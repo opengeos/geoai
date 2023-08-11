@@ -46,7 +46,7 @@ setup(
     long_description_content_type='text/markdown',
     include_package_data=True,
     keywords='geoai',
-    name='geoai',
+    name='geoai-py',
     packages=find_packages(include=['geoai', 'geoai.*']),
     setup_requires=setup_requirements,
     test_suite='tests',
