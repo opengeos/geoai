@@ -4,8 +4,8 @@
 
 To install geoai, run this command in your terminal:
 
-```
-pip install geoai
+```bash
+pip install geoai-py
 ```
 
 This is the preferred method to install geoai, as it will always install the most recent stable release.
@@ -16,6 +16,6 @@ If you don't have [pip](https://pip.pypa.io) installed, this [Python installatio
 
 To install geoai from sources, run this command in your terminal:
 
-```
+```bash
 pip install git+https://github.com/opengeos/geoai
 ```
