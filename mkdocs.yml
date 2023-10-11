@@ -47,11 +47,11 @@ plugins:
     - mkdocs-jupyter:
           include_source: True
           ignore_h1_titles: True
-          execute: True
+          execute: false
           allow_errors: false
           ignore: ["conf.py"]
           execute_ignore: ["*ignore.ipynb"]
-          
+
 markdown_extensions:
     - admonition
     - abbr
@@ -80,7 +80,18 @@ nav:
     - Changelog: changelog.md
     - Report Issues: https://github.com/opengeos/geoai/issues
     - Examples:
-        - examples/intro.ipynb
+          - examples/samgeo/satellite.ipynb
+          - examples/samgeo/automatic_mask_generator.ipynb
+          - examples/samgeo/automatic_mask_generator_hq.ipynb
+          - examples/samgeo/input_prompts.ipynb
+          - examples/samgeo/input_prompts_hq.ipynb
+          - examples/samgeo/box_prompts.ipynb
+          - examples/samgeo/text_prompts.ipynb
+          - examples/samgeo/text_prompts_batch.ipynb
+          - examples/samgeo/fast_sam.ipynb
+          - examples/samgeo/swimming_pools.ipynb
+          - examples/samgeo/arcgis.ipynb
+          - examples/samgeo/maxar_open_data.ipynb
     - API Reference:
           - geoai module: geoai.md
           - common module: common.md
