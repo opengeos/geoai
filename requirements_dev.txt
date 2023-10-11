@@ -9,4 +9,5 @@ tox
 coverage
 Sphinx
 twine
+codespell
 
