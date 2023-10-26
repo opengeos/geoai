@@ -92,6 +92,7 @@ nav:
           - examples/samgeo/swimming_pools.ipynb
           - examples/samgeo/arcgis.ipynb
           - examples/samgeo/maxar_open_data.ipynb
+          - examples/rastervision/semantic_segmentation.ipynb
     - API Reference:
           - geoai module: geoai.md
           - common module: common.md
