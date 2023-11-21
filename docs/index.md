@@ -10,5 +10,6 @@
 
 ## Features
 
+-   Visualizing geospatial data, including vector, raster, and LiDAR data
 -   Segmenting remote sensing imagery with the Segment Anything Model
 -   Classifying remote sensing imagery with deep learning models
