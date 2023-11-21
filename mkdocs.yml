@@ -93,6 +93,9 @@ nav:
           - examples/samgeo/arcgis.ipynb
           - examples/samgeo/maxar_open_data.ipynb
           - examples/rastervision/semantic_segmentation.ipynb
+          - examples/dataviz/raster_viz.ipynb
+          - examples/dataviz/vector_viz.ipynb
+          - examples/dataviz/lidar_viz.ipynb
     - API Reference:
           - geoai module: geoai.md
           - common module: common.md

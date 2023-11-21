@@ -6,6 +6,7 @@ private/
 
 # C extensions
 *.so
+**/*tif
 
 # Distribution / packaging
 .Python
