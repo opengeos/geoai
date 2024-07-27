@@ -1,0 +1,3 @@
+# segmentation module
+
+::: geoai.segmentation
