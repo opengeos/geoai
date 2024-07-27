@@ -1,13 +1,13 @@
 black
 black[jupyter]
-pip
 bump2version
-wheel
-watchdog
-flake8
-tox
-coverage
-Sphinx
-twine
 codespell
+coverage
+flake8
+pip
+Sphinx
+tox
+twine
+watchdog
+wheel
 
