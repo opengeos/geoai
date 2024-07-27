@@ -99,3 +99,4 @@ nav:
     - API Reference:
           - geoai module: geoai.md
           - common module: common.md
+          - segmentation module: segmentation.md
