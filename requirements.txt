@@ -1,5 +1,5 @@
 albumentations
-pytorch
 scikit-learn
 segment-geospatial
+torch
 transformers
