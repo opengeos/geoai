@@ -328,3 +328,22 @@ def visualize_predictions(
 
     plt.tight_layout()
     plt.show()
+
+
+# Example usage
+if __name__ == "__main__":
+    images_dir = "../datasets/Water-Bodies-Dataset/Images"
+    masks_dir = "../datasets/Water-Bodies-Dataset/Masks"
+    transform = get_transform()
+    train_dataset, val_dataset = prepare_datasets(images_dir, masks_dir, transform)
+
+    model_save_path = "./fine_tuned_model"
+    train_model(train_dataset, val_dataset, model_save_path)
+
+    image_path = "../datasets/Water-Bodies-Dataset/Images/water_body_44.jpg"
+    reference_image_path = image_path.replace("Images", "Masks")
+    segmented_mask = segment_image(image_path, model_save_path)
+
+    visualize_predictions(
+        image_path, segmented_mask, reference_image_path=reference_image_path
+    )
