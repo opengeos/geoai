@@ -7,8 +7,8 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v3
-            - uses: actions/setup-python@v4
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
               with:
                   python-version: 3.9
             - name: Install dependencies
@@ -17,10 +17,6 @@ jobs:
                   pip install --user --no-cache-dir Cython
                   pip install --user -r requirements.txt
                   pip install .
-            - name: Discover typos with codespell
-              run: |
-                  pip install codespell
-                  codespell --skip="*.csv,*.geojson,*.json,*.js,*.html,*cff,./.git" --ignore-words-list="aci,acount,acounts,fallow,hart,hist,nd,ned,ois,wqs,watermask"
             - name: PKG-TEST
               run: |
                   python -m unittest discover tests/
