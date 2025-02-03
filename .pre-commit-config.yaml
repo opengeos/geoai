@@ -12,18 +12,18 @@ repos:
         args: ["--maxkb=500"]
 
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.1.0
     hooks:
       - id: black-jupyter
         language_version: python3.11
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell
         args: ["--ignore-words-list=gis,timeseries", "--skip=*.json,*.csv"]
 
   - repo: https://github.com/kynan/nbstripout
-    rev: 0.7.1
+    rev: 0.8.1
     hooks:
       - id: nbstripout
