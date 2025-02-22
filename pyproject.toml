@@ -1,5 +1,5 @@
 [project]
-name = "geoai"
+name = "geoai-py"
 version = "0.1.4"
 dynamic = [
     "dependencies",
