@@ -1,4 +1,4 @@
-bump2version
+bump-my-version
 coverage
 flake8
 ipykernel
