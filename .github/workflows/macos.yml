@@ -27,13 +27,10 @@ jobs:
                   version: "0.4.16"
                   #   enable-cache: true
 
-            - name: Set up Python ${{ matrix.config.py }}
-              run: |
-                  uv python install ${{ matrix.config.py }}
-                  uv pip install .
-
             - name: Install dependencies
-              run: uv venv --python ${{ matrix.config.py }}
+              run: |
+                  uv venv --python ${{ matrix.config.py }}
+                  uv pip install .
 
             - name: Test import
               run: |
