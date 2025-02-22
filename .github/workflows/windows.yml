@@ -30,4 +30,4 @@ jobs:
 
             - name: Test import
               run: |
-                  uv run python -c "import goai; print('geoai import successful')"
+                  uv run python -c "import geoai; print('geoai import successful')"
