@@ -75,7 +75,7 @@ max-line-length = 88
 
 
 [project.urls]
-Homepage = "https://github.com/giswqs/geoai"
+Homepage = "https://github.com/opengeos/geoai"
 
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm>=8"]
