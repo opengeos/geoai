@@ -28,16 +28,6 @@ classifiers = [
 [project.entry-points."console_scripts"]
 geoai = "geoai.cli:main"
 
-[project.optional-dependencies]
-all = [
-    "geoai[extra]",
-]
-
-extra = [
-    "pandas",
-]
-
-
 [tool]
 [tool.setuptools.packages.find]
 include = ["geoai*"]
