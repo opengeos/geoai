@@ -925,6 +925,42 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.common.calc_stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      calc_stats()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.plot_batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      plot_batch()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.plot_images" class="md-nav__link">
+    <span class="md-ellipsis">
+      plot_images()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.plot_masks" class="md-nav__link">
+    <span class="md-ellipsis">
+      plot_masks()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.common.viz_image" class="md-nav__link">
     <span class="md-ellipsis">
       viz_image()
@@ -1016,6 +1052,42 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.common.calc_stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      calc_stats()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.plot_batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      plot_batch()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.plot_images" class="md-nav__link">
+    <span class="md-ellipsis">
+      plot_images()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.plot_masks" class="md-nav__link">
+    <span class="md-ellipsis">
+      plot_masks()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.common.viz_image" class="md-nav__link">
     <span class="md-ellipsis">
       viz_image()
@@ -1073,6 +1145,455 @@
 
 
 
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.calc_stats" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">calc_stats</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">divide_by</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.calc_stats" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Calculate the statistics (mean and std) for the entire dataset.</p>
+<p>This function is adapted from the plot_batch() function in the torchgeo library at
+https://torchgeo.readthedocs.io/en/stable/tutorials/earth_surface_water.html.
+Credit to the torchgeo developers for the original implementation.</p>
+<p>Warning: This is an approximation. The correct value should take into account the
+mean for the whole dataset for computing individual stds.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>dataset</code></td>
+        <td><code>RasterDataset</code></td>
+        <td><p>The dataset to calculate statistics for.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>divide_by</code></td>
+        <td><code>float</code></td>
+        <td><p>The value to divide the image data by. Defaults to 1.0.</p></td>
+        <td><code>1.0</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>Tuple[np.ndarray, np.ndarray]</code></td>
+      <td><p>The mean and standard deviation for each band.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calc_stats</span><span class="p">(</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">RasterDataset</span><span class="p">,</span> <span class="n">divide_by</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the statistics (mean and std) for the entire dataset.</span>
+
+<span class="sd">    This function is adapted from the plot_batch() function in the torchgeo library at</span>
+<span class="sd">    https://torchgeo.readthedocs.io/en/stable/tutorials/earth_surface_water.html.</span>
+<span class="sd">    Credit to the torchgeo developers for the original implementation.</span>
+
+<span class="sd">    Warning: This is an approximation. The correct value should take into account the</span>
+<span class="sd">    mean for the whole dataset for computing individual stds.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dataset (RasterDataset): The dataset to calculate statistics for.</span>
+<span class="sd">        divide_by (float, optional): The value to divide the image data by. Defaults to 1.0.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple[np.ndarray, np.ndarray]: The mean and standard deviation for each band.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">rasterio</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rio</span>
+
+    <span class="c1"># To avoid loading the entire dataset in memory, we will loop through each img</span>
+    <span class="c1"># The filenames will be retrieved from the dataset&#39;s rtree index</span>
+    <span class="n">files</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">item</span><span class="o">.</span><span class="n">object</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">bounds</span><span class="p">,</span> <span class="n">objects</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Resetting statistics</span>
+    <span class="n">accum_mean</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">accum_std</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+        <span class="n">img</span> <span class="o">=</span> <span class="n">rio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">file</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span> <span class="o">/</span> <span class="n">divide_by</span>  <span class="c1"># type: ignore</span>
+        <span class="n">accum_mean</span> <span class="o">+=</span> <span class="n">img</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">accum_std</span> <span class="o">+=</span> <span class="n">img</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># at the end, we shall have 2 vectors with length n=chnls</span>
+    <span class="c1"># we will average them considering the number of images</span>
+    <span class="k">return</span> <span class="n">accum_mean</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">),</span> <span class="n">accum_std</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.plot_batch" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">plot_batch</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">bright</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">cols</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">chnls</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;Blues&#39;</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.plot_batch" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Plot a batch of images and masks. This function is adapted from the plot_batch()
+function in the torchgeo library at
+https://torchgeo.readthedocs.io/en/stable/tutorials/earth_surface_water.html
+Credit to the torchgeo developers for the original implementation.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>batch</code></td>
+        <td><code>Dict[str, Any]</code></td>
+        <td><p>The batch containing images and masks.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>bright</code></td>
+        <td><code>float</code></td>
+        <td><p>The brightness factor. Defaults to 1.0.</p></td>
+        <td><code>1.0</code></td>
+      </tr>
+      <tr>
+        <td><code>cols</code></td>
+        <td><code>int</code></td>
+        <td><p>The number of columns in the plot grid. Defaults to 4.</p></td>
+        <td><code>4</code></td>
+      </tr>
+      <tr>
+        <td><code>width</code></td>
+        <td><code>int</code></td>
+        <td><p>The width of each plot. Defaults to 5.</p></td>
+        <td><code>5</code></td>
+      </tr>
+      <tr>
+        <td><code>chnls</code></td>
+        <td><code>List[int]</code></td>
+        <td><p>The channels to use for RGB. Defaults to [2, 1, 0].</p></td>
+        <td><code>[2, 1, 0]</code></td>
+      </tr>
+      <tr>
+        <td><code>cmap</code></td>
+        <td><code>str</code></td>
+        <td><p>The colormap to use for masks. Defaults to "Blues".</p></td>
+        <td><code>&#39;Blues&#39;</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>None</code></td>
+      <td><p>None</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_batch</span><span class="p">(</span>
+    <span class="n">batch</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">bright</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">cols</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
+    <span class="n">width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">chnls</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Blues&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plot a batch of images and masks. This function is adapted from the plot_batch()</span>
+<span class="sd">    function in the torchgeo library at</span>
+<span class="sd">    https://torchgeo.readthedocs.io/en/stable/tutorials/earth_surface_water.html</span>
+<span class="sd">    Credit to the torchgeo developers for the original implementation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        batch (Dict[str, Any]): The batch containing images and masks.</span>
+<span class="sd">        bright (float, optional): The brightness factor. Defaults to 1.0.</span>
+<span class="sd">        cols (int, optional): The number of columns in the plot grid. Defaults to 4.</span>
+<span class="sd">        width (int, optional): The width of each plot. Defaults to 5.</span>
+<span class="sd">        chnls (List[int], optional): The channels to use for RGB. Defaults to [2, 1, 0].</span>
+<span class="sd">        cmap (str, optional): The colormap to use for masks. Defaults to &quot;Blues&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Get the samples and the number of items in the batch</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">unbind_samples</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+
+    <span class="c1"># if batch contains images and masks, the number of images will be doubled</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span><span class="s2">&quot;image&quot;</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;mask&quot;</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">)</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+
+    <span class="c1"># calculate the number of rows in the grid</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="n">n</span> <span class="o">//</span> <span class="n">cols</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="k">if</span> <span class="n">n</span> <span class="o">%</span> <span class="n">cols</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># create a grid</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="n">cols</span> <span class="o">*</span> <span class="n">width</span><span class="p">,</span> <span class="n">rows</span> <span class="o">*</span> <span class="n">width</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="s2">&quot;image&quot;</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;mask&quot;</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">):</span>
+        <span class="c1"># plot the images on the even axis</span>
+        <span class="n">plot_images</span><span class="p">(</span>
+            <span class="n">images</span><span class="o">=</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s2">&quot;image&quot;</span><span class="p">],</span> <span class="n">samples</span><span class="p">),</span>
+            <span class="n">axs</span><span class="o">=</span><span class="n">axs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)[::</span><span class="mi">2</span><span class="p">],</span>
+            <span class="n">chnls</span><span class="o">=</span><span class="n">chnls</span><span class="p">,</span>
+            <span class="n">bright</span><span class="o">=</span><span class="n">bright</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># plot the masks on the odd axis</span>
+        <span class="n">plot_masks</span><span class="p">(</span><span class="n">masks</span><span class="o">=</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s2">&quot;mask&quot;</span><span class="p">],</span> <span class="n">samples</span><span class="p">),</span> <span class="n">axs</span><span class="o">=</span><span class="n">axs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">::</span><span class="mi">2</span><span class="p">])</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;image&quot;</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+            <span class="n">plot_images</span><span class="p">(</span>
+                <span class="n">images</span><span class="o">=</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s2">&quot;image&quot;</span><span class="p">],</span> <span class="n">samples</span><span class="p">),</span>
+                <span class="n">axs</span><span class="o">=</span><span class="n">axs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+                <span class="n">chnls</span><span class="o">=</span><span class="n">chnls</span><span class="p">,</span>
+                <span class="n">bright</span><span class="o">=</span><span class="n">bright</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="s2">&quot;mask&quot;</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+            <span class="n">plot_masks</span><span class="p">(</span>
+                <span class="n">masks</span><span class="o">=</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s2">&quot;mask&quot;</span><span class="p">],</span> <span class="n">samples</span><span class="p">),</span> <span class="n">axs</span><span class="o">=</span><span class="n">axs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cmap</span>
+            <span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.plot_images" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">plot_images</span><span class="p">(</span><span class="n">images</span><span class="p">,</span> <span class="n">axs</span><span class="p">,</span> <span class="n">chnls</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">bright</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.plot_images" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Plot a list of images.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>images</code></td>
+        <td><code>Iterable[torch.Tensor]</code></td>
+        <td><p>The images to plot.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>axs</code></td>
+        <td><code>Iterable[plt.Axes]</code></td>
+        <td><p>The axes to plot the images on.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>chnls</code></td>
+        <td><code>List[int]</code></td>
+        <td><p>The channels to use for RGB. Defaults to [2, 1, 0].</p></td>
+        <td><code>[2, 1, 0]</code></td>
+      </tr>
+      <tr>
+        <td><code>bright</code></td>
+        <td><code>float</code></td>
+        <td><p>The brightness factor. Defaults to 1.0.</p></td>
+        <td><code>1.0</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>None</code></td>
+      <td><p>None</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_images</span><span class="p">(</span>
+    <span class="n">images</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">axs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">],</span>
+    <span class="n">chnls</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="n">bright</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plot a list of images.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        images (Iterable[torch.Tensor]): The images to plot.</span>
+<span class="sd">        axs (Iterable[plt.Axes]): The axes to plot the images on.</span>
+<span class="sd">        chnls (List[int], optional): The channels to use for RGB. Defaults to [2, 1, 0].</span>
+<span class="sd">        bright (float, optional): The brightness factor. Defaults to 1.0.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">img</span><span class="p">,</span> <span class="n">ax</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">images</span><span class="p">,</span> <span class="n">axs</span><span class="p">):</span>
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">bright</span> <span class="o">*</span> <span class="n">img</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">rgb</span> <span class="o">=</span> <span class="n">arr</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)[:,</span> <span class="p">:,</span> <span class="n">chnls</span><span class="p">]</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">rgb</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.plot_masks" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">plot_masks</span><span class="p">(</span><span class="n">masks</span><span class="p">,</span> <span class="n">axs</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;Blues&#39;</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.plot_masks" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Plot a list of masks.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>masks</code></td>
+        <td><code>Iterable[torch.Tensor]</code></td>
+        <td><p>The masks to plot.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>axs</code></td>
+        <td><code>Iterable[plt.Axes]</code></td>
+        <td><p>The axes to plot the masks on.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>cmap</code></td>
+        <td><code>str</code></td>
+        <td><p>The colormap to use. Defaults to "Blues".</p></td>
+        <td><code>&#39;Blues&#39;</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>None</code></td>
+      <td><p>None</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_masks</span><span class="p">(</span>
+    <span class="n">masks</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">axs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">],</span> <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Blues&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plot a list of masks.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        masks (Iterable[torch.Tensor]): The masks to plot.</span>
+<span class="sd">        axs (Iterable[plt.Axes]): The axes to plot the masks on.</span>
+<span class="sd">        cmap (str, optional): The colormap to use. Defaults to &quot;Blues&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">mask</span><span class="p">,</span> <span class="n">ax</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">masks</span><span class="p">,</span> <span class="n">axs</span><span class="p">):</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">mask</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cmap</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
 
 
 
@@ -1186,8 +1707,6 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        None</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
         <span class="n">image</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
