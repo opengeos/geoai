@@ -1,3 +1,5 @@
+"""This module provides functions to download data, including NAIP imagery and building data from Overture Maps."""
+
 import os
 from typing import List, Tuple, Optional, Dict, Any
 import rioxarray
