@@ -74,7 +74,7 @@ def download_naip(
     items = list(search_results.items())
 
     if not items:
-        print(f"No NAIP imagery found for the specified region and parameters.")
+        print("No NAIP imagery found for the specified region and parameters.")
         return []
 
     print(f"Found {len(items)} NAIP items.")
@@ -150,7 +150,7 @@ def download_with_progress(url: str, output_path: str) -> None:
             bar.update(size)
 
 
-def preview_raster(data: Any, title: str) -> None:
+def preview_raster(data: Any, title: str = None) -> None:
     """Display a preview of the downloaded imagery.
 
     This function creates a visualization of the downloaded NAIP imagery
@@ -166,7 +166,8 @@ def preview_raster(data: Any, title: str) -> None:
 
     plt.figure(figsize=(10, 10))
     plt.imshow(rgb_data)
-    plt.title(title)
+    if title is not None:
+        plt.title(title)
     plt.axis("off")
     plt.show()
 
@@ -235,7 +236,7 @@ def download_overture_buildings(
 
     if verbose:
         logger.info(f"Running command: {' '.join(cmd)}")
-        logger.info(f"Downloading {data_type} data for area: {bbox_str}")
+        logger.info("Downloading %s data for area: %s", data_type, bbox_str)
 
     try:
         # Run the command
