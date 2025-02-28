@@ -28,6 +28,7 @@ jobs:
               run: |
                   uv venv --python ${{ matrix.python-version }}
                   uv pip install .
+                  uv pip install pystac_client planetary_computer tqdm overturemaps
 
             - name: Install optional dependencies
               run: |
