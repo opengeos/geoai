@@ -80,6 +80,7 @@ nav:
     - Changelog: changelog.md
     - Report Issues: https://github.com/opengeos/geoai/issues
     - Examples:
+          - examples/download_data.ipynb
           - examples/samgeo/satellite.ipynb
           - examples/samgeo/automatic_mask_generator.ipynb
           - examples/samgeo/automatic_mask_generator_hq.ipynb
@@ -99,4 +100,5 @@ nav:
     - API Reference:
           - geoai module: geoai.md
           - common module: common.md
+          - download module: download.md
           - segmentation module: segmentation.md
