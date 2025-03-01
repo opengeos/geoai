@@ -81,6 +81,7 @@ nav:
     - Report Issues: https://github.com/opengeos/geoai/issues
     - Examples:
           - examples/download_data.ipynb
+          - examples/data_viz.ipynb
           - examples/samgeo/satellite.ipynb
           - examples/samgeo/automatic_mask_generator.ipynb
           - examples/samgeo/automatic_mask_generator_hq.ipynb
