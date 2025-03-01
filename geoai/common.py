@@ -5,8 +5,12 @@ from collections.abc import Iterable
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, Callable
 import matplotlib.pyplot as plt
 
+import leafmap
 import torch
 import numpy as np
+import xarray as xr
+import rioxarray
+import rasterio as rio
 from torch.utils.data import DataLoader
 from torchgeo.datasets import RasterDataset, stack_samples, unbind_samples, utils
 from torchgeo.samplers import RandomGeoSampler, Units
@@ -55,9 +59,11 @@ def viz_raster(
     Returns:
         leafmap.Map: The map object with the raster layer added.
     """
-    import leafmap
 
     m = leafmap.Map(basemap=basemap)
+
+    if isinstance(source, dict):
+        source = dict_to_image(source)
 
     m.add_raster(
         source=source,
@@ -86,6 +92,7 @@ def viz_image(
     scale_factor: float = 1.0,
     figsize: Tuple[int, int] = (10, 5),
     axis_off: bool = True,
+    title: Optional[str] = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -98,6 +105,7 @@ def viz_image(
         scale_factor (float, optional): The scale factor to apply to the image. Defaults to 1.0.
         figsize (Tuple[int, int], optional): The size of the figure. Defaults to (10, 5).
         axis_off (bool, optional): Whether to turn off the axis. Defaults to True.
+        title (Optional[str], optional): The title of the plot. Defaults to None.
         **kwargs (Any): Additional keyword arguments for plt.imshow().
 
     Returns:
@@ -124,6 +132,8 @@ def viz_image(
     plt.imshow(image, **kwargs)
     if axis_off:
         plt.axis("off")
+    if title is not None:
+        plt.title(title)
     plt.show()
     plt.close()
 
@@ -277,3 +287,150 @@ def calc_stats(
     # at the end, we shall have 2 vectors with length n=chnls
     # we will average them considering the number of images
     return accum_mean / len(files), accum_std / len(files)
+
+
+def dict_to_rioxarray(data_dict: Dict) -> xr.DataArray:
+    """Convert a dictionary to a xarray DataArray. The dictionary should contain the
+    following keys: "crs", "bounds", and "image". It can be generated from a TorchGeo
+    dataset sampler.
+
+    Args:
+        data_dict (Dict): The dictionary containing the data.
+
+    Returns:
+        xr.DataArray: The xarray DataArray.
+    """
+
+    from affine import Affine
+
+    # Extract components from the dictionary
+    crs = data_dict["crs"]
+    bounds = data_dict["bounds"]
+    image_tensor = data_dict["image"]
+
+    # Convert tensor to numpy array if needed
+    if hasattr(image_tensor, "numpy"):
+        # For PyTorch tensors
+        image_array = image_tensor.numpy()
+    else:
+        # If it's already a numpy array or similar
+        image_array = np.array(image_tensor)
+
+    # Calculate pixel resolution
+    width = image_array.shape[2]  # Width is the size of the last dimension
+    height = image_array.shape[1]  # Height is the size of the middle dimension
+
+    res_x = (bounds.maxx - bounds.minx) / width
+    res_y = (bounds.maxy - bounds.miny) / height
+
+    # Create the transform matrix
+    transform = Affine(res_x, 0.0, bounds.minx, 0.0, -res_y, bounds.maxy)
+
+    # Create dimensions
+    x_coords = np.linspace(bounds.minx + res_x / 2, bounds.maxx - res_x / 2, width)
+    y_coords = np.linspace(bounds.maxy - res_y / 2, bounds.miny + res_y / 2, height)
+
+    # If time dimension exists in the bounds
+    if hasattr(bounds, "mint") and hasattr(bounds, "maxt"):
+        # Create a single time value or range if needed
+        t_coords = [
+            bounds.mint
+        ]  # Or np.linspace(bounds.mint, bounds.maxt, num_time_steps)
+
+        # Create DataArray with time dimension
+        dims = (
+            ("band", "y", "x")
+            if image_array.shape[0] <= 10
+            else ("time", "band", "y", "x")
+        )
+
+        if dims[0] == "band":
+            # For multi-band single time
+            da = xr.DataArray(
+                image_array,
+                dims=dims,
+                coords={
+                    "band": np.arange(1, image_array.shape[0] + 1),
+                    "y": y_coords,
+                    "x": x_coords,
+                },
+            )
+        else:
+            # For multi-time multi-band
+            da = xr.DataArray(
+                image_array,
+                dims=dims,
+                coords={
+                    "time": t_coords,
+                    "band": np.arange(1, image_array.shape[1] + 1),
+                    "y": y_coords,
+                    "x": x_coords,
+                },
+            )
+    else:
+        # Create DataArray without time dimension
+        da = xr.DataArray(
+            image_array,
+            dims=("band", "y", "x"),
+            coords={
+                "band": np.arange(1, image_array.shape[0] + 1),
+                "y": y_coords,
+                "x": x_coords,
+            },
+        )
+
+    # Set spatial attributes
+    da.rio.write_crs(crs, inplace=True)
+    da.rio.write_transform(transform, inplace=True)
+
+    return da
+
+
+def dict_to_image(
+    data_dict: Dict[str, Any], output: Optional[str] = None, **kwargs
+) -> rio.DatasetReader:
+    """Convert a dictionary containing spatial data to a rasterio dataset or save it to
+    a file. The dictionary should contain the following keys: "crs", "bounds", and "image".
+    It can be generated from a TorchGeo dataset sampler.
+
+    This function transforms a dictionary with CRS, bounding box, and image data
+    into a rasterio DatasetReader using leafmap's array_to_image utility after
+    first converting to a rioxarray DataArray.
+
+    Args:
+        data_dict: A dictionary containing:
+            - 'crs': A pyproj CRS object
+            - 'bounds': A BoundingBox object with minx, maxx, miny, maxy attributes
+              and optionally mint, maxt for temporal bounds
+            - 'image': A tensor or array-like object with image data
+        output: Optional path to save the image to a file. If not provided, the image
+            will be returned as a rasterio DatasetReader object.
+        **kwargs: Additional keyword arguments to pass to leafmap.array_to_image.
+            Common options include:
+            - colormap: str, name of the colormap (e.g., 'viridis', 'terrain')
+            - vmin: float, minimum value for colormap scaling
+            - vmax: float, maximum value for colormap scaling
+
+    Returns:
+        A rasterio DatasetReader object that can be used for visualization or
+        further processing.
+
+    Examples:
+        >>> image = dict_to_image(
+        ...     {'crs': CRS.from_epsg(26911), 'bounds': bbox, 'image': tensor},
+        ...     colormap='terrain'
+        ... )
+        >>> fig, ax = plt.subplots(figsize=(10, 10))
+        >>> show(image, ax=ax)
+    """
+    da = dict_to_rioxarray(data_dict)
+
+    if output is not None:
+        out_dir = os.path.abspath(os.path.dirname(output))
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+        da.rio.to_raster(output)
+        return output
+    else:
+        image = leafmap.array_to_image(da, **kwargs)
+        return image
