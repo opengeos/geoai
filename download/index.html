@@ -471,6 +471,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/data_viz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Data viz
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/samgeo/satellite/" class="md-nav__link">
         
   
@@ -1344,7 +1366,7 @@
 
 
 <h2 id="geoai.download.download_naip" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">download_naip</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_items</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">preview</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">download_naip</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">year</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_items</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">preview</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 
 <a href="#geoai.download.download_naip" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -1392,6 +1414,12 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
         <td><code>10</code></td>
       </tr>
       <tr>
+        <td><code>overwrite</code></td>
+        <td><code>bool</code></td>
+        <td><p>If True, overwrite existing files with the same name.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
         <td><code>preview</code></td>
         <td><code>bool</code></td>
         <td><p>If True, display a preview of the downloaded imagery.</p></td>
@@ -1436,6 +1464,7 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">year</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">max_items</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">preview</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
@@ -1450,6 +1479,7 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
 <span class="sd">        output_dir: Directory to save the downloaded imagery.</span>
 <span class="sd">        year: Specific year of NAIP imagery to download (e.g., 2020). If None, returns imagery from all available years.</span>
 <span class="sd">        max_items: Maximum number of items to download.</span>
+<span class="sd">        overwrite: If True, overwrite existing files with the same name.</span>
 <span class="sd">        preview: If True, display a preview of the downloaded imagery.</span>
 
 <span class="sd">    Returns:</span>
@@ -1485,6 +1515,9 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
     <span class="n">search_results</span> <span class="o">=</span> <span class="n">catalog</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="o">**</span><span class="n">search_params</span><span class="p">)</span>
     <span class="n">items</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">search_results</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
 
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_items</span><span class="p">:</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="n">items</span><span class="p">[:</span><span class="n">max_items</span><span class="p">]</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">items</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No NAIP imagery found for the specified region and parameters.&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">[]</span>
@@ -1508,6 +1541,10 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
             <span class="n">rgb_asset</span><span class="o">.</span><span class="n">href</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;?&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
         <span class="p">)</span>  <span class="c1"># Remove query parameters</span>
         <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">original_filename</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_path</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping existing file: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">downloaded_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+            <span class="k">continue</span>
 
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading item </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">original_filename</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
