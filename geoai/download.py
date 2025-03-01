@@ -26,6 +26,7 @@ def download_naip(
     output_dir: str,
     year: Optional[int] = None,
     max_items: int = 10,
+    overwrite: bool = False,
     preview: bool = False,
     **kwargs: Any,
 ) -> List[str]:
@@ -40,6 +41,7 @@ def download_naip(
         output_dir: Directory to save the downloaded imagery.
         year: Specific year of NAIP imagery to download (e.g., 2020). If None, returns imagery from all available years.
         max_items: Maximum number of items to download.
+        overwrite: If True, overwrite existing files with the same name.
         preview: If True, display a preview of the downloaded imagery.
 
     Returns:
@@ -75,6 +77,9 @@ def download_naip(
     search_results = catalog.search(**search_params)
     items = list(search_results.items())
 
+    if len(items) > max_items:
+        items = items[:max_items]
+
     if not items:
         print("No NAIP imagery found for the specified region and parameters.")
         return []
@@ -98,6 +103,10 @@ def download_naip(
             rgb_asset.href.split("?")[0]
         )  # Remove query parameters
         output_path = os.path.join(output_dir, original_filename)
+        if not overwrite and os.path.exists(output_path):
+            print(f"Skipping existing file: {output_path}")
+            downloaded_files.append(output_path)
+            continue
 
         print(f"Downloading item {i+1}/{len(items)}: {original_filename}")
 
