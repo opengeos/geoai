@@ -2,6 +2,7 @@ albumentations
 jupyter-server-proxy
 leafmap
 localtileserver
+rioxarray
 scikit-learn
 segment-geospatial
 torch
