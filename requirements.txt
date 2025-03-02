@@ -1,4 +1,5 @@
 albumentations
+huggingface_hub
 jupyter-server-proxy
 leafmap
 localtileserver

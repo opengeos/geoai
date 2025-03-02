@@ -102,4 +102,5 @@ nav:
           - geoai module: geoai.md
           - common module: common.md
           - download module: download.md
+          - extract module: extract.md
           - segmentation module: segmentation.md
