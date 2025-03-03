@@ -25,6 +25,14 @@ To install GeoAI with all optional dependencies for additional features:
 pip install "geoai-py[all]"
 ```
 
+### 🐍 Using uv
+
+To install the latest stable release of GeoAI with [uv](https://docs.astral.sh/uv), a faster alternative to pip:
+
+```bash
+uv pip install geoai-py
+```
+
 ### 🐼 Using conda
 
 For Anaconda/Miniconda users, we recommend installing GeoAI via conda-forge, which handles dependencies like GDAL more elegantly:
@@ -33,19 +41,14 @@ For Anaconda/Miniconda users, we recommend installing GeoAI via conda-forge, whi
 conda install -c conda-forge geoai
 ```
 
-Consider creating a dedicated environment for your GeoAI projects:
+### 🦡 Using mamba
+
+Mamba provides faster dependency resolution compared to conda. This is especially useful for large packages like GeoAI:
 
 ```bash
 conda create -n geo python=3.12
 conda activate geo
-conda install -c conda-forge geoai
-```
-
-### 🦡 Using mamba
-
-Mamba provides faster dependency resolution compared to conda:
-
-```bash
+conda install -c conda-forge mamba
 mamba install -c conda-forge geoai
 ```
 
