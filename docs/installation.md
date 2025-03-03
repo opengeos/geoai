@@ -64,6 +64,18 @@ mamba install -c conda-forge geoai "pytorch=*=cuda*"
 
 This will install the appropriate PyTorch version with CUDA support.
 
+If you run into issues with the ipympl package, you can install it using the following command:
+
+```bash
+mamba install -c conda-forge geoai "pytorch=*=cuda*" jupyterlab ipympl
+```
+
+If you encounter issues with the sqlite package, you can update it using the following command:
+
+```bash
+mamba update -c conda-forge sqlite
+```
+
 ### 👩‍💻 Development Installation
 
 For contributing to GeoAI development, install directly from the source repository:
