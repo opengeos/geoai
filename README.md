@@ -12,9 +12,9 @@
 
 GeoAI bridges the gap between AI and geospatial analysis, providing tools for processing, analyzing, and visualizing geospatial data using advanced machine learning techniques. Whether you're working with satellite imagery, LiDAR point clouds, or vector data, GeoAI offers intuitive interfaces to apply cutting-edge AI models.
 
-📖 **Documentation:** [https://geoai.gishub.org](https://geoai.gishub.org)
-💬 **Community:** [GitHub Discussions](https://github.com/opengeos/geoai/discussions)
-🐛 **Issue Tracker:** [GitHub Issues](https://github.com/opengeos/geoai/issues)
+-   📖 **Documentation:** [https://geoai.gishub.org](https://geoai.gishub.org)
+-   💬 **Community:** [GitHub Discussions](https://github.com/opengeos/geoai/discussions)
+-   🐛 **Issue Tracker:** [GitHub Issues](https://github.com/opengeos/geoai/issues)
 
 ## 🚀 Key Features
 
