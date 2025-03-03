@@ -103,4 +103,5 @@ nav:
           - common module: common.md
           - download module: download.md
           - extract module: extract.md
+          - proprocess module: proprocess.md
           - segmentation module: segmentation.md
