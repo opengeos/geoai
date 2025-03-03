@@ -5,8 +5,8 @@ jupyter-server-proxy
 leafmap
 localtileserver
 overturemaps
-planetary_computer
-pystac_client
+planetary-computer
+pystac-client
 rasterio
 rioxarray
 scikit-learn
