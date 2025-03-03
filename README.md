@@ -68,6 +68,12 @@ pip install geoai-py
 conda install -c conda-forge geoai
 ```
 
+### Using mamba
+
+```bash
+mamba install -c conda-forge geoai
+```
+
 ## 📋 Documentation
 
 Comprehensive documentation is available at [https://geoai.gishub.org](https://geoai.gishub.org), including:

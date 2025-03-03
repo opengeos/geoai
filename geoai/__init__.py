@@ -29,5 +29,7 @@ def set_proj_lib_path():
         return
 
 
-set_proj_lib_path()
+if "google.colab" not in sys.modules:
+    set_proj_lib_path()
+
 from .geoai import *
