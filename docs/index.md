@@ -1,4 +1,4 @@
-## GeoAI: Artificial Intelligence for Geospatial Data
+# GeoAI: Artificial Intelligence for Geospatial Data
 
 [![image](https://img.shields.io/pypi/v/geoai-py.svg)](https://pypi.python.org/pypi/geoai-py)
 [![image](https://static.pepy.tech/badge/geoai-py)](https://pepy.tech/project/geoai-py)
