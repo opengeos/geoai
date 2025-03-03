@@ -77,7 +77,7 @@ nav:
     - Usage: usage.md
     - Contributing: contributing.md
     - FAQ: faq.md
-    - Changelog: changelog.md
+    - Changelog: https://github.com/opengeos/geoai/releases
     - Report Issues: https://github.com/opengeos/geoai/issues
     - Examples:
           - examples/download_data.ipynb
