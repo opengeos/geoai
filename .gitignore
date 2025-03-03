@@ -9,6 +9,8 @@ private/
 **/*.tif
 **/*.zip
 **/*.las
+*.geojson
+docs/examples/*.md
 
 # Distribution / packaging
 .Python
