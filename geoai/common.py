@@ -621,6 +621,7 @@ def view_vector_interactive(
     import folium
     import folium.plugins as plugins
     from localtileserver import get_folium_tile_layer, TileClient
+    from leafmap import cog_tile
 
     google_tiles = {
         "Roadmap": {
@@ -656,11 +657,16 @@ def view_vector_interactive(
         elif kwargs["tiles"].lower().endswith(".tif"):
             if tiles_args is None:
                 tiles_args = {}
-            basemap_layer_name = "Local Raster"
-            client = TileClient(kwargs["tiles"])
-            raster_layer = get_folium_tile_layer(client, **tiles_args)
-            kwargs["tiles"] = raster_layer.tiles
-            kwargs["attr"] = "localtileserver"
+            if kwargs["tiles"].lower().startswith("http"):
+                basemap_layer_name = "Remote Raster"
+                kwargs["tiles"] = cog_tile(kwargs["tiles"], **tiles_args)
+                kwargs["attr"] = "TiTiler"
+            else:
+                basemap_layer_name = "Local Raster"
+                client = TileClient(kwargs["tiles"])
+                raster_layer = get_folium_tile_layer(client, **tiles_args)
+                kwargs["tiles"] = raster_layer.tiles
+                kwargs["attr"] = "localtileserver"
 
     if "max_zoom" not in kwargs:
         kwargs["max_zoom"] = 30
