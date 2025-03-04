@@ -13,6 +13,7 @@ private/
 docs/examples/*.md
 *.xml
 docs/examples/output/
+docs/examples/*.png
 
 # Distribution / packaging
 .Python

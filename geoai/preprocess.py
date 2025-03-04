@@ -115,6 +115,43 @@ def get_raster_info(raster_path):
     return info
 
 
+def get_raster_stats(raster_path, divide_by=1.0):
+    """Calculate statistics for each band in a raster dataset.
+
+    This function computes min, max, mean, and standard deviation values
+    for each band in the provided raster, returning results in a dictionary
+    with lists for each statistic type.
+
+    Args:
+        raster_path (str): Path to the raster file
+        divide_by (float, optional): Value to divide pixel values by.
+            Defaults to 1.0, which keeps the original pixel
+
+    Returns:
+        dict: Dictionary containing lists of statistics with keys:
+            - 'min': List of minimum values for each band
+            - 'max': List of maximum values for each band
+            - 'mean': List of mean values for each band
+            - 'std': List of standard deviation values for each band
+    """
+    # Initialize the results dictionary with empty lists
+    stats = {"min": [], "max": [], "mean": [], "std": []}
+
+    # Open the raster dataset
+    with rasterio.open(raster_path) as src:
+        # Calculate statistics for each band
+        for i in range(1, src.count + 1):
+            band = src.read(i, masked=True)
+
+            # Append statistics for this band to each list
+            stats["min"].append(float(band.min()) / divide_by)
+            stats["max"].append(float(band.max()) / divide_by)
+            stats["mean"].append(float(band.mean()) / divide_by)
+            stats["std"].append(float(band.std()) / divide_by)
+
+    return stats
+
+
 def print_raster_info(raster_path, show_preview=True, figsize=(10, 8)):
     """Print formatted information about a raster dataset and optionally show a preview.
 
