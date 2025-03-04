@@ -11,6 +11,8 @@ private/
 **/*.las
 *.geojson
 docs/examples/*.md
+*.xml
+docs/examples/output/
 
 # Distribution / packaging
 .Python
