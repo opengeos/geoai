@@ -493,6 +493,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/image_chips/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Image chips
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/data_visualization/" class="md-nav__link">
         
   
@@ -1062,6 +1084,24 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#geoai.common.viz_vector" class="md-nav__link">
+    <span class="md-ellipsis">
+      viz_vector()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.viz_vector_interactive" class="md-nav__link">
+    <span class="md-ellipsis">
+      viz_vector_interactive()
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1268,6 +1308,24 @@
   <a href="#geoai.common.viz_raster" class="md-nav__link">
     <span class="md-ellipsis">
       viz_raster()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.viz_vector" class="md-nav__link">
+    <span class="md-ellipsis">
+      viz_vector()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.viz_vector_interactive" class="md-nav__link">
+    <span class="md-ellipsis">
+      viz_vector_interactive()
     </span>
   </a>
   
@@ -2421,6 +2479,441 @@ Credit to the torchgeo developers for the original implementation.</p>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">m</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.viz_vector" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">viz_vector</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">edge_color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">classification</span><span class="o">=</span><span class="s1">&#39;quantiles&#39;</span><span class="p">,</span> <span class="n">n_classes</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">highlight_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">highlight_color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.viz_vector" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Visualize vector datasets with options for styling, classification, basemaps and more.</p>
+<p>This function visualizes GeoDataFrame objects with customizable symbology.
+It supports different vector types (points, lines, polygons), attribute-based
+classification, and background basemaps.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>vector_data</code></td>
+        <td><code>geopandas.GeoDataFrame</code></td>
+        <td><p>The vector dataset to visualize.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>column</code></td>
+        <td><code>str</code></td>
+        <td><p>Column to use for choropleth mapping. If None,
+a single color will be used. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>cmap</code></td>
+        <td><code>str or matplotlib.colors.Colormap</code></td>
+        <td><p>Colormap to use for
+choropleth mapping. Defaults to "viridis".</p></td>
+        <td><code>&#39;viridis&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>figsize</code></td>
+        <td><code>tuple</code></td>
+        <td><p>Figure size as (width, height) in inches.
+Defaults to (10, 10).</p></td>
+        <td><code>(10, 10)</code></td>
+      </tr>
+      <tr>
+        <td><code>title</code></td>
+        <td><code>str</code></td>
+        <td><p>Title for the plot. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>legend</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to display a legend. Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>basemap</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to add a web basemap. Requires contextily.
+Defaults to False.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
+        <td><code>alpha</code></td>
+        <td><code>float</code></td>
+        <td><p>Transparency of the vector features, between 0-1.
+Defaults to 0.7.</p></td>
+        <td><code>0.7</code></td>
+      </tr>
+      <tr>
+        <td><code>edge_color</code></td>
+        <td><code>str</code></td>
+        <td><p>Color for feature edges. Defaults to "black".</p></td>
+        <td><code>&#39;black&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>classification</code></td>
+        <td><code>str</code></td>
+        <td><p>Classification method for choropleth maps.
+Options: "quantiles", "equal_interval", "natural_breaks".
+Defaults to "quantiles".</p></td>
+        <td><code>&#39;quantiles&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>n_classes</code></td>
+        <td><code>int</code></td>
+        <td><p>Number of classes for choropleth maps.
+Defaults to 5.</p></td>
+        <td><code>5</code></td>
+      </tr>
+      <tr>
+        <td><code>highlight_index</code></td>
+        <td><code>list</code></td>
+        <td><p>List of indices to highlight.
+Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>highlight_color</code></td>
+        <td><code>str</code></td>
+        <td><p>Color to use for highlighted features.
+Defaults to "red".</p></td>
+        <td><code>&#39;red&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>scheme</code></td>
+        <td><code>str</code></td>
+        <td><p>MapClassify classification scheme. Overrides
+classification parameter if provided. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>save_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to save the figure. If None, the figure
+is not saved. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>dpi</code></td>
+        <td><code>int</code></td>
+        <td><p>DPI for saved figure. Defaults to 300.</p></td>
+        <td><code>300</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>matplotlib.axes.Axes</code></td>
+      <td><p>The Axes object containing the plot.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Examples:</strong></p>
+    <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">cities</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;cities.shp&quot;</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector</span><span class="p">(</span><span class="n">cities</span><span class="p">,</span> <span class="s2">&quot;population&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;Reds&quot;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+    <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">roads</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;roads.shp&quot;</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector</span><span class="p">(</span><span class="n">roads</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+</code></pre></div>
+
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">viz_vector</span><span class="p">(</span>
+    <span class="n">vector_data</span><span class="p">,</span>
+    <span class="n">column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">,</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+    <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">basemap</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>
+    <span class="n">edge_color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+    <span class="n">classification</span><span class="o">=</span><span class="s2">&quot;quantiles&quot;</span><span class="p">,</span>
+    <span class="n">n_classes</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">highlight_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">highlight_color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span>
+    <span class="n">scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">save_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Visualize vector datasets with options for styling, classification, basemaps and more.</span>
+
+<span class="sd">    This function visualizes GeoDataFrame objects with customizable symbology.</span>
+<span class="sd">    It supports different vector types (points, lines, polygons), attribute-based</span>
+<span class="sd">    classification, and background basemaps.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.</span>
+<span class="sd">        column (str, optional): Column to use for choropleth mapping. If None,</span>
+<span class="sd">            a single color will be used. Defaults to None.</span>
+<span class="sd">        cmap (str or matplotlib.colors.Colormap, optional): Colormap to use for</span>
+<span class="sd">            choropleth mapping. Defaults to &quot;viridis&quot;.</span>
+<span class="sd">        figsize (tuple, optional): Figure size as (width, height) in inches.</span>
+<span class="sd">            Defaults to (10, 10).</span>
+<span class="sd">        title (str, optional): Title for the plot. Defaults to None.</span>
+<span class="sd">        legend (bool, optional): Whether to display a legend. Defaults to True.</span>
+<span class="sd">        basemap (bool, optional): Whether to add a web basemap. Requires contextily.</span>
+<span class="sd">            Defaults to False.</span>
+<span class="sd">        alpha (float, optional): Transparency of the vector features, between 0-1.</span>
+<span class="sd">            Defaults to 0.7.</span>
+<span class="sd">        edge_color (str, optional): Color for feature edges. Defaults to &quot;black&quot;.</span>
+<span class="sd">        classification (str, optional): Classification method for choropleth maps.</span>
+<span class="sd">            Options: &quot;quantiles&quot;, &quot;equal_interval&quot;, &quot;natural_breaks&quot;.</span>
+<span class="sd">            Defaults to &quot;quantiles&quot;.</span>
+<span class="sd">        n_classes (int, optional): Number of classes for choropleth maps.</span>
+<span class="sd">            Defaults to 5.</span>
+<span class="sd">        highlight_index (list, optional): List of indices to highlight.</span>
+<span class="sd">            Defaults to None.</span>
+<span class="sd">        highlight_color (str, optional): Color to use for highlighted features.</span>
+<span class="sd">            Defaults to &quot;red&quot;.</span>
+<span class="sd">        scheme (str, optional): MapClassify classification scheme. Overrides</span>
+<span class="sd">            classification parameter if provided. Defaults to None.</span>
+<span class="sd">        save_path (str, optional): Path to save the figure. If None, the figure</span>
+<span class="sd">            is not saved. Defaults to None.</span>
+<span class="sd">        dpi (int, optional): DPI for saved figure. Defaults to 300.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        matplotlib.axes.Axes: The Axes object containing the plot.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; import geopandas as gpd</span>
+<span class="sd">        &gt;&gt;&gt; cities = gpd.read_file(&quot;cities.shp&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; viz_vector(cities, &quot;population&quot;, cmap=&quot;Reds&quot;, basemap=True)</span>
+
+<span class="sd">        &gt;&gt;&gt; roads = gpd.read_file(&quot;roads.shp&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; viz_vector(roads, &quot;type&quot;, basemap=True, figsize=(12, 8))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">contextily</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ctx</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">vector_data</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">vector_data</span><span class="p">)</span>
+
+    <span class="c1"># Check if input is a GeoDataFrame</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Input data must be a GeoDataFrame&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Make a copy to avoid changing the original data</span>
+    <span class="n">gdf</span> <span class="o">=</span> <span class="n">vector_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Set up figure and axis</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span>
+
+    <span class="c1"># Determine geometry type</span>
+    <span class="n">geom_type</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">geom_type</span>
+
+    <span class="c1"># Plotting parameters</span>
+    <span class="n">plot_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;alpha&quot;</span><span class="p">:</span> <span class="n">alpha</span><span class="p">,</span> <span class="s2">&quot;ax&quot;</span><span class="p">:</span> <span class="n">ax</span><span class="p">}</span>
+
+    <span class="c1"># Set up keyword arguments based on geometry type</span>
+    <span class="k">if</span> <span class="s2">&quot;Point&quot;</span> <span class="ow">in</span> <span class="n">geom_type</span><span class="p">:</span>
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;markersize&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">50</span>
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;edgecolor&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">edge_color</span>
+    <span class="k">elif</span> <span class="s2">&quot;Line&quot;</span> <span class="ow">in</span> <span class="n">geom_type</span><span class="p">:</span>
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;linewidth&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">elif</span> <span class="s2">&quot;Polygon&quot;</span> <span class="ow">in</span> <span class="n">geom_type</span><span class="p">:</span>
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;edgecolor&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">edge_color</span>
+
+    <span class="c1"># Classification options</span>
+    <span class="k">if</span> <span class="n">column</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">scheme</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Use mapclassify scheme if provided</span>
+            <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;scheme&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">scheme</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Use classification parameter</span>
+            <span class="k">if</span> <span class="n">classification</span> <span class="o">==</span> <span class="s2">&quot;quantiles&quot;</span><span class="p">:</span>
+                <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;scheme&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;quantiles&quot;</span>
+            <span class="k">elif</span> <span class="n">classification</span> <span class="o">==</span> <span class="s2">&quot;equal_interval&quot;</span><span class="p">:</span>
+                <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;scheme&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;equal_interval&quot;</span>
+            <span class="k">elif</span> <span class="n">classification</span> <span class="o">==</span> <span class="s2">&quot;natural_breaks&quot;</span><span class="p">:</span>
+                <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;scheme&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;fisher_jenks&quot;</span>
+
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">n_classes</span>
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;cmap&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cmap</span>
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">column</span>
+        <span class="n">plot_kwargs</span><span class="p">[</span><span class="s2">&quot;legend&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">legend</span>
+
+    <span class="c1"># Plot the main data</span>
+    <span class="n">gdf</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="o">**</span><span class="n">plot_kwargs</span><span class="p">)</span>
+
+    <span class="c1"># Highlight specific features if requested</span>
+    <span class="k">if</span> <span class="n">highlight_index</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">highlight_index</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+            <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">highlight_color</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">5</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Add basemap if requested</span>
+    <span class="k">if</span> <span class="n">basemap</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">add_basemap</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="n">gdf</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">providers</span><span class="o">.</span><span class="n">OpenStreetMap</span><span class="o">.</span><span class="n">Mapnik</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not add basemap: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Set title if provided</span>
+    <span class="k">if</span> <span class="n">title</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+
+    <span class="c1"># Remove axes if not needed</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_axis_off</span><span class="p">()</span>
+
+    <span class="c1"># Adjust layout</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+
+    <span class="c1"># Save figure if a path is provided</span>
+    <span class="k">if</span> <span class="n">save_path</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="n">dpi</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ax</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.viz_vector_interactive" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">viz_vector_interactive</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.viz_vector_interactive" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Visualize vector datasets with options for styling, classification, basemaps and more.</p>
+<p>This function visualizes GeoDataFrame objects with customizable symbology.
+It supports different vector types (points, lines, polygons), attribute-based
+classification, and background basemaps.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>vector_data</code></td>
+        <td><code>geopandas.GeoDataFrame</code></td>
+        <td><p>The vector dataset to visualize.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>**kwargs</code></td>
+        <td></td>
+        <td><p>Additional keyword arguments to pass to GeoDataFrame.explore() function.</p></td>
+        <td><code>{}</code></td>
+      </tr>
+      <tr>
+        <td><code>See</code></td>
+        <td><code>https</code></td>
+        <td><p>//geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html</p></td>
+        <td><em>required</em></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>folium.Map</code></td>
+      <td><p>The map object with the vector data added.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Examples:</strong></p>
+    <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">cities</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;cities.shp&quot;</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector_interactive</span><span class="p">(</span><span class="n">cities</span><span class="p">)</span>
+</code></pre></div>
+    <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">roads</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;roads.shp&quot;</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector_interactive</span><span class="p">(</span><span class="n">roads</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+</code></pre></div>
+
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">viz_vector_interactive</span><span class="p">(</span>
+    <span class="n">vector_data</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Visualize vector datasets with options for styling, classification, basemaps and more.</span>
+
+<span class="sd">    This function visualizes GeoDataFrame objects with customizable symbology.</span>
+<span class="sd">    It supports different vector types (points, lines, polygons), attribute-based</span>
+<span class="sd">    classification, and background basemaps.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.</span>
+<span class="sd">        **kwargs: Additional keyword arguments to pass to GeoDataFrame.explore() function.</span>
+<span class="sd">        See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        folium.Map: The map object with the vector data added.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; import geopandas as gpd</span>
+<span class="sd">        &gt;&gt;&gt; cities = gpd.read_file(&quot;cities.shp&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; viz_vector_interactive(cities)</span>
+
+<span class="sd">        &gt;&gt;&gt; roads = gpd.read_file(&quot;roads.shp&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; viz_vector_interactive(roads, figsize=(12, 8))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">vector_data</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">vector_data</span><span class="p">)</span>
+
+    <span class="c1"># Check if input is a GeoDataFrame</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Input data must be a GeoDataFrame&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">vector_data</span><span class="o">.</span><span class="n">explore</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div>
         </details>
     </div>
