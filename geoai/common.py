@@ -17,7 +17,7 @@ from torchgeo.samplers import RandomGeoSampler, Units
 from torchgeo.transforms import indices
 
 
-def viz_raster(
+def view_raster(
     source: str,
     indexes: Optional[int] = None,
     colormap: Optional[str] = None,
@@ -85,7 +85,7 @@ def viz_raster(
     return m
 
 
-def viz_image(
+def view_image(
     image: Union[np.ndarray, torch.Tensor],
     transpose: bool = False,
     bdx: Optional[int] = None,
@@ -438,7 +438,7 @@ def dict_to_image(
         return image
 
 
-def viz_vector(
+def view_vector(
     vector_data,
     column=None,
     cmap="viridis",
@@ -499,10 +499,10 @@ def viz_vector(
     Examples:
         >>> import geopandas as gpd
         >>> cities = gpd.read_file("cities.shp")
-        >>> viz_vector(cities, "population", cmap="Reds", basemap=True)
+        >>> view_vector(cities, "population", cmap="Reds", basemap=True)
 
         >>> roads = gpd.read_file("roads.shp")
-        >>> viz_vector(roads, "type", basemap=True, figsize=(12, 8))
+        >>> view_vector(roads, "type", basemap=True, figsize=(12, 8))
     """
     import contextily as ctx
 
@@ -586,7 +586,7 @@ def viz_vector(
     return ax
 
 
-def viz_vector_interactive(
+def view_vector_interactive(
     vector_data,
     **kwargs,
 ):
@@ -608,10 +608,10 @@ def viz_vector_interactive(
     Examples:
         >>> import geopandas as gpd
         >>> cities = gpd.read_file("cities.shp")
-        >>> viz_vector_interactive(cities)
+        >>> view_vector_interactive(cities)
 
         >>> roads = gpd.read_file("roads.shp")
-        >>> viz_vector_interactive(roads, figsize=(12, 8))
+        >>> view_vector_interactive(roads, figsize=(12, 8))
     """
     if isinstance(vector_data, str):
         vector_data = gpd.read_file(vector_data)
