@@ -55,6 +55,8 @@ plugins:
                   "examples/dataviz/*.ipynb",
                   "examples/rastervision/*.ipynb",
                   "examples/samgeo/*.ipynb",
+                  "examples/data_visualization.ipynb",
+                  "examples/download_data.ipynb",
               ]
 
 markdown_extensions:
