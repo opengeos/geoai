@@ -198,7 +198,7 @@ class BuildingFootprintExtractor:
 
             # Define the repository ID and model filename
             repo_id = "giswqs/geoai"  # Update with your actual username/repo
-            filename = "usa_building_footprints.pth"
+            filename = "building_footprints_usa.pth"
 
             # Ensure cache directory exists
             # cache_dir = os.path.join(
@@ -718,7 +718,7 @@ class BuildingFootprintExtractor:
         if "confidence" in gdf.columns:
             # Create a colorbar legend
             sm = plt.cm.ScalarMappable(
-                cmap=plt.cm.viridis,
+                cmap=plt.get_cmap("viridis"),
                 norm=plt.Normalize(gdf.confidence.min(), gdf.confidence.max()),
             )
             sm.set_array([])
