@@ -515,6 +515,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/building_footprints_usa/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building footprints usa
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/data_visualization/" class="md-nav__link">
         
   
@@ -1867,7 +1889,7 @@ BuildingFootprintExtractor        </code>
 
             <span class="c1"># Define the repository ID and model filename</span>
             <span class="n">repo_id</span> <span class="o">=</span> <span class="s2">&quot;giswqs/geoai&quot;</span>  <span class="c1"># Update with your actual username/repo</span>
-            <span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;usa_building_footprints.pth&quot;</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;building_footprints_usa.pth&quot;</span>
 
             <span class="c1"># Ensure cache directory exists</span>
             <span class="c1"># cache_dir = os.path.join(</span>
@@ -2387,7 +2409,7 @@ BuildingFootprintExtractor        </code>
         <span class="k">if</span> <span class="s2">&quot;confidence&quot;</span> <span class="ow">in</span> <span class="n">gdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
             <span class="c1"># Create a colorbar legend</span>
             <span class="n">sm</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">ScalarMappable</span><span class="p">(</span>
-                <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">viridis</span><span class="p">,</span>
+                <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">get_cmap</span><span class="p">(</span><span class="s2">&quot;viridis&quot;</span><span class="p">),</span>
                 <span class="n">norm</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">gdf</span><span class="o">.</span><span class="n">confidence</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">gdf</span><span class="o">.</span><span class="n">confidence</span><span class="o">.</span><span class="n">max</span><span class="p">()),</span>
             <span class="p">)</span>
             <span class="n">sm</span><span class="o">.</span><span class="n">set_array</span><span class="p">([])</span>
@@ -3067,7 +3089,7 @@ simplify_tolerance: Tolerance for polygon simplification</p></td>
     <span class="k">if</span> <span class="s2">&quot;confidence&quot;</span> <span class="ow">in</span> <span class="n">gdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
         <span class="c1"># Create a colorbar legend</span>
         <span class="n">sm</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">ScalarMappable</span><span class="p">(</span>
-            <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">viridis</span><span class="p">,</span>
+            <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">get_cmap</span><span class="p">(</span><span class="s2">&quot;viridis&quot;</span><span class="p">),</span>
             <span class="n">norm</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">gdf</span><span class="o">.</span><span class="n">confidence</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">gdf</span><span class="o">.</span><span class="n">confidence</span><span class="o">.</span><span class="n">max</span><span class="p">()),</span>
         <span class="p">)</span>
         <span class="n">sm</span><span class="o">.</span><span class="n">set_array</span><span class="p">([])</span>
