@@ -589,6 +589,7 @@ def view_vector(
 def view_vector_interactive(
     vector_data,
     layer_name="Vector Layer",
+    tiles_args=None,
     **kwargs,
 ):
     """
@@ -601,6 +602,8 @@ def view_vector_interactive(
     Args:
         vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.
         layer_name (str, optional): The name of the layer. Defaults to "Vector Layer".
+        tiles_args (dict, optional): Additional arguments for the localtileserver client.
+            get_folium_tile_layer function. Defaults to None.
         **kwargs: Additional keyword arguments to pass to GeoDataFrame.explore() function.
         See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html
 
@@ -617,6 +620,7 @@ def view_vector_interactive(
     """
     import folium
     import folium.plugins as plugins
+    from localtileserver import get_folium_tile_layer, TileClient
 
     google_tiles = {
         "Roadmap": {
@@ -642,12 +646,21 @@ def view_vector_interactive(
     }
 
     basemap_layer_name = None
+    raster_layer = None
 
-    if "tiles" in kwargs:
-        if isinstance(kwargs["tiles"], str) and kwargs["tiles"].title() in google_tiles:
+    if "tiles" in kwargs and isinstance(kwargs["tiles"], str):
+        if kwargs["tiles"].title() in google_tiles:
             basemap_layer_name = google_tiles[kwargs["tiles"].title()]["name"]
             kwargs["tiles"] = google_tiles[kwargs["tiles"].title()]["url"]
             kwargs["attr"] = "Google"
+        elif kwargs["tiles"].lower().endswith(".tif"):
+            if tiles_args is None:
+                tiles_args = {}
+            basemap_layer_name = "Local Raster"
+            client = TileClient(kwargs["tiles"])
+            raster_layer = get_folium_tile_layer(client, **tiles_args)
+            kwargs["tiles"] = raster_layer.tiles
+            kwargs["attr"] = "localtileserver"
 
     if "max_zoom" not in kwargs:
         kwargs["max_zoom"] = 30
