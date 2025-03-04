@@ -478,9 +478,12 @@ class BuildingFootprintExtractor:
         mask_threshold=None,
         small_building_area=None,
         nms_iou_threshold=None,
+        regularize=True,
+        angle_threshold=15,
+        rectangularity_threshold=0.7,
     ):
         """
-        Convert a building mask GeoTIFF to vector polygons and save as a vector dataset.
+        Convert a building mask GeoTIFF to vector polygons and save as GeoJSON.
 
         Args:
             mask_path: Path to the building masks GeoTIFF
@@ -489,6 +492,9 @@ class BuildingFootprintExtractor:
             mask_threshold: Threshold for mask binarization (default: self.mask_threshold)
             small_building_area: Minimum area in pixels to keep a building (default: self.small_building_area)
             nms_iou_threshold: IoU threshold for non-maximum suppression (default: self.nms_iou_threshold)
+            regularize: Whether to regularize buildings to right angles (default: True)
+            angle_threshold: Maximum deviation from 90 degrees for regularization (default: 15)
+            rectangularity_threshold: Threshold for rectangle simplification (default: 0.7)
 
         Returns:
             GeoDataFrame with building footprints
@@ -522,6 +528,10 @@ class BuildingFootprintExtractor:
         print(f"- Min building area: {small_building_area}")
         print(f"- Simplify tolerance: {simplify_tolerance}")
         print(f"- NMS IoU threshold: {nms_iou_threshold}")
+        print(f"- Regularize buildings: {regularize}")
+        if regularize:
+            print(f"- Angle threshold: {angle_threshold}° from 90°")
+            print(f"- Rectangularity threshold: {rectangularity_threshold*100}%")
 
         # Open the mask raster
         with rasterio.open(mask_path) as src:
@@ -627,10 +637,34 @@ class BuildingFootprintExtractor:
                 gdf, nms_iou_threshold=nms_iou_threshold
             )
 
-            print(f"Final building count after filtering: {len(gdf)}")
+            print(f"Building count after NMS filtering: {len(gdf)}")
+
+            # Apply regularization if requested
+            if regularize and len(gdf) > 0:
+                # Convert pixel area to geographic units for min_area parameter
+                # Estimate pixel size in geographic units
+                with rasterio.open(mask_path) as src:
+                    pixel_size_x = src.transform[
+                        0
+                    ]  # width of a pixel in geographic units
+                    pixel_size_y = abs(
+                        src.transform[4]
+                    )  # height of a pixel in geographic units
+                    avg_pixel_area = pixel_size_x * pixel_size_y
+
+                # Use 10 pixels as minimum area in geographic units
+                min_geo_area = 10 * avg_pixel_area
+
+                # Regularize buildings
+                gdf = self.regularize_buildings(
+                    gdf,
+                    min_area=min_geo_area,
+                    angle_threshold=angle_threshold,
+                    rectangularity_threshold=rectangularity_threshold,
+                )
 
             # Save to file
-            if output_path is not None:
+            if output_path:
                 gdf.to_file(output_path)
                 print(f"Saved {len(gdf)} building footprints to {output_path}")
 
@@ -1106,6 +1140,221 @@ class BuildingFootprintExtractor:
 
         print(f"Building masks saved to {output_path}")
         return output_path
+
+    def regularize_buildings(
+        self,
+        gdf,
+        min_area=10,
+        angle_threshold=15,
+        orthogonality_threshold=0.3,
+        rectangularity_threshold=0.7,
+    ):
+        """
+        Regularize building footprints to enforce right angles and rectangular shapes.
+
+        Args:
+            gdf: GeoDataFrame with building footprints
+            min_area: Minimum area in square units to keep a building
+            angle_threshold: Maximum deviation from 90 degrees to consider an angle as orthogonal (degrees)
+            orthogonality_threshold: Percentage of angles that must be orthogonal for a building to be regularized
+            rectangularity_threshold: Minimum area ratio to building's oriented bounding box for rectangular simplification
+
+        Returns:
+            GeoDataFrame with regularized building footprints
+        """
+        import numpy as np
+        from shapely.geometry import Polygon, MultiPolygon, box
+        from shapely.affinity import rotate, translate
+        import geopandas as gpd
+        import math
+        from tqdm import tqdm
+        import cv2
+
+        def get_angle(p1, p2, p3):
+            """Calculate angle between three points in degrees (0-180)"""
+            a = np.array(p1)
+            b = np.array(p2)
+            c = np.array(p3)
+
+            ba = a - b
+            bc = c - b
+
+            cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+            # Handle numerical errors that could push cosine outside [-1, 1]
+            cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
+            angle = np.degrees(np.arccos(cosine_angle))
+
+            return angle
+
+        def is_orthogonal(angle, threshold=angle_threshold):
+            """Check if angle is close to 90 degrees"""
+            return abs(angle - 90) <= threshold
+
+        def calculate_dominant_direction(polygon):
+            """Find the dominant direction of a polygon using PCA"""
+            # Extract coordinates
+            coords = np.array(polygon.exterior.coords)
+
+            # Mean center the coordinates
+            mean = np.mean(coords, axis=0)
+            centered_coords = coords - mean
+
+            # Calculate covariance matrix and its eigenvalues/eigenvectors
+            cov_matrix = np.cov(centered_coords.T)
+            eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
+
+            # Get the index of the largest eigenvalue
+            largest_idx = np.argmax(eigenvalues)
+
+            # Get the corresponding eigenvector (principal axis)
+            principal_axis = eigenvectors[:, largest_idx]
+
+            # Calculate the angle in degrees
+            angle_rad = np.arctan2(principal_axis[1], principal_axis[0])
+            angle_deg = np.degrees(angle_rad)
+
+            # Normalize to range 0-180
+            if angle_deg < 0:
+                angle_deg += 180
+
+            return angle_deg
+
+        def create_oriented_envelope(polygon, angle_deg):
+            """Create an oriented minimum area rectangle for the polygon"""
+            # Create a rotated rectangle using OpenCV method (more robust than Shapely methods)
+            coords = np.array(polygon.exterior.coords)[:-1].astype(
+                np.float32
+            )  # Skip the last point (same as first)
+
+            # Use OpenCV's minAreaRect
+            rect = cv2.minAreaRect(coords)
+            box_points = cv2.boxPoints(rect)
+
+            # Convert to shapely polygon
+            oriented_box = Polygon(box_points)
+
+            return oriented_box
+
+        def get_rectangularity(polygon, oriented_box):
+            """Calculate the rectangularity (area ratio to its oriented bounding box)"""
+            if oriented_box.area == 0:
+                return 0
+            return polygon.area / oriented_box.area
+
+        def check_orthogonality(polygon):
+            """Check what percentage of angles in the polygon are orthogonal"""
+            coords = list(polygon.exterior.coords)
+            if len(coords) <= 4:  # Triangle or point
+                return 0
+
+            # Remove last point (same as first)
+            coords = coords[:-1]
+
+            orthogonal_count = 0
+            total_angles = len(coords)
+
+            for i in range(total_angles):
+                p1 = coords[i]
+                p2 = coords[(i + 1) % total_angles]
+                p3 = coords[(i + 2) % total_angles]
+
+                angle = get_angle(p1, p2, p3)
+                if is_orthogonal(angle):
+                    orthogonal_count += 1
+
+            return orthogonal_count / total_angles
+
+        def simplify_to_rectangle(polygon):
+            """Simplify a polygon to a rectangle using its oriented bounding box"""
+            # Get dominant direction
+            angle = calculate_dominant_direction(polygon)
+
+            # Create oriented envelope
+            rect = create_oriented_envelope(polygon, angle)
+
+            return rect
+
+        if gdf is None or len(gdf) == 0:
+            print("No buildings to regularize")
+            return gdf
+
+        print(f"Regularizing {len(gdf)} building footprints...")
+        print(f"- Angle threshold: {angle_threshold}° from 90°")
+        print(f"- Min orthogonality: {orthogonality_threshold*100}% of angles")
+        print(
+            f"- Min rectangularity: {rectangularity_threshold*100}% of bounding box area"
+        )
+
+        # Create a copy to avoid modifying the original
+        result_gdf = gdf.copy()
+
+        # Track statistics
+        total_buildings = len(gdf)
+        regularized_count = 0
+        rectangularized_count = 0
+
+        # Process each building
+        for idx, row in tqdm(gdf.iterrows(), total=len(gdf)):
+            geom = row.geometry
+
+            # Skip invalid or empty geometries
+            if geom is None or geom.is_empty:
+                continue
+
+            # Handle MultiPolygons by processing the largest part
+            if isinstance(geom, MultiPolygon):
+                areas = [p.area for p in geom.geoms]
+                if not areas:
+                    continue
+                geom = list(geom.geoms)[np.argmax(areas)]
+
+            # Filter out tiny buildings
+            if geom.area < min_area:
+                continue
+
+            # Check orthogonality
+            orthogonality = check_orthogonality(geom)
+
+            # Create oriented envelope
+            oriented_box = create_oriented_envelope(
+                geom, calculate_dominant_direction(geom)
+            )
+
+            # Check rectangularity
+            rectangularity = get_rectangularity(geom, oriented_box)
+
+            # Decide how to regularize
+            if rectangularity >= rectangularity_threshold:
+                # Building is already quite rectangular, simplify to a rectangle
+                result_gdf.at[idx, "geometry"] = oriented_box
+                result_gdf.at[idx, "regularized"] = "rectangle"
+                rectangularized_count += 1
+            elif orthogonality >= orthogonality_threshold:
+                # Building has many orthogonal angles but isn't rectangular
+                # Could implement more sophisticated regularization here
+                # For now, we'll still use the oriented rectangle
+                result_gdf.at[idx, "geometry"] = oriented_box
+                result_gdf.at[idx, "regularized"] = "orthogonal"
+                regularized_count += 1
+            else:
+                # Building doesn't have clear orthogonal structure
+                # Keep original but flag as unmodified
+                result_gdf.at[idx, "regularized"] = "original"
+
+        # Report statistics
+        print(f"Regularization completed:")
+        print(f"- Total buildings: {total_buildings}")
+        print(
+            f"- Rectangular buildings: {rectangularized_count} ({rectangularized_count/total_buildings*100:.1f}%)"
+        )
+        print(
+            f"- Other regularized buildings: {regularized_count} ({regularized_count/total_buildings*100:.1f}%)"
+        )
+        print(
+            f"- Unmodified buildings: {total_buildings-rectangularized_count-regularized_count} ({(total_buildings-rectangularized_count-regularized_count)/total_buildings*100:.1f}%)"
+        )
+
+        return result_gdf
 
     def visualize_results(
         self, raster_path, gdf=None, output_path=None, figsize=(12, 12)
