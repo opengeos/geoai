@@ -520,6 +520,193 @@ def visualize_vector_by_attribute(
         print(f"Error visualizing data: {str(e)}")
 
 
+def clip_raster_by_bbox(
+    input_raster, output_raster, bbox, bands=None, bbox_type="geo", bbox_crs=None
+):
+    """
+    Clip a raster dataset using a bounding box and optionally select specific bands.
+
+    Args:
+        input_raster (str): Path to the input raster file.
+        output_raster (str): Path where the clipped raster will be saved.
+        bbox (tuple): Bounding box coordinates either as:
+                     - Geographic coordinates (minx, miny, maxx, maxy) if bbox_type="geo"
+                     - Pixel indices (min_row, min_col, max_row, max_col) if bbox_type="pixel"
+        bands (list, optional): List of band indices to keep (1-based indexing).
+                               If None, all bands will be kept.
+        bbox_type (str, optional): Type of bounding box coordinates. Either "geo" for
+                                  geographic coordinates or "pixel" for row/column indices.
+                                  Default is "geo".
+        bbox_crs (str or dict, optional): CRS of the bbox if different from the raster CRS.
+                                         Can be provided as EPSG code (e.g., "EPSG:4326") or
+                                         as a proj4 string. Only applies when bbox_type="geo".
+                                         If None, assumes bbox is in the same CRS as the raster.
+
+    Returns:
+        str: Path to the clipped output raster.
+
+    Raises:
+        ImportError: If required dependencies are not installed.
+        ValueError: If the bbox is invalid, bands are out of range, or bbox_type is invalid.
+        RuntimeError: If the clipping operation fails.
+
+    Examples:
+        # Clip using geographic coordinates in the same CRS as the raster
+        >>> clip_raster_by_bbox('input.tif', 'clipped_geo.tif', (100, 200, 300, 400))
+        'clipped_geo.tif'
+
+        # Clip using WGS84 coordinates when the raster is in a different CRS
+        >>> clip_raster_by_bbox('input.tif', 'clipped_wgs84.tif', (-122.5, 37.7, -122.4, 37.8),
+        ...                     bbox_crs="EPSG:4326")
+        'clipped_wgs84.tif'
+
+        # Clip using row/column indices
+        >>> clip_raster_by_bbox('input.tif', 'clipped_pixel.tif', (50, 100, 150, 200),
+        ...                     bbox_type="pixel")
+        'clipped_pixel.tif'
+
+        # Clip with band selection
+        >>> clip_raster_by_bbox('input.tif', 'clipped_bands.tif', (100, 200, 300, 400),
+        ...                     bands=[1, 3])
+        'clipped_bands.tif'
+    """
+    from rasterio.transform import from_bounds
+    from rasterio.warp import transform_bounds
+
+    # Validate bbox_type
+    if bbox_type not in ["geo", "pixel"]:
+        raise ValueError("bbox_type must be either 'geo' or 'pixel'")
+
+    # Validate bbox
+    if len(bbox) != 4:
+        raise ValueError("bbox must contain exactly 4 values")
+
+    # Open the source raster
+    with rasterio.open(input_raster) as src:
+        # Get the source CRS
+        src_crs = src.crs
+
+        # Handle different bbox types
+        if bbox_type == "geo":
+            minx, miny, maxx, maxy = bbox
+
+            # Validate geographic bbox
+            if minx >= maxx or miny >= maxy:
+                raise ValueError(
+                    "Invalid geographic bbox. Expected (minx, miny, maxx, maxy) where minx < maxx and miny < maxy"
+                )
+
+            # If bbox_crs is provided and different from the source CRS, transform the bbox
+            if bbox_crs is not None and bbox_crs != src_crs:
+                try:
+                    # Transform bbox coordinates from bbox_crs to src_crs
+                    minx, miny, maxx, maxy = transform_bounds(
+                        bbox_crs, src_crs, minx, miny, maxx, maxy
+                    )
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to transform bbox from {bbox_crs} to {src_crs}: {str(e)}"
+                    )
+
+            # Calculate the pixel window from geographic coordinates
+            window = src.window(minx, miny, maxx, maxy)
+
+            # Use the same bounds for the output transform
+            output_bounds = (minx, miny, maxx, maxy)
+
+        else:  # bbox_type == "pixel"
+            min_row, min_col, max_row, max_col = bbox
+
+            # Validate pixel bbox
+            if min_row >= max_row or min_col >= max_col:
+                raise ValueError(
+                    "Invalid pixel bbox. Expected (min_row, min_col, max_row, max_col) where min_row < max_row and min_col < max_col"
+                )
+
+            if (
+                min_row < 0
+                or min_col < 0
+                or max_row > src.height
+                or max_col > src.width
+            ):
+                raise ValueError(
+                    f"Pixel indices out of bounds. Raster dimensions are {src.height} rows x {src.width} columns"
+                )
+
+            # Create a window from pixel coordinates
+            window = Window(min_col, min_row, max_col - min_col, max_row - min_row)
+
+            # Calculate the geographic bounds for this window
+            window_transform = src.window_transform(window)
+            output_bounds = rasterio.transform.array_bounds(
+                window.height, window.width, window_transform
+            )
+            # Reorder to (minx, miny, maxx, maxy)
+            output_bounds = (
+                output_bounds[0],
+                output_bounds[1],
+                output_bounds[2],
+                output_bounds[3],
+            )
+
+        # Get window dimensions
+        window_width = int(window.width)
+        window_height = int(window.height)
+
+        # Check if the window is valid
+        if window_width <= 0 or window_height <= 0:
+            raise ValueError("Bounding box results in an empty window")
+
+        # Handle band selection
+        if bands is None:
+            # Use all bands
+            bands_to_read = list(range(1, src.count + 1))
+        else:
+            # Validate band indices
+            if not all(1 <= b <= src.count for b in bands):
+                raise ValueError(f"Band indices must be between 1 and {src.count}")
+            bands_to_read = bands
+
+        # Calculate new transform for the clipped raster
+        new_transform = from_bounds(
+            output_bounds[0],
+            output_bounds[1],
+            output_bounds[2],
+            output_bounds[3],
+            window_width,
+            window_height,
+        )
+
+        # Create a metadata dictionary for the output
+        out_meta = src.meta.copy()
+        out_meta.update(
+            {
+                "height": window_height,
+                "width": window_width,
+                "transform": new_transform,
+                "count": len(bands_to_read),
+            }
+        )
+
+        # Read the data for the selected bands
+        data = []
+        for band_idx in bands_to_read:
+            band_data = src.read(band_idx, window=window)
+            data.append(band_data)
+
+        # Stack the bands into a single array
+        if len(data) > 1:
+            clipped_data = np.stack(data)
+        else:
+            clipped_data = data[0][np.newaxis, :, :]
+
+        # Write the output raster
+        with rasterio.open(output_raster, "w", **out_meta) as dst:
+            dst.write(clipped_data)
+
+    return output_raster
+
+
 def raster_to_vector(
     raster_path,
     output_path=None,
