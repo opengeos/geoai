@@ -18,6 +18,8 @@ GeoAI bridges the gap between AI and geospatial analysis, providing tools for pr
 
 ## 🚀 Key Features
 
+❗ **Important notes:** The GeoAI package is under active development and new features are being added regularly. Not all features listed below are available in the current release. If you have a feature request or would like to contribute, please let us know!
+
 ### 📊 Advanced Geospatial Data Visualization
 
 -   Interactive multi-layer visualization of vector, raster, and point cloud data
