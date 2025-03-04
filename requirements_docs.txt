@@ -12,9 +12,11 @@ mkdocs-pdf-export-plugin
 mkdocstrings
 mkdocstrings-crystal
 mkdocstrings-python-legacy
+mystmd
 nbconvert
 nbformat
 pip
+pre-commit
 pygments
 pymdown-extensions
 sphinx
