@@ -23,7 +23,9 @@ class BuildingFootprintDataset(NonGeoDataset):
     Using NonGeoDataset to avoid spatial indexing issues.
     """
 
-    def __init__(self, raster_path, chip_size=(512, 512), transforms=None):
+    def __init__(
+        self, raster_path, chip_size=(512, 512), transforms=None, verbose=False
+    ):
         """
         Initialize the dataset.
 
@@ -31,6 +33,7 @@ class BuildingFootprintDataset(NonGeoDataset):
             raster_path: Path to the input raster file
             chip_size: Size of image chips to extract (height, width)
             transforms: Transforms to apply to the image
+            verbose: Whether to print detailed processing information
         """
         super().__init__()
 
@@ -38,6 +41,10 @@ class BuildingFootprintDataset(NonGeoDataset):
         self.raster_path = raster_path
         self.chip_size = chip_size
         self.transforms = transforms
+        self.verbose = verbose
+
+        # For tracking warnings about multi-band images
+        self.warned_about_bands = False
 
         # Open raster and get metadata
         with rasterio.open(self.raster_path) as src:
@@ -55,12 +62,15 @@ class BuildingFootprintDataset(NonGeoDataset):
             self.roi = box(*self.bounds)
 
             # Calculate number of chips in each dimension
-            self.rows = self.height // self.chip_size[0]
-            self.cols = self.width // self.chip_size[1]
+            # Use ceil division to ensure we cover the entire image
+            self.rows = (self.height + self.chip_size[0] - 1) // self.chip_size[0]
+            self.cols = (self.width + self.chip_size[1] - 1) // self.chip_size[1]
 
             print(
                 f"Dataset initialized with {self.rows} rows and {self.cols} columns of chips"
             )
+            print(f"Image dimensions: {self.width} x {self.height} pixels")
+            print(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
             if src.crs:
                 print(f"CRS: {src.crs}")
 
@@ -96,11 +106,17 @@ class BuildingFootprintDataset(NonGeoDataset):
 
             # Handle RGBA or multispectral images - keep only first 3 bands
             if image.shape[0] > 3:
-                print(f"Image has {image.shape[0]} bands, using first 3 bands only")
+                if not self.warned_about_bands and self.verbose:
+                    print(f"Image has {image.shape[0]} bands, using first 3 bands only")
+                    self.warned_about_bands = True
                 image = image[:3]
             elif image.shape[0] < 3:
                 # If image has fewer than 3 bands, duplicate the last band to make 3
-                print(f"Image has {image.shape[0]} bands, duplicating bands to make 3")
+                if not self.warned_about_bands and self.verbose:
+                    print(
+                        f"Image has {image.shape[0]} bands, duplicating bands to make 3"
+                    )
+                    self.warned_about_bands = True
                 temp = np.zeros((3, image.shape[1], image.shape[2]), dtype=image.dtype)
                 for c in range(3):
                     temp[c] = image[min(c, image.shape[0] - 1)]
@@ -391,8 +407,79 @@ class BuildingFootprintExtractor:
 
         return gdf.iloc[keep_indices]
 
+    def filter_edge_buildings(self, gdf, raster_path, edge_buffer=10):
+        """
+        Filter out building detections that fall in padding/edge areas of the image.
+
+        Args:
+            gdf: GeoDataFrame with building footprint detections
+            raster_path: Path to the original raster file
+            edge_buffer: Buffer in pixels to consider as edge region
+
+        Returns:
+            GeoDataFrame with filtered building footprints
+        """
+        import rasterio
+        from shapely.geometry import box
+
+        # If no buildings detected, return empty GeoDataFrame
+        if gdf is None or len(gdf) == 0:
+            return gdf
+
+        print(f"Buildings before filtering: {len(gdf)}")
+
+        with rasterio.open(raster_path) as src:
+            # Get raster bounds
+            raster_bounds = src.bounds
+            raster_width = src.width
+            raster_height = src.height
+
+            # Convert edge buffer from pixels to geographic units
+            # We need the smallest dimension of a pixel in geographic units
+            pixel_width = (raster_bounds[2] - raster_bounds[0]) / raster_width
+            pixel_height = (raster_bounds[3] - raster_bounds[1]) / raster_height
+            buffer_size = min(pixel_width, pixel_height) * edge_buffer
+
+            # Create a slightly smaller bounding box to exclude edge regions
+            inner_bounds = (
+                raster_bounds[0] + buffer_size,  # min x (west)
+                raster_bounds[1] + buffer_size,  # min y (south)
+                raster_bounds[2] - buffer_size,  # max x (east)
+                raster_bounds[3] - buffer_size,  # max y (north)
+            )
+
+            # Check that inner bounds are valid
+            if inner_bounds[0] >= inner_bounds[2] or inner_bounds[1] >= inner_bounds[3]:
+                print("Warning: Edge buffer too large, using original bounds")
+                inner_box = box(*raster_bounds)
+            else:
+                inner_box = box(*inner_bounds)
+
+            # Filter out buildings that intersect with the edge of the image
+            filtered_gdf = gdf[gdf.intersects(inner_box)]
+
+            # Additional check for buildings that have >50% of their area outside the valid region
+            valid_buildings = []
+            for idx, row in filtered_gdf.iterrows():
+                if row.geometry.intersection(inner_box).area >= 0.5 * row.geometry.area:
+                    valid_buildings.append(idx)
+
+            filtered_gdf = filtered_gdf.loc[valid_buildings]
+
+            print(f"Buildings after filtering: {len(filtered_gdf)}")
+
+            return filtered_gdf
+
     @torch.no_grad()
-    def process_raster(self, raster_path, output_path=None, batch_size=4, **kwargs):
+    def process_raster(
+        self,
+        raster_path,
+        output_path=None,
+        batch_size=4,
+        filter_edges=True,
+        edge_buffer=20,
+        **kwargs,
+    ):
         """
         Process a raster file to extract building footprints with customizable parameters.
 
@@ -400,6 +487,8 @@ class BuildingFootprintExtractor:
             raster_path: Path to input raster file
             output_path: Path to output GeoJSON file (optional)
             batch_size: Batch size for processing
+            filter_edges: Whether to filter out buildings at the edges of the image
+            edge_buffer: Size of edge buffer in pixels to filter out buildings (if filter_edges=True)
             **kwargs: Additional parameters:
                 confidence_threshold: Minimum confidence score to keep a detection (0.0-1.0)
                 overlap: Overlap between adjacent tiles (0.0-1.0)
@@ -434,6 +523,9 @@ class BuildingFootprintExtractor:
         print(f"- Mask threshold: {mask_threshold}")
         print(f"- Min building area: {small_building_area}")
         print(f"- Simplify tolerance: {simplify_tolerance}")
+        print(f"- Filter edge buildings: {filter_edges}")
+        if filter_edges:
+            print(f"- Edge buffer size: {edge_buffer} pixels")
 
         # Create dataset
         dataset = BuildingFootprintDataset(raster_path=raster_path, chip_size=chip_size)
@@ -608,12 +700,246 @@ class BuildingFootprintExtractor:
             gdf, nms_iou_threshold=nms_iou_threshold
         )
 
+        # Filter edge buildings if requested
+        if filter_edges:
+            gdf = self.filter_edge_buildings(gdf, raster_path, edge_buffer=edge_buffer)
+
         # Save to file if requested
         if output_path:
             gdf.to_file(output_path, driver="GeoJSON")
             print(f"Saved {len(gdf)} building footprints to {output_path}")
 
         return gdf
+
+    def save_masks_as_geotiff(
+        self, raster_path, output_path=None, batch_size=4, verbose=False, **kwargs
+    ):
+        """
+        Process a raster file to extract building footprint masks and save as GeoTIFF.
+
+        Args:
+            raster_path: Path to input raster file
+            output_path: Path to output GeoTIFF file (optional, default: input_masks.tif)
+            batch_size: Batch size for processing
+            verbose: Whether to print detailed processing information
+            **kwargs: Additional parameters:
+                confidence_threshold: Minimum confidence score to keep a detection (0.0-1.0)
+                chip_size: Size of image chips for processing (height, width)
+                mask_threshold: Threshold for mask binarization (0.0-1.0)
+
+        Returns:
+            Path to the saved GeoTIFF file
+        """
+
+        # Get parameters from kwargs or use instance defaults
+        confidence_threshold = kwargs.get(
+            "confidence_threshold", self.confidence_threshold
+        )
+        chip_size = kwargs.get("chip_size", self.chip_size)
+        mask_threshold = kwargs.get("mask_threshold", self.mask_threshold)
+
+        # Set default output path if not provided
+        if output_path is None:
+            output_path = os.path.splitext(raster_path)[0] + "_masks.tif"
+
+        # Print parameters being used
+        print(f"Processing masks with parameters:")
+        print(f"- Confidence threshold: {confidence_threshold}")
+        print(f"- Chip size: {chip_size}")
+        print(f"- Mask threshold: {mask_threshold}")
+
+        # Create dataset
+        dataset = BuildingFootprintDataset(
+            raster_path=raster_path, chip_size=chip_size, verbose=verbose
+        )
+
+        # Store a flag to avoid repetitive messages
+        self.raster_stats = dataset.raster_stats
+        seen_warnings = {
+            "bands": False,
+            "resize": {},  # Dictionary to track resize warnings by shape
+        }
+
+        # Open original raster to get metadata
+        with rasterio.open(raster_path) as src:
+            # Create output binary mask raster with same dimensions as input
+            output_profile = src.profile.copy()
+            output_profile.update(
+                dtype=rasterio.uint8,
+                count=1,  # Single band for building mask
+                compress="lzw",
+                nodata=0,
+            )
+
+            # Create output mask raster
+            with rasterio.open(output_path, "w", **output_profile) as dst:
+                # Initialize mask with zeros
+                mask_array = np.zeros((src.height, src.width), dtype=np.uint8)
+
+                # Custom collate function to handle Shapely objects
+                def custom_collate(batch):
+                    """Custom collate function for DataLoader"""
+                    elem = batch[0]
+                    if isinstance(elem, dict):
+                        result = {}
+                        for key in elem:
+                            if key == "bbox":
+                                # Don't collate shapely objects, keep as list
+                                result[key] = [d[key] for d in batch]
+                            else:
+                                # For tensors and other collatable types
+                                try:
+                                    result[key] = (
+                                        torch.utils.data._utils.collate.default_collate(
+                                            [d[key] for d in batch]
+                                        )
+                                    )
+                                except TypeError:
+                                    # Fall back to list for non-collatable types
+                                    result[key] = [d[key] for d in batch]
+                        return result
+                    else:
+                        # Default collate for non-dict types
+                        return torch.utils.data._utils.collate.default_collate(batch)
+
+                # Create dataloader
+                dataloader = torch.utils.data.DataLoader(
+                    dataset,
+                    batch_size=batch_size,
+                    shuffle=False,
+                    num_workers=0,
+                    collate_fn=custom_collate,
+                )
+
+                # Process batches
+                print(f"Processing raster with {len(dataloader)} batches")
+                for batch in tqdm(dataloader):
+                    # Move images to device
+                    images = batch["image"].to(self.device)
+                    coords = batch["coords"]  # (i, j) coordinates in pixels
+
+                    # Run inference
+                    with torch.no_grad():
+                        predictions = self.model(images)
+
+                    # Process predictions
+                    for idx, prediction in enumerate(predictions):
+                        masks = prediction["masks"].cpu().numpy()
+                        scores = prediction["scores"].cpu().numpy()
+
+                        # Skip if no predictions
+                        if len(scores) == 0:
+                            continue
+
+                        # Filter by confidence threshold
+                        valid_indices = scores >= confidence_threshold
+                        masks = masks[valid_indices]
+                        scores = scores[valid_indices]
+
+                        # Skip if no valid predictions
+                        if len(scores) == 0:
+                            continue
+
+                        # Get window coordinates
+                        if isinstance(coords, list):
+                            coord_item = coords[idx]
+                            if isinstance(coord_item, tuple) and len(coord_item) == 2:
+                                i, j = coord_item
+                            elif isinstance(coord_item, torch.Tensor):
+                                i, j = coord_item.cpu().numpy().tolist()
+                            else:
+                                print(f"Unexpected coords format: {type(coord_item)}")
+                                continue
+                        elif isinstance(coords, torch.Tensor):
+                            i, j = coords[idx].cpu().numpy().tolist()
+                        else:
+                            print(f"Unexpected coords type: {type(coords)}")
+                            continue
+
+                        # Get window size
+                        if isinstance(batch["window_size"], list):
+                            window_item = batch["window_size"][idx]
+                            if isinstance(window_item, tuple) and len(window_item) == 2:
+                                window_width, window_height = window_item
+                            elif isinstance(window_item, torch.Tensor):
+                                window_width, window_height = (
+                                    window_item.cpu().numpy().tolist()
+                                )
+                            else:
+                                print(
+                                    f"Unexpected window_size format: {type(window_item)}"
+                                )
+                                continue
+                        elif isinstance(batch["window_size"], torch.Tensor):
+                            window_width, window_height = (
+                                batch["window_size"][idx].cpu().numpy().tolist()
+                            )
+                        else:
+                            print(
+                                f"Unexpected window_size type: {type(batch['window_size'])}"
+                            )
+                            continue
+
+                        # Combine all masks for this window
+                        combined_mask = np.zeros(
+                            (window_height, window_width), dtype=np.uint8
+                        )
+
+                        for mask in masks:
+                            # Get the binary mask
+                            binary_mask = (mask[0] > mask_threshold).astype(
+                                np.uint8
+                            ) * 255
+
+                            # Handle size mismatch - resize binary_mask if needed
+                            mask_h, mask_w = binary_mask.shape
+                            if mask_h != window_height or mask_w != window_width:
+                                resize_key = f"{(mask_h, mask_w)}->{(window_height, window_width)}"
+                                if resize_key not in seen_warnings["resize"]:
+                                    if verbose:
+                                        print(
+                                            f"Resizing mask from {binary_mask.shape} to {(window_height, window_width)}"
+                                        )
+                                    else:
+                                        if not seen_warnings[
+                                            "resize"
+                                        ]:  # If this is the first resize warning
+                                            print(
+                                                f"Resizing masks at image edges (set verbose=True for details)"
+                                            )
+                                    seen_warnings["resize"][resize_key] = True
+
+                                # Crop or pad the binary mask to match window size
+                                resized_mask = np.zeros(
+                                    (window_height, window_width), dtype=np.uint8
+                                )
+                                copy_h = min(mask_h, window_height)
+                                copy_w = min(mask_w, window_width)
+                                resized_mask[:copy_h, :copy_w] = binary_mask[
+                                    :copy_h, :copy_w
+                                ]
+                                binary_mask = resized_mask
+
+                            # Update combined mask (taking maximum where masks overlap)
+                            combined_mask = np.maximum(combined_mask, binary_mask)
+
+                        # Write combined mask to output array
+                        # Handle edge cases where window might be smaller than chip size
+                        h, w = combined_mask.shape
+                        valid_h = min(h, src.height - j)
+                        valid_w = min(w, src.width - i)
+
+                        if valid_h > 0 and valid_w > 0:
+                            mask_array[j : j + valid_h, i : i + valid_w] = np.maximum(
+                                mask_array[j : j + valid_h, i : i + valid_w],
+                                combined_mask[:valid_h, :valid_w],
+                            )
+
+                # Write the final mask to the output file
+                dst.write(mask_array, 1)
+
+        print(f"Building masks saved to {output_path}")
+        return output_path
 
     def visualize_results(
         self, raster_path, gdf=None, output_path=None, figsize=(12, 12)
