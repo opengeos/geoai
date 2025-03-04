@@ -14,6 +14,7 @@ import rasterio
 from rasterio.windows import Window
 from rasterio.features import shapes
 from huggingface_hub import hf_hub_download
+from .preprocess import get_raster_stats
 
 
 class BuildingFootprintDataset(NonGeoDataset):
@@ -62,6 +63,9 @@ class BuildingFootprintDataset(NonGeoDataset):
             )
             if src.crs:
                 print(f"CRS: {src.crs}")
+
+        # get raster stats
+        self.raster_stats = get_raster_stats(raster_path, divide_by=255)
 
     def __getitem__(self, idx):
         """
@@ -433,6 +437,7 @@ class BuildingFootprintExtractor:
 
         # Create dataset
         dataset = BuildingFootprintDataset(raster_path=raster_path, chip_size=chip_size)
+        self.raster_stats = dataset.raster_stats
 
         # Custom collate function to handle Shapely objects
         def custom_collate(batch):
@@ -614,18 +619,24 @@ class BuildingFootprintExtractor:
         self, raster_path, gdf=None, output_path=None, figsize=(12, 12)
     ):
         """
-        Visualize building detection results.
+        Visualize building detection results with proper coordinate transformation.
+
+        This function displays building footprints on top of the raster image,
+        ensuring proper alignment between the GeoDataFrame polygons and the image.
 
         Args:
             raster_path: Path to input raster
             gdf: GeoDataFrame with building polygons (optional)
             output_path: Path to save visualization (optional)
             figsize: Figure size (width, height) in inches
+
+        Returns:
+            bool: True if visualization was successful
         """
         # Check if raster file exists
         if not os.path.exists(raster_path):
             print(f"Error: Raster file '{raster_path}' not found.")
-            return
+            return False
 
         # Process raster if GeoDataFrame not provided
         if gdf is None:
@@ -633,7 +644,26 @@ class BuildingFootprintExtractor:
 
         if gdf is None or len(gdf) == 0:
             print("No buildings to visualize")
-            return
+            return False
+
+        # Check if confidence column exists in the GeoDataFrame
+        has_confidence = False
+        if hasattr(gdf, "columns") and "confidence" in gdf.columns:
+            # Try to access a confidence value to confirm it works
+            try:
+                if len(gdf) > 0:
+                    # Try getitem access
+                    conf_val = gdf["confidence"].iloc[0]
+                    has_confidence = True
+                    print(
+                        f"Using confidence values (range: {gdf['confidence'].min():.2f} - {gdf['confidence'].max():.2f})"
+                    )
+            except Exception as e:
+                print(f"Confidence column exists but couldn't access values: {e}")
+                has_confidence = False
+        else:
+            print("No confidence column found in GeoDataFrame")
+            has_confidence = False
 
         # Read raster for visualization
         with rasterio.open(raster_path) as src:
@@ -651,8 +681,27 @@ class BuildingFootprintExtractor:
                 image = src.read(
                     out_shape=out_shape, resampling=rasterio.enums.Resampling.bilinear
                 )
+
+                # Create a scaled transform for the resampled image
+                # Calculate scaling factors
+                x_scale = src.width / out_shape[2]
+                y_scale = src.height / out_shape[1]
+
+                # Get the original transform
+                orig_transform = src.transform
+
+                # Create a scaled transform
+                scaled_transform = rasterio.transform.Affine(
+                    orig_transform.a * x_scale,
+                    orig_transform.b,
+                    orig_transform.c,
+                    orig_transform.d,
+                    orig_transform.e * y_scale,
+                    orig_transform.f,
+                )
             else:
                 image = src.read()
+                scaled_transform = src.transform
 
             # Convert to RGB for display
             if image.shape[0] > 3:
@@ -671,59 +720,133 @@ class BuildingFootprintExtractor:
 
             # Get image bounds
             bounds = src.bounds
+            crs = src.crs
 
         # Create figure with appropriate aspect ratio
         aspect_ratio = image.shape[1] / image.shape[0]  # width / height
         plt.figure(figsize=(figsize[0], figsize[0] / aspect_ratio))
-
-        # Create axis with the right projection if CRS is available
         ax = plt.gca()
 
         # Display image
         ax.imshow(image)
 
-        # Convert GeoDataFrame to pixel coordinates for plotting
-        with rasterio.open(raster_path) as src:
+        # Make sure the GeoDataFrame has the same CRS as the raster
+        if gdf.crs != crs:
+            print(f"Reprojecting GeoDataFrame from {gdf.crs} to {crs}")
+            gdf = gdf.to_crs(crs)
 
-            def geo_to_pixel(x, y):
-                return ~src.transform * (x, y)
+        # Set up colors for confidence visualization
+        if has_confidence:
+            try:
+                import matplotlib.cm as cm
+                from matplotlib.colors import Normalize
 
-            # Plot each building footprint
-            for _, row in gdf.iterrows():
+                # Get min/max confidence values
+                min_conf = gdf["confidence"].min()
+                max_conf = gdf["confidence"].max()
+
+                # Set up normalization and colormap
+                norm = Normalize(vmin=min_conf, vmax=max_conf)
+                cmap = cm.viridis
+
+                # Create scalar mappable for colorbar
+                sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+                sm.set_array([])
+
+                # Add colorbar
+                cbar = plt.colorbar(
+                    sm, ax=ax, orientation="vertical", shrink=0.7, pad=0.01
+                )
+                cbar.set_label("Confidence Score")
+            except Exception as e:
+                print(f"Error setting up confidence visualization: {e}")
+                has_confidence = False
+
+        # Function to convert coordinates
+        def geo_to_pixel(geometry, transform):
+            """Convert geometry to pixel coordinates using the provided transform."""
+            if geometry.is_empty:
+                return None
+
+            if geometry.geom_type == "Polygon":
+                # Get exterior coordinates
+                exterior_coords = list(geometry.exterior.coords)
+
+                # Convert to pixel coordinates
+                pixel_coords = [~transform * (x, y) for x, y in exterior_coords]
+
+                # Split into x and y lists
+                pixel_x = [coord[0] for coord in pixel_coords]
+                pixel_y = [coord[1] for coord in pixel_coords]
+
+                return pixel_x, pixel_y
+            else:
+                print(f"Unsupported geometry type: {geometry.geom_type}")
+                return None
+
+        # Plot each building footprint
+        for idx, row in gdf.iterrows():
+            try:
                 # Convert polygon to pixel coordinates
-                geom = row.geometry
-                if geom.is_empty:
-                    continue
+                coords = geo_to_pixel(row.geometry, scaled_transform)
 
-                try:
-                    # Get polygon exterior coordinates
-                    x, y = geom.exterior.xy
+                if coords:
+                    pixel_x, pixel_y = coords
 
-                    # Convert to pixel coordinates
-                    pixel_coords = [geo_to_pixel(x[i], y[i]) for i in range(len(x))]
-                    pixel_x = [coord[0] for coord in pixel_coords]
-                    pixel_y = [coord[1] for coord in pixel_coords]
+                    if has_confidence:
+                        try:
+                            # Get confidence value using different methods
+                            # Method 1: Try direct attribute access
+                            confidence = None
+                            try:
+                                confidence = row.confidence
+                            except:
+                                pass
 
-                    # Plot polygon
-                    ax.plot(pixel_x, pixel_y, color="red", linewidth=1)
-                except Exception as e:
-                    print(f"Error plotting polygon: {e}")
+                            # Method 2: Try dictionary-style access
+                            if confidence is None:
+                                try:
+                                    confidence = row["confidence"]
+                                except:
+                                    pass
+
+                            # Method 3: Try accessing by index from the GeoDataFrame
+                            if confidence is None:
+                                try:
+                                    confidence = gdf.iloc[idx]["confidence"]
+                                except:
+                                    pass
+
+                            if confidence is not None:
+                                color = cmap(norm(confidence))
+                                # Fill polygon with semi-transparent color
+                                ax.fill(pixel_x, pixel_y, color=color, alpha=0.5)
+                                # Draw border
+                                ax.plot(
+                                    pixel_x,
+                                    pixel_y,
+                                    color=color,
+                                    linewidth=1,
+                                    alpha=0.8,
+                                )
+                            else:
+                                # Fall back to red if confidence value couldn't be accessed
+                                ax.plot(pixel_x, pixel_y, color="red", linewidth=1)
+                        except Exception as e:
+                            print(
+                                f"Error using confidence value for polygon {idx}: {e}"
+                            )
+                            ax.plot(pixel_x, pixel_y, color="red", linewidth=1)
+                    else:
+                        # No confidence data, just plot outlines in red
+                        ax.plot(pixel_x, pixel_y, color="red", linewidth=1)
+            except Exception as e:
+                print(f"Error plotting polygon {idx}: {e}")
 
         # Remove axes
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_title(f"Building Footprints (Found: {len(gdf)})")
-
-        # Add colorbar for confidence if available
-        if "confidence" in gdf.columns:
-            # Create a colorbar legend
-            sm = plt.cm.ScalarMappable(
-                cmap=plt.get_cmap("viridis"),
-                norm=plt.Normalize(gdf.confidence.min(), gdf.confidence.max()),
-            )
-            sm.set_array([])
-            cbar = plt.colorbar(sm, ax=ax, orientation="vertical", shrink=0.7)
-            cbar.set_label("Confidence")
 
         # Save if requested
         if output_path:
@@ -734,14 +857,12 @@ class BuildingFootprintExtractor:
         plt.close()
 
         # Create a simpler visualization focused just on a subset of buildings
-        # This helps when the raster is very large
-        plt.figure(figsize=figsize)
-        ax = plt.gca()
+        if len(gdf) > 0:
+            plt.figure(figsize=figsize)
+            ax = plt.gca()
 
-        # Choose a subset of the image to show
-        with rasterio.open(raster_path) as src:
-            # Get a sample window based on the first few buildings
-            if len(gdf) > 0:
+            # Choose a subset of the image to show
+            with rasterio.open(raster_path) as src:
                 # Get centroid of first building
                 sample_geom = gdf.iloc[0].geometry
                 centroid = sample_geom.centroid
@@ -776,36 +897,109 @@ class BuildingFootprintExtractor:
 
                 sample_image = np.clip(sample_image, 0, 1)
 
-                # Get transform for this window
+                # Display sample image
+                ax.imshow(sample_image, extent=[0, window.width, window.height, 0])
+
+                # Get the correct transform for this window
                 window_transform = src.window_transform(window)
 
-                # Display sample image
-                ax.imshow(sample_image)
-
-                # Filter buildings that intersect with this window
+                # Calculate bounds of the window
                 window_bounds = rasterio.windows.bounds(window, src.transform)
                 window_box = box(*window_bounds)
+
+                # Filter buildings that intersect with this window
                 visible_gdf = gdf[gdf.intersects(window_box)]
 
-                # Plot building footprints in this view
-                for _, row in visible_gdf.iterrows():
+                # Set up colors for sample view if confidence data exists
+                if has_confidence:
                     try:
-                        # Get polygon exterior coordinates
+                        # Reuse the same normalization and colormap from main view
+                        sample_sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+                        sample_sm.set_array([])
+
+                        # Add colorbar to sample view
+                        sample_cbar = plt.colorbar(
+                            sample_sm,
+                            ax=ax,
+                            orientation="vertical",
+                            shrink=0.7,
+                            pad=0.01,
+                        )
+                        sample_cbar.set_label("Confidence Score")
+                    except Exception as e:
+                        print(f"Error setting up sample confidence visualization: {e}")
+
+                # Plot building footprints in sample view
+                for idx, row in visible_gdf.iterrows():
+                    try:
+                        # Get window-relative pixel coordinates
                         geom = row.geometry
+
+                        # Skip empty geometries
                         if geom.is_empty:
                             continue
 
-                        x, y = geom.exterior.xy
+                        # Get exterior coordinates
+                        exterior_coords = list(geom.exterior.coords)
 
-                        # Convert to pixel coordinates relative to window
-                        pixel_coords = [
-                            ~window_transform * (x[i], y[i]) for i in range(len(x))
-                        ]
+                        # Convert to pixel coordinates relative to window origin
+                        pixel_coords = []
+                        for x, y in exterior_coords:
+                            px, py = ~src.transform * (x, y)  # Convert to image pixels
+                            # Make coordinates relative to window
+                            px = px - window.col_off
+                            py = py - window.row_off
+                            pixel_coords.append((px, py))
+
+                        # Extract x and y coordinates
                         pixel_x = [coord[0] for coord in pixel_coords]
                         pixel_y = [coord[1] for coord in pixel_coords]
 
-                        # Plot polygon
-                        ax.plot(pixel_x, pixel_y, color="red", linewidth=1.5)
+                        # Use confidence colors if available
+                        if has_confidence:
+                            try:
+                                # Try different methods to access confidence
+                                confidence = None
+                                try:
+                                    confidence = row.confidence
+                                except:
+                                    pass
+
+                                if confidence is None:
+                                    try:
+                                        confidence = row["confidence"]
+                                    except:
+                                        pass
+
+                                if confidence is None:
+                                    try:
+                                        confidence = visible_gdf.iloc[idx]["confidence"]
+                                    except:
+                                        pass
+
+                                if confidence is not None:
+                                    color = cmap(norm(confidence))
+                                    # Fill polygon with semi-transparent color
+                                    ax.fill(pixel_x, pixel_y, color=color, alpha=0.5)
+                                    # Draw border
+                                    ax.plot(
+                                        pixel_x,
+                                        pixel_y,
+                                        color=color,
+                                        linewidth=1.5,
+                                        alpha=0.8,
+                                    )
+                                else:
+                                    ax.plot(
+                                        pixel_x, pixel_y, color="red", linewidth=1.5
+                                    )
+                            except Exception as e:
+                                print(
+                                    f"Error using confidence in sample view for polygon {idx}: {e}"
+                                )
+                                ax.plot(pixel_x, pixel_y, color="red", linewidth=1.5)
+                        else:
+                            ax.plot(pixel_x, pixel_y, color="red", linewidth=1.5)
                     except Exception as e:
                         print(f"Error plotting polygon in sample view: {e}")
 
@@ -828,5 +1022,3 @@ class BuildingFootprintExtractor:
                     plt.tight_layout()
                     plt.savefig(sample_output, dpi=300, bbox_inches="tight")
                     print(f"Sample visualization saved to {sample_output}")
-
-        return True

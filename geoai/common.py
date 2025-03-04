@@ -588,6 +588,8 @@ def view_vector(
 
 def view_vector_interactive(
     vector_data,
+    layer_name="Vector Layer",
+    tiles_args=None,
     **kwargs,
 ):
     """
@@ -599,6 +601,9 @@ def view_vector_interactive(
 
     Args:
         vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.
+        layer_name (str, optional): The name of the layer. Defaults to "Vector Layer".
+        tiles_args (dict, optional): Additional arguments for the localtileserver client.
+            get_folium_tile_layer function. Defaults to None.
         **kwargs: Additional keyword arguments to pass to GeoDataFrame.explore() function.
         See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html
 
@@ -613,6 +618,59 @@ def view_vector_interactive(
         >>> roads = gpd.read_file("roads.shp")
         >>> view_vector_interactive(roads, figsize=(12, 8))
     """
+    import folium
+    import folium.plugins as plugins
+    from localtileserver import get_folium_tile_layer, TileClient
+    from leafmap import cog_tile
+
+    google_tiles = {
+        "Roadmap": {
+            "url": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+            "attribution": "Google",
+            "name": "Google Maps",
+        },
+        "Satellite": {
+            "url": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+            "attribution": "Google",
+            "name": "Google Satellite",
+        },
+        "Terrain": {
+            "url": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+            "attribution": "Google",
+            "name": "Google Terrain",
+        },
+        "Hybrid": {
+            "url": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+            "attribution": "Google",
+            "name": "Google Hybrid",
+        },
+    }
+
+    basemap_layer_name = None
+    raster_layer = None
+
+    if "tiles" in kwargs and isinstance(kwargs["tiles"], str):
+        if kwargs["tiles"].title() in google_tiles:
+            basemap_layer_name = google_tiles[kwargs["tiles"].title()]["name"]
+            kwargs["tiles"] = google_tiles[kwargs["tiles"].title()]["url"]
+            kwargs["attr"] = "Google"
+        elif kwargs["tiles"].lower().endswith(".tif"):
+            if tiles_args is None:
+                tiles_args = {}
+            if kwargs["tiles"].lower().startswith("http"):
+                basemap_layer_name = "Remote Raster"
+                kwargs["tiles"] = cog_tile(kwargs["tiles"], **tiles_args)
+                kwargs["attr"] = "TiTiler"
+            else:
+                basemap_layer_name = "Local Raster"
+                client = TileClient(kwargs["tiles"])
+                raster_layer = get_folium_tile_layer(client, **tiles_args)
+                kwargs["tiles"] = raster_layer.tiles
+                kwargs["attr"] = "localtileserver"
+
+    if "max_zoom" not in kwargs:
+        kwargs["max_zoom"] = 30
+
     if isinstance(vector_data, str):
         vector_data = gpd.read_file(vector_data)
 
@@ -620,4 +678,22 @@ def view_vector_interactive(
     if not isinstance(vector_data, gpd.GeoDataFrame):
         raise TypeError("Input data must be a GeoDataFrame")
 
-    return vector_data.explore(**kwargs)
+    layer_control = kwargs.pop("layer_control", True)
+    fullscreen_control = kwargs.pop("fullscreen_control", True)
+
+    m = vector_data.explore(**kwargs)
+
+    # Change the layer name
+    for layer in m._children.values():
+        if isinstance(layer, folium.GeoJson):
+            layer.layer_name = layer_name
+        if isinstance(layer, folium.TileLayer) and basemap_layer_name:
+            layer.layer_name = basemap_layer_name
+
+    if layer_control:
+        m.add_child(folium.LayerControl())
+
+    if fullscreen_control:
+        plugins.Fullscreen().add_to(m)
+
+    return m
