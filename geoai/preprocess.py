@@ -945,32 +945,6 @@ def batch_raster_to_vector(
     return None
 
 
-# # Example usage
-# if __name__ == "__main__":
-#     # Single file conversion example
-#     gdf = raster_to_vector(
-#         raster_path="output/labels/tile_000001.tif",
-#         output_path="output/labels/tile_000001.geojson",
-#         threshold=0,
-#         min_area=10,
-#         simplify_tolerance=0.5,
-#         class_values=[1],  # For a binary mask, use [1]
-#         attribute_name='class',
-#         plot_result=True
-#     )
-
-# Batch conversion example
-# batch_raster_to_vector(
-#     input_dir="path/to/labels",
-#     output_dir="path/to/vectors",
-#     pattern="*.tif",
-#     threshold=0,
-#     min_area=10,
-#     class_values=[1, 2, 3],  # For a multiclass mask
-#     merge_output=True
-# )
-
-
 def vector_to_raster(
     vector_path,
     output_path=None,
@@ -1278,39 +1252,6 @@ def batch_vector_to_raster(
         output_files.append(output_path)
 
     return output_files
-
-
-# # Example usage
-# if __name__ == "__main__":
-#     # Single file conversion example
-#     raster_data = vector_to_raster(
-#         vector_path="buildings_train.geojson",
-#         output_path="buildings_train.tif",
-#         reference_raster="naip_train.tif",  # Optional, can use other parameters instead
-#         # attribute_field="class",  # Optional, uses field values for pixel values
-#         all_touched=True,  # Ensures small features are captured
-#         plot_result=True
-#     )
-
-# Example with custom dimensions
-# raster_data = vector_to_raster(
-#     vector_path="path/to/buildings.geojson",
-#     output_path="path/to/rasterized_buildings.tif",
-#     pixel_size=0.5,  # 0.5 meter resolution
-#     bounds=(454780, 5277567, 456282, 5278242),  # from original data
-#     crs="EPSG:26911",
-#     output_shape=(1350, 3000),  # custom dimensions
-#     attribute_field="class"
-# )
-
-# Batch conversion example
-# output_files = batch_vector_to_raster(
-#     vector_path="path/to/buildings.geojson",
-#     output_dir="path/to/output",
-#     reference_rasters=["path/to/ref1.tif", "path/to/ref2.tif"],
-#     attribute_field="class",
-#     all_touched=True
-# )
 
 
 def export_geotiff_tiles(
@@ -1893,43 +1834,6 @@ def create_overview_image(src, tile_coordinates, output_path, tile_size, stride)
     plt.close()
 
     print(f"Overview image saved to {output_path}")
-
-
-# # Example usage
-# if __name__ == "__main__":
-#     # Try to install tqdm if not available
-#     try:
-#         import tqdm
-#     except ImportError:
-#         print("Installing tqdm progress bar library...")
-#         import sys
-#         import subprocess
-
-#         subprocess.check_call([sys.executable, "-m", "pip", "install", "tqdm"])
-#         import tqdm
-
-#     # Example with vector class data
-#     export_geotiff_tiles(
-#         in_raster="naip_train.tif",
-#         out_folder="geotiff_output_vector",
-#         in_class_data="buildings_train.geojson",
-#         tile_size=256,
-#         stride=128,
-#         class_value_field="class",
-#         buffer_radius=2,
-#         create_overview=True,
-#     )
-
-#     # Example with raster class data
-#     export_geotiff_tiles(
-#         in_raster="naip_train.tif",
-#         out_folder="geotiff_output_raster",
-#         in_class_data="buildings_train.tif",  # This would be a raster mask
-#         tile_size=256,
-#         stride=128,
-#         create_overview=True,
-#         skip_empty_tiles=True,
-#     )
 
 
 def export_training_data(
@@ -2674,22 +2578,3 @@ def export_training_data(
 
     # Return statistics
     return stats, out_folder
-
-
-# if __name__ == "__main__":
-#     # Example parameters
-#     export_training_data(
-#         in_raster="naip_train.tif",
-#         out_folder="output",
-#         in_class_data="buildings_train.geojson",
-#         image_chip_format="GEOTIFF",  # Use GeoTIFF format to preserve georeference
-#         tile_size_x=256,
-#         tile_size_y=256,
-#         stride_x=128,  # Use overlapping tiles to increase chance of capturing features
-#         stride_y=128,
-#         metadata_format="PASCAL_VOC",
-#         class_value_field="class",
-#         buffer_radius=2,  # Add small buffer to buildings to ensure they're captured
-#         all_touched=True,  # Ensure small features are rasterized
-#         save_geotiff=True,  # Always save as GeoTIFF regardless of image_chip_format
-#     )
