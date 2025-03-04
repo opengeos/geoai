@@ -114,6 +114,8 @@ def viz_image(
 
     if isinstance(image, torch.Tensor):
         image = image.cpu().numpy()
+    elif isinstance(image, str):
+        image = rio.open(image).read().transpose(1, 2, 0)
 
     plt.figure(figsize=figsize)
 
