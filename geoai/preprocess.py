@@ -3,6 +3,7 @@ import math
 import os
 from PIL import Image
 from pathlib import Path
+import requests
 import warnings
 import xml.etree.ElementTree as ET
 import numpy as np
@@ -11,6 +12,7 @@ import geopandas as gpd
 import pandas as pd
 from rasterio.windows import Window
 from rasterio import features
+from rasterio.plot import show
 from shapely.geometry import box, shape
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -18,6 +20,504 @@ from torchvision.transforms import RandomRotation
 from shapely.affinity import rotate
 import torchgeo
 import torch
+
+
+def download_file(url, output_path=None, overwrite=False):
+    """
+    Download a file from a given URL with a progress bar.
+
+    Args:
+        url (str): The URL of the file to download.
+        output_path (str, optional): The path where the downloaded file will be saved.
+            If not provided, the filename from the URL will be used.
+        overwrite (bool, optional): Whether to overwrite the file if it already exists.
+
+    Returns:
+        str: The path to the downloaded file.
+    """
+    # Get the filename from the URL if output_path is not provided
+    if output_path is None:
+        output_path = os.path.basename(url)
+
+    # Check if the file already exists
+    if os.path.exists(output_path) and not overwrite:
+        print(f"File already exists: {output_path}")
+        return output_path
+
+    # Send a streaming GET request
+    response = requests.get(url, stream=True, timeout=50)
+    response.raise_for_status()  # Raise an exception for HTTP errors
+
+    # Get the total file size if available
+    total_size = int(response.headers.get("content-length", 0))
+
+    # Open the output file
+    with (
+        open(output_path, "wb") as file,
+        tqdm(
+            desc=os.path.basename(output_path),
+            total=total_size,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+        ) as progress_bar,
+    ):
+
+        # Download the file in chunks and update the progress bar
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:  # filter out keep-alive new chunks
+                file.write(chunk)
+                progress_bar.update(len(chunk))
+
+    return output_path
+
+
+def get_raster_info(raster_path):
+    """Display basic information about a raster dataset.
+
+    Args:
+        raster_path (str): Path to the raster file
+
+    Returns:
+        dict: Dictionary containing the basic information about the raster
+    """
+    # Open the raster dataset
+    with rasterio.open(raster_path) as src:
+        # Get basic metadata
+        info = {
+            "driver": src.driver,
+            "width": src.width,
+            "height": src.height,
+            "count": src.count,
+            "dtype": src.dtypes[0],
+            "crs": src.crs.to_string() if src.crs else "No CRS defined",
+            "transform": src.transform,
+            "bounds": src.bounds,
+            "resolution": (src.transform[0], -src.transform[4]),
+            "nodata": src.nodata,
+        }
+
+        # Calculate statistics for each band
+        stats = []
+        for i in range(1, src.count + 1):
+            band = src.read(i, masked=True)
+            band_stats = {
+                "band": i,
+                "min": float(band.min()),
+                "max": float(band.max()),
+                "mean": float(band.mean()),
+                "std": float(band.std()),
+            }
+            stats.append(band_stats)
+
+        info["band_stats"] = stats
+
+    return info
+
+
+def print_raster_info(raster_path, show_preview=True, figsize=(10, 8)):
+    """Print formatted information about a raster dataset and optionally show a preview.
+
+    Args:
+        raster_path (str): Path to the raster file
+        show_preview (bool, optional): Whether to display a visual preview of the raster.
+            Defaults to True.
+        figsize (tuple, optional): Figure size as (width, height). Defaults to (10, 8).
+
+    Returns:
+        dict: Dictionary containing raster information if successful, None otherwise
+    """
+    try:
+        info = get_raster_info(raster_path)
+
+        # Print basic information
+        print(f"===== RASTER INFORMATION: {raster_path} =====")
+        print(f"Driver: {info['driver']}")
+        print(f"Dimensions: {info['width']} x {info['height']} pixels")
+        print(f"Number of bands: {info['count']}")
+        print(f"Data type: {info['dtype']}")
+        print(f"Coordinate Reference System: {info['crs']}")
+        print(f"Georeferenced Bounds: {info['bounds']}")
+        print(f"Pixel Resolution: {info['resolution'][0]}, {info['resolution'][1]}")
+        print(f"NoData Value: {info['nodata']}")
+
+        # Print band statistics
+        print("\n----- Band Statistics -----")
+        for band_stat in info["band_stats"]:
+            print(f"Band {band_stat['band']}:")
+            print(f"  Min: {band_stat['min']:.2f}")
+            print(f"  Max: {band_stat['max']:.2f}")
+            print(f"  Mean: {band_stat['mean']:.2f}")
+            print(f"  Std Dev: {band_stat['std']:.2f}")
+
+        # Show a preview if requested
+        if show_preview:
+            with rasterio.open(raster_path) as src:
+                # For multi-band images, show RGB composite or first band
+                if src.count >= 3:
+                    # Try to show RGB composite
+                    rgb = np.dstack([src.read(i) for i in range(1, 4)])
+                    plt.figure(figsize=figsize)
+                    plt.imshow(rgb)
+                    plt.title(f"RGB Preview: {raster_path}")
+                else:
+                    # Show first band for single-band images
+                    plt.figure(figsize=figsize)
+                    show(
+                        src.read(1),
+                        cmap="viridis",
+                        title=f"Band 1 Preview: {raster_path}",
+                    )
+                    plt.colorbar(label="Pixel Value")
+                plt.show()
+
+    except Exception as e:
+        print(f"Error reading raster: {str(e)}")
+
+
+def get_raster_info_gdal(raster_path):
+    """Get basic information about a raster dataset using GDAL.
+
+    Args:
+        raster_path (str): Path to the raster file
+
+    Returns:
+        dict: Dictionary containing the basic information about the raster,
+            or None if the file cannot be opened
+    """
+
+    from osgeo import gdal
+
+    # Open the dataset
+    ds = gdal.Open(raster_path)
+    if ds is None:
+        print(f"Error: Could not open {raster_path}")
+        return None
+
+    # Get basic information
+    info = {
+        "driver": ds.GetDriver().ShortName,
+        "width": ds.RasterXSize,
+        "height": ds.RasterYSize,
+        "count": ds.RasterCount,
+        "projection": ds.GetProjection(),
+        "geotransform": ds.GetGeoTransform(),
+    }
+
+    # Calculate resolution
+    gt = ds.GetGeoTransform()
+    if gt:
+        info["resolution"] = (abs(gt[1]), abs(gt[5]))
+        info["origin"] = (gt[0], gt[3])
+
+    # Get band information
+    bands_info = []
+    for i in range(1, ds.RasterCount + 1):
+        band = ds.GetRasterBand(i)
+        stats = band.GetStatistics(True, True)
+        band_info = {
+            "band": i,
+            "datatype": gdal.GetDataTypeName(band.DataType),
+            "min": stats[0],
+            "max": stats[1],
+            "mean": stats[2],
+            "std": stats[3],
+            "nodata": band.GetNoDataValue(),
+        }
+        bands_info.append(band_info)
+
+    info["bands"] = bands_info
+
+    # Close the dataset
+    ds = None
+
+    return info
+
+
+def get_vector_info(vector_path):
+    """Display basic information about a vector dataset using GeoPandas.
+
+    Args:
+        vector_path (str): Path to the vector file
+
+    Returns:
+        dict: Dictionary containing the basic information about the vector dataset
+    """
+    # Open the vector dataset
+    gdf = gpd.read_file(vector_path)
+
+    # Get basic metadata
+    info = {
+        "file_path": vector_path,
+        "driver": os.path.splitext(vector_path)[1][1:].upper(),  # Format from extension
+        "feature_count": len(gdf),
+        "crs": str(gdf.crs),
+        "geometry_type": str(gdf.geom_type.value_counts().to_dict()),
+        "attribute_count": len(gdf.columns) - 1,  # Subtract the geometry column
+        "attribute_names": list(gdf.columns[gdf.columns != "geometry"]),
+        "bounds": gdf.total_bounds.tolist(),
+    }
+
+    # Add statistics about numeric attributes
+    numeric_columns = gdf.select_dtypes(include=["number"]).columns
+    attribute_stats = {}
+    for col in numeric_columns:
+        if col != "geometry":
+            attribute_stats[col] = {
+                "min": gdf[col].min(),
+                "max": gdf[col].max(),
+                "mean": gdf[col].mean(),
+                "std": gdf[col].std(),
+                "null_count": gdf[col].isna().sum(),
+            }
+
+    info["attribute_stats"] = attribute_stats
+
+    return info
+
+
+def print_vector_info(vector_path, show_preview=True, figsize=(10, 8)):
+    """Print formatted information about a vector dataset and optionally show a preview.
+
+    Args:
+        vector_path (str): Path to the vector file
+        show_preview (bool, optional): Whether to display a visual preview of the vector data.
+            Defaults to True.
+        figsize (tuple, optional): Figure size as (width, height). Defaults to (10, 8).
+
+    Returns:
+        dict: Dictionary containing vector information if successful, None otherwise
+    """
+    try:
+        info = get_vector_info(vector_path)
+
+        # Print basic information
+        print(f"===== VECTOR INFORMATION: {vector_path} =====")
+        print(f"Driver: {info['driver']}")
+        print(f"Feature count: {info['feature_count']}")
+        print(f"Geometry types: {info['geometry_type']}")
+        print(f"Coordinate Reference System: {info['crs']}")
+        print(f"Bounds: {info['bounds']}")
+        print(f"Number of attributes: {info['attribute_count']}")
+        print(f"Attribute names: {', '.join(info['attribute_names'])}")
+
+        # Print attribute statistics
+        if info["attribute_stats"]:
+            print("\n----- Attribute Statistics -----")
+            for attr, stats in info["attribute_stats"].items():
+                print(f"Attribute: {attr}")
+                for stat_name, stat_value in stats.items():
+                    print(
+                        f"  {stat_name}: {stat_value:.4f}"
+                        if isinstance(stat_value, float)
+                        else f"  {stat_name}: {stat_value}"
+                    )
+
+        # Show a preview if requested
+        if show_preview:
+            gdf = gpd.read_file(vector_path)
+            fig, ax = plt.subplots(figsize=figsize)
+            gdf.plot(ax=ax, cmap="viridis")
+            ax.set_title(f"Preview: {vector_path}")
+            plt.tight_layout()
+            plt.show()
+
+            # # Show a sample of the attribute table
+            # if not gdf.empty:
+            #     print("\n----- Sample of attribute table (first 5 rows) -----")
+            #     print(gdf.head().to_string())
+
+    except Exception as e:
+        print(f"Error reading vector data: {str(e)}")
+
+
+# Alternative implementation using OGR directly
+def get_vector_info_ogr(vector_path):
+    """Get basic information about a vector dataset using OGR.
+
+    Args:
+        vector_path (str): Path to the vector file
+
+    Returns:
+        dict: Dictionary containing the basic information about the vector dataset,
+            or None if the file cannot be opened
+    """
+    from osgeo import ogr
+
+    # Register all OGR drivers
+    ogr.RegisterAll()
+
+    # Open the dataset
+    ds = ogr.Open(vector_path)
+    if ds is None:
+        print(f"Error: Could not open {vector_path}")
+        return None
+
+    # Basic dataset information
+    info = {
+        "file_path": vector_path,
+        "driver": ds.GetDriver().GetName(),
+        "layer_count": ds.GetLayerCount(),
+        "layers": [],
+    }
+
+    # Extract information for each layer
+    for i in range(ds.GetLayerCount()):
+        layer = ds.GetLayer(i)
+        layer_info = {
+            "name": layer.GetName(),
+            "feature_count": layer.GetFeatureCount(),
+            "geometry_type": ogr.GeometryTypeToName(layer.GetGeomType()),
+            "spatial_ref": (
+                layer.GetSpatialRef().ExportToWkt() if layer.GetSpatialRef() else "None"
+            ),
+            "extent": layer.GetExtent(),
+            "fields": [],
+        }
+
+        # Get field information
+        defn = layer.GetLayerDefn()
+        for j in range(defn.GetFieldCount()):
+            field_defn = defn.GetFieldDefn(j)
+            field_info = {
+                "name": field_defn.GetName(),
+                "type": field_defn.GetTypeName(),
+                "width": field_defn.GetWidth(),
+                "precision": field_defn.GetPrecision(),
+            }
+            layer_info["fields"].append(field_info)
+
+        info["layers"].append(layer_info)
+
+    # Close the dataset
+    ds = None
+
+    return info
+
+
+def analyze_vector_attributes(vector_path, attribute_name):
+    """Analyze a specific attribute in a vector dataset and create a histogram.
+
+    Args:
+        vector_path (str): Path to the vector file
+        attribute_name (str): Name of the attribute to analyze
+
+    Returns:
+        dict: Dictionary containing analysis results for the attribute
+    """
+    try:
+        gdf = gpd.read_file(vector_path)
+
+        # Check if attribute exists
+        if attribute_name not in gdf.columns:
+            print(f"Attribute '{attribute_name}' not found in the dataset")
+            return None
+
+        # Get the attribute series
+        attr = gdf[attribute_name]
+
+        # Perform different analyses based on data type
+        if pd.api.types.is_numeric_dtype(attr):
+            # Numeric attribute
+            analysis = {
+                "attribute": attribute_name,
+                "type": "numeric",
+                "count": attr.count(),
+                "null_count": attr.isna().sum(),
+                "min": attr.min(),
+                "max": attr.max(),
+                "mean": attr.mean(),
+                "median": attr.median(),
+                "std": attr.std(),
+                "unique_values": attr.nunique(),
+            }
+
+            # Create histogram
+            plt.figure(figsize=(10, 6))
+            plt.hist(attr.dropna(), bins=20, alpha=0.7, color="blue")
+            plt.title(f"Histogram of {attribute_name}")
+            plt.xlabel(attribute_name)
+            plt.ylabel("Frequency")
+            plt.grid(True, alpha=0.3)
+            plt.show()
+
+        else:
+            # Categorical attribute
+            analysis = {
+                "attribute": attribute_name,
+                "type": "categorical",
+                "count": attr.count(),
+                "null_count": attr.isna().sum(),
+                "unique_values": attr.nunique(),
+                "value_counts": attr.value_counts().to_dict(),
+            }
+
+            # Create bar plot for top categories
+            top_n = min(10, attr.nunique())
+            plt.figure(figsize=(10, 6))
+            attr.value_counts().head(top_n).plot(kind="bar", color="skyblue")
+            plt.title(f"Top {top_n} values for {attribute_name}")
+            plt.xlabel(attribute_name)
+            plt.ylabel("Count")
+            plt.xticks(rotation=45)
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            plt.show()
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error analyzing attribute: {str(e)}")
+        return None
+
+
+def visualize_vector_by_attribute(
+    vector_path, attribute_name, cmap="viridis", figsize=(10, 8)
+):
+    """Create a thematic map visualization of vector data based on an attribute.
+
+    Args:
+        vector_path (str): Path to the vector file
+        attribute_name (str): Name of the attribute to visualize
+        cmap (str, optional): Matplotlib colormap name. Defaults to 'viridis'.
+        figsize (tuple, optional): Figure size as (width, height). Defaults to (10, 8).
+
+    Returns:
+        bool: True if visualization was successful, False otherwise
+    """
+    try:
+        # Read the vector data
+        gdf = gpd.read_file(vector_path)
+
+        # Check if attribute exists
+        if attribute_name not in gdf.columns:
+            print(f"Attribute '{attribute_name}' not found in the dataset")
+            return False
+
+        # Create the plot
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # Determine plot type based on data type
+        if pd.api.types.is_numeric_dtype(gdf[attribute_name]):
+            # Continuous data
+            gdf.plot(column=attribute_name, cmap=cmap, legend=True, ax=ax)
+        else:
+            # Categorical data
+            gdf.plot(column=attribute_name, categorical=True, legend=True, ax=ax)
+
+        # Add title and labels
+        ax.set_title(f"{os.path.basename(vector_path)} - {attribute_name}")
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+
+        # Add basemap or additional elements if available
+        # Note: Additional options could be added here for more complex maps
+
+        plt.tight_layout()
+        plt.show()
+
+    except Exception as e:
+        print(f"Error visualizing data: {str(e)}")
 
 
 def raster_to_vector(
