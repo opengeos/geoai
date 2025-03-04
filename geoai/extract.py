@@ -470,6 +470,172 @@ class BuildingFootprintExtractor:
 
             return filtered_gdf
 
+    def masks_to_vector(
+        self,
+        mask_path,
+        output_path=None,
+        simplify_tolerance=None,
+        mask_threshold=None,
+        small_building_area=None,
+        nms_iou_threshold=None,
+    ):
+        """
+        Convert a building mask GeoTIFF to vector polygons and save as a vector dataset.
+
+        Args:
+            mask_path: Path to the building masks GeoTIFF
+            output_path: Path to save the output GeoJSON (default: mask_path with .geojson extension)
+            simplify_tolerance: Tolerance for polygon simplification (default: self.simplify_tolerance)
+            mask_threshold: Threshold for mask binarization (default: self.mask_threshold)
+            small_building_area: Minimum area in pixels to keep a building (default: self.small_building_area)
+            nms_iou_threshold: IoU threshold for non-maximum suppression (default: self.nms_iou_threshold)
+
+        Returns:
+            GeoDataFrame with building footprints
+        """
+        # Use class defaults if parameters not provided
+        simplify_tolerance = (
+            simplify_tolerance
+            if simplify_tolerance is not None
+            else self.simplify_tolerance
+        )
+        mask_threshold = (
+            mask_threshold if mask_threshold is not None else self.mask_threshold
+        )
+        small_building_area = (
+            small_building_area
+            if small_building_area is not None
+            else self.small_building_area
+        )
+        nms_iou_threshold = (
+            nms_iou_threshold
+            if nms_iou_threshold is not None
+            else self.nms_iou_threshold
+        )
+
+        # Set default output path if not provided
+        # if output_path is None:
+        #     output_path = os.path.splitext(mask_path)[0] + ".geojson"
+
+        print(f"Converting mask to GeoJSON with parameters:")
+        print(f"- Mask threshold: {mask_threshold}")
+        print(f"- Min building area: {small_building_area}")
+        print(f"- Simplify tolerance: {simplify_tolerance}")
+        print(f"- NMS IoU threshold: {nms_iou_threshold}")
+
+        # Open the mask raster
+        with rasterio.open(mask_path) as src:
+            # Read the mask data
+            mask_data = src.read(1)
+            transform = src.transform
+            crs = src.crs
+
+            # Print mask statistics
+            print(f"Mask dimensions: {mask_data.shape}")
+            print(f"Mask value range: {mask_data.min()} to {mask_data.max()}")
+
+            # Prepare for connected component analysis
+            # Binarize the mask based on threshold
+            binary_mask = (mask_data > (mask_threshold * 255)).astype(np.uint8)
+
+            # Apply morphological operations for better results (optional)
+            kernel = np.ones((3, 3), np.uint8)
+            binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel)
+
+            # Find connected components
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+                binary_mask, connectivity=8
+            )
+
+            print(
+                f"Found {num_labels-1} potential buildings"
+            )  # Subtract 1 for background
+
+            # Create list to store polygons and confidence values
+            all_polygons = []
+            all_confidences = []
+
+            # Process each component (skip the first one which is background)
+            for i in tqdm(range(1, num_labels)):
+                # Extract this building
+                area = stats[i, cv2.CC_STAT_AREA]
+
+                # Skip if too small
+                if area < small_building_area:
+                    continue
+
+                # Create a mask for this building
+                building_mask = (labels == i).astype(np.uint8)
+
+                # Find contours
+                contours, _ = cv2.findContours(
+                    building_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                )
+
+                # Process each contour
+                for contour in contours:
+                    # Skip if too few points
+                    if contour.shape[0] < 3:
+                        continue
+
+                    # Simplify contour if it has many points
+                    if contour.shape[0] > 50 and simplify_tolerance > 0:
+                        epsilon = simplify_tolerance * cv2.arcLength(contour, True)
+                        contour = cv2.approxPolyDP(contour, epsilon, True)
+
+                    # Convert to list of (x, y) coordinates
+                    polygon_points = contour.reshape(-1, 2)
+
+                    # Convert pixel coordinates to geographic coordinates
+                    geo_points = []
+                    for x, y in polygon_points:
+                        gx, gy = transform * (x, y)
+                        geo_points.append((gx, gy))
+
+                    # Create Shapely polygon
+                    if len(geo_points) >= 3:
+                        try:
+                            shapely_poly = Polygon(geo_points)
+                            if shapely_poly.is_valid and shapely_poly.area > 0:
+                                all_polygons.append(shapely_poly)
+
+                                # Calculate "confidence" as normalized size
+                                # This is a proxy since we don't have model confidence scores
+                                normalized_size = min(1.0, area / 1000)  # Cap at 1.0
+                                all_confidences.append(normalized_size)
+                        except Exception as e:
+                            print(f"Error creating polygon: {e}")
+
+            print(f"Created {len(all_polygons)} valid polygons")
+
+            # Create GeoDataFrame
+            if not all_polygons:
+                print("No valid polygons found")
+                return None
+
+            gdf = gpd.GeoDataFrame(
+                {
+                    "geometry": all_polygons,
+                    "confidence": all_confidences,
+                    "class": 1,  # Building class
+                },
+                crs=crs,
+            )
+
+            # Apply non-maximum suppression to remove overlapping polygons
+            gdf = self._filter_overlapping_polygons(
+                gdf, nms_iou_threshold=nms_iou_threshold
+            )
+
+            print(f"Final building count after filtering: {len(gdf)}")
+
+            # Save to file
+            if output_path is not None:
+                gdf.to_file(output_path)
+                print(f"Saved {len(gdf)} building footprints to {output_path}")
+
+            return gdf
+
     @torch.no_grad()
     def process_raster(
         self,

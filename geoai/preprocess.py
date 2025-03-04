@@ -13,13 +13,14 @@ import pandas as pd
 from rasterio.windows import Window
 from rasterio import features
 from rasterio.plot import show
-from shapely.geometry import box, shape, mapping
+from shapely.geometry import box, shape, mapping, Polygon
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torchvision.transforms import RandomRotation
 from shapely.affinity import rotate
 import torchgeo
 import torch
+import cv2
 
 
 def download_file(url, output_path=None, overwrite=False):
@@ -2799,3 +2800,202 @@ def export_training_data(
 
     # Return statistics
     return stats, out_folder
+
+
+def masks_to_vector(
+    mask_path,
+    output_path=None,
+    simplify_tolerance=1.0,
+    mask_threshold=0.5,
+    min_area=100,
+    nms_iou_threshold=0.5,
+):
+    """
+    Convert a building mask GeoTIFF to vector polygons and save as a vector dataset.
+
+    Args:
+        mask_path: Path to the building masks GeoTIFF
+        output_path: Path to save the output GeoJSON (default: mask_path with .geojson extension)
+        simplify_tolerance: Tolerance for polygon simplification (default: self.simplify_tolerance)
+        mask_threshold: Threshold for mask binarization (default: self.mask_threshold)
+        min_area: Minimum area in pixels to keep a building (default: self.small_building_area)
+        nms_iou_threshold: IoU threshold for non-maximum suppression (default: self.nms_iou_threshold)
+
+    Returns:
+        GeoDataFrame with building footprints
+    """
+    # Set default output path if not provided
+    # if output_path is None:
+    #     output_path = os.path.splitext(mask_path)[0] + ".geojson"
+
+    print(f"Converting mask to GeoJSON with parameters:")
+    print(f"- Mask threshold: {mask_threshold}")
+    print(f"- Min building area: {min_area}")
+    print(f"- Simplify tolerance: {simplify_tolerance}")
+    print(f"- NMS IoU threshold: {nms_iou_threshold}")
+
+    # Open the mask raster
+    with rasterio.open(mask_path) as src:
+        # Read the mask data
+        mask_data = src.read(1)
+        transform = src.transform
+        crs = src.crs
+
+        # Print mask statistics
+        print(f"Mask dimensions: {mask_data.shape}")
+        print(f"Mask value range: {mask_data.min()} to {mask_data.max()}")
+
+        # Prepare for connected component analysis
+        # Binarize the mask based on threshold
+        binary_mask = (mask_data > (mask_threshold * 255)).astype(np.uint8)
+
+        # Apply morphological operations for better results (optional)
+        kernel = np.ones((3, 3), np.uint8)
+        binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel)
+
+        # Find connected components
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            binary_mask, connectivity=8
+        )
+
+        print(f"Found {num_labels-1} potential buildings")  # Subtract 1 for background
+
+        # Create list to store polygons and confidence values
+        all_polygons = []
+        all_confidences = []
+
+        # Process each component (skip the first one which is background)
+        for i in tqdm(range(1, num_labels)):
+            # Extract this building
+            area = stats[i, cv2.CC_STAT_AREA]
+
+            # Skip if too small
+            if area < min_area:
+                continue
+
+            # Create a mask for this building
+            building_mask = (labels == i).astype(np.uint8)
+
+            # Find contours
+            contours, _ = cv2.findContours(
+                building_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+
+            # Process each contour
+            for contour in contours:
+                # Skip if too few points
+                if contour.shape[0] < 3:
+                    continue
+
+                # Simplify contour if it has many points
+                if contour.shape[0] > 50 and simplify_tolerance > 0:
+                    epsilon = simplify_tolerance * cv2.arcLength(contour, True)
+                    contour = cv2.approxPolyDP(contour, epsilon, True)
+
+                # Convert to list of (x, y) coordinates
+                polygon_points = contour.reshape(-1, 2)
+
+                # Convert pixel coordinates to geographic coordinates
+                geo_points = []
+                for x, y in polygon_points:
+                    gx, gy = transform * (x, y)
+                    geo_points.append((gx, gy))
+
+                # Create Shapely polygon
+                if len(geo_points) >= 3:
+                    try:
+                        shapely_poly = Polygon(geo_points)
+                        if shapely_poly.is_valid and shapely_poly.area > 0:
+                            all_polygons.append(shapely_poly)
+
+                            # Calculate "confidence" as normalized size
+                            # This is a proxy since we don't have model confidence scores
+                            normalized_size = min(1.0, area / 1000)  # Cap at 1.0
+                            all_confidences.append(normalized_size)
+                    except Exception as e:
+                        print(f"Error creating polygon: {e}")
+
+        print(f"Created {len(all_polygons)} valid polygons")
+
+        # Create GeoDataFrame
+        if not all_polygons:
+            print("No valid polygons found")
+            return None
+
+        gdf = gpd.GeoDataFrame(
+            {
+                "geometry": all_polygons,
+                "confidence": all_confidences,
+                "class": 1,  # Building class
+            },
+            crs=crs,
+        )
+
+        def filter_overlapping_polygons(gdf, **kwargs):
+            """
+            Filter overlapping polygons using non-maximum suppression.
+
+            Args:
+                gdf: GeoDataFrame with polygons
+                **kwargs: Optional parameters:
+                    nms_iou_threshold: IoU threshold for filtering
+
+            Returns:
+                Filtered GeoDataFrame
+            """
+            if len(gdf) <= 1:
+                return gdf
+
+            # Get parameters from kwargs or use instance defaults
+            iou_threshold = kwargs.get("nms_iou_threshold", nms_iou_threshold)
+
+            # Sort by confidence
+            gdf = gdf.sort_values("confidence", ascending=False)
+
+            # Fix any invalid geometries
+            gdf["geometry"] = gdf["geometry"].apply(
+                lambda geom: geom.buffer(0) if not geom.is_valid else geom
+            )
+
+            keep_indices = []
+            polygons = gdf.geometry.values
+
+            for i in range(len(polygons)):
+                if i in keep_indices:
+                    continue
+
+                keep = True
+                for j in keep_indices:
+                    # Skip invalid geometries
+                    if not polygons[i].is_valid or not polygons[j].is_valid:
+                        continue
+
+                    # Calculate IoU
+                    try:
+                        intersection = polygons[i].intersection(polygons[j]).area
+                        union = polygons[i].area + polygons[j].area - intersection
+                        iou = intersection / union if union > 0 else 0
+
+                        if iou > iou_threshold:
+                            keep = False
+                            break
+                    except Exception:
+                        # Skip on topology exceptions
+                        continue
+
+                if keep:
+                    keep_indices.append(i)
+
+            return gdf.iloc[keep_indices]
+
+        # Apply non-maximum suppression to remove overlapping polygons
+        gdf = filter_overlapping_polygons(gdf, nms_iou_threshold=nms_iou_threshold)
+
+        print(f"Final building count after filtering: {len(gdf)}")
+
+        # Save to file
+        if output_path is not None:
+            gdf.to_file(output_path)
+            print(f"Saved {len(gdf)} building footprints to {output_path}")
+
+        return gdf
