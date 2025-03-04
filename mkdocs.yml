@@ -89,6 +89,7 @@ nav:
     - Examples:
           - examples/download_data.ipynb
           - examples/view_metadata.ipynb
+          - examples/image_chips.ipynb
           - examples/data_visualization.ipynb
           - examples/samgeo/satellite.ipynb
           - examples/samgeo/automatic_mask_generator.ipynb

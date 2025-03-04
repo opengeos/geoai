@@ -1,4 +1,5 @@
 albumentations
+contextily
 geopandas
 huggingface_hub
 jupyter-server-proxy
