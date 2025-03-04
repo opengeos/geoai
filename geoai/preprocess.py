@@ -13,7 +13,7 @@ import pandas as pd
 from rasterio.windows import Window
 from rasterio import features
 from rasterio.plot import show
-from shapely.geometry import box, shape
+from shapely.geometry import box, shape, mapping
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torchvision.transforms import RandomRotation
@@ -1764,8 +1764,22 @@ def export_geotiff_tiles(
         return stats
 
 
-def create_overview_image(src, tile_coordinates, output_path, tile_size, stride):
-    """Create an overview image showing all tiles and their status."""
+def create_overview_image(
+    src, tile_coordinates, output_path, tile_size, stride, geojson_path=None
+):
+    """Create an overview image showing all tiles and their status, with optional GeoJSON export.
+
+    Args:
+        src (rasterio.io.DatasetReader): The source raster dataset.
+        tile_coordinates (list): A list of dictionaries containing tile information.
+        output_path (str): The path where the overview image will be saved.
+        tile_size (int): The size of each tile in pixels.
+        stride (int): The stride between tiles in pixels. Controls overlap between adjacent tiles.
+        geojson_path (str, optional): If provided, exports the tile rectangles as GeoJSON to this path.
+
+    Returns:
+        str: Path to the saved overview image.
+    """
     # Read a reduced version of the source image
     overview_scale = max(
         1, int(max(src.width, src.height) / 2000)
@@ -1798,6 +1812,10 @@ def create_overview_image(src, tile_coordinates, output_path, tile_size, stride)
     plt.figure(figsize=(12, 12))
     plt.imshow(rgb)
 
+    # If GeoJSON export is requested, prepare GeoJSON structures
+    if geojson_path:
+        features = []
+
     # Draw tile boundaries
     for tile in tile_coordinates:
         # Convert bounds to pixel coordinates in overview
@@ -1827,6 +1845,43 @@ def create_overview_image(src, tile_coordinates, output_path, tile_size, stride)
                 fontsize=8,
             )
 
+        # Add to GeoJSON features if exporting
+        if geojson_path:
+            # Create a polygon from the bounds (already in geo-coordinates)
+            minx, miny, maxx, maxy = bounds
+            polygon = box(minx, miny, maxx, maxy)
+
+            # Calculate overlap with neighboring tiles
+            overlap = 0
+            if stride < tile_size:
+                overlap = tile_size - stride
+
+            # Create a GeoJSON feature
+            feature = {
+                "type": "Feature",
+                "geometry": mapping(polygon),
+                "properties": {
+                    "index": tile["index"],
+                    "has_features": tile["has_features"],
+                    "bounds_pixel": [
+                        tile["x"],
+                        tile["y"],
+                        tile["x"] + tile_size,
+                        tile["y"] + tile_size,
+                    ],
+                    "tile_size_px": tile_size,
+                    "stride_px": stride,
+                    "overlap_px": overlap,
+                },
+            }
+
+            # Add any additional properties from the tile
+            for key, value in tile.items():
+                if key not in ["x", "y", "index", "has_features", "bounds"]:
+                    feature["properties"][key] = value
+
+            features.append(feature)
+
     plt.title("Tile Overview (Green = Contains Features, Red = Empty)")
     plt.axis("off")
     plt.tight_layout()
@@ -1834,6 +1889,135 @@ def create_overview_image(src, tile_coordinates, output_path, tile_size, stride)
     plt.close()
 
     print(f"Overview image saved to {output_path}")
+
+    # Export GeoJSON if requested
+    if geojson_path:
+        geojson_collection = {
+            "type": "FeatureCollection",
+            "features": features,
+            "properties": {
+                "crs": (
+                    src.crs.to_string()
+                    if hasattr(src.crs, "to_string")
+                    else str(src.crs)
+                ),
+                "total_tiles": len(features),
+                "source_raster_dimensions": [src.width, src.height],
+            },
+        }
+
+        # Save to file
+        with open(geojson_path, "w") as f:
+            json.dump(geojson_collection, f)
+
+        print(f"GeoJSON saved to {geojson_path}")
+
+    return output_path
+
+
+def export_tiles_to_geojson(
+    tile_coordinates, src, output_path, tile_size=None, stride=None
+):
+    """
+    Export tile rectangles directly to GeoJSON without creating an overview image.
+
+    Args:
+        tile_coordinates (list): A list of dictionaries containing tile information.
+        src (rasterio.io.DatasetReader): The source raster dataset.
+        output_path (str): The path where the GeoJSON will be saved.
+        tile_size (int, optional): The size of each tile in pixels. Only needed if not in tile_coordinates.
+        stride (int, optional): The stride between tiles in pixels. Used to calculate overlaps between tiles.
+
+    Returns:
+        str: Path to the saved GeoJSON file.
+    """
+    features = []
+
+    for tile in tile_coordinates:
+        # Get the size from the tile or use the provided parameter
+        tile_width = tile.get("width", tile.get("size", tile_size))
+        tile_height = tile.get("height", tile.get("size", tile_size))
+
+        if tile_width is None or tile_height is None:
+            raise ValueError(
+                "Tile size not found in tile data and no tile_size parameter provided"
+            )
+
+        # Get bounds from the tile
+        if "bounds" in tile:
+            # If bounds are already in geo coordinates
+            minx, miny, maxx, maxy = tile["bounds"]
+        else:
+            # Try to calculate bounds from transform if available
+            if hasattr(src, "transform"):
+                # Convert pixel coordinates to geo coordinates
+                window_transform = src.transform
+                x, y = tile["x"], tile["y"]
+                minx = window_transform[2] + x * window_transform[0]
+                maxy = window_transform[5] + y * window_transform[4]
+                maxx = minx + tile_width * window_transform[0]
+                miny = maxy + tile_height * window_transform[4]
+            else:
+                raise ValueError(
+                    "Cannot determine bounds. Neither 'bounds' in tile nor transform in src."
+                )
+
+        # Calculate overlap with neighboring tiles if stride is provided
+        overlap = 0
+        if stride is not None and stride < tile_width:
+            overlap = tile_width - stride
+
+        # Create a polygon from the bounds
+        polygon = box(minx, miny, maxx, maxy)
+
+        # Create a GeoJSON feature
+        feature = {
+            "type": "Feature",
+            "geometry": mapping(polygon),
+            "properties": {
+                "index": tile["index"],
+                "has_features": tile.get("has_features", False),
+                "tile_width_px": tile_width,
+                "tile_height_px": tile_height,
+            },
+        }
+
+        # Add overlap information if stride is provided
+        if stride is not None:
+            feature["properties"]["stride_px"] = stride
+            feature["properties"]["overlap_px"] = overlap
+
+        # Add additional properties from the tile
+        for key, value in tile.items():
+            if key not in ["bounds", "geometry"]:
+                feature["properties"][key] = value
+
+        features.append(feature)
+
+    # Create the GeoJSON collection
+    geojson_collection = {
+        "type": "FeatureCollection",
+        "features": features,
+        "properties": {
+            "crs": (
+                src.crs.to_string() if hasattr(src.crs, "to_string") else str(src.crs)
+            ),
+            "total_tiles": len(features),
+            "source_raster_dimensions": (
+                [src.width, src.height] if hasattr(src, "width") else None
+            ),
+        },
+    }
+
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+
+    # Save to file
+    with open(output_path, "w") as f:
+        json.dump(geojson_collection, f)
+
+    print(f"GeoJSON saved to {output_path}")
+    return output_path
 
 
 def export_training_data(
