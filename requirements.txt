@@ -1,9 +1,11 @@
 albumentations
+contextily
 geopandas
 huggingface_hub
 jupyter-server-proxy
 leafmap
 localtileserver
+mapclassify
 overturemaps
 planetary-computer
 pystac-client

@@ -4,7 +4,7 @@ import os
 from collections.abc import Iterable
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, Callable
 import matplotlib.pyplot as plt
-
+import geopandas as gpd
 import leafmap
 import torch
 import numpy as np
@@ -436,3 +436,188 @@ def dict_to_image(
     else:
         image = leafmap.array_to_image(da, **kwargs)
         return image
+
+
+def viz_vector(
+    vector_data,
+    column=None,
+    cmap="viridis",
+    figsize=(10, 10),
+    title=None,
+    legend=True,
+    basemap=False,
+    alpha=0.7,
+    edge_color="black",
+    classification="quantiles",
+    n_classes=5,
+    highlight_index=None,
+    highlight_color="red",
+    scheme=None,
+    save_path=None,
+    dpi=300,
+):
+    """
+    Visualize vector datasets with options for styling, classification, basemaps and more.
+
+    This function visualizes GeoDataFrame objects with customizable symbology.
+    It supports different vector types (points, lines, polygons), attribute-based
+    classification, and background basemaps.
+
+    Args:
+        vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.
+        column (str, optional): Column to use for choropleth mapping. If None,
+            a single color will be used. Defaults to None.
+        cmap (str or matplotlib.colors.Colormap, optional): Colormap to use for
+            choropleth mapping. Defaults to "viridis".
+        figsize (tuple, optional): Figure size as (width, height) in inches.
+            Defaults to (10, 10).
+        title (str, optional): Title for the plot. Defaults to None.
+        legend (bool, optional): Whether to display a legend. Defaults to True.
+        basemap (bool, optional): Whether to add a web basemap. Requires contextily.
+            Defaults to False.
+        alpha (float, optional): Transparency of the vector features, between 0-1.
+            Defaults to 0.7.
+        edge_color (str, optional): Color for feature edges. Defaults to "black".
+        classification (str, optional): Classification method for choropleth maps.
+            Options: "quantiles", "equal_interval", "natural_breaks".
+            Defaults to "quantiles".
+        n_classes (int, optional): Number of classes for choropleth maps.
+            Defaults to 5.
+        highlight_index (list, optional): List of indices to highlight.
+            Defaults to None.
+        highlight_color (str, optional): Color to use for highlighted features.
+            Defaults to "red".
+        scheme (str, optional): MapClassify classification scheme. Overrides
+            classification parameter if provided. Defaults to None.
+        save_path (str, optional): Path to save the figure. If None, the figure
+            is not saved. Defaults to None.
+        dpi (int, optional): DPI for saved figure. Defaults to 300.
+
+    Returns:
+        matplotlib.axes.Axes: The Axes object containing the plot.
+
+    Examples:
+        >>> import geopandas as gpd
+        >>> cities = gpd.read_file("cities.shp")
+        >>> viz_vector(cities, "population", cmap="Reds", basemap=True)
+
+        >>> roads = gpd.read_file("roads.shp")
+        >>> viz_vector(roads, "type", basemap=True, figsize=(12, 8))
+    """
+    import contextily as ctx
+
+    if isinstance(vector_data, str):
+        vector_data = gpd.read_file(vector_data)
+
+    # Check if input is a GeoDataFrame
+    if not isinstance(vector_data, gpd.GeoDataFrame):
+        raise TypeError("Input data must be a GeoDataFrame")
+
+    # Make a copy to avoid changing the original data
+    gdf = vector_data.copy()
+
+    # Set up figure and axis
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Determine geometry type
+    geom_type = gdf.geometry.iloc[0].geom_type
+
+    # Plotting parameters
+    plot_kwargs = {"alpha": alpha, "ax": ax}
+
+    # Set up keyword arguments based on geometry type
+    if "Point" in geom_type:
+        plot_kwargs["markersize"] = 50
+        plot_kwargs["edgecolor"] = edge_color
+    elif "Line" in geom_type:
+        plot_kwargs["linewidth"] = 1
+    elif "Polygon" in geom_type:
+        plot_kwargs["edgecolor"] = edge_color
+
+    # Classification options
+    if column is not None:
+        if scheme is not None:
+            # Use mapclassify scheme if provided
+            plot_kwargs["scheme"] = scheme
+        else:
+            # Use classification parameter
+            if classification == "quantiles":
+                plot_kwargs["scheme"] = "quantiles"
+            elif classification == "equal_interval":
+                plot_kwargs["scheme"] = "equal_interval"
+            elif classification == "natural_breaks":
+                plot_kwargs["scheme"] = "fisher_jenks"
+
+        plot_kwargs["k"] = n_classes
+        plot_kwargs["cmap"] = cmap
+        plot_kwargs["column"] = column
+        plot_kwargs["legend"] = legend
+
+    # Plot the main data
+    gdf.plot(**plot_kwargs)
+
+    # Highlight specific features if requested
+    if highlight_index is not None:
+        gdf.iloc[highlight_index].plot(
+            ax=ax, color=highlight_color, edgecolor="black", linewidth=2, zorder=5
+        )
+
+    # Add basemap if requested
+    if basemap:
+        try:
+            ctx.add_basemap(ax, crs=gdf.crs, source=ctx.providers.OpenStreetMap.Mapnik)
+        except Exception as e:
+            print(f"Could not add basemap: {e}")
+
+    # Set title if provided
+    if title:
+        ax.set_title(title, fontsize=14)
+
+    # Remove axes if not needed
+    ax.set_axis_off()
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save figure if a path is provided
+    if save_path:
+        plt.savefig(save_path, dpi=dpi, bbox_inches="tight")
+
+    return ax
+
+
+def viz_vector_interactive(
+    vector_data,
+    **kwargs,
+):
+    """
+    Visualize vector datasets with options for styling, classification, basemaps and more.
+
+    This function visualizes GeoDataFrame objects with customizable symbology.
+    It supports different vector types (points, lines, polygons), attribute-based
+    classification, and background basemaps.
+
+    Args:
+        vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.
+        **kwargs: Additional keyword arguments to pass to GeoDataFrame.explore() function.
+        See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html
+
+    Returns:
+        folium.Map: The map object with the vector data added.
+
+    Examples:
+        >>> import geopandas as gpd
+        >>> cities = gpd.read_file("cities.shp")
+        >>> viz_vector_interactive(cities)
+
+        >>> roads = gpd.read_file("roads.shp")
+        >>> viz_vector_interactive(roads, figsize=(12, 8))
+    """
+    if isinstance(vector_data, str):
+        vector_data = gpd.read_file(vector_data)
+
+    # Check if input is a GeoDataFrame
+    if not isinstance(vector_data, gpd.GeoDataFrame):
+        raise TypeError("Input data must be a GeoDataFrame")
+
+    return vector_data.explore(**kwargs)
