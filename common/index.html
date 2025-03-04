@@ -1089,36 +1089,36 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_image" class="md-nav__link">
+  <a href="#geoai.common.view_image" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_image()
+      view_image()
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_raster" class="md-nav__link">
+  <a href="#geoai.common.view_raster" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_raster()
+      view_raster()
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_vector" class="md-nav__link">
+  <a href="#geoai.common.view_vector" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_vector()
+      view_vector()
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_vector_interactive" class="md-nav__link">
+  <a href="#geoai.common.view_vector_interactive" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_vector_interactive()
+      view_vector_interactive()
     </span>
   </a>
   
@@ -1318,36 +1318,36 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_image" class="md-nav__link">
+  <a href="#geoai.common.view_image" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_image()
+      view_image()
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_raster" class="md-nav__link">
+  <a href="#geoai.common.view_raster" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_raster()
+      view_raster()
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_vector" class="md-nav__link">
+  <a href="#geoai.common.view_vector" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_vector()
+      view_vector()
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#geoai.common.viz_vector_interactive" class="md-nav__link">
+  <a href="#geoai.common.view_vector_interactive" class="md-nav__link">
     <span class="md-ellipsis">
-      viz_vector_interactive()
+      view_vector_interactive()
     </span>
   </a>
   
@@ -2146,11 +2146,11 @@ Credit to the torchgeo developers for the original implementation.</p>
 
 
 
-<h2 id="geoai.common.viz_image" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">viz_image</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">transpose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">bdx</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scale_factor</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">axis_off</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<h2 id="geoai.common.view_image" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">view_image</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">transpose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">bdx</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scale_factor</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">axis_off</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 
-<a href="#geoai.common.viz_image" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#geoai.common.view_image" class="headerlink" title="Permanent link">&para;</a></h2>
 
     <div class="doc doc-contents ">
 
@@ -2234,7 +2234,7 @@ Credit to the torchgeo developers for the original implementation.</p>
 </table>
         <details class="quote">
           <summary>Source code in <code>geoai/common.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">viz_image</span><span class="p">(</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_image</span><span class="p">(</span>
     <span class="n">image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">transpose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">bdx</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2299,11 +2299,11 @@ Credit to the torchgeo developers for the original implementation.</p>
 
 
 
-<h2 id="geoai.common.viz_raster" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">viz_raster</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">indexes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attribution</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s1">&#39;Raster&#39;</span><span class="p">,</span> <span class="n">layer_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">zoom_to_layer</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">visible</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">array_args</span><span class="o">=</span><span class="p">{},</span> <span class="n">client_args</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;cors_all&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">basemap</span><span class="o">=</span><span class="s1">&#39;OpenStreetMap&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<h2 id="geoai.common.view_raster" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">view_raster</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">indexes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attribution</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s1">&#39;Raster&#39;</span><span class="p">,</span> <span class="n">layer_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">zoom_to_layer</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">visible</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">array_args</span><span class="o">=</span><span class="p">{},</span> <span class="n">client_args</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;cors_all&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">basemap</span><span class="o">=</span><span class="s1">&#39;OpenStreetMap&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 
-<a href="#geoai.common.viz_raster" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#geoai.common.view_raster" class="headerlink" title="Permanent link">&para;</a></h2>
 
     <div class="doc doc-contents ">
 
@@ -2435,7 +2435,7 @@ Credit to the torchgeo developers for the original implementation.</p>
 </table>
         <details class="quote">
           <summary>Source code in <code>geoai/common.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">viz_raster</span><span class="p">(</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_raster</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">indexes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">colormap</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2513,11 +2513,11 @@ Credit to the torchgeo developers for the original implementation.</p>
 
 
 
-<h2 id="geoai.common.viz_vector" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">viz_vector</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">edge_color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">classification</span><span class="o">=</span><span class="s1">&#39;quantiles&#39;</span><span class="p">,</span> <span class="n">n_classes</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">highlight_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">highlight_color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span></code>
+<h2 id="geoai.common.view_vector" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">view_vector</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">edge_color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">classification</span><span class="o">=</span><span class="s1">&#39;quantiles&#39;</span><span class="p">,</span> <span class="n">n_classes</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">highlight_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">highlight_color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span></code>
 
 
-<a href="#geoai.common.viz_vector" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#geoai.common.view_vector" class="headerlink" title="Permanent link">&para;</a></h2>
 
     <div class="doc doc-contents ">
 
@@ -2665,15 +2665,15 @@ is not saved. Defaults to None.</p></td>
 <p><strong>Examples:</strong></p>
     <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">cities</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;cities.shp&quot;</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector</span><span class="p">(</span><span class="n">cities</span><span class="p">,</span> <span class="s2">&quot;population&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;Reds&quot;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">view_vector</span><span class="p">(</span><span class="n">cities</span><span class="p">,</span> <span class="s2">&quot;population&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;Reds&quot;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
     <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">roads</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;roads.shp&quot;</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector</span><span class="p">(</span><span class="n">roads</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">view_vector</span><span class="p">(</span><span class="n">roads</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
 </code></pre></div>
 
         <details class="quote">
           <summary>Source code in <code>geoai/common.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">viz_vector</span><span class="p">(</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_vector</span><span class="p">(</span>
     <span class="n">vector_data</span><span class="p">,</span>
     <span class="n">column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">,</span>
@@ -2734,10 +2734,10 @@ is not saved. Defaults to None.</p></td>
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; import geopandas as gpd</span>
 <span class="sd">        &gt;&gt;&gt; cities = gpd.read_file(&quot;cities.shp&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; viz_vector(cities, &quot;population&quot;, cmap=&quot;Reds&quot;, basemap=True)</span>
+<span class="sd">        &gt;&gt;&gt; view_vector(cities, &quot;population&quot;, cmap=&quot;Reds&quot;, basemap=True)</span>
 
 <span class="sd">        &gt;&gt;&gt; roads = gpd.read_file(&quot;roads.shp&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; viz_vector(roads, &quot;type&quot;, basemap=True, figsize=(12, 8))</span>
+<span class="sd">        &gt;&gt;&gt; view_vector(roads, &quot;type&quot;, basemap=True, figsize=(12, 8))</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">contextily</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ctx</span>
 
@@ -2831,11 +2831,11 @@ is not saved. Defaults to None.</p></td>
 
 
 
-<h2 id="geoai.common.viz_vector_interactive" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">viz_vector_interactive</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<h2 id="geoai.common.view_vector_interactive" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">view_vector_interactive</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 
-<a href="#geoai.common.viz_vector_interactive" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#geoai.common.view_vector_interactive" class="headerlink" title="Permanent link">&para;</a></h2>
 
     <div class="doc doc-contents ">
 
@@ -2893,15 +2893,15 @@ classification, and background basemaps.</p>
 <p><strong>Examples:</strong></p>
     <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
 <span class="o">&gt;&gt;&gt;</span> <span class="n">cities</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;cities.shp&quot;</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector_interactive</span><span class="p">(</span><span class="n">cities</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">view_vector_interactive</span><span class="p">(</span><span class="n">cities</span><span class="p">)</span>
 </code></pre></div>
     <div class="highlight"><pre><span></span><code><span class="o">&gt;&gt;&gt;</span> <span class="n">roads</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;roads.shp&quot;</span><span class="p">)</span>
-<span class="o">&gt;&gt;&gt;</span> <span class="n">viz_vector_interactive</span><span class="p">(</span><span class="n">roads</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">view_vector_interactive</span><span class="p">(</span><span class="n">roads</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
 </code></pre></div>
 
         <details class="quote">
           <summary>Source code in <code>geoai/common.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">viz_vector_interactive</span><span class="p">(</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_vector_interactive</span><span class="p">(</span>
     <span class="n">vector_data</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">):</span>
@@ -2923,10 +2923,10 @@ classification, and background basemaps.</p>
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; import geopandas as gpd</span>
 <span class="sd">        &gt;&gt;&gt; cities = gpd.read_file(&quot;cities.shp&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; viz_vector_interactive(cities)</span>
+<span class="sd">        &gt;&gt;&gt; view_vector_interactive(cities)</span>
 
 <span class="sd">        &gt;&gt;&gt; roads = gpd.read_file(&quot;roads.shp&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; viz_vector_interactive(roads, figsize=(12, 8))</span>
+<span class="sd">        &gt;&gt;&gt; view_vector_interactive(roads, figsize=(12, 8))</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
         <span class="n">vector_data</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">vector_data</span><span class="p">)</span>
