@@ -616,6 +616,7 @@ def view_vector_interactive(
         >>> view_vector_interactive(roads, figsize=(12, 8))
     """
     import folium
+    import folium.plugins as plugins
 
     google_tiles = {
         "Roadmap": {
@@ -659,6 +660,7 @@ def view_vector_interactive(
         raise TypeError("Input data must be a GeoDataFrame")
 
     layer_control = kwargs.pop("layer_control", True)
+    fullscreen_control = kwargs.pop("fullscreen_control", True)
 
     m = vector_data.explore(**kwargs)
 
@@ -671,5 +673,8 @@ def view_vector_interactive(
 
     if layer_control:
         m.add_child(folium.LayerControl())
+
+    if fullscreen_control:
+        plugins.Fullscreen().add_to(m)
 
     return m
