@@ -47,10 +47,17 @@ plugins:
     - mkdocs-jupyter:
           include_source: True
           ignore_h1_titles: True
-          execute: false
+          execute: true
           allow_errors: false
           ignore: ["conf.py"]
-          execute_ignore: ["*ignore.ipynb"]
+          execute_ignore:
+              [
+                  "examples/dataviz/*.ipynb",
+                  "examples/rastervision/*.ipynb",
+                  "examples/samgeo/*.ipynb",
+                  "examples/data_visualization.ipynb",
+                  "examples/download_data.ipynb",
+              ]
 
 markdown_extensions:
     - admonition
@@ -81,6 +88,7 @@ nav:
     - Report Issues: https://github.com/opengeos/geoai/issues
     - Examples:
           - examples/download_data.ipynb
+          - examples/view_metadata.ipynb
           - examples/data_visualization.ipynb
           - examples/samgeo/satellite.ipynb
           - examples/samgeo/automatic_mask_generator.ipynb
