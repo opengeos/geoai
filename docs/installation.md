@@ -76,6 +76,14 @@ If you encounter issues with the sqlite package, you can update it using the fol
 mamba update -c conda-forge sqlite
 ```
 
+### Notes for Windows Users
+
+If you use mamba to install geoai, you may not have the latest version of torchgeo, which may cause issues when importing geoai. To fix this, you can install the latest version of torchgeo using the following command:
+
+```bash
+pip install -U torchgeo
+```
+
 ### 👩‍💻 Development Installation
 
 For contributing to GeoAI development, install directly from the source repository:

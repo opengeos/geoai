@@ -18,9 +18,15 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torchvision.transforms import RandomRotation
 from shapely.affinity import rotate
-import torchgeo
 import torch
 import cv2
+
+try:
+    import torchgeo
+except ImportError as e:
+    raise ImportError(
+        "Your torchgeo version is too old. Please upgrade to the latest version using 'pip install -U torchgeo'."
+    )
 
 
 def download_file(url, output_path=None, overwrite=False):
