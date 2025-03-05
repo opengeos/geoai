@@ -697,3 +697,345 @@ def view_vector_interactive(
         plugins.Fullscreen().add_to(m)
 
     return m
+
+
+def regularize_building_footprints(
+    building_polygons,
+    angle_tolerance=10,
+    simplify_tolerance=0.5,
+    orthogonalize=True,
+    preserve_topology=True,
+):
+    """
+    Regularizes building footprint polygons with multiple techniques beyond minimum
+    rotated rectangles.
+
+    Args:
+        building_polygons: GeoDataFrame or list of shapely Polygons containing building footprints
+        angle_tolerance: Degrees within which angles will be regularized to 90/180 degrees
+        simplify_tolerance: Distance tolerance for Douglas-Peucker simplification
+        orthogonalize: Whether to enforce orthogonal angles in the final polygons
+        preserve_topology: Whether to preserve topology during simplification
+
+    Returns:
+        GeoDataFrame or list of shapely Polygons with regularized building footprints
+    """
+    from shapely.geometry import Polygon, shape
+    from shapely.affinity import rotate, translate
+    from shapely import wkt
+
+    regularized_buildings = []
+
+    # Check if we're dealing with a GeoDataFrame
+    if isinstance(building_polygons, gpd.GeoDataFrame):
+        geom_objects = building_polygons.geometry
+    else:
+        geom_objects = building_polygons
+
+    for building in geom_objects:
+        # Handle potential string representations of geometries
+        if isinstance(building, str):
+            try:
+                # Try to parse as WKT
+                building = wkt.loads(building)
+            except Exception:
+                print(f"Failed to parse geometry string: {building[:30]}...")
+                continue
+
+        # Ensure we have a valid geometry
+        if not hasattr(building, "simplify"):
+            print(f"Invalid geometry type: {type(building)}")
+            continue
+
+        # Step 1: Simplify to remove noise and small vertices
+        simplified = building.simplify(
+            simplify_tolerance, preserve_topology=preserve_topology
+        )
+
+        if orthogonalize:
+            # Make sure we have a valid polygon with an exterior
+            if not hasattr(simplified, "exterior") or simplified.exterior is None:
+                print(f"Simplified geometry has no exterior: {simplified}")
+                regularized_buildings.append(building)  # Use original instead
+                continue
+
+            # Step 2: Get the dominant angle to rotate building
+            coords = np.array(simplified.exterior.coords)
+
+            # Make sure we have enough coordinates for angle calculation
+            if len(coords) < 3:
+                print(f"Not enough coordinates for angle calculation: {len(coords)}")
+                regularized_buildings.append(building)  # Use original instead
+                continue
+
+            segments = np.diff(coords, axis=0)
+            angles = np.arctan2(segments[:, 1], segments[:, 0]) * 180 / np.pi
+
+            # Find most common angle classes (0, 90, 180, 270 degrees)
+            binned_angles = np.round(angles / 90) * 90
+            dominant_angle = np.bincount(binned_angles.astype(int) % 180).argmax()
+
+            # Step 3: Rotate to align with axes, regularize, then rotate back
+            rotated = rotate(simplified, -dominant_angle, origin="centroid")
+
+            # Step 4: Rectify coordinates to enforce right angles
+            ext_coords = np.array(rotated.exterior.coords)
+            rect_coords = []
+
+            # Regularize each vertex to create orthogonal corners
+            for i in range(len(ext_coords) - 1):
+                rect_coords.append(ext_coords[i])
+
+                # Check if we need to add a right-angle vertex
+                angle = (
+                    np.arctan2(
+                        ext_coords[(i + 1) % (len(ext_coords) - 1), 1]
+                        - ext_coords[i, 1],
+                        ext_coords[(i + 1) % (len(ext_coords) - 1), 0]
+                        - ext_coords[i, 0],
+                    )
+                    * 180
+                    / np.pi
+                )
+
+                if abs(angle % 90) > angle_tolerance and abs(angle % 90) < (
+                    90 - angle_tolerance
+                ):
+                    # Add intermediate point to create right angle
+                    rect_coords.append(
+                        [
+                            ext_coords[(i + 1) % (len(ext_coords) - 1), 0],
+                            ext_coords[i, 1],
+                        ]
+                    )
+
+            # Close the polygon by adding the first point again
+            rect_coords.append(rect_coords[0])
+
+            # Create regularized polygon and rotate back
+            regularized = Polygon(rect_coords)
+            final_building = rotate(regularized, dominant_angle, origin="centroid")
+        else:
+            final_building = simplified
+
+        regularized_buildings.append(final_building)
+
+    # If input was a GeoDataFrame, return a GeoDataFrame
+    if isinstance(building_polygons, gpd.GeoDataFrame):
+        return gpd.GeoDataFrame(
+            geometry=regularized_buildings, crs=building_polygons.crs
+        )
+    else:
+        return regularized_buildings
+
+
+def hybrid_building_regularization(building_polygons):
+    """
+    A comprehensive hybrid approach to building footprint regularization.
+
+    Applies different strategies based on building characteristics.
+
+    Args:
+        building_polygons: GeoDataFrame or list of shapely Polygons containing building footprints
+
+    Returns:
+        GeoDataFrame or list of shapely Polygons with regularized building footprints
+    """
+    from shapely.geometry import Polygon
+    from shapely.affinity import rotate
+
+    # Use minimum_rotated_rectangle instead of oriented_envelope
+    try:
+        from shapely.minimum_rotated_rectangle import minimum_rotated_rectangle
+    except ImportError:
+        # For older Shapely versions
+        def minimum_rotated_rectangle(geom):
+            """Calculate the minimum rotated rectangle for a geometry"""
+            # For older Shapely versions, implement a simple version
+            return geom.minimum_rotated_rectangle
+
+    # Determine input type for correct return
+    is_gdf = isinstance(building_polygons, gpd.GeoDataFrame)
+
+    # Extract geometries if GeoDataFrame
+    if is_gdf:
+        geom_objects = building_polygons.geometry
+    else:
+        geom_objects = building_polygons
+
+    results = []
+
+    for building in geom_objects:
+        # 1. Analyze building characteristics
+        if not hasattr(building, "exterior") or building.is_empty:
+            results.append(building)
+            continue
+
+        # Calculate shape complexity metrics
+        complexity = building.length / (4 * np.sqrt(building.area))
+
+        # Calculate dominant angle
+        coords = np.array(building.exterior.coords)[:-1]
+        segments = np.diff(np.vstack([coords, coords[0]]), axis=0)
+        segment_lengths = np.sqrt(segments[:, 0] ** 2 + segments[:, 1] ** 2)
+        segment_angles = np.arctan2(segments[:, 1], segments[:, 0]) * 180 / np.pi
+
+        # Weight angles by segment length
+        hist, bins = np.histogram(
+            segment_angles % 180, bins=36, range=(0, 180), weights=segment_lengths
+        )
+        bin_centers = (bins[:-1] + bins[1:]) / 2
+        dominant_angle = bin_centers[np.argmax(hist)]
+
+        # Check if building is close to orthogonal
+        is_orthogonal = min(dominant_angle % 45, 45 - (dominant_angle % 45)) < 5
+
+        # 2. Apply appropriate regularization strategy
+        if complexity > 1.5:
+            # Complex buildings: use minimum rotated rectangle
+            result = minimum_rotated_rectangle(building)
+        elif is_orthogonal:
+            # Near-orthogonal buildings: orthogonalize in place
+            rotated = rotate(building, -dominant_angle, origin="centroid")
+
+            # Create orthogonal hull in rotated space
+            bounds = rotated.bounds
+            ortho_hull = Polygon(
+                [
+                    (bounds[0], bounds[1]),
+                    (bounds[2], bounds[1]),
+                    (bounds[2], bounds[3]),
+                    (bounds[0], bounds[3]),
+                ]
+            )
+
+            result = rotate(ortho_hull, dominant_angle, origin="centroid")
+        else:
+            # Diagonal buildings: use custom approach for diagonal buildings
+            # Rotate to align with axes
+            rotated = rotate(building, -dominant_angle, origin="centroid")
+
+            # Simplify in rotated space
+            simplified = rotated.simplify(0.3, preserve_topology=True)
+
+            # Get the bounds in rotated space
+            bounds = simplified.bounds
+            min_x, min_y, max_x, max_y = bounds
+
+            # Create a rectangular hull in rotated space
+            rect_poly = Polygon(
+                [(min_x, min_y), (max_x, min_y), (max_x, max_y), (min_x, max_y)]
+            )
+
+            # Rotate back to original orientation
+            result = rotate(rect_poly, dominant_angle, origin="centroid")
+
+        results.append(result)
+
+    # Return in same format as input
+    if is_gdf:
+        return gpd.GeoDataFrame(geometry=results, crs=building_polygons.crs)
+    else:
+        return results
+
+
+def adaptive_building_regularization(
+    building_polygons, simplify_tolerance=0.5, area_threshold=0.9, preserve_shape=True
+):
+    """
+    Adaptively regularizes building footprints based on their characteristics.
+
+    This approach determines the best regularization method for each building.
+
+    Args:
+        building_polygons: GeoDataFrame or list of shapely Polygons
+        simplify_tolerance: Distance tolerance for simplification
+        area_threshold: Minimum acceptable area ratio
+        preserve_shape: Whether to preserve overall shape for complex buildings
+
+    Returns:
+        GeoDataFrame or list of shapely Polygons with regularized building footprints
+    """
+    from shapely.geometry import Polygon
+    from shapely.affinity import rotate
+
+    # Analyze the overall dataset to set appropriate parameters
+    if is_gdf := isinstance(building_polygons, gpd.GeoDataFrame):
+        geom_objects = building_polygons.geometry
+    else:
+        geom_objects = building_polygons
+
+    results = []
+
+    for building in geom_objects:
+        # Skip invalid geometries
+        if not hasattr(building, "exterior") or building.is_empty:
+            results.append(building)
+            continue
+
+        # Measure building complexity
+        complexity = building.length / (4 * np.sqrt(building.area))
+
+        # Determine if the building has a clear principal direction
+        coords = np.array(building.exterior.coords)[:-1]
+        segments = np.diff(np.vstack([coords, coords[0]]), axis=0)
+        segment_lengths = np.sqrt(segments[:, 0] ** 2 + segments[:, 1] ** 2)
+        angles = np.arctan2(segments[:, 1], segments[:, 0]) * 180 / np.pi
+
+        # Normalize angles to 0-180 range and get histogram
+        norm_angles = angles % 180
+        hist, bins = np.histogram(
+            norm_angles, bins=18, range=(0, 180), weights=segment_lengths
+        )
+
+        # Calculate direction clarity (ratio of longest direction to total)
+        direction_clarity = np.max(hist) / np.sum(hist) if np.sum(hist) > 0 else 0
+
+        # Choose regularization method based on building characteristics
+        if complexity < 1.2 and direction_clarity > 0.5:
+            # Simple building with clear direction: use rotated rectangle
+            bin_max = np.argmax(hist)
+            bin_centers = (bins[:-1] + bins[1:]) / 2
+            dominant_angle = bin_centers[bin_max]
+
+            # Rotate to align with coordinate system
+            rotated = rotate(building, -dominant_angle, origin="centroid")
+
+            # Create bounding box in rotated space
+            bounds = rotated.bounds
+            rect = Polygon(
+                [
+                    (bounds[0], bounds[1]),
+                    (bounds[2], bounds[1]),
+                    (bounds[2], bounds[3]),
+                    (bounds[0], bounds[3]),
+                ]
+            )
+
+            # Rotate back
+            result = rotate(rect, dominant_angle, origin="centroid")
+
+            # Quality check
+            if (
+                result.area / building.area < area_threshold
+                or result.area / building.area > (1.0 / area_threshold)
+            ):
+                # Too much area change, use simplified original
+                result = building.simplify(simplify_tolerance, preserve_topology=True)
+
+        else:
+            # Complex building or no clear direction: preserve shape
+            if preserve_shape:
+                # Simplify with topology preservation
+                result = building.simplify(simplify_tolerance, preserve_topology=True)
+            else:
+                # Fall back to convex hull for very complex shapes
+                result = building.convex_hull
+
+        results.append(result)
+
+    # Return in same format as input
+    if is_gdf:
+        return gpd.GeoDataFrame(geometry=results, crs=building_polygons.crs)
+    else:
+        return results
