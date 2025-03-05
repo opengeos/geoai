@@ -111,8 +111,8 @@ nav:
           - examples/dataviz/lidar_viz.ipynb
     - API Reference:
           - geoai module: geoai.md
-          - common module: common.md
           - download module: download.md
           - extract module: extract.md
           - preprocess module: preprocess.md
           - segmentation module: segmentation.md
+          - utils module: utils.md
