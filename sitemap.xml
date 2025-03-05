@@ -9,10 +9,6 @@
          <lastmod>2025-03-05</lastmod>
     </url>
     <url>
-         <loc>https://geoai.gishub.org/common/</loc>
-         <lastmod>2025-03-05</lastmod>
-    </url>
-    <url>
          <loc>https://geoai.gishub.org/contributing/</loc>
          <lastmod>2025-03-05</lastmod>
     </url>
@@ -46,6 +42,10 @@
     </url>
     <url>
          <loc>https://geoai.gishub.org/usage/</loc>
+         <lastmod>2025-03-05</lastmod>
+    </url>
+    <url>
+         <loc>https://geoai.gishub.org/utils/</loc>
          <lastmod>2025-03-05</lastmod>
     </url>
     <url>
