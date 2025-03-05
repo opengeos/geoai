@@ -699,7 +699,7 @@ def view_vector_interactive(
     return m
 
 
-def regularize_building_footprints(
+def regularization(
     building_polygons,
     angle_tolerance=10,
     simplify_tolerance=0.5,
@@ -829,7 +829,7 @@ def regularize_building_footprints(
         return regularized_buildings
 
 
-def hybrid_building_regularization(building_polygons):
+def hybrid_regularization(building_polygons):
     """
     A comprehensive hybrid approach to building footprint regularization.
 
@@ -939,7 +939,7 @@ def hybrid_building_regularization(building_polygons):
         return results
 
 
-def adaptive_building_regularization(
+def adaptive_regularization(
     building_polygons, simplify_tolerance=0.5, area_threshold=0.9, preserve_shape=True
 ):
     """
