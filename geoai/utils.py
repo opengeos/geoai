@@ -12,9 +12,15 @@ import xarray as xr
 import rioxarray
 import rasterio as rio
 from torch.utils.data import DataLoader
-from torchgeo.datasets import RasterDataset, stack_samples, unbind_samples, utils
-from torchgeo.samplers import RandomGeoSampler, Units
-from torchgeo.transforms import indices
+
+try:
+    from torchgeo.datasets import RasterDataset, stack_samples, unbind_samples, utils
+    from torchgeo.samplers import RandomGeoSampler, Units
+    from torchgeo.transforms import indices
+except ImportError as e:
+    raise ImportError(
+        "Your torchgeo version is too old. Please upgrade to the latest version using 'pip install -U torchgeo'."
+    )
 
 
 def view_raster(
@@ -1039,3 +1045,38 @@ def adaptive_regularization(
         return gpd.GeoDataFrame(geometry=results, crs=building_polygons.crs)
     else:
         return results
+
+
+def install_package(package):
+    """Install a Python package.
+
+    Args:
+        package (str | list): The package name or a GitHub URL or a list of package names or GitHub URLs.
+    """
+    import subprocess
+
+    if isinstance(package, str):
+        packages = [package]
+    elif isinstance(package, list):
+        packages = package
+    else:
+        raise ValueError("The package argument must be a string or a list of strings.")
+
+    for package in packages:
+        if package.startswith("https"):
+            package = f"git+{package}"
+
+        # Execute pip install command and show output in real-time
+        command = f"pip install {package}"
+        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+
+        # Print output in real-time
+        while True:
+            output = process.stdout.readline()
+            if output == b"" and process.poll() is not None:
+                break
+            if output:
+                print(output.decode("utf-8").strip())
+
+        # Wait for process to complete
+        process.wait()

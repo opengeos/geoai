@@ -7,7 +7,6 @@ import geopandas as gpd
 from tqdm import tqdm
 
 import cv2
-from torchgeo.datasets import NonGeoDataset
 from torchvision.models.detection import maskrcnn_resnet50_fpn
 import torchvision.transforms as T
 import rasterio
@@ -15,6 +14,13 @@ from rasterio.windows import Window
 from rasterio.features import shapes
 from huggingface_hub import hf_hub_download
 from .preprocess import get_raster_stats
+
+try:
+    from torchgeo.datasets import NonGeoDataset
+except ImportError as e:
+    raise ImportError(
+        "Your torchgeo version is too old. Please upgrade to the latest version using 'pip install -U torchgeo'."
+    )
 
 
 class BuildingFootprintDataset(NonGeoDataset):
