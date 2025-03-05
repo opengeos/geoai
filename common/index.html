@@ -537,6 +537,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/building_regularization/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building regularization
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/data_visualization/" class="md-nav__link">
         
   
@@ -1035,6 +1057,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.common.adaptive_building_regularization" class="md-nav__link">
+    <span class="md-ellipsis">
+      adaptive_building_regularization()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.common.calc_stats" class="md-nav__link">
     <span class="md-ellipsis">
       calc_stats()
@@ -1062,6 +1093,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.common.hybrid_building_regularization" class="md-nav__link">
+    <span class="md-ellipsis">
+      hybrid_building_regularization()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.common.plot_batch" class="md-nav__link">
     <span class="md-ellipsis">
       plot_batch()
@@ -1083,6 +1123,15 @@
   <a href="#geoai.common.plot_masks" class="md-nav__link">
     <span class="md-ellipsis">
       plot_masks()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.regularize_building_footprints" class="md-nav__link">
+    <span class="md-ellipsis">
+      regularize_building_footprints()
     </span>
   </a>
   
@@ -1264,6 +1313,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.common.adaptive_building_regularization" class="md-nav__link">
+    <span class="md-ellipsis">
+      adaptive_building_regularization()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.common.calc_stats" class="md-nav__link">
     <span class="md-ellipsis">
       calc_stats()
@@ -1291,6 +1349,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.common.hybrid_building_regularization" class="md-nav__link">
+    <span class="md-ellipsis">
+      hybrid_building_regularization()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.common.plot_batch" class="md-nav__link">
     <span class="md-ellipsis">
       plot_batch()
@@ -1312,6 +1379,15 @@
   <a href="#geoai.common.plot_masks" class="md-nav__link">
     <span class="md-ellipsis">
       plot_masks()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.common.regularize_building_footprints" class="md-nav__link">
+    <span class="md-ellipsis">
+      regularize_building_footprints()
     </span>
   </a>
   
@@ -1393,6 +1469,183 @@
 
 
 
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.adaptive_building_regularization" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">adaptive_building_regularization</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">,</span> <span class="n">simplify_tolerance</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">area_threshold</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">preserve_shape</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.adaptive_building_regularization" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Adaptively regularizes building footprints based on their characteristics.</p>
+<p>This approach determines the best regularization method for each building.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>building_polygons</code></td>
+        <td></td>
+        <td><p>GeoDataFrame or list of shapely Polygons</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>simplify_tolerance</code></td>
+        <td></td>
+        <td><p>Distance tolerance for simplification</p></td>
+        <td><code>0.5</code></td>
+      </tr>
+      <tr>
+        <td><code>area_threshold</code></td>
+        <td></td>
+        <td><p>Minimum acceptable area ratio</p></td>
+        <td><code>0.9</code></td>
+      </tr>
+      <tr>
+        <td><code>preserve_shape</code></td>
+        <td></td>
+        <td><p>Whether to preserve overall shape for complex buildings</p></td>
+        <td><code>True</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td></td>
+      <td><p>GeoDataFrame or list of shapely Polygons with regularized building footprints</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">adaptive_building_regularization</span><span class="p">(</span>
+    <span class="n">building_polygons</span><span class="p">,</span> <span class="n">simplify_tolerance</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">area_threshold</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">preserve_shape</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Adaptively regularizes building footprints based on their characteristics.</span>
+
+<span class="sd">    This approach determines the best regularization method for each building.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        building_polygons: GeoDataFrame or list of shapely Polygons</span>
+<span class="sd">        simplify_tolerance: Distance tolerance for simplification</span>
+<span class="sd">        area_threshold: Minimum acceptable area ratio</span>
+<span class="sd">        preserve_shape: Whether to preserve overall shape for complex buildings</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        GeoDataFrame or list of shapely Polygons with regularized building footprints</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shapely.geometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Polygon</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shapely.affinity</span><span class="w"> </span><span class="kn">import</span> <span class="n">rotate</span>
+
+    <span class="c1"># Analyze the overall dataset to set appropriate parameters</span>
+    <span class="k">if</span> <span class="n">is_gdf</span> <span class="o">:=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">):</span>
+        <span class="n">geom_objects</span> <span class="o">=</span> <span class="n">building_polygons</span><span class="o">.</span><span class="n">geometry</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">geom_objects</span> <span class="o">=</span> <span class="n">building_polygons</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">building</span> <span class="ow">in</span> <span class="n">geom_objects</span><span class="p">:</span>
+        <span class="c1"># Skip invalid geometries</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">building</span><span class="p">,</span> <span class="s2">&quot;exterior&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">building</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">building</span><span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Measure building complexity</span>
+        <span class="n">complexity</span> <span class="o">=</span> <span class="n">building</span><span class="o">.</span><span class="n">length</span> <span class="o">/</span> <span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">building</span><span class="o">.</span><span class="n">area</span><span class="p">))</span>
+
+        <span class="c1"># Determine if the building has a clear principal direction</span>
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">building</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">coords</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">segments</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">coords</span><span class="p">,</span> <span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]]),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">segment_lengths</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">segments</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">segments</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">segments</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">segments</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+
+        <span class="c1"># Normalize angles to 0-180 range and get histogram</span>
+        <span class="n">norm_angles</span> <span class="o">=</span> <span class="n">angles</span> <span class="o">%</span> <span class="mi">180</span>
+        <span class="n">hist</span><span class="p">,</span> <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span>
+            <span class="n">norm_angles</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">180</span><span class="p">),</span> <span class="n">weights</span><span class="o">=</span><span class="n">segment_lengths</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Calculate direction clarity (ratio of longest direction to total)</span>
+        <span class="n">direction_clarity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+
+        <span class="c1"># Choose regularization method based on building characteristics</span>
+        <span class="k">if</span> <span class="n">complexity</span> <span class="o">&lt;</span> <span class="mf">1.2</span> <span class="ow">and</span> <span class="n">direction_clarity</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">:</span>
+            <span class="c1"># Simple building with clear direction: use rotated rectangle</span>
+            <span class="n">bin_max</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span>
+            <span class="n">bin_centers</span> <span class="o">=</span> <span class="p">(</span><span class="n">bins</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">bins</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span> <span class="o">/</span> <span class="mi">2</span>
+            <span class="n">dominant_angle</span> <span class="o">=</span> <span class="n">bin_centers</span><span class="p">[</span><span class="n">bin_max</span><span class="p">]</span>
+
+            <span class="c1"># Rotate to align with coordinate system</span>
+            <span class="n">rotated</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">building</span><span class="p">,</span> <span class="o">-</span><span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Create bounding box in rotated space</span>
+            <span class="n">bounds</span> <span class="o">=</span> <span class="n">rotated</span><span class="o">.</span><span class="n">bounds</span>
+            <span class="n">rect</span> <span class="o">=</span> <span class="n">Polygon</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Rotate back</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">rect</span><span class="p">,</span> <span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Quality check</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">area</span> <span class="o">/</span> <span class="n">building</span><span class="o">.</span><span class="n">area</span> <span class="o">&lt;</span> <span class="n">area_threshold</span>
+                <span class="ow">or</span> <span class="n">result</span><span class="o">.</span><span class="n">area</span> <span class="o">/</span> <span class="n">building</span><span class="o">.</span><span class="n">area</span> <span class="o">&gt;</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">area_threshold</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="c1"># Too much area change, use simplified original</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">building</span><span class="o">.</span><span class="n">simplify</span><span class="p">(</span><span class="n">simplify_tolerance</span><span class="p">,</span> <span class="n">preserve_topology</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Complex building or no clear direction: preserve shape</span>
+            <span class="k">if</span> <span class="n">preserve_shape</span><span class="p">:</span>
+                <span class="c1"># Simplify with topology preservation</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">building</span><span class="o">.</span><span class="n">simplify</span><span class="p">(</span><span class="n">simplify_tolerance</span><span class="p">,</span> <span class="n">preserve_topology</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Fall back to convex hull for very complex shapes</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">building</span><span class="o">.</span><span class="n">convex_hull</span>
+
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="c1"># Return in same format as input</span>
+    <span class="k">if</span> <span class="n">is_gdf</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">(</span><span class="n">geometry</span><span class="o">=</span><span class="n">results</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="n">building_polygons</span><span class="o">.</span><span class="n">crs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">results</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
 
 
 
@@ -1807,6 +2060,173 @@ dataset sampler.</p>
 
 
 
+<h2 id="geoai.common.hybrid_building_regularization" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">hybrid_building_regularization</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.hybrid_building_regularization" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>A comprehensive hybrid approach to building footprint regularization.</p>
+<p>Applies different strategies based on building characteristics.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>building_polygons</code></td>
+        <td></td>
+        <td><p>GeoDataFrame or list of shapely Polygons containing building footprints</p></td>
+        <td><em>required</em></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td></td>
+      <td><p>GeoDataFrame or list of shapely Polygons with regularized building footprints</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">hybrid_building_regularization</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A comprehensive hybrid approach to building footprint regularization.</span>
+
+<span class="sd">    Applies different strategies based on building characteristics.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        building_polygons: GeoDataFrame or list of shapely Polygons containing building footprints</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        GeoDataFrame or list of shapely Polygons with regularized building footprints</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shapely.geometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Polygon</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shapely.affinity</span><span class="w"> </span><span class="kn">import</span> <span class="n">rotate</span>
+
+    <span class="c1"># Use minimum_rotated_rectangle instead of oriented_envelope</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">shapely.minimum_rotated_rectangle</span><span class="w"> </span><span class="kn">import</span> <span class="n">minimum_rotated_rectangle</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="c1"># For older Shapely versions</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">minimum_rotated_rectangle</span><span class="p">(</span><span class="n">geom</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Calculate the minimum rotated rectangle for a geometry&quot;&quot;&quot;</span>
+            <span class="c1"># For older Shapely versions, implement a simple version</span>
+            <span class="k">return</span> <span class="n">geom</span><span class="o">.</span><span class="n">minimum_rotated_rectangle</span>
+
+    <span class="c1"># Determine input type for correct return</span>
+    <span class="n">is_gdf</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">)</span>
+
+    <span class="c1"># Extract geometries if GeoDataFrame</span>
+    <span class="k">if</span> <span class="n">is_gdf</span><span class="p">:</span>
+        <span class="n">geom_objects</span> <span class="o">=</span> <span class="n">building_polygons</span><span class="o">.</span><span class="n">geometry</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">geom_objects</span> <span class="o">=</span> <span class="n">building_polygons</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">building</span> <span class="ow">in</span> <span class="n">geom_objects</span><span class="p">:</span>
+        <span class="c1"># 1. Analyze building characteristics</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">building</span><span class="p">,</span> <span class="s2">&quot;exterior&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">building</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">building</span><span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Calculate shape complexity metrics</span>
+        <span class="n">complexity</span> <span class="o">=</span> <span class="n">building</span><span class="o">.</span><span class="n">length</span> <span class="o">/</span> <span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">building</span><span class="o">.</span><span class="n">area</span><span class="p">))</span>
+
+        <span class="c1"># Calculate dominant angle</span>
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">building</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">coords</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">segments</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">coords</span><span class="p">,</span> <span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]]),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">segment_lengths</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">segments</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">segments</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">segment_angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">segments</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">segments</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+
+        <span class="c1"># Weight angles by segment length</span>
+        <span class="n">hist</span><span class="p">,</span> <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span>
+            <span class="n">segment_angles</span> <span class="o">%</span> <span class="mi">180</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">36</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">180</span><span class="p">),</span> <span class="n">weights</span><span class="o">=</span><span class="n">segment_lengths</span>
+        <span class="p">)</span>
+        <span class="n">bin_centers</span> <span class="o">=</span> <span class="p">(</span><span class="n">bins</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">bins</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">dominant_angle</span> <span class="o">=</span> <span class="n">bin_centers</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">hist</span><span class="p">)]</span>
+
+        <span class="c1"># Check if building is close to orthogonal</span>
+        <span class="n">is_orthogonal</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">dominant_angle</span> <span class="o">%</span> <span class="mi">45</span><span class="p">,</span> <span class="mi">45</span> <span class="o">-</span> <span class="p">(</span><span class="n">dominant_angle</span> <span class="o">%</span> <span class="mi">45</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mi">5</span>
+
+        <span class="c1"># 2. Apply appropriate regularization strategy</span>
+        <span class="k">if</span> <span class="n">complexity</span> <span class="o">&gt;</span> <span class="mf">1.5</span><span class="p">:</span>
+            <span class="c1"># Complex buildings: use minimum rotated rectangle</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">minimum_rotated_rectangle</span><span class="p">(</span><span class="n">building</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">is_orthogonal</span><span class="p">:</span>
+            <span class="c1"># Near-orthogonal buildings: orthogonalize in place</span>
+            <span class="n">rotated</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">building</span><span class="p">,</span> <span class="o">-</span><span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Create orthogonal hull in rotated space</span>
+            <span class="n">bounds</span> <span class="o">=</span> <span class="n">rotated</span><span class="o">.</span><span class="n">bounds</span>
+            <span class="n">ortho_hull</span> <span class="o">=</span> <span class="n">Polygon</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+                    <span class="p">(</span><span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+
+            <span class="n">result</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">ortho_hull</span><span class="p">,</span> <span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Diagonal buildings: use custom approach for diagonal buildings</span>
+            <span class="c1"># Rotate to align with axes</span>
+            <span class="n">rotated</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">building</span><span class="p">,</span> <span class="o">-</span><span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Simplify in rotated space</span>
+            <span class="n">simplified</span> <span class="o">=</span> <span class="n">rotated</span><span class="o">.</span><span class="n">simplify</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">preserve_topology</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># Get the bounds in rotated space</span>
+            <span class="n">bounds</span> <span class="o">=</span> <span class="n">simplified</span><span class="o">.</span><span class="n">bounds</span>
+            <span class="n">min_x</span><span class="p">,</span> <span class="n">min_y</span><span class="p">,</span> <span class="n">max_x</span><span class="p">,</span> <span class="n">max_y</span> <span class="o">=</span> <span class="n">bounds</span>
+
+            <span class="c1"># Create a rectangular hull in rotated space</span>
+            <span class="n">rect_poly</span> <span class="o">=</span> <span class="n">Polygon</span><span class="p">(</span>
+                <span class="p">[(</span><span class="n">min_x</span><span class="p">,</span> <span class="n">min_y</span><span class="p">),</span> <span class="p">(</span><span class="n">max_x</span><span class="p">,</span> <span class="n">min_y</span><span class="p">),</span> <span class="p">(</span><span class="n">max_x</span><span class="p">,</span> <span class="n">max_y</span><span class="p">),</span> <span class="p">(</span><span class="n">min_x</span><span class="p">,</span> <span class="n">max_y</span><span class="p">)]</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Rotate back to original orientation</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">rect_poly</span><span class="p">,</span> <span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="c1"># Return in same format as input</span>
+    <span class="k">if</span> <span class="n">is_gdf</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">(</span><span class="n">geometry</span><span class="o">=</span><span class="n">results</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="n">building_polygons</span><span class="o">.</span><span class="n">crs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">results</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
 <h2 id="geoai.common.plot_batch" class="doc doc-heading">
 <code class="highlight language-python"><span class="n">plot_batch</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">bright</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">cols</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">chnls</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;Blues&#39;</span><span class="p">)</span></code>
 
@@ -2134,6 +2554,217 @@ Credit to the torchgeo developers for the original implementation.</p>
     <span class="k">for</span> <span class="n">mask</span><span class="p">,</span> <span class="n">ax</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">masks</span><span class="p">,</span> <span class="n">axs</span><span class="p">):</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">mask</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cmap</span><span class="p">)</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.common.regularize_building_footprints" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">regularize_building_footprints</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">,</span> <span class="n">angle_tolerance</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">simplify_tolerance</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">orthogonalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">preserve_topology</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+
+<a href="#geoai.common.regularize_building_footprints" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Regularizes building footprint polygons with multiple techniques beyond minimum
+rotated rectangles.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>building_polygons</code></td>
+        <td></td>
+        <td><p>GeoDataFrame or list of shapely Polygons containing building footprints</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>angle_tolerance</code></td>
+        <td></td>
+        <td><p>Degrees within which angles will be regularized to 90/180 degrees</p></td>
+        <td><code>10</code></td>
+      </tr>
+      <tr>
+        <td><code>simplify_tolerance</code></td>
+        <td></td>
+        <td><p>Distance tolerance for Douglas-Peucker simplification</p></td>
+        <td><code>0.5</code></td>
+      </tr>
+      <tr>
+        <td><code>orthogonalize</code></td>
+        <td></td>
+        <td><p>Whether to enforce orthogonal angles in the final polygons</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>preserve_topology</code></td>
+        <td></td>
+        <td><p>Whether to preserve topology during simplification</p></td>
+        <td><code>True</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td></td>
+      <td><p>GeoDataFrame or list of shapely Polygons with regularized building footprints</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/common.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">regularize_building_footprints</span><span class="p">(</span>
+    <span class="n">building_polygons</span><span class="p">,</span>
+    <span class="n">angle_tolerance</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">simplify_tolerance</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">orthogonalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">preserve_topology</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Regularizes building footprint polygons with multiple techniques beyond minimum</span>
+<span class="sd">    rotated rectangles.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        building_polygons: GeoDataFrame or list of shapely Polygons containing building footprints</span>
+<span class="sd">        angle_tolerance: Degrees within which angles will be regularized to 90/180 degrees</span>
+<span class="sd">        simplify_tolerance: Distance tolerance for Douglas-Peucker simplification</span>
+<span class="sd">        orthogonalize: Whether to enforce orthogonal angles in the final polygons</span>
+<span class="sd">        preserve_topology: Whether to preserve topology during simplification</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        GeoDataFrame or list of shapely Polygons with regularized building footprints</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shapely.geometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Polygon</span><span class="p">,</span> <span class="n">shape</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shapely.affinity</span><span class="w"> </span><span class="kn">import</span> <span class="n">rotate</span><span class="p">,</span> <span class="n">translate</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">shapely</span><span class="w"> </span><span class="kn">import</span> <span class="n">wkt</span>
+
+    <span class="n">regularized_buildings</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Check if we&#39;re dealing with a GeoDataFrame</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">):</span>
+        <span class="n">geom_objects</span> <span class="o">=</span> <span class="n">building_polygons</span><span class="o">.</span><span class="n">geometry</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">geom_objects</span> <span class="o">=</span> <span class="n">building_polygons</span>
+
+    <span class="k">for</span> <span class="n">building</span> <span class="ow">in</span> <span class="n">geom_objects</span><span class="p">:</span>
+        <span class="c1"># Handle potential string representations of geometries</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">building</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Try to parse as WKT</span>
+                <span class="n">building</span> <span class="o">=</span> <span class="n">wkt</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">building</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to parse geometry string: </span><span class="si">{</span><span class="n">building</span><span class="p">[:</span><span class="mi">30</span><span class="p">]</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+        <span class="c1"># Ensure we have a valid geometry</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">building</span><span class="p">,</span> <span class="s2">&quot;simplify&quot;</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid geometry type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">building</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Step 1: Simplify to remove noise and small vertices</span>
+        <span class="n">simplified</span> <span class="o">=</span> <span class="n">building</span><span class="o">.</span><span class="n">simplify</span><span class="p">(</span>
+            <span class="n">simplify_tolerance</span><span class="p">,</span> <span class="n">preserve_topology</span><span class="o">=</span><span class="n">preserve_topology</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">orthogonalize</span><span class="p">:</span>
+            <span class="c1"># Make sure we have a valid polygon with an exterior</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">simplified</span><span class="p">,</span> <span class="s2">&quot;exterior&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">simplified</span><span class="o">.</span><span class="n">exterior</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Simplified geometry has no exterior: </span><span class="si">{</span><span class="n">simplified</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">regularized_buildings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">building</span><span class="p">)</span>  <span class="c1"># Use original instead</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Step 2: Get the dominant angle to rotate building</span>
+            <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">simplified</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">coords</span><span class="p">)</span>
+
+            <span class="c1"># Make sure we have enough coordinates for angle calculation</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">coords</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Not enough coordinates for angle calculation: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">coords</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">regularized_buildings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">building</span><span class="p">)</span>  <span class="c1"># Use original instead</span>
+                <span class="k">continue</span>
+
+            <span class="n">segments</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">segments</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">segments</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+
+            <span class="c1"># Find most common angle classes (0, 90, 180, 270 degrees)</span>
+            <span class="n">binned_angles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">angles</span> <span class="o">/</span> <span class="mi">90</span><span class="p">)</span> <span class="o">*</span> <span class="mi">90</span>
+            <span class="n">dominant_angle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">binned_angles</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span> <span class="o">%</span> <span class="mi">180</span><span class="p">)</span><span class="o">.</span><span class="n">argmax</span><span class="p">()</span>
+
+            <span class="c1"># Step 3: Rotate to align with axes, regularize, then rotate back</span>
+            <span class="n">rotated</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">simplified</span><span class="p">,</span> <span class="o">-</span><span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Step 4: Rectify coordinates to enforce right angles</span>
+            <span class="n">ext_coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rotated</span><span class="o">.</span><span class="n">exterior</span><span class="o">.</span><span class="n">coords</span><span class="p">)</span>
+            <span class="n">rect_coords</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="c1"># Regularize each vertex to create orthogonal corners</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ext_coords</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">rect_coords</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ext_coords</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+
+                <span class="c1"># Check if we need to add a right-angle vertex</span>
+                <span class="n">angle</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span>
+                        <span class="n">ext_coords</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ext_coords</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">]</span>
+                        <span class="o">-</span> <span class="n">ext_coords</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                        <span class="n">ext_coords</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ext_coords</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">0</span><span class="p">]</span>
+                        <span class="o">-</span> <span class="n">ext_coords</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+                    <span class="p">)</span>
+                    <span class="o">*</span> <span class="mi">180</span>
+                    <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">angle</span> <span class="o">%</span> <span class="mi">90</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">angle_tolerance</span> <span class="ow">and</span> <span class="nb">abs</span><span class="p">(</span><span class="n">angle</span> <span class="o">%</span> <span class="mi">90</span><span class="p">)</span> <span class="o">&lt;</span> <span class="p">(</span>
+                    <span class="mi">90</span> <span class="o">-</span> <span class="n">angle_tolerance</span>
+                <span class="p">):</span>
+                    <span class="c1"># Add intermediate point to create right angle</span>
+                    <span class="n">rect_coords</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="p">[</span>
+                            <span class="n">ext_coords</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ext_coords</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">0</span><span class="p">],</span>
+                            <span class="n">ext_coords</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                        <span class="p">]</span>
+                    <span class="p">)</span>
+
+            <span class="c1"># Close the polygon by adding the first point again</span>
+            <span class="n">rect_coords</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rect_coords</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+            <span class="c1"># Create regularized polygon and rotate back</span>
+            <span class="n">regularized</span> <span class="o">=</span> <span class="n">Polygon</span><span class="p">(</span><span class="n">rect_coords</span><span class="p">)</span>
+            <span class="n">final_building</span> <span class="o">=</span> <span class="n">rotate</span><span class="p">(</span><span class="n">regularized</span><span class="p">,</span> <span class="n">dominant_angle</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;centroid&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">final_building</span> <span class="o">=</span> <span class="n">simplified</span>
+
+        <span class="n">regularized_buildings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">final_building</span><span class="p">)</span>
+
+    <span class="c1"># If input was a GeoDataFrame, return a GeoDataFrame</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">building_polygons</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">(</span>
+            <span class="n">geometry</span><span class="o">=</span><span class="n">regularized_buildings</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="n">building_polygons</span><span class="o">.</span><span class="n">crs</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">regularized_buildings</span>
 </code></pre></div>
         </details>
     </div>
