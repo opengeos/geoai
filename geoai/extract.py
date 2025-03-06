@@ -13,7 +13,7 @@ import rasterio
 from rasterio.windows import Window
 from rasterio.features import shapes
 from huggingface_hub import hf_hub_download
-from .preprocess import get_raster_stats
+from .utils import get_raster_stats
 
 try:
     from torchgeo.datasets import NonGeoDataset

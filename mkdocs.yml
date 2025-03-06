@@ -113,6 +113,5 @@ nav:
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
-          - preprocess module: preprocess.md
           - segmentation module: segmentation.md
           - utils module: utils.md
