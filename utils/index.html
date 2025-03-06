@@ -1161,6 +1161,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.utils.create_split_map" class="md-nav__link">
+    <span class="md-ellipsis">
+      create_split_map()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.utils.dict_to_image" class="md-nav__link">
     <span class="md-ellipsis">
       dict_to_image()
@@ -1332,6 +1341,15 @@
   <a href="#geoai.utils.calc_stats" class="md-nav__link">
     <span class="md-ellipsis">
       calc_stats()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.utils.create_split_map" class="md-nav__link">
+    <span class="md-ellipsis">
+      create_split_map()
     </span>
   </a>
   
@@ -1767,6 +1785,231 @@ mean for the whole dataset for computing individual stds.</p>
     <span class="c1"># at the end, we shall have 2 vectors with length n=chnls</span>
     <span class="c1"># we will average them considering the number of images</span>
     <span class="k">return</span> <span class="n">accum_mean</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">),</span> <span class="n">accum_std</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.utils.create_split_map" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">create_split_map</span><span class="p">(</span><span class="n">left_layer</span><span class="o">=</span><span class="s1">&#39;TERRAIN&#39;</span><span class="p">,</span> <span class="n">right_layer</span><span class="o">=</span><span class="s1">&#39;OpenTopoMap&#39;</span><span class="p">,</span> <span class="n">left_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">right_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">left_array_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">right_array_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">zoom_control</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fullscreen_control</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">layer_control</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">add_close_button</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">left_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">right_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">left_position</span><span class="o">=</span><span class="s1">&#39;bottomleft&#39;</span><span class="p">,</span> <span class="n">right_position</span><span class="o">=</span><span class="s1">&#39;bottomright&#39;</span><span class="p">,</span> <span class="n">widget_layout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">draggable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">zoom</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="s1">&#39;600px&#39;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">basemap_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+
+<a href="#geoai.utils.create_split_map" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Adds split map.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>left_layer</code></td>
+        <td><code>str</code></td>
+        <td><p>The left tile layer. Can be a local file path, HTTP URL, or a basemap name. Defaults to 'TERRAIN'.</p></td>
+        <td><code>&#39;TERRAIN&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>right_layer</code></td>
+        <td><code>str</code></td>
+        <td><p>The right tile layer. Can be a local file path, HTTP URL, or a basemap name. Defaults to 'OpenTopoMap'.</p></td>
+        <td><code>&#39;OpenTopoMap&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>left_args</code></td>
+        <td><code>dict</code></td>
+        <td><p>The arguments for the left tile layer. Defaults to {}.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>right_args</code></td>
+        <td><code>dict</code></td>
+        <td><p>The arguments for the right tile layer. Defaults to {}.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>left_array_args</code></td>
+        <td><code>dict</code></td>
+        <td><p>The arguments for array_to_image for the left layer. Defaults to {}.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>right_array_args</code></td>
+        <td><code>dict</code></td>
+        <td><p>The arguments for array_to_image for the right layer. Defaults to {}.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>zoom_control</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to add zoom control. Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>fullscreen_control</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to add fullscreen control. Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>layer_control</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to add layer control. Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>add_close_button</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to add a close button. Defaults to False.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
+        <td><code>left_label</code></td>
+        <td><code>str</code></td>
+        <td><p>The label for the left layer. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>right_label</code></td>
+        <td><code>str</code></td>
+        <td><p>The label for the right layer. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>left_position</code></td>
+        <td><code>str</code></td>
+        <td><p>The position for the left label. Defaults to "bottomleft".</p></td>
+        <td><code>&#39;bottomleft&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>right_position</code></td>
+        <td><code>str</code></td>
+        <td><p>The position for the right label. Defaults to "bottomright".</p></td>
+        <td><code>&#39;bottomright&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>widget_layout</code></td>
+        <td><code>dict</code></td>
+        <td><p>The layout for the widget. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>draggable</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether the split map is draggable. Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/utils.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_split_map</span><span class="p">(</span>
+    <span class="n">left_layer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;TERRAIN&quot;</span><span class="p">,</span>
+    <span class="n">right_layer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;OpenTopoMap&quot;</span><span class="p">,</span>
+    <span class="n">left_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">right_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">left_array_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">right_array_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">zoom_control</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">fullscreen_control</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">layer_control</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">add_close_button</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">left_label</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">right_label</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">left_position</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;bottomleft&quot;</span><span class="p">,</span>
+    <span class="n">right_position</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;bottomright&quot;</span><span class="p">,</span>
+    <span class="n">widget_layout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">draggable</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">center</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="n">zoom</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">height</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;600px&quot;</span><span class="p">,</span>
+    <span class="n">basemap</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">basemap_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">m</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Adds split map.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        left_layer (str, optional): The left tile layer. Can be a local file path, HTTP URL, or a basemap name. Defaults to &#39;TERRAIN&#39;.</span>
+<span class="sd">        right_layer (str, optional): The right tile layer. Can be a local file path, HTTP URL, or a basemap name. Defaults to &#39;OpenTopoMap&#39;.</span>
+<span class="sd">        left_args (dict, optional): The arguments for the left tile layer. Defaults to {}.</span>
+<span class="sd">        right_args (dict, optional): The arguments for the right tile layer. Defaults to {}.</span>
+<span class="sd">        left_array_args (dict, optional): The arguments for array_to_image for the left layer. Defaults to {}.</span>
+<span class="sd">        right_array_args (dict, optional): The arguments for array_to_image for the right layer. Defaults to {}.</span>
+<span class="sd">        zoom_control (bool, optional): Whether to add zoom control. Defaults to True.</span>
+<span class="sd">        fullscreen_control (bool, optional): Whether to add fullscreen control. Defaults to True.</span>
+<span class="sd">        layer_control (bool, optional): Whether to add layer control. Defaults to True.</span>
+<span class="sd">        add_close_button (bool, optional): Whether to add a close button. Defaults to False.</span>
+<span class="sd">        left_label (str, optional): The label for the left layer. Defaults to None.</span>
+<span class="sd">        right_label (str, optional): The label for the right layer. Defaults to None.</span>
+<span class="sd">        left_position (str, optional): The position for the left label. Defaults to &quot;bottomleft&quot;.</span>
+<span class="sd">        right_position (str, optional): The position for the right label. Defaults to &quot;bottomright&quot;.</span>
+<span class="sd">        widget_layout (dict, optional): The layout for the widget. Defaults to None.</span>
+<span class="sd">        draggable (bool, optional): Whether the split map is draggable. Defaults to True.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">left_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">left_args</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">right_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">right_args</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">left_array_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">left_array_args</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">right_array_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">right_array_args</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">basemap_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">basemap_args</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">m</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">leafmap</span><span class="o">.</span><span class="n">Map</span><span class="p">(</span><span class="n">center</span><span class="o">=</span><span class="n">center</span><span class="p">,</span> <span class="n">zoom</span><span class="o">=</span><span class="n">zoom</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="n">height</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">m</span><span class="o">.</span><span class="n">clear_layers</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">basemap</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">basemap</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.tif&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">basemap</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">):</span>
+                <span class="n">m</span><span class="o">.</span><span class="n">add_cog_layer</span><span class="p">(</span><span class="n">basemap</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Basemap&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">basemap_args</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">m</span><span class="o">.</span><span class="n">add_raster</span><span class="p">(</span><span class="n">basemap</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Basemap&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">basemap_args</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">m</span><span class="o">.</span><span class="n">add_basemap</span><span class="p">(</span><span class="n">basemap</span><span class="p">)</span>
+    <span class="n">m</span><span class="o">.</span><span class="n">split_map</span><span class="p">(</span>
+        <span class="n">left_layer</span><span class="o">=</span><span class="n">left_layer</span><span class="p">,</span>
+        <span class="n">right_layer</span><span class="o">=</span><span class="n">right_layer</span><span class="p">,</span>
+        <span class="n">left_args</span><span class="o">=</span><span class="n">left_args</span><span class="p">,</span>
+        <span class="n">right_args</span><span class="o">=</span><span class="n">right_args</span><span class="p">,</span>
+        <span class="n">left_array_args</span><span class="o">=</span><span class="n">left_array_args</span><span class="p">,</span>
+        <span class="n">right_array_args</span><span class="o">=</span><span class="n">right_array_args</span><span class="p">,</span>
+        <span class="n">zoom_control</span><span class="o">=</span><span class="n">zoom_control</span><span class="p">,</span>
+        <span class="n">fullscreen_control</span><span class="o">=</span><span class="n">fullscreen_control</span><span class="p">,</span>
+        <span class="n">layer_control</span><span class="o">=</span><span class="n">layer_control</span><span class="p">,</span>
+        <span class="n">add_close_button</span><span class="o">=</span><span class="n">add_close_button</span><span class="p">,</span>
+        <span class="n">left_label</span><span class="o">=</span><span class="n">left_label</span><span class="p">,</span>
+        <span class="n">right_label</span><span class="o">=</span><span class="n">right_label</span><span class="p">,</span>
+        <span class="n">left_position</span><span class="o">=</span><span class="n">left_position</span><span class="p">,</span>
+        <span class="n">right_position</span><span class="o">=</span><span class="n">right_position</span><span class="p">,</span>
+        <span class="n">widget_layout</span><span class="o">=</span><span class="n">widget_layout</span><span class="p">,</span>
+        <span class="n">draggable</span><span class="o">=</span><span class="n">draggable</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">m</span>
 </code></pre></div>
         </details>
     </div>
