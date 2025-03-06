@@ -288,7 +288,11 @@ def get_vector_info(vector_path):
         dict: Dictionary containing the basic information about the vector dataset
     """
     # Open the vector dataset
-    gdf = gpd.read_parquet(vector_path) if vector_path.endswith('.parquet') else gpd.read_file(vector_path)
+    gdf = (
+        gpd.read_parquet(vector_path)
+        if vector_path.endswith(".parquet")
+        else gpd.read_file(vector_path)
+    )
 
     # Get basic metadata
     info = {
@@ -359,7 +363,11 @@ def print_vector_info(vector_path, show_preview=True, figsize=(10, 8)):
 
         # Show a preview if requested
         if show_preview:
-            gdf = gpd.read_parquet(vector_path) if vector_path.endswith('.parquet') else gpd.read_file(vector_path)
+            gdf = (
+                gpd.read_parquet(vector_path)
+                if vector_path.endswith(".parquet")
+                else gpd.read_file(vector_path)
+            )
             fig, ax = plt.subplots(figsize=figsize)
             gdf.plot(ax=ax, cmap="viridis")
             ax.set_title(f"Preview: {vector_path}")
