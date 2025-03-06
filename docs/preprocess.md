@@ -1,3 +1,0 @@
-# preprocess module
-
-::: geoai.preprocess
