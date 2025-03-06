@@ -1080,3 +1080,97 @@ def install_package(package):
 
         # Wait for process to complete
         process.wait()
+
+
+def create_split_map(
+    left_layer: Optional[str] = "TERRAIN",
+    right_layer: Optional[str] = "OpenTopoMap",
+    left_args: Optional[dict] = None,
+    right_args: Optional[dict] = None,
+    left_array_args: Optional[dict] = None,
+    right_array_args: Optional[dict] = None,
+    zoom_control: Optional[bool] = True,
+    fullscreen_control: Optional[bool] = True,
+    layer_control: Optional[bool] = True,
+    add_close_button: Optional[bool] = False,
+    left_label: Optional[str] = None,
+    right_label: Optional[str] = None,
+    left_position: Optional[str] = "bottomleft",
+    right_position: Optional[str] = "bottomright",
+    widget_layout: Optional[dict] = None,
+    draggable: Optional[bool] = True,
+    center: Optional[List[float]] = [20, 0],
+    zoom: Optional[int] = 2,
+    height: Optional[int] = "600px",
+    basemap: Optional[str] = None,
+    basemap_args: Optional[dict] = None,
+    m=None,
+    **kwargs,
+) -> None:
+    """Adds split map.
+
+    Args:
+        left_layer (str, optional): The left tile layer. Can be a local file path, HTTP URL, or a basemap name. Defaults to 'TERRAIN'.
+        right_layer (str, optional): The right tile layer. Can be a local file path, HTTP URL, or a basemap name. Defaults to 'OpenTopoMap'.
+        left_args (dict, optional): The arguments for the left tile layer. Defaults to {}.
+        right_args (dict, optional): The arguments for the right tile layer. Defaults to {}.
+        left_array_args (dict, optional): The arguments for array_to_image for the left layer. Defaults to {}.
+        right_array_args (dict, optional): The arguments for array_to_image for the right layer. Defaults to {}.
+        zoom_control (bool, optional): Whether to add zoom control. Defaults to True.
+        fullscreen_control (bool, optional): Whether to add fullscreen control. Defaults to True.
+        layer_control (bool, optional): Whether to add layer control. Defaults to True.
+        add_close_button (bool, optional): Whether to add a close button. Defaults to False.
+        left_label (str, optional): The label for the left layer. Defaults to None.
+        right_label (str, optional): The label for the right layer. Defaults to None.
+        left_position (str, optional): The position for the left label. Defaults to "bottomleft".
+        right_position (str, optional): The position for the right label. Defaults to "bottomright".
+        widget_layout (dict, optional): The layout for the widget. Defaults to None.
+        draggable (bool, optional): Whether the split map is draggable. Defaults to True.
+    """
+
+    if left_args is None:
+        left_args = {}
+
+    if right_args is None:
+        right_args = {}
+
+    if left_array_args is None:
+        left_array_args = {}
+
+    if right_array_args is None:
+        right_array_args = {}
+
+    if basemap_args is None:
+        basemap_args = {}
+
+    if m is None:
+        m = leafmap.Map(center=center, zoom=zoom, height=height, **kwargs)
+        m.clear_layers()
+    if isinstance(basemap, str):
+        if basemap.endswith(".tif"):
+            if basemap.startswith("http"):
+                m.add_cog_layer(basemap, name="Basemap", **basemap_args)
+            else:
+                m.add_raster(basemap, name="Basemap", **basemap_args)
+        else:
+            m.add_basemap(basemap)
+    m.split_map(
+        left_layer=left_layer,
+        right_layer=right_layer,
+        left_args=left_args,
+        right_args=right_args,
+        left_array_args=left_array_args,
+        right_array_args=right_array_args,
+        zoom_control=zoom_control,
+        fullscreen_control=fullscreen_control,
+        layer_control=layer_control,
+        add_close_button=add_close_button,
+        left_label=left_label,
+        right_label=right_label,
+        left_position=left_position,
+        right_position=right_position,
+        widget_layout=widget_layout,
+        draggable=draggable,
+    )
+
+    return m
