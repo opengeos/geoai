@@ -196,7 +196,8 @@ class ObjectDetector:
         self.overlap = 0.25  # Default overlap between tiles
         self.confidence_threshold = 0.5  # Default confidence threshold
         self.nms_iou_threshold = 0.5  # IoU threshold for non-maximum suppression
-        self.small_object_area = 100  # Minimum area in pixels to keep an object
+        self.min_object_area = 100  # Minimum area in pixels to keep an object
+        self.max_object_area = None  # Maximum area in pixels to keep an object
         self.mask_threshold = 0.5  # Threshold for mask binarization
         self.simplify_tolerance = 1.0  # Tolerance for polygon simplification
 
@@ -326,7 +327,8 @@ class ObjectDetector:
             **kwargs: Optional parameters:
                 simplify_tolerance: Tolerance for polygon simplification
                 mask_threshold: Threshold for mask binarization
-                small_object_area: Minimum area in pixels to keep an object
+                min_object_area: Minimum area in pixels to keep an object
+                max_object_area: Maximum area in pixels to keep an object
 
         Returns:
             List of polygons as lists of (x, y) coordinates
@@ -335,7 +337,8 @@ class ObjectDetector:
         # Get parameters from kwargs or use instance defaults
         simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
         mask_threshold = kwargs.get("mask_threshold", self.mask_threshold)
-        small_object_area = kwargs.get("small_object_area", self.small_object_area)
+        min_object_area = kwargs.get("min_object_area", self.min_object_area)
+        max_object_area = kwargs.get("max_object_area", self.max_object_area)
 
         # Ensure binary mask
         mask = (mask > mask_threshold).astype(np.uint8)
@@ -351,7 +354,14 @@ class ObjectDetector:
         polygons = []
         for contour in contours:
             # Filter out too small contours
-            if contour.shape[0] < 3 or cv2.contourArea(contour) < small_object_area:
+            if contour.shape[0] < 3 or cv2.contourArea(contour) < min_object_area:
+                continue
+
+            # Filter out too large contours
+            if (
+                max_object_area is not None
+                and cv2.contourArea(contour) > max_object_area
+            ):
                 continue
 
             # Simplify contour if it has many points
@@ -491,7 +501,8 @@ class ObjectDetector:
         output_path=None,
         simplify_tolerance=None,
         mask_threshold=None,
-        small_object_area=None,
+        min_object_area=None,
+        max_object_area=None,
         nms_iou_threshold=None,
         regularize=True,
         angle_threshold=15,
@@ -505,7 +516,8 @@ class ObjectDetector:
             output_path: Path to save the output GeoJSON (default: mask_path with .geojson extension)
             simplify_tolerance: Tolerance for polygon simplification (default: self.simplify_tolerance)
             mask_threshold: Threshold for mask binarization (default: self.mask_threshold)
-            small_object_area: Minimum area in pixels to keep an object (default: self.small_object_area)
+            min_object_area: Minimum area in pixels to keep an object (default: self.min_object_area)
+            max_object_area: Minimum area in pixels to keep an object (default: self.max_object_area)
             nms_iou_threshold: IoU threshold for non-maximum suppression (default: self.nms_iou_threshold)
             regularize: Whether to regularize objects to right angles (default: True)
             angle_threshold: Maximum deviation from 90 degrees for regularization (default: 15)
@@ -523,10 +535,11 @@ class ObjectDetector:
         mask_threshold = (
             mask_threshold if mask_threshold is not None else self.mask_threshold
         )
-        small_object_area = (
-            small_object_area
-            if small_object_area is not None
-            else self.small_object_area
+        min_object_area = (
+            min_object_area if min_object_area is not None else self.min_object_area
+        )
+        max_object_area = (
+            max_object_area if max_object_area is not None else self.max_object_area
         )
         nms_iou_threshold = (
             nms_iou_threshold
@@ -540,7 +553,8 @@ class ObjectDetector:
 
         print(f"Converting mask to GeoJSON with parameters:")
         print(f"- Mask threshold: {mask_threshold}")
-        print(f"- Min object area: {small_object_area}")
+        print(f"- Min object area: {min_object_area}")
+        print(f"- Max object area: {max_object_area}")
         print(f"- Simplify tolerance: {simplify_tolerance}")
         print(f"- NMS IoU threshold: {nms_iou_threshold}")
         print(f"- Regularize objects: {regularize}")
@@ -586,7 +600,11 @@ class ObjectDetector:
                 area = stats[i, cv2.CC_STAT_AREA]
 
                 # Skip if too small
-                if area < small_object_area:
+                if area < min_object_area:
+                    continue
+
+                # Skip if too large
+                if max_object_area is not None and area > max_object_area:
                     continue
 
                 # Create a mask for this object
@@ -710,7 +728,7 @@ class ObjectDetector:
                 chip_size: Size of image chips for processing (height, width)
                 nms_iou_threshold: IoU threshold for non-maximum suppression (0.0-1.0)
                 mask_threshold: Threshold for mask binarization (0.0-1.0)
-                small_object_area: Minimum area in pixels to keep an object
+                min_object_area: Minimum area in pixels to keep an object
                 simplify_tolerance: Tolerance for polygon simplification
 
         Returns:
@@ -724,7 +742,8 @@ class ObjectDetector:
         chip_size = kwargs.get("chip_size", self.chip_size)
         nms_iou_threshold = kwargs.get("nms_iou_threshold", self.nms_iou_threshold)
         mask_threshold = kwargs.get("mask_threshold", self.mask_threshold)
-        small_object_area = kwargs.get("small_object_area", self.small_object_area)
+        min_object_area = kwargs.get("min_object_area", self.min_object_area)
+        max_object_area = kwargs.get("max_object_area", self.max_object_area)
         simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
 
         # Print parameters being used
@@ -734,7 +753,8 @@ class ObjectDetector:
         print(f"- Chip size: {chip_size}")
         print(f"- NMS IoU threshold: {nms_iou_threshold}")
         print(f"- Mask threshold: {mask_threshold}")
-        print(f"- Min object area: {small_object_area}")
+        print(f"- Min object area: {min_object_area}")
+        print(f"- Max object area: {max_object_area}")
         print(f"- Simplify tolerance: {simplify_tolerance}")
         print(f"- Filter edge objects: {filter_edges}")
         if filter_edges:
@@ -865,7 +885,8 @@ class ObjectDetector:
                         binary_mask,
                         simplify_tolerance=simplify_tolerance,
                         mask_threshold=mask_threshold,
-                        small_object_area=small_object_area,
+                        min_object_area=min_object_area,
+                        max_object_area=max_object_area,
                     )
 
                     # Skip if no valid polygons
