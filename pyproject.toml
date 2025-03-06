@@ -1,6 +1,6 @@
 [project]
 name = "geoai-py"
-version = "0.3.1"
+version = "0.3.2"
 dynamic = [
     "dependencies",
 ]
@@ -47,7 +47,7 @@ universal = true
 
 
 [tool.bumpversion]
-current_version = "0.3.1"
+current_version = "0.3.2"
 commit = true
 tag = true
 
