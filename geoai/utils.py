@@ -1,4 +1,4 @@
-"""The common module contains common functions and classes used by the other modules."""
+"""The utils module contains common functions and classes used by the other modules."""
 
 import json
 import math
@@ -1764,21 +1764,21 @@ def clip_raster_by_bbox(
         RuntimeError: If the clipping operation fails.
 
     Examples:
-        # Clip using geographic coordinates in the same CRS as the raster
+        Clip using geographic coordinates in the same CRS as the raster
         >>> clip_raster_by_bbox('input.tif', 'clipped_geo.tif', (100, 200, 300, 400))
         'clipped_geo.tif'
 
-        # Clip using WGS84 coordinates when the raster is in a different CRS
+        Clip using WGS84 coordinates when the raster is in a different CRS
         >>> clip_raster_by_bbox('input.tif', 'clipped_wgs84.tif', (-122.5, 37.7, -122.4, 37.8),
         ...                     bbox_crs="EPSG:4326")
         'clipped_wgs84.tif'
 
-        # Clip using row/column indices
+        Clip using row/column indices
         >>> clip_raster_by_bbox('input.tif', 'clipped_pixel.tif', (50, 100, 150, 200),
         ...                     bbox_type="pixel")
         'clipped_pixel.tif'
 
-        # Clip with band selection
+        Clip with band selection
         >>> clip_raster_by_bbox('input.tif', 'clipped_bands.tif', (100, 200, 300, 400),
         ...                     bands=[1, 3])
         'clipped_bands.tif'
