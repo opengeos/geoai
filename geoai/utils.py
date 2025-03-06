@@ -17,13 +17,13 @@ import leafmap
 import numpy as np
 import pandas as pd
 import xarray as xr
-import rioxarray
+import rioxarray as rxr
 import rasterio
 from torchvision.transforms import RandomRotation
 from rasterio.windows import Window
 from rasterio import features
 from rasterio.plot import show
-from shapely.geometry import box, shape, mapping, Polygon
+from shapely.geometry import box, shape, mapping, Polygon, MultiPolygon
 from shapely.affinity import rotate
 from tqdm import tqdm
 import torch
@@ -4180,3 +4180,772 @@ def masks_to_vector(
             print(f"Saved {len(gdf)} building footprints to {output_path}")
 
         return gdf
+
+
+def read_vector(source, layer=None, **kwargs):
+    """Reads vector data from various formats including GeoParquet.
+
+    This function dynamically determines the file type based on extension
+    and reads it into a GeoDataFrame. It supports both local files and HTTP/HTTPS URLs.
+
+    Args:
+        source: String path to the vector file or URL.
+        layer: String or integer specifying which layer to read from multi-layer
+            files (only applicable for formats like GPKG, GeoJSON, etc.).
+            Defaults to None.
+        **kwargs: Additional keyword arguments to pass to the underlying reader.
+
+    Returns:
+        geopandas.GeoDataFrame: A GeoDataFrame containing the vector data.
+
+    Raises:
+        ValueError: If the file format is not supported or source cannot be accessed.
+
+    Examples:
+        Read a local shapefile
+        >>> gdf = read_vector("path/to/data.shp")
+        >>>
+        Read a GeoParquet file from URL
+        >>> gdf = read_vector("https://example.com/data.parquet")
+        >>>
+        Read a specific layer from a GeoPackage
+        >>> gdf = read_vector("path/to/data.gpkg", layer="layer_name")
+    """
+
+    import fiona
+    import urllib.parse
+
+    # Determine if source is a URL or local file
+    parsed_url = urllib.parse.urlparse(source)
+    is_url = parsed_url.scheme in ["http", "https"]
+
+    # If it's a local file, check if it exists
+    if not is_url and not os.path.exists(source):
+        raise ValueError(f"File does not exist: {source}")
+
+    # Get file extension
+    _, ext = os.path.splitext(source)
+    ext = ext.lower()
+
+    # Handle GeoParquet files
+    if ext in [".parquet", ".pq", ".geoparquet"]:
+        return gpd.read_parquet(source, **kwargs)
+
+    # Handle common vector formats
+    if ext in [".shp", ".geojson", ".json", ".gpkg", ".gml", ".kml", ".gpx"]:
+        # For formats that might have multiple layers
+        if ext in [".gpkg", ".gml"] and layer is not None:
+            return gpd.read_file(source, layer=layer, **kwargs)
+        return gpd.read_file(source, **kwargs)
+
+    # Try to use fiona to identify valid layers for formats that might have them
+    # Only attempt this for local files as fiona.listlayers might not work with URLs
+    if layer is None and ext in [".gpkg", ".gml"] and not is_url:
+        try:
+            layers = fiona.listlayers(source)
+            if layers:
+                return gpd.read_file(source, layer=layers[0], **kwargs)
+        except Exception:
+            # If listing layers fails, we'll fall through to the generic read attempt
+            pass
+
+    # For other formats or when layer listing fails, attempt to read using GeoPandas
+    try:
+        return gpd.read_file(source, **kwargs)
+    except Exception as e:
+        raise ValueError(f"Could not read from source '{source}': {str(e)}")
+
+
+def read_raster(source, band=None, masked=True, **kwargs):
+    """Reads raster data from various formats using rioxarray.
+
+    This function reads raster data from local files or URLs into a rioxarray
+    data structure with preserved geospatial metadata.
+
+    Args:
+        source: String path to the raster file or URL.
+        band: Integer or list of integers specifying which band(s) to read.
+            Defaults to None (all bands).
+        masked: Boolean indicating whether to mask nodata values.
+            Defaults to True.
+        **kwargs: Additional keyword arguments to pass to rioxarray.open_rasterio.
+
+    Returns:
+        xarray.DataArray: A DataArray containing the raster data with geospatial
+            metadata preserved.
+
+    Raises:
+        ValueError: If the file format is not supported or source cannot be accessed.
+
+    Examples:
+        Read a local GeoTIFF
+        >>> raster = read_raster("path/to/data.tif")
+        >>>
+        Read only band 1 from a remote GeoTIFF
+        >>> raster = read_raster("https://example.com/data.tif", band=1)
+        >>>
+        Read a raster without masking nodata values
+        >>> raster = read_raster("path/to/data.tif", masked=False)
+    """
+    import urllib.parse
+    from rasterio.errors import RasterioIOError
+
+    # Determine if source is a URL or local file
+    parsed_url = urllib.parse.urlparse(source)
+    is_url = parsed_url.scheme in ["http", "https"]
+
+    # If it's a local file, check if it exists
+    if not is_url and not os.path.exists(source):
+        raise ValueError(f"Raster file does not exist: {source}")
+
+    try:
+        # Open the raster with rioxarray
+        raster = rxr.open_rasterio(source, masked=masked, **kwargs)
+
+        # Handle band selection if specified
+        if band is not None:
+            if isinstance(band, (list, tuple)):
+                # Convert from 1-based indexing to 0-based indexing
+                band_indices = [b - 1 for b in band]
+                raster = raster.isel(band=band_indices)
+            else:
+                # Single band selection (convert from 1-based to 0-based indexing)
+                raster = raster.isel(band=band - 1)
+
+        return raster
+
+    except RasterioIOError as e:
+        raise ValueError(f"Could not read raster from source '{source}': {str(e)}")
+    except Exception as e:
+        raise ValueError(f"Error reading raster data: {str(e)}")
+
+
+def temp_file_path(ext):
+    """Returns a temporary file path.
+
+    Args:
+        ext (str): The file extension.
+
+    Returns:
+        str: The temporary file path.
+    """
+
+    import tempfile
+    import uuid
+
+    if not ext.startswith("."):
+        ext = "." + ext
+    file_id = str(uuid.uuid4())
+    file_path = os.path.join(tempfile.gettempdir(), f"{file_id}{ext}")
+
+    return file_path
+
+
+def region_groups(
+    image: Union[str, "xr.DataArray", np.ndarray],
+    connectivity: int = 1,
+    min_size: int = 10,
+    max_size: Optional[int] = None,
+    threshold: Optional[int] = None,
+    properties: Optional[List[str]] = None,
+    intensity_image: Optional[Union[str, "xr.DataArray", np.ndarray]] = None,
+    out_csv: Optional[str] = None,
+    out_vector: Optional[str] = None,
+    out_image: Optional[str] = None,
+    **kwargs: Any,
+) -> Union[Tuple[np.ndarray, "pd.DataFrame"], Tuple["xr.DataArray", "pd.DataFrame"]]:
+    """
+    Segment regions in an image and filter them based on size.
+
+    Args:
+        image (Union[str, xr.DataArray, np.ndarray]): Input image, can be a file
+            path, xarray DataArray, or numpy array.
+        connectivity (int, optional): Connectivity for labeling. Defaults to 1
+            for 4-connectivity. Use 2 for 8-connectivity.
+        min_size (int, optional): Minimum size of regions to keep. Defaults to 10.
+        max_size (Optional[int], optional): Maximum size of regions to keep.
+            Defaults to None.
+        threshold (Optional[int], optional): Threshold for filling holes.
+            Defaults to None, which is equal to min_size.
+        properties (Optional[List[str]], optional): List of properties to measure.
+            See https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops
+            Defaults to None.
+        intensity_image (Optional[Union[str, xr.DataArray, np.ndarray]], optional):
+            Intensity image to measure properties. Defaults to None.
+        out_csv (Optional[str], optional): Path to save the properties as a CSV file.
+            Defaults to None.
+        out_vector (Optional[str], optional): Path to save the vector file.
+            Defaults to None.
+        out_image (Optional[str], optional): Path to save the output image.
+            Defaults to None.
+
+    Returns:
+        Union[Tuple[np.ndarray, pd.DataFrame], Tuple[xr.DataArray, pd.DataFrame]]: Labeled image and properties DataFrame.
+    """
+    from skimage import measure
+    import scipy.ndimage as ndi
+
+    if isinstance(image, str):
+        ds = rxr.open_rasterio(image)
+        da = ds.sel(band=1)
+        array = da.values.squeeze()
+    elif isinstance(image, xr.DataArray):
+        da = image
+        array = image.values.squeeze()
+    elif isinstance(image, np.ndarray):
+        array = image
+    else:
+        raise ValueError(
+            "The input image must be a file path, xarray DataArray, or numpy array."
+        )
+
+    if threshold is None:
+        threshold = min_size
+
+    # Define a custom function to calculate median intensity
+    def intensity_median(region, intensity_image):
+        # Extract the intensity values for the region
+        return np.median(intensity_image[region])
+
+    # Add your custom function to the list of extra properties
+    if intensity_image is not None:
+        extra_props = (intensity_median,)
+    else:
+        extra_props = None
+
+    if properties is None:
+        properties = [
+            "label",
+            "area",
+            "area_bbox",
+            "area_convex",
+            "area_filled",
+            "major_length",
+            "minor_length",
+            "eccentricity",
+            "diameter_areagth",
+            "extent",
+            "orientation",
+            "perimeter",
+            "solidity",
+        ]
+
+        if intensity_image is not None:
+
+            properties += [
+                "intensity_max",
+                "intensity_mean",
+                "intensity_min",
+                "intensity_std",
+            ]
+
+    if intensity_image is not None:
+        if isinstance(intensity_image, str):
+            ds = rxr.open_rasterio(intensity_image)
+            intensity_da = ds.sel(band=1)
+            intensity_image = intensity_da.values.squeeze()
+        elif isinstance(intensity_image, xr.DataArray):
+            intensity_image = intensity_image.values.squeeze()
+        elif isinstance(intensity_image, np.ndarray):
+            pass
+        else:
+            raise ValueError(
+                "The intensity_image must be a file path, xarray DataArray, or numpy array."
+            )
+
+    label_image = measure.label(array, connectivity=connectivity)
+    props = measure.regionprops_table(
+        label_image, properties=properties, intensity_image=intensity_image, **kwargs
+    )
+
+    df = pd.DataFrame(props)
+
+    # Get the labels of regions with area smaller than the threshold
+    small_regions = df[df["area"] < min_size]["label"].values
+    # Set the corresponding labels in the label_image to zero
+    for region_label in small_regions:
+        label_image[label_image == region_label] = 0
+
+    if max_size is not None:
+        large_regions = df[df["area"] > max_size]["label"].values
+        for region_label in large_regions:
+            label_image[label_image == region_label] = 0
+
+    # Find the background (holes) which are zeros
+    holes = label_image == 0
+
+    # Label the holes (connected components in the background)
+    labeled_holes, _ = ndi.label(holes)
+
+    # Measure properties of the labeled holes, including area and bounding box
+    hole_props = measure.regionprops(labeled_holes)
+
+    # Loop through each hole and fill it if it is smaller than the threshold
+    for prop in hole_props:
+        if prop.area < threshold:
+            # Get the coordinates of the small hole
+            coords = prop.coords
+
+            # Find the surrounding region's ID (non-zero value near the hole)
+            surrounding_region_values = []
+            for coord in coords:
+                x, y = coord
+                # Get a 3x3 neighborhood around the hole pixel
+                neighbors = label_image[max(0, x - 1) : x + 2, max(0, y - 1) : y + 2]
+                # Exclude the hole pixels (zeros) and get region values
+                region_values = neighbors[neighbors != 0]
+                if region_values.size > 0:
+                    surrounding_region_values.append(
+                        region_values[0]
+                    )  # Take the first non-zero value
+
+            if surrounding_region_values:
+                # Fill the hole with the mode (most frequent) of the surrounding region values
+                fill_value = max(
+                    set(surrounding_region_values), key=surrounding_region_values.count
+                )
+                label_image[coords[:, 0], coords[:, 1]] = fill_value
+
+    label_image, num_labels = measure.label(
+        label_image, connectivity=connectivity, return_num=True
+    )
+    props = measure.regionprops_table(
+        label_image,
+        properties=properties,
+        intensity_image=intensity_image,
+        extra_properties=extra_props,
+        **kwargs,
+    )
+
+    df = pd.DataFrame(props)
+    df["elongation"] = df["major_length"] / df["minor_length"]
+
+    dtype = "uint8"
+    if num_labels > 255 and num_labels <= 65535:
+        dtype = "uint16"
+    elif num_labels > 65535:
+        dtype = "uint32"
+
+    if out_csv is not None:
+        df.to_csv(out_csv, index=False)
+
+    if isinstance(image, np.ndarray):
+        return label_image, df
+    else:
+        da.values = label_image
+        if out_image is not None:
+            da.rio.to_raster(out_image, dtype=dtype)
+            if out_vector is not None:
+                tmp_vector = temp_file_path(".gpkg")
+                raster_to_vector(out_image, tmp_vector)
+                gdf = gpd.read_file(tmp_vector)
+                gdf["label"] = gdf["value"].astype(int)
+                gdf.drop(columns=["value"], inplace=True)
+                gdf2 = pd.merge(gdf, df, on="label", how="left")
+                gdf2.to_file(out_vector)
+                gdf2.sort_values("label", inplace=True)
+                df = gdf2
+        return da, df
+
+
+def add_geometric_properties(data, properties=None, area_unit="m2", length_unit="m"):
+    """Calculates geometric properties and adds them to the GeoDataFrame.
+
+    This function calculates various geometric properties of features in a
+    GeoDataFrame and adds them as new columns without modifying existing attributes.
+
+    Args:
+        data: GeoDataFrame containing vector features.
+        properties: List of geometric properties to calculate. Options include:
+            'area', 'length', 'perimeter', 'centroid_x', 'centroid_y', 'bounds',
+            'convex_hull_area', 'orientation', 'complexity', 'area_bbox',
+            'area_convex', 'area_filled', 'major_length', 'minor_length',
+            'eccentricity', 'diameter_areagth', 'extent', 'solidity',
+            'elongation'.
+            Defaults to ['area', 'length'] if None.
+        area_unit: String specifying the unit for area calculation ('m2', 'km2',
+            'ha'). Defaults to 'm2'.
+        length_unit: String specifying the unit for length calculation ('m', 'km').
+            Defaults to 'm'.
+
+    Returns:
+        geopandas.GeoDataFrame: A copy of the input GeoDataFrame with added
+        geometric property columns.
+    """
+    from shapely.ops import unary_union
+
+    if isinstance(data, str):
+        data = read_vector(data)
+
+    # Make a copy to avoid modifying the original
+    result = data.copy()
+
+    # Default properties to calculate
+    if properties is None:
+        properties = [
+            "area",
+            "length",
+            "perimeter",
+            "convex_hull_area",
+            "orientation",
+            "complexity",
+            "area_bbox",
+            "area_convex",
+            "area_filled",
+            "major_length",
+            "minor_length",
+            "eccentricity",
+            "diameter_area",
+            "extent",
+            "solidity",
+            "elongation",
+        ]
+
+    # Make sure we're working with a GeoDataFrame with a valid CRS
+
+    if not isinstance(result, gpd.GeoDataFrame):
+        raise ValueError("Input must be a GeoDataFrame")
+
+    if result.crs is None:
+        raise ValueError(
+            "GeoDataFrame must have a defined coordinate reference system (CRS)"
+        )
+
+    # Ensure we're working with a projected CRS for accurate measurements
+    if result.crs.is_geographic:
+        # Reproject to a suitable projected CRS for accurate measurements
+        result = result.to_crs(result.estimate_utm_crs())
+
+    # Basic area calculation with unit conversion
+    if "area" in properties:
+        # Calculate area (only for polygons)
+        result["area"] = result.geometry.apply(
+            lambda geom: geom.area if isinstance(geom, (Polygon, MultiPolygon)) else 0
+        )
+
+        # Convert to requested units
+        if area_unit == "km2":
+            result["area"] = result["area"] / 1_000_000  # m² to km²
+            result.rename(columns={"area": "area_km2"}, inplace=True)
+        elif area_unit == "ha":
+            result["area"] = result["area"] / 10_000  # m² to hectares
+            result.rename(columns={"area": "area_ha"}, inplace=True)
+        else:  # Default is m²
+            result.rename(columns={"area": "area_m2"}, inplace=True)
+
+    # Length calculation with unit conversion
+    if "length" in properties:
+        # Calculate length (works for lines and polygon boundaries)
+        result["length"] = result.geometry.length
+
+        # Convert to requested units
+        if length_unit == "km":
+            result["length"] = result["length"] / 1_000  # m to km
+            result.rename(columns={"length": "length_km"}, inplace=True)
+        else:  # Default is m
+            result.rename(columns={"length": "length_m"}, inplace=True)
+
+    # Perimeter calculation (for polygons)
+    if "perimeter" in properties:
+        result["perimeter"] = result.geometry.apply(
+            lambda geom: (
+                geom.boundary.length if isinstance(geom, (Polygon, MultiPolygon)) else 0
+            )
+        )
+
+        # Convert to requested units
+        if length_unit == "km":
+            result["perimeter"] = result["perimeter"] / 1_000  # m to km
+            result.rename(columns={"perimeter": "perimeter_km"}, inplace=True)
+        else:  # Default is m
+            result.rename(columns={"perimeter": "perimeter_m"}, inplace=True)
+
+    # Centroid coordinates
+    if "centroid_x" in properties or "centroid_y" in properties:
+        centroids = result.geometry.centroid
+
+        if "centroid_x" in properties:
+            result["centroid_x"] = centroids.x
+
+        if "centroid_y" in properties:
+            result["centroid_y"] = centroids.y
+
+    # Bounding box properties
+    if "bounds" in properties:
+        bounds = result.geometry.bounds
+        result["minx"] = bounds.minx
+        result["miny"] = bounds.miny
+        result["maxx"] = bounds.maxx
+        result["maxy"] = bounds.maxy
+
+    # Area of bounding box
+    if "area_bbox" in properties:
+        bounds = result.geometry.bounds
+        result["area_bbox"] = (bounds.maxx - bounds.minx) * (bounds.maxy - bounds.miny)
+
+        # Convert to requested units
+        if area_unit == "km2":
+            result["area_bbox"] = result["area_bbox"] / 1_000_000
+            result.rename(columns={"area_bbox": "area_bbox_km2"}, inplace=True)
+        elif area_unit == "ha":
+            result["area_bbox"] = result["area_bbox"] / 10_000
+            result.rename(columns={"area_bbox": "area_bbox_ha"}, inplace=True)
+        else:  # Default is m²
+            result.rename(columns={"area_bbox": "area_bbox_m2"}, inplace=True)
+
+    # Area of convex hull
+    if "area_convex" in properties or "convex_hull_area" in properties:
+        result["area_convex"] = result.geometry.convex_hull.area
+
+        # Convert to requested units
+        if area_unit == "km2":
+            result["area_convex"] = result["area_convex"] / 1_000_000
+            result.rename(columns={"area_convex": "area_convex_km2"}, inplace=True)
+        elif area_unit == "ha":
+            result["area_convex"] = result["area_convex"] / 10_000
+            result.rename(columns={"area_convex": "area_convex_ha"}, inplace=True)
+        else:  # Default is m²
+            result.rename(columns={"area_convex": "area_convex_m2"}, inplace=True)
+
+        # For backward compatibility
+        if "convex_hull_area" in properties and "area_convex" not in properties:
+            result["convex_hull_area"] = result["area_convex"]
+            if area_unit == "km2":
+                result.rename(
+                    columns={"convex_hull_area": "convex_hull_area_km2"}, inplace=True
+                )
+            elif area_unit == "ha":
+                result.rename(
+                    columns={"convex_hull_area": "convex_hull_area_ha"}, inplace=True
+                )
+            else:
+                result.rename(
+                    columns={"convex_hull_area": "convex_hull_area_m2"}, inplace=True
+                )
+
+    # Area of filled geometry (no holes)
+    if "area_filled" in properties:
+
+        def get_filled_area(geom):
+            if not isinstance(geom, (Polygon, MultiPolygon)):
+                return 0
+
+            if isinstance(geom, MultiPolygon):
+                # For MultiPolygon, fill all constituent polygons
+                filled_polys = [Polygon(p.exterior) for p in geom.geoms]
+                return unary_union(filled_polys).area
+            else:
+                # For single Polygon, create a new one with just the exterior ring
+                return Polygon(geom.exterior).area
+
+        result["area_filled"] = result.geometry.apply(get_filled_area)
+
+        # Convert to requested units
+        if area_unit == "km2":
+            result["area_filled"] = result["area_filled"] / 1_000_000
+            result.rename(columns={"area_filled": "area_filled_km2"}, inplace=True)
+        elif area_unit == "ha":
+            result["area_filled"] = result["area_filled"] / 10_000
+            result.rename(columns={"area_filled": "area_filled_ha"}, inplace=True)
+        else:  # Default is m²
+            result.rename(columns={"area_filled": "area_filled_m2"}, inplace=True)
+
+    # Axes lengths, eccentricity, orientation, and elongation
+    if any(
+        p in properties
+        for p in [
+            "major_length",
+            "minor_length",
+            "eccentricity",
+            "orientation",
+            "elongation",
+        ]
+    ):
+
+        def get_axes_properties(geom):
+            # Skip non-polygons
+            if not isinstance(geom, (Polygon, MultiPolygon)):
+                return None, None, None, None, None
+
+            # Handle multipolygons by using the largest polygon
+            if isinstance(geom, MultiPolygon):
+                # Get the polygon with the largest area
+                geom = sorted(list(geom.geoms), key=lambda p: p.area, reverse=True)[0]
+
+            try:
+                # Get the minimum rotated rectangle
+                rect = geom.minimum_rotated_rectangle
+
+                # Extract coordinates
+                coords = list(rect.exterior.coords)[
+                    :-1
+                ]  # Remove the duplicated last point
+
+                if len(coords) < 4:
+                    return None, None, None, None, None
+
+                # Calculate lengths of all four sides
+                sides = []
+                for i in range(len(coords)):
+                    p1 = coords[i]
+                    p2 = coords[(i + 1) % len(coords)]
+                    dx = p2[0] - p1[0]
+                    dy = p2[1] - p1[1]
+                    length = np.sqrt(dx**2 + dy**2)
+                    angle = np.degrees(np.arctan2(dy, dx)) % 180
+                    sides.append((length, angle, p1, p2))
+
+                # Group sides by length (allowing for small differences due to floating point precision)
+                # This ensures we correctly identify the rectangle's dimensions
+                sides_grouped = {}
+                tolerance = 1e-6  # Tolerance for length comparison
+
+                for s in sides:
+                    length, angle = s[0], s[1]
+                    matched = False
+
+                    for key in sides_grouped:
+                        if abs(length - key) < tolerance:
+                            sides_grouped[key].append(s)
+                            matched = True
+                            break
+
+                    if not matched:
+                        sides_grouped[length] = [s]
+
+                # Get unique lengths (should be 2 for a rectangle, parallel sides have equal length)
+                unique_lengths = sorted(sides_grouped.keys(), reverse=True)
+
+                if len(unique_lengths) != 2:
+                    # If we don't get exactly 2 unique lengths, something is wrong with the rectangle
+                    # Fall back to simpler method using bounds
+                    bounds = rect.bounds
+                    width = bounds[2] - bounds[0]
+                    height = bounds[3] - bounds[1]
+                    major_length = max(width, height)
+                    minor_length = min(width, height)
+                    orientation = 0 if width > height else 90
+                else:
+                    major_length = unique_lengths[0]
+                    minor_length = unique_lengths[1]
+                    # Get orientation from the major axis
+                    orientation = sides_grouped[major_length][0][1]
+
+                # Calculate eccentricity
+                if major_length > 0:
+                    # Eccentricity for an ellipse: e = sqrt(1 - (b²/a²))
+                    # where a is the semi-major axis and b is the semi-minor axis
+                    eccentricity = np.sqrt(
+                        1 - ((minor_length / 2) ** 2 / (major_length / 2) ** 2)
+                    )
+                else:
+                    eccentricity = 0
+
+                # Calculate elongation (ratio of minor to major axis)
+                elongation = major_length / minor_length if major_length > 0 else 1
+
+                return major_length, minor_length, eccentricity, orientation, elongation
+
+            except Exception as e:
+                # For debugging
+                # print(f"Error calculating axes: {e}")
+                return None, None, None, None, None
+
+        # Apply the function and split the results
+        axes_data = result.geometry.apply(get_axes_properties)
+
+        if "major_length" in properties:
+            result["major_length"] = axes_data.apply(lambda x: x[0] if x else None)
+            # Convert to requested units
+            if length_unit == "km":
+                result["major_length"] = result["major_length"] / 1_000
+                result.rename(columns={"major_length": "major_length_km"}, inplace=True)
+            else:
+                result.rename(columns={"major_length": "major_length_m"}, inplace=True)
+
+        if "minor_length" in properties:
+            result["minor_length"] = axes_data.apply(lambda x: x[1] if x else None)
+            # Convert to requested units
+            if length_unit == "km":
+                result["minor_length"] = result["minor_length"] / 1_000
+                result.rename(columns={"minor_length": "minor_length_km"}, inplace=True)
+            else:
+                result.rename(columns={"minor_length": "minor_length_m"}, inplace=True)
+
+        if "eccentricity" in properties:
+            result["eccentricity"] = axes_data.apply(lambda x: x[2] if x else None)
+
+        if "orientation" in properties:
+            result["orientation"] = axes_data.apply(lambda x: x[3] if x else None)
+
+        if "elongation" in properties:
+            result["elongation"] = axes_data.apply(lambda x: x[4] if x else None)
+
+    # Equivalent diameter based on area
+    if "diameter_areagth" in properties:
+
+        def get_equivalent_diameter(geom):
+            if not isinstance(geom, (Polygon, MultiPolygon)) or geom.area <= 0:
+                return None
+            # Diameter of a circle with the same area: d = 2 * sqrt(A / π)
+            return 2 * np.sqrt(geom.area / np.pi)
+
+        result["diameter_areagth"] = result.geometry.apply(get_equivalent_diameter)
+
+        # Convert to requested units
+        if length_unit == "km":
+            result["diameter_areagth"] = result["diameter_areagth"] / 1_000
+            result.rename(
+                columns={"diameter_areagth": "equivalent_diameter_area_km"},
+                inplace=True,
+            )
+        else:
+            result.rename(
+                columns={"diameter_areagth": "equivalent_diameter_area_m"},
+                inplace=True,
+            )
+
+    # Extent (ratio of shape area to bounding box area)
+    if "extent" in properties:
+
+        def get_extent(geom):
+            if not isinstance(geom, (Polygon, MultiPolygon)) or geom.area <= 0:
+                return None
+
+            bounds = geom.bounds
+            bbox_area = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
+
+            if bbox_area > 0:
+                return geom.area / bbox_area
+            return None
+
+        result["extent"] = result.geometry.apply(get_extent)
+
+    # Solidity (ratio of shape area to convex hull area)
+    if "solidity" in properties:
+
+        def get_solidity(geom):
+            if not isinstance(geom, (Polygon, MultiPolygon)) or geom.area <= 0:
+                return None
+
+            convex_hull_area = geom.convex_hull.area
+
+            if convex_hull_area > 0:
+                return geom.area / convex_hull_area
+            return None
+
+        result["solidity"] = result.geometry.apply(get_solidity)
+
+    # Complexity (ratio of perimeter to area)
+    if "complexity" in properties:
+
+        def calc_complexity(geom):
+            if isinstance(geom, (Polygon, MultiPolygon)) and geom.area > 0:
+                # Shape index: P / (2 * sqrt(π * A))
+                # Normalized to 1 for a circle, higher for more complex shapes
+                return geom.boundary.length / (2 * np.sqrt(np.pi * geom.area))
+            return None
+
+        result["complexity"] = result.geometry.apply(calc_complexity)
+
+    return result
