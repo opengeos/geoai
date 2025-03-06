@@ -1804,6 +1804,35 @@ class BuildingFootprintExtractor(ObjectDetector):
             model_path=model_path, repo_id=repo_id, model=model, device=device
         )
 
+    def regularize_buildings(
+        self,
+        gdf,
+        min_area=10,
+        angle_threshold=15,
+        orthogonality_threshold=0.3,
+        rectangularity_threshold=0.7,
+    ):
+        """
+        Regularize building footprints to enforce right angles and rectangular shapes.
+
+        Args:
+            gdf: GeoDataFrame with building footprints
+            min_area: Minimum area in square units to keep a building
+            angle_threshold: Maximum deviation from 90 degrees to consider an angle as orthogonal (degrees)
+            orthogonality_threshold: Percentage of angles that must be orthogonal for a building to be regularized
+            rectangularity_threshold: Minimum area ratio to building's oriented bounding box for rectangular simplification
+
+        Returns:
+            GeoDataFrame with regularized building footprints
+        """
+        return self.regularize_objects(
+            gdf,
+            min_area=min_area,
+            angle_threshold=angle_threshold,
+            orthogonality_threshold=orthogonality_threshold,
+            rectangularity_threshold=rectangularity_threshold,
+        )
+
 
 class CarDetector(ObjectDetector):
     """
