@@ -2821,7 +2821,8 @@ def masks_to_vector(
     output_path=None,
     simplify_tolerance=1.0,
     mask_threshold=0.5,
-    min_area=100,
+    min_object_area=100,
+    max_object_area=None,
     nms_iou_threshold=0.5,
 ):
     """
@@ -2832,7 +2833,8 @@ def masks_to_vector(
         output_path: Path to save the output GeoJSON (default: mask_path with .geojson extension)
         simplify_tolerance: Tolerance for polygon simplification (default: self.simplify_tolerance)
         mask_threshold: Threshold for mask binarization (default: self.mask_threshold)
-        min_area: Minimum area in pixels to keep a building (default: self.small_building_area)
+        min_object_area: Minimum area in pixels to keep a building (default: self.min_object_area)
+        max_object_area: Maximum area in pixels to keep a building (default: self.max_object_area)
         nms_iou_threshold: IoU threshold for non-maximum suppression (default: self.nms_iou_threshold)
 
     Returns:
@@ -2844,7 +2846,7 @@ def masks_to_vector(
 
     print(f"Converting mask to GeoJSON with parameters:")
     print(f"- Mask threshold: {mask_threshold}")
-    print(f"- Min building area: {min_area}")
+    print(f"- Min building area: {min_object_area}")
     print(f"- Simplify tolerance: {simplify_tolerance}")
     print(f"- NMS IoU threshold: {nms_iou_threshold}")
 
@@ -2884,7 +2886,11 @@ def masks_to_vector(
             area = stats[i, cv2.CC_STAT_AREA]
 
             # Skip if too small
-            if area < min_area:
+            if area < min_object_area:
+                continue
+
+            # Skip if too large
+            if max_object_area is not None and area > max_object_area:
                 continue
 
             # Create a mask for this building
