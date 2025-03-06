@@ -12,7 +12,7 @@ pystac-client
 rasterio
 rioxarray
 scikit-learn
-segment-geospatial
+# segment-geospatial
 torch
 torchgeo
 tqdm

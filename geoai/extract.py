@@ -23,9 +23,9 @@ except ImportError as e:
     )
 
 
-class BuildingFootprintDataset(NonGeoDataset):
+class CustomDataset(NonGeoDataset):
     """
-    A TorchGeo dataset for building footprint extraction.
+    A TorchGeo dataset for object extraction.
     Using NonGeoDataset to avoid spatial indexing issues.
     """
 
@@ -170,18 +170,20 @@ class BuildingFootprintDataset(NonGeoDataset):
         return self.rows * self.cols
 
 
-class BuildingFootprintExtractor:
+class ObjectDetector:
     """
-    Building footprint extraction using Mask R-CNN with TorchGeo.
+    Object extraction using Mask R-CNN with TorchGeo.
     """
 
-    def __init__(self, model_path=None, device=None):
+    def __init__(self, model_path=None, repo_id=None, model=None, device=None):
         """
-        Initialize the building footprint extractor.
+        Initialize the object extractor.
 
         Args:
-            model_path: Path to the .pth model file
-            device: Device to use for inference ('cuda:0', 'cpu', etc.)
+            model_path: Path to the .pth model file.
+            repo_id: Hugging Face repository ID for model download.
+            model: Pre-initialized model object (optional).
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
         """
         # Set device
         if device is None:
@@ -189,21 +191,21 @@ class BuildingFootprintExtractor:
         else:
             self.device = torch.device(device)
 
-        # Default parameters for building detection - these can be overridden in process_raster
+        # Default parameters for object detection - these can be overridden in process_raster
         self.chip_size = (512, 512)  # Size of image chips for processing
         self.overlap = 0.25  # Default overlap between tiles
         self.confidence_threshold = 0.5  # Default confidence threshold
         self.nms_iou_threshold = 0.5  # IoU threshold for non-maximum suppression
-        self.small_building_area = 100  # Minimum area in pixels to keep a building
+        self.small_object_area = 100  # Minimum area in pixels to keep an object
         self.mask_threshold = 0.5  # Threshold for mask binarization
         self.simplify_tolerance = 1.0  # Tolerance for polygon simplification
 
         # Initialize model
-        self.model = self._initialize_model()
+        self.model = self._initialize_model(model)
 
         # Download model if needed
-        if model_path is None:
-            model_path = self._download_model_from_hf()
+        if model_path is None or (not os.path.exists(model_path)):
+            model_path = self._download_model_from_hf(model_path, repo_id)
 
         # Load model weights
         self._load_weights(model_path)
@@ -211,9 +213,13 @@ class BuildingFootprintExtractor:
         # Set model to evaluation mode
         self.model.eval()
 
-    def _download_model_from_hf(self):
+    def _download_model_from_hf(self, model_path=None, repo_id=None):
         """
-        Download the USA building footprints model from Hugging Face.
+        Download the object detection model from Hugging Face.
+
+        Args:
+            model_path: Path to the model file.
+            repo_id: Hugging Face repository ID.
 
         Returns:
             Path to the downloaded model file
@@ -223,17 +229,14 @@ class BuildingFootprintExtractor:
             print("Model path not specified, downloading from Hugging Face...")
 
             # Define the repository ID and model filename
-            repo_id = "giswqs/geoai"  # Update with your actual username/repo
-            filename = "building_footprints_usa.pth"
+            if repo_id is None:
+                repo_id = "giswqs/geoai"
 
-            # Ensure cache directory exists
-            # cache_dir = os.path.join(
-            #     os.path.expanduser("~"), ".cache", "building_footprints"
-            # )
-            # os.makedirs(cache_dir, exist_ok=True)
+            if model_path is None:
+                model_path = "building_footprints_usa.pth"
 
             # Download the model
-            model_path = hf_hub_download(repo_id=repo_id, filename=filename)
+            model_path = hf_hub_download(repo_id=repo_id, filename=model_path)
             print(f"Model downloaded to: {model_path}")
 
             return model_path
@@ -243,23 +246,31 @@ class BuildingFootprintExtractor:
             print("Please specify a local model path or ensure internet connectivity.")
             raise
 
-    def _initialize_model(self):
-        """Initialize Mask R-CNN model with ResNet50 backbone."""
-        # Standard image mean and std for pre-trained models
-        # Note: This would normally come from your config file
-        image_mean = [0.485, 0.456, 0.406]
-        image_std = [0.229, 0.224, 0.225]
+    def _initialize_model(self, model):
+        """Initialize a deep learning model for object detection.
 
-        # Create model with explicit normalization parameters
-        model = maskrcnn_resnet50_fpn(
-            weights=None,
-            progress=False,
-            num_classes=2,  # Background + building
-            weights_backbone=None,
-            # These parameters ensure consistent normalization
-            image_mean=image_mean,
-            image_std=image_std,
-        )
+        Args:
+            model (torch.nn.Module): A pre-initialized model object.
+
+        Returns:
+            torch.nn.Module: A deep learning model for object detection.
+        """
+
+        if model is None:  # Initialize Mask R-CNN model with ResNet50 backbone.
+            # Standard image mean and std for pre-trained models
+            image_mean = [0.485, 0.456, 0.406]
+            image_std = [0.229, 0.224, 0.225]
+
+            # Create model with explicit normalization parameters
+            model = maskrcnn_resnet50_fpn(
+                weights=None,
+                progress=False,
+                num_classes=2,  # Background + object
+                weights_backbone=None,
+                # These parameters ensure consistent normalization
+                image_mean=image_mean,
+                image_std=image_std,
+            )
 
         model.to(self.device)
         return model
@@ -315,7 +326,7 @@ class BuildingFootprintExtractor:
             **kwargs: Optional parameters:
                 simplify_tolerance: Tolerance for polygon simplification
                 mask_threshold: Threshold for mask binarization
-                small_building_area: Minimum area in pixels to keep a building
+                small_object_area: Minimum area in pixels to keep an object
 
         Returns:
             List of polygons as lists of (x, y) coordinates
@@ -324,9 +335,7 @@ class BuildingFootprintExtractor:
         # Get parameters from kwargs or use instance defaults
         simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
         mask_threshold = kwargs.get("mask_threshold", self.mask_threshold)
-        small_building_area = kwargs.get(
-            "small_building_area", self.small_building_area
-        )
+        small_object_area = kwargs.get("small_object_area", self.small_object_area)
 
         # Ensure binary mask
         mask = (mask > mask_threshold).astype(np.uint8)
@@ -342,7 +351,7 @@ class BuildingFootprintExtractor:
         polygons = []
         for contour in contours:
             # Filter out too small contours
-            if contour.shape[0] < 3 or cv2.contourArea(contour) < small_building_area:
+            if contour.shape[0] < 3 or cv2.contourArea(contour) < small_object_area:
                 continue
 
             # Simplify contour if it has many points
@@ -413,26 +422,26 @@ class BuildingFootprintExtractor:
 
         return gdf.iloc[keep_indices]
 
-    def filter_edge_buildings(self, gdf, raster_path, edge_buffer=10):
+    def filter_edge_objects(self, gdf, raster_path, edge_buffer=10):
         """
-        Filter out building detections that fall in padding/edge areas of the image.
+        Filter out object detections that fall in padding/edge areas of the image.
 
         Args:
-            gdf: GeoDataFrame with building footprint detections
+            gdf: GeoDataFrame with object detections
             raster_path: Path to the original raster file
             edge_buffer: Buffer in pixels to consider as edge region
 
         Returns:
-            GeoDataFrame with filtered building footprints
+            GeoDataFrame with filtered objects
         """
         import rasterio
         from shapely.geometry import box
 
-        # If no buildings detected, return empty GeoDataFrame
+        # If no objects detected, return empty GeoDataFrame
         if gdf is None or len(gdf) == 0:
             return gdf
 
-        print(f"Buildings before filtering: {len(gdf)}")
+        print(f"Objects before filtering: {len(gdf)}")
 
         with rasterio.open(raster_path) as src:
             # Get raster bounds
@@ -461,18 +470,18 @@ class BuildingFootprintExtractor:
             else:
                 inner_box = box(*inner_bounds)
 
-            # Filter out buildings that intersect with the edge of the image
+            # Filter out objects that intersect with the edge of the image
             filtered_gdf = gdf[gdf.intersects(inner_box)]
 
-            # Additional check for buildings that have >50% of their area outside the valid region
-            valid_buildings = []
+            # Additional check for objects that have >50% of their area outside the valid region
+            valid_objects = []
             for idx, row in filtered_gdf.iterrows():
                 if row.geometry.intersection(inner_box).area >= 0.5 * row.geometry.area:
-                    valid_buildings.append(idx)
+                    valid_objects.append(idx)
 
-            filtered_gdf = filtered_gdf.loc[valid_buildings]
+            filtered_gdf = filtered_gdf.loc[valid_objects]
 
-            print(f"Buildings after filtering: {len(filtered_gdf)}")
+            print(f"Objects after filtering: {len(filtered_gdf)}")
 
             return filtered_gdf
 
@@ -482,28 +491,28 @@ class BuildingFootprintExtractor:
         output_path=None,
         simplify_tolerance=None,
         mask_threshold=None,
-        small_building_area=None,
+        small_object_area=None,
         nms_iou_threshold=None,
         regularize=True,
         angle_threshold=15,
         rectangularity_threshold=0.7,
     ):
         """
-        Convert a building mask GeoTIFF to vector polygons and save as GeoJSON.
+        Convert an object mask GeoTIFF to vector polygons and save as GeoJSON.
 
         Args:
-            mask_path: Path to the building masks GeoTIFF
+            mask_path: Path to the object masks GeoTIFF
             output_path: Path to save the output GeoJSON (default: mask_path with .geojson extension)
             simplify_tolerance: Tolerance for polygon simplification (default: self.simplify_tolerance)
             mask_threshold: Threshold for mask binarization (default: self.mask_threshold)
-            small_building_area: Minimum area in pixels to keep a building (default: self.small_building_area)
+            small_object_area: Minimum area in pixels to keep an object (default: self.small_object_area)
             nms_iou_threshold: IoU threshold for non-maximum suppression (default: self.nms_iou_threshold)
-            regularize: Whether to regularize buildings to right angles (default: True)
+            regularize: Whether to regularize objects to right angles (default: True)
             angle_threshold: Maximum deviation from 90 degrees for regularization (default: 15)
             rectangularity_threshold: Threshold for rectangle simplification (default: 0.7)
 
         Returns:
-            GeoDataFrame with building footprints
+            GeoDataFrame with objects
         """
         # Use class defaults if parameters not provided
         simplify_tolerance = (
@@ -514,10 +523,10 @@ class BuildingFootprintExtractor:
         mask_threshold = (
             mask_threshold if mask_threshold is not None else self.mask_threshold
         )
-        small_building_area = (
-            small_building_area
-            if small_building_area is not None
-            else self.small_building_area
+        small_object_area = (
+            small_object_area
+            if small_object_area is not None
+            else self.small_object_area
         )
         nms_iou_threshold = (
             nms_iou_threshold
@@ -531,10 +540,10 @@ class BuildingFootprintExtractor:
 
         print(f"Converting mask to GeoJSON with parameters:")
         print(f"- Mask threshold: {mask_threshold}")
-        print(f"- Min building area: {small_building_area}")
+        print(f"- Min object area: {small_object_area}")
         print(f"- Simplify tolerance: {simplify_tolerance}")
         print(f"- NMS IoU threshold: {nms_iou_threshold}")
-        print(f"- Regularize buildings: {regularize}")
+        print(f"- Regularize objects: {regularize}")
         if regularize:
             print(f"- Angle threshold: {angle_threshold}° from 90°")
             print(f"- Rectangularity threshold: {rectangularity_threshold*100}%")
@@ -564,7 +573,7 @@ class BuildingFootprintExtractor:
             )
 
             print(
-                f"Found {num_labels-1} potential buildings"
+                f"Found {num_labels-1} potential objects"
             )  # Subtract 1 for background
 
             # Create list to store polygons and confidence values
@@ -573,19 +582,19 @@ class BuildingFootprintExtractor:
 
             # Process each component (skip the first one which is background)
             for i in tqdm(range(1, num_labels)):
-                # Extract this building
+                # Extract this object
                 area = stats[i, cv2.CC_STAT_AREA]
 
                 # Skip if too small
-                if area < small_building_area:
+                if area < small_object_area:
                     continue
 
-                # Create a mask for this building
-                building_mask = (labels == i).astype(np.uint8)
+                # Create a mask for this object
+                object_mask = (labels == i).astype(np.uint8)
 
                 # Find contours
                 contours, _ = cv2.findContours(
-                    building_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                    object_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
                 )
 
                 # Process each contour
@@ -633,7 +642,7 @@ class BuildingFootprintExtractor:
                 {
                     "geometry": all_polygons,
                     "confidence": all_confidences,
-                    "class": 1,  # Building class
+                    "class": 1,  # Object class
                 },
                 crs=crs,
             )
@@ -643,7 +652,7 @@ class BuildingFootprintExtractor:
                 gdf, nms_iou_threshold=nms_iou_threshold
             )
 
-            print(f"Building count after NMS filtering: {len(gdf)}")
+            print(f"Object count after NMS filtering: {len(gdf)}")
 
             # Apply regularization if requested
             if regularize and len(gdf) > 0:
@@ -661,8 +670,8 @@ class BuildingFootprintExtractor:
                 # Use 10 pixels as minimum area in geographic units
                 min_geo_area = 10 * avg_pixel_area
 
-                # Regularize buildings
-                gdf = self.regularize_buildings(
+                # Regularize objects
+                gdf = self.regularize_objects(
                     gdf,
                     min_area=min_geo_area,
                     angle_threshold=angle_threshold,
@@ -672,7 +681,7 @@ class BuildingFootprintExtractor:
             # Save to file
             if output_path:
                 gdf.to_file(output_path)
-                print(f"Saved {len(gdf)} building footprints to {output_path}")
+                print(f"Saved {len(gdf)} objects to {output_path}")
 
             return gdf
 
@@ -687,25 +696,25 @@ class BuildingFootprintExtractor:
         **kwargs,
     ):
         """
-        Process a raster file to extract building footprints with customizable parameters.
+        Process a raster file to extract objects with customizable parameters.
 
         Args:
             raster_path: Path to input raster file
             output_path: Path to output GeoJSON file (optional)
             batch_size: Batch size for processing
-            filter_edges: Whether to filter out buildings at the edges of the image
-            edge_buffer: Size of edge buffer in pixels to filter out buildings (if filter_edges=True)
+            filter_edges: Whether to filter out objects at the edges of the image
+            edge_buffer: Size of edge buffer in pixels to filter out objects (if filter_edges=True)
             **kwargs: Additional parameters:
                 confidence_threshold: Minimum confidence score to keep a detection (0.0-1.0)
                 overlap: Overlap between adjacent tiles (0.0-1.0)
                 chip_size: Size of image chips for processing (height, width)
                 nms_iou_threshold: IoU threshold for non-maximum suppression (0.0-1.0)
                 mask_threshold: Threshold for mask binarization (0.0-1.0)
-                small_building_area: Minimum area in pixels to keep a building
+                small_object_area: Minimum area in pixels to keep an object
                 simplify_tolerance: Tolerance for polygon simplification
 
         Returns:
-            GeoDataFrame with building footprints
+            GeoDataFrame with objects
         """
         # Get parameters from kwargs or use instance defaults
         confidence_threshold = kwargs.get(
@@ -715,9 +724,7 @@ class BuildingFootprintExtractor:
         chip_size = kwargs.get("chip_size", self.chip_size)
         nms_iou_threshold = kwargs.get("nms_iou_threshold", self.nms_iou_threshold)
         mask_threshold = kwargs.get("mask_threshold", self.mask_threshold)
-        small_building_area = kwargs.get(
-            "small_building_area", self.small_building_area
-        )
+        small_object_area = kwargs.get("small_object_area", self.small_object_area)
         simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
 
         # Print parameters being used
@@ -727,14 +734,14 @@ class BuildingFootprintExtractor:
         print(f"- Chip size: {chip_size}")
         print(f"- NMS IoU threshold: {nms_iou_threshold}")
         print(f"- Mask threshold: {mask_threshold}")
-        print(f"- Min building area: {small_building_area}")
+        print(f"- Min object area: {small_object_area}")
         print(f"- Simplify tolerance: {simplify_tolerance}")
-        print(f"- Filter edge buildings: {filter_edges}")
+        print(f"- Filter edge objects: {filter_edges}")
         if filter_edges:
             print(f"- Edge buffer size: {edge_buffer} pixels")
 
         # Create dataset
-        dataset = BuildingFootprintDataset(raster_path=raster_path, chip_size=chip_size)
+        dataset = CustomDataset(raster_path=raster_path, chip_size=chip_size)
         self.raster_stats = dataset.raster_stats
 
         # Custom collate function to handle Shapely objects
@@ -858,7 +865,7 @@ class BuildingFootprintExtractor:
                         binary_mask,
                         simplify_tolerance=simplify_tolerance,
                         mask_threshold=mask_threshold,
-                        small_building_area=small_building_area,
+                        small_object_area=small_object_area,
                     )
 
                     # Skip if no valid polygons
@@ -896,7 +903,7 @@ class BuildingFootprintExtractor:
             {
                 "geometry": all_polygons,
                 "confidence": all_scores,
-                "class": 1,  # Building class
+                "class": 1,  # Object class
             },
             crs=dataset.crs,
         )
@@ -906,14 +913,14 @@ class BuildingFootprintExtractor:
             gdf, nms_iou_threshold=nms_iou_threshold
         )
 
-        # Filter edge buildings if requested
+        # Filter edge objects if requested
         if filter_edges:
-            gdf = self.filter_edge_buildings(gdf, raster_path, edge_buffer=edge_buffer)
+            gdf = self.filter_edge_objects(gdf, raster_path, edge_buffer=edge_buffer)
 
         # Save to file if requested
         if output_path:
             gdf.to_file(output_path, driver="GeoJSON")
-            print(f"Saved {len(gdf)} building footprints to {output_path}")
+            print(f"Saved {len(gdf)} objects to {output_path}")
 
         return gdf
 
@@ -921,7 +928,7 @@ class BuildingFootprintExtractor:
         self, raster_path, output_path=None, batch_size=4, verbose=False, **kwargs
     ):
         """
-        Process a raster file to extract building footprint masks and save as GeoTIFF.
+        Process a raster file to extract object masks and save as GeoTIFF.
 
         Args:
             raster_path: Path to input raster file
@@ -955,7 +962,7 @@ class BuildingFootprintExtractor:
         print(f"- Mask threshold: {mask_threshold}")
 
         # Create dataset
-        dataset = BuildingFootprintDataset(
+        dataset = CustomDataset(
             raster_path=raster_path, chip_size=chip_size, verbose=verbose
         )
 
@@ -972,7 +979,7 @@ class BuildingFootprintExtractor:
             output_profile = src.profile.copy()
             output_profile.update(
                 dtype=rasterio.uint8,
-                count=1,  # Single band for building mask
+                count=1,  # Single band for object mask
                 compress="lzw",
                 nodata=0,
             )
@@ -1144,10 +1151,10 @@ class BuildingFootprintExtractor:
                 # Write the final mask to the output file
                 dst.write(mask_array, 1)
 
-        print(f"Building masks saved to {output_path}")
+        print(f"Object masks saved to {output_path}")
         return output_path
 
-    def regularize_buildings(
+    def regularize_objects(
         self,
         gdf,
         min_area=10,
@@ -1156,17 +1163,17 @@ class BuildingFootprintExtractor:
         rectangularity_threshold=0.7,
     ):
         """
-        Regularize building footprints to enforce right angles and rectangular shapes.
+        Regularize objects to enforce right angles and rectangular shapes.
 
         Args:
-            gdf: GeoDataFrame with building footprints
-            min_area: Minimum area in square units to keep a building
+            gdf: GeoDataFrame with objects
+            min_area: Minimum area in square units to keep an object
             angle_threshold: Maximum deviation from 90 degrees to consider an angle as orthogonal (degrees)
-            orthogonality_threshold: Percentage of angles that must be orthogonal for a building to be regularized
-            rectangularity_threshold: Minimum area ratio to building's oriented bounding box for rectangular simplification
+            orthogonality_threshold: Percentage of angles that must be orthogonal for an object to be regularized
+            rectangularity_threshold: Minimum area ratio to Object's oriented bounding box for rectangular simplification
 
         Returns:
-            GeoDataFrame with regularized building footprints
+            GeoDataFrame with regularized objects
         """
         import numpy as np
         from shapely.geometry import Polygon, MultiPolygon, box
@@ -1281,10 +1288,10 @@ class BuildingFootprintExtractor:
             return rect
 
         if gdf is None or len(gdf) == 0:
-            print("No buildings to regularize")
+            print("No Objects to regularize")
             return gdf
 
-        print(f"Regularizing {len(gdf)} building footprints...")
+        print(f"Regularizing {len(gdf)} objects...")
         print(f"- Angle threshold: {angle_threshold}° from 90°")
         print(f"- Min orthogonality: {orthogonality_threshold*100}% of angles")
         print(
@@ -1295,11 +1302,11 @@ class BuildingFootprintExtractor:
         result_gdf = gdf.copy()
 
         # Track statistics
-        total_buildings = len(gdf)
+        total_objects = len(gdf)
         regularized_count = 0
         rectangularized_count = 0
 
-        # Process each building
+        # Process each Object
         for idx, row in tqdm(gdf.iterrows(), total=len(gdf)):
             geom = row.geometry
 
@@ -1314,7 +1321,7 @@ class BuildingFootprintExtractor:
                     continue
                 geom = list(geom.geoms)[np.argmax(areas)]
 
-            # Filter out tiny buildings
+            # Filter out tiny Objects
             if geom.area < min_area:
                 continue
 
@@ -1331,33 +1338,33 @@ class BuildingFootprintExtractor:
 
             # Decide how to regularize
             if rectangularity >= rectangularity_threshold:
-                # Building is already quite rectangular, simplify to a rectangle
+                # Object is already quite rectangular, simplify to a rectangle
                 result_gdf.at[idx, "geometry"] = oriented_box
                 result_gdf.at[idx, "regularized"] = "rectangle"
                 rectangularized_count += 1
             elif orthogonality >= orthogonality_threshold:
-                # Building has many orthogonal angles but isn't rectangular
+                # Object has many orthogonal angles but isn't rectangular
                 # Could implement more sophisticated regularization here
                 # For now, we'll still use the oriented rectangle
                 result_gdf.at[idx, "geometry"] = oriented_box
                 result_gdf.at[idx, "regularized"] = "orthogonal"
                 regularized_count += 1
             else:
-                # Building doesn't have clear orthogonal structure
+                # Object doesn't have clear orthogonal structure
                 # Keep original but flag as unmodified
                 result_gdf.at[idx, "regularized"] = "original"
 
         # Report statistics
         print(f"Regularization completed:")
-        print(f"- Total buildings: {total_buildings}")
+        print(f"- Total objects: {total_objects}")
         print(
-            f"- Rectangular buildings: {rectangularized_count} ({rectangularized_count/total_buildings*100:.1f}%)"
+            f"- Rectangular objects: {rectangularized_count} ({rectangularized_count/total_objects*100:.1f}%)"
         )
         print(
-            f"- Other regularized buildings: {regularized_count} ({regularized_count/total_buildings*100:.1f}%)"
+            f"- Other regularized objects: {regularized_count} ({regularized_count/total_objects*100:.1f}%)"
         )
         print(
-            f"- Unmodified buildings: {total_buildings-rectangularized_count-regularized_count} ({(total_buildings-rectangularized_count-regularized_count)/total_buildings*100:.1f}%)"
+            f"- Unmodified objects: {total_objects-rectangularized_count-regularized_count} ({(total_objects-rectangularized_count-regularized_count)/total_objects*100:.1f}%)"
         )
 
         return result_gdf
@@ -1366,14 +1373,14 @@ class BuildingFootprintExtractor:
         self, raster_path, gdf=None, output_path=None, figsize=(12, 12)
     ):
         """
-        Visualize building detection results with proper coordinate transformation.
+        Visualize object detection results with proper coordinate transformation.
 
-        This function displays building footprints on top of the raster image,
+        This function displays objects on top of the raster image,
         ensuring proper alignment between the GeoDataFrame polygons and the image.
 
         Args:
             raster_path: Path to input raster
-            gdf: GeoDataFrame with building polygons (optional)
+            gdf: GeoDataFrame with object polygons (optional)
             output_path: Path to save visualization (optional)
             figsize: Figure size (width, height) in inches
 
@@ -1390,7 +1397,7 @@ class BuildingFootprintExtractor:
             gdf = self.process_raster(raster_path)
 
         if gdf is None or len(gdf) == 0:
-            print("No buildings to visualize")
+            print("No objects to visualize")
             return False
 
         # Check if confidence column exists in the GeoDataFrame
@@ -1531,7 +1538,7 @@ class BuildingFootprintExtractor:
                 print(f"Unsupported geometry type: {geometry.geom_type}")
                 return None
 
-        # Plot each building footprint
+        # Plot each object
         for idx, row in gdf.iterrows():
             try:
                 # Convert polygon to pixel coordinates
@@ -1593,7 +1600,7 @@ class BuildingFootprintExtractor:
         # Remove axes
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.set_title(f"Building Footprints (Found: {len(gdf)})")
+        ax.set_title(f"objects (Found: {len(gdf)})")
 
         # Save if requested
         if output_path:
@@ -1603,21 +1610,21 @@ class BuildingFootprintExtractor:
 
         plt.close()
 
-        # Create a simpler visualization focused just on a subset of buildings
+        # Create a simpler visualization focused just on a subset of objects
         if len(gdf) > 0:
             plt.figure(figsize=figsize)
             ax = plt.gca()
 
             # Choose a subset of the image to show
             with rasterio.open(raster_path) as src:
-                # Get centroid of first building
+                # Get centroid of first object
                 sample_geom = gdf.iloc[0].geometry
                 centroid = sample_geom.centroid
 
                 # Convert to pixel coordinates
                 center_x, center_y = ~src.transform * (centroid.x, centroid.y)
 
-                # Define a window around this building
+                # Define a window around this object
                 window_size = 500  # pixels
                 window = rasterio.windows.Window(
                     max(0, int(center_x - window_size / 2)),
@@ -1654,7 +1661,7 @@ class BuildingFootprintExtractor:
                 window_bounds = rasterio.windows.bounds(window, src.transform)
                 window_box = box(*window_bounds)
 
-                # Filter buildings that intersect with this window
+                # Filter objects that intersect with this window
                 visible_gdf = gdf[gdf.intersects(window_box)]
 
                 # Set up colors for sample view if confidence data exists
@@ -1676,7 +1683,7 @@ class BuildingFootprintExtractor:
                     except Exception as e:
                         print(f"Error setting up sample confidence visualization: {e}")
 
-                # Plot building footprints in sample view
+                # Plot objects in sample view
                 for idx, row in visible_gdf.iterrows():
                     try:
                         # Get window-relative pixel coordinates
@@ -1751,9 +1758,7 @@ class BuildingFootprintExtractor:
                         print(f"Error plotting polygon in sample view: {e}")
 
                 # Set title
-                ax.set_title(
-                    f"Sample Area - Building Footprints (Showing: {len(visible_gdf)})"
-                )
+                ax.set_title(f"Sample Area - objects (Showing: {len(visible_gdf)})")
 
                 # Remove axes
                 ax.set_xticks([])
@@ -1769,3 +1774,57 @@ class BuildingFootprintExtractor:
                     plt.tight_layout()
                     plt.savefig(sample_output, dpi=300, bbox_inches="tight")
                     print(f"Sample visualization saved to {sample_output}")
+
+
+class BuildingFootprintExtractor(ObjectDetector):
+    """
+    Building footprint extraction using a pre-trained Mask R-CNN model.
+
+    This class extends the
+    `ObjectDetector` class with additional methods for building footprint extraction."
+    """
+
+    def __init__(
+        self,
+        model_path="building_footprints_usa.pth",
+        repo_id=None,
+        model=None,
+        device=None,
+    ):
+        """
+        Initialize the object extractor.
+
+        Args:
+            model_path: Path to the .pth model file.
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
+        """
+        super().__init__(
+            model_path=model_path, repo_id=repo_id, model=model, device=device
+        )
+
+
+class CarDetector(ObjectDetector):
+    """
+    Car detection using a pre-trained Mask R-CNN model.
+
+    This class extends the
+    `ObjectDetector` class with additional methods for car detection."
+    """
+
+    def __init__(
+        self, model_path="car_detection_usa.pth", repo_id=None, model=None, device=None
+    ):
+        """
+        Initialize the object extractor.
+
+        Args:
+            model_path: Path to the .pth model file.
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
+        """
+        super().__init__(
+            model_path=model_path, repo_id=repo_id, model=model, device=device
+        )
