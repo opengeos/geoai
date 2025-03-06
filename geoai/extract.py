@@ -201,19 +201,19 @@ class ObjectDetector:
         self.simplify_tolerance = 1.0  # Tolerance for polygon simplification
 
         # Initialize model
-        self.model = self._initialize_model(model)
+        self.model = self.initialize_model(model)
 
         # Download model if needed
         if model_path is None or (not os.path.exists(model_path)):
-            model_path = self._download_model_from_hf(model_path, repo_id)
+            model_path = self.download_model_from_hf(model_path, repo_id)
 
         # Load model weights
-        self._load_weights(model_path)
+        self.load_weights(model_path)
 
         # Set model to evaluation mode
         self.model.eval()
 
-    def _download_model_from_hf(self, model_path=None, repo_id=None):
+    def download_model_from_hf(self, model_path=None, repo_id=None):
         """
         Download the object detection model from Hugging Face.
 
@@ -246,7 +246,7 @@ class ObjectDetector:
             print("Please specify a local model path or ensure internet connectivity.")
             raise
 
-    def _initialize_model(self, model):
+    def initialize_model(self, model):
         """Initialize a deep learning model for object detection.
 
         Args:
@@ -275,7 +275,7 @@ class ObjectDetector:
         model.to(self.device)
         return model
 
-    def _load_weights(self, model_path):
+    def load_weights(self, model_path):
         """
         Load weights from file with error handling for different formats.
 
@@ -317,7 +317,7 @@ class ObjectDetector:
         except Exception as e:
             raise RuntimeError(f"Failed to load model: {e}")
 
-    def _mask_to_polygons(self, mask, **kwargs):
+    def mask_to_polygons(self, mask, **kwargs):
         """
         Convert binary mask to polygon contours using OpenCV.
 
@@ -365,7 +365,7 @@ class ObjectDetector:
 
         return polygons
 
-    def _filter_overlapping_polygons(self, gdf, **kwargs):
+    def filter_overlapping_polygons(self, gdf, **kwargs):
         """
         Filter overlapping polygons using non-maximum suppression.
 
@@ -648,7 +648,7 @@ class ObjectDetector:
             )
 
             # Apply non-maximum suppression to remove overlapping polygons
-            gdf = self._filter_overlapping_polygons(
+            gdf = self.filter_overlapping_polygons(
                 gdf, nms_iou_threshold=nms_iou_threshold
             )
 
@@ -861,7 +861,7 @@ class ObjectDetector:
                     binary_mask = mask[0]  # Get binary mask
 
                     # Convert mask to polygon with custom parameters
-                    contours = self._mask_to_polygons(
+                    contours = self.mask_to_polygons(
                         binary_mask,
                         simplify_tolerance=simplify_tolerance,
                         mask_threshold=mask_threshold,
@@ -909,9 +909,7 @@ class ObjectDetector:
         )
 
         # Remove overlapping polygons with custom threshold
-        gdf = self._filter_overlapping_polygons(
-            gdf, nms_iou_threshold=nms_iou_threshold
-        )
+        gdf = self.filter_overlapping_polygons(gdf, nms_iou_threshold=nms_iou_threshold)
 
         # Filter edge objects if requested
         if filter_edges:
