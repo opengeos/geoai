@@ -13,6 +13,7 @@ import rasterio
 from rasterio.windows import Window
 from rasterio.features import shapes
 from huggingface_hub import hf_hub_download
+import scipy.ndimage as ndimage
 from .utils import get_raster_stats
 
 try:
@@ -25,34 +26,74 @@ except ImportError as e:
 
 class CustomDataset(NonGeoDataset):
     """
-    A TorchGeo dataset for object extraction.
-    Using NonGeoDataset to avoid spatial indexing issues.
+    A TorchGeo dataset for object extraction with overlapping tiles support.
+
+    This dataset class creates overlapping image tiles for object detection,
+    ensuring complete coverage of the input raster including right and bottom edges.
+    It inherits from NonGeoDataset to avoid spatial indexing issues.
+
+    Attributes:
+        raster_path: Path to the input raster file.
+        chip_size: Size of image chips to extract (height, width).
+        overlap: Amount of overlap between adjacent tiles (0.0-1.0).
+        transforms: Transforms to apply to the image.
+        verbose: Whether to print detailed processing information.
+        stride_x: Horizontal stride between tiles based on overlap.
+        stride_y: Vertical stride between tiles based on overlap.
+        row_starts: Starting Y positions for each row of tiles.
+        col_starts: Starting X positions for each column of tiles.
+        crs: Coordinate reference system of the raster.
+        transform: Affine transform of the raster.
+        height: Height of the raster in pixels.
+        width: Width of the raster in pixels.
+        count: Number of bands in the raster.
+        bounds: Geographic bounds of the raster (west, south, east, north).
+        roi: Shapely box representing the region of interest.
+        rows: Number of rows of tiles.
+        cols: Number of columns of tiles.
+        raster_stats: Statistics of the raster.
     """
 
     def __init__(
-        self, raster_path, chip_size=(512, 512), transforms=None, verbose=False
+        self,
+        raster_path,
+        chip_size=(512, 512),
+        overlap=0.5,
+        transforms=None,
+        verbose=False,
     ):
         """
-        Initialize the dataset.
+        Initialize the dataset with overlapping tiles.
 
         Args:
-            raster_path: Path to the input raster file
-            chip_size: Size of image chips to extract (height, width)
-            transforms: Transforms to apply to the image
-            verbose: Whether to print detailed processing information
+            raster_path: Path to the input raster file.
+            chip_size: Size of image chips to extract (height, width). Default is (512, 512).
+            overlap: Amount of overlap between adjacent tiles (0.0-1.0). Default is 0.5 (50%).
+            transforms: Transforms to apply to the image. Default is None.
+            verbose: Whether to print detailed processing information. Default is False.
+
+        Raises:
+            ValueError: If overlap is too high resulting in non-positive stride.
         """
         super().__init__()
 
         # Initialize parameters
         self.raster_path = raster_path
         self.chip_size = chip_size
+        self.overlap = overlap
         self.transforms = transforms
         self.verbose = verbose
-
-        # For tracking warnings about multi-band images
         self.warned_about_bands = False
 
-        # Open raster and get metadata
+        # Calculate stride based on overlap
+        self.stride_x = int(chip_size[1] * (1 - overlap))
+        self.stride_y = int(chip_size[0] * (1 - overlap))
+
+        if self.stride_x <= 0 or self.stride_y <= 0:
+            raise ValueError(
+                f"Overlap {overlap} is too high, resulting in non-positive stride"
+            )
+
         with rasterio.open(self.raster_path) as src:
             self.crs = src.crs
             self.transform = src.transform
@@ -63,43 +104,78 @@ class CustomDataset(NonGeoDataset):
             # Define the bounds of the dataset
             west, south, east, north = src.bounds
             self.bounds = (west, south, east, north)
-
-            # Define the ROI for the dataset
             self.roi = box(*self.bounds)
 
-            # Calculate number of chips in each dimension
-            # Use ceil division to ensure we cover the entire image
-            self.rows = (self.height + self.chip_size[0] - 1) // self.chip_size[0]
-            self.cols = (self.width + self.chip_size[1] - 1) // self.chip_size[1]
+            # Calculate starting positions for each tile
+            self.row_starts = []
+            self.col_starts = []
+
+            # Normal row starts using stride
+            for r in range((self.height - 1) // self.stride_y):
+                self.row_starts.append(r * self.stride_y)
+
+            # Add a special last row that ensures we reach the bottom edge
+            if self.height > self.chip_size[0]:
+                self.row_starts.append(max(0, self.height - self.chip_size[0]))
+            else:
+                # If the image is smaller than chip size, just start at 0
+                if not self.row_starts:
+                    self.row_starts.append(0)
+
+            # Normal column starts using stride
+            for c in range((self.width - 1) // self.stride_x):
+                self.col_starts.append(c * self.stride_x)
+
+            # Add a special last column that ensures we reach the right edge
+            if self.width > self.chip_size[1]:
+                self.col_starts.append(max(0, self.width - self.chip_size[1]))
+            else:
+                # If the image is smaller than chip size, just start at 0
+                if not self.col_starts:
+                    self.col_starts.append(0)
+
+            # Update rows and cols based on actual starting positions
+            self.rows = len(self.row_starts)
+            self.cols = len(self.col_starts)
 
             print(
                 f"Dataset initialized with {self.rows} rows and {self.cols} columns of chips"
             )
             print(f"Image dimensions: {self.width} x {self.height} pixels")
             print(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
+            print(
+                f"Overlap: {overlap*100}% (stride_x={self.stride_x}, stride_y={self.stride_y})"
+            )
             if src.crs:
                 print(f"CRS: {src.crs}")
 
-        # get raster stats
+        # Get raster stats
         self.raster_stats = get_raster_stats(raster_path, divide_by=255)
 
     def __getitem__(self, idx):
         """
         Get an image chip from the dataset by index.
 
+        Retrieves an image tile with the specified overlap pattern, ensuring
+        proper coverage of the entire raster including edges.
+
         Args:
-            idx: Index of the chip
+            idx: Index of the chip to retrieve.
 
         Returns:
-            Dict containing image tensor
+            dict: Dictionary containing:
+                - image: Image tensor.
+                - bbox: Geographic bounding box for the window.
+                - coords: Pixel coordinates as tensor [i, j].
+                - window_size: Window size as tensor [width, height].
         """
         # Convert flat index to grid position
         row = idx // self.cols
         col = idx % self.cols
 
-        # Calculate pixel coordinates
-        i = col * self.chip_size[1]
-        j = row * self.chip_size[0]
+        # Get pre-calculated starting positions
+        j = self.row_starts[row]
+        i = self.col_starts[col]
 
         # Read window from raster
         with rasterio.open(self.raster_path) as src:
@@ -166,7 +242,12 @@ class CustomDataset(NonGeoDataset):
         }
 
     def __len__(self):
-        """Return the number of samples in the dataset."""
+        """
+        Return the number of samples in the dataset.
+
+        Returns:
+            int: Total number of tiles in the dataset.
+        """
         return self.rows * self.cols
 
 
@@ -761,7 +842,9 @@ class ObjectDetector:
             print(f"- Edge buffer size: {edge_buffer} pixels")
 
         # Create dataset
-        dataset = CustomDataset(raster_path=raster_path, chip_size=chip_size)
+        dataset = CustomDataset(
+            raster_path=raster_path, chip_size=chip_size, overlap=overlap
+        )
         self.raster_stats = dataset.raster_stats
 
         # Custom collate function to handle Shapely objects
@@ -969,6 +1052,7 @@ class ObjectDetector:
         )
         chip_size = kwargs.get("chip_size", self.chip_size)
         mask_threshold = kwargs.get("mask_threshold", self.mask_threshold)
+        overlap = kwargs.get("overlap", self.overlap)
 
         # Set default output path if not provided
         if output_path is None:
@@ -982,7 +1066,10 @@ class ObjectDetector:
 
         # Create dataset
         dataset = CustomDataset(
-            raster_path=raster_path, chip_size=chip_size, verbose=verbose
+            raster_path=raster_path,
+            chip_size=chip_size,
+            overlap=overlap,
+            verbose=verbose,
         )
 
         # Store a flag to avoid repetitive messages
@@ -1857,8 +1944,7 @@ class CarDetector(ObjectDetector):
     """
     Car detection using a pre-trained Mask R-CNN model.
 
-    This class extends the
-    `ObjectDetector` class with additional methods for car detection."
+    This class extends the `ObjectDetector` class with additional methods for car detection.
     """
 
     def __init__(
@@ -1876,6 +1962,274 @@ class CarDetector(ObjectDetector):
         super().__init__(
             model_path=model_path, repo_id=repo_id, model=model, device=device
         )
+
+    def save_masks_with_confidence_tiff(
+        self,
+        raster_path,
+        output_path=None,
+        confidence_threshold=None,
+        mask_threshold=None,
+        overlap=0.25,
+        batch_size=4,
+        verbose=False,
+    ):
+        """
+        Save masks with confidence values as a multi-band GeoTIFF.
+
+        Args:
+            raster_path: Path to input raster
+            output_path: Path for output GeoTIFF
+            confidence_threshold: Minimum confidence score (0.0-1.0)
+            mask_threshold: Threshold for mask binarization (0.0-1.0)
+            overlap: Overlap between tiles (0.0-1.0)
+            batch_size: Batch size for processing
+            verbose: Whether to print detailed processing information
+
+        Returns:
+            Path to the saved GeoTIFF
+        """
+        # Use provided thresholds or fall back to instance defaults
+        if confidence_threshold is None:
+            confidence_threshold = self.confidence_threshold
+        if mask_threshold is None:
+            mask_threshold = self.mask_threshold
+
+        # Default output path
+        if output_path is None:
+            output_path = os.path.splitext(raster_path)[0] + "_masks_conf.tif"
+
+        # Process the raster to get individual masks with confidence
+        with rasterio.open(raster_path) as src:
+            # Create dataset with the specified overlap
+            dataset = CustomDataset(
+                raster_path=raster_path,
+                chip_size=self.chip_size,
+                overlap=overlap,
+                verbose=verbose,
+            )
+
+            # Create output profile
+            output_profile = src.profile.copy()
+            output_profile.update(
+                dtype=rasterio.uint8,
+                count=2,  # Two bands: mask and confidence
+                compress="lzw",
+                nodata=0,
+            )
+
+            # Initialize mask and confidence arrays
+            mask_array = np.zeros((src.height, src.width), dtype=np.uint8)
+            conf_array = np.zeros((src.height, src.width), dtype=np.uint8)
+
+            # Define custom collate function to handle Shapely objects
+            def custom_collate(batch):
+                """
+                Custom collate function that handles Shapely geometries
+                by keeping them as Python objects rather than trying to collate them.
+                """
+                elem = batch[0]
+                if isinstance(elem, dict):
+                    result = {}
+                    for key in elem:
+                        if key == "bbox":
+                            # Don't collate shapely objects, keep as list
+                            result[key] = [d[key] for d in batch]
+                        else:
+                            # For tensors and other collatable types
+                            try:
+                                result[key] = (
+                                    torch.utils.data._utils.collate.default_collate(
+                                        [d[key] for d in batch]
+                                    )
+                                )
+                            except TypeError:
+                                # Fall back to list for non-collatable types
+                                result[key] = [d[key] for d in batch]
+                    return result
+                else:
+                    # Default collate for non-dict types
+                    return torch.utils.data._utils.collate.default_collate(batch)
+
+            # Create dataloader with custom collate function
+            dataloader = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=0,
+                collate_fn=custom_collate,
+            )
+
+            # Process batches
+            print(f"Processing raster with {len(dataloader)} batches")
+            for batch in tqdm(dataloader):
+                # Move images to device
+                images = batch["image"].to(self.device)
+                coords = batch["coords"]  # Tensor of shape [batch_size, 2]
+
+                # Run inference
+                with torch.no_grad():
+                    predictions = self.model(images)
+
+                # Process predictions
+                for idx, prediction in enumerate(predictions):
+                    masks = prediction["masks"].cpu().numpy()
+                    scores = prediction["scores"].cpu().numpy()
+
+                    # Filter by confidence threshold
+                    valid_indices = scores >= confidence_threshold
+                    masks = masks[valid_indices]
+                    scores = scores[valid_indices]
+
+                    # Skip if no valid predictions
+                    if len(masks) == 0:
+                        continue
+
+                    # Get window coordinates
+                    i, j = coords[idx].cpu().numpy()
+
+                    # Process each mask
+                    for mask_idx, mask in enumerate(masks):
+                        # Convert to binary mask
+                        binary_mask = (mask[0] > mask_threshold).astype(np.uint8) * 255
+                        conf_value = int(scores[mask_idx] * 255)  # Scale to 0-255
+
+                        # Update the mask and confidence arrays
+                        h, w = binary_mask.shape
+                        valid_h = min(h, src.height - j)
+                        valid_w = min(w, src.width - i)
+
+                        if valid_h > 0 and valid_w > 0:
+                            # Use maximum for overlapping regions in the mask
+                            mask_array[j : j + valid_h, i : i + valid_w] = np.maximum(
+                                mask_array[j : j + valid_h, i : i + valid_w],
+                                binary_mask[:valid_h, :valid_w],
+                            )
+
+                            # For confidence, only update where mask is positive
+                            # and confidence is higher than existing
+                            mask_region = binary_mask[:valid_h, :valid_w] > 0
+                            if np.any(mask_region):
+                                # Only update where mask is positive and new confidence is higher
+                                current_conf = conf_array[
+                                    j : j + valid_h, i : i + valid_w
+                                ]
+
+                                # Where to update confidence (mask positive & higher confidence)
+                                update_mask = np.logical_and(
+                                    mask_region,
+                                    np.logical_or(
+                                        current_conf == 0, current_conf < conf_value
+                                    ),
+                                )
+
+                                if np.any(update_mask):
+                                    conf_array[j : j + valid_h, i : i + valid_w][
+                                        update_mask
+                                    ] = conf_value
+
+            # Write to GeoTIFF
+            with rasterio.open(output_path, "w", **output_profile) as dst:
+                dst.write(mask_array, 1)
+                dst.write(conf_array, 2)
+
+            print(f"Masks with confidence values saved to {output_path}")
+            return output_path
+
+    def vectorize_with_confidence(self, masks_path, output_path=None, **kwargs):
+        """
+        Convert masks with confidence to vector polygons.
+
+        Args:
+            masks_path: Path to masks GeoTIFF with confidence band
+            output_path: Path for output GeoJSON
+            **kwargs: Additional parameters
+
+        Returns:
+            GeoDataFrame with car detections and confidence values
+        """
+
+        print(f"Processing masks from: {masks_path}")
+
+        with rasterio.open(masks_path) as src:
+            # Read mask and confidence bands
+            mask_data = src.read(1)
+            conf_data = src.read(2)
+            transform = src.transform
+            crs = src.crs
+
+            # Convert to binary mask
+            binary_mask = mask_data > 0
+
+            # Find connected components
+            labeled_mask, num_features = ndimage.label(binary_mask)
+            print(f"Found {num_features} connected components")
+
+            # Process each component
+            car_polygons = []
+            car_confidences = []
+
+            # Add progress bar
+            for label in tqdm(range(1, num_features + 1), desc="Processing components"):
+                # Create mask for this component
+                component_mask = (labeled_mask == label).astype(np.uint8)
+
+                # Get confidence value (mean of non-zero values in this region)
+                conf_region = conf_data[component_mask > 0]
+                if len(conf_region) > 0:
+                    confidence = (
+                        np.mean(conf_region) / 255.0
+                    )  # Convert back to 0-1 range
+                else:
+                    confidence = 0.0
+
+                # Find contours
+                contours, _ = cv2.findContours(
+                    component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                )
+
+                for contour in contours:
+                    # Filter by size
+                    area = cv2.contourArea(contour)
+                    if area < kwargs.get("min_object_area", 100):
+                        continue
+
+                    # Get minimum area rectangle
+                    rect = cv2.minAreaRect(contour)
+                    box_points = cv2.boxPoints(rect)
+
+                    # Convert to geographic coordinates
+                    geo_points = []
+                    for x, y in box_points:
+                        gx, gy = transform * (x, y)
+                        geo_points.append((gx, gy))
+
+                    # Create polygon
+                    poly = Polygon(geo_points)
+
+                    # Add to lists
+                    car_polygons.append(poly)
+                    car_confidences.append(confidence)
+
+            # Create GeoDataFrame
+            if car_polygons:
+                gdf = gpd.GeoDataFrame(
+                    {
+                        "geometry": car_polygons,
+                        "confidence": car_confidences,
+                        "class": [1] * len(car_polygons),
+                    },
+                    crs=crs,
+                )
+
+                # Save to file if requested
+                if output_path:
+                    gdf.to_file(output_path, driver="GeoJSON")
+                    print(f"Saved {len(gdf)} cars with confidence to {output_path}")
+
+                return gdf
+            else:
+                print("No valid car polygons found")
+                return None
 
 
 class ShipDetector(ObjectDetector):
