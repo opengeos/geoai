@@ -93,6 +93,7 @@ nav:
           - examples/building_footprints_usa.ipynb
           - examples/building_regularization.ipynb
           - examples/geometric_properties.ipynb
+          - examples/car_detection.ipynb
           - examples/data_visualization.ipynb
           - examples/samgeo/satellite.ipynb
           - examples/samgeo/automatic_mask_generator.ipynb
