@@ -54,6 +54,7 @@ def view_raster(
     array_args: Optional[Dict] = {},
     client_args: Optional[Dict] = {"cors_all": False},
     basemap: Optional[str] = "OpenStreetMap",
+    backend: Optional[str] = "folium",
     **kwargs,
 ):
     """
@@ -81,28 +82,52 @@ def view_raster(
         leafmap.Map: The map object with the raster layer added.
     """
 
+    if backend == "folium":
+        import leafmap.foliumap as leafmap
+
     m = leafmap.Map(basemap=basemap)
 
     if isinstance(source, dict):
         source = dict_to_image(source)
 
-    m.add_raster(
-        source=source,
-        indexes=indexes,
-        colormap=colormap,
-        vmin=vmin,
-        vmax=vmax,
-        nodata=nodata,
-        attribution=attribution,
-        layer_name=layer_name,
-        layer_index=layer_index,
-        zoom_to_layer=zoom_to_layer,
-        visible=visible,
-        opacity=opacity,
-        array_args=array_args,
-        client_args=client_args,
-        **kwargs,
-    )
+    if (
+        isinstance(source, str)
+        and source.lower().endswith(".tif")
+        and source.startswith("http")
+    ):
+        if indexes is not None:
+            kwargs["bidx"] = indexes
+        if colormap is not None:
+            kwargs["colormap_name"] = colormap
+        if attribution is None:
+            attribution = "TiTiler"
+
+        m.add_cog_layer(
+            source,
+            name=layer_name,
+            opacity=opacity,
+            attribution=attribution,
+            zoom_to_layer=zoom_to_layer,
+            **kwargs,
+        )
+    else:
+        m.add_raster(
+            source=source,
+            indexes=indexes,
+            colormap=colormap,
+            vmin=vmin,
+            vmax=vmax,
+            nodata=nodata,
+            attribution=attribution,
+            layer_name=layer_name,
+            layer_index=layer_index,
+            zoom_to_layer=zoom_to_layer,
+            visible=visible,
+            opacity=opacity,
+            array_args=array_args,
+            client_args=client_args,
+            **kwargs,
+        )
     return m
 
 
