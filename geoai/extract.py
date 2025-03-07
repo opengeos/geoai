@@ -1963,7 +1963,7 @@ class CarDetector(ObjectDetector):
             model_path=model_path, repo_id=repo_id, model=model, device=device
         )
 
-    def save_masks_with_confidence_tiff(
+    def generate_masks(
         self,
         raster_path,
         output_path=None,
@@ -2135,7 +2135,7 @@ class CarDetector(ObjectDetector):
             print(f"Masks with confidence values saved to {output_path}")
             return output_path
 
-    def vectorize_with_confidence(self, masks_path, output_path=None, **kwargs):
+    def vectorize_masks(self, masks_path, output_path=None, **kwargs):
         """
         Convert masks with confidence to vector polygons.
 
