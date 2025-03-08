@@ -1881,88 +1881,6 @@ class ObjectDetector:
                     plt.savefig(sample_output, dpi=300, bbox_inches="tight")
                     print(f"Sample visualization saved to {sample_output}")
 
-
-class BuildingFootprintExtractor(ObjectDetector):
-    """
-    Building footprint extraction using a pre-trained Mask R-CNN model.
-
-    This class extends the
-    `ObjectDetector` class with additional methods for building footprint extraction."
-    """
-
-    def __init__(
-        self,
-        model_path="building_footprints_usa.pth",
-        repo_id=None,
-        model=None,
-        device=None,
-    ):
-        """
-        Initialize the object extractor.
-
-        Args:
-            model_path: Path to the .pth model file.
-            repo_id: Repo ID for loading models from the Hub.
-            model: Custom model to use for inference.
-            device: Device to use for inference ('cuda:0', 'cpu', etc.).
-        """
-        super().__init__(
-            model_path=model_path, repo_id=repo_id, model=model, device=device
-        )
-
-    def regularize_buildings(
-        self,
-        gdf,
-        min_area=10,
-        angle_threshold=15,
-        orthogonality_threshold=0.3,
-        rectangularity_threshold=0.7,
-    ):
-        """
-        Regularize building footprints to enforce right angles and rectangular shapes.
-
-        Args:
-            gdf: GeoDataFrame with building footprints
-            min_area: Minimum area in square units to keep a building
-            angle_threshold: Maximum deviation from 90 degrees to consider an angle as orthogonal (degrees)
-            orthogonality_threshold: Percentage of angles that must be orthogonal for a building to be regularized
-            rectangularity_threshold: Minimum area ratio to building's oriented bounding box for rectangular simplification
-
-        Returns:
-            GeoDataFrame with regularized building footprints
-        """
-        return self.regularize_objects(
-            gdf,
-            min_area=min_area,
-            angle_threshold=angle_threshold,
-            orthogonality_threshold=orthogonality_threshold,
-            rectangularity_threshold=rectangularity_threshold,
-        )
-
-
-class CarDetector(ObjectDetector):
-    """
-    Car detection using a pre-trained Mask R-CNN model.
-
-    This class extends the `ObjectDetector` class with additional methods for car detection.
-    """
-
-    def __init__(
-        self, model_path="car_detection_usa.pth", repo_id=None, model=None, device=None
-    ):
-        """
-        Initialize the object extractor.
-
-        Args:
-            model_path: Path to the .pth model file.
-            repo_id: Repo ID for loading models from the Hub.
-            model: Custom model to use for inference.
-            device: Device to use for inference ('cuda:0', 'cpu', etc.).
-        """
-        super().__init__(
-            model_path=model_path, repo_id=repo_id, model=model, device=device
-        )
-
     def generate_masks(
         self,
         raster_path,
@@ -1972,6 +1890,7 @@ class CarDetector(ObjectDetector):
         overlap=0.25,
         batch_size=4,
         verbose=False,
+        **kwargs,
     ):
         """
         Save masks with confidence values as a multi-band GeoTIFF.
@@ -1994,6 +1913,12 @@ class CarDetector(ObjectDetector):
         if mask_threshold is None:
             mask_threshold = self.mask_threshold
 
+        # Get parameters from kwargs or use instance defaults
+        confidence_threshold = kwargs.get(
+            "confidence_threshold", self.confidence_threshold
+        )
+        chip_size = kwargs.get("chip_size", self.chip_size)
+
         # Default output path
         if output_path is None:
             output_path = os.path.splitext(raster_path)[0] + "_masks_conf.tif"
@@ -2003,7 +1928,7 @@ class CarDetector(ObjectDetector):
             # Create dataset with the specified overlap
             dataset = CustomDataset(
                 raster_path=raster_path,
-                chip_size=self.chip_size,
+                chip_size=chip_size,
                 overlap=overlap,
                 verbose=verbose,
             )
@@ -2135,13 +2060,24 @@ class CarDetector(ObjectDetector):
             print(f"Masks with confidence values saved to {output_path}")
             return output_path
 
-    def vectorize_masks(self, masks_path, output_path=None, **kwargs):
+    def vectorize_masks(
+        self,
+        masks_path,
+        output_path=None,
+        confidence_threshold=0.5,
+        min_object_area=100,
+        max_object_size=None,
+        **kwargs,
+    ):
         """
         Convert masks with confidence to vector polygons.
 
         Args:
-            masks_path: Path to masks GeoTIFF with confidence band
-            output_path: Path for output GeoJSON
+            masks_path: Path to masks GeoTIFF with confidence band.
+            output_path: Path for output GeoJSON.
+            confidence_threshold: Minimum confidence score (0.0-1.0). Default: 0.5
+            min_object_area: Minimum area in pixels to keep an object. Default: 100
+            max_object_size: Maximum area in pixels to keep an object. Default: None
             **kwargs: Additional parameters
 
         Returns:
@@ -2182,6 +2118,10 @@ class CarDetector(ObjectDetector):
                 else:
                     confidence = 0.0
 
+                # Skip if confidence is below threshold
+                if confidence < confidence_threshold:
+                    continue
+
                 # Find contours
                 contours, _ = cv2.findContours(
                     component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -2190,8 +2130,12 @@ class CarDetector(ObjectDetector):
                 for contour in contours:
                     # Filter by size
                     area = cv2.contourArea(contour)
-                    if area < kwargs.get("min_object_area", 100):
+                    if area < min_object_area:
                         continue
+
+                    if max_object_size is not None:
+                        if area > max_object_size:
+                            continue
 
                     # Get minimum area rectangle
                     rect = cv2.minAreaRect(contour)
@@ -2230,6 +2174,88 @@ class CarDetector(ObjectDetector):
             else:
                 print("No valid car polygons found")
                 return None
+
+
+class BuildingFootprintExtractor(ObjectDetector):
+    """
+    Building footprint extraction using a pre-trained Mask R-CNN model.
+
+    This class extends the
+    `ObjectDetector` class with additional methods for building footprint extraction."
+    """
+
+    def __init__(
+        self,
+        model_path="building_footprints_usa.pth",
+        repo_id=None,
+        model=None,
+        device=None,
+    ):
+        """
+        Initialize the object extractor.
+
+        Args:
+            model_path: Path to the .pth model file.
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
+        """
+        super().__init__(
+            model_path=model_path, repo_id=repo_id, model=model, device=device
+        )
+
+    def regularize_buildings(
+        self,
+        gdf,
+        min_area=10,
+        angle_threshold=15,
+        orthogonality_threshold=0.3,
+        rectangularity_threshold=0.7,
+    ):
+        """
+        Regularize building footprints to enforce right angles and rectangular shapes.
+
+        Args:
+            gdf: GeoDataFrame with building footprints
+            min_area: Minimum area in square units to keep a building
+            angle_threshold: Maximum deviation from 90 degrees to consider an angle as orthogonal (degrees)
+            orthogonality_threshold: Percentage of angles that must be orthogonal for a building to be regularized
+            rectangularity_threshold: Minimum area ratio to building's oriented bounding box for rectangular simplification
+
+        Returns:
+            GeoDataFrame with regularized building footprints
+        """
+        return self.regularize_objects(
+            gdf,
+            min_area=min_area,
+            angle_threshold=angle_threshold,
+            orthogonality_threshold=orthogonality_threshold,
+            rectangularity_threshold=rectangularity_threshold,
+        )
+
+
+class CarDetector(ObjectDetector):
+    """
+    Car detection using a pre-trained Mask R-CNN model.
+
+    This class extends the `ObjectDetector` class with additional methods for car detection.
+    """
+
+    def __init__(
+        self, model_path="car_detection_usa.pth", repo_id=None, model=None, device=None
+    ):
+        """
+        Initialize the object extractor.
+
+        Args:
+            model_path: Path to the .pth model file.
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
+        """
+        super().__init__(
+            model_path=model_path, repo_id=repo_id, model=model, device=device
+        )
 
 
 class ShipDetector(ObjectDetector):
