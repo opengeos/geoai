@@ -1887,6 +1887,8 @@ class ObjectDetector:
         output_path=None,
         confidence_threshold=None,
         mask_threshold=None,
+        min_object_area=10,
+        max_object_area=float("inf"),
         overlap=0.25,
         batch_size=4,
         verbose=False,
@@ -1895,11 +1897,16 @@ class ObjectDetector:
         """
         Save masks with confidence values as a multi-band GeoTIFF.
 
+        Objects with area smaller than min_object_area or larger than max_object_area
+        will be filtered out.
+
         Args:
             raster_path: Path to input raster
             output_path: Path for output GeoTIFF
             confidence_threshold: Minimum confidence score (0.0-1.0)
             mask_threshold: Threshold for mask binarization (0.0-1.0)
+            min_object_area: Minimum area (in pixels) for an object to be included
+            max_object_area: Maximum area (in pixels) for an object to be included
             overlap: Overlap between tiles (0.0-1.0)
             batch_size: Batch size for processing
             verbose: Whether to print detailed processing information
@@ -2012,6 +2019,21 @@ class ObjectDetector:
                     for mask_idx, mask in enumerate(masks):
                         # Convert to binary mask
                         binary_mask = (mask[0] > mask_threshold).astype(np.uint8) * 255
+
+                        # Check object area - calculate number of pixels in the mask
+                        object_area = np.sum(binary_mask > 0)
+
+                        # Skip objects that don't meet area criteria
+                        if (
+                            object_area < min_object_area
+                            or object_area > max_object_area
+                        ):
+                            if verbose:
+                                print(
+                                    f"Filtering out object with area {object_area} pixels"
+                                )
+                            continue
+
                         conf_value = int(scores[mask_idx] * 255)  # Scale to 0-255
 
                         # Update the mask and confidence arrays
