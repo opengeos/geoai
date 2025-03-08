@@ -4994,3 +4994,808 @@ def add_geometric_properties(data, properties=None, area_unit="m2", length_unit=
         result["complexity"] = result.geometry.apply(calc_complexity)
 
     return result
+
+
+def orthogonalize(
+    input_path,
+    output_path=None,
+    epsilon=0.2,
+    min_area=10,
+    min_segments=4,
+    area_tolerance=0.7,
+    detect_triangles=True,
+):
+    """
+    Orthogonalizes object masks in a GeoTIFF file.
+
+    This function reads a GeoTIFF containing object masks (binary or labeled regions),
+    converts the raster masks to vector polygons, applies orthogonalization to each polygon,
+    and optionally writes the result to a GeoJSON file.
+    The source code is adapted from the Solar Panel Detection algorithm by Esri.
+    See https://www.arcgis.com/home/item.html?id=c2508d72f2614104bfcfd5ccf1429284.
+    Credits to Esri for the original code.
+
+    Args:
+        input_path (str): Path to the input GeoTIFF file.
+        output_path (str, optional): Path to save the output GeoJSON file. If None, no file is saved.
+        epsilon (float, optional): Simplification tolerance for the Douglas-Peucker algorithm.
+            Higher values result in more simplification. Default is 0.2.
+        min_area (float, optional): Minimum area of polygons to process (smaller ones are kept as-is).
+        min_segments (int, optional): Minimum number of segments to keep after simplification.
+            Default is 4 (for rectangular shapes).
+        area_tolerance (float, optional): Allowed ratio of area change. Values less than 1.0 restrict
+            area change. Default is 0.7 (allows reduction to 70% of original area).
+        detect_triangles (bool, optional): If True, performs additional check to avoid creating triangular shapes.
+
+    Returns:
+        geopandas.GeoDataFrame: A GeoDataFrame containing the orthogonalized features.
+    """
+
+    from functools import partial
+
+    def orthogonalize_ring(ring, epsilon=0.2, min_segments=4):
+        """
+        Orthogonalizes a ring (list of coordinates).
+
+        Args:
+            ring (list): List of [x, y] coordinates forming a ring
+            epsilon (float, optional): Simplification tolerance
+            min_segments (int, optional): Minimum number of segments to keep
+
+        Returns:
+            list: Orthogonalized list of coordinates
+        """
+        if len(ring) <= 3:
+            return ring
+
+        # Convert to numpy array
+        ring_arr = np.array(ring)
+
+        # Get orientation
+        angle = math.degrees(get_orientation(ring_arr))
+
+        # Simplify using Ramer-Douglas-Peucker algorithm
+        ring_arr = simplify(ring_arr, eps=epsilon)
+
+        # If simplified too much, adjust epsilon to maintain minimum segments
+        if len(ring_arr) < min_segments:
+            # Try with smaller epsilon until we get at least min_segments points
+            for adjust_factor in [0.75, 0.5, 0.25, 0.1]:
+                test_arr = simplify(np.array(ring), eps=epsilon * adjust_factor)
+                if len(test_arr) >= min_segments:
+                    ring_arr = test_arr
+                    break
+
+        # Convert to dataframe for processing
+        df = to_dataframe(ring_arr)
+
+        # Add orientation information
+        add_orientation(df, angle)
+
+        # Align segments to orthogonal directions
+        df = align(df)
+
+        # Merge collinear line segments
+        df = merge_lines(df)
+
+        if len(df) == 0:
+            return ring
+
+        # If we have a triangle-like result (3 segments), return the original shape
+        if len(df) <= 3:
+            return ring
+
+        # Join the orthogonalized segments back into a ring
+        joined_ring = join_ring(df)
+
+        # If the join operation didn't produce a valid ring, return the original
+        if len(joined_ring) == 0 or len(joined_ring[0]) < 3:
+            return ring
+
+        # Basic validation: if result has 3 or fewer points (triangle), use original
+        if len(joined_ring[0]) <= 3:
+            return ring
+
+        # Convert back to a list and ensure it's closed
+        result = joined_ring[0].tolist()
+        if len(result) > 0 and (result[0] != result[-1]):
+            result.append(result[0])
+
+        return result
+
+    def vectorize_mask(mask, transform):
+        """
+        Converts a binary mask to vector polygons.
+
+        Args:
+            mask (numpy.ndarray): Binary mask where non-zero values represent objects
+            transform (rasterio.transform.Affine): Affine transformation matrix
+
+        Returns:
+            list: List of GeoJSON features
+        """
+        shapes = features.shapes(mask, transform=transform)
+        features_list = []
+
+        for shape, value in shapes:
+            if value > 0:  # Only process non-zero values (actual objects)
+                features_list.append(
+                    {
+                        "type": "Feature",
+                        "properties": {"value": int(value)},
+                        "geometry": shape,
+                    }
+                )
+
+        return features_list
+
+    def rasterize_features(features, shape, transform, dtype=np.uint8):
+        """
+        Converts vector features back to a raster mask.
+
+        Args:
+            features (list): List of GeoJSON features
+            shape (tuple): Shape of the output raster (height, width)
+            transform (rasterio.transform.Affine): Affine transformation matrix
+            dtype (numpy.dtype, optional): Data type of the output raster
+
+        Returns:
+            numpy.ndarray: Rasterized mask
+        """
+        mask = features.rasterize(
+            [
+                (feature["geometry"], feature["properties"]["value"])
+                for feature in features
+            ],
+            out_shape=shape,
+            transform=transform,
+            fill=0,
+            dtype=dtype,
+        )
+
+        return mask
+
+    # The following helper functions are from the original code
+    def get_orientation(contour):
+        """
+        Calculate the orientation angle of a contour.
+
+        Args:
+            contour (numpy.ndarray): Array of shape (n, 2) containing point coordinates
+
+        Returns:
+            float: Orientation angle in radians
+        """
+        box = cv2.minAreaRect(contour.astype(int))
+        (cx, cy), (w, h), angle = box
+        return math.radians(angle)
+
+    def simplify(contour, eps=0.2):
+        """
+        Simplify a contour using the Ramer-Douglas-Peucker algorithm.
+
+        Args:
+            contour (numpy.ndarray): Array of shape (n, 2) containing point coordinates
+            eps (float, optional): Epsilon value for simplification
+
+        Returns:
+            numpy.ndarray: Simplified contour
+        """
+        return rdp(contour, epsilon=eps)
+
+    def to_dataframe(ring):
+        """
+        Convert a ring to a pandas DataFrame with line segment information.
+
+        Args:
+            ring (numpy.ndarray): Array of shape (n, 2) containing point coordinates
+
+        Returns:
+            pandas.DataFrame: DataFrame with line segment information
+        """
+        df = pd.DataFrame(ring, columns=["x1", "y1"])
+        df["x2"] = df["x1"].shift(-1)
+        df["y2"] = df["y1"].shift(-1)
+        df.dropna(inplace=True)
+        df["angle_atan"] = np.arctan2((df["y2"] - df["y1"]), (df["x2"] - df["x1"]))
+        df["angle_atan_deg"] = df["angle_atan"] * 57.2958
+        df["len"] = np.sqrt((df["y2"] - df["y1"]) ** 2 + (df["x2"] - df["x1"]) ** 2)
+        df["cx"] = (df["x2"] + df["x1"]) / 2.0
+        df["cy"] = (df["y2"] + df["y1"]) / 2.0
+        return df
+
+    def add_orientation(df, angle):
+        """
+        Add orientation information to the DataFrame.
+
+        Args:
+            df (pandas.DataFrame): DataFrame with line segment information
+            angle (float): Orientation angle in degrees
+
+        Returns:
+            None: Modifies the DataFrame in-place
+        """
+        rtangle = angle + 90
+        is_parallel = (
+            (df["angle_atan_deg"] > (angle - 45))
+            & (df["angle_atan_deg"] < (angle + 45))
+        ) | (
+            (df["angle_atan_deg"] + 180 > (angle - 45))
+            & (df["angle_atan_deg"] + 180 < (angle + 45))
+        )
+        df["angle"] = math.radians(angle)
+        df["angle"] = df["angle"].where(is_parallel, math.radians(rtangle))
+
+    def align(df):
+        """
+        Align line segments to their nearest orthogonal direction.
+
+        Args:
+            df (pandas.DataFrame): DataFrame with line segment information
+
+        Returns:
+            pandas.DataFrame: DataFrame with aligned line segments
+        """
+        # Handle edge case with empty dataframe
+        if len(df) == 0:
+            return df.copy()
+
+        df_clone = df.copy()
+
+        # Ensure angle column exists and has valid values
+        if "angle" not in df_clone.columns or df_clone["angle"].isna().any():
+            # If angle data is missing, add default angles based on atan2
+            df_clone["angle"] = df_clone["angle_atan"]
+
+        # Ensure length and center point data is valid
+        if "len" not in df_clone.columns or df_clone["len"].isna().any():
+            # Recalculate lengths if missing
+            df_clone["len"] = np.sqrt(
+                (df_clone["x2"] - df_clone["x1"]) ** 2
+                + (df_clone["y2"] - df_clone["y1"]) ** 2
+            )
+
+        if "cx" not in df_clone.columns or df_clone["cx"].isna().any():
+            df_clone["cx"] = (df_clone["x1"] + df_clone["x2"]) / 2.0
+
+        if "cy" not in df_clone.columns or df_clone["cy"].isna().any():
+            df_clone["cy"] = (df_clone["y1"] + df_clone["y2"]) / 2.0
+
+        # Apply orthogonal alignment
+        df_clone["x1"] = df_clone["cx"] - ((df_clone["len"] / 2) * np.cos(df["angle"]))
+        df_clone["x2"] = df_clone["cx"] + ((df_clone["len"] / 2) * np.cos(df["angle"]))
+        df_clone["y1"] = df_clone["cy"] - ((df_clone["len"] / 2) * np.sin(df["angle"]))
+        df_clone["y2"] = df_clone["cy"] + ((df_clone["len"] / 2) * np.sin(df["angle"]))
+
+        return df_clone
+
+    def merge_lines(df_aligned):
+        """
+        Merge collinear line segments.
+
+        Args:
+            df_aligned (pandas.DataFrame): DataFrame with aligned line segments
+
+        Returns:
+            pandas.DataFrame: DataFrame with merged line segments
+        """
+        ortho_lines = []
+        groups = df_aligned.groupby(
+            (df_aligned["angle"].shift() != df_aligned["angle"]).cumsum()
+        )
+        for x, y in groups:
+            group_cx = (y["cx"] * y["len"]).sum() / y["len"].sum()
+            group_cy = (y["cy"] * y["len"]).sum() / y["len"].sum()
+            cumlen = y["len"].sum()
+
+            ortho_lines.append((group_cx, group_cy, cumlen, y["angle"].iloc[0]))
+
+        ortho_list = []
+        for cx, cy, length, rot_angle in ortho_lines:
+            X1 = cx - (length / 2) * math.cos(rot_angle)
+            X2 = cx + (length / 2) * math.cos(rot_angle)
+            Y1 = cy - (length / 2) * math.sin(rot_angle)
+            Y2 = cy + (length / 2) * math.sin(rot_angle)
+
+            ortho_list.append(
+                {
+                    "x1": X1,
+                    "y1": Y1,
+                    "x2": X2,
+                    "y2": Y2,
+                    "len": length,
+                    "cx": cx,
+                    "cy": cy,
+                    "angle": rot_angle,
+                }
+            )
+
+        if (
+            len(ortho_list) > 0 and ortho_list[0]["angle"] == ortho_list[-1]["angle"]
+        ):  # join first and last segment if they're in same direction
+            totlen = ortho_list[0]["len"] + ortho_list[-1]["len"]
+            merge_cx = (
+                (ortho_list[0]["cx"] * ortho_list[0]["len"])
+                + (ortho_list[-1]["cx"] * ortho_list[-1]["len"])
+            ) / totlen
+
+            merge_cy = (
+                (ortho_list[0]["cy"] * ortho_list[0]["len"])
+                + (ortho_list[-1]["cy"] * ortho_list[-1]["len"])
+            ) / totlen
+
+            rot_angle = ortho_list[0]["angle"]
+            X1 = merge_cx - (totlen / 2) * math.cos(rot_angle)
+            X2 = merge_cx + (totlen / 2) * math.cos(rot_angle)
+            Y1 = merge_cy - (totlen / 2) * math.sin(rot_angle)
+            Y2 = merge_cy + (totlen / 2) * math.sin(rot_angle)
+
+            ortho_list[-1] = {
+                "x1": X1,
+                "y1": Y1,
+                "x2": X2,
+                "y2": Y2,
+                "len": totlen,
+                "cx": merge_cx,
+                "cy": merge_cy,
+                "angle": rot_angle,
+            }
+            ortho_list = ortho_list[1:]
+        ortho_df = pd.DataFrame(ortho_list)
+        return ortho_df
+
+    def find_intersection(x1, y1, x2, y2, x3, y3, x4, y4):
+        """
+        Find the intersection point of two line segments.
+
+        Args:
+            x1, y1, x2, y2: Coordinates of the first line segment
+            x3, y3, x4, y4: Coordinates of the second line segment
+
+        Returns:
+            list: [x, y] coordinates of the intersection point
+
+        Raises:
+            ZeroDivisionError: If the lines are parallel or collinear
+        """
+        # Calculate the denominator of the intersection formula
+        denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+
+        # Check if lines are parallel or collinear (denominator close to zero)
+        if abs(denominator) < 1e-10:
+            raise ZeroDivisionError("Lines are parallel or collinear")
+
+        px = (
+            (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)
+        ) / denominator
+        py = (
+            (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)
+        ) / denominator
+
+        # Check if the intersection point is within a reasonable distance
+        # from both line segments to avoid extreme extrapolation
+        def point_on_segment(x, y, x1, y1, x2, y2, tolerance=2.0):
+            # Check if point (x,y) is near the line segment from (x1,y1) to (x2,y2)
+            # First check if it's near the infinite line
+            line_len = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+            if line_len < 1e-10:
+                return np.sqrt((x - x1) ** 2 + (y - y1) ** 2) <= tolerance
+
+            t = ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / (line_len**2)
+
+            # Check distance to the infinite line
+            proj_x = x1 + t * (x2 - x1)
+            proj_y = y1 + t * (y2 - y1)
+            dist_to_line = np.sqrt((x - proj_x) ** 2 + (y - proj_y) ** 2)
+
+            # Check if the projection is near the segment, not just the infinite line
+            if t < -tolerance or t > 1 + tolerance:
+                # If far from the segment, compute distance to the nearest endpoint
+                dist_to_start = np.sqrt((x - x1) ** 2 + (y - y1) ** 2)
+                dist_to_end = np.sqrt((x - x2) ** 2 + (y - y2) ** 2)
+                return min(dist_to_start, dist_to_end) <= tolerance * 2
+
+            return dist_to_line <= tolerance
+
+        # Check if intersection is reasonably close to both line segments
+        if not (
+            point_on_segment(px, py, x1, y1, x2, y2)
+            and point_on_segment(px, py, x3, y3, x4, y4)
+        ):
+            # If intersection is far from segments, it's probably extrapolating too much
+            raise ValueError("Intersection point too far from line segments")
+
+        return [px, py]
+
+    def join_ring(merged_df):
+        """
+        Join line segments to form a closed ring.
+
+        Args:
+            merged_df (pandas.DataFrame): DataFrame with merged line segments
+
+        Returns:
+            numpy.ndarray: Array of shape (1, n, 2) containing the ring coordinates
+        """
+        # Handle edge cases
+        if len(merged_df) < 3:
+            # Not enough segments to form a valid polygon
+            return np.array([[]])
+
+        ring = []
+
+        # Find intersections between adjacent line segments
+        for i in range(len(merged_df) - 1):
+            x1, y1, x2, y2, *_ = merged_df.iloc[i]
+            x3, y3, x4, y4, *_ = merged_df.iloc[i + 1]
+
+            try:
+                intersection = find_intersection(x1, y1, x2, y2, x3, y3, x4, y4)
+
+                # Check if the intersection point is too far from either line segment
+                # This helps prevent extending edges beyond reasonable bounds
+                dist_to_seg1 = min(
+                    np.sqrt((intersection[0] - x1) ** 2 + (intersection[1] - y1) ** 2),
+                    np.sqrt((intersection[0] - x2) ** 2 + (intersection[1] - y2) ** 2),
+                )
+                dist_to_seg2 = min(
+                    np.sqrt((intersection[0] - x3) ** 2 + (intersection[1] - y3) ** 2),
+                    np.sqrt((intersection[0] - x4) ** 2 + (intersection[1] - y4) ** 2),
+                )
+
+                # Use the maximum of line segment lengths as a reference
+                max_len = max(
+                    np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2),
+                    np.sqrt((x4 - x3) ** 2 + (y4 - y3) ** 2),
+                )
+
+                # If intersection is too far away, use the endpoint of the first segment instead
+                if dist_to_seg1 > max_len * 0.5 or dist_to_seg2 > max_len * 0.5:
+                    ring.append([x2, y2])
+                else:
+                    ring.append(intersection)
+            except Exception as e:
+                # If intersection calculation fails, use the endpoint of the first segment
+                ring.append([x2, y2])
+
+        # Connect last segment with first segment
+        x1, y1, x2, y2, *_ = merged_df.iloc[-1]
+        x3, y3, x4, y4, *_ = merged_df.iloc[0]
+
+        try:
+            intersection = find_intersection(x1, y1, x2, y2, x3, y3, x4, y4)
+
+            # Check if the intersection point is too far from either line segment
+            dist_to_seg1 = min(
+                np.sqrt((intersection[0] - x1) ** 2 + (intersection[1] - y1) ** 2),
+                np.sqrt((intersection[0] - x2) ** 2 + (intersection[1] - y2) ** 2),
+            )
+            dist_to_seg2 = min(
+                np.sqrt((intersection[0] - x3) ** 2 + (intersection[1] - y3) ** 2),
+                np.sqrt((intersection[0] - x4) ** 2 + (intersection[1] - y4) ** 2),
+            )
+
+            max_len = max(
+                np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2),
+                np.sqrt((x4 - x3) ** 2 + (y4 - y3) ** 2),
+            )
+
+            if dist_to_seg1 > max_len * 0.5 or dist_to_seg2 > max_len * 0.5:
+                ring.append([x2, y2])
+            else:
+                ring.append(intersection)
+        except Exception as e:
+            # If intersection calculation fails, use the endpoint of the last segment
+            ring.append([x2, y2])
+
+        # Ensure the ring is closed
+        if len(ring) > 0 and (ring[0][0] != ring[-1][0] or ring[0][1] != ring[-1][1]):
+            ring.append(ring[0])
+
+        return np.array([ring])
+
+    def rdp(M, epsilon=0, dist=None, algo="iter", return_mask=False):
+        """
+        Simplifies a given array of points using the Ramer-Douglas-Peucker algorithm.
+
+        Args:
+            M (numpy.ndarray): Array of shape (n, d) containing point coordinates
+            epsilon (float, optional): Epsilon value for simplification
+            dist (callable, optional): Distance function
+            algo (str, optional): Algorithm to use ('iter' or 'rec')
+            return_mask (bool, optional): Whether to return a mask instead of the simplified array
+
+        Returns:
+            numpy.ndarray or list: Simplified points or mask
+        """
+        if dist is None:
+            dist = pldist
+
+        if algo == "iter":
+            algo = partial(rdp_iter, return_mask=return_mask)
+        elif algo == "rec":
+            if return_mask:
+                raise NotImplementedError(
+                    'return_mask=True not supported with algo="rec"'
+                )
+            algo = rdp_rec
+
+        if "numpy" in str(type(M)):
+            return algo(M, epsilon, dist)
+
+        return algo(np.array(M), epsilon, dist).tolist()
+
+    def pldist(point, start, end):
+        """
+        Calculates the distance from 'point' to the line given by 'start' and 'end'.
+
+        Args:
+            point (numpy.ndarray): Point coordinates
+            start (numpy.ndarray): Start point of the line
+            end (numpy.ndarray): End point of the line
+
+        Returns:
+            float: Distance from point to line
+        """
+        if np.all(np.equal(start, end)):
+            return np.linalg.norm(point - start)
+
+        # Fix for NumPy 2.0 deprecation warning - handle 2D vectors properly
+        # Instead of using cross product directly, calculate the area of the
+        # parallelogram formed by the vectors and divide by the length of the line
+        line_vec = end - start
+        point_vec = point - start
+
+        # Area of parallelogram = |a|*|b|*sin(θ)
+        # For 2D vectors: |a×b| = |a|*|b|*sin(θ) = determinant([ax, ay], [bx, by])
+        area = abs(line_vec[0] * point_vec[1] - line_vec[1] * point_vec[0])
+
+        # Distance = Area / |line_vec|
+        return area / np.linalg.norm(line_vec)
+
+    def rdp_rec(M, epsilon, dist=pldist):
+        """
+        Recursive implementation of the Ramer-Douglas-Peucker algorithm.
+
+        Args:
+            M (numpy.ndarray): Array of shape (n, d) containing point coordinates
+            epsilon (float): Epsilon value for simplification
+            dist (callable, optional): Distance function
+
+        Returns:
+            numpy.ndarray: Simplified points
+        """
+        dmax = 0.0
+        index = -1
+
+        for i in range(1, M.shape[0]):
+            d = dist(M[i], M[0], M[-1])
+
+            if d > dmax:
+                index = i
+                dmax = d
+
+        if dmax > epsilon:
+            r1 = rdp_rec(M[: index + 1], epsilon, dist)
+            r2 = rdp_rec(M[index:], epsilon, dist)
+
+            return np.vstack((r1[:-1], r2))
+        else:
+            return np.vstack((M[0], M[-1]))
+
+    def _rdp_iter(M, start_index, last_index, epsilon, dist=pldist):
+        """
+        Internal iterative implementation of the Ramer-Douglas-Peucker algorithm.
+
+        Args:
+            M (numpy.ndarray): Array of shape (n, d) containing point coordinates
+            start_index (int): Start index
+            last_index (int): Last index
+            epsilon (float): Epsilon value for simplification
+            dist (callable, optional): Distance function
+
+        Returns:
+            numpy.ndarray: Boolean mask of points to keep
+        """
+        stk = []
+        stk.append([start_index, last_index])
+        global_start_index = start_index
+        indices = np.ones(last_index - start_index + 1, dtype=bool)
+
+        while stk:
+            start_index, last_index = stk.pop()
+
+            dmax = 0.0
+            index = start_index
+
+            for i in range(index + 1, last_index):
+                if indices[i - global_start_index]:
+                    d = dist(M[i], M[start_index], M[last_index])
+                    if d > dmax:
+                        index = i
+                        dmax = d
+
+            if dmax > epsilon:
+                stk.append([start_index, index])
+                stk.append([index, last_index])
+            else:
+                for i in range(start_index + 1, last_index):
+                    indices[i - global_start_index] = False
+
+        return indices
+
+    def rdp_iter(M, epsilon, dist=pldist, return_mask=False):
+        """
+        Iterative implementation of the Ramer-Douglas-Peucker algorithm.
+
+        Args:
+            M (numpy.ndarray): Array of shape (n, d) containing point coordinates
+            epsilon (float): Epsilon value for simplification
+            dist (callable, optional): Distance function
+            return_mask (bool, optional): Whether to return a mask instead of the simplified array
+
+        Returns:
+            numpy.ndarray: Simplified points or boolean mask
+        """
+        mask = _rdp_iter(M, 0, len(M) - 1, epsilon, dist)
+
+        if return_mask:
+            return mask
+
+        return M[mask]
+
+    # Read the raster data
+    with rasterio.open(input_path) as src:
+        # Read the first band (assuming it contains the mask)
+        mask = src.read(1)
+        transform = src.transform
+        crs = src.crs
+
+        # Extract shapes from the raster mask
+        shapes = features.shapes(mask, transform=transform)
+
+        # Convert shapes to GeoJSON features
+        features_list = []
+        for shape, value in shapes:
+            if value > 0:  # Only process non-zero values (actual objects)
+                # Convert GeoJSON geometry to Shapely polygon
+                polygon = Polygon(shape["coordinates"][0])
+
+                # Skip tiny polygons
+                if polygon.area < min_area:
+                    features_list.append(
+                        {
+                            "type": "Feature",
+                            "properties": {"value": int(value)},
+                            "geometry": shape,
+                        }
+                    )
+                    continue
+
+                # Check if shape is triangular and if we want to avoid triangular shapes
+                if detect_triangles:
+                    # Create a simplified version to check number of vertices
+                    simple_polygon = polygon.simplify(epsilon)
+                    if (
+                        len(simple_polygon.exterior.coords) <= 4
+                    ):  # 3 points + closing point
+                        # Likely a triangular shape - skip orthogonalization
+                        features_list.append(
+                            {
+                                "type": "Feature",
+                                "properties": {"value": int(value)},
+                                "geometry": shape,
+                            }
+                        )
+                        continue
+
+                # Process larger, non-triangular polygons
+                try:
+                    # Convert shapely polygon to a ring format for orthogonalization
+                    exterior_ring = list(polygon.exterior.coords)
+                    interior_rings = [
+                        list(interior.coords) for interior in polygon.interiors
+                    ]
+
+                    # Calculate bounding box aspect ratio to help with parameter tuning
+                    minx, miny, maxx, maxy = polygon.bounds
+                    width = maxx - minx
+                    height = maxy - miny
+                    aspect_ratio = max(width, height) / max(1.0, min(width, height))
+
+                    # Determine if this shape is likely to be a building/rectangular object
+                    # Long thin objects might require different treatment
+                    is_rectangular = aspect_ratio < 3.0
+
+                    # Rectangular objects usually need more careful orthogonalization
+                    epsilon_adjusted = epsilon
+                    min_segments_adjusted = min_segments
+
+                    if is_rectangular:
+                        # For rectangular objects, use more conservative epsilon
+                        epsilon_adjusted = epsilon * 0.75
+                        # Ensure we get at least 4 points for a proper rectangle
+                        min_segments_adjusted = max(4, min_segments)
+
+                    # Orthogonalize the exterior and interior rings
+                    orthogonalized_exterior = orthogonalize_ring(
+                        exterior_ring,
+                        epsilon=epsilon_adjusted,
+                        min_segments=min_segments_adjusted,
+                    )
+
+                    orthogonalized_interiors = [
+                        orthogonalize_ring(
+                            ring,
+                            epsilon=epsilon_adjusted,
+                            min_segments=min_segments_adjusted,
+                        )
+                        for ring in interior_rings
+                    ]
+
+                    # Validate the result - calculate area change
+                    original_area = polygon.area
+                    orthogonalized_poly = Polygon(orthogonalized_exterior)
+
+                    if orthogonalized_poly.is_valid:
+                        area_ratio = (
+                            orthogonalized_poly.area / original_area
+                            if original_area > 0
+                            else 0
+                        )
+
+                        # If area changed too much, revert to original
+                        if area_ratio < area_tolerance or area_ratio > (
+                            1.0 / area_tolerance
+                        ):
+                            # Use original polygon instead
+                            geometry = shape
+                        else:
+                            # Create a new geometry with orthogonalized rings
+                            geometry = {
+                                "type": "Polygon",
+                                "coordinates": [orthogonalized_exterior],
+                            }
+
+                            # Add interior rings if they exist
+                            if orthogonalized_interiors:
+                                geometry["coordinates"].extend(
+                                    [ring for ring in orthogonalized_interiors]
+                                )
+                    else:
+                        # If resulting polygon is invalid, use original
+                        geometry = shape
+
+                    # Add the feature to the list
+                    features_list.append(
+                        {
+                            "type": "Feature",
+                            "properties": {"value": int(value)},
+                            "geometry": geometry,
+                        }
+                    )
+                except Exception as e:
+                    # Keep the original shape if orthogonalization fails
+                    features_list.append(
+                        {
+                            "type": "Feature",
+                            "properties": {"value": int(value)},
+                            "geometry": shape,
+                        }
+                    )
+
+        # Create the final GeoJSON structure
+        geojson = {
+            "type": "FeatureCollection",
+            "crs": {"type": "name", "properties": {"name": str(crs)}},
+            "features": features_list,
+        }
+
+        # Convert to GeoDataFrame and set the CRS
+        gdf = gpd.GeoDataFrame.from_features(geojson["features"], crs=crs)
+
+        # Save to file if output_path is provided
+        if output_path:
+            gdf.to_file(output_path)
+
+        return gdf
