@@ -54,6 +54,7 @@ def view_raster(
     array_args: Optional[Dict] = {},
     client_args: Optional[Dict] = {"cors_all": False},
     basemap: Optional[str] = "OpenStreetMap",
+    basemap_args: Optional[Dict] = None,
     backend: Optional[str] = "folium",
     **kwargs,
 ):
@@ -76,6 +77,7 @@ def view_raster(
         array_args (Optional[Dict], optional): Additional arguments for array processing. Defaults to {}.
         client_args (Optional[Dict], optional): Additional arguments for the client. Defaults to {"cors_all": False}.
         basemap (Optional[str], optional): The basemap to use. Defaults to "OpenStreetMap".
+        basemap_args (Optional[Dict], optional): Additional arguments for the basemap. Defaults to None.
         **kwargs (Any): Additional keyword arguments.
 
     Returns:
@@ -87,7 +89,23 @@ def view_raster(
     else:
         import leafmap.leafmap as leafmap
 
-    m = leafmap.Map(basemap=basemap)
+    if basemap_args is None:
+        basemap_args = {}
+
+    m = leafmap.Map()
+
+    if isinstance(basemap, str):
+        if basemap.lower().endswith(".tif"):
+            if basemap.lower().startswith("http"):
+                if "name" not in basemap_args:
+                    basemap_args["name"] = "Basemap"
+                m.add_cog_layer(basemap, **basemap_args)
+            else:
+                if "layer_name" not in basemap_args:
+                    basemap_args["layer_name"] = "Basemap"
+                m.add_raster(basemap, **basemap_args)
+    else:
+        m.add_basemap(basemap, **basemap_args)
 
     if isinstance(source, dict):
         source = dict_to_image(source)
