@@ -1,20 +1,25 @@
-import os
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
-from shapely.geometry import Polygon, box
-import geopandas as gpd
-from tqdm import tqdm
+"""This module provides a dataset class for object extraction from raster data"""
 
+# Standard Library
+import os
+
+# Third-Party Libraries
 import cv2
-from torchvision.models.detection import maskrcnn_resnet50_fpn
-import torchvision.transforms as T
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import numpy as np
 import rasterio
-from rasterio.windows import Window
-from rasterio.features import shapes
-from huggingface_hub import hf_hub_download
 import scipy.ndimage as ndimage
+import torch
+from huggingface_hub import hf_hub_download
+from rasterio.windows import Window
+from shapely.geometry import Polygon, box
+from tqdm import tqdm
+from torchvision.models.detection import maskrcnn_resnet50_fpn
+
+# Local Imports
 from .utils import get_raster_stats
+
 
 try:
     from torchgeo.datasets import NonGeoDataset
