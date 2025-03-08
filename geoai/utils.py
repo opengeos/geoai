@@ -84,6 +84,8 @@ def view_raster(
 
     if backend == "folium":
         import leafmap.foliumap as leafmap
+    else:
+        import leafmap.leafmap as leafmap
 
     m = leafmap.Map(basemap=basemap)
 
