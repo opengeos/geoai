@@ -58,6 +58,7 @@ plugins:
                   "examples/data_visualization.ipynb",
                   "examples/download_data.ipynb",
                   "examples/car_detection.ipynb",
+                  "examples/ship_detection.ipynb",
               ]
 
 markdown_extensions:
