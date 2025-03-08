@@ -1,34 +1,43 @@
 """The utils module contains common functions and classes used by the other modules."""
 
+# Standard Library
 import json
 import math
 import os
-from collections.abc import Iterable
-from PIL import Image
-from pathlib import Path
-import requests
 import warnings
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-import numpy as np
-import matplotlib.pyplot as plt
+
+# Third-Party Libraries
+import cv2
 import geopandas as gpd
 import leafmap
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import xarray as xr
-import rioxarray as rxr
 import rasterio
-from torchvision.transforms import RandomRotation
-from rasterio.windows import Window
-from rasterio import features
-from rasterio.plot import show
-from shapely.geometry import box, shape, mapping, Polygon, MultiPolygon
-from shapely.affinity import rotate
-from tqdm import tqdm
+import requests
+import rioxarray as rxr
 import torch
 import torchgeo
-import cv2
+import xarray as xr
+from PIL import Image
+from rasterio import features
+from rasterio.plot import show
+from rasterio.windows import Window
+from shapely.affinity import rotate
+from shapely.geometry import (
+    MultiPolygon,
+    Polygon,
+    box,
+    mapping,
+    shape,
+)
+from torchvision.transforms import RandomRotation
+from tqdm import tqdm
+
 
 try:
     from torchgeo.datasets import RasterDataset, unbind_samples
