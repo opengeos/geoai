@@ -2164,7 +2164,7 @@ class ObjectDetector:
                 # Save to file if requested
                 if output_path:
                     gdf.to_file(output_path, driver="GeoJSON")
-                    print(f"Saved {len(gdf)} cars with confidence to {output_path}")
+                    print(f"Saved {len(gdf)} objects with confidence to {output_path}")
 
                 return gdf
             else:
@@ -2264,6 +2264,35 @@ class ShipDetector(ObjectDetector):
 
     def __init__(
         self, model_path="ship_detection.pth", repo_id=None, model=None, device=None
+    ):
+        """
+        Initialize the object extractor.
+
+        Args:
+            model_path: Path to the .pth model file.
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
+        """
+        super().__init__(
+            model_path=model_path, repo_id=repo_id, model=model, device=device
+        )
+
+
+class SolarPanelDetector(ObjectDetector):
+    """
+    Solar panel detection using a pre-trained Mask R-CNN model.
+
+    This class extends the
+    `ObjectDetector` class with additional methods for solar panel detection."
+    """
+
+    def __init__(
+        self,
+        model_path="solar_panel_detection.pth",
+        repo_id=None,
+        model=None,
+        device=None,
     ):
         """
         Initialize the object extractor.
