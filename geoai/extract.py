@@ -1913,10 +1913,6 @@ class ObjectDetector:
         if mask_threshold is None:
             mask_threshold = self.mask_threshold
 
-        # Get parameters from kwargs or use instance defaults
-        confidence_threshold = kwargs.get(
-            "confidence_threshold", self.confidence_threshold
-        )
         chip_size = kwargs.get("chip_size", self.chip_size)
 
         # Default output path
