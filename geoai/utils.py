@@ -550,6 +550,8 @@ def view_vector(
         legend (bool, optional): Whether to display a legend. Defaults to True.
         basemap (bool, optional): Whether to add a web basemap. Requires contextily.
             Defaults to False.
+        basemap_type (str, optional): Type of basemap to use. Options: 'streets', 'satellite'.
+            Defaults to 'streets'.
         alpha (float, optional): Transparency of the vector features, between 0-1.
             Defaults to 0.7.
         edge_color (str, optional): Color for feature edges. Defaults to "black".
