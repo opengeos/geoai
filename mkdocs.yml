@@ -101,19 +101,19 @@ nav:
           - examples/solar_panel_detection.ipynb
           - examples/text_prompt_segmentation.ipynb
           - examples/data_visualization.ipynb
-          - examples/samgeo/satellite.ipynb
-          - examples/samgeo/automatic_mask_generator.ipynb
-          - examples/samgeo/automatic_mask_generator_hq.ipynb
-          - examples/samgeo/input_prompts.ipynb
-          - examples/samgeo/input_prompts_hq.ipynb
-          - examples/samgeo/box_prompts.ipynb
-          - examples/samgeo/text_prompts.ipynb
-          - examples/samgeo/text_prompts_batch.ipynb
-          - examples/samgeo/fast_sam.ipynb
-          - examples/samgeo/swimming_pools.ipynb
-          - examples/samgeo/arcgis.ipynb
-          - examples/samgeo/maxar_open_data.ipynb
-          - examples/rastervision/semantic_segmentation.ipynb
+          #   - examples/samgeo/satellite.ipynb
+          #   - examples/samgeo/automatic_mask_generator.ipynb
+          #   - examples/samgeo/automatic_mask_generator_hq.ipynb
+          #   - examples/samgeo/input_prompts.ipynb
+          #   - examples/samgeo/input_prompts_hq.ipynb
+          #   - examples/samgeo/box_prompts.ipynb
+          #   - examples/samgeo/text_prompts.ipynb
+          #   - examples/samgeo/text_prompts_batch.ipynb
+          #   - examples/samgeo/fast_sam.ipynb
+          #   - examples/samgeo/swimming_pools.ipynb
+          #   - examples/samgeo/arcgis.ipynb
+          #   - examples/samgeo/maxar_open_data.ipynb
+          #   - examples/rastervision/semantic_segmentation.ipynb
           - examples/dataviz/raster_viz.ipynb
           - examples/dataviz/vector_viz.ipynb
           - examples/dataviz/lidar_viz.ipynb
