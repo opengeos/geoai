@@ -752,7 +752,10 @@ def view_vector_interactive(
         kwargs["max_zoom"] = 30
 
     if isinstance(vector_data, str):
-        vector_data = gpd.read_file(vector_data)
+        if vector_data.endswith(".parquet"):
+            vector_data = gpd.read_parquet(vector_data)
+        else:
+            vector_data = gpd.read_file(vector_data)
 
     # Check if input is a GeoDataFrame
     if not isinstance(vector_data, gpd.GeoDataFrame):
