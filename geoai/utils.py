@@ -520,6 +520,7 @@ def view_vector(
     title=None,
     legend=True,
     basemap=False,
+    basemap_type="streets",
     alpha=0.7,
     edge_color="black",
     classification="quantiles",
@@ -549,6 +550,8 @@ def view_vector(
         legend (bool, optional): Whether to display a legend. Defaults to True.
         basemap (bool, optional): Whether to add a web basemap. Requires contextily.
             Defaults to False.
+        basemap_type (str, optional): Type of basemap to use. Options: 'streets', 'satellite'.
+            Defaults to 'streets'.
         alpha (float, optional): Transparency of the vector features, between 0-1.
             Defaults to 0.7.
         edge_color (str, optional): Color for feature edges. Defaults to "black".
@@ -636,10 +639,13 @@ def view_vector(
             ax=ax, color=highlight_color, edgecolor="black", linewidth=2, zorder=5
         )
 
-    # Add basemap if requested
     if basemap:
         try:
-            ctx.add_basemap(ax, crs=gdf.crs, source=ctx.providers.OpenStreetMap.Mapnik)
+            basemap_options = {
+                "streets": ctx.providers.OpenStreetMap.Mapnik,
+                "satellite": ctx.providers.Esri.WorldImagery,
+            }
+            ctx.add_basemap(ax, crs=gdf.crs, source=basemap_options[basemap_type])
         except Exception as e:
             print(f"Could not add basemap: {e}")
 
