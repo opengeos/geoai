@@ -1,0 +1,2342 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A Python package for using Artificial Intelligence (AI) with geospatial data">
+      
+      
+        <meta name="author" content="opengeos">
+      
+      
+        <link rel="canonical" href="https://geoai.gishub.org/segment/">
+      
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
+    
+    
+      
+        <title>segment module - geoai</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Google+Sans:300,300i,400,400i,700,700i%7CRegular:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Google Sans";--md-code-font:"Regular"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../css/timeago.css">
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#segment-module" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="geoai" class="md-header__button md-logo" aria-label="geoai" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            geoai
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              segment module
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/opengeos/geoai" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="geoai" class="md-nav__button md-logo" aria-label="geoai" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    geoai
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/opengeos/geoai" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Usage
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/opengeos/geoai/releases" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Changelog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/opengeos/geoai/issues" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Report Issues
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Examples
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/download_data/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Download data
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/view_metadata/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    View metadata
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/image_chips/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Image chips
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_footprints_usa/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building footprints usa
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_regularization/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building regularization
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/geometric_properties/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Geometric properties
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/car_detection/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Car detection
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/ship_detection/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Ship detection
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/solar_panel_detection/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Solar panel detection
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/text_prompt_segmentation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Text prompt segmentation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/data_visualization/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Data visualization
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/satellite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Satellite
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/automatic_mask_generator/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Automatic mask generator
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/automatic_mask_generator_hq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Automatic mask generator hq
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/input_prompts/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Input prompts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/input_prompts_hq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Input prompts hq
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/box_prompts/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Box prompts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/text_prompts/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Text prompts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/text_prompts_batch/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Text prompts batch
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/fast_sam/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Fast sam
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/swimming_pools/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Swimming pools
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/arcgis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Arcgis
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/maxar_open_data/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Maxar open data
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/rastervision/semantic_segmentation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Semantic segmentation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/dataviz/raster_viz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Raster viz
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/dataviz/vector_viz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Vector viz
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/dataviz/lidar_viz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Lidar viz
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geoai/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    geoai module
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../download/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    download module
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extract/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    extract module
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../segmentation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    segmentation module
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    utils module
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.segment" class="md-nav__link">
+    <span class="md-ellipsis">
+      geoai.segment
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.segment.CLIPSegmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      CLIPSegmentation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CLIPSegmentation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#geoai.segment.CLIPSegmentation.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#geoai.segment.CLIPSegmentation.segment_image" class="md-nav__link">
+    <span class="md-ellipsis">
+      segment_image()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#geoai.segment.CLIPSegmentation.segment_image_batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      segment_image_batch()
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+
+
+
+                  
+
+
+  
+  
+
+
+<h1 id="segment-module">segment module<a class="headerlink" href="#segment-module" title="Permanent link">&para;</a></h1>
+
+
+  <div class="doc doc-object doc-module">
+
+<a id="geoai.segment"></a>
+    <div class="doc doc-contents first">
+
+      <p>This module provides functionality for segmenting high-resolution satellite imagery using vision-language models.</p>
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+  <div class="doc doc-object doc-class">
+
+
+
+<h2 id="geoai.segment.CLIPSegmentation" class="doc doc-heading">
+        <code>
+CLIPSegmentation        </code>
+
+
+
+<a href="#geoai.segment.CLIPSegmentation" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>A class for segmenting high-resolution satellite imagery using text prompts with CLIP-based models.</p>
+<p>This segmenter utilizes the CLIP-Seg model to perform semantic segmentation based on text prompts.
+It can process large GeoTIFF files by tiling them and handles proper georeferencing in the output.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>model_name</code></td>
+        <td><code>str</code></td>
+        <td><p>Name of the CLIP-Seg model to use. Defaults to "CIDAS/clipseg-rd64-refined".</p></td>
+        <td><code>&#39;CIDAS/clipseg-rd64-refined&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>device</code></td>
+        <td><code>str</code></td>
+        <td><p>Device to run the model on ('cuda', 'cpu'). If None, will use CUDA if available.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>tile_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Size of tiles to process the image in chunks. Defaults to 352.</p></td>
+        <td><code>512</code></td>
+      </tr>
+      <tr>
+        <td><code>overlap</code></td>
+        <td><code>int</code></td>
+        <td><p>Overlap between tiles to avoid edge artifacts. Defaults to 16.</p></td>
+        <td><code>32</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Attributes:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>processor</code></td>
+        <td><code>CLIPSegProcessor</code></td>
+        <td><p>The processor for the CLIP-Seg model.</p></td>
+      </tr>
+      <tr>
+        <td><code>model</code></td>
+        <td><code>CLIPSegForImageSegmentation</code></td>
+        <td><p>The CLIP-Seg model for segmentation.</p></td>
+      </tr>
+      <tr>
+        <td><code>device</code></td>
+        <td><code>str</code></td>
+        <td><p>The device being used ('cuda' or 'cpu').</p></td>
+      </tr>
+      <tr>
+        <td><code>tile_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Size of tiles for processing.</p></td>
+      </tr>
+      <tr>
+        <td><code>overlap</code></td>
+        <td><code>int</code></td>
+        <td><p>Overlap between tiles.</p></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/segment.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CLIPSegmentation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A class for segmenting high-resolution satellite imagery using text prompts with CLIP-based models.</span>
+
+<span class="sd">    This segmenter utilizes the CLIP-Seg model to perform semantic segmentation based on text prompts.</span>
+<span class="sd">    It can process large GeoTIFF files by tiling them and handles proper georeferencing in the output.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model_name (str): Name of the CLIP-Seg model to use. Defaults to &quot;CIDAS/clipseg-rd64-refined&quot;.</span>
+<span class="sd">        device (str): Device to run the model on (&#39;cuda&#39;, &#39;cpu&#39;). If None, will use CUDA if available.</span>
+<span class="sd">        tile_size (int): Size of tiles to process the image in chunks. Defaults to 352.</span>
+<span class="sd">        overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 16.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        processor (CLIPSegProcessor): The processor for the CLIP-Seg model.</span>
+<span class="sd">        model (CLIPSegForImageSegmentation): The CLIP-Seg model for segmentation.</span>
+<span class="sd">        device (str): The device being used (&#39;cuda&#39; or &#39;cpu&#39;).</span>
+<span class="sd">        tile_size (int): Size of tiles for processing.</span>
+<span class="sd">        overlap (int): Overlap between tiles.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="o">=</span><span class="s2">&quot;CIDAS/clipseg-rd64-refined&quot;</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">tile_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+        <span class="n">overlap</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the ImageSegmenter with the specified model and settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model_name (str): Name of the CLIP-Seg model to use. Defaults to &quot;CIDAS/clipseg-rd64-refined&quot;.</span>
+<span class="sd">            device (str): Device to run the model on (&#39;cuda&#39;, &#39;cpu&#39;). If None, will use CUDA if available.</span>
+<span class="sd">            tile_size (int): Size of tiles to process the image in chunks. Defaults to 512.</span>
+<span class="sd">            overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 32.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">=</span> <span class="n">tile_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="o">=</span> <span class="n">overlap</span>
+
+        <span class="c1"># Set device</span>
+        <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+
+        <span class="c1"># Load model and processor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">processor</span> <span class="o">=</span> <span class="n">CLIPSegProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">CLIPSegForImageSegmentation</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+        <span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model loaded on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">input_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Segment a GeoTIFF image using the provided text prompt.</span>
+
+<span class="sd">        The function processes the image in tiles and saves the result as a GeoTIFF with two bands:</span>
+<span class="sd">        - Band 1: Binary segmentation mask (0 or 1)</span>
+<span class="sd">        - Band 2: Probability scores (0.0 to 1.0)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_path (str): Path to the input GeoTIFF file.</span>
+<span class="sd">            output_path (str): Path where the output GeoTIFF will be saved.</span>
+<span class="sd">            text_prompt (str): Text description of what to segment (e.g., &quot;water&quot;, &quot;buildings&quot;).</span>
+<span class="sd">            threshold (float): Threshold for binary segmentation (0.0 to 1.0). Defaults to 0.5.</span>
+<span class="sd">            smoothing_sigma (float): Sigma value for Gaussian smoothing to reduce blockiness. Defaults to 1.0.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Path to the saved output file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Open the input GeoTIFF</span>
+        <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">input_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
+            <span class="c1"># Get metadata</span>
+            <span class="n">meta</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">meta</span>
+            <span class="n">height</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">height</span>
+            <span class="n">width</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">width</span>
+
+            <span class="c1"># Create output metadata</span>
+            <span class="n">out_meta</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">out_meta</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="s2">&quot;float32&quot;</span><span class="p">,</span> <span class="s2">&quot;nodata&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span>
+
+            <span class="c1"># Create arrays for results</span>
+            <span class="n">segmentation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="n">probabilities</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+            <span class="c1"># Calculate effective tile size (accounting for overlap)</span>
+            <span class="n">effective_tile_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+
+            <span class="c1"># Calculate number of tiles</span>
+            <span class="n">n_tiles_x</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">width</span> <span class="o">/</span> <span class="n">effective_tile_size</span><span class="p">)))</span>
+            <span class="n">n_tiles_y</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">height</span> <span class="o">/</span> <span class="n">effective_tile_size</span><span class="p">)))</span>
+            <span class="n">total_tiles</span> <span class="o">=</span> <span class="n">n_tiles_x</span> <span class="o">*</span> <span class="n">n_tiles_y</span>
+
+            <span class="c1"># Process tiles with tqdm progress bar</span>
+            <span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">total_tiles</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing tiles&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
+                <span class="c1"># Iterate through tiles</span>
+                <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_tiles_y</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_tiles_x</span><span class="p">):</span>
+                        <span class="c1"># Calculate tile coordinates with overlap</span>
+                        <span class="n">x_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span><span class="p">)</span>
+                        <span class="n">y_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span><span class="p">)</span>
+                        <span class="n">x_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span><span class="p">)</span>
+                        <span class="n">y_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                            <span class="n">height</span><span class="p">,</span> <span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+                        <span class="p">)</span>
+
+                        <span class="n">tile_width</span> <span class="o">=</span> <span class="n">x_end</span> <span class="o">-</span> <span class="n">x_start</span>
+                        <span class="n">tile_height</span> <span class="o">=</span> <span class="n">y_end</span> <span class="o">-</span> <span class="n">y_start</span>
+
+                        <span class="c1"># Read the tile</span>
+                        <span class="n">window</span> <span class="o">=</span> <span class="n">Window</span><span class="p">(</span><span class="n">x_start</span><span class="p">,</span> <span class="n">y_start</span><span class="p">,</span> <span class="n">tile_width</span><span class="p">,</span> <span class="n">tile_height</span><span class="p">)</span>
+                        <span class="n">tile_data</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+
+                        <span class="c1"># Process the tile</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="c1"># Convert to RGB if necessary (handling different satellite bands)</span>
+                            <span class="k">if</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+                                <span class="c1"># Use first three bands for RGB representation</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                                <span class="c1"># Normalize data to 0-255 range if needed</span>
+                                <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                    <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
+                                        <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                        <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                        <span class="o">*</span> <span class="mi">255</span>
+                                    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                            <span class="k">elif</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                                <span class="c1"># Create RGB from grayscale</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                                    <span class="n">tile_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span>
+                                <span class="p">)</span>
+                                <span class="c1"># Normalize if needed</span>
+                                <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                    <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
+                                        <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                        <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                        <span class="o">*</span> <span class="mi">255</span>
+                                    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="c1"># Already 3-channel, assume RGB</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                                <span class="c1"># Normalize if needed</span>
+                                <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                    <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
+                                        <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                        <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                        <span class="o">*</span> <span class="mi">255</span>
+                                    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+
+                            <span class="c1"># Convert to PIL Image</span>
+                            <span class="n">pil_image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">fromarray</span><span class="p">(</span><span class="n">rgb_tile</span><span class="p">)</span>
+
+                            <span class="c1"># Resize if needed to match model&#39;s requirements</span>
+                            <span class="k">if</span> <span class="p">(</span>
+                                <span class="n">pil_image</span><span class="o">.</span><span class="n">width</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span>
+                                <span class="ow">or</span> <span class="n">pil_image</span><span class="o">.</span><span class="n">height</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span>
+                            <span class="p">):</span>
+                                <span class="c1"># Keep aspect ratio</span>
+                                <span class="n">pil_image</span><span class="o">.</span><span class="n">thumbnail</span><span class="p">(</span>
+                                    <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span><span class="p">),</span> <span class="n">Image</span><span class="o">.</span><span class="n">LANCZOS</span>
+                                <span class="p">)</span>
+
+                            <span class="c1"># Process with CLIP-Seg</span>
+                            <span class="n">inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">processor</span><span class="p">(</span>
+                                <span class="n">text</span><span class="o">=</span><span class="n">text_prompt</span><span class="p">,</span> <span class="n">images</span><span class="o">=</span><span class="n">pil_image</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span>
+                            <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+                            <span class="c1"># Forward pass</span>
+                            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                                <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="o">**</span><span class="n">inputs</span><span class="p">)</span>
+
+                            <span class="c1"># Get logits and resize to original tile size</span>
+                            <span class="n">logits</span> <span class="o">=</span> <span class="n">outputs</span><span class="o">.</span><span class="n">logits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+                            <span class="c1"># Convert logits to probabilities with sigmoid</span>
+                            <span class="n">probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">logits</span><span class="p">)</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+
+                            <span class="c1"># Resize back to original tile size if needed</span>
+                            <span class="k">if</span> <span class="n">probs</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="n">tile_height</span><span class="p">,</span> <span class="n">tile_width</span><span class="p">):</span>
+                                <span class="c1"># Use bicubic interpolation for smoother results</span>
+                                <span class="n">probs_resized</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                                    <span class="n">Image</span><span class="o">.</span><span class="n">fromarray</span><span class="p">(</span><span class="n">probs</span><span class="p">)</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span>
+                                        <span class="p">(</span><span class="n">tile_width</span><span class="p">,</span> <span class="n">tile_height</span><span class="p">),</span> <span class="n">Image</span><span class="o">.</span><span class="n">BICUBIC</span>
+                                    <span class="p">)</span>
+                                <span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">probs_resized</span> <span class="o">=</span> <span class="n">probs</span>
+
+                            <span class="c1"># Apply gaussian blur to reduce blockiness</span>
+                            <span class="k">try</span><span class="p">:</span>
+                                <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">gaussian_filter</span>
+
+                                <span class="n">probs_resized</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span>
+                                    <span class="n">probs_resized</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">smoothing_sigma</span>
+                                <span class="p">)</span>
+                            <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+                                <span class="k">pass</span>  <span class="c1"># Continue without smoothing if scipy is not available</span>
+
+                            <span class="c1"># Store results in the full arrays</span>
+                            <span class="c1"># Only store the non-overlapping part (except at edges)</span>
+                            <span class="n">valid_x_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="k">if</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+                            <span class="n">valid_y_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="k">if</span> <span class="n">y</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+                            <span class="n">valid_x_end</span> <span class="o">=</span> <span class="p">(</span>
+                                <span class="n">tile_width</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+                                <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">n_tiles_x</span> <span class="o">-</span> <span class="mi">1</span>
+                                <span class="k">else</span> <span class="n">tile_width</span>
+                            <span class="p">)</span>
+                            <span class="n">valid_y_end</span> <span class="o">=</span> <span class="p">(</span>
+                                <span class="n">tile_height</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+                                <span class="k">if</span> <span class="n">y</span> <span class="o">&lt;</span> <span class="n">n_tiles_y</span> <span class="o">-</span> <span class="mi">1</span>
+                                <span class="k">else</span> <span class="n">tile_height</span>
+                            <span class="p">)</span>
+
+                            <span class="n">dest_x_start</span> <span class="o">=</span> <span class="n">x_start</span> <span class="o">+</span> <span class="n">valid_x_start</span>
+                            <span class="n">dest_y_start</span> <span class="o">=</span> <span class="n">y_start</span> <span class="o">+</span> <span class="n">valid_y_start</span>
+                            <span class="n">dest_x_end</span> <span class="o">=</span> <span class="n">x_start</span> <span class="o">+</span> <span class="n">valid_x_end</span>
+                            <span class="n">dest_y_end</span> <span class="o">=</span> <span class="n">y_start</span> <span class="o">+</span> <span class="n">valid_y_end</span>
+
+                            <span class="c1"># Store probabilities</span>
+                            <span class="n">probabilities</span><span class="p">[</span>
+                                <span class="n">dest_y_start</span><span class="p">:</span><span class="n">dest_y_end</span><span class="p">,</span> <span class="n">dest_x_start</span><span class="p">:</span><span class="n">dest_x_end</span>
+                            <span class="p">]</span> <span class="o">=</span> <span class="n">probs_resized</span><span class="p">[</span>
+                                <span class="n">valid_y_start</span><span class="p">:</span><span class="n">valid_y_end</span><span class="p">,</span> <span class="n">valid_x_start</span><span class="p">:</span><span class="n">valid_x_end</span>
+                            <span class="p">]</span>
+
+                        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing tile at (</span><span class="si">{</span><span class="n">x</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">y</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                            <span class="c1"># Continue with next tile</span>
+
+                        <span class="c1"># Update progress bar</span>
+                        <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+            <span class="c1"># Create binary segmentation from probabilities</span>
+            <span class="n">segmentation</span> <span class="o">=</span> <span class="p">(</span><span class="n">probabilities</span> <span class="o">&gt;=</span> <span class="n">threshold</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+            <span class="c1"># Write the output GeoTIFF</span>
+            <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">out_meta</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
+                <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">segmentation</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">probabilities</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+                <span class="c1"># Add descriptions to bands</span>
+                <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Binary Segmentation&quot;</span><span class="p">)</span>
+                <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Probability Scores&quot;</span><span class="p">)</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Segmentation saved to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output_path</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">input_paths</span><span class="p">,</span>
+        <span class="n">output_dir</span><span class="p">,</span>
+        <span class="n">text_prompt</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;_segmented&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Segment multiple GeoTIFF images using the provided text prompt.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_paths (list): List of paths to input GeoTIFF files.</span>
+<span class="sd">            output_dir (str): Directory where output GeoTIFFs will be saved.</span>
+<span class="sd">            text_prompt (str): Text description of what to segment.</span>
+<span class="sd">            threshold (float): Threshold for binary segmentation. Defaults to 0.5.</span>
+<span class="sd">            smoothing_sigma (float): Sigma value for Gaussian smoothing to reduce blockiness. Defaults to 1.0.</span>
+<span class="sd">            suffix (str): Suffix to add to output filenames. Defaults to &quot;_segmented&quot;.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list: Paths to all saved output files.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Create output directory if it doesn&#39;t exist</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">output_paths</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Process each input file</span>
+        <span class="k">for</span> <span class="n">input_path</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">input_paths</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing files&quot;</span><span class="p">):</span>
+            <span class="c1"># Generate output path</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">input_path</span><span class="p">)</span>
+            <span class="n">base_name</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_name</span><span class="si">}{</span><span class="n">suffix</span><span class="si">}{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Segment the image</span>
+            <span class="n">result_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">segment_image</span><span class="p">(</span>
+                <span class="n">input_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">smoothing_sigma</span>
+            <span class="p">)</span>
+            <span class="n">output_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result_path</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">output_paths</span>
+</code></pre></div>
+        </details>
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
+<h3 id="geoai.segment.CLIPSegmentation.__init__" class="doc doc-heading">
+<code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="s1">&#39;CIDAS/clipseg-rd64-refined&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tile_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">overlap</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span></code>
+
+  <span class="doc doc-properties">
+      <small class="doc doc-property doc-property-special"><code>special</code></small>
+  </span>
+
+<a href="#geoai.segment.CLIPSegmentation.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
+
+    <div class="doc doc-contents ">
+
+      <p>Initialize the ImageSegmenter with the specified model and settings.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>model_name</code></td>
+        <td><code>str</code></td>
+        <td><p>Name of the CLIP-Seg model to use. Defaults to "CIDAS/clipseg-rd64-refined".</p></td>
+        <td><code>&#39;CIDAS/clipseg-rd64-refined&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>device</code></td>
+        <td><code>str</code></td>
+        <td><p>Device to run the model on ('cuda', 'cpu'). If None, will use CUDA if available.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>tile_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Size of tiles to process the image in chunks. Defaults to 512.</p></td>
+        <td><code>512</code></td>
+      </tr>
+      <tr>
+        <td><code>overlap</code></td>
+        <td><code>int</code></td>
+        <td><p>Overlap between tiles to avoid edge artifacts. Defaults to 32.</p></td>
+        <td><code>32</code></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/segment.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="o">=</span><span class="s2">&quot;CIDAS/clipseg-rd64-refined&quot;</span><span class="p">,</span>
+    <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">tile_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">overlap</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initialize the ImageSegmenter with the specified model and settings.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model_name (str): Name of the CLIP-Seg model to use. Defaults to &quot;CIDAS/clipseg-rd64-refined&quot;.</span>
+<span class="sd">        device (str): Device to run the model on (&#39;cuda&#39;, &#39;cpu&#39;). If None, will use CUDA if available.</span>
+<span class="sd">        tile_size (int): Size of tiles to process the image in chunks. Defaults to 512.</span>
+<span class="sd">        overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 32.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">=</span> <span class="n">tile_size</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="o">=</span> <span class="n">overlap</span>
+
+    <span class="c1"># Set device</span>
+    <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+
+    <span class="c1"># Load model and processor</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">processor</span> <span class="o">=</span> <span class="n">CLIPSegProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">CLIPSegForImageSegmentation</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+    <span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model loaded on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
+<h3 id="geoai.segment.CLIPSegmentation.segment_image" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">segment_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span></code>
+
+
+<a href="#geoai.segment.CLIPSegmentation.segment_image" class="headerlink" title="Permanent link">&para;</a></h3>
+
+    <div class="doc doc-contents ">
+
+      <p>Segment a GeoTIFF image using the provided text prompt.</p>
+<p>The function processes the image in tiles and saves the result as a GeoTIFF with two bands:
+- Band 1: Binary segmentation mask (0 or 1)
+- Band 2: Probability scores (0.0 to 1.0)</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>input_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to the input GeoTIFF file.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>output_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path where the output GeoTIFF will be saved.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>text_prompt</code></td>
+        <td><code>str</code></td>
+        <td><p>Text description of what to segment (e.g., "water", "buildings").</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>threshold</code></td>
+        <td><code>float</code></td>
+        <td><p>Threshold for binary segmentation (0.0 to 1.0). Defaults to 0.5.</p></td>
+        <td><code>0.5</code></td>
+      </tr>
+      <tr>
+        <td><code>smoothing_sigma</code></td>
+        <td><code>float</code></td>
+        <td><p>Sigma value for Gaussian smoothing to reduce blockiness. Defaults to 1.0.</p></td>
+        <td><code>1.0</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>str</code></td>
+      <td><p>Path to the saved output file.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/segment.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">input_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Segment a GeoTIFF image using the provided text prompt.</span>
+
+<span class="sd">    The function processes the image in tiles and saves the result as a GeoTIFF with two bands:</span>
+<span class="sd">    - Band 1: Binary segmentation mask (0 or 1)</span>
+<span class="sd">    - Band 2: Probability scores (0.0 to 1.0)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        input_path (str): Path to the input GeoTIFF file.</span>
+<span class="sd">        output_path (str): Path where the output GeoTIFF will be saved.</span>
+<span class="sd">        text_prompt (str): Text description of what to segment (e.g., &quot;water&quot;, &quot;buildings&quot;).</span>
+<span class="sd">        threshold (float): Threshold for binary segmentation (0.0 to 1.0). Defaults to 0.5.</span>
+<span class="sd">        smoothing_sigma (float): Sigma value for Gaussian smoothing to reduce blockiness. Defaults to 1.0.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Path to the saved output file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Open the input GeoTIFF</span>
+    <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">input_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
+        <span class="c1"># Get metadata</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">meta</span>
+        <span class="n">height</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">height</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">width</span>
+
+        <span class="c1"># Create output metadata</span>
+        <span class="n">out_meta</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">out_meta</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="s2">&quot;float32&quot;</span><span class="p">,</span> <span class="s2">&quot;nodata&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span>
+
+        <span class="c1"># Create arrays for results</span>
+        <span class="n">segmentation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">probabilities</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="c1"># Calculate effective tile size (accounting for overlap)</span>
+        <span class="n">effective_tile_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+
+        <span class="c1"># Calculate number of tiles</span>
+        <span class="n">n_tiles_x</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">width</span> <span class="o">/</span> <span class="n">effective_tile_size</span><span class="p">)))</span>
+        <span class="n">n_tiles_y</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">height</span> <span class="o">/</span> <span class="n">effective_tile_size</span><span class="p">)))</span>
+        <span class="n">total_tiles</span> <span class="o">=</span> <span class="n">n_tiles_x</span> <span class="o">*</span> <span class="n">n_tiles_y</span>
+
+        <span class="c1"># Process tiles with tqdm progress bar</span>
+        <span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">total_tiles</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing tiles&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
+            <span class="c1"># Iterate through tiles</span>
+            <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_tiles_y</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_tiles_x</span><span class="p">):</span>
+                    <span class="c1"># Calculate tile coordinates with overlap</span>
+                    <span class="n">x_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span><span class="p">)</span>
+                    <span class="n">y_start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span><span class="p">)</span>
+                    <span class="n">x_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span><span class="p">)</span>
+                    <span class="n">y_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                        <span class="n">height</span><span class="p">,</span> <span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">effective_tile_size</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+                    <span class="p">)</span>
+
+                    <span class="n">tile_width</span> <span class="o">=</span> <span class="n">x_end</span> <span class="o">-</span> <span class="n">x_start</span>
+                    <span class="n">tile_height</span> <span class="o">=</span> <span class="n">y_end</span> <span class="o">-</span> <span class="n">y_start</span>
+
+                    <span class="c1"># Read the tile</span>
+                    <span class="n">window</span> <span class="o">=</span> <span class="n">Window</span><span class="p">(</span><span class="n">x_start</span><span class="p">,</span> <span class="n">y_start</span><span class="p">,</span> <span class="n">tile_width</span><span class="p">,</span> <span class="n">tile_height</span><span class="p">)</span>
+                    <span class="n">tile_data</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+
+                    <span class="c1"># Process the tile</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="c1"># Convert to RGB if necessary (handling different satellite bands)</span>
+                        <span class="k">if</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+                            <span class="c1"># Use first three bands for RGB representation</span>
+                            <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                            <span class="c1"># Normalize data to 0-255 range if needed</span>
+                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
+                                    <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                    <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                    <span class="o">*</span> <span class="mi">255</span>
+                                <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                        <span class="k">elif</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                            <span class="c1"># Create RGB from grayscale</span>
+                            <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                                <span class="n">tile_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span>
+                            <span class="p">)</span>
+                            <span class="c1"># Normalize if needed</span>
+                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
+                                    <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                    <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                    <span class="o">*</span> <span class="mi">255</span>
+                                <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="c1"># Already 3-channel, assume RGB</span>
+                            <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                            <span class="c1"># Normalize if needed</span>
+                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
+                                    <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                    <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+                                    <span class="o">*</span> <span class="mi">255</span>
+                                <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+
+                        <span class="c1"># Convert to PIL Image</span>
+                        <span class="n">pil_image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">fromarray</span><span class="p">(</span><span class="n">rgb_tile</span><span class="p">)</span>
+
+                        <span class="c1"># Resize if needed to match model&#39;s requirements</span>
+                        <span class="k">if</span> <span class="p">(</span>
+                            <span class="n">pil_image</span><span class="o">.</span><span class="n">width</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span>
+                            <span class="ow">or</span> <span class="n">pil_image</span><span class="o">.</span><span class="n">height</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span>
+                        <span class="p">):</span>
+                            <span class="c1"># Keep aspect ratio</span>
+                            <span class="n">pil_image</span><span class="o">.</span><span class="n">thumbnail</span><span class="p">(</span>
+                                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span><span class="p">),</span> <span class="n">Image</span><span class="o">.</span><span class="n">LANCZOS</span>
+                            <span class="p">)</span>
+
+                        <span class="c1"># Process with CLIP-Seg</span>
+                        <span class="n">inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">processor</span><span class="p">(</span>
+                            <span class="n">text</span><span class="o">=</span><span class="n">text_prompt</span><span class="p">,</span> <span class="n">images</span><span class="o">=</span><span class="n">pil_image</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span>
+                        <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+                        <span class="c1"># Forward pass</span>
+                        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                            <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="o">**</span><span class="n">inputs</span><span class="p">)</span>
+
+                        <span class="c1"># Get logits and resize to original tile size</span>
+                        <span class="n">logits</span> <span class="o">=</span> <span class="n">outputs</span><span class="o">.</span><span class="n">logits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+                        <span class="c1"># Convert logits to probabilities with sigmoid</span>
+                        <span class="n">probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">logits</span><span class="p">)</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+
+                        <span class="c1"># Resize back to original tile size if needed</span>
+                        <span class="k">if</span> <span class="n">probs</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="n">tile_height</span><span class="p">,</span> <span class="n">tile_width</span><span class="p">):</span>
+                            <span class="c1"># Use bicubic interpolation for smoother results</span>
+                            <span class="n">probs_resized</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                                <span class="n">Image</span><span class="o">.</span><span class="n">fromarray</span><span class="p">(</span><span class="n">probs</span><span class="p">)</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span>
+                                    <span class="p">(</span><span class="n">tile_width</span><span class="p">,</span> <span class="n">tile_height</span><span class="p">),</span> <span class="n">Image</span><span class="o">.</span><span class="n">BICUBIC</span>
+                                <span class="p">)</span>
+                            <span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">probs_resized</span> <span class="o">=</span> <span class="n">probs</span>
+
+                        <span class="c1"># Apply gaussian blur to reduce blockiness</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">gaussian_filter</span>
+
+                            <span class="n">probs_resized</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span>
+                                <span class="n">probs_resized</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">smoothing_sigma</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+                            <span class="k">pass</span>  <span class="c1"># Continue without smoothing if scipy is not available</span>
+
+                        <span class="c1"># Store results in the full arrays</span>
+                        <span class="c1"># Only store the non-overlapping part (except at edges)</span>
+                        <span class="n">valid_x_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="k">if</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+                        <span class="n">valid_y_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="k">if</span> <span class="n">y</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+                        <span class="n">valid_x_end</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="n">tile_width</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+                            <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">n_tiles_x</span> <span class="o">-</span> <span class="mi">1</span>
+                            <span class="k">else</span> <span class="n">tile_width</span>
+                        <span class="p">)</span>
+                        <span class="n">valid_y_end</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="n">tile_height</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span>
+                            <span class="k">if</span> <span class="n">y</span> <span class="o">&lt;</span> <span class="n">n_tiles_y</span> <span class="o">-</span> <span class="mi">1</span>
+                            <span class="k">else</span> <span class="n">tile_height</span>
+                        <span class="p">)</span>
+
+                        <span class="n">dest_x_start</span> <span class="o">=</span> <span class="n">x_start</span> <span class="o">+</span> <span class="n">valid_x_start</span>
+                        <span class="n">dest_y_start</span> <span class="o">=</span> <span class="n">y_start</span> <span class="o">+</span> <span class="n">valid_y_start</span>
+                        <span class="n">dest_x_end</span> <span class="o">=</span> <span class="n">x_start</span> <span class="o">+</span> <span class="n">valid_x_end</span>
+                        <span class="n">dest_y_end</span> <span class="o">=</span> <span class="n">y_start</span> <span class="o">+</span> <span class="n">valid_y_end</span>
+
+                        <span class="c1"># Store probabilities</span>
+                        <span class="n">probabilities</span><span class="p">[</span>
+                            <span class="n">dest_y_start</span><span class="p">:</span><span class="n">dest_y_end</span><span class="p">,</span> <span class="n">dest_x_start</span><span class="p">:</span><span class="n">dest_x_end</span>
+                        <span class="p">]</span> <span class="o">=</span> <span class="n">probs_resized</span><span class="p">[</span>
+                            <span class="n">valid_y_start</span><span class="p">:</span><span class="n">valid_y_end</span><span class="p">,</span> <span class="n">valid_x_start</span><span class="p">:</span><span class="n">valid_x_end</span>
+                        <span class="p">]</span>
+
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing tile at (</span><span class="si">{</span><span class="n">x</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">y</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="c1"># Continue with next tile</span>
+
+                    <span class="c1"># Update progress bar</span>
+                    <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Create binary segmentation from probabilities</span>
+        <span class="n">segmentation</span> <span class="o">=</span> <span class="p">(</span><span class="n">probabilities</span> <span class="o">&gt;=</span> <span class="n">threshold</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="c1"># Write the output GeoTIFF</span>
+        <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">out_meta</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
+            <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">segmentation</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">probabilities</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+            <span class="c1"># Add descriptions to bands</span>
+            <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Binary Segmentation&quot;</span><span class="p">)</span>
+            <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Probability Scores&quot;</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Segmentation saved to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">output_path</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-method">
+
+
+
+<h3 id="geoai.segment.CLIPSegmentation.segment_image_batch" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">segment_image_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_paths</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;_segmented&#39;</span><span class="p">)</span></code>
+
+
+<a href="#geoai.segment.CLIPSegmentation.segment_image_batch" class="headerlink" title="Permanent link">&para;</a></h3>
+
+    <div class="doc doc-contents ">
+
+      <p>Segment multiple GeoTIFF images using the provided text prompt.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>input_paths</code></td>
+        <td><code>list</code></td>
+        <td><p>List of paths to input GeoTIFF files.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>output_dir</code></td>
+        <td><code>str</code></td>
+        <td><p>Directory where output GeoTIFFs will be saved.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>text_prompt</code></td>
+        <td><code>str</code></td>
+        <td><p>Text description of what to segment.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>threshold</code></td>
+        <td><code>float</code></td>
+        <td><p>Threshold for binary segmentation. Defaults to 0.5.</p></td>
+        <td><code>0.5</code></td>
+      </tr>
+      <tr>
+        <td><code>smoothing_sigma</code></td>
+        <td><code>float</code></td>
+        <td><p>Sigma value for Gaussian smoothing to reduce blockiness. Defaults to 1.0.</p></td>
+        <td><code>1.0</code></td>
+      </tr>
+      <tr>
+        <td><code>suffix</code></td>
+        <td><code>str</code></td>
+        <td><p>Suffix to add to output filenames. Defaults to "_segmented".</p></td>
+        <td><code>&#39;_segmented&#39;</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>list</code></td>
+      <td><p>Paths to all saved output files.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/segment.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">input_paths</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">,</span>
+    <span class="n">text_prompt</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;_segmented&quot;</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Segment multiple GeoTIFF images using the provided text prompt.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        input_paths (list): List of paths to input GeoTIFF files.</span>
+<span class="sd">        output_dir (str): Directory where output GeoTIFFs will be saved.</span>
+<span class="sd">        text_prompt (str): Text description of what to segment.</span>
+<span class="sd">        threshold (float): Threshold for binary segmentation. Defaults to 0.5.</span>
+<span class="sd">        smoothing_sigma (float): Sigma value for Gaussian smoothing to reduce blockiness. Defaults to 1.0.</span>
+<span class="sd">        suffix (str): Suffix to add to output filenames. Defaults to &quot;_segmented&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: Paths to all saved output files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Create output directory if it doesn&#39;t exist</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">output_paths</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Process each input file</span>
+    <span class="k">for</span> <span class="n">input_path</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">input_paths</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing files&quot;</span><span class="p">):</span>
+        <span class="c1"># Generate output path</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">input_path</span><span class="p">)</span>
+        <span class="n">base_name</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_name</span><span class="si">}{</span><span class="n">suffix</span><span class="si">}{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Segment the image</span>
+        <span class="n">result_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">segment_image</span><span class="p">(</span>
+            <span class="n">input_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">smoothing_sigma</span>
+        <span class="p">)</span>
+        <span class="n">output_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result_path</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output_paths</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+
+
+  </div>
+
+    </div>
+
+  </div>
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+  </div>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 9, 2025 03:58:58"><span class="timeago" datetime="2025-03-09T03:58:58+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 9, 2025 03:58:58">2025-03-09</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 9, 2025 03:58:58"><span class="timeago" datetime="2025-03-09T03:58:58+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 9, 2025 03:58:58">2025-03-09</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 - 2025 Qiusheng Wu
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+        <script src="../js/timeago.min.js"></script>
+      
+        <script src="../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>
