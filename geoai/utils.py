@@ -520,7 +520,7 @@ def view_vector(
     title=None,
     legend=True,
     basemap=False,
-    basemap_type='streets',
+    basemap_type="streets",
     alpha=0.7,
     edge_color="black",
     classification="quantiles",
@@ -640,9 +640,9 @@ def view_vector(
     if basemap:
         try:
             basemap_options = {
-                'streets': ctx.providers.OpenStreetMap.Mapnik,
-                'satellite': ctx.providers.Esri.WorldImagery
-                }
+                "streets": ctx.providers.OpenStreetMap.Mapnik,
+                "satellite": ctx.providers.Esri.WorldImagery,
+            }
             ctx.add_basemap(ax, crs=gdf.crs, source=basemap_options[basemap_type])
         except Exception as e:
             print(f"Could not add basemap: {e}")
