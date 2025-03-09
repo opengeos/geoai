@@ -15,7 +15,10 @@ from huggingface_hub import hf_hub_download
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box
 from tqdm import tqdm
-from torchvision.models.detection import maskrcnn_resnet50_fpn
+from torchvision.models.detection import (
+    maskrcnn_resnet50_fpn,
+    fasterrcnn_resnet50_fpn_v2,
+)
 
 # Local Imports
 from .utils import get_raster_stats
@@ -65,6 +68,7 @@ class CustomDataset(NonGeoDataset):
         chip_size=(512, 512),
         overlap=0.5,
         transforms=None,
+        band_indexes=None,
         verbose=False,
     ):
         """
@@ -75,6 +79,7 @@ class CustomDataset(NonGeoDataset):
             chip_size: Size of image chips to extract (height, width). Default is (512, 512).
             overlap: Amount of overlap between adjacent tiles (0.0-1.0). Default is 0.5 (50%).
             transforms: Transforms to apply to the image. Default is None.
+            band_indexes: List of band indexes to use. Default is None (use all bands).
             verbose: Whether to print detailed processing information. Default is False.
 
         Raises:
@@ -87,6 +92,7 @@ class CustomDataset(NonGeoDataset):
         self.chip_size = chip_size
         self.overlap = overlap
         self.transforms = transforms
+        self.band_indexes = band_indexes
         self.verbose = verbose
         self.warned_about_bands = False
 
@@ -196,7 +202,10 @@ class CustomDataset(NonGeoDataset):
                 if not self.warned_about_bands and self.verbose:
                     print(f"Image has {image.shape[0]} bands, using first 3 bands only")
                     self.warned_about_bands = True
-                image = image[:3]
+                if self.band_indexes is not None:
+                    image = image[self.band_indexes]
+                else:
+                    image = image[:3]
             elif image.shape[0] < 3:
                 # If image has fewer than 3 bands, duplicate the last band to make 3
                 if not self.warned_about_bands and self.verbose:
@@ -797,6 +806,7 @@ class ObjectDetector:
         batch_size=4,
         filter_edges=True,
         edge_buffer=20,
+        band_indexes=None,
         **kwargs,
     ):
         """
@@ -808,6 +818,7 @@ class ObjectDetector:
             batch_size: Batch size for processing
             filter_edges: Whether to filter out objects at the edges of the image
             edge_buffer: Size of edge buffer in pixels to filter out objects (if filter_edges=True)
+            band_indexes: List of band indexes to use (if None, use all bands)
             **kwargs: Additional parameters:
                 confidence_threshold: Minimum confidence score to keep a detection (0.0-1.0)
                 overlap: Overlap between adjacent tiles (0.0-1.0)
@@ -848,7 +859,10 @@ class ObjectDetector:
 
         # Create dataset
         dataset = CustomDataset(
-            raster_path=raster_path, chip_size=chip_size, overlap=overlap
+            raster_path=raster_path,
+            chip_size=chip_size,
+            overlap=overlap,
+            band_indexes=band_indexes,
         )
         self.raster_stats = dataset.raster_stats
 
@@ -1896,6 +1910,7 @@ class ObjectDetector:
         max_object_area=float("inf"),
         overlap=0.25,
         batch_size=4,
+        band_indexes=None,
         verbose=False,
         **kwargs,
     ):
@@ -1914,6 +1929,7 @@ class ObjectDetector:
             max_object_area: Maximum area (in pixels) for an object to be included
             overlap: Overlap between tiles (0.0-1.0)
             batch_size: Batch size for processing
+            band_indexes: List of band indexes to use (default: all bands)
             verbose: Whether to print detailed processing information
 
         Returns:
@@ -1938,6 +1954,7 @@ class ObjectDetector:
                 raster_path=raster_path,
                 chip_size=chip_size,
                 overlap=overlap,
+                band_indexes=band_indexes,
                 verbose=verbose,
             )
 
