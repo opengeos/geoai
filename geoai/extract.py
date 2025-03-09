@@ -608,7 +608,7 @@ class ObjectDetector:
 
         Args:
             mask_path: Path to the object masks GeoTIFF
-            output_path: Path to save the output GeoJSON (default: mask_path with .geojson extension)
+            output_path: Path to save the output GeoJSON or Parquet file (default: mask_path with .geojson extension)
             simplify_tolerance: Tolerance for polygon simplification (default: self.simplify_tolerance)
             mask_threshold: Threshold for mask binarization (default: self.mask_threshold)
             min_object_area: Minimum area in pixels to keep an object (default: self.min_object_area)
@@ -793,7 +793,10 @@ class ObjectDetector:
 
             # Save to file
             if output_path:
-                gdf.to_file(output_path)
+                if output_path.endswith(".parquet"):
+                    gdf.to_parquet(output_path)
+                else:
+                    gdf.to_file(output_path)
                 print(f"Saved {len(gdf)} objects to {output_path}")
 
             return gdf
@@ -814,7 +817,7 @@ class ObjectDetector:
 
         Args:
             raster_path: Path to input raster file
-            output_path: Path to output GeoJSON file (optional)
+            output_path: Path to output GeoJSON or Parquet file (optional)
             batch_size: Batch size for processing
             filter_edges: Whether to filter out objects at the edges of the image
             edge_buffer: Size of edge buffer in pixels to filter out objects (if filter_edges=True)
@@ -1040,7 +1043,10 @@ class ObjectDetector:
 
         # Save to file if requested
         if output_path:
-            gdf.to_file(output_path, driver="GeoJSON")
+            if output_path.endswith(".parquet"):
+                gdf.to_parquet(output_path)
+            else:
+                gdf.to_file(output_path, driver="GeoJSON")
             print(f"Saved {len(gdf)} objects to {output_path}")
 
         return gdf
