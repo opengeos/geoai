@@ -61,6 +61,7 @@ plugins:
                   "examples/ship_detection.ipynb",
                   "examples/solar_panel_detection.ipynb",
                   "examples/building_footprints_africa.ipynb",
+                  "examples/building_footprints_china.ipynb",
               ]
 
 markdown_extensions:
@@ -96,6 +97,7 @@ nav:
           - examples/image_chips.ipynb
           - examples/building_footprints_usa.ipynb
           - examples/building_footprints_africa.ipynb
+          - examples/building_footprints_china.ipynb
           - examples/building_regularization.ipynb
           - examples/geometric_properties.ipynb
           - examples/car_detection.ipynb
