@@ -39,6 +39,7 @@ theme:
 plugins:
     - search
     - git-revision-date
+    - mkdocstrings:
     - git-revision-date-localized:
           enable_creation_date: true
           type: timeago
@@ -62,14 +63,14 @@ plugins:
                   "examples/building_footprints_africa.ipynb",
                   "examples/building_footprints_china.ipynb",
               ]
-    - mkdocstrings:
-          default_handler: python
-          handlers:
-              python:
-              options:
-                  docstring_style: google
-                  inventory:
-                      - path: docs/inventory.json
+    # - mkdocstrings:
+    #       default_handler: python
+    #       handlers:
+    #           python:
+    #           options:
+    #               docstring_style: google
+    #               inventory:
+    #                   - path: docs/inventory.json
 
 markdown_extensions:
     - admonition
