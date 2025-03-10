@@ -50,8 +50,7 @@ plugins:
           execute: true
           allow_errors: false
           ignore: ["conf.py"]
-          execute_ignore:
-              [
+          execute_ignore: [
                   "examples/dataviz/*.ipynb",
                   "examples/rastervision/*.ipynb",
                   "examples/samgeo/*.ipynb",
@@ -59,7 +58,7 @@ plugins:
                   "examples/download_data.ipynb",
                   "examples/car_detection.ipynb",
                   "examples/ship_detection.ipynb",
-                  "examples/solar_panel_detection.ipynb",
+                  #   "examples/solar_panel_detection.ipynb",
                   "examples/building_footprints_africa.ipynb",
                   "examples/building_footprints_china.ipynb",
               ]
