@@ -14,15 +14,14 @@ import torch
 from huggingface_hub import hf_hub_download
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box
-from tqdm import tqdm
 from torchvision.models.detection import (
-    maskrcnn_resnet50_fpn,
     fasterrcnn_resnet50_fpn_v2,
+    maskrcnn_resnet50_fpn,
 )
+from tqdm import tqdm
 
 # Local Imports
 from .utils import get_raster_stats
-
 
 try:
     from torchgeo.datasets import NonGeoDataset
@@ -1306,13 +1305,14 @@ class ObjectDetector:
         Returns:
             GeoDataFrame with regularized objects
         """
-        import numpy as np
-        from shapely.geometry import Polygon, MultiPolygon, box
-        from shapely.affinity import rotate, translate
-        import geopandas as gpd
         import math
-        from tqdm import tqdm
+
         import cv2
+        import geopandas as gpd
+        import numpy as np
+        from shapely.affinity import rotate, translate
+        from shapely.geometry import MultiPolygon, Polygon, box
+        from tqdm import tqdm
 
         def get_angle(p1, p2, p3):
             """Calculate angle between three points in degrees (0-180)"""

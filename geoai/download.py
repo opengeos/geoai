@@ -1,18 +1,19 @@
 """This module provides functions to download data, including NAIP imagery and building data from Overture Maps."""
 
+import logging
 import os
-from typing import List, Tuple, Optional, Dict, Any
-import rioxarray
-import numpy as np
-import matplotlib.pyplot as plt
-from pystac_client import Client
-import planetary_computer as pc
+import subprocess
+from typing import Any, Dict, List, Optional, Tuple
+
 import geopandas as gpd
+import matplotlib.pyplot as plt
+import numpy as np
+import planetary_computer as pc
+import requests
+import rioxarray
+from pystac_client import Client
 from shapely.geometry import box
 from tqdm import tqdm
-import requests
-import subprocess
-import logging
 
 # Configure logging
 logging.basicConfig(

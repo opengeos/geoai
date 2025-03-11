@@ -132,5 +132,6 @@ nav:
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
+          - hf module: hf.md
           - segmentation module: segmentation.md
           - utils module: utils.md
