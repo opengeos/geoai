@@ -269,7 +269,9 @@ class ObjectDetector:
     Object extraction using Mask R-CNN with TorchGeo.
     """
 
-    def __init__(self, model_path=None, repo_id=None, model=None, device=None):
+    def __init__(
+        self, model_path=None, repo_id=None, model=None, num_classes=2, device=None
+    ):
         """
         Initialize the object extractor.
 
@@ -277,6 +279,7 @@ class ObjectDetector:
             model_path: Path to the .pth model file.
             repo_id: Hugging Face repository ID for model download.
             model: Pre-initialized model object (optional).
+            num_classes: Number of classes for detection (default: 2).
             device: Device to use for inference ('cuda:0', 'cpu', etc.).
         """
         # Set device
@@ -296,7 +299,7 @@ class ObjectDetector:
         self.simplify_tolerance = 1.0  # Tolerance for polygon simplification
 
         # Initialize model
-        self.model = self.initialize_model(model)
+        self.model = self.initialize_model(model, num_classes=num_classes)
 
         # Download model if needed
         if model_path is None or (not os.path.exists(model_path)):
@@ -341,11 +344,12 @@ class ObjectDetector:
             print("Please specify a local model path or ensure internet connectivity.")
             raise
 
-    def initialize_model(self, model):
+    def initialize_model(self, model, num_classes=2):
         """Initialize a deep learning model for object detection.
 
         Args:
             model (torch.nn.Module): A pre-initialized model object.
+            num_classes (int): Number of classes for detection.
 
         Returns:
             torch.nn.Module: A deep learning model for object detection.
@@ -360,7 +364,7 @@ class ObjectDetector:
             model = maskrcnn_resnet50_fpn(
                 weights=None,
                 progress=False,
-                num_classes=2,  # Background + object
+                num_classes=num_classes,  # Background + object
                 weights_backbone=None,
                 # These parameters ensure consistent normalization
                 image_mean=image_mean,
@@ -2112,7 +2116,7 @@ class ObjectDetector:
         output_path=None,
         confidence_threshold=0.5,
         min_object_area=100,
-        max_object_size=None,
+        max_object_area=None,
         **kwargs,
     ):
         """
@@ -2123,7 +2127,7 @@ class ObjectDetector:
             output_path: Path for output GeoJSON.
             confidence_threshold: Minimum confidence score (0.0-1.0). Default: 0.5
             min_object_area: Minimum area in pixels to keep an object. Default: 100
-            max_object_size: Maximum area in pixels to keep an object. Default: None
+            max_object_area: Maximum area in pixels to keep an object. Default: None
             **kwargs: Additional parameters
 
         Returns:
@@ -2147,8 +2151,9 @@ class ObjectDetector:
             print(f"Found {num_features} connected components")
 
             # Process each component
-            car_polygons = []
-            car_confidences = []
+            polygons = []
+            confidences = []
+            pixels = []
 
             # Add progress bar
             for label in tqdm(range(1, num_features + 1), desc="Processing components"):
@@ -2179,8 +2184,8 @@ class ObjectDetector:
                     if area < min_object_area:
                         continue
 
-                    if max_object_size is not None:
-                        if area > max_object_size:
+                    if max_object_area is not None:
+                        if area > max_object_area:
                             continue
 
                     # Get minimum area rectangle
@@ -2197,16 +2202,18 @@ class ObjectDetector:
                     poly = Polygon(geo_points)
 
                     # Add to lists
-                    car_polygons.append(poly)
-                    car_confidences.append(confidence)
+                    polygons.append(poly)
+                    confidences.append(confidence)
+                    pixels.append(area)
 
             # Create GeoDataFrame
-            if car_polygons:
+            if polygons:
                 gdf = gpd.GeoDataFrame(
                     {
-                        "geometry": car_polygons,
-                        "confidence": car_confidences,
-                        "class": [1] * len(car_polygons),
+                        "geometry": polygons,
+                        "confidence": confidences,
+                        "class": [1] * len(polygons),
+                        "pixels": pixels,
                     },
                     crs=crs,
                 )
@@ -2218,7 +2225,7 @@ class ObjectDetector:
 
                 return gdf
             else:
-                print("No valid car polygons found")
+                print("No valid polygons found")
                 return None
 
 
@@ -2355,4 +2362,38 @@ class SolarPanelDetector(ObjectDetector):
         """
         super().__init__(
             model_path=model_path, repo_id=repo_id, model=model, device=device
+        )
+
+
+class ParkingSplotDetector(ObjectDetector):
+    """
+    Car detection using a pre-trained Mask R-CNN model.
+
+    This class extends the `ObjectDetector` class with additional methods for car detection.
+    """
+
+    def __init__(
+        self,
+        model_path="parking_spot_detection.pth",
+        repo_id=None,
+        model=None,
+        num_classes=3,
+        device=None,
+    ):
+        """
+        Initialize the object extractor.
+
+        Args:
+            model_path: Path to the .pth model file.
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            num_classes: Number of classes for the model. Default: 3
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
+        """
+        super().__init__(
+            model_path=model_path,
+            repo_id=repo_id,
+            model=model,
+            num_classes=num_classes,
+            device=device,
         )
