@@ -2,6 +2,7 @@ bump-my-version
 coverage
 flake8
 ipykernel
+isort
 livereload
 mkdocs
 mkdocs-git-revision-date-localized-plugin
