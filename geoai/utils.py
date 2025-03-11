@@ -28,16 +28,9 @@ from rasterio import features
 from rasterio.plot import show
 from rasterio.windows import Window
 from shapely.affinity import rotate
-from shapely.geometry import (
-    MultiPolygon,
-    Polygon,
-    box,
-    mapping,
-    shape,
-)
+from shapely.geometry import MultiPolygon, Polygon, box, mapping, shape
 from torchvision.transforms import RandomRotation
 from tqdm import tqdm
-
 
 try:
     from torchgeo.datasets import RasterDataset, unbind_samples
@@ -700,8 +693,8 @@ def view_vector_interactive(
     """
     import folium
     import folium.plugins as plugins
-    from localtileserver import get_folium_tile_layer, TileClient
     from leafmap import cog_tile
+    from localtileserver import TileClient, get_folium_tile_layer
 
     google_tiles = {
         "Roadmap": {
@@ -803,9 +796,9 @@ def regularization(
     Returns:
         GeoDataFrame or list of shapely Polygons with regularized building footprints
     """
-    from shapely.geometry import Polygon, shape
-    from shapely.affinity import rotate, translate
     from shapely import wkt
+    from shapely.affinity import rotate, translate
+    from shapely.geometry import Polygon, shape
 
     regularized_buildings = []
 
@@ -924,8 +917,8 @@ def hybrid_regularization(building_polygons):
     Returns:
         GeoDataFrame or list of shapely Polygons with regularized building footprints
     """
-    from shapely.geometry import Polygon
     from shapely.affinity import rotate
+    from shapely.geometry import Polygon
 
     # Use minimum_rotated_rectangle instead of oriented_envelope
     try:
@@ -1039,8 +1032,8 @@ def adaptive_regularization(
     Returns:
         GeoDataFrame or list of shapely Polygons with regularized building footprints
     """
-    from shapely.geometry import Polygon
     from shapely.affinity import rotate
+    from shapely.geometry import Polygon
 
     # Analyze the overall dataset to set appropriate parameters
     if is_gdf := isinstance(building_polygons, gpd.GeoDataFrame):
@@ -4275,8 +4268,9 @@ def read_vector(source, layer=None, **kwargs):
         >>> gdf = read_vector("path/to/data.gpkg", layer="layer_name")
     """
 
-    import fiona
     import urllib.parse
+
+    import fiona
 
     # Determine if source is a URL or local file
     parsed_url = urllib.parse.urlparse(source)
@@ -4351,6 +4345,7 @@ def read_raster(source, band=None, masked=True, **kwargs):
         >>> raster = read_raster("path/to/data.tif", masked=False)
     """
     import urllib.parse
+
     from rasterio.errors import RasterioIOError
 
     # Determine if source is a URL or local file
@@ -4445,8 +4440,8 @@ def region_groups(
     Returns:
         Union[Tuple[np.ndarray, pd.DataFrame], Tuple[xr.DataArray, pd.DataFrame]]: Labeled image and properties DataFrame.
     """
-    from skimage import measure
     import scipy.ndimage as ndi
+    from skimage import measure
 
     if isinstance(image, str):
         ds = rxr.open_rasterio(image)

@@ -1,0 +1,3 @@
+# hf module
+
+::: geoai.hf

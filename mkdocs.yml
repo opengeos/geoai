@@ -47,7 +47,7 @@ plugins:
     - mkdocs-jupyter:
           include_source: True
           ignore_h1_titles: True
-          execute: true
+          execute: false
           allow_errors: false
           ignore: ["conf.py"]
           execute_ignore: [
@@ -132,5 +132,6 @@ nav:
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
+          - hf module: hf.md
           - segmentation module: segmentation.md
           - utils module: utils.md

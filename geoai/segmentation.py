@@ -1,18 +1,19 @@
 import os
-import numpy as np
-from PIL import Image
-import torch
-import matplotlib.pyplot as plt
-from torch.utils.data import Dataset, Subset
-import torch.nn.functional as F
-from sklearn.model_selection import train_test_split
+
 import albumentations as A
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.nn.functional as F
 from albumentations.pytorch import ToTensorV2
+from PIL import Image
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Dataset, Subset
 from transformers import (
+    DefaultDataCollator,
+    SegformerForSemanticSegmentation,
     Trainer,
     TrainingArguments,
-    SegformerForSemanticSegmentation,
-    DefaultDataCollator,
 )
 
 

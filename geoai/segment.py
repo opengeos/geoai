@@ -1,13 +1,14 @@
 """This module provides functionality for segmenting high-resolution satellite imagery using vision-language models."""
 
 import os
+
 import numpy as np
-import torch
-from tqdm import tqdm
-from PIL import Image
 import rasterio
+import torch
+from PIL import Image
 from rasterio.windows import Window
-from transformers import CLIPSegProcessor, CLIPSegForImageSegmentation
+from tqdm import tqdm
+from transformers import CLIPSegForImageSegmentation, CLIPSegProcessor
 
 
 class CLIPSegmentation:
