@@ -21,17 +21,25 @@ from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from tqdm import tqdm
 
 
-def get_instance_segmentation_model(num_classes, pretrained=True):
+def get_instance_segmentation_model(num_classes=2, num_channels=3, pretrained=True):
     """
     Get Mask R-CNN model with custom input channels and output classes.
 
     Args:
-        num_classes (int): Number of output classes (including background)
-        pretrained (bool): Whether to use pretrained backbone
+        num_classes (int): Number of output classes (including background).
+        num_channels (int): Number of input channels (3 for RGB, 4 for RGBN).
+        pretrained (bool): Whether to use pretrained backbone.
 
     Returns:
-        model: Mask R-CNN model
+        model: Mask R-CNN model with specified input channels and output classes.
+
+    Raises:
+        ValueError: If num_channels is less than 3.
     """
+    # Validate num_channels
+    if num_channels < 3:
+        raise ValueError("num_channels must be at least 3")
+
     # Load pre-trained model
     model = maskrcnn_resnet50_fpn(
         pretrained=pretrained,
@@ -43,23 +51,23 @@ def get_instance_segmentation_model(num_classes, pretrained=True):
         ),
     )
 
-    # Modify the transform to handle 4 channels
-    # This is critical - extend the mean and std to 4 channels
-    transform = model.transform
-    # Default values are [0.485, 0.456, 0.406] and [0.229, 0.224, 0.225]
-    # Extend them to 4 channels (use the mean value for the 4th channel)
-    transform.image_mean = [
-        0.485,
-        0.456,
-        0.406,
-        0.449,
-    ]  # 0.449 is the mean of the RGB means
-    transform.image_std = [
-        0.229,
-        0.224,
-        0.225,
-        0.226,
-    ]  # 0.226 is the mean of the RGB stds
+    # Modify transform if num_channels is different from 3
+    if num_channels != 3:
+        # Get the transform
+        transform = model.transform
+
+        # Default values are [0.485, 0.456, 0.406] and [0.229, 0.224, 0.225]
+        # Calculate means and stds for additional channels
+        rgb_mean = [0.485, 0.456, 0.406]
+        rgb_std = [0.229, 0.224, 0.225]
+
+        # Extend them to num_channels (use the mean value for additional channels)
+        mean_of_means = sum(rgb_mean) / len(rgb_mean)
+        mean_of_stds = sum(rgb_std) / len(rgb_std)
+
+        # Create new lists with appropriate length
+        transform.image_mean = rgb_mean + [mean_of_means] * (num_channels - 3)
+        transform.image_std = rgb_std + [mean_of_stds] * (num_channels - 3)
 
     # Get number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
@@ -76,35 +84,37 @@ def get_instance_segmentation_model(num_classes, pretrained=True):
         in_features_mask, hidden_layer, num_classes
     )
 
-    # Modify the first layer to accept 4 channels instead of 3
-    original_layer = model.backbone.body.conv1
-    model.backbone.body.conv1 = torch.nn.Conv2d(
-        4,
-        original_layer.out_channels,
-        kernel_size=original_layer.kernel_size,
-        stride=original_layer.stride,
-        padding=original_layer.padding,
-        bias=original_layer.bias is not None,
-    )
-
-    # Copy weights from the original 3 channels to the new 4 channels layer
-    with torch.no_grad():
-        # Copy the weights for the first 3 channels
-        model.backbone.body.conv1.weight[:, :3, :, :] = original_layer.weight
-        # Initialize the 4th channel with the mean of the first 3 channels
-        model.backbone.body.conv1.weight[:, 3:4, :, :] = original_layer.weight.mean(
-            dim=1, keepdim=True
+    # Modify the first layer if num_channels is different from 3
+    if num_channels != 3:
+        original_layer = model.backbone.body.conv1
+        model.backbone.body.conv1 = torch.nn.Conv2d(
+            num_channels,
+            original_layer.out_channels,
+            kernel_size=original_layer.kernel_size,
+            stride=original_layer.stride,
+            padding=original_layer.padding,
+            bias=original_layer.bias is not None,
         )
 
-        # Copy bias if it exists
-        if original_layer.bias is not None:
-            model.backbone.body.conv1.bias = original_layer.bias
+        # Copy weights from the original 3 channels to the new layer
+        with torch.no_grad():
+            # Copy the weights for the first 3 channels
+            model.backbone.body.conv1.weight[:, :3, :, :] = original_layer.weight
+
+            # Initialize additional channels with the mean of the first 3 channels
+            mean_weight = original_layer.weight.mean(dim=1, keepdim=True)
+            for i in range(3, num_channels):
+                model.backbone.body.conv1.weight[:, i : i + 1, :, :] = mean_weight
+
+            # Copy bias if it exists
+            if original_layer.bias is not None:
+                model.backbone.body.conv1.bias = original_layer.bias
 
     return model
 
 
-class BuildingDataset(Dataset):
-    """Dataset for building detection from GeoTIFF images and labels."""
+class ObjectDetectionDataset(Dataset):
+    """Dataset for object detection from GeoTIFF images and labels."""
 
     def __init__(self, image_paths, label_paths, transforms=None):
         """
@@ -523,6 +533,8 @@ def train_MaskRCNN_model(
     images_dir,
     labels_dir,
     output_dir,
+    num_channels=3,
+    pretrained=True,
     batch_size=4,
     num_epochs=10,
     learning_rate=0.005,
@@ -589,10 +601,10 @@ def train_MaskRCNN_model(
     print(f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images")
 
     # Create datasets
-    train_dataset = BuildingDataset(
+    train_dataset = ObjectDetectionDataset(
         train_imgs, train_labels, transforms=get_transform(train=True)
     )
-    val_dataset = BuildingDataset(
+    val_dataset = ObjectDetectionDataset(
         val_imgs, val_labels, transforms=get_transform(train=False)
     )
 
@@ -614,7 +626,9 @@ def train_MaskRCNN_model(
     )
 
     # Initialize model (2 classes: background and building)
-    model = get_instance_segmentation_model(num_classes=2)
+    model = get_instance_segmentation_model(
+        num_classes=2, num_channels=num_channels, pretrained=pretrained
+    )
     model.to(device)
 
     # Set up optimizer
@@ -905,6 +919,8 @@ def object_detection(
     overlap=256,
     confidence_threshold=0.5,
     batch_size=4,
+    num_channels=3,
+    pretrained=True,
     device=None,
     **kwargs,
 ):
@@ -914,7 +930,9 @@ def object_detection(
         device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         )
-    model = get_instance_segmentation_model(num_classes=2)
+    model = get_instance_segmentation_model(
+        num_classes=2, num_channels=num_channels, pretrained=pretrained
+    )
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
