@@ -137,8 +137,6 @@ class ObjectDetectionDataset(Dataset):
         else:
             self.num_channels = num_channels
 
-        print(f"Using {self.num_channels} channels for dataset")
-
     def __len__(self):
         return len(self.image_paths)
 
@@ -724,6 +722,7 @@ def inference_on_geotiff(
     overlap=256,
     confidence_threshold=0.5,
     batch_size=4,
+    num_channels=3,
     device=None,
     **kwargs,
 ):
@@ -816,11 +815,11 @@ def inference_on_geotiff(
                 image = window.astype(np.float32) / 255.0
 
                 # Handle different number of bands
-                if image.shape[0] > 4:
-                    image = image[:4]
-                elif image.shape[0] < 4:
+                if image.shape[0] > num_channels:
+                    image = image[:num_channels]
+                elif image.shape[0] < num_channels:
                     padded = np.zeros(
-                        (4, current_height, current_width), dtype=np.float32
+                        (num_channels, current_height, current_width), dtype=np.float32
                     )
                     padded[: image.shape[0]] = image
                     image = padded
@@ -960,6 +959,7 @@ def object_detection(
         overlap=overlap,  # Overlap to avoid edge artifacts
         confidence_threshold=confidence_threshold,
         batch_size=batch_size,  # Adjust based on your GPU memory
+        num_channels=num_channels,
         device=device,
         **kwargs,
     )
