@@ -116,7 +116,7 @@ def get_instance_segmentation_model(num_classes=2, num_channels=3, pretrained=Tr
 class ObjectDetectionDataset(Dataset):
     """Dataset for object detection from GeoTIFF images and labels."""
 
-    def __init__(self, image_paths, label_paths, transforms=None):
+    def __init__(self, image_paths, label_paths, transforms=None, num_channels=None):
         """
         Initialize dataset.
 
@@ -124,10 +124,20 @@ class ObjectDetectionDataset(Dataset):
             image_paths (list): List of paths to image GeoTIFF files
             label_paths (list): List of paths to label GeoTIFF files
             transforms (callable, optional): Transformations to apply to images and masks
+            num_channels (int, optional): Number of channels to use from images
         """
         self.image_paths = image_paths
         self.label_paths = label_paths
         self.transforms = transforms
+
+        # Auto-detect the number of channels if not specified
+        if num_channels is None:
+            with rasterio.open(self.image_paths[0]) as src:
+                self.num_channels = src.count
+        else:
+            self.num_channels = num_channels
+
+        print(f"Using {self.num_channels} channels for dataset")
 
     def __len__(self):
         return len(self.image_paths)
@@ -142,11 +152,16 @@ class ObjectDetectionDataset(Dataset):
             image = image / 255.0
 
             # Handle different number of channels
-            if image.shape[0] > 4:
-                image = image[:4]  # Keep only first 4 bands if more exist
-            elif image.shape[0] < 4:
+            if image.shape[0] > self.num_channels:
+                image = image[
+                    : self.num_channels
+                ]  # Keep only first 4 bands if more exist
+            elif image.shape[0] < self.num_channels:
                 # Pad with zeros if less than 4 bands
-                padded = np.zeros((4, image.shape[1], image.shape[2]), dtype=np.float32)
+                padded = np.zeros(
+                    (self.num_channels, image.shape[1], image.shape[2]),
+                    dtype=np.float32,
+                )
                 padded[: image.shape[0]] = image
                 image = padded
 

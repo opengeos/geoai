@@ -2587,6 +2587,8 @@ def export_geotiff_tiles(
             print(f"\nRaster info for {in_raster}:")
             print(f"  CRS: {src.crs}")
             print(f"  Dimensions: {src.width} x {src.height}")
+            print(f"  Resolution: {src.res}")
+            print(f"  Bands: {src.count}")
             print(f"  Bounds: {src.bounds}")
 
         # Calculate number of tiles
