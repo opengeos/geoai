@@ -113,6 +113,7 @@ nav:
           - examples/text_prompt_segmentation.ipynb
           - examples/parking_spot_detection.ipynb
           - examples/data_visualization.ipynb
+          - examples/train_object_detection_model.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
@@ -135,4 +136,5 @@ nav:
           - extract module: extract.md
           - hf module: hf.md
           - segmentation module: segmentation.md
+          - train module: train.md
           - utils module: utils.md
