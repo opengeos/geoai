@@ -28,6 +28,13 @@ jobs:
                   uv venv --python ${{ matrix.python-version }}
                   uv pip install .
 
+            - name: Update PROJ data files
+              run: |
+                  pip install --upgrade pyproj
+                  curl -L -o proj-data.zip https://download.osgeo.org/proj/proj-data-1.9.zip
+                  unzip proj-data.zip -d proj-data
+                  cp -r proj-data/* $(python -m pyproj -v | grep "PROJ_LIB" | cut -d ' ' -f 2)
+
             - name: Test import
               run: |
                   uv run python -c "import geoai; print('geoai import successful')"
