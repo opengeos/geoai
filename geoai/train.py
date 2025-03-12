@@ -1,11 +1,8 @@
-import datetime
 import math
 import os
 import random
 import time
 
-import cv2
-import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
@@ -14,16 +11,13 @@ import torch.utils.data
 import torchvision
 
 # import torchvision.transforms as transforms
-from rasterio.features import shapes
 from rasterio.windows import Window
-from shapely.geometry import Polygon, shape
 from skimage import measure
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision.models.detection import maskrcnn_resnet50_fpn
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
-from torchvision.transforms import functional as F
 from tqdm import tqdm
 
 
