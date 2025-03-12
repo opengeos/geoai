@@ -32,13 +32,6 @@ from shapely.geometry import MultiPolygon, Polygon, box, mapping, shape
 from torchvision.transforms import RandomRotation
 from tqdm import tqdm
 
-try:
-    from torchgeo.datasets import RasterDataset, unbind_samples
-except ImportError as e:
-    raise ImportError(
-        "Your torchgeo version is too old. Please upgrade to the latest version using 'pip install -U torchgeo'."
-    )
-
 
 def view_raster(
     source: str,
@@ -53,7 +46,7 @@ def view_raster(
     zoom_to_layer: Optional[bool] = True,
     visible: Optional[bool] = True,
     opacity: Optional[float] = 1.0,
-    array_args: Optional[Dict] = {},
+    array_args: Optional[Dict] = None,
     client_args: Optional[Dict] = {"cors_all": False},
     basemap: Optional[str] = "OpenStreetMap",
     basemap_args: Optional[Dict] = None,
@@ -93,6 +86,9 @@ def view_raster(
 
     if basemap_args is None:
         basemap_args = {}
+
+    if array_args is None:
+        array_args = {}
 
     m = leafmap.Map()
 
@@ -277,6 +273,14 @@ def plot_batch(
     Returns:
         None
     """
+
+    try:
+        from torchgeo.datasets import unbind_samples
+    except ImportError as e:
+        raise ImportError(
+            "Your torchgeo version is too old. Please upgrade to the latest version using 'pip install -U torchgeo'."
+        )
+
     # Get the samples and the number of items in the batch
     samples = unbind_samples(batch.copy())
 
@@ -316,9 +320,7 @@ def plot_batch(
             )
 
 
-def calc_stats(
-    dataset: RasterDataset, divide_by: float = 1.0
-) -> Tuple[np.ndarray, np.ndarray]:
+def calc_stats(dataset, divide_by: float = 1.0) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculate the statistics (mean and std) for the entire dataset.
 
@@ -5667,11 +5669,14 @@ def orthogonalize(
         crs = src.crs
 
         # Extract shapes from the raster mask
-        shapes = features.shapes(mask, transform=transform)
+        shapes = list(features.shapes(mask, transform=transform))
+
+        # Initialize progress bar
+        print(f"Processing {len(shapes)} features...")
 
         # Convert shapes to GeoJSON features
         features_list = []
-        for shape, value in shapes:
+        for shape, value in tqdm(shapes, desc="Converting features", unit="shape"):
             if value > 0:  # Only process non-zero values (actual objects)
                 # Convert GeoJSON geometry to Shapely polygon
                 polygon = Polygon(shape["coordinates"][0])
@@ -5811,6 +5816,8 @@ def orthogonalize(
 
         # Save to file if output_path is provided
         if output_path:
+            print(f"Saving to {output_path}...")
             gdf.to_file(output_path)
+            print("Done!")
 
         return gdf
