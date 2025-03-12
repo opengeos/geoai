@@ -31,7 +31,7 @@ def get_instance_segmentation_model(num_classes=2, num_channels=3, pretrained=Tr
         pretrained (bool): Whether to use pretrained backbone.
 
     Returns:
-        model: Mask R-CNN model with specified input channels and output classes.
+        torch.nn.Module: Mask R-CNN model with specified input channels and output classes.
 
     Raises:
         ValueError: If num_channels is less than 3.
@@ -121,10 +121,11 @@ class ObjectDetectionDataset(Dataset):
         Initialize dataset.
 
         Args:
-            image_paths (list): List of paths to image GeoTIFF files
-            label_paths (list): List of paths to label GeoTIFF files
-            transforms (callable, optional): Transformations to apply to images and masks
-            num_channels (int, optional): Number of channels to use from images
+            image_paths (list): List of paths to image GeoTIFF files.
+            label_paths (list): List of paths to label GeoTIFF files.
+            transforms (callable, optional): Transformations to apply to images and masks.
+            num_channels (int, optional): Number of channels to use from images. If None,
+                auto-detected from the first image.
         """
         self.image_paths = image_paths
         self.label_paths = label_paths
@@ -257,6 +258,12 @@ class Compose:
     """Custom compose transform that works with image and target."""
 
     def __init__(self, transforms):
+        """
+        Initialize compose transform.
+
+        Args:
+            transforms (list): List of transforms to apply.
+        """
         self.transforms = transforms
 
     def __call__(self, image, target):
@@ -269,7 +276,16 @@ class ToTensor:
     """Convert numpy.ndarray to tensor."""
 
     def __call__(self, image, target):
-        # Image is already a tensor
+        """
+        Apply transform to image and target.
+
+        Args:
+            image (torch.Tensor): Input image.
+            target (dict): Target annotations.
+
+        Returns:
+            tuple: Transformed image and target.
+        """
         return image, target
 
 
@@ -277,6 +293,12 @@ class RandomHorizontalFlip:
     """Random horizontal flip transform."""
 
     def __init__(self, prob=0.5):
+        """
+        Initialize random horizontal flip.
+
+        Args:
+            prob (float): Probability of applying the flip.
+        """
         self.prob = prob
 
     def __call__(self, image, target):
@@ -303,10 +325,10 @@ def get_transform(train):
     Get transforms for data augmentation.
 
     Args:
-        train (bool): Whether to include training-specific transforms
+        train (bool): Whether to include training-specific transforms.
 
     Returns:
-        transform: Composed transforms
+        Compose: Composed transforms.
     """
     transforms = []
     transforms.append(ToTensor())
@@ -322,10 +344,10 @@ def collate_fn(batch):
     Custom collate function for batching samples.
 
     Args:
-        batch: List of (image, target) tuples
+        batch (list): List of (image, target) tuples.
 
     Returns:
-        tuple: Tuple of images and targets
+        tuple: Tuple of images and targets.
     """
     return tuple(zip(*batch))
 
@@ -335,15 +357,15 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10)
     Train the model for one epoch.
 
     Args:
-        model: The model to train
-        optimizer: The optimizer to use
-        data_loader: DataLoader for training data
-        device: Device to train on
-        epoch: Current epoch number
-        print_freq: How often to print progress
+        model (torch.nn.Module): The model to train.
+        optimizer (torch.optim.Optimizer): The optimizer to use.
+        data_loader (torch.utils.data.DataLoader): DataLoader for training data.
+        device (torch.device): Device to train on.
+        epoch (int): Current epoch number.
+        print_freq (int): How often to print progress.
 
     Returns:
-        float: Average loss for the epoch
+        float: Average loss for the epoch.
     """
     model.train()
     total_loss = 0
@@ -385,12 +407,12 @@ def evaluate(model, data_loader, device):
     Evaluate the model on the validation set.
 
     Args:
-        model: The model to evaluate
-        data_loader: DataLoader for validation data
-        device: Device to evaluate on
+        model (torch.nn.Module): The model to evaluate.
+        data_loader (torch.utils.data.DataLoader): DataLoader for validation data.
+        device (torch.device): Device to evaluate on.
 
     Returns:
-        dict: Evaluation metrics
+        dict: Evaluation metrics including loss and IoU.
     """
     model.eval()
 
@@ -461,11 +483,12 @@ def visualize_predictions(model, dataset, device, num_samples=5, output_dir=None
     Visualize model predictions.
 
     Args:
-        model: Trained model
-        dataset: Dataset to visualize
-        device: Device to run inference on
-        num_samples: Number of samples to visualize
-        output_dir: Directory to save visualizations
+        model (torch.nn.Module): Trained model.
+        dataset (torch.utils.data.Dataset): Dataset to visualize.
+        device (torch.device): Device to run inference on.
+        num_samples (int): Number of samples to visualize.
+        output_dir (str, optional): Directory to save visualizations. If None,
+            visualizations are displayed but not saved.
     """
     model.eval()
 
@@ -555,7 +578,25 @@ def train_MaskRCNN_model(
     val_split=0.2,
     visualize=False,
 ):
-    """Main function for training and evaluating the Mask R-CNN model."""
+    """
+    Train and evaluate Mask R-CNN model for instance segmentation.
+
+    Args:
+        images_dir (str): Directory containing image GeoTIFF files.
+        labels_dir (str): Directory containing label GeoTIFF files.
+        output_dir (str): Directory to save model checkpoints and results.
+        num_channels (int, optional): Number of input channels. If None, auto-detected.
+        pretrained (bool): Whether to use pretrained backbone.
+        batch_size (int): Batch size for training.
+        num_epochs (int): Number of training epochs.
+        learning_rate (float): Initial learning rate.
+        seed (int): Random seed for reproducibility.
+        val_split (float): Fraction of data to use for validation (0-1).
+        visualize (bool): Whether to generate visualizations of model predictions.
+
+    Returns:
+        None: Model weights are saved to output_dir.
+    """
 
     # Set random seeds for reproducibility
     torch.manual_seed(seed)
@@ -728,6 +769,21 @@ def inference_on_geotiff(
 ):
     """
     Perform inference on a large GeoTIFF using a sliding window approach with improved blending.
+
+    Args:
+        model (torch.nn.Module): Trained model for inference.
+        geotiff_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output mask GeoTIFF.
+        window_size (int): Size of sliding window for inference.
+        overlap (int): Overlap between adjacent windows.
+        confidence_threshold (float): Confidence threshold for predictions (0-1).
+        batch_size (int): Batch size for inference.
+        num_channels (int): Number of channels to use from the input image.
+        device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
+        **kwargs: Additional arguments.
+
+    Returns:
+        tuple: Tuple containing output path and inference time in seconds.
     """
     if device is None:
         device = (
@@ -938,7 +994,25 @@ def object_detection(
     device=None,
     **kwargs,
 ):
+    """
+    Perform object detection on a GeoTIFF using a pre-trained Mask R-CNN model.
 
+    Args:
+        input_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output mask GeoTIFF.
+        model_path (str): Path to trained model weights.
+        window_size (int): Size of sliding window for inference.
+        overlap (int): Overlap between adjacent windows.
+        confidence_threshold (float): Confidence threshold for predictions (0-1).
+        batch_size (int): Batch size for inference.
+        num_channels (int): Number of channels in the input image and model.
+        pretrained (bool): Whether to use pretrained backbone for model loading.
+        device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
+        **kwargs: Additional arguments passed to inference_on_geotiff.
+
+    Returns:
+        None: Output mask is saved to output_path.
+    """
     # Load your trained model
     if device is None:
         device = (
