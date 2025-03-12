@@ -91,7 +91,7 @@ def set_proj_lib_path(verbose=False):
         return
 
 
-if ("google.colab" not in sys.modules) and (sys.platform != "windows"):
-    set_proj_lib_path()
+# if ("google.colab" not in sys.modules) and (sys.platform != "windows"):
+#     set_proj_lib_path()
 
 from .geoai import *
