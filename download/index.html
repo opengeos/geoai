@@ -471,6 +471,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/download_sentinel2/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Download sentinel2
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/view_metadata/" class="md-nav__link">
         
   
@@ -996,6 +1018,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.download.download_pc_stac_item" class="md-nav__link">
+    <span class="md-ellipsis">
+      download_pc_stac_item()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.download.download_with_progress" class="md-nav__link">
     <span class="md-ellipsis">
       download_with_progress()
@@ -1214,6 +1245,15 @@
   <a href="#geoai.download.download_overture_buildings" class="md-nav__link">
     <span class="md-ellipsis">
       download_overture_buildings()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.download_pc_stac_item" class="md-nav__link">
+    <span class="md-ellipsis">
+      download_pc_stac_item()
     </span>
   </a>
   
@@ -1811,6 +1851,378 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">raise</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.download_pc_stac_item" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">download_pc_stac_item</span><span class="p">(</span><span class="n">item_url</span><span class="p">,</span> <span class="n">bands</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">merge_bands</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">merged_filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+
+<a href="#geoai.download.download_pc_stac_item" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Downloads a STAC item from Microsoft Planetary Computer with specified bands.</p>
+<p>This function fetches a STAC item by URL, signs the assets using Planetary Computer
+credentials, and downloads the specified bands with a progress bar. Can optionally
+merge bands into a single multi-band GeoTIFF.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>item_url</code></td>
+        <td><code>str</code></td>
+        <td><p>The URL of the STAC item to download.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>bands</code></td>
+        <td><code>list</code></td>
+        <td><p>List of specific bands to download (e.g., ['B01', 'B02']).
+                   If None, all available bands will be downloaded.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>output_dir</code></td>
+        <td><code>str</code></td>
+        <td><p>Directory to save downloaded bands. If None,
+                       bands are returned as xarray DataArrays.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>show_progress</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to display a progress bar. Default is True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>merge_bands</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to merge downloaded bands into a single
+                         multi-band GeoTIFF file. Default is False.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
+        <td><code>merged_filename</code></td>
+        <td><code>str</code></td>
+        <td><p>Filename for the merged bands. If None and
+                            merge_bands is True, uses "{item_id}_merged.tif".</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>overwrite</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to overwrite existing files. Default is False.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
+        <td><code>cell_size</code></td>
+        <td><code>float</code></td>
+        <td><p>Resolution in meters for the merged output. If None,
+                        uses the resolution of the first band.</p></td>
+        <td><code>None</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>dict</code></td>
+      <td><p>Dictionary mapping band names to their corresponding xarray DataArrays
+      or file paths if output_dir is provided. If merge_bands is True, also
+      includes a 'merged' key with the path to the merged file.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Exceptions:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>ValueError</code></td>
+        <td><p>If the item cannot be retrieved or a requested band is not available.</p></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_pc_stac_item</span><span class="p">(</span>
+    <span class="n">item_url</span><span class="p">,</span>
+    <span class="n">bands</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">show_progress</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">merge_bands</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">merged_filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">cell_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Downloads a STAC item from Microsoft Planetary Computer with specified bands.</span>
+
+<span class="sd">    This function fetches a STAC item by URL, signs the assets using Planetary Computer</span>
+<span class="sd">    credentials, and downloads the specified bands with a progress bar. Can optionally</span>
+<span class="sd">    merge bands into a single multi-band GeoTIFF.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        item_url (str): The URL of the STAC item to download.</span>
+<span class="sd">        bands (list, optional): List of specific bands to download (e.g., [&#39;B01&#39;, &#39;B02&#39;]).</span>
+<span class="sd">                               If None, all available bands will be downloaded.</span>
+<span class="sd">        output_dir (str, optional): Directory to save downloaded bands. If None,</span>
+<span class="sd">                                   bands are returned as xarray DataArrays.</span>
+<span class="sd">        show_progress (bool, optional): Whether to display a progress bar. Default is True.</span>
+<span class="sd">        merge_bands (bool, optional): Whether to merge downloaded bands into a single</span>
+<span class="sd">                                     multi-band GeoTIFF file. Default is False.</span>
+<span class="sd">        merged_filename (str, optional): Filename for the merged bands. If None and</span>
+<span class="sd">                                        merge_bands is True, uses &quot;{item_id}_merged.tif&quot;.</span>
+<span class="sd">        overwrite (bool, optional): Whether to overwrite existing files. Default is False.</span>
+<span class="sd">        cell_size (float, optional): Resolution in meters for the merged output. If None,</span>
+<span class="sd">                                    uses the resolution of the first band.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Dictionary mapping band names to their corresponding xarray DataArrays</span>
+<span class="sd">              or file paths if output_dir is provided. If merge_bands is True, also</span>
+<span class="sd">              includes a &#39;merged&#39; key with the path to the merged file.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the item cannot be retrieved or a requested band is not available.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">Resampling</span>
+
+    <span class="c1"># Get the item ID from the URL</span>
+    <span class="n">item_id</span> <span class="o">=</span> <span class="n">item_url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">collection</span> <span class="o">=</span> <span class="n">item_url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/collections/&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/items/&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Connect to the Planetary Computer STAC API</span>
+    <span class="n">catalog</span> <span class="o">=</span> <span class="n">Client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
+        <span class="s2">&quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;</span><span class="p">,</span>
+        <span class="n">modifier</span><span class="o">=</span><span class="n">pc</span><span class="o">.</span><span class="n">sign_inplace</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Search for the specific item</span>
+    <span class="n">search</span> <span class="o">=</span> <span class="n">catalog</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">collections</span><span class="o">=</span><span class="p">[</span><span class="n">collection</span><span class="p">],</span> <span class="n">ids</span><span class="o">=</span><span class="p">[</span><span class="n">item_id</span><span class="p">])</span>
+
+    <span class="c1"># Get the first item from the search results</span>
+    <span class="n">items</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">search</span><span class="o">.</span><span class="n">get_items</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">items</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Item with ID </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+
+    <span class="n">item</span> <span class="o">=</span> <span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Determine which bands to download</span>
+    <span class="n">available_assets</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">bands</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># If no bands specified, download all band assets</span>
+        <span class="n">bands_to_download</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">asset</span> <span class="k">for</span> <span class="n">asset</span> <span class="ow">in</span> <span class="n">available_assets</span> <span class="k">if</span> <span class="n">asset</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;B&quot;</span><span class="p">)</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Verify all requested bands exist</span>
+        <span class="n">missing_bands</span> <span class="o">=</span> <span class="p">[</span><span class="n">band</span> <span class="k">for</span> <span class="n">band</span> <span class="ow">in</span> <span class="n">bands</span> <span class="k">if</span> <span class="n">band</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">available_assets</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">missing_bands</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The following bands are not available: </span><span class="si">{</span><span class="n">missing_bands</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Available assets are: </span><span class="si">{</span><span class="n">available_assets</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="n">bands_to_download</span> <span class="o">=</span> <span class="n">bands</span>
+
+    <span class="c1"># Create output directory if specified and doesn&#39;t exist</span>
+    <span class="k">if</span> <span class="n">output_dir</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_dir</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">band_data_arrays</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">resampled_arrays</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">band_names</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Track band names in order</span>
+
+    <span class="c1"># Set up progress bar</span>
+    <span class="n">progress_iter</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">tqdm</span><span class="p">(</span><span class="n">bands_to_download</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Downloading bands&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">show_progress</span>
+        <span class="k">else</span> <span class="n">bands_to_download</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Download each requested band</span>
+    <span class="k">for</span> <span class="n">band</span> <span class="ow">in</span> <span class="n">progress_iter</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">band</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">show_progress</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">progress_iter</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="n">progress_iter</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Warning: Band </span><span class="si">{</span><span class="n">band</span><span class="si">}</span><span class="s2"> not found in assets, skipping.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="n">band_url</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="p">[</span><span class="n">band</span><span class="p">]</span><span class="o">.</span><span class="n">href</span>
+
+        <span class="k">if</span> <span class="n">output_dir</span><span class="p">:</span>
+            <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">band</span><span class="si">}</span><span class="s2">.tif&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Check if file exists and skip if overwrite is False</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">show_progress</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">progress_iter</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                    <span class="n">progress_iter</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> already exists, skipping (use overwrite=True to force download).&quot;</span>
+                    <span class="p">)</span>
+                <span class="c1"># Still need to open the file to get the data for merging</span>
+                <span class="k">if</span> <span class="n">merge_bands</span><span class="p">:</span>
+                    <span class="n">band_data</span> <span class="o">=</span> <span class="n">rioxarray</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+                    <span class="n">band_data_arrays</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">band</span><span class="p">,</span> <span class="n">band_data</span><span class="p">))</span>
+                    <span class="n">band_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">band</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">band</span><span class="p">]</span> <span class="o">=</span> <span class="n">file_path</span>
+                <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">show_progress</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">progress_iter</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">progress_iter</span><span class="o">.</span><span class="n">set_description</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading </span><span class="si">{</span><span class="n">band</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">band_data</span> <span class="o">=</span> <span class="n">rioxarray</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">band_url</span><span class="p">)</span>
+
+        <span class="c1"># Store the data array for potential merging later</span>
+        <span class="k">if</span> <span class="n">merge_bands</span><span class="p">:</span>
+            <span class="n">band_data_arrays</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">band</span><span class="p">,</span> <span class="n">band_data</span><span class="p">))</span>
+            <span class="n">band_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">band</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">output_dir</span><span class="p">:</span>
+            <span class="n">file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">band</span><span class="si">}</span><span class="s2">.tif&quot;</span><span class="p">)</span>
+            <span class="n">band_data</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">to_raster</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">band</span><span class="p">]</span> <span class="o">=</span> <span class="n">file_path</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">band</span><span class="p">]</span> <span class="o">=</span> <span class="n">band_data</span>
+
+    <span class="c1"># Merge bands if requested</span>
+    <span class="k">if</span> <span class="n">merge_bands</span> <span class="ow">and</span> <span class="n">output_dir</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">merged_filename</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">merged_filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">_merged.tif&quot;</span>
+
+        <span class="n">merged_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">merged_filename</span><span class="p">)</span>
+
+        <span class="c1"># Check if merged file exists and skip if overwrite is False</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">merged_path</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Merged file </span><span class="si">{</span><span class="n">merged_path</span><span class="si">}</span><span class="s2"> already exists, skipping (use overwrite=True to force creation).&quot;</span>
+                <span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;merged&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">merged_path</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Resampling and merging bands...&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Determine target cell size if not provided</span>
+            <span class="k">if</span> <span class="n">cell_size</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">band_data_arrays</span><span class="p">:</span>
+                <span class="c1"># Use the resolution of the first band (usually 10m for B02, B03, B04, B08)</span>
+                <span class="c1"># Get the affine transform (containing resolution info)</span>
+                <span class="n">first_band_data</span> <span class="o">=</span> <span class="n">band_data_arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                <span class="c1"># Extract resolution from transform</span>
+                <span class="n">cell_size</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">first_band_data</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">transform</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using detected resolution: </span><span class="si">{</span><span class="n">cell_size</span><span class="si">}</span><span class="s2">m&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">cell_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># Default to 10m if no bands are available</span>
+                <span class="n">cell_size</span> <span class="o">=</span> <span class="mi">10</span>
+                <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using default resolution: </span><span class="si">{</span><span class="n">cell_size</span><span class="si">}</span><span class="s2">m&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Process bands in memory-efficient way</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">band_name</span><span class="p">,</span> <span class="n">data_array</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">band_data_arrays</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing band: </span><span class="si">{</span><span class="n">band_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Get current resolution</span>
+                <span class="n">current_res</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">data_array</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">transform</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+
+                <span class="c1"># Resample if needed</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="nb">abs</span><span class="p">(</span><span class="n">current_res</span> <span class="o">-</span> <span class="n">cell_size</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.01</span>
+                <span class="p">):</span>  <span class="c1"># Small tolerance for floating point comparison</span>
+                    <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Resampling </span><span class="si">{</span><span class="n">band_name</span><span class="si">}</span><span class="s2"> from </span><span class="si">{</span><span class="n">current_res</span><span class="si">}</span><span class="s2">m to </span><span class="si">{</span><span class="n">cell_size</span><span class="si">}</span><span class="s2">m&quot;</span>
+                        <span class="p">)</span>
+
+                    <span class="c1"># Use bilinear for downsampling (higher to lower resolution)</span>
+                    <span class="c1"># Use nearest for upsampling (lower to higher resolution)</span>
+                    <span class="n">resampling_method</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">Resampling</span><span class="o">.</span><span class="n">bilinear</span>
+                        <span class="k">if</span> <span class="n">current_res</span> <span class="o">&lt;</span> <span class="n">cell_size</span>
+                        <span class="k">else</span> <span class="n">Resampling</span><span class="o">.</span><span class="n">nearest</span>
+                    <span class="p">)</span>
+
+                    <span class="n">resampled</span> <span class="o">=</span> <span class="n">data_array</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">reproject</span><span class="p">(</span>
+                        <span class="n">data_array</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span>
+                        <span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">cell_size</span><span class="p">),</span>
+                        <span class="n">resampling</span><span class="o">=</span><span class="n">resampling_method</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">resampled_arrays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">resampled</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">resampled_arrays</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data_array</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Stacking bands...&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Concatenate all resampled arrays along the band dimension</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">merged_data</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">resampled_arrays</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="s2">&quot;band&quot;</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Writing merged data to </span><span class="si">{</span><span class="n">merged_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Add description metadata</span>
+                <span class="n">merged_data</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Multi-band image containing </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">band_names</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+                <span class="c1"># Create a dictionary mapping band indices to band names</span>
+                <span class="n">band_descriptions</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">band_names</span><span class="p">):</span>
+                    <span class="n">band_descriptions</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">name</span>
+
+                <span class="c1"># Write the merged data to file with band descriptions</span>
+                <span class="n">merged_data</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">to_raster</span><span class="p">(</span>
+                    <span class="n">merged_path</span><span class="p">,</span>
+                    <span class="n">tags</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;BAND_NAMES&quot;</span><span class="p">:</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">band_names</span><span class="p">)},</span>
+                    <span class="n">descriptions</span><span class="o">=</span><span class="n">band_names</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;merged&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">merged_path</span>
+
+                <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Merged bands saved to: </span><span class="si">{</span><span class="n">merged_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Band order in merged file: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">band_names</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">show_progress</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during merging: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error details: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span>
+
+    <span class="k">return</span> <span class="n">result</span>
 </code></pre></div>
         </details>
     </div>
