@@ -100,6 +100,7 @@ nav:
     - Report Issues: https://github.com/opengeos/geoai/issues
     - Examples:
           - examples/download_data.ipynb
+          - examples/download_sentinel2.ipynb
           - examples/view_metadata.ipynb
           - examples/image_chips.ipynb
           - examples/building_footprints_usa.ipynb
