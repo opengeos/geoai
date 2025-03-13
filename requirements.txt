@@ -16,5 +16,6 @@ scikit-learn
 # segment-geospatial
 torch
 torchgeo
+torchinfo
 tqdm
 transformers
