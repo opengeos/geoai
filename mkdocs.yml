@@ -23,8 +23,8 @@ theme:
     name: material
     icon:
         repo: fontawesome/brands/github
-    # logo: assets/logo.png
-    # favicon: assets/favicon.png
+    logo: assets/logo.png
+    favicon: assets/logo.ico
     features:
         - navigation.instant
         - navigation.tracking
