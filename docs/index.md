@@ -8,6 +8,8 @@
 [![image](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://bit.ly/GeoAI-Tutorials)
 
+[![logo](https://raw.githubusercontent.com/opengeos/geoai/master/docs/assets/logo_rect.png)](https://github.com/opengeos/geoai/blob/master/docs/assets/logo.png)
+
 **A powerful Python package for integrating Artificial Intelligence with geospatial data analysis and visualization**
 
 GeoAI bridges the gap between AI and geospatial analysis, providing tools for processing, analyzing, and visualizing geospatial data using advanced machine learning techniques. Whether you're working with satellite imagery, LiDAR point clouds, or vector data, GeoAI offers intuitive interfaces to apply cutting-edge AI models.
