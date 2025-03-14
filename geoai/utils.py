@@ -2052,7 +2052,9 @@ def raster_to_vector(
 
                 # Add to features list with class value
                 if unique_attribute_value:
-                    all_features.append({"geometry": geom, attribute_name: class_val * shape_count})
+                    all_features.append(
+                        {"geometry": geom, attribute_name: class_val * shape_count}
+                    )
                 else:
                     all_features.append({"geometry": geom, attribute_name: class_val})
 
@@ -4615,10 +4617,20 @@ def region_groups(
                     tmp_raster = temp_file_path(".tif")
                     da.rio.to_raster(tmp_raster, dtype=dtype)
                     tmp_vector = temp_file_path(".gpkg")
-                    raster_to_vector(tmp_raster, tmp_vector, attribute_name="value", unique_attribute_value=True)
+                    raster_to_vector(
+                        tmp_raster,
+                        tmp_vector,
+                        attribute_name="value",
+                        unique_attribute_value=True,
+                    )
                 else:
                     tmp_vector = temp_file_path(".gpkg")
-                    raster_to_vector(out_image, tmp_vector, attribute_name="value", unique_attribute_value=True)
+                    raster_to_vector(
+                        out_image,
+                        tmp_vector,
+                        attribute_name="value",
+                        unique_attribute_value=True,
+                    )
                 gdf = gpd.read_file(tmp_vector)
                 gdf["label"] = gdf["value"].astype(int)
                 gdf.drop(columns=["value"], inplace=True)
