@@ -1988,6 +1988,7 @@ def raster_to_vector(
     simplify_tolerance=None,
     class_values=None,
     attribute_name="class",
+    unique_attribute_value=False,
     output_format="geojson",
     plot_result=False,
 ):
@@ -2002,6 +2003,7 @@ def raster_to_vector(
         simplify_tolerance (float): Tolerance for geometry simplification. None for no simplification.
         class_values (list): Specific pixel values to vectorize. If None, all values > threshold are vectorized.
         attribute_name (str): Name of the attribute field for the class values.
+        unique_attribute_value (bool): Whether to generate unique values for each shape within a class.
         output_format (str): Format for output file - 'geojson', 'shapefile', 'gpkg'.
         plot_result (bool): Whether to plot the resulting polygons overlaid on the raster.
 
@@ -2032,7 +2034,7 @@ def raster_to_vector(
         # Process each class value
         for class_val in class_values:
             mask = masks[class_val]
-
+            shape_count = 1
             # Vectorize the mask
             for geom, value in features.shapes(
                 mask.astype(np.uint8), mask=mask, transform=transform
@@ -2049,7 +2051,14 @@ def raster_to_vector(
                     geom = geom.simplify(simplify_tolerance)
 
                 # Add to features list with class value
-                all_features.append({"geometry": geom, attribute_name: class_val})
+                if unique_attribute_value:
+                    all_features.append(
+                        {"geometry": geom, attribute_name: class_val * shape_count}
+                    )
+                else:
+                    all_features.append({"geometry": geom, attribute_name: class_val})
+
+                shape_count += 1
 
         # Create GeoDataFrame
         if all_features:
@@ -4484,8 +4493,8 @@ def region_groups(
             "area_bbox",
             "area_convex",
             "area_filled",
-            "major_length",
-            "minor_length",
+            "axis_major_length",
+            "axis_minor_length",
             "eccentricity",
             "diameter_areagth",
             "extent",
@@ -4582,7 +4591,7 @@ def region_groups(
     )
 
     df = pd.DataFrame(props)
-    df["elongation"] = df["major_length"] / df["minor_length"]
+    df["elongation"] = df["axis_major_length"] / df["axis_minor_length"]
 
     dtype = "uint8"
     if num_labels > 255 and num_labels <= 65535:
@@ -4599,9 +4608,29 @@ def region_groups(
         da.values = label_image
         if out_image is not None:
             da.rio.to_raster(out_image, dtype=dtype)
-            if out_vector is not None:
-                tmp_vector = temp_file_path(".gpkg")
-                raster_to_vector(out_image, tmp_vector)
+
+        if out_vector is not None:
+            tmp_raster = None
+            tmp_vector = None
+            try:
+                if out_image is None:
+                    tmp_raster = temp_file_path(".tif")
+                    da.rio.to_raster(tmp_raster, dtype=dtype)
+                    tmp_vector = temp_file_path(".gpkg")
+                    raster_to_vector(
+                        tmp_raster,
+                        tmp_vector,
+                        attribute_name="value",
+                        unique_attribute_value=True,
+                    )
+                else:
+                    tmp_vector = temp_file_path(".gpkg")
+                    raster_to_vector(
+                        out_image,
+                        tmp_vector,
+                        attribute_name="value",
+                        unique_attribute_value=True,
+                    )
                 gdf = gpd.read_file(tmp_vector)
                 gdf["label"] = gdf["value"].astype(int)
                 gdf.drop(columns=["value"], inplace=True)
@@ -4609,6 +4638,15 @@ def region_groups(
                 gdf2.to_file(out_vector)
                 gdf2.sort_values("label", inplace=True)
                 df = gdf2
+            finally:
+                try:
+                    if tmp_raster is not None and os.path.exists(tmp_raster):
+                        os.remove(tmp_raster)
+                    if tmp_vector is not None and os.path.exists(tmp_vector):
+                        os.remove(tmp_vector)
+                except Exception as e:
+                    print(f"Warning: Failed to delete temporary files: {str(e)}")
+
         return da, df
 
 
