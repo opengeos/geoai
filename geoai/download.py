@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import planetary_computer as pc
 import requests
 import rioxarray
@@ -644,3 +645,396 @@ def download_pc_stac_item(
                 raise
 
     return result
+
+
+def pc_collection_list(
+    endpoint="https://planetarycomputer.microsoft.com/api/stac/v1",
+    detailed=False,
+    filter_by=None,
+    sort_by="id",
+):
+    """
+    Retrieves and displays the list of available collections from Planetary Computer.
+
+    This function connects to the Planetary Computer STAC API and retrieves the
+    list of all available collections, with options to filter and sort the results.
+
+    Args:
+        endpoint (str, optional): STAC API endpoint URL.
+            Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".
+        detailed (bool, optional): Whether to return detailed information for each
+            collection. If False, returns only basic info. Defaults to False.
+        filter_by (dict, optional): Dictionary of field:value pairs to filter
+            collections. For example, {"license": "CC-BY-4.0"}. Defaults to None.
+        sort_by (str, optional): Field to sort the collections by.
+            Defaults to "id".
+
+    Returns:
+        pandas.DataFrame: DataFrame containing collection information.
+
+    Raises:
+        ConnectionError: If there's an issue connecting to the API.
+    """
+    # Initialize the STAC client
+    try:
+        catalog = Client.open(endpoint)
+    except Exception as e:
+        raise ConnectionError(f"Failed to connect to STAC API at {endpoint}: {str(e)}")
+
+    # Get all collections
+    try:
+        collections = list(catalog.get_collections())
+    except Exception as e:
+        raise Exception(f"Error retrieving collections: {str(e)}")
+
+    # Basic info to extract from all collections
+    collection_info = []
+
+    # Extract information based on detail level
+    for collection in collections:
+        # Basic information always included
+        info = {
+            "id": collection.id,
+            "title": collection.title or "No title",
+            "description": (
+                collection.description[:100] + "..."
+                if collection.description and len(collection.description) > 100
+                else collection.description
+            ),
+        }
+
+        # Add detailed information if requested
+        if detailed:
+            # Get temporal extent if available
+            temporal_extent = "Unknown"
+            if collection.extent and collection.extent.temporal:
+                interval = (
+                    collection.extent.temporal.intervals[0]
+                    if collection.extent.temporal.intervals
+                    else None
+                )
+                if interval:
+                    start = interval[0] or "Unknown Start"
+                    end = interval[1] or "Present"
+                    if isinstance(start, datetime.datetime):
+                        start = start.strftime("%Y-%m-%d")
+                    if isinstance(end, datetime.datetime):
+                        end = end.strftime("%Y-%m-%d")
+                    temporal_extent = f"{start} to {end}"
+
+            # Add additional details
+            info.update(
+                {
+                    "license": collection.license or "Unknown",
+                    "keywords": (
+                        ", ".join(collection.keywords)
+                        if collection.keywords
+                        else "None"
+                    ),
+                    "temporal_extent": temporal_extent,
+                    "asset_count": len(collection.assets) if collection.assets else 0,
+                    "providers": (
+                        ", ".join([p.name for p in collection.providers])
+                        if collection.providers
+                        else "Unknown"
+                    ),
+                }
+            )
+
+            # Add spatial extent if available
+            if collection.extent and collection.extent.spatial:
+                info["bbox"] = (
+                    str(collection.extent.spatial.bboxes[0])
+                    if collection.extent.spatial.bboxes
+                    else "Unknown"
+                )
+
+        collection_info.append(info)
+
+    # Convert to DataFrame for easier filtering and sorting
+    df = pd.DataFrame(collection_info)
+
+    # Apply filtering if specified
+    if filter_by:
+        for field, value in filter_by.items():
+            if field in df.columns:
+                df = df[df[field].astype(str).str.contains(value, case=False, na=False)]
+
+    # Apply sorting
+    if sort_by in df.columns:
+        df = df.sort_values(by=sort_by)
+
+    print(f"Retrieved {len(df)} collections from Planetary Computer")
+
+    # # Print a nicely formatted table
+    # if not df.empty:
+    #     print("\nAvailable collections:")
+    #     print(tabulate(df, headers="keys", tablefmt="grid", showindex=False))
+
+    return df
+
+
+def pc_stac_search(
+    collection,
+    bbox=None,
+    time_range=None,
+    query=None,
+    limit=10,
+    max_items=None,
+    endpoint="https://planetarycomputer.microsoft.com/api/stac/v1",
+):
+    """
+    Search for STAC items in the Planetary Computer catalog.
+
+    This function queries the Planetary Computer STAC API to find items matching
+    the specified criteria, including collection, bounding box, time range, and
+    additional query parameters.
+
+    Args:
+        collection (str): The STAC collection ID to search within.
+        bbox (list, optional): Bounding box coordinates [west, south, east, north].
+            Defaults to None.
+        time_range (str or tuple, optional): Time range as a string "start/end" or
+            a tuple of (start, end) datetime objects. Defaults to None.
+        query (dict, optional): Additional query parameters for filtering.
+            Defaults to None.
+        limit (int, optional): Number of items to return per page. Defaults to 10.
+        max_items (int, optional): Maximum total number of items to return.
+            Defaults to None (returns all matching items).
+        endpoint (str, optional): STAC API endpoint URL.
+            Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".
+
+    Returns:
+        list: List of STAC Item objects matching the search criteria.
+
+    Raises:
+        ValueError: If invalid parameters are provided.
+        ConnectionError: If there's an issue connecting to the API.
+    """
+    import datetime
+
+    # Initialize the STAC client
+    try:
+        catalog = Client.open(endpoint)
+    except Exception as e:
+        raise ConnectionError(f"Failed to connect to STAC API at {endpoint}: {str(e)}")
+
+    # Process time_range if provided
+    if time_range:
+        if isinstance(time_range, tuple) and len(time_range) == 2:
+            # Convert datetime objects to ISO format strings
+            start, end = time_range
+            if isinstance(start, datetime.datetime):
+                start = start.isoformat()
+            if isinstance(end, datetime.datetime):
+                end = end.isoformat()
+            time_str = f"{start}/{end}"
+        elif isinstance(time_range, str):
+            time_str = time_range
+        else:
+            raise ValueError(
+                "time_range must be a 'start/end' string or tuple of (start, end)"
+            )
+    else:
+        time_str = None
+
+    # Create the search object
+    search = catalog.search(
+        collections=[collection], bbox=bbox, datetime=time_str, query=query, limit=limit
+    )
+
+    # Collect the items
+    items = []
+    try:
+        # Use max_items if specified, otherwise get all items
+        if max_items:
+            items_gen = search.get_items()
+            for item in items_gen:
+                items.append(item)
+                if len(items) >= max_items:
+                    break
+        else:
+            items = list(search.get_items())
+    except Exception as e:
+        raise Exception(f"Error retrieving search results: {str(e)}")
+
+    print(f"Found {len(items)} items matching search criteria")
+
+    return items
+
+
+def pc_stac_download(
+    items,
+    output_dir=".",
+    asset_keys=None,
+    max_workers=4,
+    skip_existing=True,
+    sign_urls=True,
+):
+    """
+    Download assets from STAC items retrieved from the Planetary Computer.
+
+    This function downloads specified assets from a list of STAC items to the
+    specified output directory. It supports parallel downloads and can skip
+    already downloaded files.
+
+    Args:
+        items (list or pystac.Item): STAC Item object or list of STAC Item objects.
+        output_dir (str, optional): Directory where assets will be saved.
+            Defaults to current directory.
+        asset_keys (list, optional): List of asset keys to download. If None,
+            downloads all available assets. Defaults to None.
+        max_workers (int, optional): Maximum number of concurrent download threads.
+            Defaults to 4.
+        skip_existing (bool, optional): Skip download if the file already exists.
+            Defaults to True.
+        sign_urls (bool, optional): Whether to sign URLs for authenticated access.
+            Defaults to True.
+
+    Returns:
+        dict: Dictionary mapping STAC item IDs to dictionaries of their downloaded
+            assets {asset_key: file_path}.
+
+    Raises:
+        TypeError: If items is not a STAC Item or list of STAC Items.
+        IOError: If there's an error writing the downloaded assets to disk.
+    """
+    import pystac
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    # Handle single item case
+    if isinstance(items, pystac.Item):
+        items = [items]
+    elif not isinstance(items, list):
+        raise TypeError("items must be a STAC Item or list of STAC Items")
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Function to sign URLs if needed
+    def get_signed_url(href):
+        if not sign_urls:
+            return href
+
+        # Planetary Computer typically requires signing URLs for accessing data
+        # Check if the URL is from Microsoft Planetary Computer
+        if "planetarycomputer" in href:
+            try:
+                sign_url = "https://planetarycomputer.microsoft.com/api/sas/v1/sign"
+                response = requests.get(sign_url, params={"href": href})
+                response.raise_for_status()
+                return response.json().get("href", href)
+            except Exception as e:
+                print(f"Warning: Failed to sign URL {href}: {str(e)}")
+                return href
+        return href
+
+    # Function to download a single asset
+    def download_asset(item, asset_key, asset):
+        item_id = item.id
+
+        # Get the asset URL and sign it if needed
+        asset_url = get_signed_url(asset.href)
+
+        # Determine output filename
+        if asset.media_type:
+            # Use appropriate file extension based on media type
+            if "tiff" in asset.media_type or "geotiff" in asset.media_type:
+                ext = ".tif"
+            elif "jpeg" in asset.media_type:
+                ext = ".jpg"
+            elif "png" in asset.media_type:
+                ext = ".png"
+            elif "json" in asset.media_type:
+                ext = ".json"
+            else:
+                # Default extension based on the original URL
+                ext = os.path.splitext(asset_url.split("?")[0])[1] or ".data"
+        else:
+            # Default extension based on the original URL
+            ext = os.path.splitext(asset_url.split("?")[0])[1] or ".data"
+
+        output_path = os.path.join(output_dir, f"{item_id}_{asset_key}{ext}")
+
+        # Skip if file exists and skip_existing is True
+        if skip_existing and os.path.exists(output_path):
+            print(f"Skipping existing asset: {asset_key} -> {output_path}")
+            return asset_key, output_path
+
+        try:
+            # Download the asset with progress bar
+            with requests.get(asset_url, stream=True) as r:
+                r.raise_for_status()
+                total_size = int(r.headers.get("content-length", 0))
+                with open(output_path, "wb") as f:
+                    with tqdm(
+                        total=total_size,
+                        unit="B",
+                        unit_scale=True,
+                        unit_divisor=1024,
+                        desc=f"Downloading {item_id}_{asset_key}",
+                        ncols=100,
+                    ) as pbar:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+
+            return asset_key, output_path
+        except Exception as e:
+            print(f"Error downloading {asset_key} for item {item_id}: {str(e)}")
+            if os.path.exists(output_path):
+                os.remove(output_path)  # Clean up partial download
+            return asset_key, None
+
+    # Process all items and their assets
+    results = {}
+
+    for item in items:
+        item_assets = {}
+        item_id = item.id
+        print(f"Processing STAC item: {item_id}")
+
+        # Determine which assets to download
+        if asset_keys:
+            assets_to_download = {
+                k: v for k, v in item.assets.items() if k in asset_keys
+            }
+            if not assets_to_download:
+                print(
+                    f"Warning: None of the specified asset keys {asset_keys} found in item {item_id}"
+                )
+                print(f"Available asset keys: {list(item.assets.keys())}")
+                continue
+        else:
+            assets_to_download = item.assets
+
+        # Download assets concurrently
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all download tasks
+            future_to_asset = {
+                executor.submit(download_asset, item, asset_key, asset): (
+                    asset_key,
+                    asset,
+                )
+                for asset_key, asset in assets_to_download.items()
+            }
+
+            # Process results as they complete
+            for future in as_completed(future_to_asset):
+                asset_key, asset = future_to_asset[future]
+                try:
+                    key, path = future.result()
+                    if path:
+                        item_assets[key] = path
+                except Exception as e:
+                    print(
+                        f"Error processing asset {asset_key} for item {item_id}: {str(e)}"
+                    )
+
+        results[item_id] = item_assets
+
+    # Count total downloaded assets
+    total_assets = sum(len(assets) for assets in results.values())
+    print(f"\nDownloaded {total_assets} assets for {len(results)} items")
+
+    return results
