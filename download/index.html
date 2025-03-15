@@ -491,6 +491,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/planetary_computer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Planetary computer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/view_metadata/" class="md-nav__link">
         
   
@@ -1074,6 +1096,33 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.download.pc_collection_list" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_collection_list()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.pc_stac_download" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_stac_download()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.pc_stac_search" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_stac_search()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.download.preview_raster" class="md-nav__link">
     <span class="md-ellipsis">
       preview_raster()
@@ -1301,6 +1350,33 @@
   <a href="#geoai.download.json_serializable" class="md-nav__link">
     <span class="md-ellipsis">
       json_serializable()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.pc_collection_list" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_collection_list()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.pc_stac_download" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_stac_download()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.pc_stac_search" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_stac_search()
     </span>
   </a>
   
@@ -2485,6 +2561,727 @@ merge bands into a single multi-band GeoTIFF.</p>
         <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">obj</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.pc_collection_list" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">pc_collection_list</span><span class="p">(</span><span class="n">endpoint</span><span class="o">=</span><span class="s1">&#39;https://planetarycomputer.microsoft.com/api/stac/v1&#39;</span><span class="p">,</span> <span class="n">detailed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">filter_by</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sort_by</span><span class="o">=</span><span class="s1">&#39;id&#39;</span><span class="p">)</span></code>
+
+
+<a href="#geoai.download.pc_collection_list" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Retrieves and displays the list of available collections from Planetary Computer.</p>
+<p>This function connects to the Planetary Computer STAC API and retrieves the
+list of all available collections, with options to filter and sort the results.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>endpoint</code></td>
+        <td><code>str</code></td>
+        <td><p>STAC API endpoint URL.
+Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".</p></td>
+        <td><code>&#39;https://planetarycomputer.microsoft.com/api/stac/v1&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>detailed</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to return detailed information for each
+collection. If False, returns only basic info. Defaults to False.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
+        <td><code>filter_by</code></td>
+        <td><code>dict</code></td>
+        <td><p>Dictionary of field:value pairs to filter
+collections. For example, {"license": "CC-BY-4.0"}. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>sort_by</code></td>
+        <td><code>str</code></td>
+        <td><p>Field to sort the collections by.
+Defaults to "id".</p></td>
+        <td><code>&#39;id&#39;</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>pandas.DataFrame</code></td>
+      <td><p>DataFrame containing collection information.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Exceptions:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>ConnectionError</code></td>
+        <td><p>If there's an issue connecting to the API.</p></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_collection_list</span><span class="p">(</span>
+    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;</span><span class="p">,</span>
+    <span class="n">detailed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">filter_by</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">sort_by</span><span class="o">=</span><span class="s2">&quot;id&quot;</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieves and displays the list of available collections from Planetary Computer.</span>
+
+<span class="sd">    This function connects to the Planetary Computer STAC API and retrieves the</span>
+<span class="sd">    list of all available collections, with options to filter and sort the results.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        endpoint (str, optional): STAC API endpoint URL.</span>
+<span class="sd">            Defaults to &quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;.</span>
+<span class="sd">        detailed (bool, optional): Whether to return detailed information for each</span>
+<span class="sd">            collection. If False, returns only basic info. Defaults to False.</span>
+<span class="sd">        filter_by (dict, optional): Dictionary of field:value pairs to filter</span>
+<span class="sd">            collections. For example, {&quot;license&quot;: &quot;CC-BY-4.0&quot;}. Defaults to None.</span>
+<span class="sd">        sort_by (str, optional): Field to sort the collections by.</span>
+<span class="sd">            Defaults to &quot;id&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas.DataFrame: DataFrame containing collection information.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ConnectionError: If there&#39;s an issue connecting to the API.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Initialize the STAC client</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">catalog</span> <span class="o">=</span> <span class="n">Client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">endpoint</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ConnectionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to connect to STAC API at </span><span class="si">{</span><span class="n">endpoint</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Get all collections</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">collections</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">catalog</span><span class="o">.</span><span class="n">get_collections</span><span class="p">())</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error retrieving collections: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Basic info to extract from all collections</span>
+    <span class="n">collection_info</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Extract information based on detail level</span>
+    <span class="k">for</span> <span class="n">collection</span> <span class="ow">in</span> <span class="n">collections</span><span class="p">:</span>
+        <span class="c1"># Basic information always included</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">collection</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s2">&quot;title&quot;</span><span class="p">:</span> <span class="n">collection</span><span class="o">.</span><span class="n">title</span> <span class="ow">or</span> <span class="s2">&quot;No title&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">collection</span><span class="o">.</span><span class="n">description</span><span class="p">[:</span><span class="mi">100</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;...&quot;</span>
+                <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">description</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">collection</span><span class="o">.</span><span class="n">description</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">100</span>
+                <span class="k">else</span> <span class="n">collection</span><span class="o">.</span><span class="n">description</span>
+            <span class="p">),</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Add detailed information if requested</span>
+        <span class="k">if</span> <span class="n">detailed</span><span class="p">:</span>
+            <span class="c1"># Get temporal extent if available</span>
+            <span class="n">temporal_extent</span> <span class="o">=</span> <span class="s2">&quot;Unknown&quot;</span>
+            <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">extent</span> <span class="ow">and</span> <span class="n">collection</span><span class="o">.</span><span class="n">extent</span><span class="o">.</span><span class="n">temporal</span><span class="p">:</span>
+                <span class="n">interval</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">collection</span><span class="o">.</span><span class="n">extent</span><span class="o">.</span><span class="n">temporal</span><span class="o">.</span><span class="n">intervals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">extent</span><span class="o">.</span><span class="n">temporal</span><span class="o">.</span><span class="n">intervals</span>
+                    <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">interval</span><span class="p">:</span>
+                    <span class="n">start</span> <span class="o">=</span> <span class="n">interval</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;Unknown Start&quot;</span>
+                    <span class="n">end</span> <span class="o">=</span> <span class="n">interval</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;Present&quot;</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">):</span>
+                        <span class="n">start</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">end</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">):</span>
+                        <span class="n">end</span> <span class="o">=</span> <span class="n">end</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">temporal_extent</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">start</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">end</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="c1"># Add additional details</span>
+            <span class="n">info</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;license&quot;</span><span class="p">:</span> <span class="n">collection</span><span class="o">.</span><span class="n">license</span> <span class="ow">or</span> <span class="s2">&quot;Unknown&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;keywords&quot;</span><span class="p">:</span> <span class="p">(</span>
+                        <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">collection</span><span class="o">.</span><span class="n">keywords</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">keywords</span>
+                        <span class="k">else</span> <span class="s2">&quot;None&quot;</span>
+                    <span class="p">),</span>
+                    <span class="s2">&quot;temporal_extent&quot;</span><span class="p">:</span> <span class="n">temporal_extent</span><span class="p">,</span>
+                    <span class="s2">&quot;asset_count&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">collection</span><span class="o">.</span><span class="n">assets</span><span class="p">)</span> <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">assets</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;providers&quot;</span><span class="p">:</span> <span class="p">(</span>
+                        <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">p</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">collection</span><span class="o">.</span><span class="n">providers</span><span class="p">])</span>
+                        <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">providers</span>
+                        <span class="k">else</span> <span class="s2">&quot;Unknown&quot;</span>
+                    <span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Add spatial extent if available</span>
+            <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">extent</span> <span class="ow">and</span> <span class="n">collection</span><span class="o">.</span><span class="n">extent</span><span class="o">.</span><span class="n">spatial</span><span class="p">:</span>
+                <span class="n">info</span><span class="p">[</span><span class="s2">&quot;bbox&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">collection</span><span class="o">.</span><span class="n">extent</span><span class="o">.</span><span class="n">spatial</span><span class="o">.</span><span class="n">bboxes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">collection</span><span class="o">.</span><span class="n">extent</span><span class="o">.</span><span class="n">spatial</span><span class="o">.</span><span class="n">bboxes</span>
+                    <span class="k">else</span> <span class="s2">&quot;Unknown&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">collection_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">info</span><span class="p">)</span>
+
+    <span class="c1"># Convert to DataFrame for easier filtering and sorting</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">collection_info</span><span class="p">)</span>
+
+    <span class="c1"># Apply filtering if specified</span>
+    <span class="k">if</span> <span class="n">filter_by</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">field</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">filter_by</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">case</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">na</span><span class="o">=</span><span class="kc">False</span><span class="p">)]</span>
+
+    <span class="c1"># Apply sorting</span>
+    <span class="k">if</span> <span class="n">sort_by</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="n">sort_by</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrieved </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> collections from Planetary Computer&quot;</span><span class="p">)</span>
+
+    <span class="c1"># # Print a nicely formatted table</span>
+    <span class="c1"># if not df.empty:</span>
+    <span class="c1">#     print(&quot;\nAvailable collections:&quot;)</span>
+    <span class="c1">#     print(tabulate(df, headers=&quot;keys&quot;, tablefmt=&quot;grid&quot;, showindex=False))</span>
+
+    <span class="k">return</span> <span class="n">df</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.pc_stac_download" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">pc_stac_download</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">asset_keys</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sign_urls</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+
+<a href="#geoai.download.pc_stac_download" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Download assets from STAC items retrieved from the Planetary Computer.</p>
+<p>This function downloads specified assets from a list of STAC items to the
+specified output directory. It supports parallel downloads and can skip
+already downloaded files.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>items</code></td>
+        <td><code>list or pystac.Item</code></td>
+        <td><p>STAC Item object or list of STAC Item objects.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>output_dir</code></td>
+        <td><code>str</code></td>
+        <td><p>Directory where assets will be saved.
+Defaults to current directory.</p></td>
+        <td><code>&#39;.&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>asset_keys</code></td>
+        <td><code>list</code></td>
+        <td><p>List of asset keys to download. If None,
+downloads all available assets. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>max_workers</code></td>
+        <td><code>int</code></td>
+        <td><p>Maximum number of concurrent download threads.
+Defaults to 4.</p></td>
+        <td><code>4</code></td>
+      </tr>
+      <tr>
+        <td><code>skip_existing</code></td>
+        <td><code>bool</code></td>
+        <td><p>Skip download if the file already exists.
+Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>sign_urls</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to sign URLs for authenticated access.
+Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>dict</code></td>
+      <td><p>Dictionary mapping STAC item IDs to dictionaries of their downloaded
+    assets {asset_key: file_path}.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Exceptions:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>TypeError</code></td>
+        <td><p>If items is not a STAC Item or list of STAC Items.</p></td>
+      </tr>
+      <tr>
+        <td><code>IOError</code></td>
+        <td><p>If there's an error writing the downloaded assets to disk.</p></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_stac_download</span><span class="p">(</span>
+    <span class="n">items</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
+    <span class="n">asset_keys</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">sign_urls</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Download assets from STAC items retrieved from the Planetary Computer.</span>
+
+<span class="sd">    This function downloads specified assets from a list of STAC items to the</span>
+<span class="sd">    specified output directory. It supports parallel downloads and can skip</span>
+<span class="sd">    already downloaded files.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        items (list or pystac.Item): STAC Item object or list of STAC Item objects.</span>
+<span class="sd">        output_dir (str, optional): Directory where assets will be saved.</span>
+<span class="sd">            Defaults to current directory.</span>
+<span class="sd">        asset_keys (list, optional): List of asset keys to download. If None,</span>
+<span class="sd">            downloads all available assets. Defaults to None.</span>
+<span class="sd">        max_workers (int, optional): Maximum number of concurrent download threads.</span>
+<span class="sd">            Defaults to 4.</span>
+<span class="sd">        skip_existing (bool, optional): Skip download if the file already exists.</span>
+<span class="sd">            Defaults to True.</span>
+<span class="sd">        sign_urls (bool, optional): Whether to sign URLs for authenticated access.</span>
+<span class="sd">            Defaults to True.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Dictionary mapping STAC item IDs to dictionaries of their downloaded</span>
+<span class="sd">            assets {asset_key: file_path}.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If items is not a STAC Item or list of STAC Items.</span>
+<span class="sd">        IOError: If there&#39;s an error writing the downloaded assets to disk.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">pystac</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span><span class="p">,</span> <span class="n">as_completed</span>
+
+    <span class="c1"># Handle single item case</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="p">):</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="n">items</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;items must be a STAC Item or list of STAC Items&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create output directory if it doesn&#39;t exist</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Function to sign URLs if needed</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_signed_url</span><span class="p">(</span><span class="n">href</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sign_urls</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">href</span>
+
+        <span class="c1"># Planetary Computer typically requires signing URLs for accessing data</span>
+        <span class="c1"># Check if the URL is from Microsoft Planetary Computer</span>
+        <span class="k">if</span> <span class="s2">&quot;planetarycomputer&quot;</span> <span class="ow">in</span> <span class="n">href</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">sign_url</span> <span class="o">=</span> <span class="s2">&quot;https://planetarycomputer.microsoft.com/api/sas/v1/sign&quot;</span>
+                <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sign_url</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;href&quot;</span><span class="p">:</span> <span class="n">href</span><span class="p">})</span>
+                <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;href&quot;</span><span class="p">,</span> <span class="n">href</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Failed to sign URL </span><span class="si">{</span><span class="n">href</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">href</span>
+        <span class="k">return</span> <span class="n">href</span>
+
+    <span class="c1"># Function to download a single asset</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">download_asset</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">asset</span><span class="p">):</span>
+        <span class="n">item_id</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span>
+
+        <span class="c1"># Get the asset URL and sign it if needed</span>
+        <span class="n">asset_url</span> <span class="o">=</span> <span class="n">get_signed_url</span><span class="p">(</span><span class="n">asset</span><span class="o">.</span><span class="n">href</span><span class="p">)</span>
+
+        <span class="c1"># Determine output filename</span>
+        <span class="k">if</span> <span class="n">asset</span><span class="o">.</span><span class="n">media_type</span><span class="p">:</span>
+            <span class="c1"># Use appropriate file extension based on media type</span>
+            <span class="k">if</span> <span class="s2">&quot;tiff&quot;</span> <span class="ow">in</span> <span class="n">asset</span><span class="o">.</span><span class="n">media_type</span> <span class="ow">or</span> <span class="s2">&quot;geotiff&quot;</span> <span class="ow">in</span> <span class="n">asset</span><span class="o">.</span><span class="n">media_type</span><span class="p">:</span>
+                <span class="n">ext</span> <span class="o">=</span> <span class="s2">&quot;.tif&quot;</span>
+            <span class="k">elif</span> <span class="s2">&quot;jpeg&quot;</span> <span class="ow">in</span> <span class="n">asset</span><span class="o">.</span><span class="n">media_type</span><span class="p">:</span>
+                <span class="n">ext</span> <span class="o">=</span> <span class="s2">&quot;.jpg&quot;</span>
+            <span class="k">elif</span> <span class="s2">&quot;png&quot;</span> <span class="ow">in</span> <span class="n">asset</span><span class="o">.</span><span class="n">media_type</span><span class="p">:</span>
+                <span class="n">ext</span> <span class="o">=</span> <span class="s2">&quot;.png&quot;</span>
+            <span class="k">elif</span> <span class="s2">&quot;json&quot;</span> <span class="ow">in</span> <span class="n">asset</span><span class="o">.</span><span class="n">media_type</span><span class="p">:</span>
+                <span class="n">ext</span> <span class="o">=</span> <span class="s2">&quot;.json&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Default extension based on the original URL</span>
+                <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">asset_url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;?&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;.data&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Default extension based on the original URL</span>
+            <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">asset_url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;?&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;.data&quot;</span>
+
+        <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Skip if file exists and skip_existing is True</span>
+        <span class="k">if</span> <span class="n">skip_existing</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_path</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipping existing asset: </span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">output_path</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Download the asset with progress bar</span>
+            <span class="k">with</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">asset_url</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">r</span><span class="p">:</span>
+                <span class="n">r</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+                <span class="n">total_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;content-length&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span>
+                        <span class="n">total</span><span class="o">=</span><span class="n">total_size</span><span class="p">,</span>
+                        <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span>
+                        <span class="n">unit_scale</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                        <span class="n">unit_divisor</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+                        <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Downloading </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">ncols</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">r</span><span class="o">.</span><span class="n">iter_content</span><span class="p">(</span><span class="n">chunk_size</span><span class="o">=</span><span class="mi">8192</span><span class="p">):</span>
+                            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+                            <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">))</span>
+
+            <span class="k">return</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">output_path</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error downloading </span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2"> for item </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_path</span><span class="p">):</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>  <span class="c1"># Clean up partial download</span>
+            <span class="k">return</span> <span class="n">asset_key</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="c1"># Process all items and their assets</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+        <span class="n">item_assets</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">item_id</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing STAC item: </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Determine which assets to download</span>
+        <span class="k">if</span> <span class="n">asset_keys</span><span class="p">:</span>
+            <span class="n">assets_to_download</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">asset_keys</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">assets_to_download</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Warning: None of the specified asset keys </span><span class="si">{</span><span class="n">asset_keys</span><span class="si">}</span><span class="s2"> found in item </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available asset keys: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">assets_to_download</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">assets</span>
+
+        <span class="c1"># Download assets concurrently</span>
+        <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">max_workers</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+            <span class="c1"># Submit all download tasks</span>
+            <span class="n">future_to_asset</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">download_asset</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">asset</span><span class="p">):</span> <span class="p">(</span>
+                    <span class="n">asset_key</span><span class="p">,</span>
+                    <span class="n">asset</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">asset</span> <span class="ow">in</span> <span class="n">assets_to_download</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="p">}</span>
+
+            <span class="c1"># Process results as they complete</span>
+            <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">future_to_asset</span><span class="p">):</span>
+                <span class="n">asset_key</span><span class="p">,</span> <span class="n">asset</span> <span class="o">=</span> <span class="n">future_to_asset</span><span class="p">[</span><span class="n">future</span><span class="p">]</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">key</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+                        <span class="n">item_assets</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Error processing asset </span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2"> for item </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+
+        <span class="n">results</span><span class="p">[</span><span class="n">item_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">item_assets</span>
+
+    <span class="c1"># Count total downloaded assets</span>
+    <span class="n">total_assets</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">assets</span><span class="p">)</span> <span class="k">for</span> <span class="n">assets</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Downloaded </span><span class="si">{</span><span class="n">total_assets</span><span class="si">}</span><span class="s2"> assets for </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)</span><span class="si">}</span><span class="s2"> items&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.pc_stac_search" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">pc_stac_search</span><span class="p">(</span><span class="n">collection</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">time_range</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">query</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">max_items</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="s1">&#39;https://planetarycomputer.microsoft.com/api/stac/v1&#39;</span><span class="p">)</span></code>
+
+
+<a href="#geoai.download.pc_stac_search" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Search for STAC items in the Planetary Computer catalog.</p>
+<p>This function queries the Planetary Computer STAC API to find items matching
+the specified criteria, including collection, bounding box, time range, and
+additional query parameters.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>collection</code></td>
+        <td><code>str</code></td>
+        <td><p>The STAC collection ID to search within.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>bbox</code></td>
+        <td><code>list</code></td>
+        <td><p>Bounding box coordinates [west, south, east, north].
+Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>time_range</code></td>
+        <td><code>str or tuple</code></td>
+        <td><p>Time range as a string "start/end" or
+a tuple of (start, end) datetime objects. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>query</code></td>
+        <td><code>dict</code></td>
+        <td><p>Additional query parameters for filtering.
+Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>limit</code></td>
+        <td><code>int</code></td>
+        <td><p>Number of items to return per page. Defaults to 10.</p></td>
+        <td><code>10</code></td>
+      </tr>
+      <tr>
+        <td><code>max_items</code></td>
+        <td><code>int</code></td>
+        <td><p>Maximum total number of items to return.
+Defaults to None (returns all matching items).</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>endpoint</code></td>
+        <td><code>str</code></td>
+        <td><p>STAC API endpoint URL.
+Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".</p></td>
+        <td><code>&#39;https://planetarycomputer.microsoft.com/api/stac/v1&#39;</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>list</code></td>
+      <td><p>List of STAC Item objects matching the search criteria.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Exceptions:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>ValueError</code></td>
+        <td><p>If invalid parameters are provided.</p></td>
+      </tr>
+      <tr>
+        <td><code>ConnectionError</code></td>
+        <td><p>If there's an issue connecting to the API.</p></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_stac_search</span><span class="p">(</span>
+    <span class="n">collection</span><span class="p">,</span>
+    <span class="n">bbox</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">time_range</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">query</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">limit</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">max_items</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Search for STAC items in the Planetary Computer catalog.</span>
+
+<span class="sd">    This function queries the Planetary Computer STAC API to find items matching</span>
+<span class="sd">    the specified criteria, including collection, bounding box, time range, and</span>
+<span class="sd">    additional query parameters.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        collection (str): The STAC collection ID to search within.</span>
+<span class="sd">        bbox (list, optional): Bounding box coordinates [west, south, east, north].</span>
+<span class="sd">            Defaults to None.</span>
+<span class="sd">        time_range (str or tuple, optional): Time range as a string &quot;start/end&quot; or</span>
+<span class="sd">            a tuple of (start, end) datetime objects. Defaults to None.</span>
+<span class="sd">        query (dict, optional): Additional query parameters for filtering.</span>
+<span class="sd">            Defaults to None.</span>
+<span class="sd">        limit (int, optional): Number of items to return per page. Defaults to 10.</span>
+<span class="sd">        max_items (int, optional): Maximum total number of items to return.</span>
+<span class="sd">            Defaults to None (returns all matching items).</span>
+<span class="sd">        endpoint (str, optional): STAC API endpoint URL.</span>
+<span class="sd">            Defaults to &quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: List of STAC Item objects matching the search criteria.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If invalid parameters are provided.</span>
+<span class="sd">        ConnectionError: If there&#39;s an issue connecting to the API.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">datetime</span>
+
+    <span class="c1"># Initialize the STAC client</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">catalog</span> <span class="o">=</span> <span class="n">Client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">endpoint</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ConnectionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to connect to STAC API at </span><span class="si">{</span><span class="n">endpoint</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Process time_range if provided</span>
+    <span class="k">if</span> <span class="n">time_range</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">time_range</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">time_range</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="c1"># Convert datetime objects to ISO format strings</span>
+            <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">time_range</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">):</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">end</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">):</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="n">end</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+            <span class="n">time_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">start</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">end</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">time_range</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">time_str</span> <span class="o">=</span> <span class="n">time_range</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;time_range must be a &#39;start/end&#39; string or tuple of (start, end)&quot;</span>
+            <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">time_str</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># Create the search object</span>
+    <span class="n">search</span> <span class="o">=</span> <span class="n">catalog</span><span class="o">.</span><span class="n">search</span><span class="p">(</span>
+        <span class="n">collections</span><span class="o">=</span><span class="p">[</span><span class="n">collection</span><span class="p">],</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">datetime</span><span class="o">=</span><span class="n">time_str</span><span class="p">,</span> <span class="n">query</span><span class="o">=</span><span class="n">query</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">limit</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Collect the items</span>
+    <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Use max_items if specified, otherwise get all items</span>
+        <span class="k">if</span> <span class="n">max_items</span><span class="p">:</span>
+            <span class="n">items_gen</span> <span class="o">=</span> <span class="n">search</span><span class="o">.</span><span class="n">get_items</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items_gen</span><span class="p">:</span>
+                <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">max_items</span><span class="p">:</span>
+                    <span class="k">break</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">items</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">search</span><span class="o">.</span><span class="n">get_items</span><span class="p">())</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error retrieving search results: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span><span class="si">}</span><span class="s2"> items matching search criteria&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">items</span>
 </code></pre></div>
         </details>
     </div>
