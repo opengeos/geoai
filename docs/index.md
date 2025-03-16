@@ -100,7 +100,3 @@ We welcome contributions of all kinds! See our [contributing guide](https://geoa
 ## 📄 License
 
 GeoAI is free and open source software, licensed under the MIT License.
-
-## 💖 Acknowledgment
-
-Some of the pre-trained models used in the geoai package are adapted from the [ArcGIS Living Atlas](https://livingatlas.arcgis.com/en/browse/?q=dlpk#d=2&q=dlpk). Credits to Esri for making these models available.
