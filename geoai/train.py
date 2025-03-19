@@ -571,32 +571,50 @@ def train_MaskRCNN_model(
     output_dir,
     num_channels=3,
     pretrained=True,
+    pretrained_model_path=None,
     batch_size=4,
     num_epochs=10,
     learning_rate=0.005,
     seed=42,
     val_split=0.2,
     visualize=False,
+    resume_training=False,
 ):
-    """
-    Train and evaluate Mask R-CNN model for instance segmentation.
+    """Train and evaluate Mask R-CNN model for instance segmentation.
+
+    This function trains a Mask R-CNN model for instance segmentation using the
+    provided dataset. It supports loading a pretrained model to either initialize
+    the backbone or to continue training from a specific checkpoint.
 
     Args:
         images_dir (str): Directory containing image GeoTIFF files.
         labels_dir (str): Directory containing label GeoTIFF files.
         output_dir (str): Directory to save model checkpoints and results.
         num_channels (int, optional): Number of input channels. If None, auto-detected.
-        pretrained (bool): Whether to use pretrained backbone.
-        batch_size (int): Batch size for training.
-        num_epochs (int): Number of training epochs.
-        learning_rate (float): Initial learning rate.
-        seed (int): Random seed for reproducibility.
-        val_split (float): Fraction of data to use for validation (0-1).
+            Defaults to 3.
+        pretrained (bool): Whether to use pretrained backbone. This is ignored if
+            pretrained_model_path is provided. Defaults to True.
+        pretrained_model_path (str, optional): Path to a .pth file to load as a
+            pretrained model for continued training. Defaults to None.
+        batch_size (int): Batch size for training. Defaults to 4.
+        num_epochs (int): Number of training epochs. Defaults to 10.
+        learning_rate (float): Initial learning rate. Defaults to 0.005.
+        seed (int): Random seed for reproducibility. Defaults to 42.
+        val_split (float): Fraction of data to use for validation (0-1). Defaults to 0.2.
         visualize (bool): Whether to generate visualizations of model predictions.
+            Defaults to False.
+        resume_training (bool): If True and pretrained_model_path is provided,
+            will try to load optimizer and scheduler states as well. Defaults to False.
 
     Returns:
         None: Model weights are saved to output_dir.
+
+    Raises:
+        FileNotFoundError: If pretrained_model_path is provided but file doesn't exist.
+        RuntimeError: If there's an issue loading the pretrained model.
     """
+
+    import datetime
 
     # Set random seeds for reproducibility
     torch.manual_seed(seed)
@@ -694,9 +712,49 @@ def train_MaskRCNN_model(
     # Set up learning rate scheduler
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8)
 
-    # Training loop
+    # Initialize training variables
+    start_epoch = 0
     best_iou = 0
-    for epoch in range(num_epochs):
+
+    # Load pretrained model if provided
+    if pretrained_model_path:
+        if not os.path.exists(pretrained_model_path):
+            raise FileNotFoundError(
+                f"Pretrained model file not found: {pretrained_model_path}"
+            )
+
+        print(f"Loading pretrained model from: {pretrained_model_path}")
+        try:
+            # Check if it's a full checkpoint or just model weights
+            checkpoint = torch.load(pretrained_model_path, map_location=device)
+
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                # It's a checkpoint with extra information
+                model.load_state_dict(checkpoint["model_state_dict"])
+
+                if resume_training:
+                    # Resume from checkpoint
+                    start_epoch = checkpoint.get("epoch", 0) + 1
+                    best_iou = checkpoint.get("best_iou", 0)
+
+                    if "optimizer_state_dict" in checkpoint:
+                        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+                    if "scheduler_state_dict" in checkpoint:
+                        lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+                    print(f"Resuming training from epoch {start_epoch}")
+                    print(f"Previous best IoU: {best_iou:.4f}")
+            else:
+                # Assume it's just the model weights
+                model.load_state_dict(checkpoint)
+
+            print("Pretrained model loaded successfully")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load pretrained model: {str(e)}")
+
+    # Training loop
+    for epoch in range(start_epoch, num_epochs):
         # Train one epoch
         train_loss = train_one_epoch(model, optimizer, train_loader, device, epoch)
 
@@ -718,7 +776,7 @@ def train_MaskRCNN_model(
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
 
         # Save checkpoint every 10 epochs
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 10 == 0 or epoch == num_epochs - 1:
             torch.save(
                 {
                     "epoch": epoch,
@@ -732,6 +790,18 @@ def train_MaskRCNN_model(
 
     # Save final model
     torch.save(model.state_dict(), os.path.join(output_dir, "final_model.pth"))
+
+    # Save full checkpoint of final state
+    torch.save(
+        {
+            "epoch": num_epochs - 1,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": lr_scheduler.state_dict(),
+            "best_iou": best_iou,
+        },
+        os.path.join(output_dir, "final_checkpoint.pth"),
+    )
 
     # Load best model for evaluation and visualization
     model.load_state_dict(torch.load(os.path.join(output_dir, "best_model.pth")))
@@ -752,7 +822,23 @@ def train_MaskRCNN_model(
             num_samples=5,
             output_dir=os.path.join(output_dir, "visualizations"),
         )
-    print(f"Training complete!. Trained model saved to {output_dir}")
+
+    # Save training summary
+    with open(os.path.join(output_dir, "training_summary.txt"), "w") as f:
+        f.write(
+            f"Training completed on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        )
+        f.write(f"Total epochs: {num_epochs}\n")
+        f.write(f"Best validation IoU: {best_iou:.4f}\n")
+        f.write(f"Final validation IoU: {final_metrics['IoU']:.4f}\n")
+        f.write(f"Final validation loss: {final_metrics['loss']:.4f}\n")
+
+        if pretrained_model_path:
+            f.write(f"Started from pretrained model: {pretrained_model_path}\n")
+            if resume_training:
+                f.write(f"Resumed training from epoch {start_epoch}\n")
+
+    print(f"Training complete! Trained model saved to {output_dir}")
 
 
 def inference_on_geotiff(
