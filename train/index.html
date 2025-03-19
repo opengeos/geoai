@@ -22,7 +22,7 @@
       
       
       <link rel="icon" href="../assets/logo.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.8">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
     
     
       
@@ -30,7 +30,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.4af4bdda.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -3216,7 +3216,7 @@ ToTensor        </code>
 
 
 <h2 id="geoai.train.train_MaskRCNN_model" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">train_MaskRCNN_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">train_MaskRCNN_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">pretrained_model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 
 <a href="#geoai.train.train_MaskRCNN_model" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -3224,6 +3224,9 @@ ToTensor        </code>
     <div class="doc doc-contents ">
 
       <p>Train and evaluate Mask R-CNN model for instance segmentation.</p>
+<p>This function trains a Mask R-CNN model for instance segmentation using the
+provided dataset. It supports loading a pretrained model to either initialize
+the backbone or to continue training from a specific checkpoint.</p>
 
 <p><strong>Parameters:</strong></p>
 <table>
@@ -3257,49 +3260,66 @@ ToTensor        </code>
       <tr>
         <td><code>num_channels</code></td>
         <td><code>int</code></td>
-        <td><p>Number of input channels. If None, auto-detected.</p></td>
+        <td><p>Number of input channels. If None, auto-detected.
+Defaults to 3.</p></td>
         <td><code>3</code></td>
       </tr>
       <tr>
         <td><code>pretrained</code></td>
         <td><code>bool</code></td>
-        <td><p>Whether to use pretrained backbone.</p></td>
+        <td><p>Whether to use pretrained backbone. This is ignored if
+pretrained_model_path is provided. Defaults to True.</p></td>
         <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>pretrained_model_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to a .pth file to load as a
+pretrained model for continued training. Defaults to None.</p></td>
+        <td><code>None</code></td>
       </tr>
       <tr>
         <td><code>batch_size</code></td>
         <td><code>int</code></td>
-        <td><p>Batch size for training.</p></td>
+        <td><p>Batch size for training. Defaults to 4.</p></td>
         <td><code>4</code></td>
       </tr>
       <tr>
         <td><code>num_epochs</code></td>
         <td><code>int</code></td>
-        <td><p>Number of training epochs.</p></td>
+        <td><p>Number of training epochs. Defaults to 10.</p></td>
         <td><code>10</code></td>
       </tr>
       <tr>
         <td><code>learning_rate</code></td>
         <td><code>float</code></td>
-        <td><p>Initial learning rate.</p></td>
+        <td><p>Initial learning rate. Defaults to 0.005.</p></td>
         <td><code>0.005</code></td>
       </tr>
       <tr>
         <td><code>seed</code></td>
         <td><code>int</code></td>
-        <td><p>Random seed for reproducibility.</p></td>
+        <td><p>Random seed for reproducibility. Defaults to 42.</p></td>
         <td><code>42</code></td>
       </tr>
       <tr>
         <td><code>val_split</code></td>
         <td><code>float</code></td>
-        <td><p>Fraction of data to use for validation (0-1).</p></td>
+        <td><p>Fraction of data to use for validation (0-1). Defaults to 0.2.</p></td>
         <td><code>0.2</code></td>
       </tr>
       <tr>
         <td><code>visualize</code></td>
         <td><code>bool</code></td>
-        <td><p>Whether to generate visualizations of model predictions.</p></td>
+        <td><p>Whether to generate visualizations of model predictions.
+Defaults to False.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
+        <td><code>resume_training</code></td>
+        <td><code>bool</code></td>
+        <td><p>If True and pretrained_model_path is provided,
+will try to load optimizer and scheduler states as well. Defaults to False.</p></td>
         <td><code>False</code></td>
       </tr>
   </tbody>
@@ -3319,6 +3339,25 @@ ToTensor        </code>
     </tr>
   </tbody>
 </table>
+<p><strong>Exceptions:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>FileNotFoundError</code></td>
+        <td><p>If pretrained_model_path is provided but file doesn't exist.</p></td>
+      </tr>
+      <tr>
+        <td><code>RuntimeError</code></td>
+        <td><p>If there's an issue loading the pretrained model.</p></td>
+      </tr>
+  </tbody>
+</table>
         <details class="quote">
           <summary>Source code in <code>geoai/train.py</code></summary>
           <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_MaskRCNN_model</span><span class="p">(</span>
@@ -3327,32 +3366,50 @@ ToTensor        </code>
     <span class="n">output_dir</span><span class="p">,</span>
     <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
     <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">pretrained_model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span>
     <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
     <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
     <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Train and evaluate Mask R-CNN model for instance segmentation.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Train and evaluate Mask R-CNN model for instance segmentation.</span>
+
+<span class="sd">    This function trains a Mask R-CNN model for instance segmentation using the</span>
+<span class="sd">    provided dataset. It supports loading a pretrained model to either initialize</span>
+<span class="sd">    the backbone or to continue training from a specific checkpoint.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        images_dir (str): Directory containing image GeoTIFF files.</span>
 <span class="sd">        labels_dir (str): Directory containing label GeoTIFF files.</span>
 <span class="sd">        output_dir (str): Directory to save model checkpoints and results.</span>
 <span class="sd">        num_channels (int, optional): Number of input channels. If None, auto-detected.</span>
-<span class="sd">        pretrained (bool): Whether to use pretrained backbone.</span>
-<span class="sd">        batch_size (int): Batch size for training.</span>
-<span class="sd">        num_epochs (int): Number of training epochs.</span>
-<span class="sd">        learning_rate (float): Initial learning rate.</span>
-<span class="sd">        seed (int): Random seed for reproducibility.</span>
-<span class="sd">        val_split (float): Fraction of data to use for validation (0-1).</span>
+<span class="sd">            Defaults to 3.</span>
+<span class="sd">        pretrained (bool): Whether to use pretrained backbone. This is ignored if</span>
+<span class="sd">            pretrained_model_path is provided. Defaults to True.</span>
+<span class="sd">        pretrained_model_path (str, optional): Path to a .pth file to load as a</span>
+<span class="sd">            pretrained model for continued training. Defaults to None.</span>
+<span class="sd">        batch_size (int): Batch size for training. Defaults to 4.</span>
+<span class="sd">        num_epochs (int): Number of training epochs. Defaults to 10.</span>
+<span class="sd">        learning_rate (float): Initial learning rate. Defaults to 0.005.</span>
+<span class="sd">        seed (int): Random seed for reproducibility. Defaults to 42.</span>
+<span class="sd">        val_split (float): Fraction of data to use for validation (0-1). Defaults to 0.2.</span>
 <span class="sd">        visualize (bool): Whether to generate visualizations of model predictions.</span>
+<span class="sd">            Defaults to False.</span>
+<span class="sd">        resume_training (bool): If True and pretrained_model_path is provided,</span>
+<span class="sd">            will try to load optimizer and scheduler states as well. Defaults to False.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        None: Model weights are saved to output_dir.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        FileNotFoundError: If pretrained_model_path is provided but file doesn&#39;t exist.</span>
+<span class="sd">        RuntimeError: If there&#39;s an issue loading the pretrained model.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">datetime</span>
 
     <span class="c1"># Set random seeds for reproducibility</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -3450,9 +3507,49 @@ ToTensor        </code>
     <span class="c1"># Set up learning rate scheduler</span>
     <span class="n">lr_scheduler</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">StepLR</span><span class="p">(</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">step_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">gamma</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
 
-    <span class="c1"># Training loop</span>
+    <span class="c1"># Initialize training variables</span>
+    <span class="n">start_epoch</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">best_iou</span> <span class="o">=</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_epochs</span><span class="p">):</span>
+
+    <span class="c1"># Load pretrained model if provided</span>
+    <span class="k">if</span> <span class="n">pretrained_model_path</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">pretrained_model_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Pretrained model file not found: </span><span class="si">{</span><span class="n">pretrained_model_path</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading pretrained model from: </span><span class="si">{</span><span class="n">pretrained_model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Check if it&#39;s a full checkpoint or just model weights</span>
+            <span class="n">checkpoint</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">pretrained_model_path</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;model_state_dict&quot;</span> <span class="ow">in</span> <span class="n">checkpoint</span><span class="p">:</span>
+                <span class="c1"># It&#39;s a checkpoint with extra information</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">[</span><span class="s2">&quot;model_state_dict&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">resume_training</span><span class="p">:</span>
+                    <span class="c1"># Resume from checkpoint</span>
+                    <span class="n">start_epoch</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;epoch&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+                    <span class="n">best_iou</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;best_iou&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="s2">&quot;optimizer_state_dict&quot;</span> <span class="ow">in</span> <span class="n">checkpoint</span><span class="p">:</span>
+                        <span class="n">optimizer</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">[</span><span class="s2">&quot;optimizer_state_dict&quot;</span><span class="p">])</span>
+
+                    <span class="k">if</span> <span class="s2">&quot;scheduler_state_dict&quot;</span> <span class="ow">in</span> <span class="n">checkpoint</span><span class="p">:</span>
+                        <span class="n">lr_scheduler</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">[</span><span class="s2">&quot;scheduler_state_dict&quot;</span><span class="p">])</span>
+
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resuming training from epoch </span><span class="si">{</span><span class="n">start_epoch</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Previous best IoU: </span><span class="si">{</span><span class="n">best_iou</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Assume it&#39;s just the model weights</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">)</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Pretrained model loaded successfully&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load pretrained model: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Training loop</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_epoch</span><span class="p">,</span> <span class="n">num_epochs</span><span class="p">):</span>
         <span class="c1"># Train one epoch</span>
         <span class="n">train_loss</span> <span class="o">=</span> <span class="n">train_one_epoch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
 
@@ -3474,7 +3571,7 @@ ToTensor        </code>
             <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;best_model.pth&quot;</span><span class="p">))</span>
 
         <span class="c1"># Save checkpoint every 10 epochs</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">epoch</span> <span class="o">==</span> <span class="n">num_epochs</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
                 <span class="p">{</span>
                     <span class="s2">&quot;epoch&quot;</span><span class="p">:</span> <span class="n">epoch</span><span class="p">,</span>
@@ -3488,6 +3585,18 @@ ToTensor        </code>
 
     <span class="c1"># Save final model</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;final_model.pth&quot;</span><span class="p">))</span>
+
+    <span class="c1"># Save full checkpoint of final state</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;epoch&quot;</span><span class="p">:</span> <span class="n">num_epochs</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;model_state_dict&quot;</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+            <span class="s2">&quot;optimizer_state_dict&quot;</span><span class="p">:</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+            <span class="s2">&quot;scheduler_state_dict&quot;</span><span class="p">:</span> <span class="n">lr_scheduler</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+            <span class="s2">&quot;best_iou&quot;</span><span class="p">:</span> <span class="n">best_iou</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;final_checkpoint.pth&quot;</span><span class="p">),</span>
+    <span class="p">)</span>
 
     <span class="c1"># Load best model for evaluation and visualization</span>
     <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;best_model.pth&quot;</span><span class="p">)))</span>
@@ -3508,7 +3617,23 @@ ToTensor        </code>
             <span class="n">num_samples</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
             <span class="n">output_dir</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;visualizations&quot;</span><span class="p">),</span>
         <span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training complete!. Trained model saved to </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Save training summary</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;training_summary.txt&quot;</span><span class="p">),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Training completed on: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1"> %H:%M:%S&#39;</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total epochs: </span><span class="si">{</span><span class="n">num_epochs</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best validation IoU: </span><span class="si">{</span><span class="n">best_iou</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final validation IoU: </span><span class="si">{</span><span class="n">final_metrics</span><span class="p">[</span><span class="s1">&#39;IoU&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final validation loss: </span><span class="si">{</span><span class="n">final_metrics</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pretrained_model_path</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Started from pretrained model: </span><span class="si">{</span><span class="n">pretrained_model_path</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">resume_training</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resumed training from epoch </span><span class="si">{</span><span class="n">start_epoch</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training complete! Trained model saved to </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
         </details>
     </div>
