@@ -1057,7 +1057,7 @@ def pc_item_asset_list(item_url):
     return list(signed_item.assets.keys())
 
 
-def read_pc_item_asset(item_url, asset_key, output=None):
+def read_pc_item_asset(item_url, asset_key, output=None, as_cog=True, **kwargs):
     """
     Read a specific asset from a STAC item in the Planetary Computer catalog.
 
@@ -1065,6 +1065,7 @@ def read_pc_item_asset(item_url, asset_key, output=None):
         item_url (str): The URL of the STAC item.
         asset_key (str): The key of the asset to read.
         output (str, optional): If specified, the path to save the asset as a raster file.
+        as_cog (bool, optional): If True, save the asset as a Cloud Optimized GeoTIFF (COG).
 
     Returns:
         xarray.DataArray: The data array for the specified asset.
@@ -1080,6 +1081,11 @@ def read_pc_item_asset(item_url, asset_key, output=None):
     asset_url = signed_item.assets[asset_key].href
     ds = rxr.open_rasterio(asset_url)
 
+    if as_cog:
+        kwargs["driver"] = "COG"  # Ensure the output is a Cloud Optimized GeoTIFF
+
     if output:
-        ds.rio.to_raster(output)
+        print(f"Saving asset '{asset_key}' to {output}...")
+        ds.rio.to_raster(output, **kwargs)
+        print(f"Asset '{asset_key}' saved successfully.")
     return ds
