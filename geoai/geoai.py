@@ -1,6 +1,5 @@
 """Main module."""
 
-from .classify import *
 from .download import (
     download_naip,
     download_overture_buildings,
