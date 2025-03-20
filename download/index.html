@@ -1193,6 +1193,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.download.pc_item_asset_list" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_item_asset_list()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.download.pc_stac_download" class="md-nav__link">
     <span class="md-ellipsis">
       pc_stac_download()
@@ -1214,6 +1223,15 @@
   <a href="#geoai.download.preview_raster" class="md-nav__link">
     <span class="md-ellipsis">
       preview_raster()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.read_pc_item_asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      read_pc_item_asset()
     </span>
   </a>
   
@@ -1453,6 +1471,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.download.pc_item_asset_list" class="md-nav__link">
+    <span class="md-ellipsis">
+      pc_item_asset_list()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.download.pc_stac_download" class="md-nav__link">
     <span class="md-ellipsis">
       pc_stac_download()
@@ -1474,6 +1501,15 @@
   <a href="#geoai.download.preview_raster" class="md-nav__link">
     <span class="md-ellipsis">
       preview_raster()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.read_pc_item_asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      read_pc_item_asset()
     </span>
   </a>
   
@@ -1846,7 +1882,7 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
                 <span class="c1">#</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Fallback to direct rioxarray opening (less common case)</span>
-                <span class="n">data</span> <span class="o">=</span> <span class="n">rioxarray</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">rgb_asset</span><span class="o">.</span><span class="n">href</span><span class="p">)</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">rxr</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">rgb_asset</span><span class="o">.</span><span class="n">href</span><span class="p">)</span>
                 <span class="n">data</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">to_raster</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
 
             <span class="n">downloaded_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
@@ -1854,7 +1890,7 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
 
             <span class="c1"># Optional: Display a preview (uncomment if needed)</span>
             <span class="k">if</span> <span class="n">preview</span><span class="p">:</span>
-                <span class="n">data</span> <span class="o">=</span> <span class="n">rioxarray</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">rxr</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
                 <span class="n">preview_raster</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
@@ -2278,7 +2314,7 @@ merge bands into a single multi-band GeoTIFF.</p>
                     <span class="p">)</span>
                 <span class="c1"># Still need to open the file to get the data for merging</span>
                 <span class="k">if</span> <span class="n">merge_bands</span><span class="p">:</span>
-                    <span class="n">band_data</span> <span class="o">=</span> <span class="n">rioxarray</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+                    <span class="n">band_data</span> <span class="o">=</span> <span class="n">rxr</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
                     <span class="n">band_data_arrays</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">band</span><span class="p">,</span> <span class="n">band_data</span><span class="p">))</span>
                     <span class="n">band_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">band</span><span class="p">)</span>
                 <span class="n">result</span><span class="p">[</span><span class="n">band</span><span class="p">]</span> <span class="o">=</span> <span class="n">file_path</span>
@@ -2287,7 +2323,7 @@ merge bands into a single multi-band GeoTIFF.</p>
         <span class="k">if</span> <span class="n">show_progress</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">progress_iter</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
             <span class="n">progress_iter</span><span class="o">.</span><span class="n">set_description</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading </span><span class="si">{</span><span class="n">band</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-        <span class="n">band_data</span> <span class="o">=</span> <span class="n">rioxarray</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">band_url</span><span class="p">)</span>
+        <span class="n">band_data</span> <span class="o">=</span> <span class="n">rxr</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">band_url</span><span class="p">)</span>
 
         <span class="c1"># Store the data array for potential merging later</span>
         <span class="k">if</span> <span class="n">merge_bands</span><span class="p">:</span>
@@ -2883,6 +2919,78 @@ Defaults to "id".</p></td>
 
 
 
+<h2 id="geoai.download.pc_item_asset_list" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">pc_item_asset_list</span><span class="p">(</span><span class="n">item_url</span><span class="p">)</span></code>
+
+
+<a href="#geoai.download.pc_item_asset_list" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Retrieve the list of asset keys from a STAC item in the Planetary Computer catalog.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>item_url</code></td>
+        <td><code>str</code></td>
+        <td><p>The URL of the STAC item.</p></td>
+        <td><em>required</em></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>list</code></td>
+      <td><p>A list of asset keys available in the signed STAC item.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_item_asset_list</span><span class="p">(</span><span class="n">item_url</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieve the list of asset keys from a STAC item in the Planetary Computer catalog.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        item_url (str): The URL of the STAC item.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of asset keys available in the signed STAC item.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">item</span> <span class="o">=</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">item_url</span><span class="p">)</span>
+    <span class="n">signed_item</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
 <h2 id="geoai.download.pc_stac_download" class="doc doc-heading">
 <code class="highlight language-python"><span class="n">pc_stac_download</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">asset_keys</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sign_urls</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
@@ -3023,7 +3131,7 @@ Defaults to True.</p></td>
 <span class="sd">        TypeError: If items is not a STAC Item or list of STAC Items.</span>
 <span class="sd">        IOError: If there&#39;s an error writing the downloaded assets to disk.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">pystac</span>
+
     <span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span><span class="p">,</span> <span class="n">as_completed</span>
 
     <span class="c1"># Handle single item case</span>
@@ -3441,6 +3549,114 @@ by converting it to an RGB array and displaying it with matplotlib.</p>
         <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.read_pc_item_asset" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">read_pc_item_asset</span><span class="p">(</span><span class="n">item_url</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_cog</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+
+<a href="#geoai.download.read_pc_item_asset" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Read a specific asset from a STAC item in the Planetary Computer catalog.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>item_url</code></td>
+        <td><code>str</code></td>
+        <td><p>The URL of the STAC item.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>asset_key</code></td>
+        <td><code>str</code></td>
+        <td><p>The key of the asset to read.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>output</code></td>
+        <td><code>str</code></td>
+        <td><p>If specified, the path to save the asset as a raster file.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>as_cog</code></td>
+        <td><code>bool</code></td>
+        <td><p>If True, save the asset as a Cloud Optimized GeoTIFF (COG).</p></td>
+        <td><code>True</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>xarray.DataArray</code></td>
+      <td><p>The data array for the specified asset.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_pc_item_asset</span><span class="p">(</span><span class="n">item_url</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_cog</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read a specific asset from a STAC item in the Planetary Computer catalog.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        item_url (str): The URL of the STAC item.</span>
+<span class="sd">        asset_key (str): The key of the asset to read.</span>
+<span class="sd">        output (str, optional): If specified, the path to save the asset as a raster file.</span>
+<span class="sd">        as_cog (bool, optional): If True, save the asset as a Cloud Optimized GeoTIFF (COG).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        xarray.DataArray: The data array for the specified asset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">item</span> <span class="o">=</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">item_url</span><span class="p">)</span>
+    <span class="n">signed_item</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">asset_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Asset &#39;</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2">&#39; not found in item &#39;</span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&#39;. It has available assets: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">asset_url</span> <span class="o">=</span> <span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="p">[</span><span class="n">asset_key</span><span class="p">]</span><span class="o">.</span><span class="n">href</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">rxr</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">asset_url</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">as_cog</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;driver&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;COG&quot;</span>  <span class="c1"># Ensure the output is a Cloud Optimized GeoTIFF</span>
+
+    <span class="k">if</span> <span class="n">output</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving asset &#39;</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2">&#39; to </span><span class="si">{</span><span class="n">output</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="n">ds</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">to_raster</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Asset &#39;</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2">&#39; saved successfully.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ds</span>
 </code></pre></div>
         </details>
     </div>
