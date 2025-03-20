@@ -2397,3 +2397,521 @@ class ParkingSplotDetector(ObjectDetector):
             num_classes=num_classes,
             device=device,
         )
+
+
+class AgricultureFieldDelineator(ObjectDetector):
+    """
+    Agricultural field boundary delineation using a pre-trained Mask R-CNN model.
+
+    This class extends the ObjectDetector class to specifically handle Sentinel-2
+    imagery with 12 spectral bands for agricultural field boundary detection.
+
+    Attributes:
+        band_selection: List of band indices to use for prediction (default: RGB)
+        sentinel_band_stats: Per-band statistics for Sentinel-2 data
+        use_ndvi: Whether to calculate and include NDVI as an additional channel
+    """
+
+    def __init__(
+        self,
+        model_path="field_boundary_detector.pth",
+        repo_id=None,
+        model=None,
+        device=None,
+        band_selection=None,
+        use_ndvi=False,
+    ):
+        """
+        Initialize the field boundary delineator.
+
+        Args:
+            model_path: Path to the .pth model file.
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
+            band_selection: List of Sentinel-2 band indices to use (None = adapt based on model)
+            use_ndvi: Whether to calculate and include NDVI as an additional channel
+        """
+        # Save parameters before calling parent constructor
+        self.custom_band_selection = band_selection
+        self.use_ndvi = use_ndvi
+
+        # Set device (copied from parent init to ensure it's set before initialize_model)
+        if device is None:
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(device)
+
+        # Initialize model differently for multi-spectral input
+        model = self.initialize_sentinel2_model(model)
+
+        # Call parent but with our custom model
+        super().__init__(
+            model_path=model_path, repo_id=repo_id, model=model, device=device
+        )
+
+        # Default Sentinel-2 band statistics (can be overridden with actual stats)
+        # Band order: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B10, B11, B12]
+        self.sentinel_band_stats = {
+            "means": [
+                0.0975,
+                0.0476,
+                0.0598,
+                0.0697,
+                0.1077,
+                0.1859,
+                0.2378,
+                0.2061,
+                0.2598,
+                0.4120,
+                0.1956,
+                0.1410,
+            ],
+            "stds": [
+                0.0551,
+                0.0290,
+                0.0298,
+                0.0479,
+                0.0506,
+                0.0505,
+                0.0747,
+                0.0642,
+                0.0782,
+                0.1187,
+                0.0651,
+                0.0679,
+            ],
+        }
+
+        # Set default band selection (RGB - typically B4, B3, B2 for Sentinel-2)
+        self.band_selection = (
+            self.custom_band_selection
+            if self.custom_band_selection is not None
+            else [3, 2, 1]
+        )  # R, G, B bands
+
+        # Customize parameters for field delineation
+        self.confidence_threshold = 0.5  # Default confidence threshold
+        self.overlap = 0.5  # Higher overlap for field boundary detection
+        self.min_object_area = 1000  # Minimum area in pixels for field detection
+        self.simplify_tolerance = 2.0  # Higher tolerance for field boundaries
+
+    def initialize_sentinel2_model(self, model=None):
+        """
+        Initialize a Mask R-CNN model with a modified first layer to accept Sentinel-2 data.
+
+        Args:
+            model: Pre-initialized model (optional)
+
+        Returns:
+            Modified model with appropriate input channels
+        """
+        import torchvision
+        from torchvision.models.detection import maskrcnn_resnet50_fpn
+        from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
+
+        if model is not None:
+            return model
+
+        # Determine number of input channels based on band selection and NDVI
+        num_input_channels = (
+            len(self.custom_band_selection)
+            if self.custom_band_selection is not None
+            else 3
+        )
+        if self.use_ndvi:
+            num_input_channels += 1
+
+        print(f"Initializing Mask R-CNN model with {num_input_channels} input channels")
+
+        # Create a ResNet50 backbone with modified input channels
+        backbone = resnet_fpn_backbone("resnet50", weights=None)
+
+        # Replace the first conv layer to accept multi-spectral input
+        original_conv = backbone.body.conv1
+        backbone.body.conv1 = torch.nn.Conv2d(
+            num_input_channels,
+            original_conv.out_channels,
+            kernel_size=original_conv.kernel_size,
+            stride=original_conv.stride,
+            padding=original_conv.padding,
+            bias=original_conv.bias is not None,
+        )
+
+        # Create Mask R-CNN with our modified backbone
+        model = maskrcnn_resnet50_fpn(
+            backbone=backbone,
+            num_classes=2,  # Background + field
+            image_mean=[0.485] * num_input_channels,  # Extend mean to all channels
+            image_std=[0.229] * num_input_channels,  # Extend std to all channels
+        )
+
+        model.to(self.device)
+        return model
+
+    def preprocess_sentinel_bands(self, image_data, band_selection=None, use_ndvi=None):
+        """
+        Preprocess Sentinel-2 band data for model input.
+
+        Args:
+            image_data: Raw Sentinel-2 image data as numpy array [bands, height, width]
+            band_selection: List of band indices to use (overrides instance default if provided)
+            use_ndvi: Whether to include NDVI (overrides instance default if provided)
+
+        Returns:
+            Processed tensor ready for model input
+        """
+        # Use instance defaults if not specified
+        band_selection = (
+            band_selection if band_selection is not None else self.band_selection
+        )
+        use_ndvi = use_ndvi if use_ndvi is not None else self.use_ndvi
+
+        # Select bands
+        selected_bands = image_data[band_selection]
+
+        # Calculate NDVI if requested (using B8 and B4 which are indices 7 and 3)
+        if (
+            use_ndvi
+            and 7 in range(image_data.shape[0])
+            and 3 in range(image_data.shape[0])
+        ):
+            nir = image_data[7].astype(np.float32)  # B8 (NIR)
+            red = image_data[3].astype(np.float32)  # B4 (Red)
+
+            # Avoid division by zero
+            denominator = nir + red
+            ndvi = np.zeros_like(nir)
+            valid_mask = denominator > 0
+            ndvi[valid_mask] = (nir[valid_mask] - red[valid_mask]) / denominator[
+                valid_mask
+            ]
+
+            # Rescale NDVI from [-1, 1] to [0, 1]
+            ndvi = (ndvi + 1) / 2
+
+            # Add NDVI as an additional channel
+            selected_bands = np.vstack([selected_bands, ndvi[np.newaxis, :, :]])
+
+        # Convert to tensor
+        image_tensor = torch.from_numpy(selected_bands).float()
+
+        # Normalize using band statistics
+        for i, band_idx in enumerate(band_selection):
+            # Make sure band_idx is within range of our statistics
+            if band_idx < len(self.sentinel_band_stats["means"]):
+                mean = self.sentinel_band_stats["means"][band_idx]
+                std = self.sentinel_band_stats["stds"][band_idx]
+                image_tensor[i] = (image_tensor[i] - mean) / std
+
+        # If NDVI was added, normalize it too (last channel)
+        if use_ndvi:
+            # NDVI is already roughly in [0,1] range, just standardize it slightly
+            image_tensor[-1] = (image_tensor[-1] - 0.5) / 0.5
+
+        return image_tensor
+
+    def update_band_stats(self, raster_path, band_selection=None, sample_size=1000):
+        """
+        Update band statistics from the input Sentinel-2 raster.
+
+        Args:
+            raster_path: Path to the Sentinel-2 raster file
+            band_selection: Specific bands to update (None = update all available)
+            sample_size: Number of random pixels to sample for statistics calculation
+
+        Returns:
+            Updated band statistics dictionary
+        """
+        with rasterio.open(raster_path) as src:
+            # Check if this is likely a Sentinel-2 product
+            band_count = src.count
+            if band_count < 3:
+                print(
+                    f"Warning: Raster has only {band_count} bands, may not be Sentinel-2 data"
+                )
+
+            # Get dimensions
+            height, width = src.height, src.width
+
+            # Determine which bands to analyze
+            if band_selection is None:
+                band_selection = list(range(1, band_count + 1))  # 1-indexed
+
+            # Initialize arrays for band statistics
+            means = []
+            stds = []
+
+            # Sample random pixels
+            np.random.seed(42)  # For reproducibility
+            sample_rows = np.random.randint(0, height, sample_size)
+            sample_cols = np.random.randint(0, width, sample_size)
+
+            # Calculate statistics for each band
+            for band in band_selection:
+                # Read band data
+                band_data = src.read(band)
+
+                # Sample values
+                sample_values = band_data[sample_rows, sample_cols]
+
+                # Remove invalid values (e.g., nodata)
+                valid_samples = sample_values[np.isfinite(sample_values)]
+
+                # Calculate statistics
+                mean = float(np.mean(valid_samples))
+                std = float(np.std(valid_samples))
+
+                # Store results
+                means.append(mean)
+                stds.append(std)
+
+                print(f"Band {band}: mean={mean:.4f}, std={std:.4f}")
+
+            # Update instance variables
+            self.sentinel_band_stats = {"means": means, "stds": stds}
+
+            return self.sentinel_band_stats
+
+    def process_sentinel_raster(
+        self,
+        raster_path,
+        output_path=None,
+        batch_size=4,
+        band_selection=None,
+        use_ndvi=None,
+        filter_edges=True,
+        edge_buffer=20,
+        **kwargs,
+    ):
+        """
+        Process a Sentinel-2 raster to extract field boundaries.
+
+        Args:
+            raster_path: Path to Sentinel-2 raster file
+            output_path: Path to output GeoJSON or Parquet file (optional)
+            batch_size: Batch size for processing
+            band_selection: List of bands to use (None = use instance default)
+            use_ndvi: Whether to include NDVI (None = use instance default)
+            filter_edges: Whether to filter out objects at the edges of the image
+            edge_buffer: Size of edge buffer in pixels to filter out objects
+            **kwargs: Additional parameters for processing
+
+        Returns:
+            GeoDataFrame with field boundaries
+        """
+        # Use instance defaults if not specified
+        band_selection = (
+            band_selection if band_selection is not None else self.band_selection
+        )
+        use_ndvi = use_ndvi if use_ndvi is not None else self.use_ndvi
+
+        # Get parameters from kwargs or use instance defaults
+        confidence_threshold = kwargs.get(
+            "confidence_threshold", self.confidence_threshold
+        )
+        overlap = kwargs.get("overlap", self.overlap)
+        chip_size = kwargs.get("chip_size", self.chip_size)
+        nms_iou_threshold = kwargs.get("nms_iou_threshold", self.nms_iou_threshold)
+        mask_threshold = kwargs.get("mask_threshold", self.mask_threshold)
+        min_object_area = kwargs.get("min_object_area", self.min_object_area)
+        simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
+
+        # Update band statistics if not already done
+        if kwargs.get("update_stats", True):
+            self.update_band_stats(raster_path, band_selection)
+
+        print(f"Processing with parameters:")
+        print(f"- Using bands: {band_selection}")
+        print(f"- Include NDVI: {use_ndvi}")
+        print(f"- Confidence threshold: {confidence_threshold}")
+        print(f"- Tile overlap: {overlap}")
+        print(f"- Chip size: {chip_size}")
+        print(f"- Filter edge objects: {filter_edges}")
+
+        # Create a custom Sentinel-2 dataset class
+        class Sentinel2Dataset(torch.utils.data.Dataset):
+            def __init__(
+                self,
+                raster_path,
+                chip_size,
+                stride_x,
+                stride_y,
+                band_selection,
+                use_ndvi,
+                field_delineator,
+            ):
+                self.raster_path = raster_path
+                self.chip_size = chip_size
+                self.stride_x = stride_x
+                self.stride_y = stride_y
+                self.band_selection = band_selection
+                self.use_ndvi = use_ndvi
+                self.field_delineator = field_delineator
+
+                with rasterio.open(self.raster_path) as src:
+                    self.height = src.height
+                    self.width = src.width
+                    self.count = src.count
+                    self.crs = src.crs
+                    self.transform = src.transform
+
+                    # Calculate row_starts and col_starts
+                    self.row_starts = []
+                    self.col_starts = []
+
+                    # Normal row starts using stride
+                    for r in range((self.height - 1) // self.stride_y):
+                        self.row_starts.append(r * self.stride_y)
+
+                    # Add a special last row that ensures we reach the bottom edge
+                    if self.height > self.chip_size[0]:
+                        self.row_starts.append(max(0, self.height - self.chip_size[0]))
+                    else:
+                        # If the image is smaller than chip size, just start at 0
+                        if not self.row_starts:
+                            self.row_starts.append(0)
+
+                    # Normal column starts using stride
+                    for c in range((self.width - 1) // self.stride_x):
+                        self.col_starts.append(c * self.stride_x)
+
+                    # Add a special last column that ensures we reach the right edge
+                    if self.width > self.chip_size[1]:
+                        self.col_starts.append(max(0, self.width - self.chip_size[1]))
+                    else:
+                        # If the image is smaller than chip size, just start at 0
+                        if not self.col_starts:
+                            self.col_starts.append(0)
+
+                # Calculate number of tiles
+                self.rows = len(self.row_starts)
+                self.cols = len(self.col_starts)
+
+                print(
+                    f"Dataset initialized with {self.rows} rows and {self.cols} columns of chips"
+                )
+                print(f"Image dimensions: {self.width} x {self.height} pixels")
+                print(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
+
+            def __len__(self):
+                return self.rows * self.cols
+
+            def __getitem__(self, idx):
+                # Convert flat index to grid position
+                row = idx // self.cols
+                col = idx % self.cols
+
+                # Get pre-calculated starting positions
+                j = self.row_starts[row]
+                i = self.col_starts[col]
+
+                # Read window from raster
+                with rasterio.open(self.raster_path) as src:
+                    # Make sure we don't read outside the image
+                    width = min(self.chip_size[1], self.width - i)
+                    height = min(self.chip_size[0], self.height - j)
+
+                    window = Window(i, j, width, height)
+
+                    # Read all bands
+                    image = src.read(window=window)
+
+                    # Handle partial windows at edges by padding
+                    if (
+                        image.shape[1] != self.chip_size[0]
+                        or image.shape[2] != self.chip_size[1]
+                    ):
+                        temp = np.zeros(
+                            (image.shape[0], self.chip_size[0], self.chip_size[1]),
+                            dtype=image.dtype,
+                        )
+                        temp[:, : image.shape[1], : image.shape[2]] = image
+                        image = temp
+
+                # Preprocess bands for the model
+                image_tensor = self.field_delineator.preprocess_sentinel_bands(
+                    image, self.band_selection, self.use_ndvi
+                )
+
+                # Get geographic bounds for the window
+                with rasterio.open(self.raster_path) as src:
+                    window_transform = src.window_transform(window)
+                    minx, miny = window_transform * (0, height)
+                    maxx, maxy = window_transform * (width, 0)
+                    bbox = [minx, miny, maxx, maxy]
+
+                return {
+                    "image": image_tensor,
+                    "bbox": bbox,
+                    "coords": torch.tensor([i, j], dtype=torch.long),
+                    "window_size": torch.tensor([width, height], dtype=torch.long),
+                }
+
+        # Calculate stride based on overlap
+        stride_x = int(chip_size[1] * (1 - overlap))
+        stride_y = int(chip_size[0] * (1 - overlap))
+
+        # Create dataset
+        dataset = Sentinel2Dataset(
+            raster_path=raster_path,
+            chip_size=chip_size,
+            stride_x=stride_x,
+            stride_y=stride_y,
+            band_selection=band_selection,
+            use_ndvi=use_ndvi,
+            field_delineator=self,
+        )
+
+        # Define custom collate function
+        def custom_collate(batch):
+            elem = batch[0]
+            if isinstance(elem, dict):
+                result = {}
+                for key in elem:
+                    if key == "bbox":
+                        # Don't collate bbox objects, keep as list
+                        result[key] = [d[key] for d in batch]
+                    else:
+                        # For tensors and other collatable types
+                        try:
+                            result[key] = (
+                                torch.utils.data._utils.collate.default_collate(
+                                    [d[key] for d in batch]
+                                )
+                            )
+                        except TypeError:
+                            # Fall back to list for non-collatable types
+                            result[key] = [d[key] for d in batch]
+                return result
+            else:
+                # Default collate for non-dict types
+                return torch.utils.data._utils.collate.default_collate(batch)
+
+        # Create dataloader
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
+            collate_fn=custom_collate,
+        )
+
+        # Process batches (call the parent class's process_raster method)
+        # We'll adapt the process_raster method to work with our Sentinel2Dataset
+        results = super().process_raster(
+            raster_path=raster_path,
+            output_path=output_path,
+            batch_size=batch_size,
+            filter_edges=filter_edges,
+            edge_buffer=edge_buffer,
+            confidence_threshold=confidence_threshold,
+            overlap=overlap,
+            chip_size=chip_size,
+            nms_iou_threshold=nms_iou_threshold,
+            mask_threshold=mask_threshold,
+            min_object_area=min_object_area,
+            simplify_tolerance=simplify_tolerance,
+        )
+
+        return results
