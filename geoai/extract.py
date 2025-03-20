@@ -2134,7 +2134,7 @@ class ObjectDetector:
                 The number of worker threads to use.
                 "None" means single-threaded processing.
                 "-1"   means using all available CPU processors.
-                Positive interger means using that specific number of threads.
+                Positive integer means using that specific number of threads.
             **kwargs: Additional parameters
 
         Returns:
@@ -2292,10 +2292,10 @@ class ObjectDetector:
 
                 with concurrent.futures.ThreadPoolExecutor(
                     max_workers=n_workers
-                ) as excutor:
+                ) as executor:
                     results = list(
                         tqdm(
-                            excutor.map(process_component, process_args),
+                            executor.map(process_component, process_args),
                             total=num_features,
                             desc="Processing components",
                         )
