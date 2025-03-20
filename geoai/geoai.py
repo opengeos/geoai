@@ -7,6 +7,7 @@ from .download import (
     pc_collection_list,
     pc_stac_search,
     pc_stac_download,
+    read_pc_item_asset,
 )
 from .extract import *
 from .hf import *
