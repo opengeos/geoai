@@ -10,8 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import planetary_computer as pc
+import pystac
 import requests
-import rioxarray
+import rioxarray as rxr
 import xarray as xr
 from pystac_client import Client
 from shapely.geometry import box
@@ -121,7 +122,7 @@ def download_naip(
                 #
             else:
                 # Fallback to direct rioxarray opening (less common case)
-                data = rioxarray.open_rasterio(rgb_asset.href)
+                data = rxr.open_rasterio(rgb_asset.href)
                 data.rio.to_raster(output_path)
 
             downloaded_files.append(output_path)
@@ -129,7 +130,7 @@ def download_naip(
 
             # Optional: Display a preview (uncomment if needed)
             if preview:
-                data = rioxarray.open_rasterio(output_path)
+                data = rxr.open_rasterio(output_path)
                 preview_raster(data)
 
         except Exception as e:
@@ -516,7 +517,7 @@ def download_pc_stac_item(
                     )
                 # Still need to open the file to get the data for merging
                 if merge_bands:
-                    band_data = rioxarray.open_rasterio(file_path)
+                    band_data = rxr.open_rasterio(file_path)
                     band_data_arrays.append((band, band_data))
                     band_names.append(band)
                 result[band] = file_path
@@ -525,7 +526,7 @@ def download_pc_stac_item(
         if show_progress and not isinstance(progress_iter, list):
             progress_iter.set_description(f"Downloading {band}")
 
-        band_data = rioxarray.open_rasterio(band_url)
+        band_data = rxr.open_rasterio(band_url)
 
         # Store the data array for potential merging later
         if merge_bands:
@@ -899,7 +900,7 @@ def pc_stac_download(
         TypeError: If items is not a STAC Item or list of STAC Items.
         IOError: If there's an error writing the downloaded assets to disk.
     """
-    import pystac
+
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     # Handle single item case
@@ -1038,3 +1039,53 @@ def pc_stac_download(
     print(f"\nDownloaded {total_assets} assets for {len(results)} items")
 
     return results
+
+
+def pc_item_asset_list(item_url):
+    """
+    Retrieve the list of asset keys from a STAC item in the Planetary Computer catalog.
+
+    Args:
+        item_url (str): The URL of the STAC item.
+
+    Returns:
+        list: A list of asset keys available in the signed STAC item.
+    """
+    item = pystac.Item.from_file(item_url)
+    signed_item = pc.sign(item)
+
+    return list(signed_item.assets.keys())
+
+
+def read_pc_item_asset(item_url, asset_key, output=None, as_cog=True, **kwargs):
+    """
+    Read a specific asset from a STAC item in the Planetary Computer catalog.
+
+    Args:
+        item_url (str): The URL of the STAC item.
+        asset_key (str): The key of the asset to read.
+        output (str, optional): If specified, the path to save the asset as a raster file.
+        as_cog (bool, optional): If True, save the asset as a Cloud Optimized GeoTIFF (COG).
+
+    Returns:
+        xarray.DataArray: The data array for the specified asset.
+    """
+    item = pystac.Item.from_file(item_url)
+    signed_item = pc.sign(item)
+
+    if asset_key not in signed_item.assets:
+        raise ValueError(
+            f"Asset '{asset_key}' not found in item '{item.id}'. It has available assets: {list(signed_item.assets.keys())}"
+        )
+
+    asset_url = signed_item.assets[asset_key].href
+    ds = rxr.open_rasterio(asset_url)
+
+    if as_cog:
+        kwargs["driver"] = "COG"  # Ensure the output is a Cloud Optimized GeoTIFF
+
+    if output:
+        print(f"Saving asset '{asset_key}' to {output}...")
+        ds.rio.to_raster(output, **kwargs)
+        print(f"Asset '{asset_key}' saved successfully.")
+    return ds
