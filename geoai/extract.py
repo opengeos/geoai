@@ -19,6 +19,7 @@ from torchvision.models.detection import (
     maskrcnn_resnet50_fpn,
 )
 from tqdm import tqdm
+import time
 
 # Local Imports
 from .utils import get_raster_stats
@@ -2117,6 +2118,7 @@ class ObjectDetector:
         confidence_threshold=0.5,
         min_object_area=100,
         max_object_area=None,
+        n_workers=None,
         **kwargs,
     ):
         """
@@ -2128,13 +2130,102 @@ class ObjectDetector:
             confidence_threshold: Minimum confidence score (0.0-1.0). Default: 0.5
             min_object_area: Minimum area in pixels to keep an object. Default: 100
             max_object_area: Maximum area in pixels to keep an object. Default: None
+            n_workers: int, default=None
+                The number of worker threads to use.
+                "None" means single-threaded processing.
+                "-1"   means using all available CPU processors.
+                Positive integer means using that specific number of threads.
             **kwargs: Additional parameters
 
         Returns:
             GeoDataFrame with car detections and confidence values
         """
 
+        def _process_single_component(
+            component_mask,
+            conf_data,
+            transform,
+            confidence_threshold,
+            min_object_area,
+            max_object_area,
+        ):
+            # Get confidence value
+            conf_region = conf_data[component_mask > 0]
+            if len(conf_region) > 0:
+                confidence = np.mean(conf_region) / 255.0
+            else:
+                confidence = 0.0
+
+            # Skip if confidence is below threshold
+            if confidence < confidence_threshold:
+                return None
+
+            # Find contours
+            contours, _ = cv2.findContours(
+                component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+
+            results = []
+
+            for contour in contours:
+                # Filter by size
+                area = cv2.contourArea(contour)
+                if area < min_object_area:
+                    continue
+
+                if max_object_area is not None and area > max_object_area:
+                    continue
+
+                # Get minimum area rectangle
+                rect = cv2.minAreaRect(contour)
+                box_points = cv2.boxPoints(rect)
+
+                # Convert to geographic coordinates
+                geo_points = []
+                for x, y in box_points:
+                    gx, gy = transform * (x, y)
+                    geo_points.append((gx, gy))
+
+                # Create polygon
+                poly = Polygon(geo_points)
+                results.append((poly, confidence, area))
+
+            return results
+
+        import concurrent.futures
+        from functools import partial
+
+        def process_component(args):
+            """
+            Helper function to process a single component
+            """
+            (
+                label,
+                labeled_mask,
+                conf_data,
+                transform,
+                confidence_threshold,
+                min_object_area,
+                max_object_area,
+            ) = args
+
+            # Create mask for this component
+            component_mask = (labeled_mask == label).astype(np.uint8)
+
+            return _process_single_component(
+                component_mask,
+                conf_data,
+                transform,
+                confidence_threshold,
+                min_object_area,
+                max_object_area,
+            )
+
+        start_time = time.time()
         print(f"Processing masks from: {masks_path}")
+
+        if n_workers == -1:
+            n_workers = os.cpu_count()
 
         with rasterio.open(masks_path) as src:
             # Read mask and confidence bands
@@ -2155,56 +2246,68 @@ class ObjectDetector:
             confidences = []
             pixels = []
 
-            # Add progress bar
-            for label in tqdm(range(1, num_features + 1), desc="Processing components"):
-                # Create mask for this component
-                component_mask = (labeled_mask == label).astype(np.uint8)
-
-                # Get confidence value (mean of non-zero values in this region)
-                conf_region = conf_data[component_mask > 0]
-                if len(conf_region) > 0:
-                    confidence = (
-                        np.mean(conf_region) / 255.0
-                    )  # Convert back to 0-1 range
-                else:
-                    confidence = 0.0
-
-                # Skip if confidence is below threshold
-                if confidence < confidence_threshold:
-                    continue
-
-                # Find contours
-                contours, _ = cv2.findContours(
-                    component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            if n_workers is None or n_workers == 1:
+                print(
+                    "Using single-threaded processing, you can speed up processing by setting n_workers > 1"
                 )
+                # Add progress bar
+                for label in tqdm(
+                    range(1, num_features + 1), desc="Processing components"
+                ):
+                    # Create mask for this component
+                    component_mask = (labeled_mask == label).astype(np.uint8)
 
-                for contour in contours:
-                    # Filter by size
-                    area = cv2.contourArea(contour)
-                    if area < min_object_area:
-                        continue
+                    result = _process_single_component(
+                        component_mask,
+                        conf_data,
+                        transform,
+                        confidence_threshold,
+                        min_object_area,
+                        max_object_area,
+                    )
 
-                    if max_object_area is not None:
-                        if area > max_object_area:
-                            continue
+                    if result:
+                        for poly, confidence, area in result:
+                            # Add to lists
+                            polygons.append(poly)
+                            confidences.append(confidence)
+                            pixels.append(area)
 
-                    # Get minimum area rectangle
-                    rect = cv2.minAreaRect(contour)
-                    box_points = cv2.boxPoints(rect)
+            else:
+                # Process components in parallel
+                print(f"Using {n_workers} workers for parallel processing")
 
-                    # Convert to geographic coordinates
-                    geo_points = []
-                    for x, y in box_points:
-                        gx, gy = transform * (x, y)
-                        geo_points.append((gx, gy))
+                process_args = [
+                    (
+                        label,
+                        labeled_mask,
+                        conf_data,
+                        transform,
+                        confidence_threshold,
+                        min_object_area,
+                        max_object_area,
+                    )
+                    for label in range(1, num_features + 1)
+                ]
 
-                    # Create polygon
-                    poly = Polygon(geo_points)
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=n_workers
+                ) as executor:
+                    results = list(
+                        tqdm(
+                            executor.map(process_component, process_args),
+                            total=num_features,
+                            desc="Processing components",
+                        )
+                    )
 
-                    # Add to lists
-                    polygons.append(poly)
-                    confidences.append(confidence)
-                    pixels.append(area)
+                    for result in results:
+                        if result:
+                            for poly, confidence, area in result:
+                                # Add to lists
+                                polygons.append(poly)
+                                confidences.append(confidence)
+                                pixels.append(area)
 
             # Create GeoDataFrame
             if polygons:
@@ -2223,8 +2326,12 @@ class ObjectDetector:
                     gdf.to_file(output_path, driver="GeoJSON")
                     print(f"Saved {len(gdf)} objects with confidence to {output_path}")
 
+                end_time = time.time()
+                print(f"Total processing time: {end_time - start_time:.2f} seconds")
                 return gdf
             else:
+                end_time = time.time()
+                print(f"Total processing time: {end_time - start_time:.2f} seconds")
                 print("No valid polygons found")
                 return None
 
