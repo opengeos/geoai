@@ -20,6 +20,7 @@ from torchvision.models.detection import (
 )
 from tqdm import tqdm
 import time
+
 # Local Imports
 from .utils import get_raster_stats
 
@@ -2146,7 +2147,7 @@ class ObjectDetector:
             transform,
             confidence_threshold,
             min_object_area,
-            max_object_area    
+            max_object_area,
         ):
             # Get confidence value
             conf_region = conf_data[component_mask > 0]
@@ -2158,9 +2159,11 @@ class ObjectDetector:
             # Skip if confidence is below threshold
             if confidence < confidence_threshold:
                 return None
-            
+
             # Find contours
-            contours, _ = cv2.findContours(component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(
+                component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
 
             results = []
 
@@ -2191,11 +2194,20 @@ class ObjectDetector:
 
         import concurrent.futures
         from functools import partial
+
         def process_component(args):
             """
             Helper function to process a single component
             """
-            label, labeled_mask, conf_data, transform, confidence_threshold, min_object_area, max_object_area = args
+            (
+                label,
+                labeled_mask,
+                conf_data,
+                transform,
+                confidence_threshold,
+                min_object_area,
+                max_object_area,
+            ) = args
 
             # Create mask for this component
             component_mask = (labeled_mask == label).astype(np.uint8)
@@ -2206,9 +2218,8 @@ class ObjectDetector:
                 transform,
                 confidence_threshold,
                 min_object_area,
-                max_object_area
+                max_object_area,
             )
-
 
         start_time = time.time()
         print(f"Processing masks from: {masks_path}")
@@ -2236,9 +2247,13 @@ class ObjectDetector:
             pixels = []
 
             if n_workers is None or n_workers == 1:
-                print("Using single-threaded processing, you can speed up processing by setting n_workers > 1")
+                print(
+                    "Using single-threaded processing, you can speed up processing by setting n_workers > 1"
+                )
                 # Add progress bar
-                for label in tqdm(range(1, num_features + 1), desc="Processing components"):
+                for label in tqdm(
+                    range(1, num_features + 1), desc="Processing components"
+                ):
                     # Create mask for this component
                     component_mask = (labeled_mask == label).astype(np.uint8)
 
@@ -2248,7 +2263,7 @@ class ObjectDetector:
                         transform,
                         confidence_threshold,
                         min_object_area,
-                        max_object_area
+                        max_object_area,
                     )
 
                     if result:
@@ -2262,14 +2277,29 @@ class ObjectDetector:
                 # Process components in parallel
                 print(f"Using {n_workers} workers for parallel processing")
 
-                process_args = [(label, labeled_mask, conf_data, transform, confidence_threshold, min_object_area, max_object_area) for label in range(1, num_features + 1)]
+                process_args = [
+                    (
+                        label,
+                        labeled_mask,
+                        conf_data,
+                        transform,
+                        confidence_threshold,
+                        min_object_area,
+                        max_object_area,
+                    )
+                    for label in range(1, num_features + 1)
+                ]
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as excutor:
-                    results = list(tqdm(
-                        excutor.map(process_component, process_args),
-                        total=num_features,
-                        desc="Processing components"
-                    ))
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=n_workers
+                ) as excutor:
+                    results = list(
+                        tqdm(
+                            excutor.map(process_component, process_args),
+                            total=num_features,
+                            desc="Processing components",
+                        )
+                    )
 
                     for result in results:
                         if result:
@@ -2295,7 +2325,7 @@ class ObjectDetector:
                 if output_path:
                     gdf.to_file(output_path, driver="GeoJSON")
                     print(f"Saved {len(gdf)} objects with confidence to {output_path}")
-                
+
                 end_time = time.time()
                 print(f"Total processing time: {end_time - start_time:.2f} seconds")
                 return gdf
