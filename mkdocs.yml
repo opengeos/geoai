@@ -119,6 +119,7 @@ nav:
           - examples/train_building_footprints_usa.ipynb
           - examples/train_solar_panel_detection.ipynb
           - examples/train_car_detection.ipynb
+          - examples/train_ship_detection.ipynb
           - examples/wetland_mapping.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
