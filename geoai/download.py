@@ -867,10 +867,9 @@ def pc_stac_search(
 def pc_stac_download(
     items,
     output_dir=".",
-    asset_keys=None,
+    assets=None,
     max_workers=4,
     skip_existing=True,
-    sign_urls=True,
 ):
     """
     Download assets from STAC items retrieved from the Planetary Computer.
@@ -883,7 +882,7 @@ def pc_stac_download(
         items (list or pystac.Item): STAC Item object or list of STAC Item objects.
         output_dir (str, optional): Directory where assets will be saved.
             Defaults to current directory.
-        asset_keys (list, optional): List of asset keys to download. If None,
+        assets (list, optional): List of asset keys to download. If None,
             downloads all available assets. Defaults to None.
         max_workers (int, optional): Maximum number of concurrent download threads.
             Defaults to 4.
@@ -912,31 +911,13 @@ def pc_stac_download(
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    # Function to sign URLs if needed
-    def get_signed_url(href):
-        if not sign_urls:
-            return href
-
-        # Planetary Computer typically requires signing URLs for accessing data
-        # Check if the URL is from Microsoft Planetary Computer
-        if "planetarycomputer" in href:
-            try:
-                sign_url = "https://planetarycomputer.microsoft.com/api/sas/v1/sign"
-                response = requests.get(sign_url, params={"href": href})
-                response.raise_for_status()
-                return response.json().get("href", href)
-            except Exception as e:
-                print(f"Warning: Failed to sign URL {href}: {str(e)}")
-                return href
-        return href
-
     # Function to download a single asset
     def download_asset(item, asset_key, asset):
+        item = pc.sign(item)
         item_id = item.id
 
         # Get the asset URL and sign it if needed
-        asset_url = get_signed_url(asset.href)
-
+        asset_url = item.assets[asset_key].href
         # Determine output filename
         if asset.media_type:
             # Use appropriate file extension based on media type
@@ -996,13 +977,11 @@ def pc_stac_download(
         print(f"Processing STAC item: {item_id}")
 
         # Determine which assets to download
-        if asset_keys:
-            assets_to_download = {
-                k: v for k, v in item.assets.items() if k in asset_keys
-            }
+        if assets:
+            assets_to_download = {k: v for k, v in item.assets.items() if k in assets}
             if not assets_to_download:
                 print(
-                    f"Warning: None of the specified asset keys {asset_keys} found in item {item_id}"
+                    f"Warning: None of the specified asset keys {assets} found in item {item_id}"
                 )
                 print(f"Available asset keys: {list(item.assets.keys())}")
                 continue
@@ -1041,51 +1020,125 @@ def pc_stac_download(
     return results
 
 
-def pc_item_asset_list(item_url):
+def pc_item_asset_list(item):
     """
     Retrieve the list of asset keys from a STAC item in the Planetary Computer catalog.
 
     Args:
-        item_url (str): The URL of the STAC item.
+        item (str): The URL of the STAC item.
 
     Returns:
         list: A list of asset keys available in the signed STAC item.
     """
-    item = pystac.Item.from_file(item_url)
-    signed_item = pc.sign(item)
+    if isinstance(item, str):
+        item = pystac.Item.from_file(item)
 
-    return list(signed_item.assets.keys())
+    if not isinstance(item, pystac.Item):
+        raise ValueError("item_url must be a string (URL) or a pystac.Item object")
+
+    return list(item.assets.keys())
 
 
-def read_pc_item_asset(item_url, asset_key, output=None, as_cog=True, **kwargs):
+def read_pc_item_asset(item, asset, output=None, as_cog=True, **kwargs):
     """
     Read a specific asset from a STAC item in the Planetary Computer catalog.
 
     Args:
-        item_url (str): The URL of the STAC item.
-        asset_key (str): The key of the asset to read.
+        item (str): The URL of the STAC item.
+        asset (str): The key of the asset to read.
         output (str, optional): If specified, the path to save the asset as a raster file.
         as_cog (bool, optional): If True, save the asset as a Cloud Optimized GeoTIFF (COG).
 
     Returns:
         xarray.DataArray: The data array for the specified asset.
     """
-    item = pystac.Item.from_file(item_url)
+    if isinstance(item, str):
+        item = pystac.Item.from_file(item)
+
+    if not isinstance(item, pystac.Item):
+        raise ValueError("item must be a string (URL) or a pystac.Item object")
+
     signed_item = pc.sign(item)
 
-    if asset_key not in signed_item.assets:
+    if asset not in signed_item.assets:
         raise ValueError(
-            f"Asset '{asset_key}' not found in item '{item.id}'. It has available assets: {list(signed_item.assets.keys())}"
+            f"Asset '{asset}' not found in item '{item.id}'. It has available assets: {list(signed_item.assets.keys())}"
         )
 
-    asset_url = signed_item.assets[asset_key].href
+    asset_url = signed_item.assets[asset].href
     ds = rxr.open_rasterio(asset_url)
 
     if as_cog:
         kwargs["driver"] = "COG"  # Ensure the output is a Cloud Optimized GeoTIFF
 
     if output:
-        print(f"Saving asset '{asset_key}' to {output}...")
+        print(f"Saving asset '{asset}' to {output}...")
         ds.rio.to_raster(output, **kwargs)
-        print(f"Asset '{asset_key}' saved successfully.")
+        print(f"Asset '{asset}' saved successfully.")
     return ds
+
+
+def view_pc_item(
+    url=None,
+    collection=None,
+    item=None,
+    assets=None,
+    bands=None,
+    titiler_endpoint=None,
+    name="STAC Item",
+    attribution="Planetary Computer",
+    opacity=1.0,
+    shown=True,
+    fit_bounds=True,
+    layer_index=None,
+    backend="folium",
+    basemap=None,
+    map_args=None,
+    **kwargs,
+):
+
+    if backend == "folium":
+        import leafmap.foliumap as leafmap
+
+    elif backend == "ipyleaflet":
+        import leafmap.leafmap as leafmap
+
+    else:
+        raise ValueError(
+            f"Unsupported backend: {backend}. Supported backends are 'folium' and 'ipyleaflet'."
+        )
+
+    if map_args is None:
+        map_args = {}
+
+    if "draw_control" not in map_args:
+        map_args["draw_control"] = False
+
+    if url is not None:
+
+        item = pystac.Item.from_file(url)
+
+    if isinstance(item, pystac.Item):
+        collection = item.collection_id
+        if assets is None:
+            assets = [list(item.assets.keys())[0]]
+        item = item.id
+
+    m = leafmap.Map(**map_args)
+    if basemap is not None:
+        m.add_basemap(basemap)
+    m.add_stac_layer(
+        collection=collection,
+        item=item,
+        assets=assets,
+        bands=bands,
+        titiler_endpoint=titiler_endpoint,
+        name=name,
+        attribution=attribution,
+        opacity=opacity,
+        shown=shown,
+        fit_bounds=fit_bounds,
+        layer_index=layer_index,
+        **kwargs,
+    )
+    return m
