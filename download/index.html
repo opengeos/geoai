@@ -2920,7 +2920,7 @@ Defaults to "id".</p></td>
 
 
 <h2 id="geoai.download.pc_item_asset_list" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">pc_item_asset_list</span><span class="p">(</span><span class="n">item_url</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">pc_item_asset_list</span><span class="p">(</span><span class="n">item</span><span class="p">)</span></code>
 
 
 <a href="#geoai.download.pc_item_asset_list" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -2941,7 +2941,7 @@ Defaults to "id".</p></td>
   </thead>
   <tbody>
       <tr>
-        <td><code>item_url</code></td>
+        <td><code>item</code></td>
         <td><code>str</code></td>
         <td><p>The URL of the STAC item.</p></td>
         <td><em>required</em></td>
@@ -2965,20 +2965,23 @@ Defaults to "id".</p></td>
 </table>
         <details class="quote">
           <summary>Source code in <code>geoai/download.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_item_asset_list</span><span class="p">(</span><span class="n">item_url</span><span class="p">):</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_item_asset_list</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Retrieve the list of asset keys from a STAC item in the Planetary Computer catalog.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        item_url (str): The URL of the STAC item.</span>
+<span class="sd">        item (str): The URL of the STAC item.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        list: A list of asset keys available in the signed STAC item.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">item</span> <span class="o">=</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">item_url</span><span class="p">)</span>
-    <span class="n">signed_item</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;item_url must be a string (URL) or a pystac.Item object&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
 </code></pre></div>
         </details>
     </div>
@@ -2992,7 +2995,7 @@ Defaults to "id".</p></td>
 
 
 <h2 id="geoai.download.pc_stac_download" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">pc_stac_download</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">asset_keys</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sign_urls</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">pc_stac_download</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 
 <a href="#geoai.download.pc_stac_download" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -3029,7 +3032,7 @@ Defaults to current directory.</p></td>
         <td><code>&#39;.&#39;</code></td>
       </tr>
       <tr>
-        <td><code>asset_keys</code></td>
+        <td><code>assets</code></td>
         <td><code>list</code></td>
         <td><p>List of asset keys to download. If None,
 downloads all available assets. Defaults to None.</p></td>
@@ -3054,7 +3057,7 @@ Defaults to True.</p></td>
         <td><code>bool</code></td>
         <td><p>Whether to sign URLs for authenticated access.
 Defaults to True.</p></td>
-        <td><code>True</code></td>
+        <td><em>required</em></td>
       </tr>
   </tbody>
 </table>
@@ -3098,10 +3101,9 @@ Defaults to True.</p></td>
           <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_stac_download</span><span class="p">(</span>
     <span class="n">items</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
-    <span class="n">asset_keys</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">sign_urls</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Download assets from STAC items retrieved from the Planetary Computer.</span>
@@ -3114,7 +3116,7 @@ Defaults to True.</p></td>
 <span class="sd">        items (list or pystac.Item): STAC Item object or list of STAC Item objects.</span>
 <span class="sd">        output_dir (str, optional): Directory where assets will be saved.</span>
 <span class="sd">            Defaults to current directory.</span>
-<span class="sd">        asset_keys (list, optional): List of asset keys to download. If None,</span>
+<span class="sd">        assets (list, optional): List of asset keys to download. If None,</span>
 <span class="sd">            downloads all available assets. Defaults to None.</span>
 <span class="sd">        max_workers (int, optional): Maximum number of concurrent download threads.</span>
 <span class="sd">            Defaults to 4.</span>
@@ -3143,31 +3145,13 @@ Defaults to True.</p></td>
     <span class="c1"># Create output directory if it doesn&#39;t exist</span>
     <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="c1"># Function to sign URLs if needed</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_signed_url</span><span class="p">(</span><span class="n">href</span><span class="p">):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">sign_urls</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">href</span>
-
-        <span class="c1"># Planetary Computer typically requires signing URLs for accessing data</span>
-        <span class="c1"># Check if the URL is from Microsoft Planetary Computer</span>
-        <span class="k">if</span> <span class="s2">&quot;planetarycomputer&quot;</span> <span class="ow">in</span> <span class="n">href</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="n">sign_url</span> <span class="o">=</span> <span class="s2">&quot;https://planetarycomputer.microsoft.com/api/sas/v1/sign&quot;</span>
-                <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sign_url</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;href&quot;</span><span class="p">:</span> <span class="n">href</span><span class="p">})</span>
-                <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-                <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;href&quot;</span><span class="p">,</span> <span class="n">href</span><span class="p">)</span>
-            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Failed to sign URL </span><span class="si">{</span><span class="n">href</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-                <span class="k">return</span> <span class="n">href</span>
-        <span class="k">return</span> <span class="n">href</span>
-
     <span class="c1"># Function to download a single asset</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">download_asset</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">asset</span><span class="p">):</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
         <span class="n">item_id</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span>
 
         <span class="c1"># Get the asset URL and sign it if needed</span>
-        <span class="n">asset_url</span> <span class="o">=</span> <span class="n">get_signed_url</span><span class="p">(</span><span class="n">asset</span><span class="o">.</span><span class="n">href</span><span class="p">)</span>
-
+        <span class="n">asset_url</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="p">[</span><span class="n">asset_key</span><span class="p">]</span><span class="o">.</span><span class="n">href</span>
         <span class="c1"># Determine output filename</span>
         <span class="k">if</span> <span class="n">asset</span><span class="o">.</span><span class="n">media_type</span><span class="p">:</span>
             <span class="c1"># Use appropriate file extension based on media type</span>
@@ -3227,13 +3211,11 @@ Defaults to True.</p></td>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing STAC item: </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="c1"># Determine which assets to download</span>
-        <span class="k">if</span> <span class="n">asset_keys</span><span class="p">:</span>
-            <span class="n">assets_to_download</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">asset_keys</span>
-            <span class="p">}</span>
+        <span class="k">if</span> <span class="n">assets</span><span class="p">:</span>
+            <span class="n">assets_to_download</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">assets</span><span class="p">}</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">assets_to_download</span><span class="p">:</span>
                 <span class="nb">print</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Warning: None of the specified asset keys </span><span class="si">{</span><span class="n">asset_keys</span><span class="si">}</span><span class="s2"> found in item </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Warning: None of the specified asset keys </span><span class="si">{</span><span class="n">assets</span><span class="si">}</span><span class="s2"> found in item </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
                 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available asset keys: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
                 <span class="k">continue</span>
@@ -3562,7 +3544,7 @@ by converting it to an RGB array and displaying it with matplotlib.</p>
 
 
 <h2 id="geoai.download.read_pc_item_asset" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">read_pc_item_asset</span><span class="p">(</span><span class="n">item_url</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_cog</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">read_pc_item_asset</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">asset</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_cog</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 
 <a href="#geoai.download.read_pc_item_asset" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -3583,13 +3565,13 @@ by converting it to an RGB array and displaying it with matplotlib.</p>
   </thead>
   <tbody>
       <tr>
-        <td><code>item_url</code></td>
+        <td><code>item</code></td>
         <td><code>str</code></td>
         <td><p>The URL of the STAC item.</p></td>
         <td><em>required</em></td>
       </tr>
       <tr>
-        <td><code>asset_key</code></td>
+        <td><code>asset</code></td>
         <td><code>str</code></td>
         <td><p>The key of the asset to read.</p></td>
         <td><em>required</em></td>
@@ -3625,43 +3607,49 @@ by converting it to an RGB array and displaying it with matplotlib.</p>
 </table>
         <details class="quote">
           <summary>Source code in <code>geoai/download.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_pc_item_asset</span><span class="p">(</span><span class="n">item_url</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_cog</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_pc_item_asset</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">asset</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_cog</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read a specific asset from a STAC item in the Planetary Computer catalog.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        item_url (str): The URL of the STAC item.</span>
-<span class="sd">        asset_key (str): The key of the asset to read.</span>
+<span class="sd">        item (str): The URL of the STAC item.</span>
+<span class="sd">        asset (str): The key of the asset to read.</span>
 <span class="sd">        output (str, optional): If specified, the path to save the asset as a raster file.</span>
 <span class="sd">        as_cog (bool, optional): If True, save the asset as a Cloud Optimized GeoTIFF (COG).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        xarray.DataArray: The data array for the specified asset.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">item</span> <span class="o">=</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">item_url</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;item must be a string (URL) or a pystac.Item object&quot;</span><span class="p">)</span>
+
     <span class="n">signed_item</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">asset_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">asset</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Asset &#39;</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2">&#39; not found in item &#39;</span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&#39;. It has available assets: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Asset &#39;</span><span class="si">{</span><span class="n">asset</span><span class="si">}</span><span class="s2">&#39; not found in item &#39;</span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&#39;. It has available assets: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
 
-    <span class="n">asset_url</span> <span class="o">=</span> <span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="p">[</span><span class="n">asset_key</span><span class="p">]</span><span class="o">.</span><span class="n">href</span>
+    <span class="n">asset_url</span> <span class="o">=</span> <span class="n">signed_item</span><span class="o">.</span><span class="n">assets</span><span class="p">[</span><span class="n">asset</span><span class="p">]</span><span class="o">.</span><span class="n">href</span>
     <span class="n">ds</span> <span class="o">=</span> <span class="n">rxr</span><span class="o">.</span><span class="n">open_rasterio</span><span class="p">(</span><span class="n">asset_url</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">as_cog</span><span class="p">:</span>
         <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;driver&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;COG&quot;</span>  <span class="c1"># Ensure the output is a Cloud Optimized GeoTIFF</span>
 
     <span class="k">if</span> <span class="n">output</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving asset &#39;</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2">&#39; to </span><span class="si">{</span><span class="n">output</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving asset &#39;</span><span class="si">{</span><span class="n">asset</span><span class="si">}</span><span class="s2">&#39; to </span><span class="si">{</span><span class="n">output</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
         <span class="n">ds</span><span class="o">.</span><span class="n">rio</span><span class="o">.</span><span class="n">to_raster</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Asset &#39;</span><span class="si">{</span><span class="n">asset_key</span><span class="si">}</span><span class="s2">&#39; saved successfully.&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Asset &#39;</span><span class="si">{</span><span class="n">asset</span><span class="si">}</span><span class="s2">&#39; saved successfully.&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ds</span>
 </code></pre></div>
         </details>
     </div>
 
   </div>
+
 
 
 
