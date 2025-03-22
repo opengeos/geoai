@@ -23,6 +23,8 @@ def set_proj_lib_path(verbose=False):
         bool: True if both paths were set successfully, False otherwise.
     """
     try:
+        from rasterio.env import set_gdal_config
+
         # Get conda environment path
         conda_env_path = os.environ.get("CONDA_PREFIX") or sys.prefix
 
@@ -85,6 +87,9 @@ def set_proj_lib_path(verbose=False):
 
                 if proj_set and gdal_set:
                     break
+
+        set_gdal_config("PROJ_LIB", os.environ["PROJ_LIB"])
+        set_gdal_config("GDAL_DATA", os.environ["GDAL_DATA"])
 
     except Exception as e:
         print(f"Error setting projection library paths: {e}")
