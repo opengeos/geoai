@@ -36,7 +36,8 @@ def train_classifier(
     mode="min",
     save_top_k=1,
     save_last=True,
-    checkpoint_filename="best_model_{epoch:02d}_{val_loss:.4f}",
+    checkpoint_filename="best_model",
+    checkpoint_path=None,
     every_n_epochs=1,
     **kwargs,
 ):
@@ -98,6 +99,7 @@ def train_classifier(
             Defaults to True.
         checkpoint_filename (str, optional): Filename pattern for saved checkpoints.
             Defaults to "best_model_{epoch:02d}_{val_loss:.4f}".
+        checkpoint_path (str, optional): Path to a checkpoint file to resume training.
         every_n_epochs (int, optional): Save a checkpoint every N epochs.
             Defaults to 1.
         **kwargs: Additional keyword arguments to pass to the datasets.
@@ -309,7 +311,10 @@ def train_classifier(
     start = timeit.default_timer()
 
     # Check for existing checkpoint
-    checkpoint_file = os.path.join(test_dir, "torchgeo_trained.ckpt")
+    if checkpoint_path is not None:
+        checkpoint_file = os.path.abspath(checkpoint_path)
+    else:
+        checkpoint_file = os.path.join(test_dir, "last.ckpt")
 
     if os.path.isfile(checkpoint_file):
         print("Resuming training from previous checkpoint...")
