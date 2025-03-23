@@ -339,7 +339,12 @@ def train_classifier(
 
 
 def classify_image(
-    image_path, model_path, output_path=None, chip_size=1024, batch_size=4
+    image_path,
+    model_path,
+    output_path=None,
+    chip_size=1024,
+    batch_size=4,
+    colormap=None,
 ):
     """
     Classify a geospatial image using a trained semantic segmentation model.
@@ -358,6 +363,8 @@ def classify_image(
                                     Defaults to "classified_output.tif".
         chip_size (int, optional): Size of chips for processing. Defaults to 1024.
         batch_size (int, optional): Batch size for inference. Defaults to 4.
+        colormap (dict, optional): Colormap to apply to the output image.
+                                    Defaults to None.
 
     Returns:
         str: Path to the saved classified image.
@@ -448,7 +455,7 @@ def classify_image(
         return dataset
 
     # Helper function to clip to original bounds
-    def clip_to_original_bounds(tif_path, original_bounds):
+    def clip_to_original_bounds(tif_path, original_bounds, colormap=None):
         """Clip a GeoTIFF to match original bounds."""
         with rasterio.open(tif_path) as src:
             # Create a window that matches the original bounds
@@ -475,6 +482,8 @@ def classify_image(
         # Write the clipped data to the same file
         with rasterio.open(tif_path, "w", **meta) as dst:
             dst.write(data)
+            if isinstance(colormap, dict):
+                dst.write_colormap(1, colormap)
 
     # Run inference on all chips
     start_time = timeit.default_timer()
@@ -541,10 +550,12 @@ def classify_image(
     # Write the merged array to the output file
     with rasterio.open(output_path, "w", **merged_metadata) as dst:
         dst.write(merged)
+        # if isinstance(colormap, dict):
+        #     dst.write_colormap(1, colormap)
 
     # Clip to original bounds
     print("Clipping to original image bounds...")
-    clip_to_original_bounds(output_path, original_bounds)
+    clip_to_original_bounds(output_path, original_bounds, colormap)
 
     # Close all chip datasets
     for chip in tqdm(georref_chips_list, desc="Cleaning up", unit="chip"):
