@@ -1387,7 +1387,7 @@
 
 
 <h2 id="geoai.classify.classify_image" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">classify_image</span><span class="p">(</span><span class="n">image_path</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">classify_image</span><span class="p">(</span><span class="n">image_path</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 
 <a href="#geoai.classify.classify_image" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -1444,6 +1444,13 @@
         <td><p>Batch size for inference. Defaults to 4.</p></td>
         <td><code>4</code></td>
       </tr>
+      <tr>
+        <td><code>colormap</code></td>
+        <td><code>dict</code></td>
+        <td><p>Colormap to apply to the output image.
+                        Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
   </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -1464,7 +1471,12 @@
         <details class="quote">
           <summary>Source code in <code>geoai/classify.py</code></summary>
           <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_image</span><span class="p">(</span>
-    <span class="n">image_path</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span>
+    <span class="n">image_path</span><span class="p">,</span>
+    <span class="n">model_path</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Classify a geospatial image using a trained semantic segmentation model.</span>
@@ -1483,6 +1495,8 @@
 <span class="sd">                                    Defaults to &quot;classified_output.tif&quot;.</span>
 <span class="sd">        chip_size (int, optional): Size of chips for processing. Defaults to 1024.</span>
 <span class="sd">        batch_size (int, optional): Batch size for inference. Defaults to 4.</span>
+<span class="sd">        colormap (dict, optional): Colormap to apply to the output image.</span>
+<span class="sd">                                    Defaults to None.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        str: Path to the saved classified image.</span>
@@ -1573,7 +1587,7 @@
         <span class="k">return</span> <span class="n">dataset</span>
 
     <span class="c1"># Helper function to clip to original bounds</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">clip_to_original_bounds</span><span class="p">(</span><span class="n">tif_path</span><span class="p">,</span> <span class="n">original_bounds</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clip_to_original_bounds</span><span class="p">(</span><span class="n">tif_path</span><span class="p">,</span> <span class="n">original_bounds</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Clip a GeoTIFF to match original bounds.&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">tif_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
             <span class="c1"># Create a window that matches the original bounds</span>
@@ -1600,6 +1614,8 @@
         <span class="c1"># Write the clipped data to the same file</span>
         <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">tif_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">meta</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">colormap</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="n">dst</span><span class="o">.</span><span class="n">write_colormap</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">colormap</span><span class="p">)</span>
 
     <span class="c1"># Run inference on all chips</span>
     <span class="n">start_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span>
@@ -1666,10 +1682,12 @@
     <span class="c1"># Write the merged array to the output file</span>
     <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">merged_metadata</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
         <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span>
+        <span class="c1"># if isinstance(colormap, dict):</span>
+        <span class="c1">#     dst.write_colormap(1, colormap)</span>
 
     <span class="c1"># Clip to original bounds</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Clipping to original image bounds...&quot;</span><span class="p">)</span>
-    <span class="n">clip_to_original_bounds</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">original_bounds</span><span class="p">)</span>
+    <span class="n">clip_to_original_bounds</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">original_bounds</span><span class="p">,</span> <span class="n">colormap</span><span class="p">)</span>
 
     <span class="c1"># Close all chip datasets</span>
     <span class="k">for</span> <span class="n">chip</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">georref_chips_list</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Cleaning up&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;chip&quot;</span><span class="p">):</span>
