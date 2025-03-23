@@ -336,3 +336,225 @@ def train_classifier(
     trainer.test(model=task, datamodule=datamodule)
 
     return task
+
+
+def classify_image(
+    image_path, model_path, output_path=None, chip_size=1024, batch_size=4
+):
+    """
+    Classify a geospatial image using a trained semantic segmentation model.
+
+    This function handles the full image classification pipeline:
+    1. Loads the image and model
+    2. Cuts the image into tiles/chips
+    3. Makes predictions on each chip
+    4. Georeferences each prediction
+    5. Merges all predictions into a single georeferenced output
+
+    Parameters:
+        image_path (str): Path to the input GeoTIFF image.
+        model_path (str): Path to the trained model checkpoint.
+        output_path (str, optional): Path to save the output classified image.
+                                    Defaults to "classified_output.tif".
+        chip_size (int, optional): Size of chips for processing. Defaults to 1024.
+        batch_size (int, optional): Batch size for inference. Defaults to 4.
+
+    Returns:
+        str: Path to the saved classified image.
+    """
+    import os
+    import numpy as np
+    import timeit
+    from tqdm import tqdm
+
+    import torch
+    from torch.utils.data import DataLoader
+
+    from torchgeo.datasets import RasterDataset, stack_samples
+    from torchgeo.samplers import GridGeoSampler
+    from torchgeo.trainers import SemanticSegmentationTask
+
+    import rasterio
+    from rasterio.transform import from_origin
+    from rasterio.io import MemoryFile
+    from rasterio.merge import merge
+
+    # Set default output path if not provided
+    if output_path is None:
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+        output_path = f"{base_name}_classified.tif"
+
+    # Make sure output directory exists
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Load the model
+    print(f"Loading model from {model_path}...")
+    task = SemanticSegmentationTask.load_from_checkpoint(model_path)
+    task.model.eval()
+    task.model.cuda()
+
+    # Set up dataset and sampler
+    print(f"Loading image from {image_path}...")
+    dataset = RasterDataset(paths=image_path)
+
+    # Get the bounds and resolution of the dataset
+    original_bounds = dataset.bounds
+    pixel_size = dataset.res
+    crs = dataset.crs.to_epsg()
+
+    # Use a GridGeoSampler to sample the image in tiles
+    sampler = GridGeoSampler(dataset, chip_size, chip_size)
+
+    # Create DataLoader
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        sampler=sampler,
+        collate_fn=stack_samples,
+        num_workers=2,
+    )
+
+    print(f"Processing image in {len(dataloader)} batches...")
+
+    # Helper function to create in-memory geotiffs for chips
+    def create_in_memory_geochip(predicted_chip, geotransform, crs):
+        """Create in-memory georeferenced chips."""
+        photometric = "MINISBLACK"
+
+        # Ensure predicted_chip has shape (bands, height, width)
+        if len(predicted_chip.shape) == 2:
+            predicted_chip = predicted_chip[np.newaxis, :, :]
+
+        memfile = MemoryFile()
+        dataset = memfile.open(
+            driver="GTiff",
+            height=predicted_chip.shape[1],
+            width=predicted_chip.shape[2],
+            count=predicted_chip.shape[0],  # Number of bands
+            dtype=np.uint8,
+            crs=crs,
+            transform=geotransform,
+            photometric=photometric,
+        )
+
+        # Write all bands
+        for band_idx in range(predicted_chip.shape[0]):
+            dataset.write(
+                predicted_chip[band_idx], band_idx + 1
+            )  # Band indices are 1-based in rasterio
+
+        return dataset
+
+    # Helper function to clip to original bounds
+    def clip_to_original_bounds(tif_path, original_bounds):
+        """Clip a GeoTIFF to match original bounds."""
+        with rasterio.open(tif_path) as src:
+            # Create a window that matches the original bounds
+            window = rasterio.windows.from_bounds(
+                original_bounds.minx,
+                original_bounds.miny,
+                original_bounds.maxx,
+                original_bounds.maxy,
+                transform=src.transform,
+            )
+
+            # Read data within the window
+            data = src.read(window=window)
+
+            # Update the transform
+            transform = rasterio.windows.transform(window, src.transform)
+
+            # Create new metadata
+            meta = src.meta.copy()
+            meta.update(
+                {"height": window.height, "width": window.width, "transform": transform}
+            )
+
+        # Write the clipped data to the same file
+        with rasterio.open(tif_path, "w", **meta) as dst:
+            dst.write(data)
+
+    # Run inference on all chips
+    start_time = timeit.default_timer()
+    georref_chips_list = []
+
+    # Progress bar for processing chips
+    progress_bar = tqdm(total=len(dataloader), desc="Processing tiles", unit="batch")
+
+    for batch in dataloader:
+        # Get images and bounds
+        images = batch["image"]
+        bounds_list = batch["bounds"]
+
+        # Normalize images
+        images = images / 255.0
+
+        # Make predictions
+        with torch.no_grad():
+            predictions = task.model.predict(images.cuda())
+            predictions = torch.softmax(predictions, dim=1)
+            predictions = torch.argmax(predictions, dim=1)
+
+        # Process each prediction in the batch
+        for i in range(len(predictions)):
+            # Get the bounds for this chip
+            bounds = bounds_list[i]
+
+            # Create geotransform
+            geotransform = from_origin(bounds.minx, bounds.maxy, pixel_size, pixel_size)
+
+            # Convert prediction to numpy array
+            pred = predictions[i].cpu().numpy().astype(np.uint8)
+            if len(pred.shape) == 2:
+                pred = pred[np.newaxis, :, :]
+
+            # Create georeferenced chip
+            georref_chips_list.append(create_in_memory_geochip(pred, geotransform, crs))
+
+        # Update progress bar
+        progress_bar.update(1)
+
+    progress_bar.close()
+
+    prediction_time = timeit.default_timer() - start_time
+    print(f"Prediction complete in {prediction_time:.2f} seconds")
+    print(f"Produced {len(georref_chips_list)} georeferenced chips")
+
+    # Merge all georeferenced chips into a single output
+    print("Merging predictions...")
+    merge_start = timeit.default_timer()
+
+    # Merge the chips using Rasterio's merge function
+    merged, merged_transform = merge(georref_chips_list)
+
+    # Calculate the number of rows and columns for the merged output
+    rows, cols = merged.shape[1], merged.shape[2]
+
+    # Update the metadata of the merged dataset
+    merged_metadata = georref_chips_list[0].meta
+    merged_metadata.update(
+        {"height": rows, "width": cols, "transform": merged_transform}
+    )
+
+    # Write the merged array to the output file
+    with rasterio.open(output_path, "w", **merged_metadata) as dst:
+        dst.write(merged)
+
+    # Clip to original bounds
+    print("Clipping to original image bounds...")
+    clip_to_original_bounds(output_path, original_bounds)
+
+    # Close all chip datasets
+    for chip in tqdm(georref_chips_list, desc="Cleaning up", unit="chip"):
+        chip.close()
+
+    merge_time = timeit.default_timer() - merge_start
+    total_time = timeit.default_timer() - start_time
+
+    print(f"Merge and save complete in {merge_time:.2f} seconds")
+    print(f"Total processing time: {total_time:.2f} seconds")
+    print(f"Successfully saved classified image to {output_path}")
+
+    return output_path
