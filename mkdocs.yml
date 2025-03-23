@@ -138,6 +138,7 @@ nav:
           - examples/dataviz/vector_viz.ipynb
           - examples/dataviz/lidar_viz.ipynb
     - API Reference:
+          - classify module: classify.md
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
