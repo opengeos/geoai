@@ -1,5 +1,7 @@
 """The module for training semantic segmentation models for classifying remote sensing imagery."""
 
+import os
+
 
 def train_classifier(
     image_root,
@@ -116,7 +118,6 @@ def train_classifier(
         RandomBatchGeoSampler,
         GridGeoSampler,
     )
-    import os
     import torch
     import multiprocessing as mp
     import timeit
@@ -345,6 +346,8 @@ def classify_image(
     chip_size=1024,
     batch_size=4,
     colormap=None,
+    num_workers=2,
+    **kwargs,
 ):
     """
     Classify a geospatial image using a trained semantic segmentation model.
@@ -365,11 +368,12 @@ def classify_image(
         batch_size (int, optional): Batch size for inference. Defaults to 4.
         colormap (dict, optional): Colormap to apply to the output image.
                                     Defaults to None.
+        num_workers (int, optional): Number of workers for DataLoader. Defaults to 2.
+        **kwargs: Additional keyword arguments for DataLoader.
 
     Returns:
         str: Path to the saved classified image.
     """
-    import os
     import numpy as np
     import timeit
     from tqdm import tqdm
@@ -420,7 +424,8 @@ def classify_image(
         batch_size=batch_size,
         sampler=sampler,
         collate_fn=stack_samples,
-        num_workers=2,
+        num_workers=num_workers,
+        **kwargs,
     )
 
     print(f"Processing image in {len(dataloader)} batches...")
@@ -569,3 +574,112 @@ def classify_image(
     print(f"Successfully saved classified image to {output_path}")
 
     return output_path
+
+
+def classify_images(
+    image_paths,
+    model_path,
+    output_dir=None,
+    chip_size=1024,
+    batch_size=4,
+    colormap=None,
+    file_extension=".tif",
+    num_workers=2,
+    **kwargs,
+):
+    """
+    Classify multiple geospatial images using a trained semantic segmentation model.
+
+    This function accepts either a list of image paths or a directory containing images
+    and applies the classify_image function to each image, saving the results in the
+    specified output directory.
+
+    Parameters:
+        image_paths (str or list): Either a directory path containing images or a list
+            of paths to input GeoTIFF images.
+        model_path (str): Path to the trained model checkpoint.
+        output_dir (str, optional): Directory to save the output classified images.
+            Defaults to None (same directory as input images for a list, or a new
+            "classified" subdirectory for a directory input).
+        chip_size (int, optional): Size of chips for processing. Defaults to 1024.
+        batch_size (int, optional): Batch size for inference. Defaults to 4.
+        colormap (dict, optional): Colormap to apply to the output images.
+            Defaults to None.
+        file_extension (str, optional): File extension to filter by when image_paths
+            is a directory. Defaults to ".tif".
+        num_workers (int, optional): Number of workers for DataLoader. Defaults to 2.
+        **kwargs: Additional keyword arguments for the classify_image function.
+
+    Returns:
+        list: List of paths to the saved classified images.
+    """
+    # Import required libraries
+    from tqdm import tqdm
+    import glob
+
+    # Process directory input
+    if isinstance(image_paths, str) and os.path.isdir(image_paths):
+        # Set default output directory if not provided
+        if output_dir is None:
+            output_dir = os.path.join(image_paths, "classified")
+
+        # Get all images with the specified extension
+        image_path_list = glob.glob(os.path.join(image_paths, f"*{file_extension}"))
+
+        # Check if any images were found
+        if not image_path_list:
+            print(f"No files with extension '{file_extension}' found in {image_paths}")
+            return []
+
+        print(f"Found {len(image_path_list)} images in directory {image_paths}")
+
+    # Process list input
+    elif isinstance(image_paths, list):
+        image_path_list = image_paths
+
+        # Set default output directory if not provided
+        if output_dir is None and len(image_path_list) > 0:
+            output_dir = os.path.dirname(image_path_list[0])
+
+    # Invalid input
+    else:
+        raise ValueError(
+            "image_paths must be either a directory path or a list of file paths"
+        )
+
+    # Create output directory if it doesn't exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    classified_image_paths = []
+
+    # Create progress bar
+    for image_path in tqdm(image_path_list, desc="Classifying images", unit="image"):
+        try:
+            # Get just the filename without extension
+            base_filename = os.path.splitext(os.path.basename(image_path))[0]
+
+            # Create output path within output_dir
+            output_path = os.path.join(
+                output_dir, f"{base_filename}_classified{file_extension}"
+            )
+
+            # Perform classification
+            classified_image_path = classify_image(
+                image_path,
+                model_path,
+                output_path=output_path,
+                chip_size=chip_size,
+                batch_size=batch_size,
+                colormap=colormap,
+                num_workers=num_workers,
+                **kwargs,
+            )
+            classified_image_paths.append(classified_image_path)
+        except Exception as e:
+            print(f"Error processing {image_path}: {str(e)}")
+
+    print(
+        f"Classification complete. Processed {len(classified_image_paths)} images successfully."
+    )
+    return classified_image_paths
