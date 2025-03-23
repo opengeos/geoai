@@ -1099,6 +1099,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.classify.classify_image" class="md-nav__link">
+    <span class="md-ellipsis">
+      classify_image()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.classify.train_classifier" class="md-nav__link">
     <span class="md-ellipsis">
       train_classifier()
@@ -1313,6 +1322,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.classify.classify_image" class="md-nav__link">
+    <span class="md-ellipsis">
+      classify_image()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.classify.train_classifier" class="md-nav__link">
     <span class="md-ellipsis">
       train_classifier()
@@ -1361,6 +1379,315 @@
 
 
 
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.classify.classify_image" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">classify_image</span><span class="p">(</span><span class="n">image_path</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span></code>
+
+
+<a href="#geoai.classify.classify_image" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Classify a geospatial image using a trained semantic segmentation model.</p>
+<p>This function handles the full image classification pipeline:
+1. Loads the image and model
+2. Cuts the image into tiles/chips
+3. Makes predictions on each chip
+4. Georeferences each prediction
+5. Merges all predictions into a single georeferenced output</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>image_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to the input GeoTIFF image.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>model_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to the trained model checkpoint.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>output_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to save the output classified image.
+                        Defaults to "classified_output.tif".</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>chip_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Size of chips for processing. Defaults to 1024.</p></td>
+        <td><code>1024</code></td>
+      </tr>
+      <tr>
+        <td><code>batch_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Batch size for inference. Defaults to 4.</p></td>
+        <td><code>4</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>str</code></td>
+      <td><p>Path to the saved classified image.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/classify.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_image</span><span class="p">(</span>
+    <span class="n">image_path</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Classify a geospatial image using a trained semantic segmentation model.</span>
+
+<span class="sd">    This function handles the full image classification pipeline:</span>
+<span class="sd">    1. Loads the image and model</span>
+<span class="sd">    2. Cuts the image into tiles/chips</span>
+<span class="sd">    3. Makes predictions on each chip</span>
+<span class="sd">    4. Georeferences each prediction</span>
+<span class="sd">    5. Merges all predictions into a single georeferenced output</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        image_path (str): Path to the input GeoTIFF image.</span>
+<span class="sd">        model_path (str): Path to the trained model checkpoint.</span>
+<span class="sd">        output_path (str, optional): Path to save the output classified image.</span>
+<span class="sd">                                    Defaults to &quot;classified_output.tif&quot;.</span>
+<span class="sd">        chip_size (int, optional): Size of chips for processing. Defaults to 1024.</span>
+<span class="sd">        batch_size (int, optional): Batch size for inference. Defaults to 4.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Path to the saved classified image.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">timeit</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataLoader</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">RasterDataset</span><span class="p">,</span> <span class="n">stack_samples</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.samplers</span><span class="w"> </span><span class="kn">import</span> <span class="n">GridGeoSampler</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="n">SemanticSegmentationTask</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">rasterio</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_origin</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryFile</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.merge</span><span class="w"> </span><span class="kn">import</span> <span class="n">merge</span>
+
+    <span class="c1"># Set default output path if not provided</span>
+    <span class="k">if</span> <span class="n">output_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">base_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">image_path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">output_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_name</span><span class="si">}</span><span class="s2">_classified.tif&quot;</span>
+
+    <span class="c1"># Make sure output directory exists</span>
+    <span class="n">output_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">output_dir</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_dir</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span>
+
+    <span class="c1"># Load the model</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading model from </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">task</span> <span class="o">=</span> <span class="n">SemanticSegmentationTask</span><span class="o">.</span><span class="n">load_from_checkpoint</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+    <span class="n">task</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="n">task</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+    <span class="c1"># Set up dataset and sampler</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading image from </span><span class="si">{</span><span class="n">image_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">RasterDataset</span><span class="p">(</span><span class="n">paths</span><span class="o">=</span><span class="n">image_path</span><span class="p">)</span>
+
+    <span class="c1"># Get the bounds and resolution of the dataset</span>
+    <span class="n">original_bounds</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">bounds</span>
+    <span class="n">pixel_size</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">res</span>
+    <span class="n">crs</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">crs</span><span class="o">.</span><span class="n">to_epsg</span><span class="p">()</span>
+
+    <span class="c1"># Use a GridGeoSampler to sample the image in tiles</span>
+    <span class="n">sampler</span> <span class="o">=</span> <span class="n">GridGeoSampler</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">chip_size</span><span class="p">,</span> <span class="n">chip_size</span><span class="p">)</span>
+
+    <span class="c1"># Create DataLoader</span>
+    <span class="n">dataloader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">dataset</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="n">sampler</span><span class="p">,</span>
+        <span class="n">collate_fn</span><span class="o">=</span><span class="n">stack_samples</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing image in </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="p">)</span><span class="si">}</span><span class="s2"> batches...&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Helper function to create in-memory geotiffs for chips</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_in_memory_geochip</span><span class="p">(</span><span class="n">predicted_chip</span><span class="p">,</span> <span class="n">geotransform</span><span class="p">,</span> <span class="n">crs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create in-memory georeferenced chips.&quot;&quot;&quot;</span>
+        <span class="n">photometric</span> <span class="o">=</span> <span class="s2">&quot;MINISBLACK&quot;</span>
+
+        <span class="c1"># Ensure predicted_chip has shape (bands, height, width)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">predicted_chip</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">predicted_chip</span> <span class="o">=</span> <span class="n">predicted_chip</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
+
+        <span class="n">memfile</span> <span class="o">=</span> <span class="n">MemoryFile</span><span class="p">()</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">memfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span>
+            <span class="n">driver</span><span class="o">=</span><span class="s2">&quot;GTiff&quot;</span><span class="p">,</span>
+            <span class="n">height</span><span class="o">=</span><span class="n">predicted_chip</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">width</span><span class="o">=</span><span class="n">predicted_chip</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+            <span class="n">count</span><span class="o">=</span><span class="n">predicted_chip</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>  <span class="c1"># Number of bands</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+            <span class="n">crs</span><span class="o">=</span><span class="n">crs</span><span class="p">,</span>
+            <span class="n">transform</span><span class="o">=</span><span class="n">geotransform</span><span class="p">,</span>
+            <span class="n">photometric</span><span class="o">=</span><span class="n">photometric</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Write all bands</span>
+        <span class="k">for</span> <span class="n">band_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">predicted_chip</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">dataset</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                <span class="n">predicted_chip</span><span class="p">[</span><span class="n">band_idx</span><span class="p">],</span> <span class="n">band_idx</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="p">)</span>  <span class="c1"># Band indices are 1-based in rasterio</span>
+
+        <span class="k">return</span> <span class="n">dataset</span>
+
+    <span class="c1"># Helper function to clip to original bounds</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clip_to_original_bounds</span><span class="p">(</span><span class="n">tif_path</span><span class="p">,</span> <span class="n">original_bounds</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Clip a GeoTIFF to match original bounds.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">tif_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
+            <span class="c1"># Create a window that matches the original bounds</span>
+            <span class="n">window</span> <span class="o">=</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">windows</span><span class="o">.</span><span class="n">from_bounds</span><span class="p">(</span>
+                <span class="n">original_bounds</span><span class="o">.</span><span class="n">minx</span><span class="p">,</span>
+                <span class="n">original_bounds</span><span class="o">.</span><span class="n">miny</span><span class="p">,</span>
+                <span class="n">original_bounds</span><span class="o">.</span><span class="n">maxx</span><span class="p">,</span>
+                <span class="n">original_bounds</span><span class="o">.</span><span class="n">maxy</span><span class="p">,</span>
+                <span class="n">transform</span><span class="o">=</span><span class="n">src</span><span class="o">.</span><span class="n">transform</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Read data within the window</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+
+            <span class="c1"># Update the transform</span>
+            <span class="n">transform</span> <span class="o">=</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">windows</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">window</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">transform</span><span class="p">)</span>
+
+            <span class="c1"># Create new metadata</span>
+            <span class="n">meta</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">meta</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="n">window</span><span class="o">.</span><span class="n">height</span><span class="p">,</span> <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="n">window</span><span class="o">.</span><span class="n">width</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="n">transform</span><span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Write the clipped data to the same file</span>
+        <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">tif_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">meta</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
+            <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="c1"># Run inference on all chips</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span>
+    <span class="n">georref_chips_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Progress bar for processing chips</span>
+    <span class="n">progress_bar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing tiles&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;batch&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">dataloader</span><span class="p">:</span>
+        <span class="c1"># Get images and bounds</span>
+        <span class="n">images</span> <span class="o">=</span> <span class="n">batch</span><span class="p">[</span><span class="s2">&quot;image&quot;</span><span class="p">]</span>
+        <span class="n">bounds_list</span> <span class="o">=</span> <span class="n">batch</span><span class="p">[</span><span class="s2">&quot;bounds&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Normalize images</span>
+        <span class="n">images</span> <span class="o">=</span> <span class="n">images</span> <span class="o">/</span> <span class="mf">255.0</span>
+
+        <span class="c1"># Make predictions</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">predictions</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+            <span class="n">predictions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">predictions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Process each prediction in the batch</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">predictions</span><span class="p">)):</span>
+            <span class="c1"># Get the bounds for this chip</span>
+            <span class="n">bounds</span> <span class="o">=</span> <span class="n">bounds_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+            <span class="c1"># Create geotransform</span>
+            <span class="n">geotransform</span> <span class="o">=</span> <span class="n">from_origin</span><span class="p">(</span><span class="n">bounds</span><span class="o">.</span><span class="n">minx</span><span class="p">,</span> <span class="n">bounds</span><span class="o">.</span><span class="n">maxy</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">)</span>
+
+            <span class="c1"># Convert prediction to numpy array</span>
+            <span class="n">pred</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pred</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">pred</span> <span class="o">=</span> <span class="n">pred</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
+
+            <span class="c1"># Create georeferenced chip</span>
+            <span class="n">georref_chips_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">create_in_memory_geochip</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">geotransform</span><span class="p">,</span> <span class="n">crs</span><span class="p">))</span>
+
+        <span class="c1"># Update progress bar</span>
+        <span class="n">progress_bar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">progress_bar</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="n">prediction_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prediction complete in </span><span class="si">{</span><span class="n">prediction_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Produced </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">georref_chips_list</span><span class="p">)</span><span class="si">}</span><span class="s2"> georeferenced chips&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Merge all georeferenced chips into a single output</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Merging predictions...&quot;</span><span class="p">)</span>
+    <span class="n">merge_start</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span>
+
+    <span class="c1"># Merge the chips using Rasterio&#39;s merge function</span>
+    <span class="n">merged</span><span class="p">,</span> <span class="n">merged_transform</span> <span class="o">=</span> <span class="n">merge</span><span class="p">(</span><span class="n">georref_chips_list</span><span class="p">)</span>
+
+    <span class="c1"># Calculate the number of rows and columns for the merged output</span>
+    <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">merged</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">merged</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+    <span class="c1"># Update the metadata of the merged dataset</span>
+    <span class="n">merged_metadata</span> <span class="o">=</span> <span class="n">georref_chips_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">meta</span>
+    <span class="n">merged_metadata</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+        <span class="p">{</span><span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="n">rows</span><span class="p">,</span> <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="n">cols</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="n">merged_transform</span><span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Write the merged array to the output file</span>
+    <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">merged_metadata</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
+        <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span>
+
+    <span class="c1"># Clip to original bounds</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Clipping to original image bounds...&quot;</span><span class="p">)</span>
+    <span class="n">clip_to_original_bounds</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">original_bounds</span><span class="p">)</span>
+
+    <span class="c1"># Close all chip datasets</span>
+    <span class="k">for</span> <span class="n">chip</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">georref_chips_list</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Cleaning up&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;chip&quot;</span><span class="p">):</span>
+        <span class="n">chip</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="n">merge_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span> <span class="o">-</span> <span class="n">merge_start</span>
+    <span class="n">total_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Merge and save complete in </span><span class="si">{</span><span class="n">merge_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total processing time: </span><span class="si">{</span><span class="n">total_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully saved classified image to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output_path</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
 
 
 
