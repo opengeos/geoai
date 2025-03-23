@@ -1,0 +1,3 @@
+# classify module
+
+::: geoai.classify
