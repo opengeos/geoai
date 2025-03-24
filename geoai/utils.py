@@ -6053,3 +6053,165 @@ def try_common_architectures(state_dict):
 
         except Exception as e:
             print(f"- {name}: Failed to load - {str(e)}")
+
+
+def mosaic_geotiffs(input_dir, output_file, mask_file=None):
+    """Create a mosaic from all GeoTIFF files as a Cloud Optimized GeoTIFF (COG).
+
+    This function identifies all GeoTIFF files in the specified directory,
+    creates a seamless mosaic with proper handling of nodata values, and saves
+    as a Cloud Optimized GeoTIFF format. If a mask file is provided, the output
+    will be clipped to the extent of the mask.
+
+    Args:
+        input_dir (str): Path to the directory containing GeoTIFF files.
+        output_file (str): Path to the output Cloud Optimized GeoTIFF file.
+        mask_file (str, optional): Path to a mask file to clip the output.
+            If provided, the output will be clipped to the extent of this mask.
+            Defaults to None.
+
+    Returns:
+        bool: True if the mosaic was created successfully, False otherwise.
+
+    Examples:
+        >>> mosaic_geotiffs('naip', 'merged_naip.tif')
+        True
+        >>> mosaic_geotiffs('naip', 'merged_naip.tif', 'boundary.tif')
+        True
+    """
+    import glob
+    from osgeo import gdal
+
+    gdal.UseExceptions()
+    # Get all tif files in the directory
+    tif_files = glob.glob(os.path.join(input_dir, "*.tif"))
+
+    if not tif_files:
+        print("No GeoTIFF files found in the specified directory.")
+        return False
+
+    # Analyze the first input file to determine compression and nodata settings
+    ds = gdal.Open(tif_files[0])
+    if ds is None:
+        print(f"Unable to open {tif_files[0]}")
+        return False
+
+    # Get driver metadata from the first file
+    driver = ds.GetDriver()
+    creation_options = []
+
+    # Check compression type
+    metadata = ds.GetMetadata("IMAGE_STRUCTURE")
+    if "COMPRESSION" in metadata:
+        compression = metadata["COMPRESSION"]
+        creation_options.append(f"COMPRESS={compression}")
+    else:
+        # Default compression if none detected
+        creation_options.append("COMPRESS=LZW")
+
+    # Add COG-specific creation options
+    creation_options.extend(["TILED=YES", "BLOCKXSIZE=512", "BLOCKYSIZE=512"])
+
+    # Check for nodata value in the first band of the first file
+    band = ds.GetRasterBand(1)
+    has_nodata = band.GetNoDataValue() is not None
+    nodata_value = band.GetNoDataValue() if has_nodata else None
+
+    # Close the dataset
+    ds = None
+
+    # Create a temporary VRT (Virtual Dataset)
+    vrt_path = os.path.join(input_dir, "temp_mosaic.vrt")
+
+    # Build VRT from input files with proper nodata handling
+    vrt_options = gdal.BuildVRTOptions(
+        resampleAlg="nearest",
+        srcNodata=nodata_value if has_nodata else None,
+        VRTNodata=nodata_value if has_nodata else None,
+    )
+    vrt_dataset = gdal.BuildVRT(vrt_path, tif_files, options=vrt_options)
+
+    # Close the VRT dataset to flush it to disk
+    vrt_dataset = None
+
+    # Create temp mosaic
+    temp_mosaic = output_file + ".temp.tif"
+
+    # Convert VRT to GeoTIFF with the same compression as input
+    translate_options = gdal.TranslateOptions(
+        format="GTiff",
+        creationOptions=creation_options,
+        noData=nodata_value if has_nodata else None,
+    )
+    gdal.Translate(temp_mosaic, vrt_path, options=translate_options)
+
+    # Apply mask if provided
+    if mask_file and os.path.exists(mask_file):
+        print(f"Clipping mosaic to mask: {mask_file}")
+
+        # Create a temporary clipped file
+        clipped_mosaic = output_file + ".clipped.tif"
+
+        # Open mask file
+        mask_ds = gdal.Open(mask_file)
+        if mask_ds is None:
+            print(f"Unable to open mask file: {mask_file}")
+            # Continue without clipping
+        else:
+            # Get mask extent
+            mask_geotransform = mask_ds.GetGeoTransform()
+            mask_projection = mask_ds.GetProjection()
+            mask_ulx = mask_geotransform[0]
+            mask_uly = mask_geotransform[3]
+            mask_lrx = mask_ulx + (mask_geotransform[1] * mask_ds.RasterXSize)
+            mask_lry = mask_uly + (mask_geotransform[5] * mask_ds.RasterYSize)
+
+            # Close mask dataset
+            mask_ds = None
+
+            # Use warp options to clip
+            warp_options = gdal.WarpOptions(
+                format="GTiff",
+                outputBounds=[mask_ulx, mask_lry, mask_lrx, mask_uly],
+                dstSRS=mask_projection,
+                creationOptions=creation_options,
+                srcNodata=nodata_value if has_nodata else None,
+                dstNodata=nodata_value if has_nodata else None,
+            )
+
+            # Apply clipping
+            gdal.Warp(clipped_mosaic, temp_mosaic, options=warp_options)
+
+            # Remove the unclipped temp mosaic and use the clipped one
+            os.remove(temp_mosaic)
+            temp_mosaic = clipped_mosaic
+
+    # Create internal overviews for the temp mosaic
+    ds = gdal.Open(temp_mosaic, gdal.GA_Update)
+    overview_list = [2, 4, 8, 16, 32]
+    ds.BuildOverviews("NEAREST", overview_list)
+    ds = None  # Close the dataset to ensure overviews are written
+
+    # Convert the temp mosaic to a proper COG
+    cog_options = gdal.TranslateOptions(
+        format="GTiff",
+        creationOptions=[
+            "TILED=YES",
+            "COPY_SRC_OVERVIEWS=YES",
+            "COMPRESS=DEFLATE",
+            "PREDICTOR=2",
+            "BLOCKXSIZE=512",
+            "BLOCKYSIZE=512",
+        ],
+        noData=nodata_value if has_nodata else None,
+    )
+    gdal.Translate(output_file, temp_mosaic, options=cog_options)
+
+    # Clean up temporary files
+    if os.path.exists(vrt_path):
+        os.remove(vrt_path)
+    if os.path.exists(temp_mosaic):
+        os.remove(temp_mosaic)
+
+    print(f"Cloud Optimized GeoTIFF mosaic created successfully: {output_file}")
+    return True
