@@ -1,6 +1,7 @@
 """The module for training semantic segmentation models for classifying remote sensing imagery."""
 
 import os
+import numpy as np
 
 
 def train_classifier(
@@ -339,7 +340,7 @@ def train_classifier(
     return task
 
 
-def classify_image(
+def _classify_image(
     image_path,
     model_path,
     output_path=None,
@@ -350,7 +351,8 @@ def classify_image(
     **kwargs,
 ):
     """
-    Classify a geospatial image using a trained semantic segmentation model.
+    Classify a geospatial image using a trained semantic segmentation model. The version has
+        tile edge artifacts.
 
     This function handles the full image classification pipeline:
     1. Loads the image and model
@@ -481,7 +483,12 @@ def classify_image(
             # Create new metadata
             meta = src.meta.copy()
             meta.update(
-                {"height": window.height, "width": window.width, "transform": transform}
+                {
+                    "height": window.height,
+                    "width": window.width,
+                    "transform": transform,
+                    "compress": "deflate",
+                }
             )
 
         # Write the clipped data to the same file
@@ -576,6 +583,250 @@ def classify_image(
     return output_path
 
 
+def classify_image(
+    image_path,
+    model_path,
+    output_path=None,
+    chip_size=1024,
+    overlap=256,
+    batch_size=4,
+    colormap=None,
+    **kwargs,
+):
+    """
+    Classify a geospatial image using a trained semantic segmentation model.
+
+    This function handles the full image classification pipeline with special
+    attention to edge handling:
+    1. Process the image in a grid pattern with overlapping tiles
+    2. Use central regions of tiles for interior parts
+    3. Special handling for edges to ensure complete coverage
+    4. Merge results into a single georeferenced output
+
+    Parameters:
+        image_path (str): Path to the input GeoTIFF image.
+        model_path (str): Path to the trained model checkpoint.
+        output_path (str, optional): Path to save the output classified image.
+                                    Defaults to "[input_name]_classified.tif".
+        chip_size (int, optional): Size of chips for processing. Defaults to 1024.
+        overlap (int, optional): Overlap size between adjacent tiles. Defaults to 256.
+        batch_size (int, optional): Batch size for inference. Defaults to 4.
+        colormap (dict, optional): Colormap to apply to the output image.
+                                   Defaults to None.
+        **kwargs: Additional keyword arguments for DataLoader.
+
+    Returns:
+        str: Path to the saved classified image.
+    """
+    import timeit
+
+    import torch
+    from torchgeo.trainers import SemanticSegmentationTask
+
+    import rasterio
+
+    import warnings
+    from rasterio.errors import NotGeoreferencedWarning
+
+    # Disable specific GDAL/rasterio warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="rasterio._.*")
+    warnings.filterwarnings("ignore", category=UserWarning, module="rasterio")
+    warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
+
+    # Also suppress GDAL error reports
+    import logging
+
+    logging.getLogger("rasterio").setLevel(logging.ERROR)
+
+    # Set default output path if not provided
+    if output_path is None:
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+        output_path = f"{base_name}_classified.tif"
+
+    # Make sure output directory exists
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Load the model
+    print(f"Loading model from {model_path}...")
+    task = SemanticSegmentationTask.load_from_checkpoint(model_path)
+    task.model.eval()
+    task.model.cuda()
+
+    # Process the image using a modified tiling approach
+    with rasterio.open(image_path) as src:
+        # Get image dimensions and metadata
+        height = src.height
+        width = src.width
+        profile = src.profile.copy()
+
+        # Prepare output array for the final result
+        output_image = np.zeros((height, width), dtype=np.uint8)
+        confidence_map = np.zeros((height, width), dtype=np.float32)
+
+        # Calculate number of tiles needed with overlap
+        # Ensure we have tiles that specifically cover the edges
+        effective_stride = chip_size - overlap
+
+        # Calculate x positions ensuring leftmost and rightmost edges are covered
+        x_positions = []
+        # Always include the leftmost position
+        x_positions.append(0)
+        # Add regular grid positions
+        for x in range(effective_stride, width - chip_size, effective_stride):
+            x_positions.append(x)
+        # Always include rightmost position that still fits
+        if width > chip_size and x_positions[-1] + chip_size < width:
+            x_positions.append(width - chip_size)
+
+        # Calculate y positions ensuring top and bottom edges are covered
+        y_positions = []
+        # Always include the topmost position
+        y_positions.append(0)
+        # Add regular grid positions
+        for y in range(effective_stride, height - chip_size, effective_stride):
+            y_positions.append(y)
+        # Always include bottommost position that still fits
+        if height > chip_size and y_positions[-1] + chip_size < height:
+            y_positions.append(height - chip_size)
+
+        # Create list of all tile positions
+        tile_positions = []
+        for y in y_positions:
+            for x in x_positions:
+                y_end = min(y + chip_size, height)
+                x_end = min(x + chip_size, width)
+                tile_positions.append((y, x, y_end, x_end))
+
+        # Print information about the tiling
+        print(
+            f"Processing {len(tile_positions)} patches covering an image of size {height}x{width}..."
+        )
+        start_time = timeit.default_timer()
+
+        # Process tiles in batches
+        for batch_start in range(0, len(tile_positions), batch_size):
+            batch_end = min(batch_start + batch_size, len(tile_positions))
+            batch_positions = tile_positions[batch_start:batch_end]
+            batch_data = []
+
+            # Load data for current batch
+            for y_start, x_start, y_end, x_end in batch_positions:
+                # Calculate actual tile size
+                actual_height = y_end - y_start
+                actual_width = x_end - x_start
+
+                # Read the tile data
+                tile_data = src.read(window=((y_start, y_end), (x_start, x_end)))
+
+                # Handle different sized tiles by padding if necessary
+                if tile_data.shape[1] != chip_size or tile_data.shape[2] != chip_size:
+                    padded_data = np.zeros(
+                        (tile_data.shape[0], chip_size, chip_size),
+                        dtype=tile_data.dtype,
+                    )
+                    padded_data[:, : tile_data.shape[1], : tile_data.shape[2]] = (
+                        tile_data
+                    )
+                    tile_data = padded_data
+
+                # Convert to tensor
+
+                tile_tensor = torch.from_numpy(tile_data).float() / 255.0
+                batch_data.append(tile_tensor)
+
+            # Convert batch to tensor
+            batch_tensor = torch.stack(batch_data)
+
+            # Run inference
+            with torch.no_grad():
+                logits = task.model.predict(batch_tensor.cuda())
+                probs = torch.softmax(logits, dim=1)
+                confidence, predictions = torch.max(probs, dim=1)
+                predictions = predictions.cpu().numpy()
+                confidence = confidence.cpu().numpy()
+
+            # Process each prediction
+            for idx, (y_start, x_start, y_end, x_end) in enumerate(batch_positions):
+                pred = predictions[idx]
+                conf = confidence[idx]
+
+                # Calculate actual tile size
+                actual_height = y_end - y_start
+                actual_width = x_end - x_start
+
+                # Get the actual prediction (removing padding if needed)
+                valid_pred = pred[:actual_height, :actual_width]
+                valid_conf = conf[:actual_height, :actual_width]
+
+                # Create confidence weights that favor central parts of tiles
+                # but still allow edge tiles to contribute fully at the image edges
+                is_edge_x = (x_start == 0) or (x_end == width)
+                is_edge_y = (y_start == 0) or (y_end == height)
+
+                # Create a mask that gives higher weight to central regions
+                # but ensures proper edge handling for boundary tiles
+                weight_mask = np.ones((actual_height, actual_width), dtype=np.float32)
+
+                # Only apply central weighting if not at an image edge
+                border = overlap // 2
+                if not is_edge_x and actual_width > 2 * border:
+                    # Apply horizontal edge falloff (linear)
+                    for i in range(border):
+                        # Left edge
+                        weight_mask[:, i] = (i + 1) / (border + 1)
+                        # Right edge (if not at image edge)
+                        if i < actual_width - border:
+                            weight_mask[:, actual_width - i - 1] = (i + 1) / (
+                                border + 1
+                            )
+
+                if not is_edge_y and actual_height > 2 * border:
+                    # Apply vertical edge falloff (linear)
+                    for i in range(border):
+                        # Top edge
+                        weight_mask[i, :] = (i + 1) / (border + 1)
+                        # Bottom edge (if not at image edge)
+                        if i < actual_height - border:
+                            weight_mask[actual_height - i - 1, :] = (i + 1) / (
+                                border + 1
+                            )
+
+                # Combine with prediction confidence
+                final_weight = weight_mask * valid_conf
+
+                # Update the output image based on confidence
+                current_conf = confidence_map[y_start:y_end, x_start:x_end]
+                update_mask = final_weight > current_conf
+
+                if np.any(update_mask):
+                    # Update only pixels where this prediction has higher confidence
+                    output_image[y_start:y_end, x_start:x_end][update_mask] = (
+                        valid_pred[update_mask]
+                    )
+                    confidence_map[y_start:y_end, x_start:x_end][update_mask] = (
+                        final_weight[update_mask]
+                    )
+
+        # Update profile for output
+        profile.update({"count": 1, "dtype": "uint8", "nodata": 0})
+
+        # Save the result
+        print(f"Saving classified image to {output_path}...")
+        with rasterio.open(output_path, "w", **profile) as dst:
+            dst.write(output_image[np.newaxis, :, :])
+            if isinstance(colormap, dict):
+                dst.write_colormap(1, colormap)
+
+        # Calculate timing
+        total_time = timeit.default_timer() - start_time
+        print(f"Total processing time: {total_time:.2f} seconds")
+        print(f"Successfully saved classified image to {output_path}")
+
+    return output_path
+
+
 def classify_images(
     image_paths,
     model_path,
@@ -584,7 +835,6 @@ def classify_images(
     batch_size=4,
     colormap=None,
     file_extension=".tif",
-    num_workers=2,
     **kwargs,
 ):
     """
@@ -607,7 +857,6 @@ def classify_images(
             Defaults to None.
         file_extension (str, optional): File extension to filter by when image_paths
             is a directory. Defaults to ".tif".
-        num_workers (int, optional): Number of workers for DataLoader. Defaults to 2.
         **kwargs: Additional keyword arguments for the classify_image function.
 
     Returns:
@@ -672,7 +921,6 @@ def classify_images(
                 chip_size=chip_size,
                 batch_size=batch_size,
                 colormap=colormap,
-                num_workers=num_workers,
                 **kwargs,
             )
             classified_image_paths.append(classified_image_path)
