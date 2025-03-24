@@ -1108,6 +1108,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.classify.classify_images" class="md-nav__link">
+    <span class="md-ellipsis">
+      classify_images()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.classify.train_classifier" class="md-nav__link">
     <span class="md-ellipsis">
       train_classifier()
@@ -1331,6 +1340,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.classify.classify_images" class="md-nav__link">
+    <span class="md-ellipsis">
+      classify_images()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.classify.train_classifier" class="md-nav__link">
     <span class="md-ellipsis">
       train_classifier()
@@ -1387,7 +1405,7 @@
 
 
 <h2 id="geoai.classify.classify_image" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">classify_image</span><span class="p">(</span><span class="n">image_path</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">classify_image</span><span class="p">(</span><span class="n">image_path</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 
 <a href="#geoai.classify.classify_image" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -1451,6 +1469,18 @@
                         Defaults to None.</p></td>
         <td><code>None</code></td>
       </tr>
+      <tr>
+        <td><code>num_workers</code></td>
+        <td><code>int</code></td>
+        <td><p>Number of workers for DataLoader. Defaults to 2.</p></td>
+        <td><code>2</code></td>
+      </tr>
+      <tr>
+        <td><code>**kwargs</code></td>
+        <td></td>
+        <td><p>Additional keyword arguments for DataLoader.</p></td>
+        <td><code>{}</code></td>
+      </tr>
   </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -1477,6 +1507,8 @@
     <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Classify a geospatial image using a trained semantic segmentation model.</span>
@@ -1497,11 +1529,12 @@
 <span class="sd">        batch_size (int, optional): Batch size for inference. Defaults to 4.</span>
 <span class="sd">        colormap (dict, optional): Colormap to apply to the output image.</span>
 <span class="sd">                                    Defaults to None.</span>
+<span class="sd">        num_workers (int, optional): Number of workers for DataLoader. Defaults to 2.</span>
+<span class="sd">        **kwargs: Additional keyword arguments for DataLoader.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        str: Path to the saved classified image.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">timeit</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
@@ -1552,7 +1585,8 @@
         <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
         <span class="n">sampler</span><span class="o">=</span><span class="n">sampler</span><span class="p">,</span>
         <span class="n">collate_fn</span><span class="o">=</span><span class="n">stack_samples</span><span class="p">,</span>
-        <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing image in </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="p">)</span><span class="si">}</span><span class="s2"> batches...&quot;</span><span class="p">)</span>
@@ -1701,6 +1735,227 @@
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully saved classified image to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_path</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.classify.classify_images" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">classify_images</span><span class="p">(</span><span class="n">image_paths</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">file_extension</span><span class="o">=</span><span class="s1">&#39;.tif&#39;</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+
+<a href="#geoai.classify.classify_images" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Classify multiple geospatial images using a trained semantic segmentation model.</p>
+<p>This function accepts either a list of image paths or a directory containing images
+and applies the classify_image function to each image, saving the results in the
+specified output directory.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>image_paths</code></td>
+        <td><code>str or list</code></td>
+        <td><p>Either a directory path containing images or a list
+of paths to input GeoTIFF images.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>model_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to the trained model checkpoint.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>output_dir</code></td>
+        <td><code>str</code></td>
+        <td><p>Directory to save the output classified images.
+Defaults to None (same directory as input images for a list, or a new
+"classified" subdirectory for a directory input).</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>chip_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Size of chips for processing. Defaults to 1024.</p></td>
+        <td><code>1024</code></td>
+      </tr>
+      <tr>
+        <td><code>batch_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Batch size for inference. Defaults to 4.</p></td>
+        <td><code>4</code></td>
+      </tr>
+      <tr>
+        <td><code>colormap</code></td>
+        <td><code>dict</code></td>
+        <td><p>Colormap to apply to the output images.
+Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>file_extension</code></td>
+        <td><code>str</code></td>
+        <td><p>File extension to filter by when image_paths
+is a directory. Defaults to ".tif".</p></td>
+        <td><code>&#39;.tif&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>num_workers</code></td>
+        <td><code>int</code></td>
+        <td><p>Number of workers for DataLoader. Defaults to 2.</p></td>
+        <td><code>2</code></td>
+      </tr>
+      <tr>
+        <td><code>**kwargs</code></td>
+        <td></td>
+        <td><p>Additional keyword arguments for the classify_image function.</p></td>
+        <td><code>{}</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>list</code></td>
+      <td><p>List of paths to the saved classified images.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/classify.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_images</span><span class="p">(</span>
+    <span class="n">image_paths</span><span class="p">,</span>
+    <span class="n">model_path</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">chip_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">file_extension</span><span class="o">=</span><span class="s2">&quot;.tif&quot;</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Classify multiple geospatial images using a trained semantic segmentation model.</span>
+
+<span class="sd">    This function accepts either a list of image paths or a directory containing images</span>
+<span class="sd">    and applies the classify_image function to each image, saving the results in the</span>
+<span class="sd">    specified output directory.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        image_paths (str or list): Either a directory path containing images or a list</span>
+<span class="sd">            of paths to input GeoTIFF images.</span>
+<span class="sd">        model_path (str): Path to the trained model checkpoint.</span>
+<span class="sd">        output_dir (str, optional): Directory to save the output classified images.</span>
+<span class="sd">            Defaults to None (same directory as input images for a list, or a new</span>
+<span class="sd">            &quot;classified&quot; subdirectory for a directory input).</span>
+<span class="sd">        chip_size (int, optional): Size of chips for processing. Defaults to 1024.</span>
+<span class="sd">        batch_size (int, optional): Batch size for inference. Defaults to 4.</span>
+<span class="sd">        colormap (dict, optional): Colormap to apply to the output images.</span>
+<span class="sd">            Defaults to None.</span>
+<span class="sd">        file_extension (str, optional): File extension to filter by when image_paths</span>
+<span class="sd">            is a directory. Defaults to &quot;.tif&quot;.</span>
+<span class="sd">        num_workers (int, optional): Number of workers for DataLoader. Defaults to 2.</span>
+<span class="sd">        **kwargs: Additional keyword arguments for the classify_image function.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: List of paths to the saved classified images.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Import required libraries</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">glob</span>
+
+    <span class="c1"># Process directory input</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">image_paths</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">image_paths</span><span class="p">):</span>
+        <span class="c1"># Set default output directory if not provided</span>
+        <span class="k">if</span> <span class="n">output_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">image_paths</span><span class="p">,</span> <span class="s2">&quot;classified&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get all images with the specified extension</span>
+        <span class="n">image_path_list</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">image_paths</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;*</span><span class="si">{</span><span class="n">file_extension</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span>
+
+        <span class="c1"># Check if any images were found</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">image_path_list</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No files with extension &#39;</span><span class="si">{</span><span class="n">file_extension</span><span class="si">}</span><span class="s2">&#39; found in </span><span class="si">{</span><span class="n">image_paths</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_path_list</span><span class="p">)</span><span class="si">}</span><span class="s2"> images in directory </span><span class="si">{</span><span class="n">image_paths</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Process list input</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">image_paths</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="n">image_path_list</span> <span class="o">=</span> <span class="n">image_paths</span>
+
+        <span class="c1"># Set default output directory if not provided</span>
+        <span class="k">if</span> <span class="n">output_dir</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">image_path_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">output_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">image_path_list</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="c1"># Invalid input</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;image_paths must be either a directory path or a list of file paths&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Create output directory if it doesn&#39;t exist</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_dir</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span>
+
+    <span class="n">classified_image_paths</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Create progress bar</span>
+    <span class="k">for</span> <span class="n">image_path</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">image_path_list</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Classifying images&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;image&quot;</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Get just the filename without extension</span>
+            <span class="n">base_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">image_path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="c1"># Create output path within output_dir</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">base_filename</span><span class="si">}</span><span class="s2">_classified</span><span class="si">{</span><span class="n">file_extension</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Perform classification</span>
+            <span class="n">classified_image_path</span> <span class="o">=</span> <span class="n">classify_image</span><span class="p">(</span>
+                <span class="n">image_path</span><span class="p">,</span>
+                <span class="n">model_path</span><span class="p">,</span>
+                <span class="n">output_path</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span>
+                <span class="n">chip_size</span><span class="o">=</span><span class="n">chip_size</span><span class="p">,</span>
+                <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+                <span class="n">colormap</span><span class="o">=</span><span class="n">colormap</span><span class="p">,</span>
+                <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">classified_image_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">classified_image_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing </span><span class="si">{</span><span class="n">image_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Classification complete. Processed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">classified_image_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> images successfully.&quot;</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">classified_image_paths</span>
 </code></pre></div>
         </details>
     </div>
@@ -2116,7 +2371,6 @@ Defaults to 1.</p></td>
         <span class="n">RandomBatchGeoSampler</span><span class="p">,</span>
         <span class="n">GridGeoSampler</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mp</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">timeit</span>
