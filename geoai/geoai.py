@@ -13,7 +13,7 @@ from .download import (
     read_pc_item_asset,
     view_pc_item,
 )
-from .classify import train_classifier, classify_image
+from .classify import train_classifier, classify_image, classify_images
 from .extract import *
 from .hf import *
 from .segment import *
