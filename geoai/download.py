@@ -207,98 +207,124 @@ def json_serializable(obj: Any) -> Any:
         return obj
 
 
+def get_overture_latest_release():
+    """
+    Retrieves the value of the 'latest' key from the Overture Maps release JSON file.
+
+    Returns:
+        str: The value of the 'latest' key from the releases.json file.
+
+    Raises:
+        requests.RequestException: If there's an issue with the HTTP request.
+        KeyError: If the 'latest' key is not found in the JSON data.
+        json.JSONDecodeError: If the response cannot be parsed as JSON.
+    """
+    import json
+
+    url = "https://labs.overturemaps.org/data/releases.json"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+
+        data = response.json()
+        latest_release = data.get("latest")
+
+        if latest_release is None:
+            raise KeyError("The 'latest' key was not found in the releases.json file")
+
+        return latest_release
+
+    except requests.RequestException as e:
+        print(f"Error making the request: {e}")
+        raise
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON response: {e}")
+        raise
+    except KeyError as e:
+        print(f"Key error: {e}")
+        raise
+
+
+def get_all_overture_types():
+    """Get a list of all available Overture Maps data types.
+
+    Returns:
+        list: List of available Overture Maps data types.
+    """
+    from overturemaps import core
+
+    return core.get_all_overture_types()
+
+
 def download_overture_buildings(
     bbox: Tuple[float, float, float, float],
-    output_file: str,
-    output_format: str = "geojson",
-    data_type: str = "building",
-    verbose: bool = True,
+    output: str,
+    overture_type: str = "building",
+    **kwargs: Any,
 ) -> str:
     """Download building data from Overture Maps for a given bounding box using the overturemaps CLI tool.
 
     Args:
         bbox: Bounding box in the format (min_lon, min_lat, max_lon, max_lat) in WGS84 coordinates.
-        output_file: Path to save the output file.
-        output_format: Format to save the output, one of "geojson", "geojsonseq", or "geoparquet".
-        data_type: The Overture Maps data type to download (building, place, etc.).
-        verbose: Whether to print verbose output.
+        output: Path to save the output file.
+        overture_type: The Overture Maps data type to download (building, place, etc.).
 
     Returns:
         Path to the output file.
     """
-    # Create output directory if needed
-    output_dir = os.path.dirname(output_file)
-    if output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
 
-    # Format the bounding box string for the command
-    west, south, east, north = bbox
-    bbox_str = f"{west},{south},{east},{north}"
+    return get_overture_data(
+        overture_type=overture_type, bbox=bbox, output=output, **kwargs
+    )
 
-    # Build the command
-    cmd = [
-        "overturemaps",
-        "download",
-        "--bbox",
-        bbox_str,
-        "-f",
-        output_format,
-        "--type",
-        data_type,
-        "--output",
-        output_file,
-    ]
 
-    if verbose:
-        logger.info(f"Running command: {' '.join(cmd)}")
-        logger.info("Downloading %s data for area: %s", data_type, bbox_str)
+def get_overture_data(
+    overture_type: str,
+    bbox: Tuple[float, float, float, float] = None,
+    columns: List[str] = None,
+    output: str = None,
+    **kwargs: Any,
+) -> "gpd.GeoDataFrame":
+    """Fetches overture data and returns it as a GeoDataFrame.
+
+    Args:
+        overture_type (str): The type of overture data to fetch.It can be one of the following:
+            address|building|building_part|division|division_area|division_boundary|place|
+            segment|connector|infrastructure|land|land_cover|land_use|water
+        bbox (Tuple[float, float, float, float], optional): The bounding box to
+            filter the data. Defaults to None.
+        columns (List[str], optional): The columns to include in the output.
+            Defaults to None.
+        output (str, optional): The file path to save the output GeoDataFrame.
+            Defaults to None.
+
+    Returns:
+        gpd.GeoDataFrame: The fetched overture data as a GeoDataFrame.
+
+    Raises:
+        ImportError: If the overture package is not installed.
+    """
 
     try:
-        # Run the command
-        result = subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.PIPE if not verbose else None,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        from overturemaps import core
+    except ImportError:
+        raise ImportError("The overturemaps package is required to use this function")
 
-        # Check if the file was created
-        if os.path.exists(output_file):
-            file_size = os.path.getsize(output_file) / (1024 * 1024)  # Size in MB
-            logger.info(
-                f"Successfully downloaded data to {output_file} ({file_size:.2f} MB)"
-            )
+    gdf = core.geodataframe(overture_type, bbox=bbox)
+    if columns is not None:
+        gdf = gdf[columns]
 
-            # Optionally show some stats about the downloaded data
-            if output_format == "geojson" and os.path.getsize(output_file) > 0:
-                try:
-                    gdf = gpd.read_file(output_file)
-                    logger.info(f"Downloaded {len(gdf)} features")
+    gdf.crs = "EPSG:4326"
 
-                    if len(gdf) > 0 and verbose:
-                        # Show a sample of the attribute names
-                        attrs = list(gdf.columns)
-                        attrs.remove("geometry")
-                        logger.info(f"Available attributes: {', '.join(attrs[:10])}...")
-                except Exception as e:
-                    logger.warning(f"Could not read the GeoJSON file: {str(e)}")
+    out_dir = os.path.dirname(os.path.abspath(output))
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
 
-            return output_file
-        else:
-            logger.error(f"Command completed but file {output_file} was not created")
-            if result.stderr:
-                logger.error(f"Command error output: {result.stderr}")
-            return None
+    if output is not None:
+        gdf.to_file(output, **kwargs)
 
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Error running overturemaps command: {str(e)}")
-        if e.stderr:
-            logger.error(f"Command error output: {e.stderr}")
-        raise RuntimeError(f"Failed to download Overture Maps data: {str(e)}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        raise
+    return gdf
 
 
 def convert_vector_format(
@@ -361,18 +387,23 @@ def convert_vector_format(
         raise
 
 
-def extract_building_stats(geojson_file: str) -> Dict[str, Any]:
+def extract_building_stats(data: str) -> Dict[str, Any]:
     """Extract statistics from the building data.
 
     Args:
-        geojson_file: Path to the GeoJSON file.
+        data: Path to the GeoJSON file or GeoDataFrame containing building data.
 
     Returns:
         Dictionary with statistics.
     """
     try:
         # Read the GeoJSON file
-        gdf = gpd.read_file(geojson_file)
+
+        if isinstance(data, gpd.GeoDataFrame):
+            gdf = data
+        else:
+
+            gdf = gpd.read_file(data)
 
         # Calculate statistics
         bbox = gdf.total_bounds.tolist()
