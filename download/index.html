@@ -1197,6 +1197,33 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.download.get_all_overture_types" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_all_overture_types()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.get_overture_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_overture_data()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.get_overture_latest_release" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_overture_latest_release()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.download.json_serializable" class="md-nav__link">
     <span class="md-ellipsis">
       json_serializable()
@@ -1469,6 +1496,33 @@
   <a href="#geoai.download.extract_building_stats" class="md-nav__link">
     <span class="md-ellipsis">
       extract_building_stats()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.get_all_overture_types" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_all_overture_types()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.get_overture_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_overture_data()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.download.get_overture_latest_release" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_overture_latest_release()
     </span>
   </a>
   
@@ -1932,7 +1986,7 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
 
 
 <h2 id="geoai.download.download_overture_buildings" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">download_overture_buildings</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s1">&#39;geojson&#39;</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="s1">&#39;building&#39;</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">download_overture_buildings</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">output</span><span class="p">,</span> <span class="n">overture_type</span><span class="o">=</span><span class="s1">&#39;building&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 
 <a href="#geoai.download.download_overture_buildings" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -1959,28 +2013,16 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
         <td><em>required</em></td>
       </tr>
       <tr>
-        <td><code>output_file</code></td>
+        <td><code>output</code></td>
         <td><code>str</code></td>
         <td><p>Path to save the output file.</p></td>
         <td><em>required</em></td>
       </tr>
       <tr>
-        <td><code>output_format</code></td>
-        <td><code>str</code></td>
-        <td><p>Format to save the output, one of "geojson", "geojsonseq", or "geoparquet".</p></td>
-        <td><code>&#39;geojson&#39;</code></td>
-      </tr>
-      <tr>
-        <td><code>data_type</code></td>
+        <td><code>overture_type</code></td>
         <td><code>str</code></td>
         <td><p>The Overture Maps data type to download (building, place, etc.).</p></td>
         <td><code>&#39;building&#39;</code></td>
-      </tr>
-      <tr>
-        <td><code>verbose</code></td>
-        <td><code>bool</code></td>
-        <td><p>Whether to print verbose output.</p></td>
-        <td><code>True</code></td>
       </tr>
   </tbody>
 </table>
@@ -2003,96 +2045,24 @@ It downloads the imagery and saves it as GeoTIFF files.</p>
           <summary>Source code in <code>geoai/download.py</code></summary>
           <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_overture_buildings</span><span class="p">(</span>
     <span class="n">bbox</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
-    <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;geojson&quot;</span><span class="p">,</span>
-    <span class="n">data_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;building&quot;</span><span class="p">,</span>
-    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">overture_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;building&quot;</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Download building data from Overture Maps for a given bounding box using the overturemaps CLI tool.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        bbox: Bounding box in the format (min_lon, min_lat, max_lon, max_lat) in WGS84 coordinates.</span>
-<span class="sd">        output_file: Path to save the output file.</span>
-<span class="sd">        output_format: Format to save the output, one of &quot;geojson&quot;, &quot;geojsonseq&quot;, or &quot;geoparquet&quot;.</span>
-<span class="sd">        data_type: The Overture Maps data type to download (building, place, etc.).</span>
-<span class="sd">        verbose: Whether to print verbose output.</span>
+<span class="sd">        output: Path to save the output file.</span>
+<span class="sd">        overture_type: The Overture Maps data type to download (building, place, etc.).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Path to the output file.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Create output directory if needed</span>
-    <span class="n">output_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">output_dir</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_dir</span><span class="p">):</span>
-        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="c1"># Format the bounding box string for the command</span>
-    <span class="n">west</span><span class="p">,</span> <span class="n">south</span><span class="p">,</span> <span class="n">east</span><span class="p">,</span> <span class="n">north</span> <span class="o">=</span> <span class="n">bbox</span>
-    <span class="n">bbox_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">west</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">south</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">east</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">north</span><span class="si">}</span><span class="s2">&quot;</span>
-
-    <span class="c1"># Build the command</span>
-    <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="s2">&quot;overturemaps&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;download&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;--bbox&quot;</span><span class="p">,</span>
-        <span class="n">bbox_str</span><span class="p">,</span>
-        <span class="s2">&quot;-f&quot;</span><span class="p">,</span>
-        <span class="n">output_format</span><span class="p">,</span>
-        <span class="s2">&quot;--type&quot;</span><span class="p">,</span>
-        <span class="n">data_type</span><span class="p">,</span>
-        <span class="s2">&quot;--output&quot;</span><span class="p">,</span>
-        <span class="n">output_file</span><span class="p">,</span>
-    <span class="p">]</span>
-
-    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running command: </span><span class="si">{</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Downloading </span><span class="si">%s</span><span class="s2"> data for area: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">data_type</span><span class="p">,</span> <span class="n">bbox_str</span><span class="p">)</span>
-
-    <span class="k">try</span><span class="p">:</span>
-        <span class="c1"># Run the command</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-            <span class="n">cmd</span><span class="p">,</span>
-            <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-            <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">verbose</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
-            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="c1"># Check if the file was created</span>
-        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_file</span><span class="p">):</span>
-            <span class="n">file_size</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>  <span class="c1"># Size in MB</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Successfully downloaded data to </span><span class="si">{</span><span class="n">output_file</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">file_size</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB)&quot;</span>
-            <span class="p">)</span>
-
-            <span class="c1"># Optionally show some stats about the downloaded data</span>
-            <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;geojson&quot;</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">gdf</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
-                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gdf</span><span class="p">)</span><span class="si">}</span><span class="s2"> features&quot;</span><span class="p">)</span>
-
-                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">gdf</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">verbose</span><span class="p">:</span>
-                        <span class="c1"># Show a sample of the attribute names</span>
-                        <span class="n">attrs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">gdf</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
-                        <span class="n">attrs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">&quot;geometry&quot;</span><span class="p">)</span>
-                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available attributes: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">attrs</span><span class="p">[:</span><span class="mi">10</span><span class="p">])</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
-                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not read the GeoJSON file: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-            <span class="k">return</span> <span class="n">output_file</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command completed but file </span><span class="si">{</span><span class="n">output_file</span><span class="si">}</span><span class="s2"> was not created&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command error output: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
-
-    <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error running overturemaps command: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">e</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Command error output: </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to download Overture Maps data: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">raise</span>
+    <span class="k">return</span> <span class="n">get_overture_data</span><span class="p">(</span>
+        <span class="n">overture_type</span><span class="o">=</span><span class="n">overture_type</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">output</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span>
 </code></pre></div>
         </details>
     </div>
@@ -2551,7 +2521,7 @@ merge bands into a single multi-band GeoTIFF.</p>
 
 
 <h2 id="geoai.download.extract_building_stats" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">extract_building_stats</span><span class="p">(</span><span class="n">geojson_file</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">extract_building_stats</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></code>
 
 
 <a href="#geoai.download.extract_building_stats" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -2572,9 +2542,9 @@ merge bands into a single multi-band GeoTIFF.</p>
   </thead>
   <tbody>
       <tr>
-        <td><code>geojson_file</code></td>
+        <td><code>data</code></td>
         <td><code>str</code></td>
-        <td><p>Path to the GeoJSON file.</p></td>
+        <td><p>Path to the GeoJSON file or GeoDataFrame containing building data.</p></td>
         <td><em>required</em></td>
       </tr>
   </tbody>
@@ -2596,18 +2566,23 @@ merge bands into a single multi-band GeoTIFF.</p>
 </table>
         <details class="quote">
           <summary>Source code in <code>geoai/download.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_building_stats</span><span class="p">(</span><span class="n">geojson_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_building_stats</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract statistics from the building data.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        geojson_file: Path to the GeoJSON file.</span>
+<span class="sd">        data: Path to the GeoJSON file or GeoDataFrame containing building data.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Dictionary with statistics.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="c1"># Read the GeoJSON file</span>
-        <span class="n">gdf</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">geojson_file</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">):</span>
+            <span class="n">gdf</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="k">else</span><span class="p">:</span>
+
+            <span class="n">gdf</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
         <span class="c1"># Calculate statistics</span>
         <span class="n">bbox</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">total_bounds</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
@@ -2632,6 +2607,295 @@ merge bands into a single multi-band GeoTIFF.</p>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error extracting statistics: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)}</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.get_all_overture_types" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">get_all_overture_types</span><span class="p">()</span></code>
+
+
+<a href="#geoai.download.get_all_overture_types" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Get a list of all available Overture Maps data types.</p>
+
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>list</code></td>
+      <td><p>List of available Overture Maps data types.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_all_overture_types</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get a list of all available Overture Maps data types.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: List of available Overture Maps data types.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">overturemaps</span><span class="w"> </span><span class="kn">import</span> <span class="n">core</span>
+
+    <span class="k">return</span> <span class="n">core</span><span class="o">.</span><span class="n">get_all_overture_types</span><span class="p">()</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.get_overture_data" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">get_overture_data</span><span class="p">(</span><span class="n">overture_type</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+
+<a href="#geoai.download.get_overture_data" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Fetches overture data and returns it as a GeoDataFrame.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>overture_type</code></td>
+        <td><code>str</code></td>
+        <td><p>The type of overture data to fetch.It can be one of the following:
+address|building|building_part|division|division_area|division_boundary|place|
+segment|connector|infrastructure|land|land_cover|land_use|water</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>bbox</code></td>
+        <td><code>Tuple[float, float, float, float]</code></td>
+        <td><p>The bounding box to
+filter the data. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>columns</code></td>
+        <td><code>List[str]</code></td>
+        <td><p>The columns to include in the output.
+Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>output</code></td>
+        <td><code>str</code></td>
+        <td><p>The file path to save the output GeoDataFrame.
+Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>gpd.GeoDataFrame</code></td>
+      <td><p>The fetched overture data as a GeoDataFrame.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Exceptions:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>ImportError</code></td>
+        <td><p>If the overture package is not installed.</p></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_overture_data</span><span class="p">(</span>
+    <span class="n">overture_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bbox</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">columns</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;gpd.GeoDataFrame&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fetches overture data and returns it as a GeoDataFrame.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        overture_type (str): The type of overture data to fetch.It can be one of the following:</span>
+<span class="sd">            address|building|building_part|division|division_area|division_boundary|place|</span>
+<span class="sd">            segment|connector|infrastructure|land|land_cover|land_use|water</span>
+<span class="sd">        bbox (Tuple[float, float, float, float], optional): The bounding box to</span>
+<span class="sd">            filter the data. Defaults to None.</span>
+<span class="sd">        columns (List[str], optional): The columns to include in the output.</span>
+<span class="sd">            Defaults to None.</span>
+<span class="sd">        output (str, optional): The file path to save the output GeoDataFrame.</span>
+<span class="sd">            Defaults to None.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        gpd.GeoDataFrame: The fetched overture data as a GeoDataFrame.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ImportError: If the overture package is not installed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">overturemaps</span><span class="w"> </span><span class="kn">import</span> <span class="n">core</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;The overturemaps package is required to use this function&quot;</span><span class="p">)</span>
+
+    <span class="n">gdf</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">geodataframe</span><span class="p">(</span><span class="n">overture_type</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">columns</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">gdf</span> <span class="o">=</span> <span class="n">gdf</span><span class="p">[</span><span class="n">columns</span><span class="p">]</span>
+
+    <span class="n">gdf</span><span class="o">.</span><span class="n">crs</span> <span class="o">=</span> <span class="s2">&quot;EPSG:4326&quot;</span>
+
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">output</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">out_dir</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">gdf</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">gdf</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.download.get_overture_latest_release" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">get_overture_latest_release</span><span class="p">()</span></code>
+
+
+<a href="#geoai.download.get_overture_latest_release" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Retrieves the value of the 'latest' key from the Overture Maps release JSON file.</p>
+
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>str</code></td>
+      <td><p>The value of the 'latest' key from the releases.json file.</p></td>
+    </tr>
+  </tbody>
+</table>
+<p><strong>Exceptions:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>requests.RequestException</code></td>
+        <td><p>If there's an issue with the HTTP request.</p></td>
+      </tr>
+      <tr>
+        <td><code>KeyError</code></td>
+        <td><p>If the 'latest' key is not found in the JSON data.</p></td>
+      </tr>
+      <tr>
+        <td><code>json.JSONDecodeError</code></td>
+        <td><p>If the response cannot be parsed as JSON.</p></td>
+      </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/download.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_overture_latest_release</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieves the value of the &#39;latest&#39; key from the Overture Maps release JSON file.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The value of the &#39;latest&#39; key from the releases.json file.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        requests.RequestException: If there&#39;s an issue with the HTTP request.</span>
+<span class="sd">        KeyError: If the &#39;latest&#39; key is not found in the JSON data.</span>
+<span class="sd">        json.JSONDecodeError: If the response cannot be parsed as JSON.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+    <span class="n">url</span> <span class="o">=</span> <span class="s2">&quot;https://labs.overturemaps.org/data/releases.json&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>  <span class="c1"># Raise an exception for HTTP errors</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="n">latest_release</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;latest&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">latest_release</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;The &#39;latest&#39; key was not found in the releases.json file&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">latest_release</span>
+
+    <span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">RequestException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error making the request: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
+    <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error parsing JSON response: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
+    <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Key error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
 </code></pre></div>
         </details>
     </div>
