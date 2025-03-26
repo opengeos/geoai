@@ -1,3 +1,4 @@
+import glob
 import math
 import os
 import random
@@ -19,6 +20,8 @@ from torchvision.models.detection import maskrcnn_resnet50_fpn
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from tqdm import tqdm
+
+from .utils import download_model_from_hf
 
 
 def get_instance_segmentation_model(num_classes=2, num_channels=3, pretrained=True):
@@ -1107,19 +1110,35 @@ def object_detection(
     model = get_instance_segmentation_model(
         num_classes=2, num_channels=num_channels, pretrained=pretrained
     )
+
+    if not os.path.exists(model_path):
+        try:
+            model_path = download_model_from_hf(model_path)
+        except Exception as e:
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
 
-    inference_on_geotiff(
-        model=model,
-        geotiff_path=input_path,
-        output_path=output_path,
-        window_size=window_size,  # Adjust based on your model and memory
-        overlap=overlap,  # Overlap to avoid edge artifacts
-        confidence_threshold=confidence_threshold,
-        batch_size=batch_size,  # Adjust based on your GPU memory
-        num_channels=num_channels,
-        device=device,
-        **kwargs,
-    )
+    if isinstance(input_path, str) and (not input_path.endswith(".tif")):
+        files = glob.glob(os.path.join(input_path, "*.tif"))
+        files.sort()
+
+    elif isinstance(input_path, str):
+        files = [input_path]
+
+    for inde, file in enumerate(files):
+        print(f"Processing file {inde + 1}/{len(files)}: {file}")
+        inference_on_geotiff(
+            model=model,
+            geotiff_path=input_path,
+            output_path=output_path,
+            window_size=window_size,  # Adjust based on your model and memory
+            overlap=overlap,  # Overlap to avoid edge artifacts
+            confidence_threshold=confidence_threshold,
+            batch_size=batch_size,  # Adjust based on your GPU memory
+            num_channels=num_channels,
+            device=device,
+            **kwargs,
+        )
