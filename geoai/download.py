@@ -207,9 +207,12 @@ def json_serializable(obj: Any) -> Any:
         return obj
 
 
-def get_overture_latest_release():
+def get_overture_latest_release(patch=True) -> str:
     """
     Retrieves the value of the 'latest' key from the Overture Maps release JSON file.
+
+    Args:
+        patch (bool): If True, returns the full version string (e.g., "2025-02-19.0").
 
     Returns:
         str: The value of the 'latest' key from the releases.json file.
@@ -219,8 +222,6 @@ def get_overture_latest_release():
         KeyError: If the 'latest' key is not found in the JSON data.
         json.JSONDecodeError: If the response cannot be parsed as JSON.
     """
-    import json
-
     url = "https://labs.overturemaps.org/data/releases.json"
 
     try:
@@ -228,7 +229,12 @@ def get_overture_latest_release():
         response.raise_for_status()  # Raise an exception for HTTP errors
 
         data = response.json()
-        latest_release = data.get("latest")
+        if patch:
+            latest_release = data.get("latest")
+        else:
+            latest_release = data.get("latest").split(".")[
+                0
+            ]  # Extract the version number
 
         if latest_release is None:
             raise KeyError("The 'latest' key was not found in the releases.json file")
@@ -934,7 +940,7 @@ def pc_stac_download(
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     # Handle single item case
-    if isinstance(items, pystac.Item):
+    if isinstance(items, pystac.Item) or isinstance(items, str):
         items = [items]
     elif not isinstance(items, list):
         raise TypeError("items must be a STAC Item or list of STAC Items")
@@ -1004,6 +1010,8 @@ def pc_stac_download(
 
     for item in items:
         item_assets = {}
+        if isinstance(item, str):
+            item = pystac.Item.from_file(item)
         item_id = item.id
         print(f"Processing STAC item: {item_id}")
 
