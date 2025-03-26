@@ -355,7 +355,9 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10):
+def train_one_epoch(
+    model, optimizer, data_loader, device, epoch, print_freq=10, verbose=True
+):
     """
     Train the model for one epoch.
 
@@ -366,6 +368,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10)
         device (torch.device): Device to train on.
         epoch (int): Current epoch number.
         print_freq (int): How often to print progress.
+        verbose (bool): Whether to print detailed progress.
 
     Returns:
         float: Average loss for the epoch.
@@ -395,9 +398,10 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10)
         # Print progress
         if i % print_freq == 0:
             elapsed_time = time.time() - start_time
-            print(
-                f"Epoch: {epoch}, Batch: {i}/{len(data_loader)}, Loss: {losses.item():.4f}, Time: {elapsed_time:.2f}s"
-            )
+            if verbose:
+                print(
+                    f"Epoch: {epoch}, Batch: {i}/{len(data_loader)}, Loss: {losses.item():.4f}, Time: {elapsed_time:.2f}s"
+                )
             start_time = time.time()
 
     # Calculate average loss
@@ -582,6 +586,8 @@ def train_MaskRCNN_model(
     val_split=0.2,
     visualize=False,
     resume_training=False,
+    print_freq=10,
+    verbose=True,
 ):
     """Train and evaluate Mask R-CNN model for instance segmentation.
 
@@ -608,7 +614,8 @@ def train_MaskRCNN_model(
             Defaults to False.
         resume_training (bool): If True and pretrained_model_path is provided,
             will try to load optimizer and scheduler states as well. Defaults to False.
-
+        print_freq (int): Frequency of printing training progress. Defaults to 10.
+        verbose (bool): If True, prints detailed training progress. Defaults to True.
     Returns:
         None: Model weights are saved to output_dir.
 
@@ -759,7 +766,9 @@ def train_MaskRCNN_model(
     # Training loop
     for epoch in range(start_epoch, num_epochs):
         # Train one epoch
-        train_loss = train_one_epoch(model, optimizer, train_loader, device, epoch)
+        train_loss = train_one_epoch(
+            model, optimizer, train_loader, device, epoch, print_freq, verbose
+        )
 
         # Update learning rate
         lr_scheduler.step()
@@ -1110,6 +1119,69 @@ def object_detection(
     model = get_instance_segmentation_model(
         num_classes=2, num_channels=num_channels, pretrained=pretrained
     )
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.to(device)
+    model.eval()
+
+    inference_on_geotiff(
+        model=model,
+        geotiff_path=input_path,
+        output_path=output_path,
+        window_size=window_size,  # Adjust based on your model and memory
+        overlap=overlap,  # Overlap to avoid edge artifacts
+        confidence_threshold=confidence_threshold,
+        batch_size=batch_size,  # Adjust based on your GPU memory
+        num_channels=num_channels,
+        device=device,
+        **kwargs,
+    )
+
+
+def object_detection_batch(
+    input_paths,
+    output_dir,
+    model_path,
+    filenames=None,
+    window_size=512,
+    overlap=256,
+    confidence_threshold=0.5,
+    batch_size=4,
+    num_channels=3,
+    pretrained=True,
+    device=None,
+    **kwargs,
+):
+    """
+    Perform object detection on a GeoTIFF using a pre-trained Mask R-CNN model.
+
+    Args:
+        input_paths (str or list): Path(s) to input GeoTIFF file(s). If a directory is provided,
+            all .tif files in that directory will be processed.
+        output_dir (str): Directory to save output mask GeoTIFF files.
+        model_path (str): Path to trained model weights.
+        filenames (list, optional): List of output filenames. If None, defaults to
+            "<input_filename>_mask.tif" for each input file.
+            If provided, must match the number of input files.
+        window_size (int): Size of sliding window for inference.
+        overlap (int): Overlap between adjacent windows.
+        confidence_threshold (float): Confidence threshold for predictions (0-1).
+        batch_size (int): Batch size for inference.
+        num_channels (int): Number of channels in the input image and model.
+        pretrained (bool): Whether to use pretrained backbone for model loading.
+        device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
+        **kwargs: Additional arguments passed to inference_on_geotiff.
+
+    Returns:
+        None: Output mask is saved to output_path.
+    """
+    # Load your trained model
+    if device is None:
+        device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
+    model = get_instance_segmentation_model(
+        num_classes=2, num_channels=num_channels, pretrained=pretrained
+    )
 
     if not os.path.exists(model_path):
         try:
@@ -1121,19 +1193,27 @@ def object_detection(
     model.to(device)
     model.eval()
 
-    if isinstance(input_path, str) and (not input_path.endswith(".tif")):
-        files = glob.glob(os.path.join(input_path, "*.tif"))
+    if isinstance(input_paths, str) and (not input_paths.endswith(".tif")):
+        files = glob.glob(os.path.join(input_paths, "*.tif"))
         files.sort()
+    elif isinstance(input_paths, str):
+        files = [input_paths]
 
-    elif isinstance(input_path, str):
-        files = [input_path]
+    if filenames is None:
+        filenames = [
+            os.path.join(output_dir, os.path.basename(f).replace(".tif", "_mask.tif"))
+            for f in files
+        ]
+    else:
+        if len(filenames) != len(files):
+            raise ValueError("Number of filenames must match number of input files.")
 
-    for inde, file in enumerate(files):
-        print(f"Processing file {inde + 1}/{len(files)}: {file}")
+    for index, file in enumerate(files):
+        print(f"Processing file {index + 1}/{len(files)}: {file}")
         inference_on_geotiff(
             model=model,
-            geotiff_path=input_path,
-            output_path=output_path,
+            geotiff_path=input_paths,
+            output_path=filenames[index],
             window_size=window_size,  # Adjust based on your model and memory
             overlap=overlap,  # Overlap to avoid edge artifacts
             confidence_threshold=confidence_threshold,
