@@ -17,7 +17,7 @@ from .classify import train_classifier, classify_image, classify_images
 from .extract import *
 from .hf import *
 from .segment import *
-from .train import object_detection, train_MaskRCNN_model
+from .train import object_detection, object_detection_batch, train_MaskRCNN_model
 from .utils import *
 
 
