@@ -2810,7 +2810,7 @@ Defaults to None.</p></td>
 
 
 <h2 id="geoai.download.get_overture_latest_release" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">get_overture_latest_release</span><span class="p">()</span></code>
+<code class="highlight language-python"><span class="n">get_overture_latest_release</span><span class="p">(</span><span class="n">patch</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 
 <a href="#geoai.download.get_overture_latest_release" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -2819,6 +2819,25 @@ Defaults to None.</p></td>
 
       <p>Retrieves the value of the 'latest' key from the Overture Maps release JSON file.</p>
 
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>patch</code></td>
+        <td><code>bool</code></td>
+        <td><p>If True, returns the full version string (e.g., "2025-02-19.0").</p></td>
+        <td><code>True</code></td>
+      </tr>
+  </tbody>
+</table>
 <p><strong>Returns:</strong></p>
 <table>
   <thead>
@@ -2859,9 +2878,12 @@ Defaults to None.</p></td>
 </table>
         <details class="quote">
           <summary>Source code in <code>geoai/download.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_overture_latest_release</span><span class="p">():</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_overture_latest_release</span><span class="p">(</span><span class="n">patch</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Retrieves the value of the &#39;latest&#39; key from the Overture Maps release JSON file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        patch (bool): If True, returns the full version string (e.g., &quot;2025-02-19.0&quot;).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        str: The value of the &#39;latest&#39; key from the releases.json file.</span>
@@ -2871,8 +2893,6 @@ Defaults to None.</p></td>
 <span class="sd">        KeyError: If the &#39;latest&#39; key is not found in the JSON data.</span>
 <span class="sd">        json.JSONDecodeError: If the response cannot be parsed as JSON.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-
     <span class="n">url</span> <span class="o">=</span> <span class="s2">&quot;https://labs.overturemaps.org/data/releases.json&quot;</span>
 
     <span class="k">try</span><span class="p">:</span>
@@ -2880,7 +2900,12 @@ Defaults to None.</p></td>
         <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>  <span class="c1"># Raise an exception for HTTP errors</span>
 
         <span class="n">data</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
-        <span class="n">latest_release</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;latest&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">patch</span><span class="p">:</span>
+            <span class="n">latest_release</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;latest&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">latest_release</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;latest&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span>
+                <span class="mi">0</span>
+            <span class="p">]</span>  <span class="c1"># Extract the version number</span>
 
         <span class="k">if</span> <span class="n">latest_release</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;The &#39;latest&#39; key was not found in the releases.json file&quot;</span><span class="p">)</span>
@@ -3423,7 +3448,7 @@ Defaults to True.</p></td>
     <span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span><span class="p">,</span> <span class="n">as_completed</span>
 
     <span class="c1"># Handle single item case</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
         <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="n">items</span><span class="p">]</span>
     <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;items must be a STAC Item or list of STAC Items&quot;</span><span class="p">)</span>
@@ -3493,6 +3518,8 @@ Defaults to True.</p></td>
 
     <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
         <span class="n">item_assets</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">item</span> <span class="o">=</span> <span class="n">pystac</span><span class="o">.</span><span class="n">Item</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
         <span class="n">item_id</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing STAC item: </span><span class="si">{</span><span class="n">item_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
