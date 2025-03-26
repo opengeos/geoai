@@ -1119,6 +1119,13 @@ def object_detection(
     model = get_instance_segmentation_model(
         num_classes=2, num_channels=num_channels, pretrained=pretrained
     )
+
+    if not os.path.exists(model_path):
+        try:
+            model_path = download_model_from_hf(model_path)
+        except Exception as e:
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
