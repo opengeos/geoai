@@ -1403,6 +1403,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.train.object_detection_batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      object_detection_batch()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.train.train_MaskRCNN_model" class="md-nav__link">
     <span class="md-ellipsis">
       train_MaskRCNN_model()
@@ -1647,6 +1656,15 @@
   <a href="#geoai.train.object_detection" class="md-nav__link">
     <span class="md-ellipsis">
       object_detection()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.train.object_detection_batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      object_detection_batch()
     </span>
   </a>
   
@@ -3319,6 +3337,13 @@ ToTensor        </code>
     <span class="n">model</span> <span class="o">=</span> <span class="n">get_instance_segmentation_model</span><span class="p">(</span>
         <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="n">num_channels</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="n">pretrained</span>
     <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">model_path</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">model_path</span> <span class="o">=</span> <span class="n">download_model_from_hf</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model file not found: </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
     <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_path</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="n">device</span><span class="p">))</span>
     <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
     <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
@@ -3347,8 +3372,223 @@ ToTensor        </code>
 
 
 
+<h2 id="geoai.train.object_detection_batch" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">object_detection_batch</span><span class="p">(</span><span class="n">input_paths</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">filenames</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">overlap</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">confidence_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+
+<a href="#geoai.train.object_detection_batch" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Perform object detection on a GeoTIFF using a pre-trained Mask R-CNN model.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>input_paths</code></td>
+        <td><code>str or list</code></td>
+        <td><p>Path(s) to input GeoTIFF file(s). If a directory is provided,
+all .tif files in that directory will be processed.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>output_dir</code></td>
+        <td><code>str</code></td>
+        <td><p>Directory to save output mask GeoTIFF files.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>model_path</code></td>
+        <td><code>str</code></td>
+        <td><p>Path to trained model weights.</p></td>
+        <td><em>required</em></td>
+      </tr>
+      <tr>
+        <td><code>filenames</code></td>
+        <td><code>list</code></td>
+        <td><p>List of output filenames. If None, defaults to
+"<input_filename>_mask.tif" for each input file.
+If provided, must match the number of input files.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>window_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Size of sliding window for inference.</p></td>
+        <td><code>512</code></td>
+      </tr>
+      <tr>
+        <td><code>overlap</code></td>
+        <td><code>int</code></td>
+        <td><p>Overlap between adjacent windows.</p></td>
+        <td><code>256</code></td>
+      </tr>
+      <tr>
+        <td><code>confidence_threshold</code></td>
+        <td><code>float</code></td>
+        <td><p>Confidence threshold for predictions (0-1).</p></td>
+        <td><code>0.5</code></td>
+      </tr>
+      <tr>
+        <td><code>batch_size</code></td>
+        <td><code>int</code></td>
+        <td><p>Batch size for inference.</p></td>
+        <td><code>4</code></td>
+      </tr>
+      <tr>
+        <td><code>num_channels</code></td>
+        <td><code>int</code></td>
+        <td><p>Number of channels in the input image and model.</p></td>
+        <td><code>3</code></td>
+      </tr>
+      <tr>
+        <td><code>pretrained</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to use pretrained backbone for model loading.</p></td>
+        <td><code>True</code></td>
+      </tr>
+      <tr>
+        <td><code>device</code></td>
+        <td><code>torch.device</code></td>
+        <td><p>Device to run inference on. If None, uses CUDA if available.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>**kwargs</code></td>
+        <td></td>
+        <td><p>Additional arguments passed to inference_on_geotiff.</p></td>
+        <td><code>{}</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>None</code></td>
+      <td><p>Output mask is saved to output_path.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/train.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">object_detection_batch</span><span class="p">(</span>
+    <span class="n">input_paths</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">,</span>
+    <span class="n">model_path</span><span class="p">,</span>
+    <span class="n">filenames</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">window_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">overlap</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+    <span class="n">confidence_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform object detection on a GeoTIFF using a pre-trained Mask R-CNN model.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        input_paths (str or list): Path(s) to input GeoTIFF file(s). If a directory is provided,</span>
+<span class="sd">            all .tif files in that directory will be processed.</span>
+<span class="sd">        output_dir (str): Directory to save output mask GeoTIFF files.</span>
+<span class="sd">        model_path (str): Path to trained model weights.</span>
+<span class="sd">        filenames (list, optional): List of output filenames. If None, defaults to</span>
+<span class="sd">            &quot;&lt;input_filename&gt;_mask.tif&quot; for each input file.</span>
+<span class="sd">            If provided, must match the number of input files.</span>
+<span class="sd">        window_size (int): Size of sliding window for inference.</span>
+<span class="sd">        overlap (int): Overlap between adjacent windows.</span>
+<span class="sd">        confidence_threshold (float): Confidence threshold for predictions (0-1).</span>
+<span class="sd">        batch_size (int): Batch size for inference.</span>
+<span class="sd">        num_channels (int): Number of channels in the input image and model.</span>
+<span class="sd">        pretrained (bool): Whether to use pretrained backbone for model loading.</span>
+<span class="sd">        device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.</span>
+<span class="sd">        **kwargs: Additional arguments passed to inference_on_geotiff.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Output mask is saved to output_path.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Load your trained model</span>
+    <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">get_instance_segmentation_model</span><span class="p">(</span>
+        <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="n">num_channels</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="n">pretrained</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_dir</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">model_path</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">model_path</span> <span class="o">=</span> <span class="n">download_model_from_hf</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model file not found: </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_path</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="n">device</span><span class="p">))</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_paths</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">input_paths</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.tif&quot;</span><span class="p">)):</span>
+        <span class="n">files</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">input_paths</span><span class="p">,</span> <span class="s2">&quot;*.tif&quot;</span><span class="p">))</span>
+        <span class="n">files</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_paths</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">files</span> <span class="o">=</span> <span class="p">[</span><span class="n">input_paths</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">filenames</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">filenames</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.tif&quot;</span><span class="p">,</span> <span class="s2">&quot;_mask.tif&quot;</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">filenames</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Number of filenames must match number of input files.&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">file</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">files</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing file </span><span class="si">{</span><span class="n">index</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">inference_on_geotiff</span><span class="p">(</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">geotiff_path</span><span class="o">=</span><span class="n">file</span><span class="p">,</span>
+            <span class="n">output_path</span><span class="o">=</span><span class="n">filenames</span><span class="p">[</span><span class="n">index</span><span class="p">],</span>
+            <span class="n">window_size</span><span class="o">=</span><span class="n">window_size</span><span class="p">,</span>  <span class="c1"># Adjust based on your model and memory</span>
+            <span class="n">overlap</span><span class="o">=</span><span class="n">overlap</span><span class="p">,</span>  <span class="c1"># Overlap to avoid edge artifacts</span>
+            <span class="n">confidence_threshold</span><span class="o">=</span><span class="n">confidence_threshold</span><span class="p">,</span>
+            <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>  <span class="c1"># Adjust based on your GPU memory</span>
+            <span class="n">num_channels</span><span class="o">=</span><span class="n">num_channels</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
 <h2 id="geoai.train.train_MaskRCNN_model" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">train_MaskRCNN_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">pretrained_model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">train_MaskRCNN_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">pretrained_model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 
 <a href="#geoai.train.train_MaskRCNN_model" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -3454,6 +3694,18 @@ Defaults to False.</p></td>
 will try to load optimizer and scheduler states as well. Defaults to False.</p></td>
         <td><code>False</code></td>
       </tr>
+      <tr>
+        <td><code>print_freq</code></td>
+        <td><code>int</code></td>
+        <td><p>Frequency of printing training progress. Defaults to 10.</p></td>
+        <td><code>10</code></td>
+      </tr>
+      <tr>
+        <td><code>verbose</code></td>
+        <td><code>bool</code></td>
+        <td><p>If True, prints detailed training progress. Defaults to True.</p></td>
+        <td><code>True</code></td>
+      </tr>
   </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -3506,6 +3758,8 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
     <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
     <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Train and evaluate Mask R-CNN model for instance segmentation.</span>
 
@@ -3532,7 +3786,8 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
 <span class="sd">            Defaults to False.</span>
 <span class="sd">        resume_training (bool): If True and pretrained_model_path is provided,</span>
 <span class="sd">            will try to load optimizer and scheduler states as well. Defaults to False.</span>
-
+<span class="sd">        print_freq (int): Frequency of printing training progress. Defaults to 10.</span>
+<span class="sd">        verbose (bool): If True, prints detailed training progress. Defaults to True.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        None: Model weights are saved to output_dir.</span>
 
@@ -3683,7 +3938,9 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
     <span class="c1"># Training loop</span>
     <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_epoch</span><span class="p">,</span> <span class="n">num_epochs</span><span class="p">):</span>
         <span class="c1"># Train one epoch</span>
-        <span class="n">train_loss</span> <span class="o">=</span> <span class="n">train_one_epoch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
+        <span class="n">train_loss</span> <span class="o">=</span> <span class="n">train_one_epoch</span><span class="p">(</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">print_freq</span><span class="p">,</span> <span class="n">verbose</span>
+        <span class="p">)</span>
 
         <span class="c1"># Update learning rate</span>
         <span class="n">lr_scheduler</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
@@ -3779,7 +4036,7 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
 
 
 <h2 id="geoai.train.train_one_epoch" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">train_one_epoch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span></code>
+<code class="highlight language-python"><span class="n">train_one_epoch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 
 <a href="#geoai.train.train_one_epoch" class="headerlink" title="Permanent link">&para;</a></h2>
@@ -3835,6 +4092,12 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
         <td><p>How often to print progress.</p></td>
         <td><code>10</code></td>
       </tr>
+      <tr>
+        <td><code>verbose</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to print detailed progress.</p></td>
+        <td><code>True</code></td>
+      </tr>
   </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -3854,7 +4117,9 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
 </table>
         <details class="quote">
           <summary>Source code in <code>geoai/train.py</code></summary>
-          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_one_epoch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_one_epoch</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Train the model for one epoch.</span>
 
@@ -3865,6 +4130,7 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
 <span class="sd">        device (torch.device): Device to train on.</span>
 <span class="sd">        epoch (int): Current epoch number.</span>
 <span class="sd">        print_freq (int): How often to print progress.</span>
+<span class="sd">        verbose (bool): Whether to print detailed progress.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        float: Average loss for the epoch.</span>
@@ -3894,9 +4160,10 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p><
         <span class="c1"># Print progress</span>
         <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="n">print_freq</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">elapsed_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
-            <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Epoch: </span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s2">, Batch: </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data_loader</span><span class="p">)</span><span class="si">}</span><span class="s2">, Loss: </span><span class="si">{</span><span class="n">losses</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, Time: </span><span class="si">{</span><span class="n">elapsed_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s&quot;</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Epoch: </span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s2">, Batch: </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data_loader</span><span class="p">)</span><span class="si">}</span><span class="s2">, Loss: </span><span class="si">{</span><span class="n">losses</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, Time: </span><span class="si">{</span><span class="n">elapsed_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s&quot;</span>
+                <span class="p">)</span>
             <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
 
     <span class="c1"># Calculate average loss</span>
