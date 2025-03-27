@@ -6215,3 +6215,37 @@ def mosaic_geotiffs(input_dir, output_file, mask_file=None):
 
     print(f"Cloud Optimized GeoTIFF mosaic created successfully: {output_file}")
     return True
+
+
+def download_model_from_hf(model_path, repo_id=None):
+    """
+    Download the object detection model from Hugging Face.
+
+    Args:
+        model_path: Path to the model file.
+        repo_id: Hugging Face repository ID.
+
+    Returns:
+        Path to the downloaded model file
+    """
+    from huggingface_hub import hf_hub_download
+
+    try:
+
+        # Define the repository ID and model filename
+        if repo_id is None:
+            print(
+                "Repo is is not specified, using default Hugging Face repo_id: giswqs/geoai"
+            )
+            repo_id = "giswqs/geoai"
+
+        # Download the model
+        model_path = hf_hub_download(repo_id=repo_id, filename=model_path)
+        print(f"Model downloaded to: {model_path}")
+
+        return model_path
+
+    except Exception as e:
+        print(f"Error downloading model from Hugging Face: {e}")
+        print("Please specify a local model path or ensure internet connectivity.")
+        raise
