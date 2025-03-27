@@ -1219,7 +1219,7 @@ def object_detection_batch(
         print(f"Processing file {index + 1}/{len(files)}: {file}")
         inference_on_geotiff(
             model=model,
-            geotiff_path=input_paths,
+            geotiff_path=file,
             output_path=filenames[index],
             window_size=window_size,  # Adjust based on your model and memory
             overlap=overlap,  # Overlap to avoid edge artifacts
