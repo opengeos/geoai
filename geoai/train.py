@@ -1190,6 +1190,9 @@ def object_detection_batch(
         num_classes=2, num_channels=num_channels, pretrained=pretrained
     )
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
     if not os.path.exists(model_path):
         try:
             model_path = download_model_from_hf(model_path)
