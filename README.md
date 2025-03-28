@@ -100,3 +100,10 @@ We welcome contributions of all kinds! See our [contributing guide](https://geoa
 ## 📄 License
 
 GeoAI is free and open source software, licensed under the MIT License.
+
+## Acknowledgments
+
+We gratefully acknowledge the support of the following organizations:
+
+-   [NASA](https://www.nasa.gov): This research is partially supported by the National Aeronautics and Space Administration (NASA) through Grant No. 80NSSC22K1742, awarded under the [Open Source Tools, Frameworks, and Libraries Program](https://bit.ly/3RVBRcQ).
+-   [AmericaView](https://americaview.org): This work is also partially supported by the U.S. Geological Survey through Grant/Cooperative Agreement No. G23AP00683 (GY23-GY27) in collaboration with AmericaView.
