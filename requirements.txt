@@ -6,6 +6,7 @@ jupyter-server-proxy
 leafmap
 localtileserver
 mapclassify
+maplibre
 overturemaps
 planetary-computer
 pystac-client
