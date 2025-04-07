@@ -574,6 +574,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/edit_vector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Edit vector
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/image_chips/" class="md-nav__link">
         
   
@@ -1265,6 +1288,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#geoai.geoai.edit_vector_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      edit_vector_data()
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1506,6 +1538,15 @@
   <a href="#geoai.geoai.create_vector_data" class="md-nav__link">
     <span class="md-ellipsis">
       create_vector_data()
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.geoai.edit_vector_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      edit_vector_data()
     </span>
   </a>
   
@@ -1950,6 +1991,268 @@ Defaults to 0.</p></td>
         <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
         <span class="n">height</span><span class="o">=</span><span class="n">height</span><span class="p">,</span>
         <span class="n">frame_border</span><span class="o">=</span><span class="n">frame_border</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div>
+        </details>
+    </div>
+
+  </div>
+
+
+
+  <div class="doc doc-object doc-function">
+
+
+
+<h2 id="geoai.geoai.edit_vector_data" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">edit_vector_data</span><span class="p">(</span><span class="n">m</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">properties</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">time_format</span><span class="o">=</span><span class="s1">&#39;%Y%m</span><span class="si">%d</span><span class="s1">T%H%M%S&#39;</span><span class="p">,</span> <span class="n">column_widths</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">map_height</span><span class="o">=</span><span class="s1">&#39;600px&#39;</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">filename_prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">file_ext</span><span class="o">=</span><span class="s1">&#39;geojson&#39;</span><span class="p">,</span> <span class="n">add_mapillary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s1">&#39;photo&#39;</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="mf">5e-05</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">420</span><span class="p">,</span> <span class="n">frame_border</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">controls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">position</span><span class="o">=</span><span class="s1">&#39;top-right&#39;</span><span class="p">,</span> <span class="n">fit_bounds_options</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+
+<a href="#geoai.geoai.edit_vector_data" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents ">
+
+      <p>Generates a widget-based interface for creating and managing vector data on a map.</p>
+<p>This function creates an interactive widget interface that allows users to draw features
+(points, lines, polygons) on a map, assign properties to these features, and export them
+as GeoJSON files. The interface includes a map, a sidebar for property management, and
+buttons for saving, exporting, and resetting the data.</p>
+
+<p><strong>Parameters:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr>
+        <td><code>m</code></td>
+        <td><code>Map</code></td>
+        <td><p>An existing Map object. If not provided, a default map with
+basemaps and drawing controls will be created. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>filename</code></td>
+        <td><code>str or gpd.GeoDataFrame</code></td>
+        <td><p>The path to a GeoJSON file or a GeoDataFrame
+containing the vector data to be edited. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>properties</code></td>
+        <td><code>Dict[str, List[Any]]</code></td>
+        <td><p>A dictionary where keys are property names
+and values are lists of possible values for each property. These properties can be
+assigned to the drawn features. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>time_format</code></td>
+        <td><code>str</code></td>
+        <td><p>The format string for the timestamp used in the exported
+filename. Defaults to "%Y%m%dT%H%M%S".</p></td>
+        <td><code>&#39;%Y%m%dT%H%M%S&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>column_widths</code></td>
+        <td><code>Optional[List[int]]</code></td>
+        <td><p>A list of two integers specifying the
+relative widths of the map and sidebar columns. Defaults to (9, 3).</p></td>
+        <td><code>(9, 3)</code></td>
+      </tr>
+      <tr>
+        <td><code>map_height</code></td>
+        <td><code>str</code></td>
+        <td><p>The height of the map widget. Defaults to "600px".</p></td>
+        <td><code>&#39;600px&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>out_dir</code></td>
+        <td><code>str</code></td>
+        <td><p>The directory where the exported GeoJSON files will be saved.
+If not provided, the current working directory is used. Defaults to None.</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>filename_prefix</code></td>
+        <td><code>str</code></td>
+        <td><p>A prefix to be added to the exported filename.
+Defaults to "".</p></td>
+        <td><code>&#39;&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>file_ext</code></td>
+        <td><code>str</code></td>
+        <td><p>The file extension for the exported file. Defaults to "geojson".</p></td>
+        <td><code>&#39;geojson&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>add_mapillary</code></td>
+        <td><code>bool</code></td>
+        <td><p>Whether to add a Mapillary image widget that displays the
+nearest image to the clicked point on the map. Defaults to False.</p></td>
+        <td><code>False</code></td>
+      </tr>
+      <tr>
+        <td><code>style</code></td>
+        <td><code>str</code></td>
+        <td><p>The style of the Mapillary image widget. Can be "classic", "photo",
+or "split". Defaults to "photo".</p></td>
+        <td><code>&#39;photo&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>radius</code></td>
+        <td><code>float</code></td>
+        <td><p>The radius (in degrees) used to search for the nearest Mapillary
+image. Defaults to 0.00005 degrees.</p></td>
+        <td><code>5e-05</code></td>
+      </tr>
+      <tr>
+        <td><code>width</code></td>
+        <td><code>int</code></td>
+        <td><p>The width of the Mapillary image widget. Defaults to 300.</p></td>
+        <td><code>300</code></td>
+      </tr>
+      <tr>
+        <td><code>height</code></td>
+        <td><code>int</code></td>
+        <td><p>The height of the Mapillary image widget. Defaults to 420.</p></td>
+        <td><code>420</code></td>
+      </tr>
+      <tr>
+        <td><code>frame_border</code></td>
+        <td><code>int</code></td>
+        <td><p>The width of the frame border for the Mapillary image widget.
+Defaults to 0.</p></td>
+        <td><code>0</code></td>
+      </tr>
+      <tr>
+        <td><code>controls</code></td>
+        <td><code>Optional[List[str]]</code></td>
+        <td><p>The drawing controls to be added to the map.
+Defaults to ["point", "polygon", "line_string", "trash"].</p></td>
+        <td><code>None</code></td>
+      </tr>
+      <tr>
+        <td><code>position</code></td>
+        <td><code>str</code></td>
+        <td><p>The position of the drawing controls on the map. Defaults to "top-right".</p></td>
+        <td><code>&#39;top-right&#39;</code></td>
+      </tr>
+      <tr>
+        <td><code>**kwargs</code></td>
+        <td><code>Any</code></td>
+        <td><p>Additional keyword arguments that may be passed to the function.</p></td>
+        <td><code>{}</code></td>
+      </tr>
+  </tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>widgets.VBox</code></td>
+      <td><p>A vertical box widget containing the map, sidebar, and control buttons.</p></td>
+    </tr>
+  </tbody>
+</table>
+        <details class="quote">
+          <summary>Source code in <code>geoai/geoai.py</code></summary>
+          <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">edit_vector_data</span><span class="p">(</span>
+    <span class="n">m</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Map</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">properties</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">time_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">T%H%M%S&quot;</span><span class="p">,</span>
+    <span class="n">column_widths</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+    <span class="n">map_height</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;600px&quot;</span><span class="p">,</span>
+    <span class="n">out_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">filename_prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="n">file_ext</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;geojson&quot;</span><span class="p">,</span>
+    <span class="n">add_mapillary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">style</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;photo&quot;</span><span class="p">,</span>
+    <span class="n">radius</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.00005</span><span class="p">,</span>
+    <span class="n">width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">300</span><span class="p">,</span>
+    <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">420</span><span class="p">,</span>
+    <span class="n">frame_border</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">controls</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">position</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;top-right&quot;</span><span class="p">,</span>
+    <span class="n">fit_bounds_options</span><span class="p">:</span> <span class="n">Dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generates a widget-based interface for creating and managing vector data on a map.</span>
+
+<span class="sd">    This function creates an interactive widget interface that allows users to draw features</span>
+<span class="sd">    (points, lines, polygons) on a map, assign properties to these features, and export them</span>
+<span class="sd">    as GeoJSON files. The interface includes a map, a sidebar for property management, and</span>
+<span class="sd">    buttons for saving, exporting, and resetting the data.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        m (Map, optional): An existing Map object. If not provided, a default map with</span>
+<span class="sd">            basemaps and drawing controls will be created. Defaults to None.</span>
+<span class="sd">        filename (str or gpd.GeoDataFrame): The path to a GeoJSON file or a GeoDataFrame</span>
+<span class="sd">            containing the vector data to be edited. Defaults to None.</span>
+<span class="sd">        properties (Dict[str, List[Any]], optional): A dictionary where keys are property names</span>
+<span class="sd">            and values are lists of possible values for each property. These properties can be</span>
+<span class="sd">            assigned to the drawn features. Defaults to None.</span>
+<span class="sd">        time_format (str, optional): The format string for the timestamp used in the exported</span>
+<span class="sd">            filename. Defaults to &quot;%Y%m%dT%H%M%S&quot;.</span>
+<span class="sd">        column_widths (Optional[List[int]], optional): A list of two integers specifying the</span>
+<span class="sd">            relative widths of the map and sidebar columns. Defaults to (9, 3).</span>
+<span class="sd">        map_height (str, optional): The height of the map widget. Defaults to &quot;600px&quot;.</span>
+<span class="sd">        out_dir (str, optional): The directory where the exported GeoJSON files will be saved.</span>
+<span class="sd">            If not provided, the current working directory is used. Defaults to None.</span>
+<span class="sd">        filename_prefix (str, optional): A prefix to be added to the exported filename.</span>
+<span class="sd">            Defaults to &quot;&quot;.</span>
+<span class="sd">        file_ext (str, optional): The file extension for the exported file. Defaults to &quot;geojson&quot;.</span>
+<span class="sd">        add_mapillary (bool, optional): Whether to add a Mapillary image widget that displays the</span>
+<span class="sd">            nearest image to the clicked point on the map. Defaults to False.</span>
+<span class="sd">        style (str, optional): The style of the Mapillary image widget. Can be &quot;classic&quot;, &quot;photo&quot;,</span>
+<span class="sd">            or &quot;split&quot;. Defaults to &quot;photo&quot;.</span>
+<span class="sd">        radius (float, optional): The radius (in degrees) used to search for the nearest Mapillary</span>
+<span class="sd">            image. Defaults to 0.00005 degrees.</span>
+<span class="sd">        width (int, optional): The width of the Mapillary image widget. Defaults to 300.</span>
+<span class="sd">        height (int, optional): The height of the Mapillary image widget. Defaults to 420.</span>
+<span class="sd">        frame_border (int, optional): The width of the frame border for the Mapillary image widget.</span>
+<span class="sd">            Defaults to 0.</span>
+<span class="sd">        controls (Optional[List[str]], optional): The drawing controls to be added to the map.</span>
+<span class="sd">            Defaults to [&quot;point&quot;, &quot;polygon&quot;, &quot;line_string&quot;, &quot;trash&quot;].</span>
+<span class="sd">        position (str, optional): The position of the drawing controls on the map. Defaults to &quot;top-right&quot;.</span>
+<span class="sd">        **kwargs (Any): Additional keyword arguments that may be passed to the function.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        widgets.VBox: A vertical box widget containing the map, sidebar, and control buttons.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">maplibregl</span><span class="o">.</span><span class="n">edit_vector_data</span><span class="p">(</span>
+        <span class="n">m</span><span class="o">=</span><span class="n">m</span><span class="p">,</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">filename</span><span class="p">,</span>
+        <span class="n">properties</span><span class="o">=</span><span class="n">properties</span><span class="p">,</span>
+        <span class="n">time_format</span><span class="o">=</span><span class="n">time_format</span><span class="p">,</span>
+        <span class="n">column_widths</span><span class="o">=</span><span class="n">column_widths</span><span class="p">,</span>
+        <span class="n">map_height</span><span class="o">=</span><span class="n">map_height</span><span class="p">,</span>
+        <span class="n">out_dir</span><span class="o">=</span><span class="n">out_dir</span><span class="p">,</span>
+        <span class="n">filename_prefix</span><span class="o">=</span><span class="n">filename_prefix</span><span class="p">,</span>
+        <span class="n">file_ext</span><span class="o">=</span><span class="n">file_ext</span><span class="p">,</span>
+        <span class="n">add_mapillary</span><span class="o">=</span><span class="n">add_mapillary</span><span class="p">,</span>
+        <span class="n">style</span><span class="o">=</span><span class="n">style</span><span class="p">,</span>
+        <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span>
+        <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="n">height</span><span class="p">,</span>
+        <span class="n">frame_border</span><span class="o">=</span><span class="n">frame_border</span><span class="p">,</span>
+        <span class="n">controls</span><span class="o">=</span><span class="n">controls</span><span class="p">,</span>
+        <span class="n">position</span><span class="o">=</span><span class="n">position</span><span class="p">,</span>
+        <span class="n">fit_bounds_options</span><span class="o">=</span><span class="n">fit_bounds_options</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre></div>
