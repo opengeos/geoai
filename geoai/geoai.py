@@ -1,5 +1,9 @@
 """Main module."""
 
+import logging
+
+logging.getLogger("maplibre").setLevel(logging.ERROR)
+
 import leafmap
 import leafmap.maplibregl as maplibregl
 
