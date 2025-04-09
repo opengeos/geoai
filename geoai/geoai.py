@@ -1,5 +1,6 @@
 """Main module."""
 
+import logging
 import leafmap
 import leafmap.maplibregl as maplibregl
 
@@ -20,6 +21,8 @@ from .hf import *
 from .segment import *
 from .train import object_detection, object_detection_batch, train_MaskRCNN_model
 from .utils import *
+
+logging.getLogger("maplibre").setLevel(logging.ERROR)
 
 
 class Map(leafmap.Map):
