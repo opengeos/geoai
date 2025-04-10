@@ -34,6 +34,7 @@ jobs:
               run: |
                   uv pip install --find-links https://girder.github.io/large_image_wheels GDAL pyproj
                   uv pip install pytest
+                  uv pip install "geoai-py[extra]"
 
             - name: Test import
               run: |

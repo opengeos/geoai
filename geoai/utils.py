@@ -6249,3 +6249,99 @@ def download_model_from_hf(model_path, repo_id=None):
         print(f"Error downloading model from Hugging Face: {e}")
         print("Please specify a local model path or ensure internet connectivity.")
         raise
+
+
+def regularize(
+    data: Union[gpd.GeoDataFrame, str],
+    parallel_threshold: float = 1.0,
+    target_crs: Optional[Union[str, "pyproj.CRS"]] = None,
+    simplify: bool = True,
+    simplify_tolerance: float = 0.5,
+    allow_45_degree: bool = True,
+    diagonal_threshold_reduction: float = 15,
+    allow_circles: bool = True,
+    circle_threshold: float = 0.9,
+    num_cores: int = 1,
+    include_metadata: bool = False,
+    output_path: Optional[str] = None,
+    **kwargs,
+) -> gpd.GeoDataFrame:
+    """Regularizes polygon geometries in a GeoDataFrame by aligning edges.
+
+    Aligns edges to be parallel or perpendicular (optionally also 45 degrees)
+    to their main direction. Handles reprojection, initial simplification,
+    regularization, geometry cleanup, and parallel processing.
+
+    This function is a wrapper around the `regularize_geodataframe` function
+    from the `buildingregulariser` package. Credits to the original author
+    Nick Wright. Check out the repo at https://github.com/DPIRD-DMA/Building-Regulariser.
+
+    Args:
+        data (Union[gpd.GeoDataFrame, str]): Input GeoDataFrame with polygon or multipolygon geometries,
+            or a file path to the GeoDataFrame.
+        parallel_threshold (float, optional): Distance threshold for merging nearly parallel adjacent edges
+            during regularization. Defaults to 1.0.
+        target_crs (Optional[Union[str, "pyproj.CRS"]], optional): Target Coordinate Reference System for
+            processing. If None, uses the input GeoDataFrame's CRS. Processing is more reliable in a
+            projected CRS. Defaults to None.
+        simplify (bool, optional): If True, applies initial simplification to the geometry before
+            regularization. Defaults to True.
+        simplify_tolerance (float, optional): Tolerance for the initial simplification step (if `simplify`
+            is True). Also used for geometry cleanup steps. Defaults to 0.5.
+        allow_45_degree (bool, optional): If True, allows edges to be oriented at 45-degree angles relative
+            to the main direction during regularization. Defaults to True.
+        diagonal_threshold_reduction (float, optional): Reduction factor in degrees to reduce the likelihood
+            of diagonal edges being created. Larger values reduce the likelihood of diagonal edges.
+            Defaults to 15.
+        allow_circles (bool, optional): If True, attempts to detect polygons that are nearly circular and
+            replaces them with perfect circles. Defaults to True.
+        circle_threshold (float, optional): Intersection over Union (IoU) threshold used for circle detection
+            (if `allow_circles` is True). Value between 0 and 1. Defaults to 0.9.
+        num_cores (int, optional): Number of CPU cores to use for parallel processing. If 1, processing is
+            done sequentially. Defaults to 1.
+        include_metadata (bool, optional): If True, includes metadata about the regularization process in the
+            output GeoDataFrame. Defaults to False.
+        output_path (Optional[str], optional): Path to save the output GeoDataFrame. If None, the output is
+            not saved. Defaults to None.
+        **kwargs: Additional keyword arguments to pass to the `to_file` method when saving the output.
+
+    Returns:
+        gpd.GeoDataFrame: A new GeoDataFrame with regularized polygon geometries. Original attributes are
+        preserved. Geometries that failed processing might be dropped.
+
+    Raises:
+        ValueError: If the input data is not a GeoDataFrame or a file path, or if the input GeoDataFrame is empty.
+    """
+    try:
+        from buildingregulariser import regularize_geodataframe
+    except ImportError:
+        install_package("buildingregulariser")
+        from buildingregulariser import regularize_geodataframe
+
+    if isinstance(data, str):
+        data = gpd.read_file(data)
+    elif not isinstance(data, gpd.GeoDataFrame):
+        raise ValueError("Input data must be a GeoDataFrame or a file path.")
+
+    # Check if the input data is empty
+    if data.empty:
+        raise ValueError("Input GeoDataFrame is empty.")
+
+    gdf = regularize_geodataframe(
+        data,
+        parallel_threshold=parallel_threshold,
+        target_crs=target_crs,
+        simplify=simplify,
+        simplify_tolerance=simplify_tolerance,
+        allow_45_degree=allow_45_degree,
+        diagonal_threshold_reduction=diagonal_threshold_reduction,
+        allow_circles=allow_circles,
+        circle_threshold=circle_threshold,
+        num_cores=num_cores,
+        include_metadata=include_metadata,
+    )
+
+    if output_path:
+        gdf.to_file(output_path, **kwargs)
+
+    return gdf
