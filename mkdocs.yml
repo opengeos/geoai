@@ -47,20 +47,21 @@ plugins:
     - mkdocs-jupyter:
           include_source: True
           ignore_h1_titles: True
-          execute: false
+          execute: true
           allow_errors: false
           ignore: ["conf.py"]
-          execute_ignore: [
+          execute_ignore:
+              [
                   "examples/dataviz/*.ipynb",
                   "examples/rastervision/*.ipynb",
                   "examples/samgeo/*.ipynb",
+                  "examples/download_*.ipynb",
+                  "examples/planetary_computer.ipynb",
+                  "examples/*_detection.ipynb",
+                  "examples/building_footprints_*.ipynb",
                   "examples/data_visualization.ipynb",
-                  "examples/download_data.ipynb",
-                  "examples/car_detection.ipynb",
-                  "examples/ship_detection.ipynb",
-                  #   "examples/solar_panel_detection.ipynb",
-                  "examples/building_footprints_africa.ipynb",
-                  "examples/building_footprints_china.ipynb",
+                  "examples/train_*.ipynb",
+                  "examples/wetland_mapping.ipynb",
               ]
     # - mkdocstrings:
     #       default_handler: python
