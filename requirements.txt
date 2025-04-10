@@ -1,4 +1,5 @@
 albumentations
+buildingregulariser
 contextily
 geopandas
 huggingface_hub
