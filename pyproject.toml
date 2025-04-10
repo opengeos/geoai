@@ -37,7 +37,7 @@ exclude = ["docs*"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-extra = ["overturemaps"]
+extra = ["overturemaps", "buildingregulariser"]
 
 [tool.distutils.bdist_wheel]
 universal = true
