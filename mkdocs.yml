@@ -124,6 +124,7 @@ nav:
           - examples/train_ship_detection.ipynb
           - examples/train_water_detection.ipynb
           - examples/wetland_mapping.ipynb
+          - examples/regularization.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
