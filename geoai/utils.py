@@ -6312,7 +6312,11 @@ def regularize(
     Raises:
         ValueError: If the input data is not a GeoDataFrame or a file path, or if the input GeoDataFrame is empty.
     """
-    from buildingregulariser import regularize_geodataframe
+    try:
+        from buildingregulariser import regularize_geodataframe
+    except ImportError:
+        install_package("buildingregulariser")
+        from buildingregulariser import regularize_geodataframe
 
     if isinstance(data, str):
         data = gpd.read_file(data)
