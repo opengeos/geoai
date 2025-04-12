@@ -905,7 +905,7 @@ def pc_stac_download(
     items,
     output_dir=".",
     assets=None,
-    max_workers=4,
+    max_workers=1,
     skip_existing=True,
 ):
     """
@@ -922,7 +922,7 @@ def pc_stac_download(
         assets (list, optional): List of asset keys to download. If None,
             downloads all available assets. Defaults to None.
         max_workers (int, optional): Maximum number of concurrent download threads.
-            Defaults to 4.
+            Defaults to 1.
         skip_existing (bool, optional): Skip download if the file already exists.
             Defaults to True.
         sign_urls (bool, optional): Whether to sign URLs for authenticated access.

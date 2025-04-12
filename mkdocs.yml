@@ -62,15 +62,8 @@ plugins:
                   "examples/data_visualization.ipynb",
                   "examples/train_*.ipynb",
                   "examples/wetland_mapping.ipynb",
+                  "workshops/GeoAI_Workshop_2025.ipynb",
               ]
-    # - mkdocstrings:
-    #       default_handler: python
-    #       handlers:
-    #           python:
-    #           options:
-    #               docstring_style: google
-    #               inventory:
-    #                   - path: docs/inventory.json
 
 markdown_extensions:
     - admonition
@@ -142,6 +135,8 @@ nav:
           - examples/dataviz/raster_viz.ipynb
           - examples/dataviz/vector_viz.ipynb
           - examples/dataviz/lidar_viz.ipynb
+    - Workshops:
+          - workshops/GeoAI_Workshop_2025.ipynb
     - API Reference:
           - classify module: classify.md
           - geoai module: geoai.md
