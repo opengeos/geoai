@@ -6235,7 +6235,7 @@ def download_model_from_hf(model_path, repo_id=None):
         # Define the repository ID and model filename
         if repo_id is None:
             print(
-                "Repo is is not specified, using default Hugging Face repo_id: giswqs/geoai"
+                "Repo is not specified, using default Hugging Face repo_id: giswqs/geoai"
             )
             repo_id = "giswqs/geoai"
 
