@@ -1130,6 +1130,74 @@
       
   
   
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Workshops
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            Workshops
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workshops/GeoAI_Workshop_2025/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    GeoAI Workshop 2025
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -1143,10 +1211,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
             
   
   
@@ -1159,8 +1227,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             API Reference
           </label>
@@ -4674,7 +4742,7 @@ Defaults to "id".</p>
 
 
 <h2 id="geoai.download.pc_stac_download" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">pc_stac_download</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">pc_stac_download</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#geoai.download.pc_stac_download" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -4758,11 +4826,11 @@ downloads all available assets. Defaults to None.</p>
             <td>
               <div class="doc-md-description">
                 <p>Maximum number of concurrent download threads.
-Defaults to 4.</p>
+Defaults to 1.</p>
               </div>
             </td>
             <td>
-                  <code>4</code>
+                  <code>1</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5020,7 +5088,7 @@ assets {asset_key: file_path}.</p>
     <span class="n">items</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
     <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">max_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -5037,7 +5105,7 @@ assets {asset_key: file_path}.</p>
 <span class="sd">        assets (list, optional): List of asset keys to download. If None,</span>
 <span class="sd">            downloads all available assets. Defaults to None.</span>
 <span class="sd">        max_workers (int, optional): Maximum number of concurrent download threads.</span>
-<span class="sd">            Defaults to 4.</span>
+<span class="sd">            Defaults to 1.</span>
 <span class="sd">        skip_existing (bool, optional): Skip download if the file already exists.</span>
 <span class="sd">            Defaults to True.</span>
 <span class="sd">        sign_urls (bool, optional): Whether to sign URLs for authenticated access.</span>
