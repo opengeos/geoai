@@ -62,7 +62,7 @@ plugins:
                   "examples/data_visualization.ipynb",
                   "examples/train_*.ipynb",
                   "examples/wetland_mapping.ipynb",
-                  "examples/glove_projection.ipynb",
+                  "examples/globe_projection.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -120,7 +120,7 @@ nav:
           - examples/train_water_detection.ipynb
           - examples/wetland_mapping.ipynb
           - examples/regularization.ipynb
-          - examples/glove_projection.ipynb
+          - examples/globe_projection.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
