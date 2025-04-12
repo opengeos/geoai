@@ -15,6 +15,7 @@ docs/examples/*.md
 docs/examples/output/
 docs/examples/*.png
 docs/examples/data/
+docs/workshops/data/
 *.pth
 
 # Distribution / packaging
