@@ -19,6 +19,7 @@ from .download import (
     pc_stac_download,
     read_pc_item_asset,
     view_pc_item,
+    view_pc_items,
 )
 from .classify import train_classifier, classify_image, classify_images
 from .extract import *

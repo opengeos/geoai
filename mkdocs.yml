@@ -96,6 +96,7 @@ nav:
     - Examples:
           - examples/download_data.ipynb
           - examples/download_sentinel2.ipynb
+          - examples/download_naip.ipynb
           - examples/planetary_computer.ipynb
           - examples/view_metadata.ipynb
           - examples/create_vector.ipynb
