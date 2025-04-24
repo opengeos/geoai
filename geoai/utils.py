@@ -2112,7 +2112,7 @@ def raster_to_vector(
         return gdf
 
 
-def batch_raster_to_vector(
+def raster_to_vector_batch(
     input_dir,
     output_dir,
     pattern="*.tif",

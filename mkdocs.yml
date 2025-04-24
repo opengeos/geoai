@@ -119,6 +119,7 @@ nav:
           - examples/train_car_detection.ipynb
           - examples/train_ship_detection.ipynb
           - examples/train_water_detection.ipynb
+          - examples/water_dynamics.ipynb
           - examples/wetland_mapping.ipynb
           - examples/regularization.ipynb
           - examples/globe_projection.ipynb
