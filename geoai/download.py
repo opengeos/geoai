@@ -1135,7 +1135,37 @@ def view_pc_item(
     map_args=None,
     **kwargs,
 ):
+    """
+    Visualize a STAC item from the Planetary Computer on an interactive map.
 
+    This function allows users to display a STAC item on a map using either the
+    `folium` or `ipyleaflet` backend. It supports adding basemaps, configuring
+    map options, and customizing the visualization of the STAC item.
+
+    Args:
+        url (str, optional): URL of the STAC item to visualize. Defaults to None.
+        collection (str, optional): The collection ID of the STAC item. Defaults to None.
+        item (str or pystac.Item, optional): The STAC item or its ID. Defaults to None.
+        assets (list, optional): List of asset keys to visualize. Defaults to None.
+        bands (list, optional): List of specific bands to visualize. Defaults to None.
+        titiler_endpoint (str, optional): URL of the Titiler endpoint for rendering. Defaults to None.
+        name (str, optional): Name of the layer to display on the map. Defaults to "STAC Item".
+        attribution (str, optional): Attribution text for the layer. Defaults to "Planetary Computer".
+        opacity (float, optional): Opacity of the layer (0.0 to 1.0). Defaults to 1.0.
+        shown (bool, optional): Whether the layer is visible by default. Defaults to True.
+        fit_bounds (bool, optional): Whether to fit the map bounds to the layer. Defaults to True.
+        layer_index (int, optional): Index of the layer in the map's layer stack. Defaults to None.
+        backend (str, optional): Map backend to use ('folium' or 'ipyleaflet'). Defaults to "folium".
+        basemap (str, optional): Name of the basemap to add to the map. Defaults to None.
+        map_args (dict, optional): Additional arguments for configuring the map. Defaults to None.
+        **kwargs: Additional keyword arguments passed to the `add_stac_layer` method.
+
+    Returns:
+        leafmap.Map: An interactive map with the STAC item visualized.
+
+    Raises:
+        ValueError: If an unsupported backend is specified.
+    """
     if backend == "folium":
         import leafmap.foliumap as leafmap
 
@@ -1180,4 +1210,104 @@ def view_pc_item(
         layer_index=layer_index,
         **kwargs,
     )
+    return m
+
+
+def view_pc_items(
+    urls=None,
+    collection=None,
+    items=None,
+    assets=None,
+    bands=None,
+    titiler_endpoint=None,
+    attribution="Planetary Computer",
+    opacity=1.0,
+    shown=True,
+    fit_bounds=True,
+    layer_index=None,
+    backend="folium",
+    basemap=None,
+    map_args=None,
+    **kwargs,
+):
+    """
+    Visualize multiple STAC items from the Planetary Computer on an interactive map.
+
+    This function allows users to display multiple STAC items on a map using either
+    the `folium` or `ipyleaflet` backend. It supports adding basemaps, configuring
+    map options, and customizing the visualization of the STAC items.
+
+    Args:
+        urls (list, optional): List of URLs of the STAC items to visualize. Defaults to None.
+        collection (str, optional): The collection ID of the STAC items. Defaults to None.
+        items (list or str, optional): List of STAC items or their IDs. Defaults to None.
+        assets (list, optional): List of asset keys to visualize. Defaults to None.
+        bands (list, optional): List of specific bands to visualize. Defaults to None.
+        titiler_endpoint (str, optional): URL of the Titiler endpoint for rendering. Defaults to None.
+        attribution (str, optional): Attribution text for the layers. Defaults to "Planetary Computer".
+        opacity (float, optional): Opacity of the layers (0.0 to 1.0). Defaults to 1.0.
+        shown (bool, optional): Whether the layers are visible by default. Defaults to True.
+        fit_bounds (bool, optional): Whether to fit the map bounds to the layers. Defaults to True.
+        layer_index (int, optional): Index of the layers in the map's layer stack. Defaults to None.
+        backend (str, optional): Map backend to use ('folium' or 'ipyleaflet'). Defaults to "folium".
+        basemap (str, optional): Name of the basemap to add to the map. Defaults to None.
+        map_args (dict, optional): Additional arguments for configuring the map. Defaults to None.
+        **kwargs: Additional keyword arguments passed to the `add_stac_layer` method.
+
+    Returns:
+        leafmap.Map: An interactive map with the STAC items visualized.
+
+    Raises:
+        ValueError: If an unsupported backend is specified.
+    """
+    if backend == "folium":
+        import leafmap.foliumap as leafmap
+
+    elif backend == "ipyleaflet":
+        import leafmap.leafmap as leafmap
+
+    else:
+        raise ValueError(
+            f"Unsupported backend: {backend}. Supported backends are 'folium' and 'ipyleaflet'."
+        )
+
+    if map_args is None:
+        map_args = {}
+
+    if "draw_control" not in map_args:
+        map_args["draw_control"] = False
+
+    if urls is not None:
+        items = [pystac.Item.from_file(url) for url in urls]
+
+    if isinstance(items, str):
+        items = [pystac.Item.from_file(items)]
+    m = leafmap.Map(**map_args)
+
+    if basemap is not None:
+        m.add_basemap(basemap)
+    if isinstance(items, list):
+
+        for item in items:
+
+            if isinstance(item, pystac.Item):
+                collection = item.collection_id
+                if assets is None:
+                    assets = [list(item.assets.keys())[0]]
+                item = item.id
+
+                m.add_stac_layer(
+                    collection=collection,
+                    item=item,
+                    assets=assets,
+                    bands=bands,
+                    titiler_endpoint=titiler_endpoint,
+                    name=item,
+                    attribution=attribution,
+                    opacity=opacity,
+                    shown=shown,
+                    fit_bounds=fit_bounds,
+                    layer_index=layer_index,
+                    **kwargs,
+                )
     return m
