@@ -61,6 +61,7 @@ plugins:
                   "examples/building_footprints_*.ipynb",
                   "examples/data_visualization.ipynb",
                   "examples/train_*.ipynb",
+                  "examples/water_dynamics.ipynb",
                   "examples/wetland_mapping.ipynb",
                   "examples/globe_projection.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
