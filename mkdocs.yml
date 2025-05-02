@@ -148,6 +148,7 @@ nav:
           - download module: download.md
           - extract module: extract.md
           - hf module: hf.md
+          - samgeo module: samgeo.md
           - segmentation module: segmentation.md
           - train module: train.md
           - utils module: utils.md
