@@ -123,8 +123,11 @@ def train_classifier(
     from torchgeo.datamodules import GeoDataModule
     from torchgeo.datasets import RasterDataset, stack_samples
     from torchgeo.datasets.splits import random_bbox_assignment
-    from torchgeo.samplers import (GridGeoSampler, RandomBatchGeoSampler,
-                                   RandomGeoSampler)
+    from torchgeo.samplers import (
+        GridGeoSampler,
+        RandomBatchGeoSampler,
+        RandomGeoSampler,
+    )
     from torchgeo.trainers import SemanticSegmentationTask
 
     # Create a wrapper class for albumentations to work with TorchGeo format
