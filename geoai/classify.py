@@ -1,6 +1,7 @@
 """The module for training semantic segmentation models for classifying remote sensing imagery."""
 
 import os
+
 import numpy as np
 
 
@@ -110,23 +111,21 @@ def train_classifier(
     Returns:
         object: Trained SemanticSegmentationTask model.
     """
-    import lightning.pytorch as pl
-    from torch.utils.data import DataLoader
-    from torchgeo.datasets import stack_samples, RasterDataset
-    from torchgeo.datasets.splits import random_bbox_assignment
-    from torchgeo.samplers import (
-        RandomGeoSampler,
-        RandomBatchGeoSampler,
-        GridGeoSampler,
-    )
-    import torch
     import multiprocessing as mp
     import timeit
+
     import albumentations as A
-    from torchgeo.datamodules import GeoDataModule
-    from torchgeo.trainers import SemanticSegmentationTask
+    import lightning.pytorch as pl
+    import torch
     from lightning.pytorch.callbacks import ModelCheckpoint
     from lightning.pytorch.loggers import CSVLogger
+    from torch.utils.data import DataLoader
+    from torchgeo.datamodules import GeoDataModule
+    from torchgeo.datasets import RasterDataset, stack_samples
+    from torchgeo.datasets.splits import random_bbox_assignment
+    from torchgeo.samplers import (GridGeoSampler, RandomBatchGeoSampler,
+                                   RandomGeoSampler)
+    from torchgeo.trainers import SemanticSegmentationTask
 
     # Create a wrapper class for albumentations to work with TorchGeo format
     class AlbumentationsWrapper:
@@ -376,21 +375,19 @@ def _classify_image(
     Returns:
         str: Path to the saved classified image.
     """
-    import numpy as np
     import timeit
-    from tqdm import tqdm
 
+    import numpy as np
+    import rasterio
     import torch
+    from rasterio.io import MemoryFile
+    from rasterio.merge import merge
+    from rasterio.transform import from_origin
     from torch.utils.data import DataLoader
-
     from torchgeo.datasets import RasterDataset, stack_samples
     from torchgeo.samplers import GridGeoSampler
     from torchgeo.trainers import SemanticSegmentationTask
-
-    import rasterio
-    from rasterio.transform import from_origin
-    from rasterio.io import MemoryFile
-    from rasterio.merge import merge
+    from tqdm import tqdm
 
     # Set default output path if not provided
     if output_path is None:
@@ -619,14 +616,12 @@ def classify_image(
         str: Path to the saved classified image.
     """
     import timeit
-
-    import torch
-    from torchgeo.trainers import SemanticSegmentationTask
+    import warnings
 
     import rasterio
-
-    import warnings
+    import torch
     from rasterio.errors import NotGeoreferencedWarning
+    from torchgeo.trainers import SemanticSegmentationTask
 
     # Disable specific GDAL/rasterio warnings
     warnings.filterwarnings("ignore", category=UserWarning, module="rasterio._.*")
@@ -863,8 +858,9 @@ def classify_images(
         list: List of paths to the saved classified images.
     """
     # Import required libraries
-    from tqdm import tqdm
     import glob
+
+    from tqdm import tqdm
 
     # Process directory input
     if isinstance(image_paths, str) and os.path.isdir(image_paths):
