@@ -1,3 +1,0 @@
-# samgeo module
-
-::: geoai.samgeo
