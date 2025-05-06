@@ -1126,6 +1126,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/samgeo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Samgeo
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/dataviz/raster_viz/" class="md-nav__link">
         
   
@@ -1486,6 +1509,29 @@
   
   <span class="md-ellipsis">
     hf module
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    sam module
     
   </span>
   
@@ -2113,9 +2159,7 @@ attention to edge handling:
 <span class="normal">822</span>
 <span class="normal">823</span>
 <span class="normal">824</span>
-<span class="normal">825</span>
-<span class="normal">826</span>
-<span class="normal">827</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_image</span><span class="p">(</span>
+<span class="normal">825</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_image</span><span class="p">(</span>
     <span class="n">image_path</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -2151,14 +2195,12 @@ attention to edge handling:
 <span class="sd">        str: Path to the saved classified image.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">timeit</span>
-
-    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="n">SemanticSegmentationTask</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 
     <span class="kn">import</span><span class="w"> </span><span class="nn">rasterio</span>
-
-    <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">rasterio.errors</span><span class="w"> </span><span class="kn">import</span> <span class="n">NotGeoreferencedWarning</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="n">SemanticSegmentationTask</span>
 
     <span class="c1"># Disable specific GDAL/rasterio warnings</span>
     <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">UserWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s2">&quot;rasterio._.*&quot;</span><span class="p">)</span>
@@ -2551,7 +2593,9 @@ is a directory. Defaults to ".tif".</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/classify.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">830</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">828</span>
+<span class="normal">829</span>
+<span class="normal">830</span>
 <span class="normal">831</span>
 <span class="normal">832</span>
 <span class="normal">833</span>
@@ -2653,8 +2697,7 @@ is a directory. Defaults to ".tif".</p>
 <span class="normal">929</span>
 <span class="normal">930</span>
 <span class="normal">931</span>
-<span class="normal">932</span>
-<span class="normal">933</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_images</span><span class="p">(</span>
+<span class="normal">932</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_images</span><span class="p">(</span>
     <span class="n">image_paths</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -2690,8 +2733,9 @@ is a directory. Defaults to ".tif".</p>
 <span class="sd">        list: List of paths to the saved classified images.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Import required libraries</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">glob</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
 
     <span class="c1"># Process directory input</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">image_paths</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">image_paths</span><span class="p">):</span>
@@ -3444,8 +3488,7 @@ Defaults to 1.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/classify.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  7</span>
-<span class="normal">  8</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  8</span>
 <span class="normal">  9</span>
 <span class="normal"> 10</span>
 <span class="normal"> 11</span>
@@ -3777,7 +3820,9 @@ Defaults to 1.</p>
 <span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
-<span class="normal">340</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_classifier</span><span class="p">(</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_classifier</span><span class="p">(</span>
     <span class="n">image_root</span><span class="p">,</span>
     <span class="n">label_root</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;output&quot;</span><span class="p">,</span>
@@ -3883,23 +3928,24 @@ Defaults to 1.</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        object: Trained SemanticSegmentationTask model.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">lightning.pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torch.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataLoader</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">stack_samples</span><span class="p">,</span> <span class="n">RasterDataset</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.datasets.splits</span><span class="w"> </span><span class="kn">import</span> <span class="n">random_bbox_assignment</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.samplers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-        <span class="n">RandomGeoSampler</span><span class="p">,</span>
-        <span class="n">RandomBatchGeoSampler</span><span class="p">,</span>
-        <span class="n">GridGeoSampler</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mp</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">timeit</span>
+
     <span class="kn">import</span><span class="w"> </span><span class="nn">albumentations</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">A</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.datamodules</span><span class="w"> </span><span class="kn">import</span> <span class="n">GeoDataModule</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="n">SemanticSegmentationTask</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">lightning.pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">lightning.pytorch.callbacks</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelCheckpoint</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">lightning.pytorch.loggers</span><span class="w"> </span><span class="kn">import</span> <span class="n">CSVLogger</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataLoader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.datamodules</span><span class="w"> </span><span class="kn">import</span> <span class="n">GeoDataModule</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">RasterDataset</span><span class="p">,</span> <span class="n">stack_samples</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.datasets.splits</span><span class="w"> </span><span class="kn">import</span> <span class="n">random_bbox_assignment</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.samplers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">GridGeoSampler</span><span class="p">,</span>
+        <span class="n">RandomBatchGeoSampler</span><span class="p">,</span>
+        <span class="n">RandomGeoSampler</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torchgeo.trainers</span><span class="w"> </span><span class="kn">import</span> <span class="n">SemanticSegmentationTask</span>
 
     <span class="c1"># Create a wrapper class for albumentations to work with TorchGeo format</span>
     <span class="k">class</span><span class="w"> </span><span class="nc">AlbumentationsWrapper</span><span class="p">:</span>
