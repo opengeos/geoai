@@ -64,6 +64,7 @@ plugins:
                   "examples/water_dynamics.ipynb",
                   "examples/wetland_mapping.ipynb",
                   "examples/globe_projection.ipynb",
+                  "examples/samgeo.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -124,6 +125,7 @@ nav:
           - examples/wetland_mapping.ipynb
           - examples/regularization.ipynb
           - examples/globe_projection.ipynb
+          - examples/samgeo.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
@@ -148,6 +150,7 @@ nav:
           - download module: download.md
           - extract module: extract.md
           - hf module: hf.md
+          - sam module: sam.md
           - segmentation module: segmentation.md
           - train module: train.md
           - utils module: utils.md

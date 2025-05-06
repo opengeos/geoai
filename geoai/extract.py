@@ -2,6 +2,7 @@
 
 # Standard Library
 import os
+import time
 
 # Third-Party Libraries
 import cv2
@@ -19,7 +20,6 @@ from torchvision.models.detection import (
     maskrcnn_resnet50_fpn,
 )
 from tqdm import tqdm
-import time
 
 # Local Imports
 from .utils import get_raster_stats

@@ -7,21 +7,21 @@ logging.getLogger("maplibre").setLevel(logging.ERROR)
 import leafmap
 import leafmap.maplibregl as maplibregl
 
+from .classify import classify_image, classify_images, train_classifier
 from .download import (
     download_naip,
     download_overture_buildings,
     download_pc_stac_item,
-    get_overture_data,
     extract_building_stats,
+    get_overture_data,
     pc_collection_list,
     pc_item_asset_list,
-    pc_stac_search,
     pc_stac_download,
+    pc_stac_search,
     read_pc_item_asset,
     view_pc_item,
     view_pc_items,
 )
-from .classify import train_classifier, classify_image, classify_images
 from .extract import *
 from .hf import *
 from .segment import *

@@ -6080,6 +6080,7 @@ def mosaic_geotiffs(input_dir, output_file, mask_file=None):
         True
     """
     import glob
+
     from osgeo import gdal
 
     gdal.UseExceptions()
@@ -6345,3 +6346,331 @@ def regularize(
         gdf.to_file(output_path, **kwargs)
 
     return gdf
+
+
+def vector_to_geojson(filename, output=None, **kwargs):
+    """Converts a vector file to a geojson file.
+
+    Args:
+        filename (str): The vector file path.
+        output (str, optional): The output geojson file path. Defaults to None.
+
+    Returns:
+        dict: The geojson dictionary.
+    """
+
+    if filename.startswith("http"):
+        filename = download_file(filename)
+
+    gdf = gpd.read_file(filename, **kwargs)
+    if output is None:
+        return gdf.__geo_interface__
+    else:
+        gdf.to_file(output, driver="GeoJSON")
+
+
+def geojson_to_coords(
+    geojson: str, src_crs: str = "epsg:4326", dst_crs: str = "epsg:4326"
+) -> list:
+    """Converts a geojson file or a dictionary of feature collection to a list of centroid coordinates.
+
+    Args:
+        geojson (str | dict): The geojson file path or a dictionary of feature collection.
+        src_crs (str, optional): The source CRS. Defaults to "epsg:4326".
+        dst_crs (str, optional): The destination CRS. Defaults to "epsg:4326".
+
+    Returns:
+        list: A list of centroid coordinates in the format of [[x1, y1], [x2, y2], ...]
+    """
+
+    import json
+    import warnings
+
+    warnings.filterwarnings("ignore")
+
+    if isinstance(geojson, dict):
+        geojson = json.dumps(geojson)
+    gdf = gpd.read_file(geojson, driver="GeoJSON")
+    centroids = gdf.geometry.centroid
+    centroid_list = [[point.x, point.y] for point in centroids]
+    if src_crs != dst_crs:
+        centroid_list = transform_coords(
+            [x[0] for x in centroid_list],
+            [x[1] for x in centroid_list],
+            src_crs,
+            dst_crs,
+        )
+        centroid_list = [[x, y] for x, y in zip(centroid_list[0], centroid_list[1])]
+    return centroid_list
+
+
+def coords_to_xy(
+    src_fp: str,
+    coords: np.ndarray,
+    coord_crs: str = "epsg:4326",
+    return_out_of_bounds=False,
+    **kwargs,
+) -> np.ndarray:
+    """Converts a list or array of coordinates to pixel coordinates, i.e., (col, row) coordinates.
+
+    Args:
+        src_fp: The source raster file path.
+        coords: A 2D or 3D array of coordinates. Can be of shape [[x1, y1], [x2, y2], ...]
+                or [[[x1, y1]], [[x2, y2]], ...].
+        coord_crs: The coordinate CRS of the input coordinates. Defaults to "epsg:4326".
+        return_out_of_bounds: Whether to return out-of-bounds coordinates. Defaults to False.
+        **kwargs: Additional keyword arguments to pass to rasterio.transform.rowcol.
+
+    Returns:
+        A 2D or 3D array of pixel coordinates in the same format as the input.
+    """
+    from rasterio.warp import transform as transform_coords
+
+    out_of_bounds = []
+    if isinstance(coords, np.ndarray):
+        input_is_3d = coords.ndim == 3  # Check if the input is a 3D array
+    else:
+        input_is_3d = False
+
+    # Flatten the 3D array to 2D if necessary
+    if input_is_3d:
+        original_shape = coords.shape  # Store the original shape
+        coords = coords.reshape(-1, 2)  # Flatten to 2D
+
+    # Convert ndarray to a list if necessary
+    if isinstance(coords, np.ndarray):
+        coords = coords.tolist()
+
+    xs, ys = zip(*coords)
+    with rasterio.open(src_fp) as src:
+        width = src.width
+        height = src.height
+        if coord_crs != src.crs:
+            xs, ys = transform_coords(coord_crs, src.crs, xs, ys, **kwargs)
+        rows, cols = rasterio.transform.rowcol(src.transform, xs, ys, **kwargs)
+
+    result = [[col, row] for col, row in zip(cols, rows)]
+
+    output = []
+
+    for i, (x, y) in enumerate(result):
+        if x >= 0 and y >= 0 and x < width and y < height:
+            output.append([x, y])
+        else:
+            out_of_bounds.append(i)
+
+    # Convert the output back to the original shape if input was 3D
+    output = np.array(output)
+    if input_is_3d:
+        output = output.reshape(original_shape)
+
+    # Handle cases where no valid pixel coordinates are found
+    if len(output) == 0:
+        print("No valid pixel coordinates found.")
+    elif len(output) < len(coords):
+        print("Some coordinates are out of the image boundary.")
+
+    if return_out_of_bounds:
+        return output, out_of_bounds
+    else:
+        return output
+
+
+def boxes_to_vector(coords, src_crs, dst_crs="EPSG:4326", output=None, **kwargs):
+    """
+    Convert a list of bounding box coordinates to vector data.
+
+    Args:
+        coords (list): A list of bounding box coordinates in the format [[left, top, right, bottom], [left, top, right, bottom], ...].
+        src_crs (int or str): The EPSG code or proj4 string representing the source coordinate reference system (CRS) of the input coordinates.
+        dst_crs (int or str, optional): The EPSG code or proj4 string representing the destination CRS to reproject the data (default is "EPSG:4326").
+        output (str or None, optional): The full file path (including the directory and filename without the extension) where the vector data should be saved.
+                                       If None (default), the function returns the GeoDataFrame without saving it to a file.
+        **kwargs: Additional keyword arguments to pass to geopandas.GeoDataFrame.to_file() when saving the vector data.
+
+    Returns:
+        geopandas.GeoDataFrame or None: The GeoDataFrame with the converted vector data if output is None, otherwise None if the data is saved to a file.
+    """
+
+    from shapely.geometry import box
+
+    # Create a list of Shapely Polygon objects based on the provided coordinates
+    polygons = [box(*coord) for coord in coords]
+
+    # Create a GeoDataFrame with the Shapely Polygon objects
+    gdf = gpd.GeoDataFrame({"geometry": polygons}, crs=src_crs)
+
+    # Reproject the GeoDataFrame to the specified EPSG code
+    gdf_reprojected = gdf.to_crs(dst_crs)
+
+    if output is not None:
+        gdf_reprojected.to_file(output, **kwargs)
+    else:
+        return gdf_reprojected
+
+
+def rowcol_to_xy(
+    src_fp,
+    rows=None,
+    cols=None,
+    boxes=None,
+    zs=None,
+    offset="center",
+    output=None,
+    dst_crs="EPSG:4326",
+    **kwargs,
+):
+    """Converts a list of (row, col) coordinates to (x, y) coordinates.
+
+    Args:
+        src_fp (str): The source raster file path.
+        rows (list, optional): A list of row coordinates. Defaults to None.
+        cols (list, optional): A list of col coordinates. Defaults to None.
+        boxes (list, optional): A list of (row, col) coordinates in the format of [[left, top, right, bottom], [left, top, right, bottom], ...]
+        zs: zs (list or float, optional): Height associated with coordinates. Primarily used for RPC based coordinate transformations.
+        offset (str, optional): Determines if the returned coordinates are for the center of the pixel or for a corner.
+        output (str, optional): The output vector file path. Defaults to None.
+        dst_crs (str, optional): The destination CRS. Defaults to "EPSG:4326".
+        **kwargs: Additional keyword arguments to pass to rasterio.transform.xy.
+
+    Returns:
+        A list of (x, y) coordinates.
+    """
+
+    if boxes is not None:
+        rows = []
+        cols = []
+
+        for box in boxes:
+            rows.append(box[1])
+            rows.append(box[3])
+            cols.append(box[0])
+            cols.append(box[2])
+
+    if rows is None or cols is None:
+        raise ValueError("rows and cols must be provided.")
+
+    with rasterio.open(src_fp) as src:
+        xs, ys = rasterio.transform.xy(src.transform, rows, cols, zs, offset, **kwargs)
+        src_crs = src.crs
+
+    if boxes is None:
+        return [[x, y] for x, y in zip(xs, ys)]
+    else:
+        result = [[xs[i], ys[i + 1], xs[i + 1], ys[i]] for i in range(0, len(xs), 2)]
+
+        if output is not None:
+            boxes_to_vector(result, src_crs, dst_crs, output)
+        else:
+            return result
+
+
+def bbox_to_xy(
+    src_fp: str, coords: list, coord_crs: str = "epsg:4326", **kwargs
+) -> list:
+    """Converts a list of coordinates to pixel coordinates, i.e., (col, row) coordinates.
+        Note that map bbox coords is [minx, miny, maxx, maxy] from bottomleft to topright
+        While rasterio bbox coords is [minx, max, maxx, min] from topleft to bottomright
+
+    Args:
+        src_fp (str): The source raster file path.
+        coords (list): A list of coordinates in the format of [[minx, miny, maxx, maxy], [minx, miny, maxx, maxy], ...]
+        coord_crs (str, optional): The coordinate CRS of the input coordinates. Defaults to "epsg:4326".
+
+    Returns:
+        list: A list of pixel coordinates in the format of [[minx, maxy, maxx, miny], ...] from top left to bottom right.
+    """
+
+    if isinstance(coords, str):
+        gdf = gpd.read_file(coords)
+        coords = gdf.geometry.bounds.values.tolist()
+        if gdf.crs is not None:
+            coord_crs = f"epsg:{gdf.crs.to_epsg()}"
+    elif isinstance(coords, np.ndarray):
+        coords = coords.tolist()
+    if isinstance(coords, dict):
+        import json
+
+        geojson = json.dumps(coords)
+        gdf = gpd.read_file(geojson, driver="GeoJSON")
+        coords = gdf.geometry.bounds.values.tolist()
+
+    elif not isinstance(coords, list):
+        raise ValueError("coords must be a list of coordinates.")
+
+    if not isinstance(coords[0], list):
+        coords = [coords]
+
+    new_coords = []
+
+    with rasterio.open(src_fp) as src:
+        width = src.width
+        height = src.height
+
+        for coord in coords:
+            minx, miny, maxx, maxy = coord
+
+            if coord_crs != src.crs:
+                minx, miny = transform_coords(minx, miny, coord_crs, src.crs, **kwargs)
+                maxx, maxy = transform_coords(maxx, maxy, coord_crs, src.crs, **kwargs)
+
+                rows1, cols1 = rasterio.transform.rowcol(
+                    src.transform, minx, miny, **kwargs
+                )
+                rows2, cols2 = rasterio.transform.rowcol(
+                    src.transform, maxx, maxy, **kwargs
+                )
+
+                new_coords.append([cols1, rows1, cols2, rows2])
+
+            else:
+                new_coords.append([minx, miny, maxx, maxy])
+
+    result = []
+
+    for coord in new_coords:
+        minx, miny, maxx, maxy = coord
+
+        if (
+            minx >= 0
+            and miny >= 0
+            and maxx >= 0
+            and maxy >= 0
+            and minx < width
+            and miny < height
+            and maxx < width
+            and maxy < height
+        ):
+            # Note that map bbox coords is [minx, miny, maxx, maxy] from bottomleft to topright
+            # While rasterio bbox coords is [minx, max, maxx, min] from topleft to bottomright
+            result.append([minx, maxy, maxx, miny])
+
+    if len(result) == 0:
+        print("No valid pixel coordinates found.")
+        return None
+    elif len(result) == 1:
+        return result[0]
+    elif len(result) < len(coords):
+        print("Some coordinates are out of the image boundary.")
+
+    return result
+
+
+def geojson_to_xy(
+    src_fp: str, geojson: str, coord_crs: str = "epsg:4326", **kwargs
+) -> list:
+    """Converts a geojson file or a dictionary of feature collection to a list of pixel coordinates.
+
+    Args:
+        src_fp: The source raster file path.
+        geojson: The geojson file path or a dictionary of feature collection.
+        coord_crs: The coordinate CRS of the input coordinates. Defaults to "epsg:4326".
+        **kwargs: Additional keyword arguments to pass to rasterio.transform.rowcol.
+
+    Returns:
+        A list of pixel coordinates in the format of [[x1, y1], [x2, y2], ...]
+    """
+    with rasterio.open(src_fp) as src:
+        src_crs = src.crs
+    coords = geojson_to_coords(geojson, coord_crs, src_crs)
+    return coords_to_xy(src_fp, coords, src_crs, **kwargs)
