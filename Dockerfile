@@ -37,7 +37,7 @@ WORKDIR /home/jovyan/geoai
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_GEOAI=0.0.0
 
 RUN rm -rf /home/jovyan/geoai/geoai.egg-info && \
-    pip install -U geoai && \
+    pip install . && \
     mkdir -p /home/jovyan/work && \
     fix-permissions /home/jovyan
 
