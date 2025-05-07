@@ -1,4 +1,4 @@
-FROM quay.io/jupyter/pytorch-notebook:cuda12-latest
+FROM quay.io/jupyter/base-notebook:latest
 
 # -------------------------------------------------------
 # 1. Install system-level packages (minimal, just git)
