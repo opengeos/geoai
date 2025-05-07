@@ -577,6 +577,7 @@ def train_MaskRCNN_model(
     labels_dir,
     output_dir,
     num_channels=3,
+    model=None,
     pretrained=True,
     pretrained_model_path=None,
     batch_size=4,
@@ -601,6 +602,7 @@ def train_MaskRCNN_model(
         output_dir (str): Directory to save model checkpoints and results.
         num_channels (int, optional): Number of input channels. If None, auto-detected.
             Defaults to 3.
+        model (torch.nn.Module, optional): Predefined model. If None, a new model is created.
         pretrained (bool): Whether to use pretrained backbone. This is ignored if
             pretrained_model_path is provided. Defaults to True.
         pretrained_model_path (str, optional): Path to a .pth file to load as a
@@ -708,9 +710,10 @@ def train_MaskRCNN_model(
     )
 
     # Initialize model (2 classes: background and building)
-    model = get_instance_segmentation_model(
-        num_classes=2, num_channels=num_channels, pretrained=pretrained
-    )
+    if model is None:
+        model = get_instance_segmentation_model(
+            num_classes=2, num_channels=num_channels, pretrained=pretrained
+        )
     model.to(device)
 
     # Set up optimizer
@@ -1088,6 +1091,7 @@ def object_detection(
     confidence_threshold=0.5,
     batch_size=4,
     num_channels=3,
+    model=None,
     pretrained=True,
     device=None,
     **kwargs,
@@ -1104,6 +1108,7 @@ def object_detection(
         confidence_threshold (float): Confidence threshold for predictions (0-1).
         batch_size (int): Batch size for inference.
         num_channels (int): Number of channels in the input image and model.
+        model (torch.nn.Module, optional): Predefined model. If None, a new model is created.
         pretrained (bool): Whether to use pretrained backbone for model loading.
         device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
         **kwargs: Additional arguments passed to inference_on_geotiff.
@@ -1116,9 +1121,10 @@ def object_detection(
         device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         )
-    model = get_instance_segmentation_model(
-        num_classes=2, num_channels=num_channels, pretrained=pretrained
-    )
+    if model is None:
+        model = get_instance_segmentation_model(
+            num_classes=2, num_channels=num_channels, pretrained=pretrained
+        )
 
     if not os.path.exists(model_path):
         try:
@@ -1153,6 +1159,7 @@ def object_detection_batch(
     overlap=256,
     confidence_threshold=0.5,
     batch_size=4,
+    model=None,
     num_channels=3,
     pretrained=True,
     device=None,
@@ -1174,6 +1181,7 @@ def object_detection_batch(
         confidence_threshold (float): Confidence threshold for predictions (0-1).
         batch_size (int): Batch size for inference.
         num_channels (int): Number of channels in the input image and model.
+        model (torch.nn.Module, optional): Predefined model. If None, a new model is created.
         pretrained (bool): Whether to use pretrained backbone for model loading.
         device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
         **kwargs: Additional arguments passed to inference_on_geotiff.
@@ -1186,9 +1194,10 @@ def object_detection_batch(
         device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         )
-    model = get_instance_segmentation_model(
-        num_classes=2, num_channels=num_channels, pretrained=pretrained
-    )
+    if model is None:
+        model = get_instance_segmentation_model(
+            num_classes=2, num_channels=num_channels, pretrained=pretrained
+        )
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
