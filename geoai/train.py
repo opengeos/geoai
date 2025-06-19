@@ -1308,11 +1308,11 @@ class SemanticSegmentationDataset(Dataset):
         # Load label mask
         with rasterio.open(self.label_paths[idx]) as src:
             label_mask = src.read(1).astype(np.int64)
-            # Convert to binary mask (building=1, background=0)
-            binary_mask = (label_mask > 0).astype(np.int64)
+            # Keep original class values for multi-class segmentation
+            # No conversion to binary - preserve all class labels
 
         # Convert to tensor
-        mask = torch.as_tensor(binary_mask, dtype=torch.long)
+        mask = torch.as_tensor(label_mask, dtype=torch.long)
 
         # Apply transforms if specified
         if self.transforms is not None:
@@ -1470,66 +1470,88 @@ def get_smp_model(
         )
 
 
-def dice_coefficient(pred, target, smooth=1e-6):
+def dice_coefficient(pred, target, smooth=1e-6, num_classes=None):
     """
-    Calculate Dice coefficient for binary segmentation.
+    Calculate Dice coefficient for segmentation (binary or multi-class).
 
     Args:
         pred (torch.Tensor): Predicted mask (probabilities or logits) with shape [C, H, W] or [H, W].
         target (torch.Tensor): Ground truth mask with shape [H, W].
         smooth (float): Smoothing factor to avoid division by zero.
+        num_classes (int, optional): Number of classes. If None, auto-detected.
 
     Returns:
-        float: Dice coefficient.
+        float: Mean Dice coefficient across all classes.
     """
-    # Convert predictions to binary
+    # Convert predictions to class predictions
     if pred.dim() == 3:  # [C, H, W] format
         pred = torch.softmax(pred, dim=0)
-        pred = torch.argmax(pred, dim=0)
+        pred_classes = torch.argmax(pred, dim=0)
     elif pred.dim() == 2:  # [H, W] format
-        pass  # Already in the right format
+        pred_classes = pred
     else:
         raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
 
-    pred = pred.float()
-    target = target.float()
+    # Auto-detect number of classes if not provided
+    if num_classes is None:
+        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
 
-    intersection = (pred * target).sum()
-    union = pred.sum() + target.sum()
+    # Calculate Dice for each class and average
+    dice_scores = []
+    for class_id in range(num_classes):
+        pred_class = (pred_classes == class_id).float()
+        target_class = (target == class_id).float()
 
-    dice = (2.0 * intersection + smooth) / (union + smooth)
-    return dice.item()
+        intersection = (pred_class * target_class).sum()
+        union = pred_class.sum() + target_class.sum()
+
+        if union > 0:
+            dice = (2.0 * intersection + smooth) / (union + smooth)
+            dice_scores.append(dice.item())
+
+    return sum(dice_scores) / len(dice_scores) if dice_scores else 0.0
 
 
-def iou_coefficient(pred, target, smooth=1e-6):
+def iou_coefficient(pred, target, smooth=1e-6, num_classes=None):
     """
-    Calculate IoU coefficient for binary segmentation.
+    Calculate IoU coefficient for segmentation (binary or multi-class).
 
     Args:
         pred (torch.Tensor): Predicted mask (probabilities or logits) with shape [C, H, W] or [H, W].
         target (torch.Tensor): Ground truth mask with shape [H, W].
         smooth (float): Smoothing factor to avoid division by zero.
+        num_classes (int, optional): Number of classes. If None, auto-detected.
 
     Returns:
-        float: IoU coefficient.
+        float: Mean IoU coefficient across all classes.
     """
-    # Convert predictions to binary
+    # Convert predictions to class predictions
     if pred.dim() == 3:  # [C, H, W] format
         pred = torch.softmax(pred, dim=0)
-        pred = torch.argmax(pred, dim=0)
+        pred_classes = torch.argmax(pred, dim=0)
     elif pred.dim() == 2:  # [H, W] format
-        pass  # Already in the right format
+        pred_classes = pred
     else:
         raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
 
-    pred = pred.float()
-    target = target.float()
+    # Auto-detect number of classes if not provided
+    if num_classes is None:
+        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
 
-    intersection = (pred * target).sum()
-    union = pred.sum() + target.sum() - intersection
+    # Calculate IoU for each class and average
+    iou_scores = []
+    for class_id in range(num_classes):
+        pred_class = (pred_classes == class_id).float()
+        target_class = (target == class_id).float()
 
-    iou = (intersection + smooth) / (union + smooth)
-    return iou.item()
+        intersection = (pred_class * target_class).sum()
+        union = pred_class.sum() + target_class.sum() - intersection
+
+        if union > 0:
+            iou = (intersection + smooth) / (union + smooth)
+            iou_scores.append(iou.item())
+
+    return sum(iou_scores) / len(iou_scores) if iou_scores else 0.0
 
 
 def train_semantic_one_epoch(
@@ -1588,7 +1610,7 @@ def train_semantic_one_epoch(
     return avg_loss
 
 
-def evaluate_semantic(model, data_loader, device, criterion):
+def evaluate_semantic(model, data_loader, device, criterion, num_classes=2):
     """
     Evaluate the semantic segmentation model on the validation set.
 
@@ -1597,6 +1619,7 @@ def evaluate_semantic(model, data_loader, device, criterion):
         data_loader (torch.utils.data.DataLoader): DataLoader for validation data.
         device (torch.device): Device to evaluate on.
         criterion: Loss function.
+        num_classes (int): Number of classes for evaluation metrics.
 
     Returns:
         dict: Evaluation metrics including loss, IoU, and Dice.
@@ -1621,8 +1644,8 @@ def evaluate_semantic(model, data_loader, device, criterion):
 
             # Calculate metrics for each sample in the batch
             for pred, target in zip(outputs, targets):
-                dice = dice_coefficient(pred, target)
-                iou = iou_coefficient(pred, target)
+                dice = dice_coefficient(pred, target, num_classes=num_classes)
+                iou = iou_coefficient(pred, target, num_classes=num_classes)
                 dice_scores.append(dice)
                 iou_scores.append(iou)
 
@@ -1634,7 +1657,7 @@ def evaluate_semantic(model, data_loader, device, criterion):
     return {"loss": avg_loss, "Dice": avg_dice, "IoU": avg_iou}
 
 
-def train_object_detection(
+def train_segmentation_model(
     images_dir,
     labels_dir,
     output_dir,
@@ -1841,7 +1864,9 @@ def train_object_detection(
         train_losses.append(train_loss)
 
         # Evaluate on validation set
-        eval_metrics = evaluate_semantic(model, val_loader, device, criterion)
+        eval_metrics = evaluate_semantic(
+            model, val_loader, device, criterion, num_classes=num_classes
+        )
         val_losses.append(eval_metrics["loss"])
         val_ious.append(eval_metrics["IoU"])
         val_dices.append(eval_metrics["Dice"])
@@ -2003,8 +2028,9 @@ def semantic_inference_on_geotiff(
         out_meta = meta.copy()
         out_meta.update({"count": 1, "dtype": "uint8"})
 
-        # Initialize accumulator arrays
-        pred_accumulator = np.zeros((height, width), dtype=np.float32)
+        # Initialize accumulator arrays for multi-class probability blending
+        # We'll accumulate probabilities for each class and then take argmax
+        prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
         count_accumulator = np.zeros((height, width), dtype=np.float32)
 
         # Calculate steps
@@ -2073,12 +2099,11 @@ def semantic_inference_on_geotiff(
                         batch_tensor = torch.stack(batch_inputs)
                         outputs = model(batch_tensor)
 
-                        # Apply softmax and get class predictions
+                        # Apply softmax to get class probabilities
                         probs = torch.softmax(outputs, dim=1)
-                        preds = torch.argmax(probs, dim=1)
 
                     # Process each output in the batch
-                    for idx, pred in enumerate(preds):
+                    for idx, prob in enumerate(probs):
                         y_pos, x_pos, h, w = batch_positions[idx]
 
                         # Create weight matrix for blending
@@ -2097,37 +2122,64 @@ def semantic_inference_on_geotiff(
                             ]
                         )
                         edge_distance = np.minimum(edge_distance, overlap / 2)
-                        weight = edge_distance / (overlap / 2)
 
-                        # Convert prediction to numpy
-                        pred_np = pred.cpu().numpy().astype(np.float32)
+                        # Avoid zero weights - use minimum weight of 0.1
+                        weight = np.maximum(edge_distance / (overlap / 2), 0.1)
 
-                        # Apply weight to prediction
-                        weighted_pred = pred_np * weight
+                        # For non-overlapping windows, use uniform weight
+                        if overlap == 0:
+                            weight = np.ones_like(weight)
 
-                        # Add to accumulators
-                        pred_accumulator[
-                            y_pos : y_pos + h, x_pos : x_pos + w
-                        ] += weighted_pred
-                        count_accumulator[
-                            y_pos : y_pos + h, x_pos : x_pos + w
-                        ] += weight
+                        # Convert probabilities to numpy [C, H, W]
+                        prob_np = prob.cpu().numpy()
+
+                        # Accumulate weighted probabilities for each class
+                        y_slice = slice(y_pos, y_pos + h)
+                        x_slice = slice(x_pos, x_pos + w)
+
+                        # Add weighted probabilities for each class
+                        for class_idx in range(num_classes):
+                            prob_accumulator[class_idx, y_slice, x_slice] += (
+                                prob_np[class_idx] * weight
+                            )
+
+                        # Update weight accumulator
+                        count_accumulator[y_slice, x_slice] += weight
 
                     # Reset batch
                     batch_inputs = []
                     batch_positions = []
                     batch_count = 0
-                    pbar.update(len(preds))
+                    pbar.update(len(probs))
 
         pbar.close()
 
-        # Calculate final mask
+        # Calculate final mask by taking argmax of accumulated probabilities
         mask = np.zeros((height, width), dtype=np.uint8)
         valid_pixels = count_accumulator > 0
+
         if np.any(valid_pixels):
-            mask[valid_pixels] = (
-                pred_accumulator[valid_pixels] / count_accumulator[valid_pixels] > 0.5
+            # Normalize accumulated probabilities by weights
+            normalized_probs = np.zeros_like(prob_accumulator)
+            for class_idx in range(num_classes):
+                normalized_probs[class_idx, valid_pixels] = (
+                    prob_accumulator[class_idx, valid_pixels]
+                    / count_accumulator[valid_pixels]
+                )
+
+            # Take argmax to get final class predictions
+            mask[valid_pixels] = np.argmax(
+                normalized_probs[:, valid_pixels], axis=0
             ).astype(np.uint8)
+
+            # Check class distribution in predictions (summary only)
+            unique_classes, class_counts = np.unique(
+                mask[valid_pixels], return_counts=True
+            )
+            bg_ratio = np.sum(mask == 0) / mask.size
+            print(
+                f"Predicted classes: {len(unique_classes)} classes, Background: {bg_ratio:.1%}"
+            )
 
         inference_time = time.time() - start_time
         print(f"Inference completed in {inference_time:.2f} seconds")
@@ -2141,7 +2193,7 @@ def semantic_inference_on_geotiff(
         return output_path, inference_time
 
 
-def semantic_object_detection(
+def semantic_segmentation(
     input_path,
     output_path,
     model_path,
