@@ -6674,3 +6674,16 @@ def geojson_to_xy(
         src_crs = src.crs
     coords = geojson_to_coords(geojson, coord_crs, src_crs)
     return coords_to_xy(src_fp, coords, src_crs, **kwargs)
+
+
+def write_colormap(image, colormap, output=None):
+    """Write a colormap to an image.
+
+    Args:
+        image: The image to write the colormap to.
+        colormap: The colormap to write to the image.
+        output: The output file path.
+    """
+    if isinstance(colormap, str):
+        colormap = leafmap.get_image_colormap(colormap)
+    leafmap.write_image_colormap(image, colormap, output)
