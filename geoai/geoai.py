@@ -25,7 +25,13 @@ from .download import (
 from .extract import *
 from .hf import *
 from .segment import *
-from .train import object_detection, object_detection_batch, train_MaskRCNN_model
+from .train import (
+    object_detection,
+    object_detection_batch,
+    train_MaskRCNN_model,
+    train_object_detection,
+    semantic_object_detection,
+)
 from .utils import *
 
 
