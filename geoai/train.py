@@ -24,6 +24,16 @@ from tqdm import tqdm
 from .utils import download_model_from_hf
 
 
+# Additional imports for semantic segmentation
+try:
+    import segmentation_models_pytorch as smp
+    from torch.nn import functional as F
+
+    SMP_AVAILABLE = True
+except ImportError:
+    SMP_AVAILABLE = False
+
+
 def get_instance_segmentation_model(num_classes=2, num_channels=3, pretrained=True):
     """
     Get Mask R-CNN model with custom input channels and output classes.
@@ -1241,3 +1251,964 @@ def object_detection_batch(
             device=device,
             **kwargs,
         )
+
+
+class SemanticSegmentationDataset(Dataset):
+    """Dataset for semantic segmentation from GeoTIFF images and labels."""
+
+    def __init__(self, image_paths, label_paths, transforms=None, num_channels=None):
+        """
+        Initialize dataset for semantic segmentation.
+
+        Args:
+            image_paths (list): List of paths to image GeoTIFF files.
+            label_paths (list): List of paths to label GeoTIFF files.
+            transforms (callable, optional): Transformations to apply to images and masks.
+            num_channels (int, optional): Number of channels to use from images. If None,
+                auto-detected from the first image.
+        """
+        self.image_paths = image_paths
+        self.label_paths = label_paths
+        self.transforms = transforms
+
+        # Auto-detect the number of channels if not specified
+        if num_channels is None:
+            with rasterio.open(self.image_paths[0]) as src:
+                self.num_channels = src.count
+        else:
+            self.num_channels = num_channels
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        # Load image
+        with rasterio.open(self.image_paths[idx]) as src:
+            # Read as [C, H, W] format
+            image = src.read().astype(np.float32)
+
+            # Normalize image to [0, 1] range
+            image = image / 255.0
+
+            # Handle different number of channels
+            if image.shape[0] > self.num_channels:
+                image = image[: self.num_channels]  # Keep only specified bands
+            elif image.shape[0] < self.num_channels:
+                # Pad with zeros if less than specified bands
+                padded = np.zeros(
+                    (self.num_channels, image.shape[1], image.shape[2]),
+                    dtype=np.float32,
+                )
+                padded[: image.shape[0]] = image
+                image = padded
+
+            # Convert to CHW tensor
+            image = torch.as_tensor(image, dtype=torch.float32)
+
+        # Load label mask
+        with rasterio.open(self.label_paths[idx]) as src:
+            label_mask = src.read(1).astype(np.int64)
+            # Convert to binary mask (building=1, background=0)
+            binary_mask = (label_mask > 0).astype(np.int64)
+
+        # Convert to tensor
+        mask = torch.as_tensor(binary_mask, dtype=torch.long)
+
+        # Apply transforms if specified
+        if self.transforms is not None:
+            image, mask = self.transforms(image, mask)
+
+        return image, mask
+
+
+class SemanticTransforms:
+    """Custom transforms for semantic segmentation."""
+
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, image, mask):
+        for t in self.transforms:
+            image, mask = t(image, mask)
+        return image, mask
+
+
+class SemanticToTensor:
+    """Convert numpy.ndarray to tensor for semantic segmentation."""
+
+    def __call__(self, image, mask):
+        return image, mask
+
+
+class SemanticRandomHorizontalFlip:
+    """Random horizontal flip transform for semantic segmentation."""
+
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, image, mask):
+        if random.random() < self.prob:
+            # Flip image and mask along width dimension
+            image = torch.flip(image, dims=[2])
+            mask = torch.flip(mask, dims=[1])
+        return image, mask
+
+
+def get_semantic_transform(train):
+    """
+    Get transforms for semantic segmentation data augmentation.
+
+    Args:
+        train (bool): Whether to include training-specific transforms.
+
+    Returns:
+        SemanticTransforms: Composed transforms.
+    """
+    transforms = []
+    transforms.append(SemanticToTensor())
+
+    if train:
+        transforms.append(SemanticRandomHorizontalFlip(0.5))
+
+    return SemanticTransforms(transforms)
+
+
+def get_smp_model(
+    architecture="unet",
+    encoder_name="resnet34",
+    encoder_weights="imagenet",
+    in_channels=3,
+    classes=2,
+    activation=None,
+    **kwargs,
+):
+    """
+    Get a segmentation model from segmentation-models-pytorch using the generic create_model function.
+
+    Args:
+        architecture (str): Model architecture (e.g., 'unet', 'deeplabv3', 'deeplabv3plus', 'fpn',
+            'pspnet', 'linknet', 'manet', 'pan', 'upernet', etc.). Case insensitive.
+        encoder_name (str): Encoder backbone name (e.g., 'resnet34', 'efficientnet-b0', 'mit_b0', etc.).
+        encoder_weights (str): Encoder weights ('imagenet' or None).
+        in_channels (int): Number of input channels.
+        classes (int): Number of output classes.
+        activation (str): Activation function for output layer.
+        **kwargs: Additional arguments passed to smp.create_model().
+
+    Returns:
+        torch.nn.Module: Segmentation model.
+
+    Note:
+        This function uses smp.create_model() which supports all architectures available in
+        segmentation-models-pytorch, making it future-proof for new model additions.
+    """
+    if not SMP_AVAILABLE:
+        raise ImportError(
+            "segmentation-models-pytorch is not installed. "
+            "Please install it with: pip install segmentation-models-pytorch"
+        )
+
+    try:
+        # Use the generic create_model function - supports all SMP architectures
+        model = smp.create_model(
+            arch=architecture,  # Case insensitive
+            encoder_name=encoder_name,
+            encoder_weights=encoder_weights,
+            in_channels=in_channels,
+            classes=classes,
+            **kwargs,
+        )
+
+        # Apply activation if specified (note: activation is handled differently in create_model)
+        if activation is not None:
+            import warnings
+
+            warnings.warn(
+                "The 'activation' parameter is deprecated when using smp.create_model(). "
+                "Apply activation manually after model creation if needed.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        return model
+
+    except Exception as e:
+        # Provide helpful error message
+        available_archs = []
+        try:
+            # Try to get available architectures from smp
+            if hasattr(smp, "get_available_models"):
+                available_archs = smp.get_available_models()
+            else:
+                available_archs = [
+                    "unet",
+                    "unetplusplus",
+                    "manet",
+                    "linknet",
+                    "fpn",
+                    "pspnet",
+                    "deeplabv3",
+                    "deeplabv3plus",
+                    "pan",
+                    "upernet",
+                ]
+        except:
+            available_archs = [
+                "unet",
+                "fpn",
+                "deeplabv3plus",
+                "pspnet",
+                "linknet",
+                "manet",
+            ]
+
+        raise ValueError(
+            f"Failed to create model with architecture '{architecture}' and encoder '{encoder_name}'. "
+            f"Error: {str(e)}. "
+            f"Available architectures include: {', '.join(available_archs)}. "
+            f"Please check the segmentation-models-pytorch documentation for supported combinations."
+        )
+
+
+def dice_coefficient(pred, target, smooth=1e-6):
+    """
+    Calculate Dice coefficient for binary segmentation.
+
+    Args:
+        pred (torch.Tensor): Predicted mask (probabilities or logits) with shape [C, H, W] or [H, W].
+        target (torch.Tensor): Ground truth mask with shape [H, W].
+        smooth (float): Smoothing factor to avoid division by zero.
+
+    Returns:
+        float: Dice coefficient.
+    """
+    # Convert predictions to binary
+    if pred.dim() == 3:  # [C, H, W] format
+        pred = torch.softmax(pred, dim=0)
+        pred = torch.argmax(pred, dim=0)
+    elif pred.dim() == 2:  # [H, W] format
+        pass  # Already in the right format
+    else:
+        raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
+
+    pred = pred.float()
+    target = target.float()
+
+    intersection = (pred * target).sum()
+    union = pred.sum() + target.sum()
+
+    dice = (2.0 * intersection + smooth) / (union + smooth)
+    return dice.item()
+
+
+def iou_coefficient(pred, target, smooth=1e-6):
+    """
+    Calculate IoU coefficient for binary segmentation.
+
+    Args:
+        pred (torch.Tensor): Predicted mask (probabilities or logits) with shape [C, H, W] or [H, W].
+        target (torch.Tensor): Ground truth mask with shape [H, W].
+        smooth (float): Smoothing factor to avoid division by zero.
+
+    Returns:
+        float: IoU coefficient.
+    """
+    # Convert predictions to binary
+    if pred.dim() == 3:  # [C, H, W] format
+        pred = torch.softmax(pred, dim=0)
+        pred = torch.argmax(pred, dim=0)
+    elif pred.dim() == 2:  # [H, W] format
+        pass  # Already in the right format
+    else:
+        raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
+
+    pred = pred.float()
+    target = target.float()
+
+    intersection = (pred * target).sum()
+    union = pred.sum() + target.sum() - intersection
+
+    iou = (intersection + smooth) / (union + smooth)
+    return iou.item()
+
+
+def train_semantic_one_epoch(
+    model, optimizer, data_loader, device, epoch, criterion, print_freq=10, verbose=True
+):
+    """
+    Train the semantic segmentation model for one epoch.
+
+    Args:
+        model (torch.nn.Module): The model to train.
+        optimizer (torch.optim.Optimizer): The optimizer to use.
+        data_loader (torch.utils.data.DataLoader): DataLoader for training data.
+        device (torch.device): Device to train on.
+        epoch (int): Current epoch number.
+        criterion: Loss function.
+        print_freq (int): How often to print progress.
+        verbose (bool): Whether to print detailed progress.
+
+    Returns:
+        float: Average loss for the epoch.
+    """
+    model.train()
+    total_loss = 0
+    num_batches = len(data_loader)
+
+    start_time = time.time()
+
+    for i, (images, targets) in enumerate(data_loader):
+        # Move images and targets to device
+        images = images.to(device)
+        targets = targets.to(device)
+
+        # Forward pass
+        outputs = model(images)
+        loss = criterion(outputs, targets)
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Track loss
+        total_loss += loss.item()
+
+        # Print progress
+        if i % print_freq == 0:
+            elapsed_time = time.time() - start_time
+            if verbose:
+                print(
+                    f"Epoch: {epoch}, Batch: {i}/{num_batches}, Loss: {loss.item():.4f}, Time: {elapsed_time:.2f}s"
+                )
+            start_time = time.time()
+
+    # Calculate average loss
+    avg_loss = total_loss / num_batches
+    return avg_loss
+
+
+def evaluate_semantic(model, data_loader, device, criterion):
+    """
+    Evaluate the semantic segmentation model on the validation set.
+
+    Args:
+        model (torch.nn.Module): The model to evaluate.
+        data_loader (torch.utils.data.DataLoader): DataLoader for validation data.
+        device (torch.device): Device to evaluate on.
+        criterion: Loss function.
+
+    Returns:
+        dict: Evaluation metrics including loss, IoU, and Dice.
+    """
+    model.eval()
+
+    total_loss = 0
+    dice_scores = []
+    iou_scores = []
+    num_batches = len(data_loader)
+
+    with torch.no_grad():
+        for images, targets in data_loader:
+            # Move to device
+            images = images.to(device)
+            targets = targets.to(device)
+
+            # Forward pass
+            outputs = model(images)
+            loss = criterion(outputs, targets)
+            total_loss += loss.item()
+
+            # Calculate metrics for each sample in the batch
+            for pred, target in zip(outputs, targets):
+                dice = dice_coefficient(pred, target)
+                iou = iou_coefficient(pred, target)
+                dice_scores.append(dice)
+                iou_scores.append(iou)
+
+    # Calculate metrics
+    avg_loss = total_loss / num_batches
+    avg_dice = sum(dice_scores) / len(dice_scores) if dice_scores else 0
+    avg_iou = sum(iou_scores) / len(iou_scores) if iou_scores else 0
+
+    return {"loss": avg_loss, "Dice": avg_dice, "IoU": avg_iou}
+
+
+def train_object_detection(
+    images_dir,
+    labels_dir,
+    output_dir,
+    architecture="unet",
+    encoder_name="resnet34",
+    encoder_weights="imagenet",
+    num_channels=3,
+    num_classes=2,
+    batch_size=8,
+    num_epochs=50,
+    learning_rate=0.001,
+    weight_decay=1e-4,
+    seed=42,
+    val_split=0.2,
+    print_freq=10,
+    verbose=True,
+    save_best_only=True,
+    plot_curves=False,
+    **kwargs,
+):
+    """
+    Train a semantic segmentation model for object detection using segmentation-models-pytorch.
+
+    This function trains a semantic segmentation model for object detection (e.g., building detection)
+    using models from the segmentation-models-pytorch library. Unlike instance segmentation (Mask R-CNN),
+    this approach treats the task as pixel-level binary classification.
+
+    Args:
+        images_dir (str): Directory containing image GeoTIFF files.
+        labels_dir (str): Directory containing label GeoTIFF files.
+        output_dir (str): Directory to save model checkpoints and results.
+        architecture (str): Model architecture ('unet', 'deeplabv3', 'deeplabv3plus', 'fpn',
+            'pspnet', 'linknet', 'manet'). Defaults to 'unet'.
+        encoder_name (str): Encoder backbone name (e.g., 'resnet34', 'resnet50', 'efficientnet-b0').
+            Defaults to 'resnet34'.
+        encoder_weights (str): Encoder pretrained weights ('imagenet' or None). Defaults to 'imagenet'.
+        num_channels (int): Number of input channels. Defaults to 3.
+        num_classes (int): Number of output classes (typically 2 for binary segmentation). Defaults to 2.
+        batch_size (int): Batch size for training. Defaults to 8.
+        num_epochs (int): Number of training epochs. Defaults to 50.
+        learning_rate (float): Initial learning rate. Defaults to 0.001.
+        weight_decay (float): Weight decay for optimizer. Defaults to 1e-4.
+        seed (int): Random seed for reproducibility. Defaults to 42.
+        val_split (float): Fraction of data to use for validation (0-1). Defaults to 0.2.
+        print_freq (int): Frequency of printing training progress. Defaults to 10.
+        verbose (bool): If True, prints detailed training progress. Defaults to True.
+        save_best_only (bool): If True, only saves the best model. Otherwise saves all checkpoints.
+            Defaults to True.
+        plot_curves (bool): If True, plots training curves. Defaults to False.
+        **kwargs: Additional arguments passed to smp.create_model().
+    Returns:
+        None: Model weights are saved to output_dir.
+
+    Raises:
+        ImportError: If segmentation-models-pytorch is not installed.
+        FileNotFoundError: If input directories don't exist or contain no matching files.
+    """
+    import datetime
+
+    if not SMP_AVAILABLE:
+        raise ImportError(
+            "segmentation-models-pytorch is not installed. "
+            "Please install it with: pip install segmentation-models-pytorch"
+        )
+
+    # Set random seeds for reproducibility
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Get device
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    print(f"Using device: {device}")
+
+    # Get all image and label files
+    image_files = sorted(
+        [
+            os.path.join(images_dir, f)
+            for f in os.listdir(images_dir)
+            if f.endswith(".tif")
+        ]
+    )
+    label_files = sorted(
+        [
+            os.path.join(labels_dir, f)
+            for f in os.listdir(labels_dir)
+            if f.endswith(".tif")
+        ]
+    )
+
+    print(f"Found {len(image_files)} image files and {len(label_files)} label files")
+
+    # Ensure matching files
+    if len(image_files) != len(label_files):
+        print("Warning: Number of image files and label files don't match!")
+        # Find matching files by basename
+        basenames = [os.path.basename(f) for f in image_files]
+        label_files = [
+            os.path.join(labels_dir, os.path.basename(f))
+            for f in image_files
+            if os.path.exists(os.path.join(labels_dir, os.path.basename(f)))
+        ]
+        image_files = [
+            f
+            for f, b in zip(image_files, basenames)
+            if os.path.exists(os.path.join(labels_dir, b))
+        ]
+        print(f"Using {len(image_files)} matching files")
+
+    if len(image_files) == 0:
+        raise FileNotFoundError("No matching image and label files found")
+
+    # Split data into train and validation sets
+    train_imgs, val_imgs, train_labels, val_labels = train_test_split(
+        image_files, label_files, test_size=val_split, random_state=seed
+    )
+
+    print(f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images")
+
+    # Create datasets
+    train_dataset = SemanticSegmentationDataset(
+        train_imgs,
+        train_labels,
+        transforms=get_semantic_transform(train=True),
+        num_channels=num_channels,
+    )
+    val_dataset = SemanticSegmentationDataset(
+        val_imgs,
+        val_labels,
+        transforms=get_semantic_transform(train=False),
+        num_channels=num_channels,
+    )
+
+    # Create data loaders
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+    )
+
+    # Initialize model
+    model = get_smp_model(
+        architecture=architecture,
+        encoder_name=encoder_name,
+        encoder_weights=encoder_weights,
+        in_channels=num_channels,
+        classes=num_classes,
+        activation=None,  # We'll apply softmax later
+        **kwargs,
+    )
+    model.to(device)
+
+    # Set up loss function (CrossEntropyLoss for multi-class, can also use DiceLoss)
+    criterion = torch.nn.CrossEntropyLoss()
+
+    # Set up optimizer
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=learning_rate, weight_decay=weight_decay
+    )
+
+    # Set up learning rate scheduler
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=5, verbose=True
+    )
+
+    # Initialize tracking variables
+    best_iou = 0
+    train_losses = []
+    val_losses = []
+    val_ious = []
+    val_dices = []
+
+    print(f"Starting training with {architecture} + {encoder_name}")
+    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+
+    # Training loop
+    for epoch in range(num_epochs):
+        # Train one epoch
+        train_loss = train_semantic_one_epoch(
+            model,
+            optimizer,
+            train_loader,
+            device,
+            epoch,
+            criterion,
+            print_freq,
+            verbose,
+        )
+        train_losses.append(train_loss)
+
+        # Evaluate on validation set
+        eval_metrics = evaluate_semantic(model, val_loader, device, criterion)
+        val_losses.append(eval_metrics["loss"])
+        val_ious.append(eval_metrics["IoU"])
+        val_dices.append(eval_metrics["Dice"])
+
+        # Update learning rate
+        lr_scheduler.step(eval_metrics["loss"])
+
+        # Print metrics
+        print(
+            f"Epoch {epoch+1}/{num_epochs}: "
+            f"Train Loss: {train_loss:.4f}, "
+            f"Val Loss: {eval_metrics['loss']:.4f}, "
+            f"Val IoU: {eval_metrics['IoU']:.4f}, "
+            f"Val Dice: {eval_metrics['Dice']:.4f}"
+        )
+
+        # Save best model
+        if eval_metrics["IoU"] > best_iou:
+            best_iou = eval_metrics["IoU"]
+            print(f"Saving best model with IoU: {best_iou:.4f}")
+            torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
+
+        # Save checkpoint every 10 epochs (if not save_best_only)
+        if not save_best_only and ((epoch + 1) % 10 == 0 or epoch == num_epochs - 1):
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": lr_scheduler.state_dict(),
+                    "best_iou": best_iou,
+                    "architecture": architecture,
+                    "encoder_name": encoder_name,
+                    "num_channels": num_channels,
+                    "num_classes": num_classes,
+                },
+                os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}.pth"),
+            )
+
+    # Save final model
+    torch.save(model.state_dict(), os.path.join(output_dir, "final_model.pth"))
+
+    # Save training history
+    history = {
+        "train_losses": train_losses,
+        "val_losses": val_losses,
+        "val_ious": val_ious,
+        "val_dices": val_dices,
+    }
+    torch.save(history, os.path.join(output_dir, "training_history.pth"))
+
+    # Save training summary
+    with open(os.path.join(output_dir, "training_summary.txt"), "w") as f:
+        f.write(
+            f"Training completed on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        )
+        f.write(f"Architecture: {architecture}\n")
+        f.write(f"Encoder: {encoder_name}\n")
+        f.write(f"Total epochs: {num_epochs}\n")
+        f.write(f"Best validation IoU: {best_iou:.4f}\n")
+        f.write(f"Final validation IoU: {val_ious[-1]:.4f}\n")
+        f.write(f"Final validation Dice: {val_dices[-1]:.4f}\n")
+        f.write(f"Final validation loss: {val_losses[-1]:.4f}\n")
+
+    print(f"Training complete! Best IoU: {best_iou:.4f}")
+    print(f"Models saved to {output_dir}")
+
+    # Plot training curves
+    if plot_curves:
+        try:
+            plt.figure(figsize=(15, 5))
+
+            plt.subplot(1, 3, 1)
+            plt.plot(train_losses, label="Train Loss")
+            plt.plot(val_losses, label="Val Loss")
+            plt.title("Loss")
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            plt.legend()
+            plt.grid(True)
+
+            plt.subplot(1, 3, 2)
+            plt.plot(val_ious, label="Val IoU")
+            plt.title("IoU Score")
+            plt.xlabel("Epoch")
+            plt.ylabel("IoU")
+            plt.legend()
+            plt.grid(True)
+
+            plt.subplot(1, 3, 3)
+            plt.plot(val_dices, label="Val Dice")
+            plt.title("Dice Score")
+            plt.xlabel("Epoch")
+            plt.ylabel("Dice")
+            plt.legend()
+            plt.grid(True)
+
+            plt.tight_layout()
+            plt.savefig(
+                os.path.join(output_dir, "training_curves.png"),
+                dpi=150,
+                bbox_inches="tight",
+            )
+            print(
+                f"Training curves saved to {os.path.join(output_dir, 'training_curves.png')}"
+            )
+            plt.close()
+        except Exception as e:
+            print(f"Could not save training curves: {e}")
+
+
+def semantic_inference_on_geotiff(
+    model,
+    geotiff_path,
+    output_path,
+    window_size=512,
+    overlap=256,
+    batch_size=4,
+    num_channels=3,
+    num_classes=2,
+    device=None,
+    **kwargs,
+):
+    """
+    Perform semantic segmentation inference on a large GeoTIFF using a sliding window approach.
+
+    Args:
+        model (torch.nn.Module): Trained semantic segmentation model.
+        geotiff_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output mask GeoTIFF.
+        window_size (int): Size of sliding window for inference.
+        overlap (int): Overlap between adjacent windows.
+        batch_size (int): Batch size for inference.
+        num_channels (int): Number of channels to use from the input image.
+        num_classes (int): Number of classes in the model output.
+        device (torch.device, optional): Device to run inference on.
+        **kwargs: Additional arguments.
+
+    Returns:
+        tuple: Tuple containing output path and inference time in seconds.
+    """
+    if device is None:
+        device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
+
+    # Put model in evaluation mode
+    model.to(device)
+    model.eval()
+
+    # Open the GeoTIFF
+    with rasterio.open(geotiff_path) as src:
+        # Read metadata
+        meta = src.meta
+        height = src.height
+        width = src.width
+
+        # Update metadata for output raster
+        out_meta = meta.copy()
+        out_meta.update({"count": 1, "dtype": "uint8"})
+
+        # Initialize accumulator arrays
+        pred_accumulator = np.zeros((height, width), dtype=np.float32)
+        count_accumulator = np.zeros((height, width), dtype=np.float32)
+
+        # Calculate steps
+        steps_y = math.ceil((height - overlap) / (window_size - overlap))
+        steps_x = math.ceil((width - overlap) / (window_size - overlap))
+        last_y = height - window_size
+        last_x = width - window_size
+
+        total_windows = steps_y * steps_x
+        print(f"Processing {total_windows} windows...")
+
+        pbar = tqdm(total=total_windows)
+        batch_inputs = []
+        batch_positions = []
+        batch_count = 0
+
+        start_time = time.time()
+
+        for i in range(steps_y + 1):
+            y = min(i * (window_size - overlap), last_y)
+            y = max(0, y)
+
+            if y > last_y and i > 0:
+                continue
+
+            for j in range(steps_x + 1):
+                x = min(j * (window_size - overlap), last_x)
+                x = max(0, x)
+
+                if x > last_x and j > 0:
+                    continue
+
+                # Read window
+                window = src.read(window=Window(x, y, window_size, window_size))
+
+                if window.shape[1] == 0 or window.shape[2] == 0:
+                    continue
+
+                current_height = window.shape[1]
+                current_width = window.shape[2]
+
+                # Normalize and prepare input
+                image = window.astype(np.float32) / 255.0
+
+                # Handle different number of bands
+                if image.shape[0] > num_channels:
+                    image = image[:num_channels]
+                elif image.shape[0] < num_channels:
+                    padded = np.zeros(
+                        (num_channels, current_height, current_width), dtype=np.float32
+                    )
+                    padded[: image.shape[0]] = image
+                    image = padded
+
+                # Convert to tensor
+                image_tensor = torch.tensor(image, device=device)
+
+                # Add to batch
+                batch_inputs.append(image_tensor)
+                batch_positions.append((y, x, current_height, current_width))
+                batch_count += 1
+
+                # Process batch
+                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                    with torch.no_grad():
+                        batch_tensor = torch.stack(batch_inputs)
+                        outputs = model(batch_tensor)
+
+                        # Apply softmax and get class predictions
+                        probs = torch.softmax(outputs, dim=1)
+                        preds = torch.argmax(probs, dim=1)
+
+                    # Process each output in the batch
+                    for idx, pred in enumerate(preds):
+                        y_pos, x_pos, h, w = batch_positions[idx]
+
+                        # Create weight matrix for blending
+                        y_grid, x_grid = np.mgrid[0:h, 0:w]
+                        dist_from_left = x_grid
+                        dist_from_right = w - x_grid - 1
+                        dist_from_top = y_grid
+                        dist_from_bottom = h - y_grid - 1
+
+                        edge_distance = np.minimum.reduce(
+                            [
+                                dist_from_left,
+                                dist_from_right,
+                                dist_from_top,
+                                dist_from_bottom,
+                            ]
+                        )
+                        edge_distance = np.minimum(edge_distance, overlap / 2)
+                        weight = edge_distance / (overlap / 2)
+
+                        # Convert prediction to numpy
+                        pred_np = pred.cpu().numpy().astype(np.float32)
+
+                        # Apply weight to prediction
+                        weighted_pred = pred_np * weight
+
+                        # Add to accumulators
+                        pred_accumulator[
+                            y_pos : y_pos + h, x_pos : x_pos + w
+                        ] += weighted_pred
+                        count_accumulator[
+                            y_pos : y_pos + h, x_pos : x_pos + w
+                        ] += weight
+
+                    # Reset batch
+                    batch_inputs = []
+                    batch_positions = []
+                    batch_count = 0
+                    pbar.update(len(preds))
+
+        pbar.close()
+
+        # Calculate final mask
+        mask = np.zeros((height, width), dtype=np.uint8)
+        valid_pixels = count_accumulator > 0
+        if np.any(valid_pixels):
+            mask[valid_pixels] = (
+                pred_accumulator[valid_pixels] / count_accumulator[valid_pixels] > 0.5
+            ).astype(np.uint8)
+
+        inference_time = time.time() - start_time
+        print(f"Inference completed in {inference_time:.2f} seconds")
+
+        # Save output
+        with rasterio.open(output_path, "w", **out_meta) as dst:
+            dst.write(mask, 1)
+
+        print(f"Saved prediction to {output_path}")
+
+        return output_path, inference_time
+
+
+def semantic_object_detection(
+    input_path,
+    output_path,
+    model_path,
+    architecture="unet",
+    encoder_name="resnet34",
+    num_channels=3,
+    num_classes=2,
+    window_size=512,
+    overlap=256,
+    batch_size=4,
+    device=None,
+    **kwargs,
+):
+    """
+    Perform semantic segmentation on a GeoTIFF using a trained model.
+
+    Args:
+        input_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output mask GeoTIFF.
+        model_path (str): Path to trained model weights.
+        architecture (str): Model architecture used for training.
+        encoder_name (str): Encoder backbone name used for training.
+        num_channels (int): Number of channels in the input image and model.
+        num_classes (int): Number of classes in the model.
+        window_size (int): Size of sliding window for inference.
+        overlap (int): Overlap between adjacent windows.
+        batch_size (int): Batch size for inference.
+        device (torch.device, optional): Device to run inference on.
+        **kwargs: Additional arguments.
+
+    Returns:
+        None: Output mask is saved to output_path.
+    """
+    if device is None:
+        device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
+
+    # Load model
+    model = get_smp_model(
+        architecture=architecture,
+        encoder_name=encoder_name,
+        encoder_weights=None,  # We're loading trained weights
+        in_channels=num_channels,
+        classes=num_classes,
+        activation=None,
+    )
+
+    if not os.path.exists(model_path):
+        try:
+            model_path = download_model_from_hf(model_path)
+        except Exception as e:
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.to(device)
+    model.eval()
+
+    semantic_inference_on_geotiff(
+        model=model,
+        geotiff_path=input_path,
+        output_path=output_path,
+        window_size=window_size,
+        overlap=overlap,
+        batch_size=batch_size,
+        num_channels=num_channels,
+        num_classes=num_classes,
+        device=device,
+        **kwargs,
+    )

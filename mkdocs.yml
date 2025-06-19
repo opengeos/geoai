@@ -116,6 +116,7 @@ nav:
           - examples/parking_spot_detection.ipynb
           - examples/data_visualization.ipynb
           - examples/train_object_detection_model.ipynb
+          - examples/train_segmentation_model.ipynb
           - examples/train_building_footprints_usa.ipynb
           - examples/train_solar_panel_detection.ipynb
           - examples/train_car_detection.ipynb
