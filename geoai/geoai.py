@@ -29,8 +29,8 @@ from .train import (
     object_detection,
     object_detection_batch,
     train_MaskRCNN_model,
-    train_object_detection,
-    semantic_object_detection,
+    train_segmentation_model,
+    semantic_segmentation,
 )
 from .utils import *
 
