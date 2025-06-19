@@ -942,6 +942,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/train_landcover_classification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Train landcover classification
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/train_building_footprints_usa/" class="md-nav__link">
         
   
@@ -2430,6 +2453,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#geoai.geoai.write_colormap" class="md-nav__link">
+    <span class="md-ellipsis">
+      write_colormap
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3630,6 +3662,15 @@
   <a href="#geoai.geoai.visualize_vector_by_attribute" class="md-nav__link">
     <span class="md-ellipsis">
       visualize_vector_by_attribute
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.geoai.write_colormap" class="md-nav__link">
+    <span class="md-ellipsis">
+      write_colormap
     </span>
   </a>
   
@@ -44870,6 +44911,109 @@ get_folium_tile_layer function. Defaults to None.</p>
 
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error visualizing data: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="geoai.geoai.write_colormap" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">write_colormap</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">colormap</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#geoai.geoai.write_colormap" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Write a colormap to an image.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>image</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The image to write the colormap to.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>colormap</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The colormap to write to the image.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>output</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The output file path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="quote">
+              <summary>Source code in <code>geoai/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6679</span>
+<span class="normal">6680</span>
+<span class="normal">6681</span>
+<span class="normal">6682</span>
+<span class="normal">6683</span>
+<span class="normal">6684</span>
+<span class="normal">6685</span>
+<span class="normal">6686</span>
+<span class="normal">6687</span>
+<span class="normal">6688</span>
+<span class="normal">6689</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">write_colormap</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">colormap</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write a colormap to an image.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        image: The image to write the colormap to.</span>
+<span class="sd">        colormap: The colormap to write to the image.</span>
+<span class="sd">        output: The output file path.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">colormap</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">colormap</span> <span class="o">=</span> <span class="n">leafmap</span><span class="o">.</span><span class="n">get_image_colormap</span><span class="p">(</span><span class="n">colormap</span><span class="p">)</span>
+    <span class="n">leafmap</span><span class="o">.</span><span class="n">write_image_colormap</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">colormap</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
