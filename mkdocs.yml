@@ -65,6 +65,7 @@ plugins:
                   "examples/wetland_mapping.ipynb",
                   "examples/globe_projection.ipynb",
                   "examples/samgeo.ipynb",
+                  "examples/grounded_sam.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -128,6 +129,7 @@ nav:
           - examples/regularization.ipynb
           - examples/globe_projection.ipynb
           - examples/samgeo.ipynb
+          - examples/grounded_sam.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
