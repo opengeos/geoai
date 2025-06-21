@@ -6687,3 +6687,50 @@ def write_colormap(image, colormap, output=None):
     if isinstance(colormap, str):
         colormap = leafmap.get_image_colormap(colormap)
     leafmap.write_image_colormap(image, colormap, output)
+
+
+def plot_performance_metrics(history_path, figsize=(15, 5), verbose=True):
+    """Plot performance metrics from a history object.
+
+    Args:
+        history_path: The history object to plot.
+        figsize: The figure size.
+        verbose: Whether to print the best and final metrics.
+    """
+    history = torch.load(history_path)
+
+    plt.figure(figsize=figsize)
+
+    plt.subplot(1, 3, 1)
+    plt.plot(history["train_losses"], label="Train Loss")
+    plt.plot(history["val_losses"], label="Val Loss")
+    plt.title("Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.grid(True)
+
+    plt.subplot(1, 3, 2)
+    plt.plot(history["val_ious"], label="Val IoU")
+    plt.title("IoU Score")
+    plt.xlabel("Epoch")
+    plt.ylabel("IoU")
+    plt.legend()
+    plt.grid(True)
+
+    plt.subplot(1, 3, 3)
+    plt.plot(history["val_dices"], label="Val Dice")
+    plt.title("Dice Score")
+    plt.xlabel("Epoch")
+    plt.ylabel("Dice")
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+    if verbose:
+        print(f"Best IoU: {max(history['val_ious']):.4f}")
+        print(f"Best Dice: {max(history['val_dices']):.4f}")
+        print(f"Final IoU: {history['val_ious'][-1]:.4f}")
+        print(f"Final Dice: {history['val_dices'][-1]:.4f}")
