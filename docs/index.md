@@ -6,7 +6,7 @@
 [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/geoai.svg)](https://anaconda.org/conda-forge/geoai)
 [![Conda Recipe](https://img.shields.io/badge/recipe-geoai-green.svg)](https://github.com/giswqs/geoai-py-feedstock)
 [![image](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://bit.ly/GeoAI-Tutorials)
+[![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://tinyurl.com/GeoAI-Tutorials)
 
 [![logo](https://raw.githubusercontent.com/opengeos/geoai/master/docs/assets/logo_rect.png)](https://github.com/opengeos/geoai/blob/master/docs/assets/logo.png)
 
@@ -89,9 +89,9 @@ Comprehensive documentation is available at [https://geoai.gishub.org](https://g
 
 ## 📺 Video Tutorials
 
-Check out our [YouTube channel](https://bit.ly/GeoAI-Tutorials) for video tutorials on using GeoAI for geospatial data analysis and visualization.
+Check out our [YouTube channel](https://tinyurl.com/GeoAI-Tutorials) for video tutorials on using GeoAI for geospatial data analysis and visualization.
 
-[![cover](https://github.com/user-attachments/assets/3cde9547-ab62-4d70-b23a-3e5ed27c7407)](https://bit.ly/GeoAI-Tutorials)
+[![cover](https://github.com/user-attachments/assets/3cde9547-ab62-4d70-b23a-3e5ed27c7407)](https://tinyurl.com/GeoAI-Tutorials)
 
 ## 🤝 Contributing
 
