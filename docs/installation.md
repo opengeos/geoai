@@ -123,7 +123,7 @@ print(geoai.__version__)
 
 If you encounter installation problems:
 
-1. Check the [FAQ section](https://geoai.gishub.org/faq) of our documentation
+1. Check the [FAQ section](https://opengeoai.org/faq) of our documentation
 2. Search for similar issues in our [GitHub Issues](https://github.com/opengeos/geoai/issues)
 3. Ask for help in our [GitHub Discussions](https://github.com/opengeos/geoai/discussions)
 

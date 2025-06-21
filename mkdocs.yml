@@ -1,7 +1,7 @@
 site_name: geoai
 site_description: A Python package for using Artificial Intelligence (AI) with geospatial data
 site_author: opengeos
-site_url: https://geoai.gishub.org
+site_url: https://opengeoai.org
 repo_url: https://github.com/opengeos/geoai
 
 copyright: "Copyright &copy; 2023 - 2025 Qiusheng Wu"
