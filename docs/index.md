@@ -14,7 +14,7 @@
 
 GeoAI bridges the gap between AI and geospatial analysis, providing tools for processing, analyzing, and visualizing geospatial data using advanced machine learning techniques. Whether you're working with satellite imagery, LiDAR point clouds, or vector data, GeoAI offers intuitive interfaces to apply cutting-edge AI models.
 
--   📖 **Documentation:** [https://geoai.gishub.org](https://geoai.gishub.org)
+-   📖 **Documentation:** [https://opengeoai.org](https://opengeoai.org)
 -   💬 **Community:** [GitHub Discussions](https://github.com/opengeos/geoai/discussions)
 -   🐛 **Issue Tracker:** [GitHub Issues](https://github.com/opengeos/geoai/issues)
 
@@ -80,7 +80,7 @@ mamba install -c conda-forge geoai
 
 ## 📋 Documentation
 
-Comprehensive documentation is available at [https://geoai.gishub.org](https://geoai.gishub.org), including:
+Comprehensive documentation is available at [https://opengeoai.org](https://opengeoai.org), including:
 
 -   Detailed API reference
 -   Tutorials and example notebooks
@@ -95,7 +95,7 @@ Check out our [YouTube channel](https://tinyurl.com/GeoAI-Tutorials) for video t
 
 ## 🤝 Contributing
 
-We welcome contributions of all kinds! See our [contributing guide](https://geoai.gishub.org/contributing) for ways to get started.
+We welcome contributions of all kinds! See our [contributing guide](https://opengeoai.org/contributing) for ways to get started.
 
 ## 📄 License
 
