@@ -6734,3 +6734,16 @@ def plot_performance_metrics(history_path, figsize=(15, 5), verbose=True):
         print(f"Best Dice: {max(history['val_dices']):.4f}")
         print(f"Final IoU: {history['val_ious'][-1]:.4f}")
         print(f"Final Dice: {history['val_dices'][-1]:.4f}")
+
+
+def get_device():
+    """
+    Returns the best available device for deep learning in the order:
+    CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU
+    """
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
