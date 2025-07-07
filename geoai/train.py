@@ -21,7 +21,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from tqdm import tqdm
 
-from .utils import download_model_from_hf
+from .utils import download_model_from_hf, get_device
 
 
 # Additional imports for semantic segmentation
@@ -598,6 +598,7 @@ def train_MaskRCNN_model(
     visualize=False,
     resume_training=False,
     print_freq=10,
+    device=None,
     verbose=True,
 ):
     """Train and evaluate Mask R-CNN model for instance segmentation.
@@ -627,6 +628,7 @@ def train_MaskRCNN_model(
         resume_training (bool): If True and pretrained_model_path is provided,
             will try to load optimizer and scheduler states as well. Defaults to False.
         print_freq (int): Frequency of printing training progress. Defaults to 10.
+        device (torch.device): Device to train on. If None, uses CUDA if available.
         verbose (bool): If True, prints detailed training progress. Defaults to True.
     Returns:
         None: Model weights are saved to output_dir.
@@ -649,7 +651,8 @@ def train_MaskRCNN_model(
     os.makedirs(output_dir, exist_ok=True)
 
     # Get device
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    if device is None:
+        device = get_device()
     print(f"Using device: {device}")
 
     # Get all image and label files
@@ -897,9 +900,7 @@ def inference_on_geotiff(
         tuple: Tuple containing output path and inference time in seconds.
     """
     if device is None:
-        device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        device = get_device()
 
     # Put model in evaluation mode
     model.to(device)
@@ -1128,9 +1129,7 @@ def object_detection(
     """
     # Load your trained model
     if device is None:
-        device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        device = get_device()
     if model is None:
         model = get_instance_segmentation_model(
             num_classes=2, num_channels=num_channels, pretrained=pretrained
@@ -1201,9 +1200,8 @@ def object_detection_batch(
     """
     # Load your trained model
     if device is None:
-        device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        device = get_device()
+
     if model is None:
         model = get_instance_segmentation_model(
             num_classes=2, num_channels=num_channels, pretrained=pretrained
@@ -1676,6 +1674,7 @@ def train_segmentation_model(
     verbose=True,
     save_best_only=True,
     plot_curves=False,
+    device=None,
     **kwargs,
 ):
     """
@@ -1734,7 +1733,8 @@ def train_segmentation_model(
     os.makedirs(output_dir, exist_ok=True)
 
     # Get device
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    if device is None:
+        device = get_device()
     print(f"Using device: {device}")
 
     # Get all image and label files
@@ -2009,9 +2009,7 @@ def semantic_inference_on_geotiff(
         tuple: Tuple containing output path and inference time in seconds.
     """
     if device is None:
-        device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        device = get_device()
 
     # Put model in evaluation mode
     model.to(device)
@@ -2228,9 +2226,7 @@ def semantic_segmentation(
         None: Output mask is saved to output_path.
     """
     if device is None:
-        device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        device = get_device()
 
     # Load model
     model = get_smp_model(
