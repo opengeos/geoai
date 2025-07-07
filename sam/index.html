@@ -22,7 +22,7 @@
       
       
       <link rel="icon" href="../assets/logo.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
     
     
       
@@ -1861,6 +1861,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.sam.get_device" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_device
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.sam.get_raster_info" class="md-nav__link">
     <span class="md-ellipsis">
       get_raster_info
@@ -2575,6 +2584,15 @@
   <a href="#geoai.sam.geojson_to_xy" class="md-nav__link">
     <span class="md-ellipsis">
       geojson_to_xy
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.sam.get_device" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_device
     </span>
   </a>
   
@@ -16971,6 +16989,50 @@ If not provided, the filename from the URL will be used.</p>
 <div class="doc doc-object doc-function">
 
 
+<h2 id="geoai.sam.get_device" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_device</span><span class="p">()</span></code>
+
+<a href="#geoai.sam.get_device" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Returns the best available device for deep learning in the order:
+CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
+
+
+            <details class="quote">
+              <summary>Source code in <code>geoai/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6739</span>
+<span class="normal">6740</span>
+<span class="normal">6741</span>
+<span class="normal">6742</span>
+<span class="normal">6743</span>
+<span class="normal">6744</span>
+<span class="normal">6745</span>
+<span class="normal">6746</span>
+<span class="normal">6747</span>
+<span class="normal">6748</span>
+<span class="normal">6749</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_device</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the best available device for deep learning in the order:</span>
+<span class="sd">    CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="p">,</span> <span class="s2">&quot;mps&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;mps&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="geoai.sam.get_raster_info" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">get_raster_info</span><span class="p">(</span><span class="n">raster_path</span><span class="p">)</span></code>
 
@@ -29462,7 +29524,7 @@ get_folium_tile_layer function. Defaults to None.</p>
       <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "search.highlight", "search.share"], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      <script src="../assets/javascripts/bundle.56ea9cef.min.js"></script>
       
         <script src="../js/timeago.min.js"></script>
       
