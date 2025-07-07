@@ -1675,6 +1675,8 @@ def train_segmentation_model(
     save_best_only=True,
     plot_curves=False,
     device=None,
+    checkpoint_path=None,
+    resume_training=False,
     **kwargs,
 ):
     """
@@ -1706,6 +1708,11 @@ def train_segmentation_model(
         save_best_only (bool): If True, only saves the best model. Otherwise saves all checkpoints.
             Defaults to True.
         plot_curves (bool): If True, plots training curves. Defaults to False.
+        device (torch.device): Device to train on. If None, uses CUDA if available.
+        checkpoint_path (str, optional): Path to a checkpoint file to load for resuming training.
+            If provided, will load model weights and optionally optimizer/scheduler state.
+        resume_training (bool): If True and checkpoint_path is provided, will resume training
+            from the checkpoint including optimizer and scheduler state. Defaults to False.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -1844,12 +1851,63 @@ def train_segmentation_model(
     val_losses = []
     val_ious = []
     val_dices = []
+    start_epoch = 0
+
+    # Load checkpoint if provided
+    if checkpoint_path is not None:
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
+
+        print(f"Loading checkpoint from: {checkpoint_path}")
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                # Load model state
+                model.load_state_dict(checkpoint["model_state_dict"])
+
+                if resume_training:
+                    # Resume training from checkpoint
+                    start_epoch = checkpoint.get("epoch", 0) + 1
+                    best_iou = checkpoint.get("best_iou", 0)
+
+                    # Load optimizer state if available
+                    if "optimizer_state_dict" in checkpoint:
+                        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+                    # Load scheduler state if available
+                    if "scheduler_state_dict" in checkpoint:
+                        lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+                    # Load training history if available
+                    if "train_losses" in checkpoint:
+                        train_losses = checkpoint["train_losses"]
+                    if "val_losses" in checkpoint:
+                        val_losses = checkpoint["val_losses"]
+                    if "val_ious" in checkpoint:
+                        val_ious = checkpoint["val_ious"]
+                    if "val_dices" in checkpoint:
+                        val_dices = checkpoint["val_dices"]
+
+                    print(f"Resuming training from epoch {start_epoch}")
+                    print(f"Previous best IoU: {best_iou:.4f}")
+                else:
+                    print("Loaded model weights only (not resuming training state)")
+            else:
+                # Assume it's just model weights
+                model.load_state_dict(checkpoint)
+                print("Loaded model weights only")
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to load checkpoint: {str(e)}")
 
     print(f"Starting training with {architecture} + {encoder_name}")
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    if start_epoch > 0:
+        print(f"Resuming from epoch {start_epoch}/{num_epochs}")
 
     # Training loop
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         # Train one epoch
         train_loss = train_semantic_one_epoch(
             model,
@@ -1902,6 +1960,10 @@ def train_segmentation_model(
                     "encoder_name": encoder_name,
                     "num_channels": num_channels,
                     "num_classes": num_classes,
+                    "train_losses": train_losses,
+                    "val_losses": val_losses,
+                    "val_ious": val_ious,
+                    "val_dices": val_dices,
                 },
                 os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}.pth"),
             )
@@ -1919,7 +1981,9 @@ def train_segmentation_model(
     torch.save(history, os.path.join(output_dir, "training_history.pth"))
 
     # Save training summary
-    with open(os.path.join(output_dir, "training_summary.txt"), "w") as f:
+    with open(
+        os.path.join(output_dir, "training_summary.txt"), "w", encoding="utf-8"
+    ) as f:
         f.write(
             f"Training completed on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         )
