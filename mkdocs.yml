@@ -130,6 +130,7 @@ nav:
           - examples/globe_projection.ipynb
           - examples/samgeo.ipynb
           - examples/grounded_sam.ipynb
+          - examples/load_model_checkpoint.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
