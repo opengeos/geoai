@@ -709,7 +709,7 @@ def train_MaskRCNN_model(
     # Create data loaders
     # Use num_workers=0 on macOS to avoid multiprocessing issues
     num_workers = 0 if platform.system() == "Darwin" else 4
-    
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -1810,7 +1810,7 @@ def train_segmentation_model(
     # Create data loaders
     # Use num_workers=0 on macOS to avoid multiprocessing issues
     num_workers = 0 if platform.system() == "Darwin" else 4
-    
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
