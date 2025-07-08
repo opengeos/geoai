@@ -67,6 +67,7 @@ plugins:
                   "examples/samgeo.ipynb",
                   "examples/grounded_sam.ipynb",
                   "examples/load_model_checkpoint.ipynb",
+                  "examples/water_detection.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
