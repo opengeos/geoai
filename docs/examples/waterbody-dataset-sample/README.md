@@ -1,0 +1,1 @@
+This waterbody dataset is downloaded from https://www.kaggle.com/datasets/franciscoescobar/satellite-images-of-water-bodies. It is distributed under the CC BY-NC-SA 4.0 license. Credits to the original authors of this dataset. This sample dataset contains 10 images.

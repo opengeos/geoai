@@ -2305,6 +2305,7 @@ def semantic_inference_on_geotiff(
     num_channels=3,
     num_classes=2,
     device=None,
+    quiet=False,
     **kwargs,
 ):
     """
@@ -2320,6 +2321,7 @@ def semantic_inference_on_geotiff(
         num_channels (int): Number of channels to use from the input image.
         num_classes (int): Number of classes in the model output.
         device (torch.device, optional): Device to run inference on.
+        quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
     Returns:
@@ -2355,9 +2357,14 @@ def semantic_inference_on_geotiff(
         last_x = width - window_size
 
         total_windows = steps_y * steps_x
-        print(f"Processing {total_windows} windows...")
+        if not quiet:
+            print(f"Processing {total_windows} windows...")
 
-        pbar = tqdm(total=total_windows)
+        if not quiet:
+            pbar = tqdm(total=total_windows)
+        else:
+            pbar = None
+
         batch_inputs = []
         batch_positions = []
         batch_count = 0
@@ -2465,9 +2472,11 @@ def semantic_inference_on_geotiff(
                     batch_inputs = []
                     batch_positions = []
                     batch_count = 0
-                    pbar.update(len(probs))
+                    if pbar is not None:
+                        pbar.update(len(probs))
 
-        pbar.close()
+        if pbar is not None:
+            pbar.close()
 
         # Calculate final mask by taking argmax of accumulated probabilities
         mask = np.zeros((height, width), dtype=np.uint8)
@@ -2492,12 +2501,14 @@ def semantic_inference_on_geotiff(
                 mask[valid_pixels], return_counts=True
             )
             bg_ratio = np.sum(mask == 0) / mask.size
-            print(
-                f"Predicted classes: {len(unique_classes)} classes, Background: {bg_ratio:.1%}"
-            )
+            if not quiet:
+                print(
+                    f"Predicted classes: {len(unique_classes)} classes, Background: {bg_ratio:.1%}"
+                )
 
         inference_time = time.time() - start_time
-        print(f"Inference completed in {inference_time:.2f} seconds")
+        if not quiet:
+            print(f"Inference completed in {inference_time:.2f} seconds")
 
         # Save output
         out_dir = os.path.dirname(output_path)
@@ -2505,7 +2516,8 @@ def semantic_inference_on_geotiff(
         with rasterio.open(output_path, "w", **out_meta) as dst:
             dst.write(mask, 1)
 
-        print(f"Saved prediction to {output_path}")
+        if not quiet:
+            print(f"Saved prediction to {output_path}")
 
         return output_path, inference_time
 
@@ -2521,6 +2533,7 @@ def semantic_inference_on_image(
     num_classes=2,
     device=None,
     binary_output=True,
+    quiet=False,
     **kwargs,
 ):
     """
@@ -2537,6 +2550,7 @@ def semantic_inference_on_image(
         num_classes (int): Number of classes in the model output.
         device (torch.device, optional): Device to run inference on.
         binary_output (bool): If True, convert multi-class output to binary (class > 0).
+        quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
     Returns:
@@ -2564,7 +2578,8 @@ def semantic_inference_on_image(
         # Convert to [C, H, W] format like rasterio
         img_array = np.transpose(img_array, (2, 0, 1))
 
-        print(f"Processing image: {width}x{height}")
+        if not quiet:
+            print(f"Processing image: {width}x{height}")
 
         # Initialize accumulator arrays for multi-class probability blending
         prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
@@ -2577,9 +2592,14 @@ def semantic_inference_on_image(
         last_x = width - window_size
 
         total_windows = steps_y * steps_x
-        print(f"Processing {total_windows} windows...")
+        if not quiet:
+            print(f"Processing {total_windows} windows...")
 
-        pbar = tqdm(total=total_windows)
+        if not quiet:
+            pbar = tqdm(total=total_windows)
+        else:
+            pbar = None
+
         batch_inputs = []
         batch_positions = []
         batch_count = 0
@@ -2697,9 +2717,11 @@ def semantic_inference_on_image(
                     batch_inputs = []
                     batch_positions = []
                     batch_count = 0
-                    pbar.update(len(probs))
+                    if pbar is not None:
+                        pbar.update(len(probs))
 
-        pbar.close()
+        if pbar is not None:
+            pbar.close()
 
         # Calculate final mask by taking argmax of accumulated probabilities
         mask = np.zeros((height, width), dtype=np.uint8)
@@ -2725,7 +2747,8 @@ def semantic_inference_on_image(
             class_distribution = {
                 int(cls): int(count) for cls, count in zip(unique_classes, class_counts)
             }
-            print(f"Raw predicted classes and counts: {class_distribution}")
+            if not quiet:
+                print(f"Raw predicted classes and counts: {class_distribution}")
 
             # Convert to binary if requested and num_classes == 2
             if binary_output and num_classes == 2:
@@ -2742,10 +2765,12 @@ def semantic_inference_on_image(
                     int(cls): int(count)
                     for cls, count in zip(unique_classes, class_counts)
                 }
-                print(f"Binary predicted classes and counts: {binary_distribution}")
+                if not quiet:
+                    print(f"Binary predicted classes and counts: {binary_distribution}")
 
         inference_time = time.time() - start_time
-        print(f"Inference completed in {inference_time:.2f} seconds")
+        if not quiet:
+            print(f"Inference completed in {inference_time:.2f} seconds")
 
         # Save output as image
         # For binary masks, use PNG to avoid JPEG compression artifacts
@@ -2756,9 +2781,10 @@ def semantic_inference_on_image(
             out_dir = os.path.dirname(output_path)
             os.makedirs(out_dir, exist_ok=True)
             output_img.save(output_path_png)
-            print(
-                f"Saved binary prediction to {output_path_png} (PNG format to preserve exact values)"
-            )
+            if not quiet:
+                print(
+                    f"Saved binary prediction to {output_path_png} (PNG format to preserve exact values)"
+                )
 
             # Also save the original requested format for compatibility
             if output_path != output_path_png:
@@ -2767,7 +2793,8 @@ def semantic_inference_on_image(
         else:
             output_img = Image.fromarray(mask, mode="L")
             output_img.save(output_path)
-            print(f"Saved prediction to {output_path}")
+            if not quiet:
+                print(f"Saved prediction to {output_path}")
 
         return output_path, inference_time
 
@@ -2784,6 +2811,7 @@ def semantic_segmentation(
     overlap=256,
     batch_size=4,
     device=None,
+    quiet=False,
     **kwargs,
 ):
     """
@@ -2804,6 +2832,7 @@ def semantic_segmentation(
         overlap (int): Overlap between adjacent windows.
         batch_size (int): Batch size for inference.
         device (torch.device, optional): Device to run inference on.
+        quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
     Returns:
@@ -2816,9 +2845,10 @@ def semantic_segmentation(
     input_ext = os.path.splitext(input_path)[1].lower()
     is_geotiff = input_ext in [".tif", ".tiff"]
 
-    print(
-        f"Input file format: {'GeoTIFF' if is_geotiff else 'Regular image'} ({input_ext})"
-    )
+    if not quiet:
+        print(
+            f"Input file format: {'GeoTIFF' if is_geotiff else 'Regular image'} ({input_ext})"
+        )
 
     # Load model
     model = get_smp_model(
@@ -2852,6 +2882,7 @@ def semantic_segmentation(
             num_channels=num_channels,
             num_classes=num_classes,
             device=device,
+            quiet=quiet,
             **kwargs,
         )
     else:
@@ -2869,5 +2900,170 @@ def semantic_segmentation(
             num_classes=num_classes,
             device=device,
             binary_output=True,  # Convert to binary output for better visualization
+            quiet=quiet,
             **kwargs,
         )
+
+
+def semantic_segmentation_batch(
+    input_dir,
+    output_dir,
+    model_path,
+    architecture="unet",
+    encoder_name="resnet34",
+    num_channels=3,
+    num_classes=2,
+    window_size=512,
+    overlap=256,
+    batch_size=4,
+    device=None,
+    filenames=None,
+    quiet=False,
+    **kwargs,
+):
+    """
+    Perform semantic segmentation on a batch of images from an input directory.
+
+    This function processes all images in a directory and saves the results to an output directory.
+    It automatically detects the input format and uses the appropriate inference method for either
+    GeoTIFF files or regular image formats (JPG, PNG, etc.). For GeoTIFF inputs, outputs are saved
+    as GeoTIFF. For other formats, outputs are saved as PNG to preserve exact values.
+
+    Args:
+        input_dir (str): Directory containing input image files to process.
+        output_dir (str): Directory to save output mask files.
+        model_path (str): Path to trained model weights.
+        architecture (str): Model architecture used for training. Defaults to "unet".
+        encoder_name (str): Encoder backbone name used for training. Defaults to "resnet34".
+        num_channels (int): Number of channels in the input image and model. Defaults to 3.
+        num_classes (int): Number of classes in the model. Defaults to 2.
+        window_size (int): Size of sliding window for inference. Defaults to 512.
+        overlap (int): Overlap between adjacent windows. Defaults to 256.
+        batch_size (int): Batch size for inference. Defaults to 4.
+        device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
+        filenames (list, optional): List of output filenames. If None, defaults to
+            "<input_filename>_mask.<ext>" for each input file where <ext> is "tif" for GeoTIFF
+            inputs and "png" for other formats. If provided, must match the number of input files.
+        quiet (bool): If True, suppress progress bar. Defaults to False.
+        **kwargs: Additional arguments passed to the inference functions.
+
+    Returns:
+        None: Output masks are saved to output_dir.
+
+    Raises:
+        FileNotFoundError: If input_dir doesn't exist or contains no supported image files.
+        ValueError: If filenames is provided but doesn't match the number of input files.
+    """
+    if device is None:
+        device = get_device()
+
+    # Check if input directory exists
+    if not os.path.exists(input_dir):
+        raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Get all supported image files
+    image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+    image_files = sorted(
+        [
+            os.path.join(input_dir, f)
+            for f in os.listdir(input_dir)
+            if f.lower().endswith(image_extensions)
+        ]
+    )
+
+    if len(image_files) == 0:
+        raise FileNotFoundError(f"No supported image files found in {input_dir}")
+
+    print(f"Found {len(image_files)} image files to process")
+
+    # Load model once for all images
+    model = get_smp_model(
+        architecture=architecture,
+        encoder_name=encoder_name,
+        encoder_weights=None,  # We're loading trained weights
+        in_channels=num_channels,
+        classes=num_classes,
+        activation=None,
+    )
+
+    if not os.path.exists(model_path):
+        try:
+            model_path = download_model_from_hf(model_path)
+        except Exception as e:
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.to(device)
+    model.eval()
+
+    # Generate output filenames if not provided
+    if filenames is None:
+        filenames = []
+        for image_file in image_files:
+            base_name = os.path.splitext(os.path.basename(image_file))[0]
+            input_ext = os.path.splitext(image_file)[1].lower()
+
+            # Use GeoTIFF extension for GeoTIFF inputs, PNG for others
+            if input_ext in [".tif", ".tiff"]:
+                output_ext = ".tif"
+            else:
+                output_ext = ".png"
+
+            output_filename = f"{base_name}_mask{output_ext}"
+            filenames.append(os.path.join(output_dir, output_filename))
+    else:
+        # Validate filenames list
+        if len(filenames) != len(image_files):
+            raise ValueError(
+                f"Number of filenames ({len(filenames)}) must match number of input files ({len(image_files)})"
+            )
+
+    # Process each image
+    for i, (input_path, output_path) in enumerate(zip(image_files, filenames)):
+        print(
+            f"Processing file {i + 1}/{len(image_files)}: {os.path.basename(input_path)}"
+        )
+
+        # Detect file format based on extension
+        input_ext = os.path.splitext(input_path)[1].lower()
+        is_geotiff = input_ext in [".tif", ".tiff"]
+
+        try:
+            # Use appropriate inference function based on file format
+            if is_geotiff:
+                semantic_inference_on_geotiff(
+                    model=model,
+                    geotiff_path=input_path,
+                    output_path=output_path,
+                    window_size=window_size,
+                    overlap=overlap,
+                    batch_size=batch_size,
+                    num_channels=num_channels,
+                    num_classes=num_classes,
+                    device=device,
+                    quiet=quiet,
+                    **kwargs,
+                )
+            else:
+                semantic_inference_on_image(
+                    model=model,
+                    image_path=input_path,
+                    output_path=output_path,
+                    window_size=window_size,
+                    overlap=overlap,
+                    batch_size=batch_size,
+                    num_channels=num_channels,
+                    num_classes=num_classes,
+                    device=device,
+                    binary_output=True,  # Convert to binary output for better visualization
+                    quiet=quiet,
+                    **kwargs,
+                )
+        except Exception as e:
+            print(f"Error processing {input_path}: {str(e)}")
+            continue
+
+    print(f"Batch processing completed. Results saved to {output_dir}")
