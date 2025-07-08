@@ -5,6 +5,7 @@ import glob
 import json
 import math
 import os
+import subprocess
 import warnings
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
@@ -7382,3 +7383,92 @@ def plot_prediction_comparison(
         plt.show()
 
     return fig
+
+
+def get_raster_resolution(image_path: str) -> Tuple[float, float]:
+    """Get pixel resolution from the raster using rasterio.
+
+    Args:
+        image_path: The path to the raster image.
+
+    Returns:
+        A tuple of (x resolution, y resolution).
+    """
+    with rasterio.open(image_path) as src:
+        res = src.res
+    return res
+
+
+def stack_bands(
+    input_files: List[str],
+    output_file: str,
+    resolution: Optional[float] = None,
+    dtype: Optional[str] = None,  # e.g., "UInt16", "Float32"
+    temp_vrt: str = "stack.vrt",
+    overwrite: bool = False,
+    compress: str = "DEFLATE",
+    output_format: str = "COG",
+    extra_gdal_translate_args: Optional[List[str]] = None,
+) -> str:
+    """
+    Stack bands from multiple images into a single multi-band GeoTIFF.
+
+    Args:
+        input_files (List[str]): List of input image paths.
+        output_file (str): Path to the output stacked image.
+        resolution (float, optional): Output resolution. If None, inferred from first image.
+        dtype (str, optional): Output data type (e.g., "UInt16", "Float32").
+        temp_vrt (str): Temporary VRT filename.
+        overwrite (bool): Whether to overwrite the output file.
+        compress (str): Compression method.
+        output_format (str): GDAL output format (default is "COG").
+        extra_gdal_translate_args (List[str], optional): Extra arguments for gdal_translate.
+
+    Returns:
+        str: Path to the output file.
+    """
+    if not input_files:
+        raise ValueError("No input files provided.")
+
+    if os.path.exists(output_file) and not overwrite:
+        print(f"Output file already exists: {output_file}")
+        return output_file
+
+    # Infer resolution if not provided
+    if resolution is None:
+        resolution_x, resolution_y = get_raster_resolution(input_files[0])
+    else:
+        resolution_x = resolution_y = resolution
+
+    # Step 1: Build VRT
+    vrt_cmd = ["gdalbuildvrt", "-separate", temp_vrt] + input_files
+    subprocess.run(vrt_cmd, check=True)
+
+    # Step 2: Translate VRT to output GeoTIFF
+    translate_cmd = [
+        "gdal_translate",
+        "-tr",
+        str(resolution_x),
+        str(resolution_y),
+        temp_vrt,
+        output_file,
+        "-of",
+        output_format,
+        "-co",
+        f"COMPRESS={compress}",
+    ]
+
+    if dtype:
+        translate_cmd.insert(1, "-ot")
+        translate_cmd.insert(2, dtype)
+
+    if extra_gdal_translate_args:
+        translate_cmd += extra_gdal_translate_args
+
+    subprocess.run(translate_cmd, check=True)
+
+    # Step 3: Clean up VRT
+    if os.path.exists(temp_vrt):
+        os.remove(temp_vrt)
+
+    return output_file

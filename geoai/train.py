@@ -511,7 +511,7 @@ def visualize_predictions(model, dataset, device, num_samples=5, output_dir=None
 
     # Create output directory if needed
     if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(os.path.abspath(output_dir), exist_ok=True)
 
     # Select random samples
     indices = random.sample(range(len(dataset)), min(num_samples, len(dataset)))
@@ -648,7 +648,7 @@ def train_MaskRCNN_model(
     torch.backends.cudnn.benchmark = False
 
     # Create output directory
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.abspath(output_dir), exist_ok=True)
 
     # Get device
     if device is None:
@@ -1216,7 +1216,7 @@ def object_detection_batch(
         )
 
     if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(os.path.abspath(output_dir), exist_ok=True)
 
     if not os.path.exists(model_path):
         try:
@@ -1905,7 +1905,7 @@ def train_segmentation_model(
     torch.backends.cudnn.benchmark = False
 
     # Create output directory
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.abspath(output_dir), exist_ok=True)
 
     # Get device
     if device is None:
@@ -2511,7 +2511,7 @@ def semantic_inference_on_geotiff(
             print(f"Inference completed in {inference_time:.2f} seconds")
 
         # Save output
-        out_dir = os.path.dirname(output_path)
+        out_dir = os.path.abspath(os.path.dirname(output_path))
         os.makedirs(out_dir, exist_ok=True)
         with rasterio.open(output_path, "w", **out_meta) as dst:
             dst.write(mask, 1)
@@ -2778,7 +2778,7 @@ def semantic_inference_on_image(
             # Change extension to PNG if binary output to preserve exact values
             output_path_png = os.path.splitext(output_path)[0] + ".png"
             output_img = Image.fromarray(mask, mode="L")
-            out_dir = os.path.dirname(output_path)
+            out_dir = os.path.abspath(os.path.dirname(output_path))
             os.makedirs(out_dir, exist_ok=True)
             output_img.save(output_path_png)
             if not quiet:
@@ -2887,7 +2887,7 @@ def semantic_segmentation(
         )
     else:
         # Create output directory if it doesn't exist
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        os.makedirs(os.path.abspath(os.path.dirname(output_path)), exist_ok=True)
 
         semantic_inference_on_image(
             model=model,
@@ -2962,7 +2962,7 @@ def semantic_segmentation_batch(
         raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
 
     # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.abspath(output_dir), exist_ok=True)
 
     # Get all supported image files
     image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
