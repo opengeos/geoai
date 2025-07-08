@@ -31,6 +31,7 @@ from .train import (
     train_MaskRCNN_model,
     train_segmentation_model,
     semantic_segmentation,
+    semantic_segmentation_batch,
 )
 from .utils import *
 
