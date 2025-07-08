@@ -13,7 +13,8 @@ private/
 docs/examples/*.md
 *.xml
 docs/examples/output/
-docs/examples/*.png
+docs/examples/**/*.png
+docs/examples/**/*.jpg
 docs/examples/data/
 docs/workshops/data/
 *.pth

@@ -1250,52 +1250,59 @@ def create_split_map(
     return m
 
 
-def download_file(url, output_path=None, overwrite=False):
+def download_file(url, output_path=None, overwrite=False, unzip=True):
     """
     Download a file from a given URL with a progress bar.
+    Optionally unzip the file if it's a ZIP archive.
 
     Args:
         url (str): The URL of the file to download.
         output_path (str, optional): The path where the downloaded file will be saved.
             If not provided, the filename from the URL will be used.
         overwrite (bool, optional): Whether to overwrite the file if it already exists.
+        unzip (bool, optional): Whether to unzip the file if it is a ZIP archive.
 
     Returns:
-        str: The path to the downloaded file.
+        str: The path to the downloaded file or the extracted directory.
     """
-    # Get the filename from the URL if output_path is not provided
+
+    from tqdm import tqdm
+    import zipfile
+
     if output_path is None:
         output_path = os.path.basename(url)
 
-    # Check if the file already exists
     if os.path.exists(output_path) and not overwrite:
         print(f"File already exists: {output_path}")
-        return output_path
+    else:
+        # Download the file with a progress bar
+        response = requests.get(url, stream=True, timeout=50)
+        response.raise_for_status()
+        total_size = int(response.headers.get("content-length", 0))
 
-    # Send a streaming GET request
-    response = requests.get(url, stream=True, timeout=50)
-    response.raise_for_status()  # Raise an exception for HTTP errors
+        with (
+            open(output_path, "wb") as file,
+            tqdm(
+                desc=f"Downloading {os.path.basename(output_path)}",
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as progress_bar,
+        ):
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:
+                    file.write(chunk)
+                    progress_bar.update(len(chunk))
 
-    # Get the total file size if available
-    total_size = int(response.headers.get("content-length", 0))
-
-    # Open the output file
-    with (
-        open(output_path, "wb") as file,
-        tqdm(
-            desc=os.path.basename(output_path),
-            total=total_size,
-            unit="B",
-            unit_scale=True,
-            unit_divisor=1024,
-        ) as progress_bar,
-    ):
-
-        # Download the file in chunks and update the progress bar
-        for chunk in response.iter_content(chunk_size=1024):
-            if chunk:  # filter out keep-alive new chunks
-                file.write(chunk)
-                progress_bar.update(len(chunk))
+    # If the file is a ZIP archive and unzip is True
+    if unzip and zipfile.is_zipfile(output_path):
+        extract_dir = os.path.splitext(output_path)[0]
+        if not os.path.exists(extract_dir) or overwrite:
+            with zipfile.ZipFile(output_path, "r") as zip_ref:
+                zip_ref.extractall(extract_dir)
+            print(f"Extracted to: {extract_dir}")
+        return extract_dir
 
     return output_path
 
@@ -6747,3 +6754,119 @@ def get_device():
         return torch.device("mps")
     else:
         return torch.device("cpu")
+
+
+def plot_prediction_comparison(
+    original_image: Union[str, np.ndarray, Image.Image],
+    prediction_image: Union[str, np.ndarray, Image.Image],
+    ground_truth_image: Optional[Union[str, np.ndarray, Image.Image]] = None,
+    titles: Optional[List[str]] = None,
+    figsize: Tuple[int, int] = (15, 5),
+    save_path: Optional[str] = None,
+    show_plot: bool = True,
+    prediction_colormap: str = "gray",
+    ground_truth_colormap: str = "gray",
+    original_colormap: Optional[str] = None,
+):
+    """
+    Plot original image, prediction image, and optionally ground truth image side by side.
+
+    Args:
+        original_image: Original input image (file path, numpy array, or PIL Image)
+        prediction_image: Prediction/segmentation mask (file path, numpy array, or PIL Image)
+        ground_truth_image: Optional ground truth mask (file path, numpy array, or PIL Image)
+        titles: Optional list of titles for each subplot
+        figsize: Figure size tuple (width, height)
+        save_path: Optional path to save the plot
+        show_plot: Whether to display the plot
+        prediction_colormap: Colormap for prediction image
+        ground_truth_colormap: Colormap for ground truth image
+        original_colormap: Colormap for original image (None for RGB)
+
+    Returns:
+        matplotlib.figure.Figure: The figure object
+    """
+
+    def _load_image(img_input):
+        """Helper function to load image from various input types."""
+        if isinstance(img_input, str):
+            # File path
+            if img_input.lower().endswith((".tif", ".tiff")):
+                # Handle GeoTIFF files
+                with rasterio.open(img_input) as src:
+                    img = src.read()
+                    if img.shape[0] == 1:
+                        # Single band
+                        img = img[0]
+                    else:
+                        # Multi-band, transpose to (H, W, C)
+                        img = np.transpose(img, (1, 2, 0))
+            else:
+                # Regular image file
+                img = np.array(Image.open(img_input))
+        elif isinstance(img_input, Image.Image):
+            # PIL Image
+            img = np.array(img_input)
+        elif isinstance(img_input, np.ndarray):
+            # NumPy array
+            img = img_input
+        else:
+            raise ValueError(f"Unsupported image type: {type(img_input)}")
+
+        return img
+
+    # Load images
+    original = _load_image(original_image)
+    prediction = _load_image(prediction_image)
+    ground_truth = (
+        _load_image(ground_truth_image) if ground_truth_image is not None else None
+    )
+
+    # Determine number of subplots
+    num_plots = 3 if ground_truth is not None else 2
+
+    # Create figure and subplots
+    fig, axes = plt.subplots(1, num_plots, figsize=figsize)
+    if num_plots == 2:
+        axes = [axes[0], axes[1]]
+
+    # Default titles
+    if titles is None:
+        titles = ["Original Image", "Prediction"]
+        if ground_truth is not None:
+            titles.append("Ground Truth")
+
+    # Plot original image
+    if len(original.shape) == 3 and original.shape[2] in [3, 4]:
+        # RGB or RGBA image
+        axes[0].imshow(original)
+    else:
+        # Grayscale or single channel
+        axes[0].imshow(original, cmap=original_colormap)
+    axes[0].set_title(titles[0])
+    axes[0].axis("off")
+
+    # Plot prediction image
+    axes[1].imshow(prediction, cmap=prediction_colormap)
+    axes[1].set_title(titles[1])
+    axes[1].axis("off")
+
+    # Plot ground truth if provided
+    if ground_truth is not None:
+        axes[2].imshow(ground_truth, cmap=ground_truth_colormap)
+        axes[2].set_title(titles[2])
+        axes[2].axis("off")
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save if requested
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to: {save_path}")
+
+    # Show plot
+    if show_plot:
+        plt.show()
+
+    return fig
