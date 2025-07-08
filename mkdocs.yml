@@ -47,7 +47,7 @@ plugins:
     - mkdocs-jupyter:
           include_source: True
           ignore_h1_titles: True
-          execute: true
+          execute: false
           allow_errors: false
           ignore: ["conf.py"]
           execute_ignore:
@@ -69,6 +69,7 @@ plugins:
                   "examples/load_model_checkpoint.ipynb",
                   "examples/water_detection.ipynb",
                   "examples/batch_segmentation.ipynb",
+                  "examples/building_detection_lidar.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -137,6 +138,7 @@ nav:
           - examples/load_model_checkpoint.ipynb
           - examples/water_detection.ipynb
           - examples/batch_segmentation.ipynb
+          - examples/building_detection_lidar.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
@@ -150,9 +152,9 @@ nav:
           #   - examples/samgeo/arcgis.ipynb
           #   - examples/samgeo/maxar_open_data.ipynb
           #   - examples/rastervision/semantic_segmentation.ipynb
-          - examples/dataviz/raster_viz.ipynb
-          - examples/dataviz/vector_viz.ipynb
-          - examples/dataviz/lidar_viz.ipynb
+          #   - examples/dataviz/raster_viz.ipynb
+          #   - examples/dataviz/vector_viz.ipynb
+          #   - examples/dataviz/lidar_viz.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
     - API Reference:
