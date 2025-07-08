@@ -132,6 +132,7 @@ nav:
           - examples/samgeo.ipynb
           - examples/grounded_sam.ipynb
           - examples/load_model_checkpoint.ipynb
+          - examples/water_detection.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
