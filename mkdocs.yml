@@ -108,6 +108,7 @@ nav:
           - examples/create_vector.ipynb
           - examples/edit_vector.ipynb
           - examples/image_chips.ipynb
+          - examples/image_tiling.ipynb
           - examples/building_footprints_usa.ipynb
           - examples/building_footprints_africa.ipynb
           - examples/building_footprints_china.ipynb
