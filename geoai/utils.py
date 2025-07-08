@@ -1,6 +1,7 @@
 """The utils module contains common functions and classes used by the other modules."""
 
 # Standard Library
+import glob
 import json
 import math
 import os
@@ -3053,6 +3054,517 @@ def export_geotiff_tiles(
 
         # Return statistics dictionary for further processing if needed
         return stats
+
+
+def export_geotiff_tiles_batch(
+    images_folder,
+    masks_folder,
+    output_folder,
+    tile_size=256,
+    stride=128,
+    class_value_field="class",
+    buffer_radius=0,
+    max_tiles=None,
+    quiet=False,
+    all_touched=True,
+    create_overview=False,
+    skip_empty_tiles=False,
+    image_extensions=None,
+    mask_extensions=None,
+):
+    """
+    Export georeferenced GeoTIFF tiles from folders of images and masks.
+
+    This function processes multiple image-mask pairs from input folders,
+    generating tiles for each pair. All image tiles are saved to a single
+    'images' folder and all mask tiles to a single 'masks' folder.
+
+    Images and masks are paired by their sorted order (alphabetically), not by
+    filename matching. The number of images and masks must be equal.
+
+    Args:
+        images_folder (str): Path to folder containing raster images
+        masks_folder (str): Path to folder containing classification masks/vectors
+        output_folder (str): Path to output folder
+        tile_size (int): Size of tiles in pixels (square)
+        stride (int): Step size between tiles
+        class_value_field (str): Field containing class values (for vector data)
+        buffer_radius (float): Buffer to add around features (in units of the CRS)
+        max_tiles (int): Maximum number of tiles to process per image (None for all)
+        quiet (bool): If True, suppress non-essential output
+        all_touched (bool): Whether to use all_touched=True in rasterization (for vector data)
+        create_overview (bool): Whether to create an overview image of all tiles
+        skip_empty_tiles (bool): If True, skip tiles with no features
+        image_extensions (list): List of image file extensions to process (default: common raster formats)
+        mask_extensions (list): List of mask file extensions to process (default: common raster/vector formats)
+
+    Returns:
+        dict: Dictionary containing batch processing statistics
+
+    Raises:
+        ValueError: If no images or masks found, or if counts don't match
+    """
+    # Default extensions if not provided
+    if image_extensions is None:
+        image_extensions = [".tif", ".tiff", ".jpg", ".jpeg", ".png", ".jp2", ".img"]
+    if mask_extensions is None:
+        mask_extensions = [
+            ".tif",
+            ".tiff",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".jp2",
+            ".img",
+            ".shp",
+            ".geojson",
+            ".gpkg",
+            ".geoparquet",
+            ".json",
+        ]
+
+    # Convert extensions to lowercase for comparison
+    image_extensions = [ext.lower() for ext in image_extensions]
+    mask_extensions = [ext.lower() for ext in mask_extensions]
+
+    # Create output folder structure
+    os.makedirs(output_folder, exist_ok=True)
+    output_images_dir = os.path.join(output_folder, "images")
+    output_masks_dir = os.path.join(output_folder, "masks")
+    os.makedirs(output_images_dir, exist_ok=True)
+    os.makedirs(output_masks_dir, exist_ok=True)
+
+    # Get list of image files
+    image_files = []
+    for ext in image_extensions:
+        pattern = os.path.join(images_folder, f"*{ext}")
+        image_files.extend(glob.glob(pattern))
+
+    # Get list of mask files
+    mask_files = []
+    for ext in mask_extensions:
+        pattern = os.path.join(masks_folder, f"*{ext}")
+        mask_files.extend(glob.glob(pattern))
+
+    # Sort files for consistent processing
+    image_files.sort()
+    mask_files.sort()
+
+    if not image_files:
+        raise ValueError(
+            f"No image files found in {images_folder} with extensions {image_extensions}"
+        )
+
+    if not mask_files:
+        raise ValueError(
+            f"No mask files found in {masks_folder} with extensions {mask_extensions}"
+        )
+
+    if len(image_files) != len(mask_files):
+        raise ValueError(
+            f"Number of image files ({len(image_files)}) does not match number of mask files ({len(mask_files)})"
+        )
+
+    # Initialize batch statistics
+    batch_stats = {
+        "total_image_pairs": 0,
+        "processed_pairs": 0,
+        "total_tiles": 0,
+        "tiles_with_features": 0,
+        "errors": 0,
+        "processed_files": [],
+        "failed_files": [],
+    }
+
+    if not quiet:
+        print(
+            f"Found {len(image_files)} image files and {len(mask_files)} mask files to process"
+        )
+        print(f"Processing batch from {images_folder} and {masks_folder}")
+        print(f"Output folder: {output_folder}")
+        print("-" * 60)
+
+    # Global tile counter for unique naming
+    global_tile_counter = 0
+
+    # Process each image-mask pair by sorted order
+    for idx, (image_file, mask_file) in enumerate(
+        tqdm(
+            zip(image_files, mask_files),
+            desc="Processing image pairs",
+            disable=quiet,
+            total=len(image_files),
+        )
+    ):
+        batch_stats["total_image_pairs"] += 1
+
+        # Get base filename without extension for naming (use image filename)
+        base_name = os.path.splitext(os.path.basename(image_file))[0]
+
+        try:
+            if not quiet:
+                print(f"\nProcessing: {base_name}")
+                print(f"  Image: {os.path.basename(image_file)}")
+                print(f"  Mask: {os.path.basename(mask_file)}")
+
+            # Process the image-mask pair manually to get direct control over tile saving
+            tiles_generated = _process_image_mask_pair(
+                image_file=image_file,
+                mask_file=mask_file,
+                base_name=base_name,
+                output_images_dir=output_images_dir,
+                output_masks_dir=output_masks_dir,
+                global_tile_counter=global_tile_counter,
+                tile_size=tile_size,
+                stride=stride,
+                class_value_field=class_value_field,
+                buffer_radius=buffer_radius,
+                max_tiles=max_tiles,
+                all_touched=all_touched,
+                skip_empty_tiles=skip_empty_tiles,
+                quiet=quiet,
+            )
+
+            # Update counters
+            global_tile_counter += tiles_generated["total_tiles"]
+
+            # Update batch statistics
+            batch_stats["processed_pairs"] += 1
+            batch_stats["total_tiles"] += tiles_generated["total_tiles"]
+            batch_stats["tiles_with_features"] += tiles_generated["tiles_with_features"]
+            batch_stats["errors"] += tiles_generated["errors"]
+
+            batch_stats["processed_files"].append(
+                {
+                    "image": image_file,
+                    "mask": mask_file,
+                    "base_name": base_name,
+                    "tiles_generated": tiles_generated["total_tiles"],
+                    "tiles_with_features": tiles_generated["tiles_with_features"],
+                }
+            )
+
+        except Exception as e:
+            if not quiet:
+                print(f"ERROR processing {base_name}: {e}")
+            batch_stats["failed_files"].append(
+                {"image": image_file, "mask": mask_file, "error": str(e)}
+            )
+            batch_stats["errors"] += 1
+
+    # Print batch summary
+    if not quiet:
+        print("\n" + "=" * 60)
+        print("BATCH PROCESSING SUMMARY")
+        print("=" * 60)
+        print(f"Total image pairs found: {batch_stats['total_image_pairs']}")
+        print(f"Successfully processed: {batch_stats['processed_pairs']}")
+        print(f"Failed to process: {len(batch_stats['failed_files'])}")
+        print(f"Total tiles generated: {batch_stats['total_tiles']}")
+        print(f"Tiles with features: {batch_stats['tiles_with_features']}")
+
+        if batch_stats["total_tiles"] > 0:
+            feature_percentage = (
+                batch_stats["tiles_with_features"] / batch_stats["total_tiles"]
+            ) * 100
+            print(f"Feature percentage: {feature_percentage:.1f}%")
+
+        if batch_stats["errors"] > 0:
+            print(f"Total errors: {batch_stats['errors']}")
+
+        print(f"Output saved to: {output_folder}")
+        print(f"  Images: {output_images_dir}")
+        print(f"  Masks: {output_masks_dir}")
+
+        # List failed files if any
+        if batch_stats["failed_files"]:
+            print(f"\nFailed files:")
+            for failed in batch_stats["failed_files"]:
+                print(f"  - {os.path.basename(failed['image'])}: {failed['error']}")
+
+    return batch_stats
+
+
+def _process_image_mask_pair(
+    image_file,
+    mask_file,
+    base_name,
+    output_images_dir,
+    output_masks_dir,
+    global_tile_counter,
+    tile_size=256,
+    stride=128,
+    class_value_field="class",
+    buffer_radius=0,
+    max_tiles=None,
+    all_touched=True,
+    skip_empty_tiles=False,
+    quiet=False,
+):
+    """
+    Process a single image-mask pair and save tiles directly to output directories.
+
+    Returns:
+        dict: Statistics for this image-mask pair
+    """
+    import warnings
+
+    # Determine if mask data is raster or vector
+    is_class_data_raster = False
+    if isinstance(mask_file, str):
+        file_ext = Path(mask_file).suffix.lower()
+        # Common raster extensions
+        if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
+            try:
+                with rasterio.open(mask_file) as src:
+                    is_class_data_raster = True
+            except Exception:
+                is_class_data_raster = False
+
+    # Track statistics
+    stats = {
+        "total_tiles": 0,
+        "tiles_with_features": 0,
+        "errors": 0,
+    }
+
+    # Open the input raster
+    with rasterio.open(image_file) as src:
+        # Calculate number of tiles
+        num_tiles_x = math.ceil((src.width - tile_size) / stride) + 1
+        num_tiles_y = math.ceil((src.height - tile_size) / stride) + 1
+        total_tiles = num_tiles_x * num_tiles_y
+
+        if max_tiles is None:
+            max_tiles = total_tiles
+
+        # Process classification data
+        class_to_id = {}
+
+        if is_class_data_raster:
+            # Load raster class data
+            with rasterio.open(mask_file) as class_src:
+                # Check if raster CRS matches
+                if class_src.crs != src.crs:
+                    warnings.warn(
+                        f"CRS mismatch: Class raster ({class_src.crs}) doesn't match input raster ({src.crs}). "
+                        f"Results may be misaligned."
+                    )
+
+                # Get unique values from raster
+                sample_data = class_src.read(
+                    1,
+                    out_shape=(
+                        1,
+                        min(class_src.height, 1000),
+                        min(class_src.width, 1000),
+                    ),
+                )
+
+                unique_classes = np.unique(sample_data)
+                unique_classes = unique_classes[
+                    unique_classes > 0
+                ]  # Remove 0 as it's typically background
+
+                # Create class mapping
+                class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
+        else:
+            # Load vector class data
+            try:
+                gdf = gpd.read_file(mask_file)
+
+                # Always reproject to match raster CRS
+                if gdf.crs != src.crs:
+                    gdf = gdf.to_crs(src.crs)
+
+                # Apply buffer if specified
+                if buffer_radius > 0:
+                    gdf["geometry"] = gdf.buffer(buffer_radius)
+
+                # Check if class_value_field exists
+                if class_value_field in gdf.columns:
+                    unique_classes = gdf[class_value_field].unique()
+                    # Create class mapping
+                    class_to_id = {cls: i + 1 for i, cls in enumerate(unique_classes)}
+                else:
+                    class_to_id = {1: 1}  # Default mapping
+            except Exception as e:
+                raise ValueError(f"Error processing vector data: {e}")
+
+        # Process tiles
+        tile_index = 0
+        for y in range(num_tiles_y):
+            for x in range(num_tiles_x):
+                if tile_index >= max_tiles:
+                    break
+
+                # Calculate window coordinates
+                window_x = x * stride
+                window_y = y * stride
+
+                # Adjust for edge cases
+                if window_x + tile_size > src.width:
+                    window_x = src.width - tile_size
+                if window_y + tile_size > src.height:
+                    window_y = src.height - tile_size
+
+                # Define window
+                window = Window(window_x, window_y, tile_size, tile_size)
+
+                # Get window transform and bounds
+                window_transform = src.window_transform(window)
+
+                # Calculate window bounds
+                minx = window_transform[2]  # Upper left x
+                maxy = window_transform[5]  # Upper left y
+                maxx = minx + tile_size * window_transform[0]  # Add width
+                miny = maxy + tile_size * window_transform[4]  # Add height
+
+                window_bounds = box(minx, miny, maxx, maxy)
+
+                # Create label mask
+                label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
+                has_features = False
+
+                # Process classification data to create labels
+                if is_class_data_raster:
+                    # For raster class data
+                    with rasterio.open(mask_file) as class_src:
+                        # Get corresponding window in class raster
+                        window_class = rasterio.windows.from_bounds(
+                            minx, miny, maxx, maxy, class_src.transform
+                        )
+
+                        # Read label data
+                        try:
+                            label_data = class_src.read(
+                                1,
+                                window=window_class,
+                                boundless=True,
+                                out_shape=(tile_size, tile_size),
+                            )
+
+                            # Remap class values if needed
+                            if class_to_id:
+                                remapped_data = np.zeros_like(label_data)
+                                for orig_val, new_val in class_to_id.items():
+                                    remapped_data[label_data == orig_val] = new_val
+                                label_mask = remapped_data
+                            else:
+                                label_mask = label_data
+
+                            # Check if we have any features
+                            if np.any(label_mask > 0):
+                                has_features = True
+                        except Exception as e:
+                            if not quiet:
+                                print(f"Error reading class raster window: {e}")
+                            stats["errors"] += 1
+                else:
+                    # For vector class data
+                    # Find features that intersect with window
+                    window_features = gdf[gdf.intersects(window_bounds)]
+
+                    if len(window_features) > 0:
+                        for idx, feature in window_features.iterrows():
+                            # Get class value
+                            if class_value_field in feature:
+                                class_val = feature[class_value_field]
+                                class_id = class_to_id.get(class_val, 1)
+                            else:
+                                class_id = 1
+
+                            # Get geometry in window coordinates
+                            geom = feature.geometry.intersection(window_bounds)
+                            if not geom.is_empty:
+                                try:
+                                    # Rasterize feature
+                                    feature_mask = features.rasterize(
+                                        [(geom, class_id)],
+                                        out_shape=(tile_size, tile_size),
+                                        transform=window_transform,
+                                        fill=0,
+                                        all_touched=all_touched,
+                                    )
+
+                                    # Add to label mask
+                                    label_mask = np.maximum(label_mask, feature_mask)
+
+                                    # Check if the feature was actually rasterized
+                                    if np.any(feature_mask):
+                                        has_features = True
+                                except Exception as e:
+                                    if not quiet:
+                                        print(f"Error rasterizing feature {idx}: {e}")
+                                    stats["errors"] += 1
+
+                # Skip tile if no features and skip_empty_tiles is True
+                if skip_empty_tiles and not has_features:
+                    tile_index += 1
+                    continue
+
+                # Generate unique tile name
+                tile_name = f"{base_name}_{global_tile_counter + tile_index:06d}"
+
+                # Read image data
+                image_data = src.read(window=window)
+
+                # Export image as GeoTIFF
+                image_path = os.path.join(output_images_dir, f"{tile_name}.tif")
+
+                # Create profile for image GeoTIFF
+                image_profile = src.profile.copy()
+                image_profile.update(
+                    {
+                        "height": tile_size,
+                        "width": tile_size,
+                        "count": image_data.shape[0],
+                        "transform": window_transform,
+                    }
+                )
+
+                # Save image as GeoTIFF
+                try:
+                    with rasterio.open(image_path, "w", **image_profile) as dst:
+                        dst.write(image_data)
+                    stats["total_tiles"] += 1
+                except Exception as e:
+                    if not quiet:
+                        print(f"ERROR saving image GeoTIFF: {e}")
+                    stats["errors"] += 1
+
+                # Create profile for label GeoTIFF
+                label_profile = {
+                    "driver": "GTiff",
+                    "height": tile_size,
+                    "width": tile_size,
+                    "count": 1,
+                    "dtype": "uint8",
+                    "crs": src.crs,
+                    "transform": window_transform,
+                }
+
+                # Export label as GeoTIFF
+                label_path = os.path.join(output_masks_dir, f"{tile_name}.tif")
+                try:
+                    with rasterio.open(label_path, "w", **label_profile) as dst:
+                        dst.write(label_mask.astype(np.uint8), 1)
+
+                    if has_features:
+                        stats["tiles_with_features"] += 1
+                except Exception as e:
+                    if not quiet:
+                        print(f"ERROR saving label GeoTIFF: {e}")
+                    stats["errors"] += 1
+
+                tile_index += 1
+                if tile_index >= max_tiles:
+                    break
+
+            if tile_index >= max_tiles:
+                break
+
+    return stats
 
 
 def create_overview_image(
