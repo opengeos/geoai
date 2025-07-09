@@ -1287,6 +1287,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/water_detection_s2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Water detection s2
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/batch_segmentation/" class="md-nav__link">
         
   
@@ -35929,18 +35952,18 @@ or None if the file cannot be opened</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7388</span>
-<span class="normal">7389</span>
-<span class="normal">7390</span>
-<span class="normal">7391</span>
-<span class="normal">7392</span>
-<span class="normal">7393</span>
-<span class="normal">7394</span>
-<span class="normal">7395</span>
-<span class="normal">7396</span>
-<span class="normal">7397</span>
-<span class="normal">7398</span>
-<span class="normal">7399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_resolution</span><span class="p">(</span><span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7406</span>
+<span class="normal">7407</span>
+<span class="normal">7408</span>
+<span class="normal">7409</span>
+<span class="normal">7410</span>
+<span class="normal">7411</span>
+<span class="normal">7412</span>
+<span class="normal">7413</span>
+<span class="normal">7414</span>
+<span class="normal">7415</span>
+<span class="normal">7416</span>
+<span class="normal">7417</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_resolution</span><span class="p">(</span><span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get pixel resolution from the raster using rasterio.</span>
 
 <span class="sd">    Args:</span>
@@ -42065,14 +42088,18 @@ Credit to the torchgeo developers for the original implementation.</p>
 
 
 <h2 id="geoai.geoai.plot_prediction_comparison" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">plot_prediction_comparison</span><span class="p">(</span><span class="n">original_image</span><span class="p">,</span> <span class="n">prediction_image</span><span class="p">,</span> <span class="n">ground_truth_image</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">titles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">save_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">prediction_colormap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">ground_truth_colormap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">original_colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">plot_prediction_comparison</span><span class="p">(</span><span class="n">original_image</span><span class="p">,</span> <span class="n">prediction_image</span><span class="p">,</span> <span class="n">ground_truth_image</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">titles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">save_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">prediction_colormap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">ground_truth_colormap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">original_colormap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">indexes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">divider</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#geoai.geoai.plot_prediction_comparison" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents ">
 
-        <p>Plot original image, prediction image, and optionally ground truth image side by side.</p>
+        <p>Plot original image, prediction, and optional ground truth side by side.</p>
+<p>Supports input as file paths, NumPy arrays, or PIL Images. For multi-band
+images, selected channels can be specified via <code>indexes</code>. If the image data
+is not normalized (e.g., Sentinel-2 [0, 10000]), the <code>divider</code> can be used
+to scale values for visualization.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -42095,7 +42122,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Original input image (file path, numpy array, or PIL Image)</p>
+                <p>Original input image as a file path, NumPy array, or PIL Image.</p>
               </div>
             </td>
             <td>
@@ -42111,7 +42138,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Prediction/segmentation mask (file path, numpy array, or PIL Image)</p>
+                <p>Predicted segmentation mask image.</p>
               </div>
             </td>
             <td>
@@ -42127,7 +42154,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional ground truth mask (file path, numpy array, or PIL Image)</p>
+                <p>Ground truth mask image. Defaults to None.</p>
               </div>
             </td>
             <td>
@@ -42143,7 +42170,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional list of titles for each subplot</p>
+                <p>List of titles for the subplots. If not provided, default titles are used.</p>
               </div>
             </td>
             <td>
@@ -42159,7 +42186,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Figure size tuple (width, height)</p>
+                <p>Size of the entire figure in inches. Defaults to (15, 5).</p>
               </div>
             </td>
             <td>
@@ -42175,7 +42202,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional path to save the plot</p>
+                <p>If specified, saves the figure to this path. Defaults to None.</p>
               </div>
             </td>
             <td>
@@ -42191,7 +42218,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Whether to display the plot</p>
+                <p>Whether to display the figure using plt.show(). Defaults to True.</p>
               </div>
             </td>
             <td>
@@ -42207,7 +42234,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Colormap for prediction image</p>
+                <p>Colormap to use for the prediction mask. Defaults to "gray".</p>
               </div>
             </td>
             <td>
@@ -42223,7 +42250,7 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Colormap for ground truth image</p>
+                <p>Colormap to use for the ground truth mask. Defaults to "gray".</p>
               </div>
             </td>
             <td>
@@ -42239,7 +42266,40 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Colormap for original image (None for RGB)</p>
+                <p>Colormap to use for the original image if it's grayscale. Defaults to None.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>indexes</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.List">List</span>[<span title="int">int</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of band/channel indexes (0-based for NumPy, 1-based for rasterio) to extract from the original image.
+Useful for multi-band imagery like Sentinel-2. Defaults to None.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>divider</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Value to divide the original image by for normalization (e.g., 10000 for reflectance). Defaults to None.</p>
               </div>
             </td>
             <td>
@@ -42264,7 +42324,8 @@ Credit to the torchgeo developers for the original implementation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>matplotlib.figure.Figure: The figure object</p>
+                <p>matplotlib.figure.Figure:
+The generated matplotlib figure object.</p>
               </div>
             </td>
           </tr>
@@ -42387,7 +42448,25 @@ Credit to the torchgeo developers for the original implementation.</p>
 <span class="normal">7382</span>
 <span class="normal">7383</span>
 <span class="normal">7384</span>
-<span class="normal">7385</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction_comparison</span><span class="p">(</span>
+<span class="normal">7385</span>
+<span class="normal">7386</span>
+<span class="normal">7387</span>
+<span class="normal">7388</span>
+<span class="normal">7389</span>
+<span class="normal">7390</span>
+<span class="normal">7391</span>
+<span class="normal">7392</span>
+<span class="normal">7393</span>
+<span class="normal">7394</span>
+<span class="normal">7395</span>
+<span class="normal">7396</span>
+<span class="normal">7397</span>
+<span class="normal">7398</span>
+<span class="normal">7399</span>
+<span class="normal">7400</span>
+<span class="normal">7401</span>
+<span class="normal">7402</span>
+<span class="normal">7403</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction_comparison</span><span class="p">(</span>
     <span class="n">original_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">],</span>
     <span class="n">prediction_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">],</span>
     <span class="n">ground_truth_image</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -42398,105 +42477,123 @@ Credit to the torchgeo developers for the original implementation.</p>
     <span class="n">prediction_colormap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span><span class="p">,</span>
     <span class="n">ground_truth_colormap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;gray&quot;</span><span class="p">,</span>
     <span class="n">original_colormap</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">indexes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">divider</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Plot original image, prediction image, and optionally ground truth image side by side.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Plot original image, prediction, and optional ground truth side by side.</span>
+
+<span class="sd">    Supports input as file paths, NumPy arrays, or PIL Images. For multi-band</span>
+<span class="sd">    images, selected channels can be specified via `indexes`. If the image data</span>
+<span class="sd">    is not normalized (e.g., Sentinel-2 [0, 10000]), the `divider` can be used</span>
+<span class="sd">    to scale values for visualization.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        original_image: Original input image (file path, numpy array, or PIL Image)</span>
-<span class="sd">        prediction_image: Prediction/segmentation mask (file path, numpy array, or PIL Image)</span>
-<span class="sd">        ground_truth_image: Optional ground truth mask (file path, numpy array, or PIL Image)</span>
-<span class="sd">        titles: Optional list of titles for each subplot</span>
-<span class="sd">        figsize: Figure size tuple (width, height)</span>
-<span class="sd">        save_path: Optional path to save the plot</span>
-<span class="sd">        show_plot: Whether to display the plot</span>
-<span class="sd">        prediction_colormap: Colormap for prediction image</span>
-<span class="sd">        ground_truth_colormap: Colormap for ground truth image</span>
-<span class="sd">        original_colormap: Colormap for original image (None for RGB)</span>
+<span class="sd">        original_image (Union[str, np.ndarray, Image.Image]):</span>
+<span class="sd">            Original input image as a file path, NumPy array, or PIL Image.</span>
+<span class="sd">        prediction_image (Union[str, np.ndarray, Image.Image]):</span>
+<span class="sd">            Predicted segmentation mask image.</span>
+<span class="sd">        ground_truth_image (Optional[Union[str, np.ndarray, Image.Image]], optional):</span>
+<span class="sd">            Ground truth mask image. Defaults to None.</span>
+<span class="sd">        titles (Optional[List[str]], optional):</span>
+<span class="sd">            List of titles for the subplots. If not provided, default titles are used.</span>
+<span class="sd">        figsize (Tuple[int, int], optional):</span>
+<span class="sd">            Size of the entire figure in inches. Defaults to (15, 5).</span>
+<span class="sd">        save_path (Optional[str], optional):</span>
+<span class="sd">            If specified, saves the figure to this path. Defaults to None.</span>
+<span class="sd">        show_plot (bool, optional):</span>
+<span class="sd">            Whether to display the figure using plt.show(). Defaults to True.</span>
+<span class="sd">        prediction_colormap (str, optional):</span>
+<span class="sd">            Colormap to use for the prediction mask. Defaults to &quot;gray&quot;.</span>
+<span class="sd">        ground_truth_colormap (str, optional):</span>
+<span class="sd">            Colormap to use for the ground truth mask. Defaults to &quot;gray&quot;.</span>
+<span class="sd">        original_colormap (Optional[str], optional):</span>
+<span class="sd">            Colormap to use for the original image if it&#39;s grayscale. Defaults to None.</span>
+<span class="sd">        indexes (Optional[List[int]], optional):</span>
+<span class="sd">            List of band/channel indexes (0-based for NumPy, 1-based for rasterio) to extract from the original image.</span>
+<span class="sd">            Useful for multi-band imagery like Sentinel-2. Defaults to None.</span>
+<span class="sd">        divider (Optional[float], optional):</span>
+<span class="sd">            Value to divide the original image by for normalization (e.g., 10000 for reflectance). Defaults to None.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        matplotlib.figure.Figure: The figure object</span>
+<span class="sd">        matplotlib.figure.Figure:</span>
+<span class="sd">            The generated matplotlib figure object.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_load_image</span><span class="p">(</span><span class="n">img_input</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_image</span><span class="p">(</span><span class="n">img_input</span><span class="p">,</span> <span class="n">indexes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper function to load image from various input types.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">img_input</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="c1"># File path</span>
             <span class="k">if</span> <span class="n">img_input</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">&quot;.tif&quot;</span><span class="p">,</span> <span class="s2">&quot;.tiff&quot;</span><span class="p">)):</span>
-                <span class="c1"># Handle GeoTIFF files</span>
                 <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_input</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
-                    <span class="n">img</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-                    <span class="k">if</span> <span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-                        <span class="c1"># Single band</span>
-                        <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">indexes</span><span class="p">:</span>
+                        <span class="n">img</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">indexes</span><span class="p">)</span>  <span class="c1"># 1-based</span>
+                        <span class="n">img</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">indexes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">img</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="p">)</span>
                     <span class="k">else</span><span class="p">:</span>
-                        <span class="c1"># Multi-band, transpose to (H, W, C)</span>
-                        <span class="n">img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+                        <span class="n">img</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                            <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="c1"># Regular image file</span>
                 <span class="n">img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_input</span><span class="p">))</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">img_input</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">):</span>
-            <span class="c1"># PIL Image</span>
             <span class="n">img</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">img_input</span><span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">img_input</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
-            <span class="c1"># NumPy array</span>
             <span class="n">img</span> <span class="o">=</span> <span class="n">img_input</span>
+            <span class="k">if</span> <span class="n">indexes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">img</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">indexes</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported image type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">img_input</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
         <span class="k">return</span> <span class="n">img</span>
 
     <span class="c1"># Load images</span>
-    <span class="n">original</span> <span class="o">=</span> <span class="n">_load_image</span><span class="p">(</span><span class="n">original_image</span><span class="p">)</span>
+    <span class="n">original</span> <span class="o">=</span> <span class="n">_load_image</span><span class="p">(</span><span class="n">original_image</span><span class="p">,</span> <span class="n">indexes</span><span class="o">=</span><span class="n">indexes</span><span class="p">)</span>
     <span class="n">prediction</span> <span class="o">=</span> <span class="n">_load_image</span><span class="p">(</span><span class="n">prediction_image</span><span class="p">)</span>
     <span class="n">ground_truth</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">_load_image</span><span class="p">(</span><span class="n">ground_truth_image</span><span class="p">)</span> <span class="k">if</span> <span class="n">ground_truth_image</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="p">)</span>
 
-    <span class="c1"># Determine number of subplots</span>
-    <span class="n">num_plots</span> <span class="o">=</span> <span class="mi">3</span> <span class="k">if</span> <span class="n">ground_truth</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">2</span>
+    <span class="c1"># Apply divider normalization if requested</span>
+    <span class="k">if</span> <span class="n">divider</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> <span class="n">original</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">original</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">original</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">/</span> <span class="n">divider</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
-    <span class="c1"># Create figure and subplots</span>
+    <span class="c1"># Determine layout</span>
+    <span class="n">num_plots</span> <span class="o">=</span> <span class="mi">3</span> <span class="k">if</span> <span class="n">ground_truth</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">2</span>
     <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_plots</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">num_plots</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
         <span class="n">axes</span> <span class="o">=</span> <span class="p">[</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
 
-    <span class="c1"># Default titles</span>
     <span class="k">if</span> <span class="n">titles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">titles</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Original Image&quot;</span><span class="p">,</span> <span class="s2">&quot;Prediction&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">ground_truth</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">titles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Ground Truth&quot;</span><span class="p">)</span>
 
-    <span class="c1"># Plot original image</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">original</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">original</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]:</span>
-        <span class="c1"># RGB or RGBA image</span>
+    <span class="c1"># Plot original</span>
+    <span class="k">if</span> <span class="n">original</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">original</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]:</span>
         <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">original</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="c1"># Grayscale or single channel</span>
         <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">original_colormap</span><span class="p">)</span>
     <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">titles</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
 
-    <span class="c1"># Plot prediction image</span>
+    <span class="c1"># Prediction</span>
     <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">prediction_colormap</span><span class="p">)</span>
     <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">titles</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
     <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
 
-    <span class="c1"># Plot ground truth if provided</span>
+    <span class="c1"># Ground truth</span>
     <span class="k">if</span> <span class="n">ground_truth</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">ground_truth</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">ground_truth_colormap</span><span class="p">)</span>
         <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">titles</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
         <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
 
-    <span class="c1"># Adjust layout</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 
-    <span class="c1"># Save if requested</span>
     <span class="k">if</span> <span class="n">save_path</span><span class="p">:</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Plot saved to: </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-    <span class="c1"># Show plot</span>
     <span class="k">if</span> <span class="n">show_plot</span><span class="p">:</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
@@ -46572,25 +46669,7 @@ not saved. Defaults to None.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7402</span>
-<span class="normal">7403</span>
-<span class="normal">7404</span>
-<span class="normal">7405</span>
-<span class="normal">7406</span>
-<span class="normal">7407</span>
-<span class="normal">7408</span>
-<span class="normal">7409</span>
-<span class="normal">7410</span>
-<span class="normal">7411</span>
-<span class="normal">7412</span>
-<span class="normal">7413</span>
-<span class="normal">7414</span>
-<span class="normal">7415</span>
-<span class="normal">7416</span>
-<span class="normal">7417</span>
-<span class="normal">7418</span>
-<span class="normal">7419</span>
-<span class="normal">7420</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7420</span>
 <span class="normal">7421</span>
 <span class="normal">7422</span>
 <span class="normal">7423</span>
@@ -46644,7 +46723,25 @@ not saved. Defaults to None.</p>
 <span class="normal">7471</span>
 <span class="normal">7472</span>
 <span class="normal">7473</span>
-<span class="normal">7474</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
+<span class="normal">7474</span>
+<span class="normal">7475</span>
+<span class="normal">7476</span>
+<span class="normal">7477</span>
+<span class="normal">7478</span>
+<span class="normal">7479</span>
+<span class="normal">7480</span>
+<span class="normal">7481</span>
+<span class="normal">7482</span>
+<span class="normal">7483</span>
+<span class="normal">7484</span>
+<span class="normal">7485</span>
+<span class="normal">7486</span>
+<span class="normal">7487</span>
+<span class="normal">7488</span>
+<span class="normal">7489</span>
+<span class="normal">7490</span>
+<span class="normal">7491</span>
+<span class="normal">7492</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
     <span class="n">input_files</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">resolution</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
