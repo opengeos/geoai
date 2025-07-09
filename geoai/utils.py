@@ -7280,105 +7280,123 @@ def plot_prediction_comparison(
     prediction_colormap: str = "gray",
     ground_truth_colormap: str = "gray",
     original_colormap: Optional[str] = None,
+    indexes: Optional[List[int]] = None,
+    divider: Optional[float] = None,
 ):
-    """
-    Plot original image, prediction image, and optionally ground truth image side by side.
+    """Plot original image, prediction, and optional ground truth side by side.
+
+    Supports input as file paths, NumPy arrays, or PIL Images. For multi-band
+    images, selected channels can be specified via `indexes`. If the image data
+    is not normalized (e.g., Sentinel-2 [0, 10000]), the `divider` can be used
+    to scale values for visualization.
 
     Args:
-        original_image: Original input image (file path, numpy array, or PIL Image)
-        prediction_image: Prediction/segmentation mask (file path, numpy array, or PIL Image)
-        ground_truth_image: Optional ground truth mask (file path, numpy array, or PIL Image)
-        titles: Optional list of titles for each subplot
-        figsize: Figure size tuple (width, height)
-        save_path: Optional path to save the plot
-        show_plot: Whether to display the plot
-        prediction_colormap: Colormap for prediction image
-        ground_truth_colormap: Colormap for ground truth image
-        original_colormap: Colormap for original image (None for RGB)
+        original_image (Union[str, np.ndarray, Image.Image]):
+            Original input image as a file path, NumPy array, or PIL Image.
+        prediction_image (Union[str, np.ndarray, Image.Image]):
+            Predicted segmentation mask image.
+        ground_truth_image (Optional[Union[str, np.ndarray, Image.Image]], optional):
+            Ground truth mask image. Defaults to None.
+        titles (Optional[List[str]], optional):
+            List of titles for the subplots. If not provided, default titles are used.
+        figsize (Tuple[int, int], optional):
+            Size of the entire figure in inches. Defaults to (15, 5).
+        save_path (Optional[str], optional):
+            If specified, saves the figure to this path. Defaults to None.
+        show_plot (bool, optional):
+            Whether to display the figure using plt.show(). Defaults to True.
+        prediction_colormap (str, optional):
+            Colormap to use for the prediction mask. Defaults to "gray".
+        ground_truth_colormap (str, optional):
+            Colormap to use for the ground truth mask. Defaults to "gray".
+        original_colormap (Optional[str], optional):
+            Colormap to use for the original image if it's grayscale. Defaults to None.
+        indexes (Optional[List[int]], optional):
+            List of band/channel indexes (0-based for NumPy, 1-based for rasterio) to extract from the original image.
+            Useful for multi-band imagery like Sentinel-2. Defaults to None.
+        divider (Optional[float], optional):
+            Value to divide the original image by for normalization (e.g., 10000 for reflectance). Defaults to None.
 
     Returns:
-        matplotlib.figure.Figure: The figure object
+        matplotlib.figure.Figure:
+            The generated matplotlib figure object.
     """
 
-    def _load_image(img_input):
+    def _load_image(img_input, indexes=None):
         """Helper function to load image from various input types."""
         if isinstance(img_input, str):
-            # File path
             if img_input.lower().endswith((".tif", ".tiff")):
-                # Handle GeoTIFF files
                 with rasterio.open(img_input) as src:
-                    img = src.read()
-                    if img.shape[0] == 1:
-                        # Single band
-                        img = img[0]
+                    if indexes:
+                        img = src.read(indexes)  # 1-based
+                        img = (
+                            np.transpose(img, (1, 2, 0)) if len(indexes) > 1 else img[0]
+                        )
                     else:
-                        # Multi-band, transpose to (H, W, C)
-                        img = np.transpose(img, (1, 2, 0))
+                        img = src.read()
+                        if img.shape[0] == 1:
+                            img = img[0]
+                        else:
+                            img = np.transpose(img, (1, 2, 0))
             else:
-                # Regular image file
                 img = np.array(Image.open(img_input))
         elif isinstance(img_input, Image.Image):
-            # PIL Image
             img = np.array(img_input)
         elif isinstance(img_input, np.ndarray):
-            # NumPy array
             img = img_input
+            if indexes is not None and img.ndim == 3:
+                img = img[:, :, indexes]
         else:
             raise ValueError(f"Unsupported image type: {type(img_input)}")
-
         return img
 
     # Load images
-    original = _load_image(original_image)
+    original = _load_image(original_image, indexes=indexes)
     prediction = _load_image(prediction_image)
     ground_truth = (
         _load_image(ground_truth_image) if ground_truth_image is not None else None
     )
 
-    # Determine number of subplots
-    num_plots = 3 if ground_truth is not None else 2
+    # Apply divider normalization if requested
+    if divider is not None and isinstance(original, np.ndarray) and original.ndim == 3:
+        original = np.clip(original.astype(np.float32) / divider, 0, 1)
 
-    # Create figure and subplots
+    # Determine layout
+    num_plots = 3 if ground_truth is not None else 2
     fig, axes = plt.subplots(1, num_plots, figsize=figsize)
     if num_plots == 2:
         axes = [axes[0], axes[1]]
 
-    # Default titles
     if titles is None:
         titles = ["Original Image", "Prediction"]
         if ground_truth is not None:
             titles.append("Ground Truth")
 
-    # Plot original image
-    if len(original.shape) == 3 and original.shape[2] in [3, 4]:
-        # RGB or RGBA image
+    # Plot original
+    if original.ndim == 3 and original.shape[2] in [3, 4]:
         axes[0].imshow(original)
     else:
-        # Grayscale or single channel
         axes[0].imshow(original, cmap=original_colormap)
     axes[0].set_title(titles[0])
     axes[0].axis("off")
 
-    # Plot prediction image
+    # Prediction
     axes[1].imshow(prediction, cmap=prediction_colormap)
     axes[1].set_title(titles[1])
     axes[1].axis("off")
 
-    # Plot ground truth if provided
+    # Ground truth
     if ground_truth is not None:
         axes[2].imshow(ground_truth, cmap=ground_truth_colormap)
         axes[2].set_title(titles[2])
         axes[2].axis("off")
 
-    # Adjust layout
     plt.tight_layout()
 
-    # Save if requested
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
         print(f"Plot saved to: {save_path}")
 
-    # Show plot
     if show_plot:
         plt.show()
 
