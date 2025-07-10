@@ -5680,11 +5680,11 @@ def orthogonalize(
 
         # Enhanced validation: check for triangular result and geometric validity
         result_coords = joined_ring[0]
-        
+
         # If result has 3 or fewer points (triangle), use original
         if len(result_coords) <= 3:  # 2 points + closing point (degenerate)
             return ring
-        
+
         # Additional validation: check for degenerate geometry
         # Calculate area ratio to detect if the shape got severely distorted
         def calculate_polygon_area(coords):
@@ -5697,51 +5697,53 @@ def orthogonalize(
                 area += coords[i][0] * coords[j][1]
                 area -= coords[j][0] * coords[i][1]
             return abs(area) / 2
-        
+
         original_area = calculate_polygon_area(ring)
         result_area = calculate_polygon_area(result_coords)
-        
-        # If the area changed dramatically (more than 30% shrinkage or 300% growth), use original  
+
+        # If the area changed dramatically (more than 30% shrinkage or 300% growth), use original
         if original_area > 0 and result_area > 0:
             area_ratio = result_area / original_area
             if area_ratio < 0.3 or area_ratio > 3.0:
                 return ring
-        
+
         # Check for triangular spikes and problematic artifacts
         very_acute_angle_count = 0
         triangular_spike_detected = False
-        
+
         for i in range(len(result_coords) - 1):  # -1 to exclude closing point
             p1 = result_coords[i - 1]
             p2 = result_coords[i]
             p3 = result_coords[(i + 1) % (len(result_coords) - 1)]
-            
+
             # Calculate angle at p2
             v1 = np.array([p1[0] - p2[0], p1[1] - p2[1]])
             v2 = np.array([p3[0] - p2[0], p3[1] - p2[1]])
-            
+
             v1_norm = np.linalg.norm(v1)
             v2_norm = np.linalg.norm(v2)
-            
+
             if v1_norm > 0 and v2_norm > 0:
                 cos_angle = np.dot(v1, v2) / (v1_norm * v2_norm)
                 cos_angle = np.clip(cos_angle, -1, 1)
                 angle = np.arccos(cos_angle)
-                
+
                 # Count very acute angles (< 20 degrees) - these are likely spikes
                 if angle < np.pi / 9:  # 20 degrees
                     very_acute_angle_count += 1
                     # If it's very acute with short sides, it's definitely a spike
                     if v1_norm < 5 or v2_norm < 5:
                         triangular_spike_detected = True
-        
+
         # Check for excessively long edges that might be artifacts
         edge_lengths = []
         for i in range(len(result_coords) - 1):
-            edge_len = np.sqrt((result_coords[i+1][0] - result_coords[i][0])**2 + 
-                             (result_coords[i+1][1] - result_coords[i][1])**2)
+            edge_len = np.sqrt(
+                (result_coords[i + 1][0] - result_coords[i][0]) ** 2
+                + (result_coords[i + 1][1] - result_coords[i][1]) ** 2
+            )
             edge_lengths.append(edge_len)
-        
+
         excessive_edge_detected = False
         if len(edge_lengths) > 0:
             avg_edge_length = np.mean(edge_lengths)
@@ -5749,7 +5751,7 @@ def orthogonalize(
             # Only reject if edge is extremely disproportionate (8x average)
             if max_edge_length > avg_edge_length * 8:
                 excessive_edge_detected = True
-        
+
         # Check for triangular artifacts by detecting spikes that extend beyond bounds
         # Calculate original bounds
         orig_xs = [p[0] for p in ring]
@@ -5758,30 +5760,34 @@ def orthogonalize(
         orig_min_y, orig_max_y = min(orig_ys), max(orig_ys)
         orig_width = orig_max_x - orig_min_x
         orig_height = orig_max_y - orig_min_y
-        
+
         # Calculate result bounds
         result_xs = [p[0] for p in result_coords]
         result_ys = [p[1] for p in result_coords]
         result_min_x, result_max_x = min(result_xs), max(result_xs)
         result_min_y, result_max_y = min(result_ys), max(result_ys)
-        
+
         # Stricter bounds checking to catch triangular artifacts
         bounds_extension_detected = False
         # More conservative: only allow 10% extension
         tolerance_x = max(orig_width * 0.1, 1.0)  # 10% tolerance, at least 1 unit
         tolerance_y = max(orig_height * 0.1, 1.0)  # 10% tolerance, at least 1 unit
-        
-        if (result_min_x < orig_min_x - tolerance_x or
-            result_max_x > orig_max_x + tolerance_x or 
-            result_min_y < orig_min_y - tolerance_y or
-            result_max_y > orig_max_y + tolerance_y):
+
+        if (
+            result_min_x < orig_min_x - tolerance_x
+            or result_max_x > orig_max_x + tolerance_x
+            or result_min_y < orig_min_y - tolerance_y
+            or result_max_y > orig_max_y + tolerance_y
+        ):
             bounds_extension_detected = True
-        
+
         # Reject if we detect triangular spikes, excessive edges, or bounds violations
-        if (triangular_spike_detected or 
-            very_acute_angle_count > 2 or  # Multiple very acute angles 
-            excessive_edge_detected or
-            bounds_extension_detected):  # Any significant bounds extension
+        if (
+            triangular_spike_detected
+            or very_acute_angle_count > 2  # Multiple very acute angles
+            or excessive_edge_detected
+            or bounds_extension_detected
+        ):  # Any significant bounds extension
             return ring
 
         # Convert back to a list and ensure it's closed
@@ -6010,10 +6016,10 @@ def orthogonalize(
                 first_center = np.array([ortho_list[0]["cx"], ortho_list[0]["cy"]])
                 last_center = np.array([ortho_list[-1]["cx"], ortho_list[-1]["cy"]])
                 center_distance = np.linalg.norm(first_center - last_center)
-                
+
                 # Get average segment length for comparison
                 avg_length = sum(seg["len"] for seg in ortho_list) / len(ortho_list)
-                
+
                 # Only merge if segments are close enough and it won't create degenerate shapes
                 if center_distance > avg_length * 1.5:
                     # Skip merging - segments are too far apart
@@ -6192,19 +6198,25 @@ def orthogonalize(
                 v2 = np.array([x4 - x3, y4 - y3])
                 v1_norm = np.linalg.norm(v1)
                 v2_norm = np.linalg.norm(v2)
-                
+
                 if v1_norm > 0 and v2_norm > 0:
                     cos_angle = np.dot(v1, v2) / (v1_norm * v2_norm)
                     cos_angle = np.clip(cos_angle, -1, 1)
                     angle = np.arccos(cos_angle)
-                    
+
                     # Check for very sharp angles that could create triangular artifacts
-                    is_sharp_angle = angle < np.pi / 6 or angle > 5 * np.pi / 6  # <30° or >150°
+                    is_sharp_angle = (
+                        angle < np.pi / 6 or angle > 5 * np.pi / 6
+                    )  # <30° or >150°
                 else:
                     is_sharp_angle = False
 
                 # Determine whether to use intersection or segment endpoint
-                if (dist_to_seg1 > max_len * 0.5 or dist_to_seg2 > max_len * 0.5 or is_sharp_angle):
+                if (
+                    dist_to_seg1 > max_len * 0.5
+                    or dist_to_seg2 > max_len * 0.5
+                    or is_sharp_angle
+                ):
                     # Use a more conservative approach for problematic intersections
                     # Use the closer endpoint between segments
                     dist_x2_to_seg2 = min(
@@ -6215,7 +6227,7 @@ def orthogonalize(
                         np.sqrt((x3 - x1) ** 2 + (y3 - y1) ** 2),
                         np.sqrt((x3 - x2) ** 2 + (y3 - y2) ** 2),
                     )
-                    
+
                     if dist_x2_to_seg2 <= dist_x3_to_seg1:
                         ring.append([x2, y2])
                     else:
@@ -6253,7 +6265,7 @@ def orthogonalize(
             v2 = np.array([x4 - x3, y4 - y3])
             v1_norm = np.linalg.norm(v1)
             v2_norm = np.linalg.norm(v2)
-            
+
             if v1_norm > 0 and v2_norm > 0:
                 cos_angle = np.dot(v1, v2) / (v1_norm * v2_norm)
                 cos_angle = np.clip(cos_angle, -1, 1)
@@ -6262,7 +6274,11 @@ def orthogonalize(
             else:
                 is_sharp_angle = False
 
-            if (dist_to_seg1 > max_len * 0.5 or dist_to_seg2 > max_len * 0.5 or is_sharp_angle):
+            if (
+                dist_to_seg1 > max_len * 0.5
+                or dist_to_seg2 > max_len * 0.5
+                or is_sharp_angle
+            ):
                 # Use conservative approach for closing segment
                 dist_x2_to_seg2 = min(
                     np.sqrt((x2 - x3) ** 2 + (y2 - y3) ** 2),
@@ -6272,7 +6288,7 @@ def orthogonalize(
                     np.sqrt((x3 - x1) ** 2 + (y3 - y1) ** 2),
                     np.sqrt((x3 - x2) ** 2 + (y3 - y2) ** 2),
                 )
-                
+
                 if dist_x2_to_seg2 <= dist_x3_to_seg1:
                     ring.append([x2, y2])
                 else:
