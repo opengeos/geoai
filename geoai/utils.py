@@ -157,7 +157,8 @@ def view_image(
     image: Union[np.ndarray, torch.Tensor],
     transpose: bool = False,
     bdx: Optional[int] = None,
-    scale_factor: float = 1.0,
+    clip_percentiles: Optional[Tuple[float, float]] = (2, 98),
+    gamma: Optional[float] = None,
     figsize: Tuple[int, int] = (10, 5),
     axis_off: bool = True,
     title: Optional[str] = None,
@@ -196,8 +197,14 @@ def view_image(
     if len(image.shape) > 2 and image.shape[2] > 3:
         image = image[:, :, 0:3]
 
-    if scale_factor != 1.0:
-        image = np.clip(image * scale_factor, 0, 1)
+    if clip_percentiles is not None:
+        p_low, p_high = clip_percentiles
+        lower = np.percentile(image, p_low)
+        upper = np.percentile(image, p_high)
+        image = np.clip((image - lower) / (upper - lower), 0, 1)
+
+    if gamma is not None:
+        image = np.power(image, gamma)
 
     plt.imshow(image, **kwargs)
     if axis_off:
