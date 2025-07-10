@@ -186,7 +186,7 @@ def view_image(
     elif isinstance(image, str):
         image = rasterio.open(image).read().transpose(1, 2, 0)
 
-    plt.figure(figsize=figsize)
+    ax = plt.figure(figsize=figsize)
 
     if transpose:
         image = image.transpose(1, 2, 0)
@@ -213,6 +213,8 @@ def view_image(
         plt.title(title)
     plt.show()
     plt.close()
+
+    return ax
 
 
 def plot_images(
