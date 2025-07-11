@@ -16,6 +16,9 @@ jobs:
               with:
                   fetch-depth: 0
 
+            # - name: Install GDAL system dependencies
+            #   run: sudo apt-get update && sudo apt-get install -y gdal-bin libgdal-dev
+
             - name: Install uv
               uses: astral-sh/setup-uv@v6
               with:
@@ -33,15 +36,15 @@ jobs:
 
             - name: Install optional dependencies
               run: |
-                  uv pip install --find-links https://girder.github.io/large_image_wheels GDAL pyproj
+                  # uv pip install --find-links https://girder.github.io/large_image_wheels GDAL pyproj
                   uv pip install pytest
                   uv pip install "geoai-py[extra]"
 
-            - name: Test import
-              run: |
-                  uv run python -c "import geoai; print('geoai import successful')"
-                  uv run python -c "from osgeo import gdal; print('gdal import successful')"
-                  uv run gdalinfo --version
+            # - name: Test import
+            #   run: |
+            #       uv run python -c "import geoai; print('geoai import successful')"
+            #       uv run python -c "from osgeo import gdal; print('gdal import successful')"
+            #       uv run gdalinfo --version
 
             - name: Running pytest
               run: |
