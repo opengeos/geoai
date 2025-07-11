@@ -750,6 +750,15 @@ def train_MaskRCNN_model(
     start_epoch = 0
     best_iou = 0
 
+    # Initialize training history
+    training_history = {
+        "train_loss": [],
+        "val_loss": [],
+        "val_iou": [],
+        "epochs": [],
+        "lr": [],
+    }
+
     # Load pretrained model if provided
     if pretrained_model_path:
         if not os.path.exists(pretrained_model_path):
@@ -800,6 +809,13 @@ def train_MaskRCNN_model(
         # Evaluate
         eval_metrics = evaluate(model, val_loader, device)
 
+        # Record training history
+        training_history["train_loss"].append(train_loss)
+        training_history["val_loss"].append(eval_metrics["loss"])
+        training_history["val_iou"].append(eval_metrics["IoU"])
+        training_history["epochs"].append(epoch + 1)
+        training_history["lr"].append(optimizer.param_groups[0]["lr"])
+
         # Print metrics
         print(
             f"Epoch {epoch+1}/{num_epochs}: Train Loss: {train_loss:.4f}, Val Loss: {eval_metrics['loss']:.4f}, Val IoU: {eval_metrics['IoU']:.4f}"
@@ -811,33 +827,11 @@ def train_MaskRCNN_model(
             print(f"Saving best model with IoU: {best_iou:.4f}")
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
 
-        # Save checkpoint every 10 epochs
-        if (epoch + 1) % 10 == 0 or epoch == num_epochs - 1:
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "scheduler_state_dict": lr_scheduler.state_dict(),
-                    "best_iou": best_iou,
-                },
-                os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}.pth"),
-            )
-
     # Save final model
     torch.save(model.state_dict(), os.path.join(output_dir, "final_model.pth"))
 
-    # Save full checkpoint of final state
-    torch.save(
-        {
-            "epoch": num_epochs - 1,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "scheduler_state_dict": lr_scheduler.state_dict(),
-            "best_iou": best_iou,
-        },
-        os.path.join(output_dir, "final_checkpoint.pth"),
-    )
+    # Save training history
+    torch.save(training_history, os.path.join(output_dir, "training_history.pth"))
 
     # Load best model for evaluation and visualization
     model.load_state_dict(torch.load(os.path.join(output_dir, "best_model.pth")))
@@ -1097,6 +1091,237 @@ def inference_on_geotiff(
             dst.write(mask, 1)
 
         print(f"Saved prediction to {output_path}")
+
+        return output_path, inference_time
+
+
+def instance_segmentation_inference_on_geotiff(
+    model,
+    geotiff_path,
+    output_path,
+    window_size=512,
+    overlap=256,
+    confidence_threshold=0.5,
+    batch_size=4,
+    num_channels=3,
+    device=None,
+    **kwargs,
+):
+    """
+    Perform instance segmentation inference on a large GeoTIFF using a sliding window approach.
+
+    This function collects all detections first, then applies non-maximum suppression
+    to handle overlapping detections from different windows, preventing artifacts.
+
+    Args:
+        model (torch.nn.Module): Trained model for inference.
+        geotiff_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output instance mask GeoTIFF.
+        window_size (int): Size of sliding window for inference.
+        overlap (int): Overlap between adjacent windows.
+        confidence_threshold (float): Confidence threshold for predictions (0-1).
+        batch_size (int): Batch size for inference.
+        num_channels (int): Number of channels to use from the input image.
+        device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
+        **kwargs: Additional arguments.
+
+    Returns:
+        tuple: Tuple containing output path and inference time in seconds.
+    """
+    if device is None:
+        device = get_device()
+
+    # Put model in evaluation mode
+    model.to(device)
+    model.eval()
+
+    # Open the GeoTIFF
+    with rasterio.open(geotiff_path) as src:
+        # Read metadata
+        meta = src.meta
+        height = src.height
+        width = src.width
+
+        # Update metadata for output raster
+        out_meta = meta.copy()
+        out_meta.update(
+            {"count": 1, "dtype": "uint16"}  # uint16 to support many instances
+        )
+
+        # Store all detections globally for NMS
+        all_detections = []
+
+        # Calculate the number of windows needed to cover the entire image
+        steps_y = math.ceil((height - overlap) / (window_size - overlap))
+        steps_x = math.ceil((width - overlap) / (window_size - overlap))
+
+        # Ensure we cover the entire image
+        last_y = height - window_size
+        last_x = width - window_size
+
+        total_windows = steps_y * steps_x
+        print(
+            f"Processing {total_windows} windows with size {window_size}x{window_size} and overlap {overlap}..."
+        )
+
+        # Create progress bar
+        pbar = tqdm(total=total_windows)
+
+        # Process in batches
+        batch_inputs = []
+        batch_positions = []
+        batch_count = 0
+
+        start_time = time.time()
+
+        # Slide window over the image
+        for i in range(steps_y + 1):  # +1 to ensure we reach the edge
+            y = min(i * (window_size - overlap), last_y)
+            y = max(0, y)  # Prevent negative indices
+
+            if y > last_y and i > 0:  # Skip if we've already covered the entire height
+                continue
+
+            for j in range(steps_x + 1):  # +1 to ensure we reach the edge
+                x = min(j * (window_size - overlap), last_x)
+                x = max(0, x)  # Prevent negative indices
+
+                if (
+                    x > last_x and j > 0
+                ):  # Skip if we've already covered the entire width
+                    continue
+
+                # Read window
+                window = src.read(window=Window(x, y, window_size, window_size))
+
+                # Check if window is valid
+                if window.shape[1] == 0 or window.shape[2] == 0:
+                    continue
+
+                # Handle edge cases where window might be smaller than expected
+                actual_height, actual_width = window.shape[1], window.shape[2]
+
+                # Convert to [C, H, W] format and normalize
+                image = window.astype(np.float32) / 255.0
+
+                # Handle different number of channels
+                if image.shape[0] > num_channels:
+                    image = image[:num_channels]
+                elif image.shape[0] < num_channels:
+                    # Pad with zeros if less than expected channels
+                    padded = np.zeros(
+                        (num_channels, image.shape[1], image.shape[2]), dtype=np.float32
+                    )
+                    padded[: image.shape[0]] = image
+                    image = padded
+
+                # Convert to tensor
+                image_tensor = torch.tensor(image, device=device)
+
+                # Add to batch
+                batch_inputs.append(image_tensor)
+                batch_positions.append((y, x, actual_height, actual_width))
+                batch_count += 1
+
+                # Process batch when it reaches the batch size or at the end
+                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                    # Forward pass
+                    with torch.no_grad():
+                        outputs = model(batch_inputs)
+
+                    # Process each output in the batch
+                    for idx, output in enumerate(outputs):
+                        y_pos, x_pos, h, w = batch_positions[idx]
+
+                        # Process each detected instance
+                        if len(output["scores"]) > 0:
+                            # Get instances that meet confidence threshold
+                            keep = output["scores"] > confidence_threshold
+                            masks = output["masks"][keep].squeeze(1)
+                            scores = output["scores"][keep]
+                            boxes = output["boxes"][keep]
+
+                            # Convert to global coordinates and store
+                            for k in range(len(masks)):
+                                mask = masks[k].cpu().numpy() > 0.5
+                                score = scores[k].cpu().item()
+                                box = boxes[k].cpu().numpy()
+
+                                # Convert box to global coordinates
+                                global_box = [
+                                    box[0] + x_pos,
+                                    box[1] + y_pos,
+                                    box[2] + x_pos,
+                                    box[3] + y_pos,
+                                ]
+
+                                # Create global mask
+                                global_mask = np.zeros((height, width), dtype=bool)
+                                global_mask[y_pos : y_pos + h, x_pos : x_pos + w] = mask
+
+                                all_detections.append(
+                                    {
+                                        "mask": global_mask,
+                                        "score": score,
+                                        "box": global_box,
+                                    }
+                                )
+
+                    # Reset batch
+                    batch_inputs = []
+                    batch_positions = []
+                    batch_count = 0
+
+                    # Update progress bar
+                    pbar.update(len(outputs))
+
+        # Close progress bar
+        pbar.close()
+
+        print(f"Collected {len(all_detections)} detections before NMS")
+
+        # Apply Non-Maximum Suppression to handle overlapping detections
+        if len(all_detections) > 0:
+            # Convert to tensors for NMS
+            boxes = torch.tensor([det["box"] for det in all_detections])
+            scores = torch.tensor([det["score"] for det in all_detections])
+
+            # Apply NMS with IoU threshold
+            nms_threshold = 0.3  # IoU threshold for NMS
+            keep_indices = torchvision.ops.nms(boxes, scores, nms_threshold)
+
+            # Keep only the selected detections
+            final_detections = [all_detections[i] for i in keep_indices]
+            print(f"After NMS: {len(final_detections)} detections")
+
+            # Create final instance mask
+            instance_mask = np.zeros((height, width), dtype=np.uint16)
+
+            # Sort by score (highest first) for consistent ordering
+            final_detections.sort(key=lambda x: x["score"], reverse=True)
+
+            # Assign unique IDs to each detection
+            for instance_id, detection in enumerate(final_detections, 1):
+                mask = detection["mask"]
+                # Only assign to pixels that are not already assigned
+                available_pixels = (instance_mask == 0) & mask
+                instance_mask[available_pixels] = instance_id
+        else:
+            # No detections found
+            instance_mask = np.zeros((height, width), dtype=np.uint16)
+
+        # Record time
+        inference_time = time.time() - start_time
+        print(f"Instance segmentation completed in {inference_time:.2f} seconds")
+        print(
+            f"Final instances: {len(final_detections) if len(all_detections) > 0 else 0}"
+        )
+
+        # Save output
+        with rasterio.open(output_path, "w", **out_meta) as dst:
+            dst.write(instance_mask, 1)
+
+        print(f"Saved instance segmentation to {output_path}")
 
         return output_path, inference_time
 
@@ -3064,6 +3289,223 @@ def semantic_segmentation_batch(
                 )
         except Exception as e:
             print(f"Error processing {input_path}: {str(e)}")
+            continue
+
+    print(f"Batch processing completed. Results saved to {output_dir}")
+
+
+def train_instance_segmentation_model(
+    images_dir,
+    labels_dir,
+    output_dir,
+    num_classes=2,
+    num_channels=3,
+    batch_size=4,
+    num_epochs=10,
+    learning_rate=0.005,
+    seed=42,
+    val_split=0.2,
+    visualize=False,
+    device=None,
+    verbose=True,
+    **kwargs,
+):
+    """
+    Train an instance segmentation model using Mask R-CNN.
+
+    This is a wrapper function for train_MaskRCNN_model with clearer naming.
+
+    Args:
+        images_dir (str): Directory containing image GeoTIFF files.
+        labels_dir (str): Directory containing label GeoTIFF files.
+        output_dir (str): Directory to save model checkpoints and results.
+        num_classes (int): Number of classes (including background). Defaults to 2.
+        num_channels (int): Number of input channels. Defaults to 3.
+        batch_size (int): Batch size for training. Defaults to 4.
+        num_epochs (int): Number of training epochs. Defaults to 10.
+        learning_rate (float): Initial learning rate. Defaults to 0.005.
+        seed (int): Random seed for reproducibility. Defaults to 42.
+        val_split (float): Fraction of data to use for validation (0-1). Defaults to 0.2.
+        visualize (bool): Whether to generate visualizations. Defaults to False.
+        device (torch.device): Device to train on. If None, uses CUDA if available.
+        verbose (bool): If True, prints detailed training progress. Defaults to True.
+        **kwargs: Additional arguments passed to train_MaskRCNN_model.
+
+    Returns:
+        None: Model weights are saved to output_dir.
+    """
+    # Create model with the specified number of classes
+    model = get_instance_segmentation_model(
+        num_classes=num_classes, num_channels=num_channels, pretrained=True
+    )
+
+    return train_MaskRCNN_model(
+        images_dir=images_dir,
+        labels_dir=labels_dir,
+        output_dir=output_dir,
+        num_channels=num_channels,
+        model=model,
+        batch_size=batch_size,
+        num_epochs=num_epochs,
+        learning_rate=learning_rate,
+        seed=seed,
+        val_split=val_split,
+        visualize=visualize,
+        device=device,
+        verbose=verbose,
+        **kwargs,
+    )
+
+
+def instance_segmentation(
+    input_path,
+    output_path,
+    model_path,
+    window_size=512,
+    overlap=256,
+    confidence_threshold=0.5,
+    batch_size=4,
+    num_channels=3,
+    num_classes=2,
+    device=None,
+    **kwargs,
+):
+    """
+    Perform instance segmentation on a GeoTIFF using a pre-trained Mask R-CNN model.
+
+    This is a wrapper function for object_detection with clearer naming.
+
+    Args:
+        input_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output mask GeoTIFF.
+        model_path (str): Path to trained model weights.
+        window_size (int): Size of sliding window for inference. Defaults to 512.
+        overlap (int): Overlap between adjacent windows. Defaults to 256.
+        confidence_threshold (float): Confidence threshold for predictions (0-1). Defaults to 0.5.
+        batch_size (int): Batch size for inference. Defaults to 4.
+        num_channels (int): Number of channels in the input image and model. Defaults to 3.
+        num_classes (int): Number of classes (including background). Defaults to 2.
+        device (torch.device): Device to run inference on. If None, uses CUDA if available.
+        **kwargs: Additional arguments passed to object_detection.
+
+    Returns:
+        None: Output mask is saved to output_path.
+    """
+    # Create model with the specified number of classes
+    model = get_instance_segmentation_model(
+        num_classes=num_classes, num_channels=num_channels, pretrained=True
+    )
+
+    # Load the trained model
+    if device is None:
+        device = get_device()
+
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.to(device)
+
+    # Use the proper instance segmentation inference function
+    return instance_segmentation_inference_on_geotiff(
+        model=model,
+        geotiff_path=input_path,
+        output_path=output_path,
+        window_size=window_size,
+        overlap=overlap,
+        confidence_threshold=confidence_threshold,
+        batch_size=batch_size,
+        num_channels=num_channels,
+        device=device,
+        **kwargs,
+    )
+
+
+def instance_segmentation_batch(
+    input_dir,
+    output_dir,
+    model_path,
+    window_size=512,
+    overlap=256,
+    confidence_threshold=0.5,
+    batch_size=4,
+    num_channels=3,
+    num_classes=2,
+    device=None,
+    **kwargs,
+):
+    """
+    Perform instance segmentation on multiple GeoTIFF files using a pre-trained Mask R-CNN model.
+
+    This is a wrapper function for object_detection_batch with clearer naming.
+
+    Args:
+        input_dir (str): Directory containing input GeoTIFF files.
+        output_dir (str): Directory to save output mask GeoTIFF files.
+        model_path (str): Path to trained model weights.
+        window_size (int): Size of sliding window for inference. Defaults to 512.
+        overlap (int): Overlap between adjacent windows. Defaults to 256.
+        confidence_threshold (float): Confidence threshold for predictions (0-1). Defaults to 0.5.
+        batch_size (int): Batch size for inference. Defaults to 4.
+        num_channels (int): Number of channels in the input image and model. Defaults to 3.
+        num_classes (int): Number of classes (including background). Defaults to 2.
+        device (torch.device): Device to run inference on. If None, uses CUDA if available.
+        **kwargs: Additional arguments passed to object_detection_batch.
+
+    Returns:
+        None: Output masks are saved to output_dir.
+    """
+    # Create model with the specified number of classes
+    model = get_instance_segmentation_model(
+        num_classes=num_classes, num_channels=num_channels, pretrained=True
+    )
+
+    # Load the trained model
+    if device is None:
+        device = get_device()
+
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.to(device)
+
+    # Process all GeoTIFF files in the input directory
+    import glob
+
+    input_files = glob.glob(os.path.join(input_dir, "*.tif")) + glob.glob(
+        os.path.join(input_dir, "*.tiff")
+    )
+
+    if not input_files:
+        print(f"No GeoTIFF files found in {input_dir}")
+        return
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    print(f"Processing {len(input_files)} files...")
+
+    for input_file in input_files:
+        try:
+            # Generate output filename
+            base_name = os.path.splitext(os.path.basename(input_file))[0]
+            output_file = os.path.join(output_dir, f"{base_name}_instances.tif")
+
+            print(f"Processing {input_file}...")
+
+            # Run instance segmentation inference
+            instance_segmentation_inference_on_geotiff(
+                model=model,
+                geotiff_path=input_file,
+                output_path=output_file,
+                window_size=window_size,
+                overlap=overlap,
+                confidence_threshold=confidence_threshold,
+                batch_size=batch_size,
+                num_channels=num_channels,
+                device=device,
+                **kwargs,
+            )
+
+            print(f"Saved result to {output_file}")
+
+        except Exception as e:
+            print(f"Error processing {input_file}: {str(e)}")
             continue
 
     print(f"Batch processing completed. Results saved to {output_dir}")

@@ -7453,41 +7453,61 @@ def plot_performance_metrics(history_path, figsize=(15, 5), verbose=True):
     """
     history = torch.load(history_path)
 
+    # Handle different key naming conventions
+    train_loss_key = "train_losses" if "train_losses" in history else "train_loss"
+    val_loss_key = "val_losses" if "val_losses" in history else "val_loss"
+    val_iou_key = "val_ious" if "val_ious" in history else "val_iou"
+    val_dice_key = "val_dices" if "val_dices" in history else "val_dice"
+
+    # Determine number of subplots based on available metrics
+    has_dice = val_dice_key in history
+    n_plots = 3 if has_dice else 2
+    figsize = (15, 5) if has_dice else (10, 5)
+
     plt.figure(figsize=figsize)
 
-    plt.subplot(1, 3, 1)
-    plt.plot(history["train_losses"], label="Train Loss")
-    plt.plot(history["val_losses"], label="Val Loss")
+    # Plot loss
+    plt.subplot(1, n_plots, 1)
+    if train_loss_key in history:
+        plt.plot(history[train_loss_key], label="Train Loss")
+    if val_loss_key in history:
+        plt.plot(history[val_loss_key], label="Val Loss")
     plt.title("Loss")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
     plt.grid(True)
 
-    plt.subplot(1, 3, 2)
-    plt.plot(history["val_ious"], label="Val IoU")
+    # Plot IoU
+    plt.subplot(1, n_plots, 2)
+    if val_iou_key in history:
+        plt.plot(history[val_iou_key], label="Val IoU")
     plt.title("IoU Score")
     plt.xlabel("Epoch")
     plt.ylabel("IoU")
     plt.legend()
     plt.grid(True)
 
-    plt.subplot(1, 3, 3)
-    plt.plot(history["val_dices"], label="Val Dice")
-    plt.title("Dice Score")
-    plt.xlabel("Epoch")
-    plt.ylabel("Dice")
-    plt.legend()
-    plt.grid(True)
+    # Plot Dice if available
+    if has_dice:
+        plt.subplot(1, n_plots, 3)
+        plt.plot(history[val_dice_key], label="Val Dice")
+        plt.title("Dice Score")
+        plt.xlabel("Epoch")
+        plt.ylabel("Dice")
+        plt.legend()
+        plt.grid(True)
 
     plt.tight_layout()
     plt.show()
 
     if verbose:
-        print(f"Best IoU: {max(history['val_ious']):.4f}")
-        print(f"Best Dice: {max(history['val_dices']):.4f}")
-        print(f"Final IoU: {history['val_ious'][-1]:.4f}")
-        print(f"Final Dice: {history['val_dices'][-1]:.4f}")
+        if val_iou_key in history:
+            print(f"Best IoU: {max(history[val_iou_key]):.4f}")
+            print(f"Final IoU: {history[val_iou_key][-1]:.4f}")
+        if val_dice_key in history:
+            print(f"Best Dice: {max(history[val_dice_key]):.4f}")
+            print(f"Final Dice: {history[val_dice_key][-1]:.4f}")
 
 
 def get_device():
