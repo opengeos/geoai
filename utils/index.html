@@ -1347,6 +1347,29 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/instance_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Instance segmentation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -12808,17 +12831,17 @@ CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7493</span>
-<span class="normal">7494</span>
-<span class="normal">7495</span>
-<span class="normal">7496</span>
-<span class="normal">7497</span>
-<span class="normal">7498</span>
-<span class="normal">7499</span>
-<span class="normal">7500</span>
-<span class="normal">7501</span>
-<span class="normal">7502</span>
-<span class="normal">7503</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_device</span><span class="p">():</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7513</span>
+<span class="normal">7514</span>
+<span class="normal">7515</span>
+<span class="normal">7516</span>
+<span class="normal">7517</span>
+<span class="normal">7518</span>
+<span class="normal">7519</span>
+<span class="normal">7520</span>
+<span class="normal">7521</span>
+<span class="normal">7522</span>
+<span class="normal">7523</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_device</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns the best available device for deep learning in the order:</span>
 <span class="sd">    CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</span>
@@ -13250,18 +13273,18 @@ or None if the file cannot be opened</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7640</span>
-<span class="normal">7641</span>
-<span class="normal">7642</span>
-<span class="normal">7643</span>
-<span class="normal">7644</span>
-<span class="normal">7645</span>
-<span class="normal">7646</span>
-<span class="normal">7647</span>
-<span class="normal">7648</span>
-<span class="normal">7649</span>
-<span class="normal">7650</span>
-<span class="normal">7651</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_resolution</span><span class="p">(</span><span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7660</span>
+<span class="normal">7661</span>
+<span class="normal">7662</span>
+<span class="normal">7663</span>
+<span class="normal">7664</span>
+<span class="normal">7665</span>
+<span class="normal">7666</span>
+<span class="normal">7667</span>
+<span class="normal">7668</span>
+<span class="normal">7669</span>
+<span class="normal">7670</span>
+<span class="normal">7671</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_resolution</span><span class="p">(</span><span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get pixel resolution from the raster using rasterio.</span>
 
 <span class="sd">    Args:</span>
@@ -18574,7 +18597,27 @@ Credit to the torchgeo developers for the original implementation.</p>
 <span class="normal">7487</span>
 <span class="normal">7488</span>
 <span class="normal">7489</span>
-<span class="normal">7490</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_performance_metrics</span><span class="p">(</span><span class="n">history_path</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="normal">7490</span>
+<span class="normal">7491</span>
+<span class="normal">7492</span>
+<span class="normal">7493</span>
+<span class="normal">7494</span>
+<span class="normal">7495</span>
+<span class="normal">7496</span>
+<span class="normal">7497</span>
+<span class="normal">7498</span>
+<span class="normal">7499</span>
+<span class="normal">7500</span>
+<span class="normal">7501</span>
+<span class="normal">7502</span>
+<span class="normal">7503</span>
+<span class="normal">7504</span>
+<span class="normal">7505</span>
+<span class="normal">7506</span>
+<span class="normal">7507</span>
+<span class="normal">7508</span>
+<span class="normal">7509</span>
+<span class="normal">7510</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_performance_metrics</span><span class="p">(</span><span class="n">history_path</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Plot performance metrics from a history object.</span>
 
 <span class="sd">    Args:</span>
@@ -18584,41 +18627,61 @@ Credit to the torchgeo developers for the original implementation.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">history</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">history_path</span><span class="p">)</span>
 
+    <span class="c1"># Handle different key naming conventions</span>
+    <span class="n">train_loss_key</span> <span class="o">=</span> <span class="s2">&quot;train_losses&quot;</span> <span class="k">if</span> <span class="s2">&quot;train_losses&quot;</span> <span class="ow">in</span> <span class="n">history</span> <span class="k">else</span> <span class="s2">&quot;train_loss&quot;</span>
+    <span class="n">val_loss_key</span> <span class="o">=</span> <span class="s2">&quot;val_losses&quot;</span> <span class="k">if</span> <span class="s2">&quot;val_losses&quot;</span> <span class="ow">in</span> <span class="n">history</span> <span class="k">else</span> <span class="s2">&quot;val_loss&quot;</span>
+    <span class="n">val_iou_key</span> <span class="o">=</span> <span class="s2">&quot;val_ious&quot;</span> <span class="k">if</span> <span class="s2">&quot;val_ious&quot;</span> <span class="ow">in</span> <span class="n">history</span> <span class="k">else</span> <span class="s2">&quot;val_iou&quot;</span>
+    <span class="n">val_dice_key</span> <span class="o">=</span> <span class="s2">&quot;val_dices&quot;</span> <span class="k">if</span> <span class="s2">&quot;val_dices&quot;</span> <span class="ow">in</span> <span class="n">history</span> <span class="k">else</span> <span class="s2">&quot;val_dice&quot;</span>
+
+    <span class="c1"># Determine number of subplots based on available metrics</span>
+    <span class="n">has_dice</span> <span class="o">=</span> <span class="n">val_dice_key</span> <span class="ow">in</span> <span class="n">history</span>
+    <span class="n">n_plots</span> <span class="o">=</span> <span class="mi">3</span> <span class="k">if</span> <span class="n">has_dice</span> <span class="k">else</span> <span class="mi">2</span>
+    <span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="k">if</span> <span class="n">has_dice</span> <span class="k">else</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+
     <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span>
 
-    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="s2">&quot;train_losses&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Train Loss&quot;</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="s2">&quot;val_losses&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Val Loss&quot;</span><span class="p">)</span>
+    <span class="c1"># Plot loss</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_plots</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">train_loss_key</span> <span class="ow">in</span> <span class="n">history</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="n">train_loss_key</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Train Loss&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">val_loss_key</span> <span class="ow">in</span> <span class="n">history</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="n">val_loss_key</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Val Loss&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Loss&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Epoch&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Loss&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="s2">&quot;val_ious&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Val IoU&quot;</span><span class="p">)</span>
+    <span class="c1"># Plot IoU</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_plots</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">val_iou_key</span> <span class="ow">in</span> <span class="n">history</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="n">val_iou_key</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Val IoU&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;IoU Score&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Epoch&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;IoU&quot;</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="s2">&quot;val_dices&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Val Dice&quot;</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Dice Score&quot;</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Epoch&quot;</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Dice&quot;</span><span class="p">)</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Plot Dice if available</span>
+    <span class="k">if</span> <span class="n">has_dice</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_plots</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="n">val_dice_key</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Val Dice&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Dice Score&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Epoch&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Dice&quot;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best IoU: </span><span class="si">{</span><span class="nb">max</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="s1">&#39;val_ious&#39;</span><span class="p">])</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best Dice: </span><span class="si">{</span><span class="nb">max</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="s1">&#39;val_dices&#39;</span><span class="p">])</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final IoU: </span><span class="si">{</span><span class="n">history</span><span class="p">[</span><span class="s1">&#39;val_ious&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final Dice: </span><span class="si">{</span><span class="n">history</span><span class="p">[</span><span class="s1">&#39;val_dices&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">val_iou_key</span> <span class="ow">in</span> <span class="n">history</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best IoU: </span><span class="si">{</span><span class="nb">max</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="n">val_iou_key</span><span class="p">])</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final IoU: </span><span class="si">{</span><span class="n">history</span><span class="p">[</span><span class="n">val_iou_key</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">val_dice_key</span> <span class="ow">in</span> <span class="n">history</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best Dice: </span><span class="si">{</span><span class="nb">max</span><span class="p">(</span><span class="n">history</span><span class="p">[</span><span class="n">val_dice_key</span><span class="p">])</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final Dice: </span><span class="si">{</span><span class="n">history</span><span class="p">[</span><span class="n">val_dice_key</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -18876,27 +18939,7 @@ The generated matplotlib figure object.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7506</span>
-<span class="normal">7507</span>
-<span class="normal">7508</span>
-<span class="normal">7509</span>
-<span class="normal">7510</span>
-<span class="normal">7511</span>
-<span class="normal">7512</span>
-<span class="normal">7513</span>
-<span class="normal">7514</span>
-<span class="normal">7515</span>
-<span class="normal">7516</span>
-<span class="normal">7517</span>
-<span class="normal">7518</span>
-<span class="normal">7519</span>
-<span class="normal">7520</span>
-<span class="normal">7521</span>
-<span class="normal">7522</span>
-<span class="normal">7523</span>
-<span class="normal">7524</span>
-<span class="normal">7525</span>
-<span class="normal">7526</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7526</span>
 <span class="normal">7527</span>
 <span class="normal">7528</span>
 <span class="normal">7529</span>
@@ -19007,7 +19050,27 @@ The generated matplotlib figure object.</p>
 <span class="normal">7634</span>
 <span class="normal">7635</span>
 <span class="normal">7636</span>
-<span class="normal">7637</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction_comparison</span><span class="p">(</span>
+<span class="normal">7637</span>
+<span class="normal">7638</span>
+<span class="normal">7639</span>
+<span class="normal">7640</span>
+<span class="normal">7641</span>
+<span class="normal">7642</span>
+<span class="normal">7643</span>
+<span class="normal">7644</span>
+<span class="normal">7645</span>
+<span class="normal">7646</span>
+<span class="normal">7647</span>
+<span class="normal">7648</span>
+<span class="normal">7649</span>
+<span class="normal">7650</span>
+<span class="normal">7651</span>
+<span class="normal">7652</span>
+<span class="normal">7653</span>
+<span class="normal">7654</span>
+<span class="normal">7655</span>
+<span class="normal">7656</span>
+<span class="normal">7657</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction_comparison</span><span class="p">(</span>
     <span class="n">original_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">],</span>
     <span class="n">prediction_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">],</span>
     <span class="n">ground_truth_image</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -23210,27 +23273,7 @@ not saved. Defaults to None.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7654</span>
-<span class="normal">7655</span>
-<span class="normal">7656</span>
-<span class="normal">7657</span>
-<span class="normal">7658</span>
-<span class="normal">7659</span>
-<span class="normal">7660</span>
-<span class="normal">7661</span>
-<span class="normal">7662</span>
-<span class="normal">7663</span>
-<span class="normal">7664</span>
-<span class="normal">7665</span>
-<span class="normal">7666</span>
-<span class="normal">7667</span>
-<span class="normal">7668</span>
-<span class="normal">7669</span>
-<span class="normal">7670</span>
-<span class="normal">7671</span>
-<span class="normal">7672</span>
-<span class="normal">7673</span>
-<span class="normal">7674</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7674</span>
 <span class="normal">7675</span>
 <span class="normal">7676</span>
 <span class="normal">7677</span>
@@ -23282,7 +23325,27 @@ not saved. Defaults to None.</p>
 <span class="normal">7723</span>
 <span class="normal">7724</span>
 <span class="normal">7725</span>
-<span class="normal">7726</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
+<span class="normal">7726</span>
+<span class="normal">7727</span>
+<span class="normal">7728</span>
+<span class="normal">7729</span>
+<span class="normal">7730</span>
+<span class="normal">7731</span>
+<span class="normal">7732</span>
+<span class="normal">7733</span>
+<span class="normal">7734</span>
+<span class="normal">7735</span>
+<span class="normal">7736</span>
+<span class="normal">7737</span>
+<span class="normal">7738</span>
+<span class="normal">7739</span>
+<span class="normal">7740</span>
+<span class="normal">7741</span>
+<span class="normal">7742</span>
+<span class="normal">7743</span>
+<span class="normal">7744</span>
+<span class="normal">7745</span>
+<span class="normal">7746</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
     <span class="n">input_files</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">resolution</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
