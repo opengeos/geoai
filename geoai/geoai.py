@@ -32,6 +32,11 @@ from .train import (
     train_segmentation_model,
     semantic_segmentation,
     semantic_segmentation_batch,
+    train_instance_segmentation_model,
+    instance_segmentation,
+    instance_segmentation_batch,
+    get_instance_segmentation_model,
+    instance_segmentation_inference_on_geotiff,
 )
 from .utils import *
 

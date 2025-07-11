@@ -140,6 +140,7 @@ nav:
           - examples/water_detection_s2.ipynb
           - examples/batch_segmentation.ipynb
           - examples/building_detection_lidar.ipynb
+          - examples/instance_segmentation.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
