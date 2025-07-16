@@ -3391,10 +3391,7 @@ auto-detected from the first image.</p>
 
               <details class="quote">
                 <summary>Source code in <code>geoai/train.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1725</span>
-<span class="normal">1726</span>
-<span class="normal">1727</span>
-<span class="normal">1728</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1728</span>
 <span class="normal">1729</span>
 <span class="normal">1730</span>
 <span class="normal">1731</span>
@@ -3402,7 +3399,10 @@ auto-detected from the first image.</p>
 <span class="normal">1733</span>
 <span class="normal">1734</span>
 <span class="normal">1735</span>
-<span class="normal">1736</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticRandomHorizontalFlip</span><span class="p">:</span>
+<span class="normal">1736</span>
+<span class="normal">1737</span>
+<span class="normal">1738</span>
+<span class="normal">1739</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticRandomHorizontalFlip</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Random horizontal flip transform for semantic segmentation.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prob</span><span class="o">=</span><span class="mf">0.5</span><span class="p">):</span>
@@ -3463,10 +3463,7 @@ auto-detected from the first image.</p>
 
               <details class="quote">
                 <summary>Source code in <code>geoai/train.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1487</span>
-<span class="normal">1488</span>
-<span class="normal">1489</span>
-<span class="normal">1490</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1490</span>
 <span class="normal">1491</span>
 <span class="normal">1492</span>
 <span class="normal">1493</span>
@@ -3679,7 +3676,10 @@ auto-detected from the first image.</p>
 <span class="normal">1700</span>
 <span class="normal">1701</span>
 <span class="normal">1702</span>
-<span class="normal">1703</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticSegmentationDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+<span class="normal">1703</span>
+<span class="normal">1704</span>
+<span class="normal">1705</span>
+<span class="normal">1706</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticSegmentationDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Dataset for semantic segmentation from GeoTIFF, PNG, JPG, and other image formats.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -4058,10 +4058,7 @@ If None, images will keep their original sizes.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1490</span>
-<span class="normal">1491</span>
-<span class="normal">1492</span>
-<span class="normal">1493</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1493</span>
 <span class="normal">1494</span>
 <span class="normal">1495</span>
 <span class="normal">1496</span>
@@ -4095,7 +4092,10 @@ If None, images will keep their original sizes.</p>
 <span class="normal">1524</span>
 <span class="normal">1525</span>
 <span class="normal">1526</span>
-<span class="normal">1527</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1527</span>
+<span class="normal">1528</span>
+<span class="normal">1529</span>
+<span class="normal">1530</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">image_paths</span><span class="p">,</span>
     <span class="n">label_paths</span><span class="p">,</span>
@@ -4171,11 +4171,11 @@ If None, images will keep their original sizes.</p>
 
               <details class="quote">
                 <summary>Source code in <code>geoai/train.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1718</span>
-<span class="normal">1719</span>
-<span class="normal">1720</span>
-<span class="normal">1721</span>
-<span class="normal">1722</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticToTensor</span><span class="p">:</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1721</span>
+<span class="normal">1722</span>
+<span class="normal">1723</span>
+<span class="normal">1724</span>
+<span class="normal">1725</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticToTensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert numpy.ndarray to tensor for semantic segmentation.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">,</span> <span class="n">mask</span><span class="p">):</span>
@@ -4227,16 +4227,16 @@ If None, images will keep their original sizes.</p>
 
               <details class="quote">
                 <summary>Source code in <code>geoai/train.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1706</span>
-<span class="normal">1707</span>
-<span class="normal">1708</span>
-<span class="normal">1709</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1709</span>
 <span class="normal">1710</span>
 <span class="normal">1711</span>
 <span class="normal">1712</span>
 <span class="normal">1713</span>
 <span class="normal">1714</span>
-<span class="normal">1715</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticTransforms</span><span class="p">:</span>
+<span class="normal">1715</span>
+<span class="normal">1716</span>
+<span class="normal">1717</span>
+<span class="normal">1718</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SemanticTransforms</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom transforms for semantic segmentation.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">transforms</span><span class="p">):</span>
@@ -4673,10 +4673,7 @@ If None, images will keep their original sizes.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1855</span>
-<span class="normal">1856</span>
-<span class="normal">1857</span>
-<span class="normal">1858</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1858</span>
 <span class="normal">1859</span>
 <span class="normal">1860</span>
 <span class="normal">1861</span>
@@ -4712,7 +4709,10 @@ If None, images will keep their original sizes.</p>
 <span class="normal">1891</span>
 <span class="normal">1892</span>
 <span class="normal">1893</span>
-<span class="normal">1894</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dice_coefficient</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">1894</span>
+<span class="normal">1895</span>
+<span class="normal">1896</span>
+<span class="normal">1897</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dice_coefficient</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate Dice coefficient for segmentation (binary or multi-class).</span>
 
@@ -5144,10 +5144,7 @@ If None, images will keep their original sizes.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1995</span>
-<span class="normal">1996</span>
-<span class="normal">1997</span>
-<span class="normal">1998</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1998</span>
 <span class="normal">1999</span>
 <span class="normal">2000</span>
 <span class="normal">2001</span>
@@ -5188,7 +5185,10 @@ If None, images will keep their original sizes.</p>
 <span class="normal">2036</span>
 <span class="normal">2037</span>
 <span class="normal">2038</span>
-<span class="normal">2039</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_semantic</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">criterion</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="normal">2039</span>
+<span class="normal">2040</span>
+<span class="normal">2041</span>
+<span class="normal">2042</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_semantic</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">criterion</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Evaluate the semantic segmentation model on the validation set.</span>
 
@@ -5617,10 +5617,7 @@ If None, images will keep their original sizes.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1739</span>
-<span class="normal">1740</span>
-<span class="normal">1741</span>
-<span class="normal">1742</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1742</span>
 <span class="normal">1743</span>
 <span class="normal">1744</span>
 <span class="normal">1745</span>
@@ -5633,7 +5630,10 @@ If None, images will keep their original sizes.</p>
 <span class="normal">1752</span>
 <span class="normal">1753</span>
 <span class="normal">1754</span>
-<span class="normal">1755</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_semantic_transform</span><span class="p">(</span><span class="n">train</span><span class="p">):</span>
+<span class="normal">1755</span>
+<span class="normal">1756</span>
+<span class="normal">1757</span>
+<span class="normal">1758</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_semantic_transform</span><span class="p">(</span><span class="n">train</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Get transforms for semantic segmentation data augmentation.</span>
 
@@ -5827,10 +5827,7 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1758</span>
-<span class="normal">1759</span>
-<span class="normal">1760</span>
-<span class="normal">1761</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1761</span>
 <span class="normal">1762</span>
 <span class="normal">1763</span>
 <span class="normal">1764</span>
@@ -5921,7 +5918,10 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 <span class="normal">1849</span>
 <span class="normal">1850</span>
 <span class="normal">1851</span>
-<span class="normal">1852</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_smp_model</span><span class="p">(</span>
+<span class="normal">1852</span>
+<span class="normal">1853</span>
+<span class="normal">1854</span>
+<span class="normal">1855</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_smp_model</span><span class="p">(</span>
     <span class="n">architecture</span><span class="o">=</span><span class="s2">&quot;unet&quot;</span><span class="p">,</span>
     <span class="n">encoder_name</span><span class="o">=</span><span class="s2">&quot;resnet34&quot;</span><span class="p">,</span>
     <span class="n">encoder_weights</span><span class="o">=</span><span class="s2">&quot;imagenet&quot;</span><span class="p">,</span>
@@ -6342,10 +6342,7 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 874</span>
-<span class="normal"> 875</span>
-<span class="normal"> 876</span>
-<span class="normal"> 877</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 877</span>
 <span class="normal"> 878</span>
 <span class="normal"> 879</span>
 <span class="normal"> 880</span>
@@ -6563,7 +6560,10 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 <span class="normal">1092</span>
 <span class="normal">1093</span>
 <span class="normal">1094</span>
-<span class="normal">1095</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inference_on_geotiff</span><span class="p">(</span>
+<span class="normal">1095</span>
+<span class="normal">1096</span>
+<span class="normal">1097</span>
+<span class="normal">1098</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inference_on_geotiff</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">geotiff_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">,</span>
@@ -7020,13 +7020,7 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3365</span>
-<span class="normal">3366</span>
-<span class="normal">3367</span>
-<span class="normal">3368</span>
-<span class="normal">3369</span>
-<span class="normal">3370</span>
-<span class="normal">3371</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3371</span>
 <span class="normal">3372</span>
 <span class="normal">3373</span>
 <span class="normal">3374</span>
@@ -7078,7 +7072,13 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 <span class="normal">3420</span>
 <span class="normal">3421</span>
 <span class="normal">3422</span>
-<span class="normal">3423</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">instance_segmentation</span><span class="p">(</span>
+<span class="normal">3423</span>
+<span class="normal">3424</span>
+<span class="normal">3425</span>
+<span class="normal">3426</span>
+<span class="normal">3427</span>
+<span class="normal">3428</span>
+<span class="normal">3429</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">instance_segmentation</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
@@ -7372,13 +7372,7 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3426</span>
-<span class="normal">3427</span>
-<span class="normal">3428</span>
-<span class="normal">3429</span>
-<span class="normal">3430</span>
-<span class="normal">3431</span>
-<span class="normal">3432</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3432</span>
 <span class="normal">3433</span>
 <span class="normal">3434</span>
 <span class="normal">3435</span>
@@ -7462,7 +7456,13 @@ segmentation-models-pytorch, making it future-proof for new model additions.</p>
 <span class="normal">3513</span>
 <span class="normal">3514</span>
 <span class="normal">3515</span>
-<span class="normal">3516</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">instance_segmentation_batch</span><span class="p">(</span>
+<span class="normal">3516</span>
+<span class="normal">3517</span>
+<span class="normal">3518</span>
+<span class="normal">3519</span>
+<span class="normal">3520</span>
+<span class="normal">3521</span>
+<span class="normal">3522</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">instance_segmentation_batch</span><span class="p">(</span>
     <span class="n">input_dir</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
@@ -7773,10 +7773,7 @@ to handle overlapping detections from different windows, preventing artifacts.</
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1098</span>
-<span class="normal">1099</span>
-<span class="normal">1100</span>
-<span class="normal">1101</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1101</span>
 <span class="normal">1102</span>
 <span class="normal">1103</span>
 <span class="normal">1104</span>
@@ -8001,7 +7998,10 @@ to handle overlapping detections from different windows, preventing artifacts.</
 <span class="normal">1323</span>
 <span class="normal">1324</span>
 <span class="normal">1325</span>
-<span class="normal">1326</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">instance_segmentation_inference_on_geotiff</span><span class="p">(</span>
+<span class="normal">1326</span>
+<span class="normal">1327</span>
+<span class="normal">1328</span>
+<span class="normal">1329</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">instance_segmentation_inference_on_geotiff</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">geotiff_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">,</span>
@@ -8353,10 +8353,7 @@ to handle overlapping detections from different windows, preventing artifacts.</
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1897</span>
-<span class="normal">1898</span>
-<span class="normal">1899</span>
-<span class="normal">1900</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1900</span>
 <span class="normal">1901</span>
 <span class="normal">1902</span>
 <span class="normal">1903</span>
@@ -8392,7 +8389,10 @@ to handle overlapping detections from different windows, preventing artifacts.</
 <span class="normal">1933</span>
 <span class="normal">1934</span>
 <span class="normal">1935</span>
-<span class="normal">1936</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">iou_coefficient</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">1936</span>
+<span class="normal">1937</span>
+<span class="normal">1938</span>
+<span class="normal">1939</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">iou_coefficient</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate IoU coefficient for segmentation (binary or multi-class).</span>
 
@@ -8682,10 +8682,7 @@ to handle overlapping detections from different windows, preventing artifacts.</
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1329</span>
-<span class="normal">1330</span>
-<span class="normal">1331</span>
-<span class="normal">1332</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1332</span>
 <span class="normal">1333</span>
 <span class="normal">1334</span>
 <span class="normal">1335</span>
@@ -8745,7 +8742,10 @@ to handle overlapping detections from different windows, preventing artifacts.</
 <span class="normal">1389</span>
 <span class="normal">1390</span>
 <span class="normal">1391</span>
-<span class="normal">1392</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">object_detection</span><span class="p">(</span>
+<span class="normal">1392</span>
+<span class="normal">1393</span>
+<span class="normal">1394</span>
+<span class="normal">1395</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">object_detection</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
@@ -9078,10 +9078,7 @@ If provided, must match the number of input files.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1395</span>
-<span class="normal">1396</span>
-<span class="normal">1397</span>
-<span class="normal">1398</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1398</span>
 <span class="normal">1399</span>
 <span class="normal">1400</span>
 <span class="normal">1401</span>
@@ -9167,7 +9164,10 @@ If provided, must match the number of input files.</p>
 <span class="normal">1481</span>
 <span class="normal">1482</span>
 <span class="normal">1483</span>
-<span class="normal">1484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">object_detection_batch</span><span class="p">(</span>
+<span class="normal">1484</span>
+<span class="normal">1485</span>
+<span class="normal">1486</span>
+<span class="normal">1487</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">object_detection_batch</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
@@ -9491,13 +9491,7 @@ If provided, must match the number of input files.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2528</span>
-<span class="normal">2529</span>
-<span class="normal">2530</span>
-<span class="normal">2531</span>
-<span class="normal">2532</span>
-<span class="normal">2533</span>
-<span class="normal">2534</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2534</span>
 <span class="normal">2535</span>
 <span class="normal">2536</span>
 <span class="normal">2537</span>
@@ -9715,7 +9709,13 @@ If provided, must match the number of input files.</p>
 <span class="normal">2749</span>
 <span class="normal">2750</span>
 <span class="normal">2751</span>
-<span class="normal">2752</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_inference_on_geotiff</span><span class="p">(</span>
+<span class="normal">2752</span>
+<span class="normal">2753</span>
+<span class="normal">2754</span>
+<span class="normal">2755</span>
+<span class="normal">2756</span>
+<span class="normal">2757</span>
+<span class="normal">2758</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_inference_on_geotiff</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">geotiff_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">,</span>
@@ -10190,13 +10190,7 @@ If provided, must match the number of input files.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2755</span>
-<span class="normal">2756</span>
-<span class="normal">2757</span>
-<span class="normal">2758</span>
-<span class="normal">2759</span>
-<span class="normal">2760</span>
-<span class="normal">2761</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2761</span>
 <span class="normal">2762</span>
 <span class="normal">2763</span>
 <span class="normal">2764</span>
@@ -10464,7 +10458,13 @@ If provided, must match the number of input files.</p>
 <span class="normal">3026</span>
 <span class="normal">3027</span>
 <span class="normal">3028</span>
-<span class="normal">3029</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_inference_on_image</span><span class="p">(</span>
+<span class="normal">3029</span>
+<span class="normal">3030</span>
+<span class="normal">3031</span>
+<span class="normal">3032</span>
+<span class="normal">3033</span>
+<span class="normal">3034</span>
+<span class="normal">3035</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_inference_on_image</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">image_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">,</span>
@@ -11007,13 +11007,7 @@ inference method for either GeoTIFF files or regular image formats (JPG, PNG, et
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3032</span>
-<span class="normal">3033</span>
-<span class="normal">3034</span>
-<span class="normal">3035</span>
-<span class="normal">3036</span>
-<span class="normal">3037</span>
-<span class="normal">3038</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3038</span>
 <span class="normal">3039</span>
 <span class="normal">3040</span>
 <span class="normal">3041</span>
@@ -11110,7 +11104,13 @@ inference method for either GeoTIFF files or regular image formats (JPG, PNG, et
 <span class="normal">3132</span>
 <span class="normal">3133</span>
 <span class="normal">3134</span>
-<span class="normal">3135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_segmentation</span><span class="p">(</span>
+<span class="normal">3135</span>
+<span class="normal">3136</span>
+<span class="normal">3137</span>
+<span class="normal">3138</span>
+<span class="normal">3139</span>
+<span class="normal">3140</span>
+<span class="normal">3141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_segmentation</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
@@ -11535,13 +11535,7 @@ inputs and "png" for other formats. If provided, must match the number of input 
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3138</span>
-<span class="normal">3139</span>
-<span class="normal">3140</span>
-<span class="normal">3141</span>
-<span class="normal">3142</span>
-<span class="normal">3143</span>
-<span class="normal">3144</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3144</span>
 <span class="normal">3145</span>
 <span class="normal">3146</span>
 <span class="normal">3147</span>
@@ -11696,7 +11690,13 @@ inputs and "png" for other formats. If provided, must match the number of input 
 <span class="normal">3296</span>
 <span class="normal">3297</span>
 <span class="normal">3298</span>
-<span class="normal">3299</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_segmentation_batch</span><span class="p">(</span>
+<span class="normal">3299</span>
+<span class="normal">3300</span>
+<span class="normal">3301</span>
+<span class="normal">3302</span>
+<span class="normal">3303</span>
+<span class="normal">3304</span>
+<span class="normal">3305</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">semantic_segmentation_batch</span><span class="p">(</span>
     <span class="n">input_dir</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">,</span>
@@ -11868,7 +11868,7 @@ inputs and "png" for other formats. If provided, must match the number of input 
 
 
 <h2 id="geoai.train.train_MaskRCNN_model" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">train_MaskRCNN_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">pretrained_model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">train_MaskRCNN_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">pretrained_model_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#geoai.train.train_MaskRCNN_model" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -12495,7 +12495,10 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p>
 <span class="normal">868</span>
 <span class="normal">869</span>
 <span class="normal">870</span>
-<span class="normal">871</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_MaskRCNN_model</span><span class="p">(</span>
+<span class="normal">871</span>
+<span class="normal">872</span>
+<span class="normal">873</span>
+<span class="normal">874</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_MaskRCNN_model</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">,</span>
@@ -12512,6 +12515,7 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p>
     <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
     <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Train and evaluate Mask R-CNN model for instance segmentation.</span>
@@ -12625,7 +12629,9 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p>
     <span class="c1"># Create data loaders</span>
     <span class="c1"># Use num_workers=0 on macOS and Windows to avoid multiprocessing issues</span>
     <span class="c1"># Windows often has issues with multiprocessing in Jupyter notebooks</span>
-    <span class="n">num_workers</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;Darwin&quot;</span><span class="p">,</span> <span class="s2">&quot;Windows&quot;</span><span class="p">]</span> <span class="k">else</span> <span class="mi">4</span>
+    <span class="c1"># Increase num_workers for better data loading performance</span>
+    <span class="k">if</span> <span class="n">num_workers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">num_workers</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;Darwin&quot;</span><span class="p">,</span> <span class="s2">&quot;Windows&quot;</span><span class="p">]</span> <span class="k">else</span> <span class="mi">8</span>
 
     <span class="n">train_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
         <span class="n">train_dataset</span><span class="p">,</span>
@@ -13065,13 +13071,7 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3302</span>
-<span class="normal">3303</span>
-<span class="normal">3304</span>
-<span class="normal">3305</span>
-<span class="normal">3306</span>
-<span class="normal">3307</span>
-<span class="normal">3308</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3308</span>
 <span class="normal">3309</span>
 <span class="normal">3310</span>
 <span class="normal">3311</span>
@@ -13125,7 +13125,13 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p>
 <span class="normal">3359</span>
 <span class="normal">3360</span>
 <span class="normal">3361</span>
-<span class="normal">3362</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_instance_segmentation_model</span><span class="p">(</span>
+<span class="normal">3362</span>
+<span class="normal">3363</span>
+<span class="normal">3364</span>
+<span class="normal">3365</span>
+<span class="normal">3366</span>
+<span class="normal">3367</span>
+<span class="normal">3368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_instance_segmentation_model</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">,</span>
@@ -13470,7 +13476,7 @@ will try to load optimizer and scheduler states as well. Defaults to False.</p>
 
 
 <h2 id="geoai.train.train_segmentation_model" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">train_segmentation_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">architecture</span><span class="o">=</span><span class="s1">&#39;unet&#39;</span><span class="p">,</span> <span class="n">encoder_name</span><span class="o">=</span><span class="s1">&#39;resnet34&#39;</span><span class="p">,</span> <span class="n">encoder_weights</span><span class="o">=</span><span class="s1">&#39;imagenet&#39;</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_best_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">plot_curves</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">target_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resize_mode</span><span class="o">=</span><span class="s1">&#39;resize&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">train_segmentation_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">architecture</span><span class="o">=</span><span class="s1">&#39;unet&#39;</span><span class="p">,</span> <span class="n">encoder_name</span><span class="o">=</span><span class="s1">&#39;resnet34&#39;</span><span class="p">,</span> <span class="n">encoder_weights</span><span class="o">=</span><span class="s1">&#39;imagenet&#39;</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_best_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">plot_curves</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">target_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resize_mode</span><span class="o">=</span><span class="s1">&#39;resize&#39;</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#geoai.train.train_segmentation_model" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -13927,10 +13933,7 @@ resizing, set this parameter explicitly. Example: (512, 512). Defaults to None.<
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2042</span>
-<span class="normal">2043</span>
-<span class="normal">2044</span>
-<span class="normal">2045</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2045</span>
 <span class="normal">2046</span>
 <span class="normal">2047</span>
 <span class="normal">2048</span>
@@ -14410,7 +14413,13 @@ resizing, set this parameter explicitly. Example: (512, 512). Defaults to None.<
 <span class="normal">2522</span>
 <span class="normal">2523</span>
 <span class="normal">2524</span>
-<span class="normal">2525</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_segmentation_model</span><span class="p">(</span>
+<span class="normal">2525</span>
+<span class="normal">2526</span>
+<span class="normal">2527</span>
+<span class="normal">2528</span>
+<span class="normal">2529</span>
+<span class="normal">2530</span>
+<span class="normal">2531</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_segmentation_model</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">,</span>
@@ -14434,6 +14443,7 @@ resizing, set this parameter explicitly. Example: (512, 512). Defaults to None.<
     <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">target_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">resize_mode</span><span class="o">=</span><span class="s2">&quot;resize&quot;</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -14623,7 +14633,9 @@ resizing, set this parameter explicitly. Example: (512, 512). Defaults to None.<
     <span class="c1"># Create data loaders</span>
     <span class="c1"># Use num_workers=0 on macOS and Windows to avoid multiprocessing issues</span>
     <span class="c1"># Windows often has issues with multiprocessing in Jupyter notebooks</span>
-    <span class="n">num_workers</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;Darwin&quot;</span><span class="p">,</span> <span class="s2">&quot;Windows&quot;</span><span class="p">]</span> <span class="k">else</span> <span class="mi">4</span>
+    <span class="c1"># Increase num_workers for better data loading performance</span>
+    <span class="k">if</span> <span class="n">num_workers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">num_workers</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;Darwin&quot;</span><span class="p">,</span> <span class="s2">&quot;Windows&quot;</span><span class="p">]</span> <span class="k">else</span> <span class="mi">8</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="n">train_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
@@ -15080,10 +15092,7 @@ resizing, set this parameter explicitly. Example: (512, 512). Defaults to None.<
 
             <details class="quote">
               <summary>Source code in <code>geoai/train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1939</span>
-<span class="normal">1940</span>
-<span class="normal">1941</span>
-<span class="normal">1942</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1942</span>
 <span class="normal">1943</span>
 <span class="normal">1944</span>
 <span class="normal">1945</span>
@@ -15133,7 +15142,10 @@ resizing, set this parameter explicitly. Example: (512, 512). Defaults to None.<
 <span class="normal">1989</span>
 <span class="normal">1990</span>
 <span class="normal">1991</span>
-<span class="normal">1992</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_semantic_one_epoch</span><span class="p">(</span>
+<span class="normal">1992</span>
+<span class="normal">1993</span>
+<span class="normal">1994</span>
+<span class="normal">1995</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_semantic_one_epoch</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">criterion</span><span class="p">,</span> <span class="n">print_freq</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
