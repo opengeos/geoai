@@ -2309,6 +2309,11 @@ def train_segmentation_model(
         **kwargs,
     )
     model.to(device)
+    
+    # Enable multi-GPU training if multiple GPUs are available
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs for training")
+        model = torch.nn.DataParallel(model)
 
     # Set up loss function (CrossEntropyLoss for multi-class, can also use DiceLoss)
     criterion = torch.nn.CrossEntropyLoss()
