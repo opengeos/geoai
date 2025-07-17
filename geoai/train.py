@@ -1380,11 +1380,13 @@ def object_detection(
 
     # Load state dict and handle DataParallel module prefix
     state_dict = torch.load(model_path, map_location=device)
-    
+
     # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith('module.') for key in state_dict.keys()):
-        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
-    
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {
+            key.replace("module.", ""): value for key, value in state_dict.items()
+        }
+
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -1462,11 +1464,13 @@ def object_detection_batch(
 
     # Load state dict and handle DataParallel module prefix
     state_dict = torch.load(model_path, map_location=device)
-    
+
     # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith('module.') for key in state_dict.keys()):
-        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
-    
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {
+            key.replace("module.", ""): value for key, value in state_dict.items()
+        }
+
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -3120,11 +3124,13 @@ def semantic_segmentation(
 
     # Load state dict and handle DataParallel module prefix
     state_dict = torch.load(model_path, map_location=device)
-    
+
     # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith('module.') for key in state_dict.keys()):
-        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
-    
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {
+            key.replace("module.", ""): value for key, value in state_dict.items()
+        }
+
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -3256,11 +3262,13 @@ def semantic_segmentation_batch(
 
     # Load state dict and handle DataParallel module prefix
     state_dict = torch.load(model_path, map_location=device)
-    
+
     # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith('module.') for key in state_dict.keys()):
-        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
-    
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {
+            key.replace("module.", ""): value for key, value in state_dict.items()
+        }
+
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -3443,11 +3451,13 @@ def instance_segmentation(
 
     # Load state dict and handle DataParallel module prefix
     state_dict = torch.load(model_path, map_location=device)
-    
+
     # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith('module.') for key in state_dict.keys()):
-        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
-    
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {
+            key.replace("module.", ""): value for key, value in state_dict.items()
+        }
+
     model.load_state_dict(state_dict)
     model.to(device)
 
@@ -3511,11 +3521,13 @@ def instance_segmentation_batch(
 
     # Load state dict and handle DataParallel module prefix
     state_dict = torch.load(model_path, map_location=device)
-    
+
     # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith('module.') for key in state_dict.keys()):
-        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
-    
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {
+            key.replace("module.", ""): value for key, value in state_dict.items()
+        }
+
     model.load_state_dict(state_dict)
     model.to(device)
 
