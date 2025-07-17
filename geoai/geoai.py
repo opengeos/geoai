@@ -39,6 +39,7 @@ from .train import (
     instance_segmentation_inference_on_geotiff,
 )
 from .utils import *
+from .change_detection import ChangeDetection
 
 
 class Map(leafmap.Map):
