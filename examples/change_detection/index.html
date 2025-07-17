@@ -12,24 +12,28 @@
         <meta name="author" content="opengeos">
       
       
-        <link rel="canonical" href="https://opengeoai.org/examples/samgeo/fast_sam/">
+        <link rel="canonical" href="https://opengeoai.org/examples/change_detection/">
       
       
+        <link rel="prev" href="../instance_segmentation/">
       
       
-      <link rel="icon" href="../../../assets/logo.ico">
+        <link rel="next" href="../../workshops/GeoAI_Workshop_2025/">
+      
+      
+      <link rel="icon" href="../../assets/logo.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
     
     
       
-        <title>Fast sam - geoai</title>
+        <title>Change detection - geoai</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.342714a4.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,11 +52,11 @@
       
     
     
-      <link rel="stylesheet" href="../../../css/timeago.css">
+      <link rel="stylesheet" href="../../css/timeago.css">
     
-      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#segmenting-remote-sensing-imagery-with-fastsam" class="md-skip">
+        <a href="#change-detection-with-instance-segmentation" class="md-skip">
           Skip to content
         </a>
       
@@ -94,9 +98,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="geoai" class="md-header__button md-logo" aria-label="geoai" data-md-component="logo">
+    <a href="../.." title="geoai" class="md-header__button md-logo" aria-label="geoai" data-md-component="logo">
       
-  <img src="../../../assets/logo.png" alt="logo">
+  <img src="../../assets/logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -113,7 +117,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Fast sam
+              Change detection
             
           </span>
         </div>
@@ -234,9 +238,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="geoai" class="md-nav__button md-logo" aria-label="geoai" data-md-component="logo">
+    <a href="../.." title="geoai" class="md-nav__button md-logo" aria-label="geoai" data-md-component="logo">
       
-  <img src="../../../assets/logo.png" alt="logo">
+  <img src="../../assets/logo.png" alt="logo">
 
     </a>
     geoai
@@ -263,7 +267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -285,7 +289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../installation/" class="md-nav__link">
+      <a href="../../installation/" class="md-nav__link">
         
   
   
@@ -307,7 +311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../usage/" class="md-nav__link">
+      <a href="../../usage/" class="md-nav__link">
         
   
   
@@ -329,7 +333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/" class="md-nav__link">
+      <a href="../../contributing/" class="md-nav__link">
         
   
   
@@ -351,7 +355,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../faq/" class="md-nav__link">
+      <a href="../../faq/" class="md-nav__link">
         
   
   
@@ -414,18 +418,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -441,7 +447,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Examples
@@ -455,7 +461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../download_data/" class="md-nav__link">
+      <a href="../download_data/" class="md-nav__link">
         
   
   
@@ -478,7 +484,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../download_sentinel2/" class="md-nav__link">
+      <a href="../download_sentinel2/" class="md-nav__link">
         
   
   
@@ -501,7 +507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../download_naip/" class="md-nav__link">
+      <a href="../download_naip/" class="md-nav__link">
         
   
   
@@ -524,7 +530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../planetary_computer/" class="md-nav__link">
+      <a href="../planetary_computer/" class="md-nav__link">
         
   
   
@@ -547,7 +553,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../view_metadata/" class="md-nav__link">
+      <a href="../view_metadata/" class="md-nav__link">
         
   
   
@@ -570,7 +576,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../create_vector/" class="md-nav__link">
+      <a href="../create_vector/" class="md-nav__link">
         
   
   
@@ -593,7 +599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../edit_vector/" class="md-nav__link">
+      <a href="../edit_vector/" class="md-nav__link">
         
   
   
@@ -616,7 +622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../image_chips/" class="md-nav__link">
+      <a href="../image_chips/" class="md-nav__link">
         
   
   
@@ -639,7 +645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../image_tiling/" class="md-nav__link">
+      <a href="../image_tiling/" class="md-nav__link">
         
   
   
@@ -662,7 +668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_footprints_usa/" class="md-nav__link">
+      <a href="../building_footprints_usa/" class="md-nav__link">
         
   
   
@@ -685,7 +691,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_footprints_africa/" class="md-nav__link">
+      <a href="../building_footprints_africa/" class="md-nav__link">
         
   
   
@@ -708,7 +714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_footprints_china/" class="md-nav__link">
+      <a href="../building_footprints_china/" class="md-nav__link">
         
   
   
@@ -731,7 +737,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_regularization/" class="md-nav__link">
+      <a href="../building_regularization/" class="md-nav__link">
         
   
   
@@ -754,7 +760,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../geometric_properties/" class="md-nav__link">
+      <a href="../geometric_properties/" class="md-nav__link">
         
   
   
@@ -777,7 +783,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../car_detection/" class="md-nav__link">
+      <a href="../car_detection/" class="md-nav__link">
         
   
   
@@ -800,7 +806,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ship_detection/" class="md-nav__link">
+      <a href="../ship_detection/" class="md-nav__link">
         
   
   
@@ -823,7 +829,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../solar_panel_detection/" class="md-nav__link">
+      <a href="../solar_panel_detection/" class="md-nav__link">
         
   
   
@@ -846,7 +852,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../text_prompt_segmentation/" class="md-nav__link">
+      <a href="../text_prompt_segmentation/" class="md-nav__link">
         
   
   
@@ -869,7 +875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../parking_spot_detection/" class="md-nav__link">
+      <a href="../parking_spot_detection/" class="md-nav__link">
         
   
   
@@ -892,7 +898,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../data_visualization/" class="md-nav__link">
+      <a href="../data_visualization/" class="md-nav__link">
         
   
   
@@ -915,7 +921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_object_detection_model/" class="md-nav__link">
+      <a href="../train_object_detection_model/" class="md-nav__link">
         
   
   
@@ -938,7 +944,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_segmentation_model/" class="md-nav__link">
+      <a href="../train_segmentation_model/" class="md-nav__link">
         
   
   
@@ -961,7 +967,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_landcover_classification/" class="md-nav__link">
+      <a href="../train_landcover_classification/" class="md-nav__link">
         
   
   
@@ -984,7 +990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_building_footprints_usa/" class="md-nav__link">
+      <a href="../train_building_footprints_usa/" class="md-nav__link">
         
   
   
@@ -1007,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_solar_panel_detection/" class="md-nav__link">
+      <a href="../train_solar_panel_detection/" class="md-nav__link">
         
   
   
@@ -1030,7 +1036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_car_detection/" class="md-nav__link">
+      <a href="../train_car_detection/" class="md-nav__link">
         
   
   
@@ -1053,7 +1059,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_ship_detection/" class="md-nav__link">
+      <a href="../train_ship_detection/" class="md-nav__link">
         
   
   
@@ -1076,7 +1082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_water_detection/" class="md-nav__link">
+      <a href="../train_water_detection/" class="md-nav__link">
         
   
   
@@ -1099,7 +1105,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../water_dynamics/" class="md-nav__link">
+      <a href="../water_dynamics/" class="md-nav__link">
         
   
   
@@ -1122,7 +1128,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../wetland_mapping/" class="md-nav__link">
+      <a href="../wetland_mapping/" class="md-nav__link">
         
   
   
@@ -1145,7 +1151,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../regularization/" class="md-nav__link">
+      <a href="../regularization/" class="md-nav__link">
         
   
   
@@ -1168,7 +1174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../globe_projection/" class="md-nav__link">
+      <a href="../globe_projection/" class="md-nav__link">
         
   
   
@@ -1191,7 +1197,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../samgeo/" class="md-nav__link">
         
   
   
@@ -1214,7 +1220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../grounded_sam/" class="md-nav__link">
+      <a href="../grounded_sam/" class="md-nav__link">
         
   
   
@@ -1237,7 +1243,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../load_model_checkpoint/" class="md-nav__link">
+      <a href="../load_model_checkpoint/" class="md-nav__link">
         
   
   
@@ -1260,7 +1266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../water_detection/" class="md-nav__link">
+      <a href="../water_detection/" class="md-nav__link">
         
   
   
@@ -1283,7 +1289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../water_detection_s2/" class="md-nav__link">
+      <a href="../water_detection_s2/" class="md-nav__link">
         
   
   
@@ -1306,7 +1312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../batch_segmentation/" class="md-nav__link">
+      <a href="../batch_segmentation/" class="md-nav__link">
         
   
   
@@ -1329,7 +1335,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_detection_lidar/" class="md-nav__link">
+      <a href="../building_detection_lidar/" class="md-nav__link">
         
   
   
@@ -1352,7 +1358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instance_segmentation/" class="md-nav__link">
+      <a href="../instance_segmentation/" class="md-nav__link">
         
   
   
@@ -1372,10 +1378,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../change_detection/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Change detection
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1386,6 +1414,185 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#install-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Install packages
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Import libraries
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setup
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#download-sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Download sample data
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visualize-sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Visualize sample data
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initialize-change-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initialize Change Detection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-change-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run Change Detection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analyze-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analyze Results
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visualizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Visualizations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comprehensive-analysis-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      Comprehensive Analysis Report
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-click-complete-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      One-Click Complete Analysis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Summary
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-features-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Features Used:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-files-generated" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Files Generated:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advantages-over-traditional-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advantages Over Traditional Methods:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1443,7 +1650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../workshops/GeoAI_Workshop_2025/" class="md-nav__link">
+      <a href="../../workshops/GeoAI_Workshop_2025/" class="md-nav__link">
         
   
   
@@ -1511,7 +1718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../change_detection/" class="md-nav__link">
+      <a href="../../change_detection/" class="md-nav__link">
         
   
   
@@ -1534,7 +1741,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../classify/" class="md-nav__link">
+      <a href="../../classify/" class="md-nav__link">
         
   
   
@@ -1557,7 +1764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../geoai/" class="md-nav__link">
+      <a href="../../geoai/" class="md-nav__link">
         
   
   
@@ -1580,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../download/" class="md-nav__link">
+      <a href="../../download/" class="md-nav__link">
         
   
   
@@ -1603,7 +1810,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../extract/" class="md-nav__link">
+      <a href="../../extract/" class="md-nav__link">
         
   
   
@@ -1626,7 +1833,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../hf/" class="md-nav__link">
+      <a href="../../hf/" class="md-nav__link">
         
   
   
@@ -1649,7 +1856,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../sam/" class="md-nav__link">
+      <a href="../../sam/" class="md-nav__link">
         
   
   
@@ -1672,7 +1879,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../segmentation/" class="md-nav__link">
+      <a href="../../segmentation/" class="md-nav__link">
         
   
   
@@ -1695,7 +1902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../train/" class="md-nav__link">
+      <a href="../../train/" class="md-nav__link">
         
   
   
@@ -1718,7 +1925,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../utils/" class="md-nav__link">
+      <a href="../../utils/" class="md-nav__link">
         
   
   
@@ -1768,38 +1975,161 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#install-dependencies" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
-      Install dependencies
+      Overview
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#create-an-interactive-map" class="md-nav__link">
+  <a href="#key-features" class="md-nav__link">
     <span class="md-ellipsis">
-      Create an interactive map
+      Key Features
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#download-a-sample-image" class="md-nav__link">
+  <a href="#install-packages" class="md-nav__link">
     <span class="md-ellipsis">
-      Download a sample image
+      Install packages
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#initialize-samgeo-class" class="md-nav__link">
+  <a href="#import-libraries" class="md-nav__link">
     <span class="md-ellipsis">
-      Initialize SamGeo class
+      Import libraries
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setup
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#download-sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Download sample data
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visualize-sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Visualize sample data
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initialize-change-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initialize Change Detection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-change-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run Change Detection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analyze-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analyze Results
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visualizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Visualizations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comprehensive-analysis-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      Comprehensive Analysis Report
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-click-complete-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      One-Click Complete Analysis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Summary
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-features-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Features Used:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-files-generated" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Files Generated:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advantages-over-traditional-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advantages Over Traditional Methods:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1816,7 +2146,7 @@
               <article class="md-content__inner md-typeset">
                 
 
-    <a href="/examples/samgeo/fast_sam/fast_sam.ipynb" title="Download Notebook" class="md-content__button md-icon">
+    <a href="/examples/change_detection/change_detection.ipynb" title="Download Notebook" class="md-content__button md-icon">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z"/></svg>
     </a>
 
@@ -2271,11 +2601,21 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="segmenting-remote-sensing-imagery-with-fastsam">Segmenting remote sensing imagery with FastSAM<a class="anchor-link" href="#segmenting-remote-sensing-imagery-with-fastsam">¶</a></h1><p><a href="https://studiolab.sagemaker.aws/import/github/opengeos/segment-geospatial/blob/main/docs/examples/fast_sam.ipynb"><img alt="image" src="https://studiolab.sagemaker.aws/studiolab.svg"/></a>
-<a href="https://pccompute.westeurope.cloudapp.azure.com/compute/hub/user-redirect/git-pull?repo=https://github.com/opengeos/segment-geospatial&amp;urlpath=lab/tree/segment-geospatial/docs/examples/fast_sam.ipynb&amp;branch=main"><img alt="image" src="https://img.shields.io/badge/Open-Planetary%20Computer-black?style=flat&amp;logo=microsoft"/></a>
-<a href="https://colab.research.google.com/github/opengeos/segment-geospatial/blob/main/docs/examples/fast_sam.ipynb"><img alt="image" src="https://colab.research.google.com/assets/colab-badge.svg"/></a></p>
-<p>FastSAM: <a href="https://github.com/CASIA-IVA-Lab/FastSAM">https://github.com/CASIA-IVA-Lab/FastSAM</a></p>
-<p>Make sure you use GPU runtime for this notebook. For Google Colab, go to <code>Runtime</code> -&gt; <code>Change runtime type</code> and select <code>GPU</code> as the hardware accelerator.</p>
+<h1 id="change-detection-with-instance-segmentation">Change Detection with Instance Segmentation<a class="anchor-link" href="#change-detection-with-instance-segmentation">¶</a></h1><p><a href="https://colab.research.google.com/github/opengeos/geoai/blob/main/docs/examples/change_detection.ipynb"><img alt="image" src="https://colab.research.google.com/assets/colab-badge.svg"/></a></p>
+<p>This notebook demonstrates the change detection functionality in GeoAI, which provides instance segmentation and confidence scoring for individual change objects.</p>
+<p>The change detection functionality builds upon the <a href="https://github.com/Z-Zheng/pytorch-change-models">torchange</a> package developed by Dr. Zhuo Zheng. We have made it much easier to analyze remote sensing imagery and visualize the results.</p>
+<h2 id="overview">Overview<a class="anchor-link" href="#overview">¶</a></h2><p>The change detection system provides:</p>
+<ul>
+<li><strong>Instance Segmentation</strong>: Each change object gets a unique ID</li>
+<li><strong>Confidence Scores</strong>: Individual confidence values for each detected instance</li>
+<li><strong>Proper GeoTIFF Output</strong>: Maintains spatial reference information</li>
+</ul>
+<h2 id="key-features">Key Features<a class="anchor-link" href="#key-features">¶</a></h2><ul>
+<li>Instance-level change detection with unique IDs</li>
+<li>Confidence scoring for quality assessment</li>
+<li>Support for large GeoTIFF files</li>
+<li>Comprehensive analysis capabilities</li>
+</ul>
 </div>
 </div>
 </div>
@@ -2286,7 +2626,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="install-dependencies">Install dependencies<a class="anchor-link" href="#install-dependencies">¶</a></h2><p>Uncomment and run the following cell to install the required dependencies.</p>
+<h2 id="install-packages">Install packages<a class="anchor-link" href="#install-packages">¶</a></h2>
 </div>
 </div>
 </div>
@@ -2309,11 +2649,22 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># %pip install segment-geospatial segment-anything-fast</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># %pip install geoai-py</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-1"># %pip install segment-geospatial segment-anything-fast</div>
+<div class="clipboard-copy-txt" id="cell-1"># %pip install geoai-py</div>
 </div>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="import-libraries">Import libraries<a class="anchor-link" href="#import-libraries">¶</a></h2>
 </div>
 </div>
 </div>
@@ -2336,13 +2687,17 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">leafmap</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">samgeo</span><span class="w"> </span><span class="kn">import</span> <span class="n">tms_to_geotiff</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">samgeo.fast_sam</span><span class="w"> </span><span class="kn">import</span> <span class="n">SamGeo</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">geoai</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-2">import leafmap
-from samgeo import tms_to_geotiff
-from samgeo.fast_sam import SamGeo</div>
+<div class="clipboard-copy-txt" id="cell-2">import geoai
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path</div>
 </div>
 </div>
 </div>
@@ -2355,7 +2710,7 @@ from samgeo.fast_sam import SamGeo</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="create-an-interactive-map">Create an interactive map<a class="anchor-link" href="#create-an-interactive-map">¶</a></h2>
+<h2 id="setup">Setup<a class="anchor-link" href="#setup">¶</a></h2>
 </div>
 </div>
 </div>
@@ -2378,13 +2733,25 @@ from samgeo.fast_sam import SamGeo</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span> <span class="o">=</span> <span class="n">leafmap</span><span class="o">.</span><span class="n">Map</span><span class="p">(</span><span class="n">center</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">22.17615</span><span class="p">,</span> <span class="o">-</span><span class="mf">51.253043</span><span class="p">],</span> <span class="n">zoom</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="s2">"800px"</span><span class="p">)</span>
-<span class="n">m</span><span class="o">.</span><span class="n">add_basemap</span><span class="p">(</span><span class="s2">"SATELLITE"</span><span class="p">)</span>
-<span class="n">m</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Check if CUDA is available</span>
+<span class="n">device</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">get_device</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Using device: </span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<span class="c1"># Set up paths</span>
+<span class="n">out_folder</span> <span class="o">=</span> <span class="s2">"change_detection_results"</span>
+<span class="n">Path</span><span class="p">(</span><span class="n">out_folder</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Working directory: </span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-3">m = leafmap.Map(center=[-22.17615, -51.253043], zoom=18, height="800px")
-m.add_basemap("SATELLITE")
-m</div>
+<div class="clipboard-copy-txt" id="cell-3"># Check if CUDA is available
+device = geoai.get_device()
+print(f"Using device: {device}")
+
+# Set up paths
+out_folder = "change_detection_results"
+Path(out_folder).mkdir(exist_ok=True)
+
+print(f"Working directory: {out_folder}")</div>
 </div>
 </div>
 </div>
@@ -2397,7 +2764,7 @@ m</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="download-a-sample-image">Download a sample image<a class="anchor-link" href="#download-a-sample-image">¶</a></h2><p>Pan and zoom the map to select the area of interest. Use the draw tools to draw a polygon or rectangle on the map</p>
+<h2 id="download-sample-data">Download sample data<a class="anchor-link" href="#download-sample-data">¶</a></h2><p>We'll use NAIP imagery for Las Vegas to demonstrate change detection.</p>
 </div>
 </div>
 </div>
@@ -2420,15 +2787,38 @@ m</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">bbox</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">user_roi_bounds</span><span class="p">()</span>
-<span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="n">bbox</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mf">51.2565</span><span class="p">,</span> <span class="o">-</span><span class="mf">22.1777</span><span class="p">,</span> <span class="o">-</span><span class="mf">51.2512</span><span class="p">,</span> <span class="o">-</span><span class="mf">22.175</span><span class="p">]</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Download NAIP imagery</span>
+<span class="n">naip_2019_url</span> <span class="o">=</span> <span class="s2">"https://huggingface.co/datasets/giswqs/geospatial/resolve/main/las_vegas_naip_2019_a.tif"</span>
+<span class="n">naip_2022_url</span> <span class="o">=</span> <span class="s2">"https://huggingface.co/datasets/giswqs/geospatial/resolve/main/las_vegas_naip_2022_a.tif"</span>
+
+<span class="n">naip_2019_path</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">naip_2019_url</span><span class="p">)</span>
+<span class="n">naip_2022_path</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">naip_2022_url</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Downloaded 2019 NAIP: </span><span class="si">{</span><span class="n">naip_2019_path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Downloaded 2022 NAIP: </span><span class="si">{</span><span class="n">naip_2022_path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-4">bbox = m.user_roi_bounds()
-if bbox is None:
-    bbox = [-51.2565, -22.1777, -51.2512, -22.175]</div>
+<div class="clipboard-copy-txt" id="cell-4"># Download NAIP imagery
+naip_2019_url = "https://huggingface.co/datasets/giswqs/geospatial/resolve/main/las_vegas_naip_2019_a.tif"
+naip_2022_url = "https://huggingface.co/datasets/giswqs/geospatial/resolve/main/las_vegas_naip_2022_a.tif"
+
+naip_2019_path = geoai.download_file(naip_2019_url)
+naip_2022_path = geoai.download_file(naip_2022_url)
+
+print(f"Downloaded 2019 NAIP: {naip_2019_path}")
+print(f"Downloaded 2022 NAIP: {naip_2022_path}")</div>
 </div>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="visualize-sample-data">Visualize sample data<a class="anchor-link" href="#visualize-sample-data">¶</a></h2>
 </div>
 </div>
 </div>
@@ -2451,24 +2841,13 @@ if bbox is None:
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">image</span> <span class="o">=</span> <span class="s2">"Image.tif"</span>
-<span class="n">tms_to_geotiff</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="n">image</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">zoom</span><span class="o">=</span><span class="mi">19</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"Satellite"</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Check raster information</span>
+<span class="n">geoai</span><span class="o">.</span><span class="n">get_raster_info</span><span class="p">(</span><span class="n">naip_2019_path</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-5">image = "Image.tif"
-tms_to_geotiff(output=image, bbox=bbox, zoom=19, source="Satellite", overwrite=True)</div>
+<div class="clipboard-copy-txt" id="cell-5"># Check raster information
+geoai.get_raster_info(naip_2019_path)</div>
 </div>
 </div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>You can also use your own image. Uncomment and run the following cell to use your own image.</p>
 </div>
 </div>
 </div>
@@ -2491,22 +2870,13 @@ tms_to_geotiff(output=image, bbox=bbox, zoom=19, source="Satellite", overwrite=T
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># image = '/path/to/your/own/image.tif'</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># View the images</span>
+<span class="n">geoai</span><span class="o">.</span><span class="n">view_raster</span><span class="p">(</span><span class="n">naip_2019_path</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-6"># image = '/path/to/your/own/image.tif'</div>
+<div class="clipboard-copy-txt" id="cell-6"># View the images
+geoai.view_raster(naip_2019_path)</div>
 </div>
 </div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Display the downloaded image on the map.</p>
 </div>
 </div>
 </div>
@@ -2529,13 +2899,9 @@ tms_to_geotiff(output=image, bbox=bbox, zoom=19, source="Satellite", overwrite=T
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">False</span>
-<span class="n">m</span><span class="o">.</span><span class="n">add_raster</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s2">"Image"</span><span class="p">)</span>
-<span class="n">m</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">geoai</span><span class="o">.</span><span class="n">view_raster</span><span class="p">(</span><span class="n">naip_2022_path</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-7">m.layers[-1].visible = False
-m.add_raster(image, layer_name="Image")
-m</div>
+<div class="clipboard-copy-txt" id="cell-7">geoai.view_raster(naip_2022_path)</div>
 </div>
 </div>
 </div>
@@ -2548,7 +2914,7 @@ m</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="initialize-samgeo-class">Initialize SamGeo class<a class="anchor-link" href="#initialize-samgeo-class">¶</a></h2><p>The initialization of the SamGeo class might take a few minutes. The initialization downloads the model weights and sets up the model for inference.</p>
+<h2 id="initialize-change-detection">Initialize Change Detection<a class="anchor-link" href="#initialize-change-detection">¶</a></h2><p>Create the change detection system with optimal parameters.</p>
 </div>
 </div>
 </div>
@@ -2571,13 +2937,39 @@ m</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">samgeo.fast_sam</span><span class="w"> </span><span class="kn">import</span> <span class="n">SamGeo</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Initialize change detection</span>
+<span class="n">detector</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">ChangeDetection</span><span class="p">(</span><span class="n">sam_model_type</span><span class="o">=</span><span class="s2">"vit_h"</span><span class="p">)</span>
 
-<span class="n">sam</span> <span class="o">=</span> <span class="n">SamGeo</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"FastSAM-x.pt"</span><span class="p">)</span>
+<span class="c1"># Configure parameters (following the torchange example)</span>
+<span class="n">detector</span><span class="o">.</span><span class="n">set_hyperparameters</span><span class="p">(</span>
+    <span class="n">change_confidence_threshold</span><span class="o">=</span><span class="mi">145</span><span class="p">,</span>
+    <span class="n">use_normalized_feature</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">bitemporal_match</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">detector</span><span class="o">.</span><span class="n">set_mask_generator_params</span><span class="p">(</span>
+    <span class="n">points_per_side</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+    <span class="n">stability_score_thresh</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Change detection system initialized!"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-8">from samgeo.fast_sam import SamGeo
+<div class="clipboard-copy-txt" id="cell-8"># Initialize change detection
+detector = geoai.ChangeDetection(sam_model_type="vit_h")
 
-sam = SamGeo(model="FastSAM-x.pt")</div>
+# Configure parameters (following the torchange example)
+detector.set_hyperparameters(
+    change_confidence_threshold=145,
+    use_normalized_feature=True,
+    bitemporal_match=True,
+)
+
+detector.set_mask_generator_params(
+    points_per_side=32,
+    stability_score_thresh=0.95,
+)
+
+print("Change detection system initialized!")</div>
 </div>
 </div>
 </div>
@@ -2590,7 +2982,7 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Set the image.</p>
+<h2 id="run-change-detection">Run Change Detection<a class="anchor-link" href="#run-change-detection">¶</a></h2><p>Execute change detection with instance segmentation and confidence scoring.</p>
 </div>
 </div>
 </div>
@@ -2613,9 +3005,39 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">set_image</span><span class="p">(</span><span class="s2">"Image.tif"</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Run change detection</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">detect_changes</span><span class="p">(</span>
+    <span class="n">naip_2019_path</span><span class="p">,</span>
+    <span class="n">naip_2022_path</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/binary_mask.tif"</span><span class="p">,</span>
+    <span class="n">export_probability</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">probability_output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/probability_mask.tif"</span><span class="p">,</span>
+    <span class="n">export_instance_masks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">instance_masks_output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/instance_masks.tif"</span><span class="p">,</span>
+    <span class="n">return_detailed_results</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">return_results</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Change detection completed!"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total instances detected: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'total_masks'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Image size: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'original_shape'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-9">sam.set_image("Image.tif")</div>
+<div class="clipboard-copy-txt" id="cell-9"># Run change detection
+results = detector.detect_changes(
+    naip_2019_path,
+    naip_2022_path,
+    output_path=f"{out_folder}/binary_mask.tif",
+    export_probability=True,
+    probability_output_path=f"{out_folder}/probability_mask.tif",
+    export_instance_masks=True,
+    instance_masks_output_path=f"{out_folder}/instance_masks.tif",
+    return_detailed_results=True,
+    return_results=False,
+)
+
+print(f"Change detection completed!")
+print(f"Total instances detected: {results['summary']['total_masks']}")
+print(f"Image size: {results['summary']['original_shape']}")</div>
 </div>
 </div>
 </div>
@@ -2628,7 +3050,7 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Segment the image with <code>everything_prompt</code>. You can also try <code>point_prompt</code>, <code>box_prompt</code>, or <code>text_prompt</code>.</p>
+<h2 id="analyze-results">Analyze Results<a class="anchor-link" href="#analyze-results">¶</a></h2><p>Display key statistics and quality metrics.</p>
 </div>
 </div>
 </div>
@@ -2651,9 +3073,39 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">everything_prompt</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="s2">"mask.tif"</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Display statistics</span>
+<span class="k">if</span> <span class="s2">"statistics"</span> <span class="ow">in</span> <span class="n">results</span> <span class="ow">and</span> <span class="n">results</span><span class="p">[</span><span class="s2">"statistics"</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Quality Statistics:"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">metric</span><span class="p">,</span> <span class="n">stats</span> <span class="ow">in</span> <span class="n">results</span><span class="p">[</span><span class="s2">"statistics"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">: mean=</span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">'mean'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, std=</span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">'std'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<span class="c1"># Show top instances</span>
+<span class="k">if</span> <span class="s2">"masks"</span> <span class="ow">in</span> <span class="n">results</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s2">"masks"</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Top 5 detected instances:"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">mask</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s2">"masks"</span><span class="p">][:</span><span class="mi">5</span><span class="p">]):</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">. Instance </span><span class="si">{</span><span class="n">mask</span><span class="p">[</span><span class="s1">'mask_id'</span><span class="p">]</span><span class="si">}</span><span class="s2">: "</span>
+            <span class="sa">f</span><span class="s2">"IoU=</span><span class="si">{</span><span class="n">mask</span><span class="p">[</span><span class="s1">'iou_pred'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"Stability=</span><span class="si">{</span><span class="n">mask</span><span class="p">[</span><span class="s1">'stability_score'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"Area=</span><span class="si">{</span><span class="n">mask</span><span class="p">[</span><span class="s1">'area'</span><span class="p">]</span><span class="si">}</span><span class="s2"> pixels"</span>
+        <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-10">sam.everything_prompt(output="mask.tif")</div>
+<div class="clipboard-copy-txt" id="cell-10"># Display statistics
+if "statistics" in results and results["statistics"]:
+    print("Quality Statistics:")
+    for metric, stats in results["statistics"].items():
+        print(f"  {metric}: mean={stats['mean']:.3f}, std={stats['std']:.3f}")
+
+# Show top instances
+if "masks" in results and len(results["masks"]) &gt; 0:
+    print("\nTop 5 detected instances:")
+    for i, mask in enumerate(results["masks"][:5]):
+        print(
+            f"  {i+1}. Instance {mask['mask_id']}: "
+            f"IoU={mask['iou_pred']:.3f}, "
+            f"Stability={mask['stability_score']:.3f}, "
+            f"Area={mask['area']} pixels"
+        )</div>
 </div>
 </div>
 </div>
@@ -2666,7 +3118,7 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Show the annotated image.</p>
+<h2 id="visualizations">Visualizations<a class="anchor-link" href="#visualizations">¶</a></h2><p>Use the integrated visualization methods for comprehensive analysis.</p>
 </div>
 </div>
 </div>
@@ -2689,9 +3141,21 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">show_anns</span><span class="p">(</span><span class="s2">"mask.png"</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># probability visualization</span>
+<span class="n">detector</span><span class="o">.</span><span class="n">visualize_results</span><span class="p">(</span>
+    <span class="n">naip_2019_path</span><span class="p">,</span>
+    <span class="n">naip_2022_path</span><span class="p">,</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/binary_mask.tif"</span><span class="p">,</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/probability_mask.tif"</span><span class="p">,</span>
+<span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-11">sam.show_anns("mask.png")</div>
+<div class="clipboard-copy-txt" id="cell-11"># probability visualization
+detector.visualize_results(
+    naip_2019_path,
+    naip_2022_path,
+    f"{out_folder}/binary_mask.tif",
+    f"{out_folder}/probability_mask.tif",
+)</div>
 </div>
 </div>
 </div>
@@ -2704,18 +3168,7 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><img alt="" src="https://i.imgur.com/af4bj7O.png"/></p>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Convert the segmentation results from GeoTIFF to vector.</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/e7c00b50-c456-4653-b8ce-0c9ec8f05b7f"/></p>
 </div>
 </div>
 </div>
@@ -2738,22 +3191,25 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">raster_to_vector</span><span class="p">(</span><span class="s2">"mask.tif"</span><span class="p">,</span> <span class="s2">"mask.geojson"</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Create split comparison visualization</span>
+<span class="n">detector</span><span class="o">.</span><span class="n">create_split_comparison</span><span class="p">(</span>
+    <span class="n">naip_2019_path</span><span class="p">,</span>
+    <span class="n">naip_2022_path</span><span class="p">,</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/binary_mask.tif"</span><span class="p">,</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/probability_mask.tif"</span><span class="p">,</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/split_comparison.png"</span><span class="p">,</span>
+<span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-12">sam.raster_to_vector("mask.tif", "mask.geojson")</div>
+<div class="clipboard-copy-txt" id="cell-12"># Create split comparison visualization
+detector.create_split_comparison(
+    naip_2019_path,
+    naip_2022_path,
+    f"{out_folder}/binary_mask.tif",
+    f"{out_folder}/probability_mask.tif",
+    f"{out_folder}/split_comparison.png",
+)</div>
 </div>
 </div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Show the segmentation results on the map.</p>
 </div>
 </div>
 </div>
@@ -2776,13 +3232,19 @@ sam = SamGeo(model="FastSAM-x.pt")</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span><span class="o">.</span><span class="n">add_raster</span><span class="p">(</span><span class="s2">"mask.tif"</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s2">"Mask"</span><span class="p">)</span>
-<span class="n">m</span><span class="o">.</span><span class="n">add_vector</span><span class="p">(</span><span class="s2">"mask.geojson"</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s2">"Mask Vector"</span><span class="p">)</span>
-<span class="n">m</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Analyze individual instances</span>
+<span class="n">instance_stats</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">analyze_instances</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/instance_masks.tif"</span><span class="p">,</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/instance_masks_scores.tif"</span><span class="p">,</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/instance_analysis.png"</span><span class="p">,</span>
+<span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-13">m.add_raster("mask.tif", opacity=0.5, layer_name="Mask")
-m.add_vector("mask.geojson", layer_name="Mask Vector")
-m</div>
+<div class="clipboard-copy-txt" id="cell-13"># Analyze individual instances
+instance_stats = detector.analyze_instances(
+    f"{out_folder}/instance_masks.tif",
+    f"{out_folder}/instance_masks_scores.tif",
+    f"{out_folder}/instance_analysis.png",
+)</div>
 </div>
 </div>
 </div>
@@ -2795,7 +3257,138 @@ m</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><img alt="" src="https://i.imgur.com/LvEAMSl.png"/></p>
+<p><img alt="" src="https://github.com/user-attachments/assets/ea1f8a51-ea14-415a-9733-78b243061dd3"/></p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="comprehensive-analysis-report">Comprehensive Analysis Report<a class="anchor-link" href="#comprehensive-analysis-report">¶</a></h2><p>Generate a detailed analysis report combining all metrics.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="CodeMirror cm-s-jupyter">
+<div class="zeroclipboard-container">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-14">
+<div>
+<span class="notice" hidden="">Copied!</span>
+<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
+<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+</clipboard-copy>
+</div>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Create comprehensive analysis report</span>
+<span class="n">detector</span><span class="o">.</span><span class="n">create_comprehensive_report</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">out_folder</span><span class="si">}</span><span class="s2">/comprehensive_report.png"</span><span class="p">)</span>
+</pre></div>
+<div class="clipboard-copy-txt" id="cell-14"># Create comprehensive analysis report
+detector.create_comprehensive_report(results, f"{out_folder}/comprehensive_report.png")</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p><img alt="" src="https://github.com/user-attachments/assets/629caf85-0713-4e04-8023-f4273edbbb4c"/></p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="one-click-complete-analysis">One-Click Complete Analysis<a class="anchor-link" href="#one-click-complete-analysis">¶</a></h2><p>For ultimate simplicity, use the complete analysis method.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="CodeMirror cm-s-jupyter">
+<div class="zeroclipboard-container">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-15">
+<div>
+<span class="notice" hidden="">Copied!</span>
+<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
+<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+</clipboard-copy>
+</div>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Alternative: Run complete analysis in one step</span>
+<span class="c1"># This method does everything - detection, file outputs, and all visualizations</span>
+<span class="n">complete_results</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">run_complete_analysis</span><span class="p">(</span>
+    <span class="n">naip_2019_path</span><span class="p">,</span> <span class="n">naip_2022_path</span><span class="p">,</span> <span class="s2">"complete_analysis_results"</span>
+<span class="p">)</span>
+</pre></div>
+<div class="clipboard-copy-txt" id="cell-15"># Alternative: Run complete analysis in one step
+# This method does everything - detection, file outputs, and all visualizations
+complete_results = detector.run_complete_analysis(
+    naip_2019_path, naip_2022_path, "complete_analysis_results"
+)</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="summary">Summary<a class="anchor-link" href="#summary">¶</a></h2><p>This notebook demonstrated the change detection functionality in GeoAI with integrated visualization methods:</p>
+<h3 id="key-features-used">Key Features Used:<a class="anchor-link" href="#key-features-used">¶</a></h3><ol>
+<li><strong>Change Detection</strong>: Instance segmentation with confidence scoring</li>
+<li><strong>Integrated Visualizations</strong>: Built-in methods for comprehensive analysis</li>
+<li><strong>Simplified API</strong>: Clean, streamlined interface following geoai patterns</li>
+<li><strong>Complete Analysis</strong>: One-click method for full analysis workflow</li>
+</ol>
+<h3 id="output-files-generated">Output Files Generated:<a class="anchor-link" href="#output-files-generated">¶</a></h3><ul>
+<li><code>binary_mask.tif</code>: Traditional binary change detection</li>
+<li><code>probability_mask.tif</code>: Probability-weighted change detection</li>
+<li><code>instance_masks.tif</code>: Instance segmentation with unique IDs</li>
+<li><code>instance_masks_scores.tif</code>: Confidence scores for each instance</li>
+<li><code>enhanced_probability_results.png</code>: Comprehensive visualization</li>
+<li><code>split_comparison.png</code>: Before/after split comparison</li>
+<li><code>instance_analysis.png</code>: Individual instance analysis</li>
+<li><code>comprehensive_report.png</code>: Complete analysis report</li>
+</ul>
+<h3 id="advantages-over-traditional-methods">Advantages Over Traditional Methods:<a class="anchor-link" href="#advantages-over-traditional-methods">¶</a></h3><ol>
+<li><strong>Instance-Level Analysis</strong>: Each change object has unique ID and metrics</li>
+<li><strong>Quality Assessment</strong>: Confidence scores for filtering and ranking</li>
+<li><strong>Rich Visualizations</strong>: Multiple analysis perspectives in one package</li>
+<li><strong>Simplified Workflow</strong>: Integrated methods reduce code complexity</li>
+<li><strong>Flexible Usage</strong>: From simple detection to comprehensive analysis</li>
+</ol>
 </div>
 </div>
 </div>
@@ -2829,7 +3422,7 @@ m</div>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 27, 2024 16:50:48 UTC"><span class="timeago" datetime="2024-07-27T16:50:48+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 27, 2024 16:50:48 UTC">2024-07-27</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 17, 2025 16:14:12 UTC"><span class="timeago" datetime="2025-07-17T16:14:12+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 17, 2025 16:14:12 UTC">2025-07-17</span>
   </span>
 
     
@@ -2839,7 +3432,7 @@ m</div>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 11, 2023 23:10:59 UTC"><span class="timeago" datetime="2023-10-11T23:10:59+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 11, 2023 23:10:59 UTC">2023-10-11</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 17, 2025 16:14:12 UTC"><span class="timeago" datetime="2025-07-17T16:14:12+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 17, 2025 16:14:12 UTC">2025-07-17</span>
   </span>
 
     
@@ -2898,14 +3491,14 @@ m</div>
     
     
       
-      <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "search.highlight", "search.share"], "search": "../../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "search.highlight", "search.share"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      <script src="../../assets/javascripts/bundle.56ea9cef.min.js"></script>
       
-        <script src="../../../js/timeago.min.js"></script>
+        <script src="../../js/timeago.min.js"></script>
       
-        <script src="../../../js/timeago_mkdocs_material.js"></script>
+        <script src="../../js/timeago_mkdocs_material.js"></script>
       
     
   </body>

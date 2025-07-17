@@ -5,6 +5,10 @@
          <lastmod>2025-07-17</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/change_detection/</loc>
+         <lastmod>2025-07-17</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/changelog/</loc>
          <lastmod>2025-07-17</lastmod>
     </url>
@@ -94,6 +98,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/car_detection/</loc>
+         <lastmod>2025-07-17</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/change_detection/</loc>
          <lastmod>2025-07-17</lastmod>
     </url>
     <url>
@@ -294,10 +302,6 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/text_prompts_batch/</loc>
-         <lastmod>2025-07-17</lastmod>
-    </url>
-    <url>
-         <loc>https://opengeoai.org/examples/waterbody-dataset-sample/</loc>
          <lastmod>2025-07-17</lastmod>
     </url>
     <url>
