@@ -18,6 +18,7 @@ scikit-image
 scikit-learn
 # segment-geospatial
 torch
+torchange
 torchgeo
 torchinfo
 tqdm
