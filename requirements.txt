@@ -1,6 +1,7 @@
 albumentations
 buildingregulariser
 contextily
+ever-beta
 geopandas
 huggingface_hub
 jupyter-server-proxy
@@ -18,6 +19,7 @@ scikit-image
 scikit-learn
 # segment-geospatial
 torch
+torchange
 torchgeo
 torchinfo
 tqdm

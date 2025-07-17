@@ -141,6 +141,7 @@ nav:
           - examples/batch_segmentation.ipynb
           - examples/building_detection_lidar.ipynb
           - examples/instance_segmentation.ipynb
+          - examples/change_detection.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
@@ -160,6 +161,7 @@ nav:
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
     - API Reference:
+          - change_detection module: change_detection.md
           - classify module: classify.md
           - geoai module: geoai.md
           - download module: download.md
