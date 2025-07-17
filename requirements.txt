@@ -1,6 +1,7 @@
 albumentations
 buildingregulariser
 contextily
+ever-beta
 geopandas
 huggingface_hub
 jupyter-server-proxy
