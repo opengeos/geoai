@@ -630,6 +630,7 @@ def train_MaskRCNN_model(
             will try to load optimizer and scheduler states as well. Defaults to False.
         print_freq (int): Frequency of printing training progress. Defaults to 10.
         device (torch.device): Device to train on. If None, uses CUDA if available.
+        num_workers (int): Number of workers for data loading. If None, uses 0 on macOS and Windows, 8 otherwise.
         verbose (bool): If True, prints detailed training progress. Defaults to True.
     Returns:
         None: Model weights are saved to output_dir.
@@ -1377,7 +1378,14 @@ def object_detection(
         except Exception as e:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # Load state dict and handle DataParallel module prefix
+    state_dict = torch.load(model_path, map_location=device)
+    
+    # Remove 'module.' prefix if present (from DataParallel training)
+    if any(key.startswith('module.') for key in state_dict.keys()):
+        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
+    
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 
@@ -1452,7 +1460,14 @@ def object_detection_batch(
         except Exception as e:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # Load state dict and handle DataParallel module prefix
+    state_dict = torch.load(model_path, map_location=device)
+    
+    # Remove 'module.' prefix if present (from DataParallel training)
+    if any(key.startswith('module.') for key in state_dict.keys()):
+        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
+    
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 
@@ -2110,6 +2125,7 @@ def train_segmentation_model(
         resize_mode (str): How to handle size standardization when target_size is specified.
             'resize' - Resize images to target_size (may change aspect ratio)
             'pad' - Pad images to target_size (preserves aspect ratio). Defaults to 'resize'.
+        num_workers (int): Number of workers for data loading. If None, uses 0 on macOS and Windows, 8 otherwise.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -3102,7 +3118,14 @@ def semantic_segmentation(
         except Exception as e:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # Load state dict and handle DataParallel module prefix
+    state_dict = torch.load(model_path, map_location=device)
+    
+    # Remove 'module.' prefix if present (from DataParallel training)
+    if any(key.startswith('module.') for key in state_dict.keys()):
+        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
+    
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 
@@ -3231,7 +3254,14 @@ def semantic_segmentation_batch(
         except Exception as e:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # Load state dict and handle DataParallel module prefix
+    state_dict = torch.load(model_path, map_location=device)
+    
+    # Remove 'module.' prefix if present (from DataParallel training)
+    if any(key.startswith('module.') for key in state_dict.keys()):
+        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
+    
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 
@@ -3411,7 +3441,14 @@ def instance_segmentation(
     if device is None:
         device = get_device()
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # Load state dict and handle DataParallel module prefix
+    state_dict = torch.load(model_path, map_location=device)
+    
+    # Remove 'module.' prefix if present (from DataParallel training)
+    if any(key.startswith('module.') for key in state_dict.keys()):
+        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
+    
+    model.load_state_dict(state_dict)
     model.to(device)
 
     # Use the proper instance segmentation inference function
@@ -3472,7 +3509,14 @@ def instance_segmentation_batch(
     if device is None:
         device = get_device()
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # Load state dict and handle DataParallel module prefix
+    state_dict = torch.load(model_path, map_location=device)
+    
+    # Remove 'module.' prefix if present (from DataParallel training)
+    if any(key.startswith('module.') for key in state_dict.keys()):
+        state_dict = {key.replace('module.', ''): value for key, value in state_dict.items()}
+    
+    model.load_state_dict(state_dict)
     model.to(device)
 
     # Process all GeoTIFF files in the input directory
