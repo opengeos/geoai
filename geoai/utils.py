@@ -7748,3 +7748,11 @@ def stack_bands(
         os.remove(temp_vrt)
 
     return output_file
+
+
+def empty_cache():
+    """Empty the cache of the current device."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        torch.mps.empty_cache()
