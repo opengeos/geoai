@@ -7699,8 +7699,12 @@ def stack_bands(
     Returns:
         str: Path to the output file.
     """
+    import leafmap
+
     if not input_files:
         raise ValueError("No input files provided.")
+    elif isinstance(input_files, str):
+        input_files = leafmap.find_files(input_files, ".tif")
 
     if os.path.exists(output_file) and not overwrite:
         print(f"Output file already exists: {output_file}")
