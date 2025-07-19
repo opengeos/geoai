@@ -1,6 +1,7 @@
 albumentations
 buildingregulariser
 contextily
+detectron2
 ever-beta
 geopandas
 huggingface_hub
@@ -12,6 +13,7 @@ maplibre
 opencv-python-headless
 overturemaps
 planetary-computer
+pyarrow<21.0
 pystac-client
 rasterio
 rioxarray
