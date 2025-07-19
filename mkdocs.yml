@@ -160,6 +160,7 @@ nav:
           #   - examples/dataviz/lidar_viz.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
+          - workshops/AWS_2025.ipynb
     - API Reference:
           - change_detection module: change_detection.md
           - classify module: classify.md

@@ -7699,8 +7699,12 @@ def stack_bands(
     Returns:
         str: Path to the output file.
     """
+    import leafmap
+
     if not input_files:
         raise ValueError("No input files provided.")
+    elif isinstance(input_files, str):
+        input_files = leafmap.find_files(input_files, ".tif")
 
     if os.path.exists(output_file) and not overwrite:
         print(f"Output file already exists: {output_file}")
@@ -7744,3 +7748,11 @@ def stack_bands(
         os.remove(temp_vrt)
 
     return output_file
+
+
+def empty_cache():
+    """Empty the cache of the current device."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        torch.mps.empty_cache()
