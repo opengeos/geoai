@@ -1463,6 +1463,29 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workshops/AWS_2025/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    AWS 2025
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1948,6 +1971,15 @@
   <a href="#geoai.sam.download_model_from_hf" class="md-nav__link">
     <span class="md-ellipsis">
       download_model_from_hf
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.sam.empty_cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      empty_cache
     </span>
   </a>
   
@@ -2713,6 +2745,15 @@
   <a href="#geoai.sam.download_model_from_hf" class="md-nav__link">
     <span class="md-ellipsis">
       download_model_from_hf
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.sam.empty_cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      empty_cache
     </span>
   </a>
   
@@ -13378,6 +13419,39 @@ If not provided, the filename from the URL will be used.</p>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error downloading model from Hugging Face: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Please specify a local model path or ensure internet connectivity.&quot;</span><span class="p">)</span>
         <span class="k">raise</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="geoai.sam.empty_cache" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">empty_cache</span><span class="p">()</span></code>
+
+<a href="#geoai.sam.empty_cache" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Empty the cache of the current device.</p>
+
+
+            <details class="quote">
+              <summary>Source code in <code>geoai/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7753</span>
+<span class="normal">7754</span>
+<span class="normal">7755</span>
+<span class="normal">7756</span>
+<span class="normal">7757</span>
+<span class="normal">7758</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">empty_cache</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Empty the cache of the current device.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="p">,</span> <span class="s2">&quot;mps&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -28522,7 +28596,11 @@ not saved. Defaults to None.</p>
 <span class="normal">7743</span>
 <span class="normal">7744</span>
 <span class="normal">7745</span>
-<span class="normal">7746</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
+<span class="normal">7746</span>
+<span class="normal">7747</span>
+<span class="normal">7748</span>
+<span class="normal">7749</span>
+<span class="normal">7750</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
     <span class="n">input_files</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">resolution</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -28550,8 +28628,12 @@ not saved. Defaults to None.</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        str: Path to the output file.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">leafmap</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">input_files</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No input files provided.&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_files</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">input_files</span> <span class="o">=</span> <span class="n">leafmap</span><span class="o">.</span><span class="n">find_files</span><span class="p">(</span><span class="n">input_files</span><span class="p">,</span> <span class="s2">&quot;.tif&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output file already exists: </span><span class="si">{</span><span class="n">output_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
