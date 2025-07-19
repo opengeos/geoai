@@ -1,7 +1,6 @@
 albumentations
 buildingregulariser
 contextily
-detectron2
 ever-beta
 geopandas
 huggingface_hub
