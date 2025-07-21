@@ -1,13 +1,16 @@
 """Change detection module for remote sensing imagery using torchange."""
 
 import os
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 from rasterio.windows import from_bounds
 from skimage.transform import resize
-import matplotlib.pyplot as plt
-import cv2
 from torchange.models.segment_any_change import AnyChange, show_change_masks
+
 from .utils import download_file
 
 
@@ -47,15 +50,15 @@ class ChangeDetection:
 
     def set_hyperparameters(
         self,
-        change_confidence_threshold=155,
-        auto_threshold=False,
-        use_normalized_feature=True,
-        area_thresh=0.8,
-        match_hist=False,
-        object_sim_thresh=60,
-        bitemporal_match=True,
-        **kwargs,
-    ):
+        change_confidence_threshold: int = 155,
+        auto_threshold: bool = False,
+        use_normalized_feature: bool = True,
+        area_thresh: float = 0.8,
+        match_hist: bool = False,
+        object_sim_thresh: int = 60,
+        bitemporal_match: bool = True,
+        **kwargs: Any,
+    ) -> None:
         """
         Set hyperparameters for the change detection model.
 
@@ -83,16 +86,16 @@ class ChangeDetection:
 
     def set_mask_generator_params(
         self,
-        points_per_side=32,
+        points_per_side: int = 32,
         points_per_batch: int = 64,
         pred_iou_thresh: float = 0.5,
         stability_score_thresh: float = 0.95,
         stability_score_offset: float = 1.0,
         box_nms_thresh: float = 0.7,
-        point_grids=None,
+        point_grids: Optional[List] = None,
         min_mask_region_area: int = 0,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """
         Set mask generator parameters.
 
@@ -203,17 +206,17 @@ class ChangeDetection:
 
     def detect_changes(
         self,
-        image1_path,
-        image2_path,
-        output_path=None,
-        target_size=1024,
-        return_results=True,
-        export_probability=False,
-        probability_output_path=None,
-        export_instance_masks=False,
-        instance_masks_output_path=None,
-        return_detailed_results=False,
-    ):
+        image1_path: str,
+        image2_path: str,
+        output_path: Optional[str] = None,
+        target_size: int = 1024,
+        return_results: bool = True,
+        export_probability: bool = False,
+        probability_output_path: Optional[str] = None,
+        export_instance_masks: bool = False,
+        instance_masks_output_path: Optional[str] = None,
+        return_detailed_results: bool = False,
+    ) -> Union[Tuple[Any, np.ndarray, np.ndarray], Dict[str, Any], None]:
         """
         Detect changes between two GeoTIFF images with instance segmentation.
 
@@ -530,7 +533,9 @@ class ChangeDetection:
         ) as dst:
             dst.write(prob_final.astype(np.float32), 1)
 
-    def visualize_changes(self, image1_path, image2_path, figsize=(15, 5)):
+    def visualize_changes(
+        self, image1_path: str, image2_path: str, figsize: Tuple[int, int] = (15, 5)
+    ) -> plt.Figure:
         """
         Visualize change detection results.
 
@@ -1516,14 +1521,16 @@ Areas:
         return results
 
 
-def download_checkpoint(model_type="vit_h", checkpoint_dir=None):
+def download_checkpoint(
+    model_type: str = "vit_h", checkpoint_dir: Optional[str] = None
+) -> str:
     """Download the SAM model checkpoint.
 
     Args:
         model_type (str, optional): The model type. Can be one of ['vit_h', 'vit_l', 'vit_b'].
             Defaults to 'vit_h'. See https://bit.ly/3VrpxUh for more details.
         checkpoint_dir (str, optional): The checkpoint_dir directory. Defaults to None,
-        "~/.cache/torch/hub/checkpoints".
+            which uses "~/.cache/torch/hub/checkpoints".
     """
 
     model_types = {

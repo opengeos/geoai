@@ -1,50 +1,51 @@
 """The module for training semantic segmentation models for classifying remote sensing imagery."""
 
 import os
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
 
 def train_classifier(
-    image_root,
-    label_root,
-    output_dir="output",
-    in_channels=4,
-    num_classes=14,
-    epochs=20,
-    img_size=256,
-    batch_size=8,
-    sample_size=500,
-    model="unet",
-    backbone="resnet50",
-    weights=True,
-    num_filters=3,
-    loss="ce",
-    class_weights=None,
-    ignore_index=None,
-    lr=0.001,
-    patience=10,
-    freeze_backbone=False,
-    freeze_decoder=False,
-    transforms=None,
-    use_augmentation=False,
-    seed=42,
-    train_val_test_split=(0.6, 0.2, 0.2),
-    accelerator="auto",
-    devices="auto",
-    logger=None,
-    callbacks=None,
-    log_every_n_steps=10,
-    use_distributed_sampler=False,
-    monitor_metric="val_loss",
-    mode="min",
-    save_top_k=1,
-    save_last=True,
-    checkpoint_filename="best_model",
-    checkpoint_path=None,
-    every_n_epochs=1,
-    **kwargs,
-):
+    image_root: str,
+    label_root: str,
+    output_dir: str = "output",
+    in_channels: int = 4,
+    num_classes: int = 14,
+    epochs: int = 20,
+    img_size: int = 256,
+    batch_size: int = 8,
+    sample_size: int = 500,
+    model: str = "unet",
+    backbone: str = "resnet50",
+    weights: bool = True,
+    num_filters: int = 3,
+    loss: str = "ce",
+    class_weights: Optional[List[float]] = None,
+    ignore_index: Optional[int] = None,
+    lr: float = 0.001,
+    patience: int = 10,
+    freeze_backbone: bool = False,
+    freeze_decoder: bool = False,
+    transforms: Optional[Any] = None,
+    use_augmentation: bool = False,
+    seed: int = 42,
+    train_val_test_split: tuple = (0.6, 0.2, 0.2),
+    accelerator: str = "auto",
+    devices: str = "auto",
+    logger: Optional[Any] = None,
+    callbacks: Optional[List[Any]] = None,
+    log_every_n_steps: int = 10,
+    use_distributed_sampler: bool = False,
+    monitor_metric: str = "val_loss",
+    mode: str = "min",
+    save_top_k: int = 1,
+    save_last: bool = True,
+    checkpoint_filename: str = "best_model",
+    checkpoint_path: Optional[str] = None,
+    every_n_epochs: int = 1,
+    **kwargs: Any,
+) -> Any:
     """Train a semantic segmentation model on geospatial imagery.
 
     This function sets up datasets, model, trainer, and executes the training process
@@ -584,15 +585,15 @@ def _classify_image(
 
 
 def classify_image(
-    image_path,
-    model_path,
-    output_path=None,
-    chip_size=1024,
-    overlap=256,
-    batch_size=4,
-    colormap=None,
-    **kwargs,
-):
+    image_path: str,
+    model_path: str,
+    output_path: Optional[str] = None,
+    chip_size: int = 1024,
+    overlap: int = 256,
+    batch_size: int = 4,
+    colormap: Optional[Dict] = None,
+    **kwargs: Any,
+) -> str:
     """
     Classify a geospatial image using a trained semantic segmentation model.
 
@@ -826,15 +827,15 @@ def classify_image(
 
 
 def classify_images(
-    image_paths,
-    model_path,
-    output_dir=None,
-    chip_size=1024,
-    batch_size=4,
-    colormap=None,
-    file_extension=".tif",
-    **kwargs,
-):
+    image_paths: Union[str, List[str]],
+    model_path: str,
+    output_dir: Optional[str] = None,
+    chip_size: int = 1024,
+    batch_size: int = 4,
+    colormap: Optional[Dict] = None,
+    file_extension: str = ".tif",
+    **kwargs: Any,
+) -> List[str]:
     """
     Classify multiple geospatial images using a trained semantic segmentation model.
 

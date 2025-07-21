@@ -2,7 +2,7 @@
 
 import csv
 import os
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,9 @@ from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForMaskedImageModeling, pipeline
 
 
-def get_model_config(model_id):
+def get_model_config(
+    model_id: str,
+) -> "transformers.configuration_utils.PretrainedConfig":
     """
     Get the model configuration for a Hugging Face model.
 
@@ -25,7 +27,7 @@ def get_model_config(model_id):
     return AutoConfig.from_pretrained(model_id)
 
 
-def get_model_input_channels(model_id):
+def get_model_input_channels(model_id: str) -> int:
     """
     Check the number of input channels supported by a Hugging Face model.
 
@@ -63,14 +65,14 @@ def get_model_input_channels(model_id):
 
 
 def image_segmentation(
-    tif_path,
-    output_path,
-    labels_to_extract=None,
-    dtype="uint8",
-    model_name=None,
-    segmenter_args=None,
-    **kwargs,
-):
+    tif_path: str,
+    output_path: str,
+    labels_to_extract: Optional[List[str]] = None,
+    dtype: str = "uint8",
+    model_name: Optional[str] = None,
+    segmenter_args: Optional[Dict] = None,
+    **kwargs: Any,
+) -> str:
     """
     Segments an image with a Hugging Face segmentation model and saves the results
     as a single georeferenced image where each class has a unique integer value.
@@ -204,7 +206,7 @@ def mask_generation(
     band_indices: Optional[List[int]] = None,
     min_object_size: int = 0,
     generator_kwargs: Optional[Dict] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> Tuple[str, str]:
     """
     Process a GeoTIFF using SAM mask generation and save results as a GeoTIFF and CSV.

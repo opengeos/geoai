@@ -3,6 +3,7 @@
 # Standard Library
 import os
 import time
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 # Third-Party Libraries
 import cv2
@@ -64,13 +65,13 @@ class CustomDataset(NonGeoDataset):
 
     def __init__(
         self,
-        raster_path,
-        chip_size=(512, 512),
-        overlap=0.5,
-        transforms=None,
-        band_indexes=None,
-        verbose=False,
-    ):
+        raster_path: str,
+        chip_size: Tuple[int, int] = (512, 512),
+        overlap: float = 0.5,
+        transforms: Optional[Any] = None,
+        band_indexes: Optional[List[int]] = None,
+        verbose: bool = False,
+    ) -> None:
         """
         Initialize the dataset with overlapping tiles.
 
@@ -163,7 +164,7 @@ class CustomDataset(NonGeoDataset):
         # Get raster stats
         self.raster_stats = get_raster_stats(raster_path, divide_by=255)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
         """
         Get an image chip from the dataset by index.
 
@@ -255,7 +256,7 @@ class CustomDataset(NonGeoDataset):
             ),  # Consistent format
         }
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Return the number of samples in the dataset.
 
@@ -271,8 +272,13 @@ class ObjectDetector:
     """
 
     def __init__(
-        self, model_path=None, repo_id=None, model=None, num_classes=2, device=None
-    ):
+        self,
+        model_path: Optional[str] = None,
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        num_classes: int = 2,
+        device: Optional[str] = None,
+    ) -> None:
         """
         Initialize the object extractor.
 
@@ -312,7 +318,9 @@ class ObjectDetector:
         # Set model to evaluation mode
         self.model.eval()
 
-    def download_model_from_hf(self, model_path=None, repo_id=None):
+    def download_model_from_hf(
+        self, model_path: Optional[str] = None, repo_id: Optional[str] = None
+    ) -> str:
         """
         Download the object detection model from Hugging Face.
 
@@ -345,7 +353,7 @@ class ObjectDetector:
             print("Please specify a local model path or ensure internet connectivity.")
             raise
 
-    def initialize_model(self, model, num_classes=2):
+    def initialize_model(self, model: Optional[Any], num_classes: int = 2) -> Any:
         """Initialize a deep learning model for object detection.
 
         Args:
@@ -375,7 +383,7 @@ class ObjectDetector:
         model.to(self.device)
         return model
 
-    def load_weights(self, model_path):
+    def load_weights(self, model_path: str) -> None:
         """
         Load weights from file with error handling for different formats.
 
@@ -417,7 +425,7 @@ class ObjectDetector:
         except Exception as e:
             raise RuntimeError(f"Failed to load model: {e}")
 
-    def mask_to_polygons(self, mask, **kwargs):
+    def mask_to_polygons(self, mask: np.ndarray, **kwargs: Any) -> List[Polygon]:
         """
         Convert binary mask to polygon contours using OpenCV.
 
@@ -474,7 +482,9 @@ class ObjectDetector:
 
         return polygons
 
-    def filter_overlapping_polygons(self, gdf, **kwargs):
+    def filter_overlapping_polygons(
+        self, gdf: gpd.GeoDataFrame, **kwargs: Any
+    ) -> gpd.GeoDataFrame:
         """
         Filter overlapping polygons using non-maximum suppression.
 
@@ -531,7 +541,9 @@ class ObjectDetector:
 
         return gdf.iloc[keep_indices]
 
-    def filter_edge_objects(self, gdf, raster_path, edge_buffer=10):
+    def filter_edge_objects(
+        self, gdf: gpd.GeoDataFrame, raster_path: str, edge_buffer: int = 10
+    ) -> gpd.GeoDataFrame:
         """
         Filter out object detections that fall in padding/edge areas of the image.
 
@@ -596,17 +608,17 @@ class ObjectDetector:
 
     def masks_to_vector(
         self,
-        mask_path,
-        output_path=None,
-        simplify_tolerance=None,
-        mask_threshold=None,
-        min_object_area=None,
-        max_object_area=None,
-        nms_iou_threshold=None,
-        regularize=True,
-        angle_threshold=15,
-        rectangularity_threshold=0.7,
-    ):
+        mask_path: str,
+        output_path: Optional[str] = None,
+        simplify_tolerance: Optional[float] = None,
+        mask_threshold: Optional[float] = None,
+        min_object_area: Optional[int] = None,
+        max_object_area: Optional[int] = None,
+        nms_iou_threshold: Optional[float] = None,
+        regularize: bool = True,
+        angle_threshold: int = 15,
+        rectangularity_threshold: float = 0.7,
+    ) -> gpd.GeoDataFrame:
         """
         Convert an object mask GeoTIFF to vector polygons and save as GeoJSON.
 
@@ -808,14 +820,14 @@ class ObjectDetector:
     @torch.no_grad()
     def process_raster(
         self,
-        raster_path,
-        output_path=None,
-        batch_size=4,
-        filter_edges=True,
-        edge_buffer=20,
-        band_indexes=None,
-        **kwargs,
-    ):
+        raster_path: str,
+        output_path: Optional[str] = None,
+        batch_size: int = 4,
+        filter_edges: bool = True,
+        edge_buffer: int = 20,
+        band_indexes: Optional[List[int]] = None,
+        **kwargs: Any,
+    ) -> "gpd.GeoDataFrame":
         """
         Process a raster file to extract objects with customizable parameters.
 
@@ -874,7 +886,7 @@ class ObjectDetector:
         self.raster_stats = dataset.raster_stats
 
         # Custom collate function to handle Shapely objects
-        def custom_collate(batch):
+        def custom_collate(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
             """
             Custom collate function that handles Shapely geometries
             by keeping them as Python objects rather than trying to collate them.
@@ -1056,8 +1068,13 @@ class ObjectDetector:
         return gdf
 
     def save_masks_as_geotiff(
-        self, raster_path, output_path=None, batch_size=4, verbose=False, **kwargs
-    ):
+        self,
+        raster_path: str,
+        output_path: Optional[str] = None,
+        batch_size: int = 4,
+        verbose: bool = False,
+        **kwargs: Any,
+    ) -> str:
         """
         Process a raster file to extract object masks and save as GeoTIFF.
 
@@ -1125,7 +1142,7 @@ class ObjectDetector:
                 mask_array = np.zeros((src.height, src.width), dtype=np.uint8)
 
                 # Custom collate function to handle Shapely objects
-                def custom_collate(batch):
+                def custom_collate(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
                     """Custom collate function for DataLoader"""
                     elem = batch[0]
                     if isinstance(elem, dict):
@@ -1291,12 +1308,12 @@ class ObjectDetector:
 
     def regularize_objects(
         self,
-        gdf,
-        min_area=10,
-        angle_threshold=15,
-        orthogonality_threshold=0.3,
-        rectangularity_threshold=0.7,
-    ):
+        gdf: gpd.GeoDataFrame,
+        min_area: int = 10,
+        angle_threshold: int = 15,
+        orthogonality_threshold: float = 0.3,
+        rectangularity_threshold: float = 0.7,
+    ) -> gpd.GeoDataFrame:
         """
         Regularize objects to enforce right angles and rectangular shapes.
 
@@ -1319,7 +1336,9 @@ class ObjectDetector:
         from shapely.geometry import MultiPolygon, Polygon, box
         from tqdm import tqdm
 
-        def get_angle(p1, p2, p3):
+        def get_angle(
+            p1: Tuple[float, float], p2: Tuple[float, float], p3: Tuple[float, float]
+        ) -> float:
             """Calculate angle between three points in degrees (0-180)"""
             a = np.array(p1)
             b = np.array(p2)
@@ -1335,11 +1354,11 @@ class ObjectDetector:
 
             return angle
 
-        def is_orthogonal(angle, threshold=angle_threshold):
+        def is_orthogonal(angle: float, threshold: int = angle_threshold) -> bool:
             """Check if angle is close to 90 degrees"""
             return abs(angle - 90) <= threshold
 
-        def calculate_dominant_direction(polygon):
+        def calculate_dominant_direction(polygon: Polygon) -> float:
             """Find the dominant direction of a polygon using PCA"""
             # Extract coordinates
             coords = np.array(polygon.exterior.coords)
@@ -1368,7 +1387,7 @@ class ObjectDetector:
 
             return angle_deg
 
-        def create_oriented_envelope(polygon, angle_deg):
+        def create_oriented_envelope(polygon: Polygon, angle_deg: float) -> Polygon:
             """Create an oriented minimum area rectangle for the polygon"""
             # Create a rotated rectangle using OpenCV method (more robust than Shapely methods)
             coords = np.array(polygon.exterior.coords)[:-1].astype(
@@ -1384,13 +1403,13 @@ class ObjectDetector:
 
             return oriented_box
 
-        def get_rectangularity(polygon, oriented_box):
+        def get_rectangularity(polygon: Polygon, oriented_box: Polygon) -> float:
             """Calculate the rectangularity (area ratio to its oriented bounding box)"""
             if oriented_box.area == 0:
                 return 0
             return polygon.area / oriented_box.area
 
-        def check_orthogonality(polygon):
+        def check_orthogonality(polygon: Polygon) -> float:
             """Check what percentage of angles in the polygon are orthogonal"""
             coords = list(polygon.exterior.coords)
             if len(coords) <= 4:  # Triangle or point
@@ -1413,7 +1432,7 @@ class ObjectDetector:
 
             return orthogonal_count / total_angles
 
-        def simplify_to_rectangle(polygon):
+        def simplify_to_rectangle(polygon: Polygon) -> Polygon:
             """Simplify a polygon to a rectangle using its oriented bounding box"""
             # Get dominant direction
             angle = calculate_dominant_direction(polygon)
@@ -1506,8 +1525,12 @@ class ObjectDetector:
         return result_gdf
 
     def visualize_results(
-        self, raster_path, gdf=None, output_path=None, figsize=(12, 12)
-    ):
+        self,
+        raster_path: str,
+        gdf: Optional[gpd.GeoDataFrame] = None,
+        output_path: Optional[str] = None,
+        figsize: Tuple[int, int] = (12, 12),
+    ) -> bool:
         """
         Visualize object detection results with proper coordinate transformation.
 
@@ -1653,7 +1676,9 @@ class ObjectDetector:
                 has_confidence = False
 
         # Function to convert coordinates
-        def geo_to_pixel(geometry, transform):
+        def geo_to_pixel(
+            geometry: Any, transform: Any
+        ) -> Optional[Tuple[List[float], List[float]]]:
             """Convert geometry to pixel coordinates using the provided transform."""
             if geometry.is_empty:
                 return None
@@ -1913,18 +1938,18 @@ class ObjectDetector:
 
     def generate_masks(
         self,
-        raster_path,
-        output_path=None,
-        confidence_threshold=None,
-        mask_threshold=None,
-        min_object_area=10,
-        max_object_area=float("inf"),
-        overlap=0.25,
-        batch_size=4,
-        band_indexes=None,
-        verbose=False,
-        **kwargs,
-    ):
+        raster_path: str,
+        output_path: Optional[str] = None,
+        confidence_threshold: Optional[float] = None,
+        mask_threshold: Optional[float] = None,
+        min_object_area: int = 10,
+        max_object_area: float = float("inf"),
+        overlap: float = 0.25,
+        batch_size: int = 4,
+        band_indexes: Optional[List[int]] = None,
+        verbose: bool = False,
+        **kwargs: Any,
+    ) -> str:
         """
         Save masks with confidence values as a multi-band GeoTIFF.
 
@@ -1983,7 +2008,7 @@ class ObjectDetector:
             conf_array = np.zeros((src.height, src.width), dtype=np.uint8)
 
             # Define custom collate function to handle Shapely objects
-            def custom_collate(batch):
+            def custom_collate(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
                 """
                 Custom collate function that handles Shapely geometries
                 by keeping them as Python objects rather than trying to collate them.
@@ -2113,14 +2138,14 @@ class ObjectDetector:
 
     def vectorize_masks(
         self,
-        masks_path,
-        output_path=None,
-        confidence_threshold=0.5,
-        min_object_area=100,
-        max_object_area=None,
-        n_workers=None,
-        **kwargs,
-    ):
+        masks_path: str,
+        output_path: Optional[str] = None,
+        confidence_threshold: float = 0.5,
+        min_object_area: int = 100,
+        max_object_area: Optional[int] = None,
+        n_workers: Optional[int] = None,
+        **kwargs: Any,
+    ) -> gpd.GeoDataFrame:
         """
         Convert masks with confidence to vector polygons.
 
@@ -2142,13 +2167,13 @@ class ObjectDetector:
         """
 
         def _process_single_component(
-            component_mask,
-            conf_data,
-            transform,
-            confidence_threshold,
-            min_object_area,
-            max_object_area,
-        ):
+            component_mask: np.ndarray,
+            conf_data: np.ndarray,
+            transform: Any,
+            confidence_threshold: float,
+            min_object_area: int,
+            max_object_area: Optional[int],
+        ) -> Optional[Dict[str, Any]]:
             # Get confidence value
             conf_region = conf_data[component_mask > 0]
             if len(conf_region) > 0:
@@ -2195,7 +2220,9 @@ class ObjectDetector:
         import concurrent.futures
         from functools import partial
 
-        def process_component(args):
+        def process_component(
+            args: Tuple[int, np.ndarray, np.ndarray, Any, float, int, Optional[int]],
+        ) -> Optional[Dict[str, Any]]:
             """
             Helper function to process a single component
             """
@@ -2346,11 +2373,11 @@ class BuildingFootprintExtractor(ObjectDetector):
 
     def __init__(
         self,
-        model_path="building_footprints_usa.pth",
-        repo_id=None,
-        model=None,
-        device=None,
-    ):
+        model_path: str = "building_footprints_usa.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        device: Optional[str] = None,
+    ) -> None:
         """
         Initialize the object extractor.
 
@@ -2366,12 +2393,12 @@ class BuildingFootprintExtractor(ObjectDetector):
 
     def regularize_buildings(
         self,
-        gdf,
-        min_area=10,
-        angle_threshold=15,
-        orthogonality_threshold=0.3,
-        rectangularity_threshold=0.7,
-    ):
+        gdf: gpd.GeoDataFrame,
+        min_area: int = 10,
+        angle_threshold: int = 15,
+        orthogonality_threshold: float = 0.3,
+        rectangularity_threshold: float = 0.7,
+    ) -> gpd.GeoDataFrame:
         """
         Regularize building footprints to enforce right angles and rectangular shapes.
 
@@ -2402,8 +2429,12 @@ class CarDetector(ObjectDetector):
     """
 
     def __init__(
-        self, model_path="car_detection_usa.pth", repo_id=None, model=None, device=None
-    ):
+        self,
+        model_path: str = "car_detection_usa.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        device: Optional[str] = None,
+    ) -> None:
         """
         Initialize the object extractor.
 
@@ -2427,8 +2458,12 @@ class ShipDetector(ObjectDetector):
     """
 
     def __init__(
-        self, model_path="ship_detection.pth", repo_id=None, model=None, device=None
-    ):
+        self,
+        model_path: str = "ship_detection.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        device: Optional[str] = None,
+    ) -> None:
         """
         Initialize the object extractor.
 
@@ -2453,11 +2488,11 @@ class SolarPanelDetector(ObjectDetector):
 
     def __init__(
         self,
-        model_path="solar_panel_detection.pth",
-        repo_id=None,
-        model=None,
-        device=None,
-    ):
+        model_path: str = "solar_panel_detection.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        device: Optional[str] = None,
+    ) -> None:
         """
         Initialize the object extractor.
 
@@ -2481,12 +2516,12 @@ class ParkingSplotDetector(ObjectDetector):
 
     def __init__(
         self,
-        model_path="parking_spot_detection.pth",
-        repo_id=None,
-        model=None,
-        num_classes=3,
-        device=None,
-    ):
+        model_path: str = "parking_spot_detection.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        num_classes: int = 3,
+        device: Optional[str] = None,
+    ) -> None:
         """
         Initialize the object extractor.
 
@@ -2521,13 +2556,13 @@ class AgricultureFieldDelineator(ObjectDetector):
 
     def __init__(
         self,
-        model_path="field_boundary_detector.pth",
-        repo_id=None,
-        model=None,
-        device=None,
-        band_selection=None,
-        use_ndvi=False,
-    ):
+        model_path: str = "field_boundary_detector.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        device: Optional[str] = None,
+        band_selection: Optional[List[int]] = None,
+        use_ndvi: bool = False,
+    ) -> None:
         """
         Initialize the field boundary delineator.
 
@@ -2603,7 +2638,7 @@ class AgricultureFieldDelineator(ObjectDetector):
         self.min_object_area = 1000  # Minimum area in pixels for field detection
         self.simplify_tolerance = 2.0  # Higher tolerance for field boundaries
 
-    def initialize_sentinel2_model(self, model=None):
+    def initialize_sentinel2_model(self, model: Optional[Any] = None) -> Any:
         """
         Initialize a Mask R-CNN model with a modified first layer to accept Sentinel-2 data.
 
@@ -2656,7 +2691,12 @@ class AgricultureFieldDelineator(ObjectDetector):
         model.to(self.device)
         return model
 
-    def preprocess_sentinel_bands(self, image_data, band_selection=None, use_ndvi=None):
+    def preprocess_sentinel_bands(
+        self,
+        image_data: np.ndarray,
+        band_selection: Optional[List[int]] = None,
+        use_ndvi: Optional[bool] = None,
+    ) -> torch.Tensor:
         """
         Preprocess Sentinel-2 band data for model input.
 
@@ -2718,7 +2758,12 @@ class AgricultureFieldDelineator(ObjectDetector):
 
         return image_tensor
 
-    def update_band_stats(self, raster_path, band_selection=None, sample_size=1000):
+    def update_band_stats(
+        self,
+        raster_path: str,
+        band_selection: Optional[List[int]] = None,
+        sample_size: int = 1000,
+    ) -> Dict[str, List[float]]:
         """
         Update band statistics from the input Sentinel-2 raster.
 
@@ -2782,15 +2827,15 @@ class AgricultureFieldDelineator(ObjectDetector):
 
     def process_sentinel_raster(
         self,
-        raster_path,
-        output_path=None,
-        batch_size=4,
-        band_selection=None,
-        use_ndvi=None,
-        filter_edges=True,
-        edge_buffer=20,
-        **kwargs,
-    ):
+        raster_path: str,
+        output_path: Optional[str] = None,
+        batch_size: int = 4,
+        band_selection: Optional[List[int]] = None,
+        use_ndvi: Optional[bool] = None,
+        filter_edges: bool = True,
+        edge_buffer: int = 20,
+        **kwargs: Any,
+    ) -> gpd.GeoDataFrame:
         """
         Process a Sentinel-2 raster to extract field boundaries.
 
@@ -2840,14 +2885,14 @@ class AgricultureFieldDelineator(ObjectDetector):
         class Sentinel2Dataset(torch.utils.data.Dataset):
             def __init__(
                 self,
-                raster_path,
-                chip_size,
-                stride_x,
-                stride_y,
-                band_selection,
-                use_ndvi,
-                field_delineator,
-            ):
+                raster_path: str,
+                chip_size: Tuple[int, int],
+                stride_x: int,
+                stride_y: int,
+                band_selection: List[int],
+                use_ndvi: bool,
+                field_delineator: Any,
+            ) -> None:
                 self.raster_path = raster_path
                 self.chip_size = chip_size
                 self.stride_x = stride_x
@@ -2901,10 +2946,10 @@ class AgricultureFieldDelineator(ObjectDetector):
                 print(f"Image dimensions: {self.width} x {self.height} pixels")
                 print(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
 
-            def __len__(self):
+            def __len__(self) -> int:
                 return self.rows * self.cols
 
-            def __getitem__(self, idx):
+            def __getitem__(self, idx: int) -> Dict[str, Any]:
                 # Convert flat index to grid position
                 row = idx // self.cols
                 col = idx % self.cols
@@ -2971,7 +3016,7 @@ class AgricultureFieldDelineator(ObjectDetector):
         )
 
         # Define custom collate function
-        def custom_collate(batch):
+        def custom_collate(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
             elem = batch[0]
             if isinstance(elem, dict):
                 result = {}

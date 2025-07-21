@@ -3,22 +3,23 @@ See https://github.com/facebookresearch/detectron2 for more details.
 """
 
 import os
-import numpy as np
-import cv2
-import torch
-import rasterio
-from rasterio.transform import from_bounds
-from rasterio.crs import CRS
-from typing import Dict, List, Optional, Tuple, Union
 import warnings
+from typing import Dict, List, Optional, Tuple, Union
+
+import cv2
+import numpy as np
+import rasterio
+import torch
+from rasterio.crs import CRS
+from rasterio.transform import from_bounds
 
 try:
     import detectron2
     from detectron2 import model_zoo
-    from detectron2.engine import DefaultPredictor
-    from detectron2.config import get_cfg, LazyConfig
-    from detectron2.utils.visualizer import Visualizer
+    from detectron2.config import LazyConfig, get_cfg
     from detectron2.data import MetadataCatalog
+    from detectron2.engine import DefaultPredictor
+    from detectron2.utils.visualizer import Visualizer
 
     HAS_DETECTRON2 = True
 except ImportError:
@@ -328,7 +329,7 @@ def visualize_detectron2_results(
     v = Visualizer(image_rgb, scale=1.0)
 
     # Create instances object for visualization
-    from detectron2.structures import Instances, Boxes
+    from detectron2.structures import Boxes, Instances
 
     instances = Instances((image.shape[0], image.shape[1]))
     instances.pred_masks = torch.from_numpy(results["masks"])
@@ -432,7 +433,7 @@ def batch_detectron2_segment(
     return results
 
 
-def get_class_id_name_mapping(config_path: str, lazy: bool = False):
+def get_class_id_name_mapping(config_path: str, lazy: bool = False) -> Dict[int, str]:
     """
     Get class ID to name mapping from a Detectron2 model config.
 

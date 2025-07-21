@@ -1,12 +1,14 @@
 """Main module."""
 
 import logging
+from typing import Any, Dict, List, Optional
 
 logging.getLogger("maplibre").setLevel(logging.ERROR)
 
 import leafmap
 import leafmap.maplibregl as maplibregl
 
+from .change_detection import ChangeDetection
 from .classify import classify_image, classify_images, train_classifier
 from .download import (
     download_naip,
@@ -26,26 +28,25 @@ from .extract import *
 from .hf import *
 from .segment import *
 from .train import (
+    get_instance_segmentation_model,
+    instance_segmentation,
+    instance_segmentation_batch,
+    instance_segmentation_inference_on_geotiff,
     object_detection,
     object_detection_batch,
-    train_MaskRCNN_model,
-    train_segmentation_model,
     semantic_segmentation,
     semantic_segmentation_batch,
     train_instance_segmentation_model,
-    instance_segmentation,
-    instance_segmentation_batch,
-    get_instance_segmentation_model,
-    instance_segmentation_inference_on_geotiff,
+    train_MaskRCNN_model,
+    train_segmentation_model,
 )
 from .utils import *
-from .change_detection import ChangeDetection
 
 
 class Map(leafmap.Map):
     """A subclass of leafmap.Map for GeoAI applications."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the Map class."""
         super().__init__(*args, **kwargs)
 
@@ -53,7 +54,7 @@ class Map(leafmap.Map):
 class MapLibre(maplibregl.Map):
     """A subclass of maplibregl.Map for GeoAI applications."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the MapLibre class."""
         super().__init__(*args, **kwargs)
 
@@ -74,7 +75,7 @@ def create_vector_data(
     height: int = 420,
     frame_border: int = 0,
     **kwargs: Any,
-):
+) -> Any:
     """Generates a widget-based interface for creating and managing vector data on a map.
 
     This function creates an interactive widget interface that allows users to draw features
@@ -158,9 +159,9 @@ def edit_vector_data(
     frame_border: int = 0,
     controls: Optional[List[str]] = None,
     position: str = "top-right",
-    fit_bounds_options: Dict = None,
+    fit_bounds_options: Optional[Dict] = None,
     **kwargs: Any,
-):
+) -> Any:
     """Generates a widget-based interface for creating and managing vector data on a map.
 
     This function creates an interactive widget interface that allows users to draw features

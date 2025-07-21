@@ -3,7 +3,7 @@
 import logging
 import os
 import subprocess
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -252,7 +252,7 @@ def get_overture_latest_release(patch=True) -> str:
         raise
 
 
-def get_all_overture_types():
+def get_all_overture_types() -> List[str]:
     """Get a list of all available Overture Maps data types.
 
     Returns:
@@ -437,15 +437,15 @@ def extract_building_stats(data: str) -> Dict[str, Any]:
 
 
 def download_pc_stac_item(
-    item_url,
-    bands=None,
-    output_dir=None,
-    show_progress=True,
-    merge_bands=False,
-    merged_filename=None,
-    overwrite=False,
-    cell_size=None,
-):
+    item_url: str,
+    bands: Optional[List[str]] = None,
+    output_dir: Optional[str] = None,
+    show_progress: bool = True,
+    merge_bands: bool = False,
+    merged_filename: Optional[str] = None,
+    overwrite: bool = False,
+    cell_size: Optional[float] = None,
+) -> Dict[str, Any]:
     """
     Downloads a STAC item from Microsoft Planetary Computer with specified bands.
 
@@ -686,11 +686,11 @@ def download_pc_stac_item(
 
 
 def pc_collection_list(
-    endpoint="https://planetarycomputer.microsoft.com/api/stac/v1",
-    detailed=False,
-    filter_by=None,
-    sort_by="id",
-):
+    endpoint: str = "https://planetarycomputer.microsoft.com/api/stac/v1",
+    detailed: bool = False,
+    filter_by: Optional[str] = None,
+    sort_by: str = "id",
+) -> List[Dict[str, Any]]:
     """
     Retrieves and displays the list of available collections from Planetary Computer.
 
@@ -813,14 +813,14 @@ def pc_collection_list(
 
 
 def pc_stac_search(
-    collection,
-    bbox=None,
-    time_range=None,
-    query=None,
-    limit=10,
-    max_items=None,
-    endpoint="https://planetarycomputer.microsoft.com/api/stac/v1",
-):
+    collection: str,
+    bbox: Optional[List[float]] = None,
+    time_range: Optional[str] = None,
+    query: Optional[Dict[str, Any]] = None,
+    limit: int = 10,
+    max_items: Optional[int] = None,
+    endpoint: str = "https://planetarycomputer.microsoft.com/api/stac/v1",
+) -> List["pystac.Item"]:
     """
     Search for STAC items in the Planetary Computer catalog.
 
@@ -902,12 +902,12 @@ def pc_stac_search(
 
 
 def pc_stac_download(
-    items,
-    output_dir=".",
-    assets=None,
-    max_workers=1,
-    skip_existing=True,
-):
+    items: Union["pystac.Item", List["pystac.Item"]],
+    output_dir: str = ".",
+    assets: Optional[List[str]] = None,
+    max_workers: int = 1,
+    skip_existing: bool = True,
+) -> Dict[str, Dict[str, str]]:
     """
     Download assets from STAC items retrieved from the Planetary Computer.
 
@@ -924,8 +924,6 @@ def pc_stac_download(
         max_workers (int, optional): Maximum number of concurrent download threads.
             Defaults to 1.
         skip_existing (bool, optional): Skip download if the file already exists.
-            Defaults to True.
-        sign_urls (bool, optional): Whether to sign URLs for authenticated access.
             Defaults to True.
 
     Returns:
@@ -949,7 +947,9 @@ def pc_stac_download(
     os.makedirs(output_dir, exist_ok=True)
 
     # Function to download a single asset
-    def download_asset(item, asset_key, asset):
+    def download_asset(
+        item: "pystac.Item", asset_key: str, asset: "pystac.Asset"
+    ) -> str:
         item = pc.sign(item)
         item_id = item.id
 
@@ -1059,7 +1059,7 @@ def pc_stac_download(
     return results
 
 
-def pc_item_asset_list(item):
+def pc_item_asset_list(item: Union[str, "pystac.Item"]) -> List[str]:
     """
     Retrieve the list of asset keys from a STAC item in the Planetary Computer catalog.
 
@@ -1078,7 +1078,13 @@ def pc_item_asset_list(item):
     return list(item.assets.keys())
 
 
-def read_pc_item_asset(item, asset, output=None, as_cog=True, **kwargs):
+def read_pc_item_asset(
+    item: Union[str, "pystac.Item"],
+    asset: str,
+    output: Optional[str] = None,
+    as_cog: bool = True,
+    **kwargs: Any,
+) -> "xr.Dataset":
     """
     Read a specific asset from a STAC item in the Planetary Computer catalog.
 
@@ -1118,23 +1124,23 @@ def read_pc_item_asset(item, asset, output=None, as_cog=True, **kwargs):
 
 
 def view_pc_item(
-    url=None,
-    collection=None,
-    item=None,
-    assets=None,
-    bands=None,
-    titiler_endpoint=None,
-    name="STAC Item",
-    attribution="Planetary Computer",
-    opacity=1.0,
-    shown=True,
-    fit_bounds=True,
-    layer_index=None,
-    backend="folium",
-    basemap=None,
-    map_args=None,
-    **kwargs,
-):
+    url: Optional[str] = None,
+    collection: Optional[str] = None,
+    item: Optional[str] = None,
+    assets: Optional[Union[str, List[str]]] = None,
+    bands: Optional[List[str]] = None,
+    titiler_endpoint: Optional[str] = None,
+    name: str = "STAC Item",
+    attribution: str = "Planetary Computer",
+    opacity: float = 1.0,
+    shown: bool = True,
+    fit_bounds: bool = True,
+    layer_index: Optional[int] = None,
+    backend: str = "folium",
+    basemap: Optional[str] = None,
+    map_args: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> Any:
     """
     Visualize a STAC item from the Planetary Computer on an interactive map.
 
@@ -1214,22 +1220,22 @@ def view_pc_item(
 
 
 def view_pc_items(
-    urls=None,
-    collection=None,
-    items=None,
-    assets=None,
-    bands=None,
-    titiler_endpoint=None,
-    attribution="Planetary Computer",
-    opacity=1.0,
-    shown=True,
-    fit_bounds=True,
-    layer_index=None,
-    backend="folium",
-    basemap=None,
-    map_args=None,
-    **kwargs,
-):
+    urls: Optional[List[str]] = None,
+    collection: Optional[str] = None,
+    items: Optional[List[str]] = None,
+    assets: Optional[Union[str, List[str]]] = None,
+    bands: Optional[List[str]] = None,
+    titiler_endpoint: Optional[str] = None,
+    attribution: str = "Planetary Computer",
+    opacity: float = 1.0,
+    shown: bool = True,
+    fit_bounds: bool = True,
+    layer_index: Optional[int] = None,
+    backend: str = "folium",
+    basemap: Optional[str] = None,
+    map_args: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> Any:
     """
     Visualize multiple STAC items from the Planetary Computer on an interactive map.
 

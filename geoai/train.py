@@ -4,6 +4,7 @@ import os
 import platform
 import random
 import time
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,7 +35,9 @@ except ImportError:
     SMP_AVAILABLE = False
 
 
-def get_instance_segmentation_model(num_classes=2, num_channels=3, pretrained=True):
+def get_instance_segmentation_model(
+    num_classes: int = 2, num_channels: int = 3, pretrained: bool = True
+) -> torch.nn.Module:
     """
     Get Mask R-CNN model with custom input channels and output classes.
 
@@ -129,7 +132,13 @@ def get_instance_segmentation_model(num_classes=2, num_channels=3, pretrained=Tr
 class ObjectDetectionDataset(Dataset):
     """Dataset for object detection from GeoTIFF images and labels."""
 
-    def __init__(self, image_paths, label_paths, transforms=None, num_channels=None):
+    def __init__(
+        self,
+        image_paths: List[str],
+        label_paths: List[str],
+        transforms: Optional[Callable] = None,
+        num_channels: Optional[int] = None,
+    ) -> None:
         """
         Initialize dataset.
 
@@ -151,10 +160,10 @@ class ObjectDetectionDataset(Dataset):
         else:
             self.num_channels = num_channels
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.image_paths)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         # Load image
         with rasterio.open(self.image_paths[idx]) as src:
             # Read as [C, H, W] format
@@ -270,7 +279,7 @@ class ObjectDetectionDataset(Dataset):
 class Compose:
     """Custom compose transform that works with image and target."""
 
-    def __init__(self, transforms):
+    def __init__(self, transforms: List[Callable]) -> None:
         """
         Initialize compose transform.
 
@@ -279,7 +288,9 @@ class Compose:
         """
         self.transforms = transforms
 
-    def __call__(self, image, target):
+    def __call__(
+        self, image: torch.Tensor, target: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         for t in self.transforms:
             image, target = t(image, target)
         return image, target
@@ -288,7 +299,9 @@ class Compose:
 class ToTensor:
     """Convert numpy.ndarray to tensor."""
 
-    def __call__(self, image, target):
+    def __call__(
+        self, image: torch.Tensor, target: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Apply transform to image and target.
 
@@ -305,7 +318,7 @@ class ToTensor:
 class RandomHorizontalFlip:
     """Random horizontal flip transform."""
 
-    def __init__(self, prob=0.5):
+    def __init__(self, prob: float = 0.5) -> None:
         """
         Initialize random horizontal flip.
 
@@ -314,7 +327,9 @@ class RandomHorizontalFlip:
         """
         self.prob = prob
 
-    def __call__(self, image, target):
+    def __call__(
+        self, image: torch.Tensor, target: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         if random.random() < self.prob:
             # Flip image
             image = torch.flip(image, dims=[2])  # Flip along width dimension
@@ -333,7 +348,7 @@ class RandomHorizontalFlip:
         return image, target
 
 
-def get_transform(train):
+def get_transform(train: bool) -> torchvision.transforms.Compose:
     """
     Get transforms for data augmentation.
 
@@ -352,7 +367,9 @@ def get_transform(train):
     return Compose(transforms)
 
 
-def collate_fn(batch):
+def collate_fn(
+    batch: List[Tuple[torch.Tensor, Dict[str, torch.Tensor]]],
+) -> Tuple[Tuple[torch.Tensor, ...], Tuple[Dict[str, torch.Tensor], ...]]:
     """
     Custom collate function for batching samples.
 
@@ -366,8 +383,14 @@ def collate_fn(batch):
 
 
 def train_one_epoch(
-    model, optimizer, data_loader, device, epoch, print_freq=10, verbose=True
-):
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    data_loader: DataLoader,
+    device: torch.device,
+    epoch: int,
+    print_freq: int = 10,
+    verbose: bool = True,
+) -> float:
     """
     Train the model for one epoch.
 
@@ -419,7 +442,9 @@ def train_one_epoch(
     return avg_loss
 
 
-def evaluate(model, data_loader, device):
+def evaluate(
+    model: torch.nn.Module, data_loader: DataLoader, device: torch.device
+) -> Dict[str, float]:
     """
     Evaluate the model on the validation set.
 
@@ -495,7 +520,13 @@ def evaluate(model, data_loader, device):
     return {"loss": avg_loss, "IoU": avg_iou}
 
 
-def visualize_predictions(model, dataset, device, num_samples=5, output_dir=None):
+def visualize_predictions(
+    model: torch.nn.Module,
+    dataset: Dataset,
+    device: torch.device,
+    num_samples: int = 5,
+    output_dir: Optional[str] = None,
+) -> None:
     """
     Visualize model predictions.
 
@@ -583,25 +614,25 @@ def visualize_predictions(model, dataset, device, num_samples=5, output_dir=None
 
 
 def train_MaskRCNN_model(
-    images_dir,
-    labels_dir,
-    output_dir,
-    num_channels=3,
-    model=None,
-    pretrained=True,
-    pretrained_model_path=None,
-    batch_size=4,
-    num_epochs=10,
-    learning_rate=0.005,
-    seed=42,
-    val_split=0.2,
-    visualize=False,
-    resume_training=False,
-    print_freq=10,
-    device=None,
-    num_workers=None,
-    verbose=True,
-):
+    images_dir: str,
+    labels_dir: str,
+    output_dir: str,
+    num_channels: int = 3,
+    model: Optional[torch.nn.Module] = None,
+    pretrained: bool = True,
+    pretrained_model_path: Optional[str] = None,
+    batch_size: int = 4,
+    num_epochs: int = 10,
+    learning_rate: float = 0.005,
+    seed: int = 42,
+    val_split: float = 0.2,
+    visualize: bool = False,
+    resume_training: bool = False,
+    print_freq: int = 10,
+    device: Optional[torch.device] = None,
+    num_workers: Optional[int] = None,
+    verbose: bool = True,
+) -> torch.nn.Module:
     """Train and evaluate Mask R-CNN model for instance segmentation.
 
     This function trains a Mask R-CNN model for instance segmentation using the
@@ -876,17 +907,17 @@ def train_MaskRCNN_model(
 
 
 def inference_on_geotiff(
-    model,
-    geotiff_path,
-    output_path,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    num_channels=3,
-    device=None,
-    **kwargs,
-):
+    model: torch.nn.Module,
+    geotiff_path: str,
+    output_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Perform inference on a large GeoTIFF using a sliding window approach with improved blending.
 
@@ -1100,17 +1131,17 @@ def inference_on_geotiff(
 
 
 def instance_segmentation_inference_on_geotiff(
-    model,
-    geotiff_path,
-    output_path,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    num_channels=3,
-    device=None,
-    **kwargs,
-):
+    model: torch.nn.Module,
+    geotiff_path: str,
+    output_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> Tuple[str, float]:
     """
     Perform instance segmentation inference on a large GeoTIFF using a sliding window approach.
 
@@ -1331,19 +1362,19 @@ def instance_segmentation_inference_on_geotiff(
 
 
 def object_detection(
-    input_path,
-    output_path,
-    model_path,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    num_channels=3,
-    model=None,
-    pretrained=True,
-    device=None,
-    **kwargs,
-):
+    input_path: str,
+    output_path: str,
+    model_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    model: Optional[torch.nn.Module] = None,
+    pretrained: bool = True,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> None:
     """
     Perform object detection on a GeoTIFF using a pre-trained Mask R-CNN model.
 
@@ -1406,20 +1437,20 @@ def object_detection(
 
 
 def object_detection_batch(
-    input_paths,
-    output_dir,
-    model_path,
-    filenames=None,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    model=None,
-    num_channels=3,
-    pretrained=True,
-    device=None,
-    **kwargs,
-):
+    input_paths: Union[str, List[str]],
+    output_dir: str,
+    model_path: str,
+    filenames: Optional[List[str]] = None,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    model: Optional[torch.nn.Module] = None,
+    num_channels: int = 3,
+    pretrained: bool = True,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> None:
     """
     Perform object detection on a GeoTIFF using a pre-trained Mask R-CNN model.
 
@@ -1511,14 +1542,14 @@ class SemanticSegmentationDataset(Dataset):
 
     def __init__(
         self,
-        image_paths,
-        label_paths,
-        transforms=None,
-        num_channels=None,
-        target_size=None,
-        resize_mode="resize",
-        num_classes=2,
-    ):
+        image_paths: List[str],
+        label_paths: List[str],
+        transforms: Optional[Callable] = None,
+        num_channels: Optional[int] = None,
+        target_size: Optional[Tuple[int, int]] = None,
+        resize_mode: str = "resize",
+        num_classes: int = 2,
+    ) -> None:
         """
         Initialize dataset for semantic segmentation.
 
@@ -1548,11 +1579,11 @@ class SemanticSegmentationDataset(Dataset):
         else:
             self.num_channels = num_channels
 
-    def _is_geotiff(self, file_path):
+    def _is_geotiff(self, file_path: str) -> bool:
         """Check if file is a GeoTIFF based on extension."""
         return file_path.lower().endswith((".tif", ".tiff"))
 
-    def _get_num_channels(self, image_path):
+    def _get_num_channels(self, image_path: str) -> int:
         """Get number of channels from an image file."""
         if self._is_geotiff(image_path):
             with rasterio.open(image_path) as src:
@@ -1570,7 +1601,9 @@ class SemanticSegmentationDataset(Dataset):
                     # Convert to RGB and return 3 channels
                     return 3
 
-    def _resize_image_and_mask(self, image, mask):
+    def _resize_image_and_mask(
+        self, image: np.ndarray, mask: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Resize image and mask to target size."""
         if self.target_size is None:
             return image, mask
@@ -1608,7 +1641,9 @@ class SemanticSegmentationDataset(Dataset):
 
         return image, mask
 
-    def _pad_to_size(self, tensor, target_size):
+    def _pad_to_size(
+        self, tensor: torch.Tensor, target_size: Tuple[int, int]
+    ) -> torch.Tensor:
         """Pad tensor to target size with zeros."""
         target_h, target_w = target_size
 
@@ -1640,10 +1675,10 @@ class SemanticSegmentationDataset(Dataset):
 
         return padded
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.image_paths)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         # Load image
         image_path = self.image_paths[idx]
         if self._is_geotiff(image_path):
@@ -1728,10 +1763,12 @@ class SemanticSegmentationDataset(Dataset):
 class SemanticTransforms:
     """Custom transforms for semantic segmentation."""
 
-    def __init__(self, transforms):
+    def __init__(self, transforms: List[Callable]) -> None:
         self.transforms = transforms
 
-    def __call__(self, image, mask):
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         for t in self.transforms:
             image, mask = t(image, mask)
         return image, mask
@@ -1740,17 +1777,21 @@ class SemanticTransforms:
 class SemanticToTensor:
     """Convert numpy.ndarray to tensor for semantic segmentation."""
 
-    def __call__(self, image, mask):
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         return image, mask
 
 
 class SemanticRandomHorizontalFlip:
     """Random horizontal flip transform for semantic segmentation."""
 
-    def __init__(self, prob=0.5):
+    def __init__(self, prob: float = 0.5) -> None:
         self.prob = prob
 
-    def __call__(self, image, mask):
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         if random.random() < self.prob:
             # Flip image and mask along width dimension
             image = torch.flip(image, dims=[2])
@@ -1758,7 +1799,7 @@ class SemanticRandomHorizontalFlip:
         return image, mask
 
 
-def get_semantic_transform(train):
+def get_semantic_transform(train: bool) -> Any:
     """
     Get transforms for semantic segmentation data augmentation.
 
@@ -1778,14 +1819,14 @@ def get_semantic_transform(train):
 
 
 def get_smp_model(
-    architecture="unet",
-    encoder_name="resnet34",
-    encoder_weights="imagenet",
-    in_channels=3,
-    classes=2,
-    activation=None,
-    **kwargs,
-):
+    architecture: str = "unet",
+    encoder_name: str = "resnet34",
+    encoder_weights: Optional[str] = "imagenet",
+    in_channels: int = 3,
+    classes: int = 2,
+    activation: Optional[str] = None,
+    **kwargs: Any,
+) -> torch.nn.Module:
     """
     Get a segmentation model from segmentation-models-pytorch using the generic create_model function.
 
@@ -1874,7 +1915,12 @@ def get_smp_model(
         )
 
 
-def dice_coefficient(pred, target, smooth=1e-6, num_classes=None):
+def dice_coefficient(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    smooth: float = 1e-6,
+    num_classes: Optional[int] = None,
+) -> float:
     """
     Calculate Dice coefficient for segmentation (binary or multi-class).
 
@@ -1916,7 +1962,12 @@ def dice_coefficient(pred, target, smooth=1e-6, num_classes=None):
     return sum(dice_scores) / len(dice_scores) if dice_scores else 0.0
 
 
-def iou_coefficient(pred, target, smooth=1e-6, num_classes=None):
+def iou_coefficient(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    smooth: float = 1e-6,
+    num_classes: Optional[int] = None,
+) -> float:
     """
     Calculate IoU coefficient for segmentation (binary or multi-class).
 
@@ -1959,8 +2010,15 @@ def iou_coefficient(pred, target, smooth=1e-6, num_classes=None):
 
 
 def train_semantic_one_epoch(
-    model, optimizer, data_loader, device, epoch, criterion, print_freq=10, verbose=True
-):
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    data_loader: DataLoader,
+    device: torch.device,
+    epoch: int,
+    criterion: Any,
+    print_freq: int = 10,
+    verbose: bool = True,
+) -> float:
     """
     Train the semantic segmentation model for one epoch.
 
@@ -2014,7 +2072,13 @@ def train_semantic_one_epoch(
     return avg_loss
 
 
-def evaluate_semantic(model, data_loader, device, criterion, num_classes=2):
+def evaluate_semantic(
+    model: torch.nn.Module,
+    data_loader: DataLoader,
+    device: torch.device,
+    criterion: Any,
+    num_classes: int = 2,
+) -> Dict[str, float]:
     """
     Evaluate the semantic segmentation model on the validation set.
 
@@ -2062,32 +2126,32 @@ def evaluate_semantic(model, data_loader, device, criterion, num_classes=2):
 
 
 def train_segmentation_model(
-    images_dir,
-    labels_dir,
-    output_dir,
-    architecture="unet",
-    encoder_name="resnet34",
-    encoder_weights="imagenet",
-    num_channels=3,
-    num_classes=2,
-    batch_size=8,
-    num_epochs=50,
-    learning_rate=0.001,
-    weight_decay=1e-4,
-    seed=42,
-    val_split=0.2,
-    print_freq=10,
-    verbose=True,
-    save_best_only=True,
-    plot_curves=False,
-    device=None,
-    checkpoint_path=None,
-    resume_training=False,
-    target_size=None,
-    resize_mode="resize",
-    num_workers=None,
-    **kwargs,
-):
+    images_dir: str,
+    labels_dir: str,
+    output_dir: str,
+    architecture: str = "unet",
+    encoder_name: str = "resnet34",
+    encoder_weights: Optional[str] = "imagenet",
+    num_channels: int = 3,
+    num_classes: int = 2,
+    batch_size: int = 8,
+    num_epochs: int = 50,
+    learning_rate: float = 0.001,
+    weight_decay: float = 1e-4,
+    seed: int = 42,
+    val_split: float = 0.2,
+    print_freq: int = 10,
+    verbose: bool = True,
+    save_best_only: bool = True,
+    plot_curves: bool = False,
+    device: Optional[torch.device] = None,
+    checkpoint_path: Optional[str] = None,
+    resume_training: bool = False,
+    target_size: Optional[Tuple[int, int]] = None,
+    resize_mode: str = "resize",
+    num_workers: Optional[int] = None,
+    **kwargs: Any,
+) -> torch.nn.Module:
     """
     Train a semantic segmentation model for object detection using segmentation-models-pytorch.
 
@@ -2552,18 +2616,18 @@ def train_segmentation_model(
 
 
 def semantic_inference_on_geotiff(
-    model,
-    geotiff_path,
-    output_path,
-    window_size=512,
-    overlap=256,
-    batch_size=4,
-    num_channels=3,
-    num_classes=2,
-    device=None,
-    quiet=False,
-    **kwargs,
-):
+    model: torch.nn.Module,
+    geotiff_path: str,
+    output_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    num_classes: int = 2,
+    device: Optional[torch.device] = None,
+    quiet: bool = False,
+    **kwargs: Any,
+) -> Tuple[str, float]:
     """
     Perform semantic segmentation inference on a large GeoTIFF using a sliding window approach.
 
@@ -2779,19 +2843,19 @@ def semantic_inference_on_geotiff(
 
 
 def semantic_inference_on_image(
-    model,
-    image_path,
-    output_path,
-    window_size=512,
-    overlap=256,
-    batch_size=4,
-    num_channels=3,
-    num_classes=2,
-    device=None,
-    binary_output=True,
-    quiet=False,
-    **kwargs,
-):
+    model: torch.nn.Module,
+    image_path: str,
+    output_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    num_classes: int = 2,
+    device: Optional[torch.device] = None,
+    binary_output: bool = True,
+    quiet: bool = False,
+    **kwargs: Any,
+) -> Tuple[str, float]:
     """
     Perform semantic segmentation inference on a regular image (JPG, PNG, etc.) using a sliding window approach.
 
@@ -3056,20 +3120,20 @@ def semantic_inference_on_image(
 
 
 def semantic_segmentation(
-    input_path,
-    output_path,
-    model_path,
-    architecture="unet",
-    encoder_name="resnet34",
-    num_channels=3,
-    num_classes=2,
-    window_size=512,
-    overlap=256,
-    batch_size=4,
-    device=None,
-    quiet=False,
-    **kwargs,
-):
+    input_path: str,
+    output_path: str,
+    model_path: str,
+    architecture: str = "unet",
+    encoder_name: str = "resnet34",
+    num_channels: int = 3,
+    num_classes: int = 2,
+    window_size: int = 512,
+    overlap: int = 256,
+    batch_size: int = 4,
+    device: Optional[torch.device] = None,
+    quiet: bool = False,
+    **kwargs: Any,
+) -> None:
     """
     Perform semantic segmentation on an image file using a trained model.
 
@@ -3171,21 +3235,21 @@ def semantic_segmentation(
 
 
 def semantic_segmentation_batch(
-    input_dir,
-    output_dir,
-    model_path,
-    architecture="unet",
-    encoder_name="resnet34",
-    num_channels=3,
-    num_classes=2,
-    window_size=512,
-    overlap=256,
-    batch_size=4,
-    device=None,
-    filenames=None,
-    quiet=False,
-    **kwargs,
-):
+    input_dir: str,
+    output_dir: str,
+    model_path: str,
+    architecture: str = "unet",
+    encoder_name: str = "resnet34",
+    num_channels: int = 3,
+    num_classes: int = 2,
+    window_size: int = 512,
+    overlap: int = 256,
+    batch_size: int = 4,
+    device: Optional[torch.device] = None,
+    filenames: Optional[List[str]] = None,
+    quiet: bool = False,
+    **kwargs: Any,
+) -> None:
     """
     Perform semantic segmentation on a batch of images from an input directory.
 
@@ -3344,21 +3408,21 @@ def semantic_segmentation_batch(
 
 
 def train_instance_segmentation_model(
-    images_dir,
-    labels_dir,
-    output_dir,
-    num_classes=2,
-    num_channels=3,
-    batch_size=4,
-    num_epochs=10,
-    learning_rate=0.005,
-    seed=42,
-    val_split=0.2,
-    visualize=False,
-    device=None,
-    verbose=True,
-    **kwargs,
-):
+    images_dir: str,
+    labels_dir: str,
+    output_dir: str,
+    num_classes: int = 2,
+    num_channels: int = 3,
+    batch_size: int = 4,
+    num_epochs: int = 10,
+    learning_rate: float = 0.005,
+    seed: int = 42,
+    val_split: float = 0.2,
+    visualize: bool = False,
+    device: Optional[torch.device] = None,
+    verbose: bool = True,
+    **kwargs: Any,
+) -> torch.nn.Module:
     """
     Train an instance segmentation model using Mask R-CNN.
 
@@ -3407,18 +3471,18 @@ def train_instance_segmentation_model(
 
 
 def instance_segmentation(
-    input_path,
-    output_path,
-    model_path,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    num_channels=3,
-    num_classes=2,
-    device=None,
-    **kwargs,
-):
+    input_path: str,
+    output_path: str,
+    model_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    num_classes: int = 2,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> None:
     """
     Perform instance segmentation on a GeoTIFF using a pre-trained Mask R-CNN model.
 
@@ -3477,18 +3541,18 @@ def instance_segmentation(
 
 
 def instance_segmentation_batch(
-    input_dir,
-    output_dir,
-    model_path,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    num_channels=3,
-    num_classes=2,
-    device=None,
-    **kwargs,
-):
+    input_dir: str,
+    output_dir: str,
+    model_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    num_classes: int = 2,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> None:
     """
     Perform instance segmentation on multiple GeoTIFF files using a pre-trained Mask R-CNN model.
 
