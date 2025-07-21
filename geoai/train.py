@@ -4,6 +4,7 @@ import os
 import platform
 import random
 import time
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -333,7 +334,7 @@ class RandomHorizontalFlip:
         return image, target
 
 
-def get_transform(train):
+def get_transform(train: bool) -> torchvision.transforms.Compose:
     """
     Get transforms for data augmentation.
 
@@ -366,8 +367,14 @@ def collate_fn(batch):
 
 
 def train_one_epoch(
-    model, optimizer, data_loader, device, epoch, print_freq=10, verbose=True
-):
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    data_loader: DataLoader,
+    device: torch.device,
+    epoch: int,
+    print_freq: int = 10,
+    verbose: bool = True,
+) -> float:
     """
     Train the model for one epoch.
 
@@ -876,17 +883,17 @@ def train_MaskRCNN_model(
 
 
 def inference_on_geotiff(
-    model,
-    geotiff_path,
-    output_path,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    num_channels=3,
-    device=None,
-    **kwargs,
-):
+    model: torch.nn.Module,
+    geotiff_path: str,
+    output_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Perform inference on a large GeoTIFF using a sliding window approach with improved blending.
 
@@ -1100,17 +1107,17 @@ def inference_on_geotiff(
 
 
 def instance_segmentation_inference_on_geotiff(
-    model,
-    geotiff_path,
-    output_path,
-    window_size=512,
-    overlap=256,
-    confidence_threshold=0.5,
-    batch_size=4,
-    num_channels=3,
-    device=None,
-    **kwargs,
-):
+    model: torch.nn.Module,
+    geotiff_path: str,
+    output_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> Tuple[str, float]:
     """
     Perform instance segmentation inference on a large GeoTIFF using a sliding window approach.
 
@@ -1758,7 +1765,7 @@ class SemanticRandomHorizontalFlip:
         return image, mask
 
 
-def get_semantic_transform(train):
+def get_semantic_transform(train: bool) -> Any:
     """
     Get transforms for semantic segmentation data augmentation.
 
@@ -1916,7 +1923,12 @@ def dice_coefficient(pred, target, smooth=1e-6, num_classes=None):
     return sum(dice_scores) / len(dice_scores) if dice_scores else 0.0
 
 
-def iou_coefficient(pred, target, smooth=1e-6, num_classes=None):
+def iou_coefficient(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    smooth: float = 1e-6,
+    num_classes: Optional[int] = None,
+) -> float:
     """
     Calculate IoU coefficient for segmentation (binary or multi-class).
 
@@ -1959,8 +1971,15 @@ def iou_coefficient(pred, target, smooth=1e-6, num_classes=None):
 
 
 def train_semantic_one_epoch(
-    model, optimizer, data_loader, device, epoch, criterion, print_freq=10, verbose=True
-):
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    data_loader: DataLoader,
+    device: torch.device,
+    epoch: int,
+    criterion: Any,
+    print_freq: int = 10,
+    verbose: bool = True,
+) -> float:
     """
     Train the semantic segmentation model for one epoch.
 
@@ -2552,18 +2571,18 @@ def train_segmentation_model(
 
 
 def semantic_inference_on_geotiff(
-    model,
-    geotiff_path,
-    output_path,
-    window_size=512,
-    overlap=256,
-    batch_size=4,
-    num_channels=3,
-    num_classes=2,
-    device=None,
-    quiet=False,
-    **kwargs,
-):
+    model: torch.nn.Module,
+    geotiff_path: str,
+    output_path: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    num_classes: int = 2,
+    device: Optional[torch.device] = None,
+    quiet: bool = False,
+    **kwargs: Any,
+) -> Tuple[str, float]:
     """
     Perform semantic segmentation inference on a large GeoTIFF using a sliding window approach.
 

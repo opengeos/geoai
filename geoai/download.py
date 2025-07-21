@@ -437,15 +437,15 @@ def extract_building_stats(data: str) -> Dict[str, Any]:
 
 
 def download_pc_stac_item(
-    item_url,
-    bands=None,
-    output_dir=None,
-    show_progress=True,
-    merge_bands=False,
-    merged_filename=None,
-    overwrite=False,
-    cell_size=None,
-):
+    item_url: str,
+    bands: Optional[List[str]] = None,
+    output_dir: Optional[str] = None,
+    show_progress: bool = True,
+    merge_bands: bool = False,
+    merged_filename: Optional[str] = None,
+    overwrite: bool = False,
+    cell_size: Optional[float] = None,
+) -> Dict[str, Any]:
     """
     Downloads a STAC item from Microsoft Planetary Computer with specified bands.
 

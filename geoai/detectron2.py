@@ -432,7 +432,7 @@ def batch_detectron2_segment(
     return results
 
 
-def get_class_id_name_mapping(config_path: str, lazy: bool = False):
+def get_class_id_name_mapping(config_path: str, lazy: bool = False) -> Dict[int, str]:
     """
     Get class ID to name mapping from a Detectron2 model config.
 
