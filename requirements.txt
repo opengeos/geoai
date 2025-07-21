@@ -12,7 +12,7 @@ maplibre
 opencv-python-headless
 overturemaps
 planetary-computer
-pyarrow<21.0
+pyarrow<22.0
 pystac-client
 rasterio
 rioxarray
