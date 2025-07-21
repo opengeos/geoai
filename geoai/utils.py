@@ -1251,7 +1251,7 @@ def create_split_map(
             if basemap.startswith("http"):
                 m.add_cog_layer(basemap, name="Basemap", **basemap_args)
             else:
-                m.add_raster(basemap, name="Basemap", **basemap_args)
+                m.add_raster(basemap, layer_name="Basemap", **basemap_args)
         else:
             m.add_basemap(basemap)
     m.split_map(
