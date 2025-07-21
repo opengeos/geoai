@@ -2,23 +2,23 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, List, Dict, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cv2
+import geopandas as gpd
 import numpy as np
 import rasterio
 import torch
-import geopandas as gpd
 from PIL import Image
-from rasterio.windows import Window
 from rasterio.warp import transform_bounds
-from shapely.geometry import box, Polygon
+from rasterio.windows import Window
+from shapely.geometry import Polygon, box
 from tqdm import tqdm
 from transformers import (
-    CLIPSegForImageSegmentation,
-    CLIPSegProcessor,
     AutoModelForMaskGeneration,
     AutoProcessor,
+    CLIPSegForImageSegmentation,
+    CLIPSegProcessor,
     pipeline,
 )
 
@@ -90,13 +90,13 @@ class GroundedSAM:
 
     def __init__(
         self,
-        detector_id="IDEA-Research/grounding-dino-tiny",
-        segmenter_id="facebook/sam-vit-base",
-        device=None,
-        tile_size=1024,
-        overlap=128,
-        threshold=0.3,
-    ):
+        detector_id: str = "IDEA-Research/grounding-dino-tiny",
+        segmenter_id: str = "facebook/sam-vit-base",
+        device: Optional[str] = None,
+        tile_size: int = 1024,
+        overlap: int = 128,
+        threshold: float = 0.3,
+    ) -> None:
         """
         Initialize the GroundedSAM with the specified models and settings.
 
@@ -125,7 +125,7 @@ class GroundedSAM:
 
         print(f"GroundedSAM initialized on {self.device}")
 
-    def _load_models(self):
+    def _load_models(self) -> None:
         """Load the Grounding DINO and SAM models."""
         # Load Grounding DINO
         self.object_detector = pipeline(
@@ -408,17 +408,17 @@ class GroundedSAM:
 
     def segment_image(
         self,
-        input_path,
-        output_path,
-        text_prompts,
-        polygon_refinement=False,
-        export_boxes=False,
-        export_polygons=True,
-        smoothing_sigma=1.0,
-        nms_threshold=0.5,
-        min_polygon_area=50,
-        simplify_tolerance=2.0,
-    ):
+        input_path: str,
+        output_path: str,
+        text_prompts: Union[str, List[str]],
+        polygon_refinement: bool = False,
+        export_boxes: bool = False,
+        export_polygons: bool = True,
+        smoothing_sigma: float = 1.0,
+        nms_threshold: float = 0.5,
+        min_polygon_area: int = 50,
+        simplify_tolerance: float = 2.0,
+    ) -> str:
         """
         Segment a GeoTIFF image using text prompts with improved instance segmentation.
 
@@ -742,11 +742,11 @@ class CLIPSegmentation:
 
     def __init__(
         self,
-        model_name="CIDAS/clipseg-rd64-refined",
-        device=None,
-        tile_size=512,
-        overlap=32,
-    ):
+        model_name: str = "CIDAS/clipseg-rd64-refined",
+        device: Optional[str] = None,
+        tile_size: int = 512,
+        overlap: int = 32,
+    ) -> None:
         """
         Initialize the ImageSegmenter with the specified model and settings.
 
@@ -774,8 +774,13 @@ class CLIPSegmentation:
         print(f"Model loaded on {self.device}")
 
     def segment_image(
-        self, input_path, output_path, text_prompt, threshold=0.5, smoothing_sigma=1.0
-    ):
+        self,
+        input_path: str,
+        output_path: str,
+        text_prompt: str,
+        threshold: float = 0.5,
+        smoothing_sigma: float = 1.0,
+    ) -> str:
         """
         Segment a GeoTIFF image using the provided text prompt.
 
@@ -974,13 +979,13 @@ class CLIPSegmentation:
 
     def segment_image_batch(
         self,
-        input_paths,
-        output_dir,
-        text_prompt,
-        threshold=0.5,
-        smoothing_sigma=1.0,
-        suffix="_segmented",
-    ):
+        input_paths: List[str],
+        output_dir: str,
+        text_prompt: str,
+        threshold: float = 0.5,
+        smoothing_sigma: float = 1.0,
+        suffix: str = "_segmented",
+    ) -> List[str]:
         """
         Segment multiple GeoTIFF images using the provided text prompt.
 

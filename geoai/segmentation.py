@@ -1,4 +1,5 @@
 import os
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import albumentations as A
 import matplotlib.pyplot as plt
@@ -24,10 +25,10 @@ class CustomDataset(Dataset):
         self,
         images_dir: str,
         masks_dir: str,
-        transform: A.Compose = None,
-        target_size: tuple = (256, 256),
+        transform: Optional[A.Compose] = None,
+        target_size: Tuple[int, int] = (256, 256),
         num_classes: int = 2,
-    ):
+    ) -> None:
         """
         Args:
             images_dir (str): Directory containing images.
@@ -48,7 +49,7 @@ class CustomDataset(Dataset):
         """Returns the total number of samples."""
         return len(self.images)
 
-    def __getitem__(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         """
         Args:
             idx (int): Index of the sample to fetch.
@@ -109,7 +110,7 @@ def prepare_datasets(
     transform: A.Compose,
     test_size: float = 0.2,
     random_state: int = 42,
-) -> tuple:
+) -> Tuple[Subset, Subset]:
     """
     Args:
         images_dir (str): Directory containing images.
@@ -233,7 +234,7 @@ def preprocess_image(image_path: str, target_size: tuple = (256, 256)) -> torch.
 def predict_image(
     model: SegformerForSemanticSegmentation,
     image_tensor: torch.Tensor,
-    original_size: tuple,
+    original_size: Tuple[int, int],
     device: torch.device,
 ) -> np.ndarray:
     """
@@ -262,7 +263,7 @@ def predict_image(
 def segment_image(
     image_path: str,
     model_path: str,
-    target_size: tuple = (256, 256),
+    target_size: Tuple[int, int] = (256, 256),
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> np.ndarray:
     """
@@ -288,8 +289,8 @@ def segment_image(
 def visualize_predictions(
     image_path: str,
     segmented_mask: np.ndarray,
-    target_size: tuple = (256, 256),
-    reference_image_path: str = None,
+    target_size: Tuple[int, int] = (256, 256),
+    reference_image_path: Optional[str] = None,
 ) -> None:
     """
     Visualizes the original image, segmented mask, and optionally the reference image.
