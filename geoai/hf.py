@@ -12,7 +12,9 @@ from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForMaskedImageModeling, pipeline
 
 
-def get_model_config(model_id: str) -> "transformers.configuration_utils.PretrainedConfig":
+def get_model_config(
+    model_id: str,
+) -> "transformers.configuration_utils.PretrainedConfig":
     """
     Get the model configuration for a Hugging Face model.
 

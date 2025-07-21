@@ -947,7 +947,9 @@ def pc_stac_download(
     os.makedirs(output_dir, exist_ok=True)
 
     # Function to download a single asset
-    def download_asset(item: "pystac.Item", asset_key: str, asset: "pystac.Asset") -> str:
+    def download_asset(
+        item: "pystac.Item", asset_key: str, asset: "pystac.Asset"
+    ) -> str:
         item = pc.sign(item)
         item_id = item.id
 
