@@ -55,8 +55,8 @@ def view_raster(
     basemap: Optional[str] = "OpenStreetMap",
     basemap_args: Optional[Dict] = None,
     backend: Optional[str] = "folium",
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Any:
     """
     Visualize a raster using leafmap.
 
@@ -1132,7 +1132,7 @@ def adaptive_regularization(
         return results
 
 
-def install_package(package):
+def install_package(package: Union[str, List[str]]) -> None:
     """Install a Python package.
 
     Args:
@@ -1261,7 +1261,12 @@ def create_split_map(
     return m
 
 
-def download_file(url, output_path=None, overwrite=False, unzip=True):
+def download_file(
+    url: str,
+    output_path: Optional[str] = None,
+    overwrite: bool = False,
+    unzip: bool = True,
+) -> str:
     """
     Download a file from a given URL with a progress bar.
     Optionally unzip the file if it's a ZIP archive.
@@ -1318,7 +1323,7 @@ def download_file(url, output_path=None, overwrite=False, unzip=True):
     return output_path
 
 
-def get_raster_info(raster_path):
+def get_raster_info(raster_path: str) -> Dict[str, Any]:
     """Display basic information about a raster dataset.
 
     Args:
@@ -1361,7 +1366,7 @@ def get_raster_info(raster_path):
     return info
 
 
-def get_raster_stats(raster_path, divide_by=1.0):
+def get_raster_stats(raster_path: str, divide_by: float = 1.0) -> Dict[str, Any]:
     """Calculate statistics for each band in a raster dataset.
 
     This function computes min, max, mean, and standard deviation values
@@ -7510,7 +7515,7 @@ def plot_performance_metrics(history_path, figsize=(15, 5), verbose=True):
             print(f"Final Dice: {history[val_dice_key][-1]:.4f}")
 
 
-def get_device():
+def get_device() -> torch.device:
     """
     Returns the best available device for deep learning in the order:
     CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU

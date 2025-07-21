@@ -3,6 +3,7 @@
 # Standard Library
 import os
 import time
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Third-Party Libraries
 import cv2
@@ -64,13 +65,13 @@ class CustomDataset(NonGeoDataset):
 
     def __init__(
         self,
-        raster_path,
-        chip_size=(512, 512),
-        overlap=0.5,
-        transforms=None,
-        band_indexes=None,
-        verbose=False,
-    ):
+        raster_path: str,
+        chip_size: Tuple[int, int] = (512, 512),
+        overlap: float = 0.5,
+        transforms: Optional[Any] = None,
+        band_indexes: Optional[List[int]] = None,
+        verbose: bool = False,
+    ) -> None:
         """
         Initialize the dataset with overlapping tiles.
 
@@ -163,7 +164,7 @@ class CustomDataset(NonGeoDataset):
         # Get raster stats
         self.raster_stats = get_raster_stats(raster_path, divide_by=255)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
         """
         Get an image chip from the dataset by index.
 
@@ -255,7 +256,7 @@ class CustomDataset(NonGeoDataset):
             ),  # Consistent format
         }
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Return the number of samples in the dataset.
 
@@ -271,8 +272,13 @@ class ObjectDetector:
     """
 
     def __init__(
-        self, model_path=None, repo_id=None, model=None, num_classes=2, device=None
-    ):
+        self,
+        model_path: Optional[str] = None,
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        num_classes: int = 2,
+        device: Optional[str] = None,
+    ) -> None:
         """
         Initialize the object extractor.
 
@@ -808,14 +814,14 @@ class ObjectDetector:
     @torch.no_grad()
     def process_raster(
         self,
-        raster_path,
-        output_path=None,
-        batch_size=4,
-        filter_edges=True,
-        edge_buffer=20,
-        band_indexes=None,
-        **kwargs,
-    ):
+        raster_path: str,
+        output_path: Optional[str] = None,
+        batch_size: int = 4,
+        filter_edges: bool = True,
+        edge_buffer: int = 20,
+        band_indexes: Optional[List[int]] = None,
+        **kwargs: Any,
+    ) -> "gpd.GeoDataFrame":
         """
         Process a raster file to extract objects with customizable parameters.
 
