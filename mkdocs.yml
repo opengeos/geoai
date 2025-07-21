@@ -164,6 +164,7 @@ nav:
     - API Reference:
           - change_detection module: change_detection.md
           - classify module: classify.md
+          - detectron2 module: detectron2.md
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
