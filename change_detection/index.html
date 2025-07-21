@@ -2182,10 +2182,7 @@
 
               <details class="quote">
                 <summary>Source code in <code>geoai/change_detection.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  14</span>
-<span class="normal">  15</span>
-<span class="normal">  16</span>
-<span class="normal">  17</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  17</span>
 <span class="normal">  18</span>
 <span class="normal">  19</span>
 <span class="normal">  20</span>
@@ -3684,7 +3681,12 @@
 <span class="normal">1513</span>
 <span class="normal">1514</span>
 <span class="normal">1515</span>
-<span class="normal">1516</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ChangeDetection</span><span class="p">:</span>
+<span class="normal">1516</span>
+<span class="normal">1517</span>
+<span class="normal">1518</span>
+<span class="normal">1519</span>
+<span class="normal">1520</span>
+<span class="normal">1521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ChangeDetection</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A class for change detection on geospatial imagery using torchange and SAM.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sam_model_type</span><span class="o">=</span><span class="s2">&quot;vit_h&quot;</span><span class="p">,</span> <span class="n">sam_checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -3720,15 +3722,15 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set_hyperparameters</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">change_confidence_threshold</span><span class="o">=</span><span class="mi">155</span><span class="p">,</span>
-        <span class="n">auto_threshold</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">use_normalized_feature</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="n">area_thresh</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
-        <span class="n">match_hist</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">object_sim_thresh</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
-        <span class="n">bitemporal_match</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">change_confidence_threshold</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">155</span><span class="p">,</span>
+        <span class="n">auto_threshold</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">use_normalized_feature</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">area_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.8</span><span class="p">,</span>
+        <span class="n">match_hist</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">object_sim_thresh</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span>
+        <span class="n">bitemporal_match</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Set hyperparameters for the change detection model.</span>
 
@@ -3756,16 +3758,16 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set_mask_generator_params</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">points_per_side</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+        <span class="n">points_per_side</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
         <span class="n">points_per_batch</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">64</span><span class="p">,</span>
         <span class="n">pred_iou_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
         <span class="n">stability_score_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span>
         <span class="n">stability_score_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
         <span class="n">box_nms_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.7</span><span class="p">,</span>
-        <span class="n">point_grids</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">point_grids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">min_mask_region_area</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Set mask generator parameters.</span>
 
@@ -3876,17 +3878,17 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">detect_changes</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">image1_path</span><span class="p">,</span>
-        <span class="n">image2_path</span><span class="p">,</span>
-        <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">target_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
-        <span class="n">return_results</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="n">export_probability</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">probability_output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">export_instance_masks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">instance_masks_output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">return_detailed_results</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">image1_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">image2_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">target_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+        <span class="n">return_results</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">export_probability</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">probability_output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">export_instance_masks</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">instance_masks_output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_detailed_results</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Detect changes between two GeoTIFF images with instance segmentation.</span>
 
@@ -4203,7 +4205,9 @@
         <span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">prob_final</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">visualize_changes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image1_path</span><span class="p">,</span> <span class="n">image2_path</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">)):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">visualize_changes</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">image1_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">image2_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">plt</span><span class="o">.</span><span class="n">Figure</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Visualize change detection results.</span>
 
@@ -5265,10 +5269,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
-<span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">20</span>
 <span class="normal">21</span>
 <span class="normal">22</span>
 <span class="normal">23</span>
@@ -5276,7 +5277,10 @@
 <span class="normal">25</span>
 <span class="normal">26</span>
 <span class="normal">27</span>
-<span class="normal">28</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sam_model_type</span><span class="o">=</span><span class="s2">&quot;vit_h&quot;</span><span class="p">,</span> <span class="n">sam_checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sam_model_type</span><span class="o">=</span><span class="s2">&quot;vit_h&quot;</span><span class="p">,</span> <span class="n">sam_checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Initialize the ChangeDetection class.</span>
 
@@ -5310,12 +5314,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">787</span>
-<span class="normal">788</span>
-<span class="normal">789</span>
-<span class="normal">790</span>
-<span class="normal">791</span>
-<span class="normal">792</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">792</span>
 <span class="normal">793</span>
 <span class="normal">794</span>
 <span class="normal">795</span>
@@ -5418,7 +5417,12 @@
 <span class="normal">892</span>
 <span class="normal">893</span>
 <span class="normal">894</span>
-<span class="normal">895</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">analyze_instances</span><span class="p">(</span>
+<span class="normal">895</span>
+<span class="normal">896</span>
+<span class="normal">897</span>
+<span class="normal">898</span>
+<span class="normal">899</span>
+<span class="normal">900</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">analyze_instances</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">instance_mask_path</span><span class="p">,</span> <span class="n">scores_path</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="s2">&quot;instance_analysis.png&quot;</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Analyze and visualize instance segmentation results.&quot;&quot;&quot;</span>
@@ -5549,12 +5553,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 897</span>
-<span class="normal"> 898</span>
-<span class="normal"> 899</span>
-<span class="normal"> 900</span>
-<span class="normal"> 901</span>
-<span class="normal"> 902</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 902</span>
 <span class="normal"> 903</span>
 <span class="normal"> 904</span>
 <span class="normal"> 905</span>
@@ -5733,7 +5732,12 @@
 <span class="normal">1078</span>
 <span class="normal">1079</span>
 <span class="normal">1080</span>
-<span class="normal">1081</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">create_comprehensive_report</span><span class="p">(</span>
+<span class="normal">1081</span>
+<span class="normal">1082</span>
+<span class="normal">1083</span>
+<span class="normal">1084</span>
+<span class="normal">1085</span>
+<span class="normal">1086</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="nf">create_comprehensive_report</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">results_dict</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="s2">&quot;comprehensive_report.png&quot;</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a comprehensive visualization report from detailed results.&quot;&quot;&quot;</span>
@@ -5940,12 +5944,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">696</span>
-<span class="normal">697</span>
-<span class="normal">698</span>
-<span class="normal">699</span>
-<span class="normal">700</span>
-<span class="normal">701</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">701</span>
 <span class="normal">702</span>
 <span class="normal">703</span>
 <span class="normal">704</span>
@@ -6029,7 +6028,12 @@
 <span class="normal">782</span>
 <span class="normal">783</span>
 <span class="normal">784</span>
-<span class="normal">785</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_split_comparison</span><span class="p">(</span>
+<span class="normal">785</span>
+<span class="normal">786</span>
+<span class="normal">787</span>
+<span class="normal">788</span>
+<span class="normal">789</span>
+<span class="normal">790</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_split_comparison</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">image1_path</span><span class="p">,</span>
     <span class="n">image2_path</span><span class="p">,</span>
@@ -6325,6 +6329,7 @@
       <tbody>
           <tr class="doc-section-item">
 <td><code>tuple</code></td>            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Tuple">Tuple</span>[<span title="typing.Any">Any</span>, <span title="numpy.ndarray">ndarray</span>, <span title="numpy.ndarray">ndarray</span>], <span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>], None]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6334,6 +6339,7 @@
           </tr>
           <tr class="doc-section-item">
 <td><code>dict</code></td>            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Tuple">Tuple</span>[<span title="typing.Any">Any</span>, <span title="numpy.ndarray">ndarray</span>, <span title="numpy.ndarray">ndarray</span>], <span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>], None]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6347,10 +6353,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">207</span>
 <span class="normal">208</span>
 <span class="normal">209</span>
 <span class="normal">210</span>
@@ -6441,19 +6444,22 @@
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
-<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detect_changes</span><span class="p">(</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detect_changes</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">image1_path</span><span class="p">,</span>
-    <span class="n">image2_path</span><span class="p">,</span>
-    <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">target_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
-    <span class="n">return_results</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">export_probability</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">probability_output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">export_instance_masks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">instance_masks_output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">return_detailed_results</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">image1_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">image2_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">target_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+    <span class="n">return_results</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">export_probability</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">probability_output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">export_instance_masks</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">instance_masks_output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">return_detailed_results</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Detect changes between two GeoTIFF images with instance segmentation.</span>
 
@@ -6558,12 +6564,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1083</span>
-<span class="normal">1084</span>
-<span class="normal">1085</span>
-<span class="normal">1086</span>
-<span class="normal">1087</span>
-<span class="normal">1088</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1088</span>
 <span class="normal">1089</span>
 <span class="normal">1090</span>
 <span class="normal">1091</span>
@@ -6611,7 +6612,12 @@
 <span class="normal">1133</span>
 <span class="normal">1134</span>
 <span class="normal">1135</span>
-<span class="normal">1136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_complete_analysis</span><span class="p">(</span>
+<span class="normal">1136</span>
+<span class="normal">1137</span>
+<span class="normal">1138</span>
+<span class="normal">1139</span>
+<span class="normal">1140</span>
+<span class="normal">1141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_complete_analysis</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">image1_path</span><span class="p">,</span> <span class="n">image2_path</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;change_detection_results&quot;</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Run complete change detection analysis with all outputs and visualizations.&quot;&quot;&quot;</span>
@@ -6813,6 +6819,7 @@
                 <code>**kwargs</code>
             </td>
             <td>
+                  <code><span title="typing.Any">Any</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6829,10 +6836,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
@@ -6863,17 +6867,20 @@
 <span class="normal">79</span>
 <span class="normal">80</span>
 <span class="normal">81</span>
-<span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_hyperparameters</span><span class="p">(</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_hyperparameters</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">change_confidence_threshold</span><span class="o">=</span><span class="mi">155</span><span class="p">,</span>
-    <span class="n">auto_threshold</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">use_normalized_feature</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">area_thresh</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
-    <span class="n">match_hist</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">object_sim_thresh</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
-    <span class="n">bitemporal_match</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">change_confidence_threshold</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">155</span><span class="p">,</span>
+    <span class="n">auto_threshold</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">use_normalized_feature</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">area_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.8</span><span class="p">,</span>
+    <span class="n">match_hist</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">object_sim_thresh</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span>
+    <span class="n">bitemporal_match</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Set hyperparameters for the change detection model.</span>
 
@@ -7062,6 +7069,7 @@
                 <code>**kwargs</code>
             </td>
             <td>
+                  <code><span title="typing.Any">Any</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7078,10 +7086,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 87</span>
 <span class="normal"> 88</span>
 <span class="normal"> 89</span>
 <span class="normal"> 90</span>
@@ -7115,18 +7120,21 @@
 <span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
-<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_mask_generator_params</span><span class="p">(</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_mask_generator_params</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">points_per_side</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+    <span class="n">points_per_side</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
     <span class="n">points_per_batch</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">64</span><span class="p">,</span>
     <span class="n">pred_iou_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
     <span class="n">stability_score_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.95</span><span class="p">,</span>
     <span class="n">stability_score_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
     <span class="n">box_nms_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.7</span><span class="p">,</span>
-    <span class="n">point_grids</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">point_grids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">min_mask_region_area</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Set mask generator parameters.</span>
 
@@ -7247,6 +7255,7 @@
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><span title="matplotlib.pyplot.Figure">Figure</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7260,10 +7269,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">533</span>
-<span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">536</span>
 <span class="normal">537</span>
 <span class="normal">538</span>
 <span class="normal">539</span>
@@ -7280,7 +7286,14 @@
 <span class="normal">550</span>
 <span class="normal">551</span>
 <span class="normal">552</span>
-<span class="normal">553</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_changes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image1_path</span><span class="p">,</span> <span class="n">image2_path</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">)):</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_changes</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">image1_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">image2_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">plt</span><span class="o">.</span><span class="n">Figure</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Visualize change detection results.</span>
 
@@ -7323,12 +7336,7 @@
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">555</span>
-<span class="normal">556</span>
-<span class="normal">557</span>
-<span class="normal">558</span>
-<span class="normal">559</span>
-<span class="normal">560</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">560</span>
 <span class="normal">561</span>
 <span class="normal">562</span>
 <span class="normal">563</span>
@@ -7462,7 +7470,12 @@
 <span class="normal">691</span>
 <span class="normal">692</span>
 <span class="normal">693</span>
-<span class="normal">694</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_results</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image1_path</span><span class="p">,</span> <span class="n">image2_path</span><span class="p">,</span> <span class="n">binary_path</span><span class="p">,</span> <span class="n">prob_path</span><span class="p">):</span>
+<span class="normal">694</span>
+<span class="normal">695</span>
+<span class="normal">696</span>
+<span class="normal">697</span>
+<span class="normal">698</span>
+<span class="normal">699</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_results</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image1_path</span><span class="p">,</span> <span class="n">image2_path</span><span class="p">,</span> <span class="n">binary_path</span><span class="p">,</span> <span class="n">prob_path</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create enhanced visualization with probability analysis.&quot;&quot;&quot;</span>
 
     <span class="c1"># Load data</span>
@@ -7668,7 +7681,8 @@ Defaults to 'vit_h'. See https://bit.ly/3VrpxUh for more details.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The checkpoint_dir directory. Defaults to None,</p>
+                <p>The checkpoint_dir directory. Defaults to None,
+which uses "~/.cache/torch/hub/checkpoints".</p>
               </div>
             </td>
             <td>
@@ -7681,12 +7695,7 @@ Defaults to 'vit_h'. See https://bit.ly/3VrpxUh for more details.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/change_detection.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1519</span>
-<span class="normal">1520</span>
-<span class="normal">1521</span>
-<span class="normal">1522</span>
-<span class="normal">1523</span>
-<span class="normal">1524</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1524</span>
 <span class="normal">1525</span>
 <span class="normal">1526</span>
 <span class="normal">1527</span>
@@ -7723,14 +7732,23 @@ Defaults to 'vit_h'. See https://bit.ly/3VrpxUh for more details.</p>
 <span class="normal">1558</span>
 <span class="normal">1559</span>
 <span class="normal">1560</span>
-<span class="normal">1561</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_checkpoint</span><span class="p">(</span><span class="n">model_type</span><span class="o">=</span><span class="s2">&quot;vit_h&quot;</span><span class="p">,</span> <span class="n">checkpoint_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">1561</span>
+<span class="normal">1562</span>
+<span class="normal">1563</span>
+<span class="normal">1564</span>
+<span class="normal">1565</span>
+<span class="normal">1566</span>
+<span class="normal">1567</span>
+<span class="normal">1568</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_checkpoint</span><span class="p">(</span>
+    <span class="n">model_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;vit_h&quot;</span><span class="p">,</span> <span class="n">checkpoint_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Download the SAM model checkpoint.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        model_type (str, optional): The model type. Can be one of [&#39;vit_h&#39;, &#39;vit_l&#39;, &#39;vit_b&#39;].</span>
 <span class="sd">            Defaults to &#39;vit_h&#39;. See https://bit.ly/3VrpxUh for more details.</span>
 <span class="sd">        checkpoint_dir (str, optional): The checkpoint_dir directory. Defaults to None,</span>
-<span class="sd">        &quot;~/.cache/torch/hub/checkpoints&quot;.</span>
+<span class="sd">            which uses &quot;~/.cache/torch/hub/checkpoints&quot;.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">model_types</span> <span class="o">=</span> <span class="p">{</span>

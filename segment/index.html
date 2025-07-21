@@ -2508,7 +2508,12 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 <span class="normal">1013</span>
 <span class="normal">1014</span>
 <span class="normal">1015</span>
-<span class="normal">1016</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CLIPSegmentation</span><span class="p">:</span>
+<span class="normal">1016</span>
+<span class="normal">1017</span>
+<span class="normal">1018</span>
+<span class="normal">1019</span>
+<span class="normal">1020</span>
+<span class="normal">1021</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CLIPSegmentation</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class for segmenting high-resolution satellite imagery using text prompts with CLIP-based models.</span>
 
@@ -2531,11 +2536,11 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">model_name</span><span class="o">=</span><span class="s2">&quot;CIDAS/clipseg-rd64-refined&quot;</span><span class="p">,</span>
-        <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">tile_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
-        <span class="n">overlap</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;CIDAS/clipseg-rd64-refined&quot;</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">tile_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span>
+        <span class="n">overlap</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Initialize the ImageSegmenter with the specified model and settings.</span>
 
@@ -2563,8 +2568,13 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model loaded on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">input_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span>
-    <span class="p">):</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">text_prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">smoothing_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Segment a GeoTIFF image using the provided text prompt.</span>
 
@@ -2763,13 +2773,13 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
     <span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">input_paths</span><span class="p">,</span>
-        <span class="n">output_dir</span><span class="p">,</span>
-        <span class="n">text_prompt</span><span class="p">,</span>
-        <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-        <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-        <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;_segmented&quot;</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">text_prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">smoothing_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">suffix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;_segmented&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Segment multiple GeoTIFF images using the provided text prompt.</span>
 
@@ -2946,11 +2956,11 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 <span class="normal">773</span>
 <span class="normal">774</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">model_name</span><span class="o">=</span><span class="s2">&quot;CIDAS/clipseg-rd64-refined&quot;</span><span class="p">,</span>
-    <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">tile_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
-    <span class="n">overlap</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;CIDAS/clipseg-rd64-refined&quot;</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">tile_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span>
+    <span class="n">overlap</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Initialize the ImageSegmenter with the specified model and settings.</span>
 
@@ -3105,6 +3115,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
       <tbody>
           <tr class="doc-section-item">
 <td><code>str</code></td>            <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3315,9 +3326,19 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 <span class="normal">970</span>
 <span class="normal">971</span>
 <span class="normal">972</span>
-<span class="normal">973</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span> <span class="n">input_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span>
-<span class="p">):</span>
+<span class="normal">973</span>
+<span class="normal">974</span>
+<span class="normal">975</span>
+<span class="normal">976</span>
+<span class="normal">977</span>
+<span class="normal">978</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">text_prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">smoothing_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Segment a GeoTIFF image using the provided text prompt.</span>
 
@@ -3655,6 +3676,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
       <tbody>
           <tr class="doc-section-item">
 <td><code>list</code></td>            <td>
+                  <code><span title="typing.List">List</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3668,12 +3690,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
             <details class="quote">
               <summary>Source code in <code>geoai/segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 975</span>
-<span class="normal"> 976</span>
-<span class="normal"> 977</span>
-<span class="normal"> 978</span>
-<span class="normal"> 979</span>
-<span class="normal"> 980</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 980</span>
 <span class="normal"> 981</span>
 <span class="normal"> 982</span>
 <span class="normal"> 983</span>
@@ -3709,15 +3726,20 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 <span class="normal">1013</span>
 <span class="normal">1014</span>
 <span class="normal">1015</span>
-<span class="normal">1016</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
+<span class="normal">1016</span>
+<span class="normal">1017</span>
+<span class="normal">1018</span>
+<span class="normal">1019</span>
+<span class="normal">1020</span>
+<span class="normal">1021</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">input_paths</span><span class="p">,</span>
-    <span class="n">output_dir</span><span class="p">,</span>
-    <span class="n">text_prompt</span><span class="p">,</span>
-    <span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-    <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-    <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;_segmented&quot;</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">text_prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">smoothing_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">suffix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;_segmented&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Segment multiple GeoTIFF images using the provided text prompt.</span>
 
@@ -4794,13 +4816,13 @@ and handles proper georeferencing in the outputs.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">detector_id</span><span class="o">=</span><span class="s2">&quot;IDEA-Research/grounding-dino-tiny&quot;</span><span class="p">,</span>
-        <span class="n">segmenter_id</span><span class="o">=</span><span class="s2">&quot;facebook/sam-vit-base&quot;</span><span class="p">,</span>
-        <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">tile_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
-        <span class="n">overlap</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
-        <span class="n">threshold</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">detector_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;IDEA-Research/grounding-dino-tiny&quot;</span><span class="p">,</span>
+        <span class="n">segmenter_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;facebook/sam-vit-base&quot;</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">tile_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+        <span class="n">overlap</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Initialize the GroundedSAM with the specified models and settings.</span>
 
@@ -4829,7 +4851,7 @@ and handles proper georeferencing in the outputs.</p>
 
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;GroundedSAM initialized on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_load_models</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_models</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load the Grounding DINO and SAM models.&quot;&quot;&quot;</span>
         <span class="c1"># Load Grounding DINO</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">object_detector</span> <span class="o">=</span> <span class="n">pipeline</span><span class="p">(</span>
@@ -5112,17 +5134,17 @@ and handles proper georeferencing in the outputs.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">input_path</span><span class="p">,</span>
-        <span class="n">output_path</span><span class="p">,</span>
-        <span class="n">text_prompts</span><span class="p">,</span>
-        <span class="n">polygon_refinement</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">export_boxes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">export_polygons</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-        <span class="n">nms_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-        <span class="n">min_polygon_area</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-        <span class="n">simplify_tolerance</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">text_prompts</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+        <span class="n">polygon_refinement</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">export_boxes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">export_polygons</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">smoothing_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">nms_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">min_polygon_area</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="n">simplify_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Segment a GeoTIFF image using text prompts with improved instance segmentation.</span>
 
@@ -5600,13 +5622,13 @@ and handles proper georeferencing in the outputs.</p>
 <span class="normal">125</span>
 <span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">detector_id</span><span class="o">=</span><span class="s2">&quot;IDEA-Research/grounding-dino-tiny&quot;</span><span class="p">,</span>
-    <span class="n">segmenter_id</span><span class="o">=</span><span class="s2">&quot;facebook/sam-vit-base&quot;</span><span class="p">,</span>
-    <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">tile_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
-    <span class="n">overlap</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
-    <span class="n">threshold</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">detector_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;IDEA-Research/grounding-dino-tiny&quot;</span><span class="p">,</span>
+    <span class="n">segmenter_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;facebook/sam-vit-base&quot;</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">tile_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+    <span class="n">overlap</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Initialize the GroundedSAM with the specified models and settings.</span>
 
@@ -5840,6 +5862,7 @@ and handles proper georeferencing in the outputs.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>Dict</code></td>            <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6165,17 +6188,17 @@ and handles proper georeferencing in the outputs.</p>
 <span class="normal">718</span>
 <span class="normal">719</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">input_path</span><span class="p">,</span>
-    <span class="n">output_path</span><span class="p">,</span>
-    <span class="n">text_prompts</span><span class="p">,</span>
-    <span class="n">polygon_refinement</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">export_boxes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">export_polygons</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">smoothing_sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-    <span class="n">nms_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-    <span class="n">min_polygon_area</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-    <span class="n">simplify_tolerance</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">text_prompts</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+    <span class="n">polygon_refinement</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">export_boxes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">export_polygons</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">smoothing_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">nms_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">min_polygon_area</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="n">simplify_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Segment a GeoTIFF image using text prompts with improved instance segmentation.</span>
 

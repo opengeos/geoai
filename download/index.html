@@ -3206,6 +3206,7 @@ merge bands into a single multi-band GeoTIFF.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>dict</code></td>            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3491,15 +3492,15 @@ merge bands into a single multi-band GeoTIFF.</p>
 <span class="normal">683</span>
 <span class="normal">684</span>
 <span class="normal">685</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_pc_stac_item</span><span class="p">(</span>
-    <span class="n">item_url</span><span class="p">,</span>
-    <span class="n">bands</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">show_progress</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">merge_bands</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">merged_filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">cell_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">item_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bands</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">merge_bands</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">merged_filename</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">cell_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Downloads a STAC item from Microsoft Planetary Computer with specified bands.</span>
 
@@ -4041,6 +4042,7 @@ merge bands into a single multi-band GeoTIFF.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>list</code></td>            <td>
+                  <code><span title="typing.List">List</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4062,7 +4064,7 @@ merge bands into a single multi-band GeoTIFF.</p>
 <span class="normal">260</span>
 <span class="normal">261</span>
 <span class="normal">262</span>
-<span class="normal">263</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_all_overture_types</span><span class="p">():</span>
+<span class="normal">263</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_all_overture_types</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get a list of all available Overture Maps data types.</span>
 
 <span class="sd">    Returns:</span>
@@ -4743,6 +4745,7 @@ Defaults to "id".</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><span title="typing.List">List</span>[<span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4904,11 +4907,11 @@ Defaults to "id".</p>
 <span class="normal">810</span>
 <span class="normal">811</span>
 <span class="normal">812</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_collection_list</span><span class="p">(</span>
-    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;</span><span class="p">,</span>
-    <span class="n">detailed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">filter_by</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">sort_by</span><span class="o">=</span><span class="s2">&quot;id&quot;</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;</span><span class="p">,</span>
+    <span class="n">detailed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">filter_by</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">sort_by</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;id&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Retrieves and displays the list of available collections from Planetary Computer.</span>
 
@@ -5090,6 +5093,7 @@ Defaults to "id".</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>list</code></td>            <td>
+                  <code><span title="typing.List">List</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5119,7 +5123,7 @@ Defaults to "id".</p>
 <span class="normal">1075</span>
 <span class="normal">1076</span>
 <span class="normal">1077</span>
-<span class="normal">1078</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_item_asset_list</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+<span class="normal">1078</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_item_asset_list</span><span class="p">(</span><span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;pystac.Item&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Retrieve the list of asset keys from a STAC item in the Planetary Computer catalog.</span>
 
@@ -5254,23 +5258,6 @@ Defaults to True.</p>
                   <code>True</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>sign_urls</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to sign URLs for authenticated access.
-Defaults to True.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -5286,6 +5273,7 @@ Defaults to True.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>dict</code></td>            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="str">str</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5489,12 +5477,12 @@ assets {asset_key: file_path}.</p>
 <span class="normal">1057</span>
 <span class="normal">1058</span>
 <span class="normal">1059</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_stac_download</span><span class="p">(</span>
-    <span class="n">items</span><span class="p">,</span>
-    <span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
-    <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">max_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-    <span class="n">skip_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">items</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="s2">&quot;pystac.Item&quot;</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;pystac.Item&quot;</span><span class="p">]],</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
+    <span class="n">assets</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">max_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">skip_existing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Download assets from STAC items retrieved from the Planetary Computer.</span>
 
@@ -5511,8 +5499,6 @@ assets {asset_key: file_path}.</p>
 <span class="sd">        max_workers (int, optional): Maximum number of concurrent download threads.</span>
 <span class="sd">            Defaults to 1.</span>
 <span class="sd">        skip_existing (bool, optional): Skip download if the file already exists.</span>
-<span class="sd">            Defaults to True.</span>
-<span class="sd">        sign_urls (bool, optional): Whether to sign URLs for authenticated access.</span>
 <span class="sd">            Defaults to True.</span>
 
 <span class="sd">    Returns:</span>
@@ -5536,7 +5522,9 @@ assets {asset_key: file_path}.</p>
     <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="c1"># Function to download a single asset</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">download_asset</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">,</span> <span class="n">asset</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">download_asset</span><span class="p">(</span>
+        <span class="n">item</span><span class="p">:</span> <span class="s2">&quot;pystac.Item&quot;</span><span class="p">,</span> <span class="n">asset_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">asset</span><span class="p">:</span> <span class="s2">&quot;pystac.Asset&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">item</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
         <span class="n">item_id</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">id</span>
 
@@ -5810,6 +5798,7 @@ Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>list</code></td>            <td>
+                  <code><span title="typing.List">List</span>[<span title="pystac.Item">Item</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5943,14 +5932,14 @@ Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".</p>
 <span class="normal">899</span>
 <span class="normal">900</span>
 <span class="normal">901</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">pc_stac_search</span><span class="p">(</span>
-    <span class="n">collection</span><span class="p">,</span>
-    <span class="n">bbox</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">time_range</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">query</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">limit</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-    <span class="n">max_items</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">collection</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bbox</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">time_range</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">query</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">max_items</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;https://planetarycomputer.microsoft.com/api/stac/v1&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;pystac.Item&quot;</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Search for STAC items in the Planetary Computer catalog.</span>
 
@@ -6249,6 +6238,7 @@ by converting it to an RGB array and displaying it with matplotlib.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><span title="xarray.Dataset">Dataset</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6298,7 +6288,19 @@ by converting it to an RGB array and displaying it with matplotlib.</p>
 <span class="normal">1114</span>
 <span class="normal">1115</span>
 <span class="normal">1116</span>
-<span class="normal">1117</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_pc_item_asset</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">asset</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_cog</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="normal">1117</span>
+<span class="normal">1118</span>
+<span class="normal">1119</span>
+<span class="normal">1120</span>
+<span class="normal">1121</span>
+<span class="normal">1122</span>
+<span class="normal">1123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_pc_item_asset</span><span class="p">(</span>
+    <span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;pystac.Item&quot;</span><span class="p">],</span>
+    <span class="n">asset</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">as_cog</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;xr.Dataset&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read a specific asset from a STAC item in the Planetary Computer catalog.</span>
 
@@ -6614,6 +6616,7 @@ map options, and customizing the visualization of the STAC item.</p>
                 <code>**kwargs</code>
             </td>
             <td>
+                  <code><span title="typing.Any">Any</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6639,6 +6642,7 @@ map options, and customizing the visualization of the STAC item.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><span title="typing.Any">Any</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6675,13 +6679,7 @@ map options, and customizing the visualization of the STAC item.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/download.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1120</span>
-<span class="normal">1121</span>
-<span class="normal">1122</span>
-<span class="normal">1123</span>
-<span class="normal">1124</span>
-<span class="normal">1125</span>
-<span class="normal">1126</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1126</span>
 <span class="normal">1127</span>
 <span class="normal">1128</span>
 <span class="normal">1129</span>
@@ -6768,24 +6766,30 @@ map options, and customizing the visualization of the STAC item.</p>
 <span class="normal">1210</span>
 <span class="normal">1211</span>
 <span class="normal">1212</span>
-<span class="normal">1213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_pc_item</span><span class="p">(</span>
-    <span class="n">url</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">collection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">item</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">bands</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">titiler_endpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;STAC Item&quot;</span><span class="p">,</span>
-    <span class="n">attribution</span><span class="o">=</span><span class="s2">&quot;Planetary Computer&quot;</span><span class="p">,</span>
-    <span class="n">opacity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-    <span class="n">shown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">fit_bounds</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">layer_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;folium&quot;</span><span class="p">,</span>
-    <span class="n">basemap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">map_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-<span class="p">):</span>
+<span class="normal">1213</span>
+<span class="normal">1214</span>
+<span class="normal">1215</span>
+<span class="normal">1216</span>
+<span class="normal">1217</span>
+<span class="normal">1218</span>
+<span class="normal">1219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_pc_item</span><span class="p">(</span>
+    <span class="n">url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">collection</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">item</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">assets</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">bands</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">titiler_endpoint</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;STAC Item&quot;</span><span class="p">,</span>
+    <span class="n">attribution</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Planetary Computer&quot;</span><span class="p">,</span>
+    <span class="n">opacity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">shown</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">fit_bounds</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">layer_index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;folium&quot;</span><span class="p">,</span>
+    <span class="n">basemap</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">map_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Visualize a STAC item from the Planetary Computer on an interactive map.</span>
 
@@ -7125,6 +7129,7 @@ map options, and customizing the visualization of the STAC items.</p>
                 <code>**kwargs</code>
             </td>
             <td>
+                  <code><span title="typing.Any">Any</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7150,6 +7155,7 @@ map options, and customizing the visualization of the STAC items.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><span title="typing.Any">Any</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7186,13 +7192,7 @@ map options, and customizing the visualization of the STAC items.</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/download.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1216</span>
-<span class="normal">1217</span>
-<span class="normal">1218</span>
-<span class="normal">1219</span>
-<span class="normal">1220</span>
-<span class="normal">1221</span>
-<span class="normal">1222</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1222</span>
 <span class="normal">1223</span>
 <span class="normal">1224</span>
 <span class="normal">1225</span>
@@ -7283,23 +7283,29 @@ map options, and customizing the visualization of the STAC items.</p>
 <span class="normal">1310</span>
 <span class="normal">1311</span>
 <span class="normal">1312</span>
-<span class="normal">1313</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_pc_items</span><span class="p">(</span>
-    <span class="n">urls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">collection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">items</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">assets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">bands</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">titiler_endpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">attribution</span><span class="o">=</span><span class="s2">&quot;Planetary Computer&quot;</span><span class="p">,</span>
-    <span class="n">opacity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-    <span class="n">shown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">fit_bounds</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">layer_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;folium&quot;</span><span class="p">,</span>
-    <span class="n">basemap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">map_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-<span class="p">):</span>
+<span class="normal">1313</span>
+<span class="normal">1314</span>
+<span class="normal">1315</span>
+<span class="normal">1316</span>
+<span class="normal">1317</span>
+<span class="normal">1318</span>
+<span class="normal">1319</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_pc_items</span><span class="p">(</span>
+    <span class="n">urls</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">collection</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">items</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">assets</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">bands</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">titiler_endpoint</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">attribution</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Planetary Computer&quot;</span><span class="p">,</span>
+    <span class="n">opacity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">shown</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">fit_bounds</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">layer_index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;folium&quot;</span><span class="p">,</span>
+    <span class="n">basemap</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">map_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Visualize multiple STAC items from the Planetary Computer on an interactive map.</span>
 
