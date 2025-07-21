@@ -11,7 +11,8 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import (Any, Callable, Dict, Generator, Iterator, List, Optional,
+                    Tuple, Union)
 
 # Third-Party Libraries
 import cv2
@@ -471,8 +472,8 @@ def dict_to_rioxarray(data_dict: Dict) -> xr.DataArray:
 
 
 def dict_to_image(
-    data_dict: Dict[str, Any], output: Optional[str] = None, **kwargs
-) -> rasterio.DatasetReader:
+    data_dict: Dict[str, Any], output: Optional[str] = None, **kwargs: Any
+) -> Union[str, Any]:
     """Convert a dictionary containing spatial data to a rasterio dataset or save it to
     a file. The dictionary should contain the following keys: "crs", "bounds", and "image".
     It can be generated from a TorchGeo dataset sampler.
@@ -521,24 +522,24 @@ def dict_to_image(
 
 
 def view_vector(
-    vector_data,
-    column=None,
-    cmap="viridis",
-    figsize=(10, 10),
-    title=None,
-    legend=True,
-    basemap=False,
-    basemap_type="streets",
-    alpha=0.7,
-    edge_color="black",
-    classification="quantiles",
-    n_classes=5,
-    highlight_index=None,
-    highlight_color="red",
-    scheme=None,
-    save_path=None,
-    dpi=300,
-):
+    vector_data: Union[str, gpd.GeoDataFrame],
+    column: Optional[str] = None,
+    cmap: str = "viridis",
+    figsize: Tuple[int, int] = (10, 10),
+    title: Optional[str] = None,
+    legend: bool = True,
+    basemap: bool = False,
+    basemap_type: str = "streets",
+    alpha: float = 0.7,
+    edge_color: str = "black",
+    classification: str = "quantiles",
+    n_classes: int = 5,
+    highlight_index: Optional[int] = None,
+    highlight_color: str = "red",
+    scheme: Optional[str] = None,
+    save_path: Optional[str] = None,
+    dpi: int = 300,
+) -> Any:
     """
     Visualize vector datasets with options for styling, classification, basemaps and more.
 
@@ -675,11 +676,11 @@ def view_vector(
 
 
 def view_vector_interactive(
-    vector_data,
-    layer_name="Vector Layer",
-    tiles_args=None,
-    **kwargs,
-):
+    vector_data: Union[str, gpd.GeoDataFrame],
+    layer_name: str = "Vector Layer",
+    tiles_args: Optional[Dict] = None,
+    **kwargs: Any,
+) -> Any:
     """
     Visualize vector datasets with options for styling, classification, basemaps and more.
 
@@ -791,12 +792,12 @@ def view_vector_interactive(
 
 
 def regularization(
-    building_polygons,
-    angle_tolerance=10,
-    simplify_tolerance=0.5,
-    orthogonalize=True,
-    preserve_topology=True,
-):
+    building_polygons: Union[gpd.GeoDataFrame, List[Polygon]],
+    angle_tolerance: float = 10,
+    simplify_tolerance: float = 0.5,
+    orthogonalize: bool = True,
+    preserve_topology: bool = True,
+) -> Union[gpd.GeoDataFrame, List[Polygon]]:
     """
     Regularizes building footprint polygons with multiple techniques beyond minimum
     rotated rectangles.
@@ -920,7 +921,7 @@ def regularization(
         return regularized_buildings
 
 
-def hybrid_regularization(building_polygons):
+def hybrid_regularization(building_polygons: Union[gpd.GeoDataFrame, List[Polygon]]) -> Union[gpd.GeoDataFrame, List[Polygon]]:
     """
     A comprehensive hybrid approach to building footprint regularization.
 
@@ -1031,8 +1032,11 @@ def hybrid_regularization(building_polygons):
 
 
 def adaptive_regularization(
-    building_polygons, simplify_tolerance=0.5, area_threshold=0.9, preserve_shape=True
-):
+    building_polygons: Union[gpd.GeoDataFrame, List[Polygon]], 
+    simplify_tolerance: float = 0.5, 
+    area_threshold: float = 0.9, 
+    preserve_shape: bool = True
+) -> Union[gpd.GeoDataFrame, List[Polygon]]:
     """
     Adaptively regularizes building footprints based on their characteristics.
 
@@ -1188,9 +1192,9 @@ def create_split_map(
     zoom: Optional[int] = 2,
     height: Optional[int] = "600px",
     basemap: Optional[str] = None,
-    basemap_args: Optional[dict] = None,
-    m=None,
-    **kwargs,
+    basemap_args: Optional[Dict] = None,
+    m: Optional[Any] = None,
+    **kwargs: Any,
 ) -> None:
     """Adds split map.
 
@@ -1282,8 +1286,9 @@ def download_file(
         str: The path to the downloaded file or the extracted directory.
     """
 
-    from tqdm import tqdm
     import zipfile
+
+    from tqdm import tqdm
 
     if output_path is None:
         output_path = os.path.basename(url)
@@ -1403,7 +1408,7 @@ def get_raster_stats(raster_path: str, divide_by: float = 1.0) -> Dict[str, Any]
     return stats
 
 
-def print_raster_info(raster_path, show_preview=True, figsize=(10, 8)):
+def print_raster_info(raster_path: str, show_preview: bool = True, figsize: Tuple[int, int] = (10, 8)) -> Optional[Dict[str, Any]]:
     """Print formatted information about a raster dataset and optionally show a preview.
 
     Args:
@@ -1463,7 +1468,7 @@ def print_raster_info(raster_path, show_preview=True, figsize=(10, 8)):
         print(f"Error reading raster: {str(e)}")
 
 
-def get_raster_info_gdal(raster_path):
+def get_raster_info_gdal(raster_path: str) -> Optional[Dict[str, Any]]:
     """Get basic information about a raster dataset using GDAL.
 
     Args:
@@ -1522,7 +1527,7 @@ def get_raster_info_gdal(raster_path):
     return info
 
 
-def get_vector_info(vector_path):
+def get_vector_info(vector_path: str) -> Optional[Dict[str, Any]]:
     """Display basic information about a vector dataset using GeoPandas.
 
     Args:
@@ -1568,7 +1573,7 @@ def get_vector_info(vector_path):
     return info
 
 
-def print_vector_info(vector_path, show_preview=True, figsize=(10, 8)):
+def print_vector_info(vector_path: str, show_preview: bool = True, figsize: Tuple[int, int] = (10, 8)) -> Optional[Dict[str, Any]]:
     """Print formatted information about a vector dataset and optionally show a preview.
 
     Args:
@@ -1628,7 +1633,7 @@ def print_vector_info(vector_path, show_preview=True, figsize=(10, 8)):
 
 
 # Alternative implementation using OGR directly
-def get_vector_info_ogr(vector_path):
+def get_vector_info_ogr(vector_path: str) -> Optional[Dict[str, Any]]:
     """Get basic information about a vector dataset using OGR.
 
     Args:
@@ -1691,7 +1696,7 @@ def get_vector_info_ogr(vector_path):
     return info
 
 
-def analyze_vector_attributes(vector_path, attribute_name):
+def analyze_vector_attributes(vector_path: str, attribute_name: str) -> Optional[Dict[str, Any]]:
     """Analyze a specific attribute in a vector dataset and create a histogram.
 
     Args:
@@ -1768,8 +1773,8 @@ def analyze_vector_attributes(vector_path, attribute_name):
 
 
 def visualize_vector_by_attribute(
-    vector_path, attribute_name, cmap="viridis", figsize=(10, 8)
-):
+    vector_path: str, attribute_name: str, cmap: str = "viridis", figsize: Tuple[int, int] = (10, 8)
+) -> bool:
     """Create a thematic map visualization of vector data based on an attribute.
 
     Args:
@@ -1817,8 +1822,13 @@ def visualize_vector_by_attribute(
 
 
 def clip_raster_by_bbox(
-    input_raster, output_raster, bbox, bands=None, bbox_type="geo", bbox_crs=None
-):
+    input_raster: str, 
+    output_raster: str, 
+    bbox: List[float], 
+    bands: Optional[List[int]] = None, 
+    bbox_type: str = "geo", 
+    bbox_crs: Optional[str] = None
+) -> str:
     """
     Clip a raster dataset using a bounding box and optionally select specific bands.
 
@@ -2004,17 +2014,17 @@ def clip_raster_by_bbox(
 
 
 def raster_to_vector(
-    raster_path,
-    output_path=None,
-    threshold=0,
-    min_area=10,
-    simplify_tolerance=None,
-    class_values=None,
-    attribute_name="class",
-    unique_attribute_value=False,
-    output_format="geojson",
-    plot_result=False,
-):
+    raster_path: str,
+    output_path: Optional[str] = None,
+    threshold: float = 0,
+    min_area: float = 10,
+    simplify_tolerance: Optional[float] = None,
+    class_values: Optional[List[int]] = None,
+    attribute_name: str = "class",
+    unique_attribute_value: bool = False,
+    output_format: str = "geojson",
+    plot_result: bool = False,
+) -> gpd.GeoDataFrame:
     """
     Convert a raster label mask to vector polygons.
 
@@ -2136,18 +2146,18 @@ def raster_to_vector(
 
 
 def raster_to_vector_batch(
-    input_dir,
-    output_dir,
-    pattern="*.tif",
-    threshold=0,
-    min_area=10,
-    simplify_tolerance=None,
-    class_values=None,
-    attribute_name="class",
-    output_format="geojson",
-    merge_output=False,
-    merge_filename="merged_vectors",
-):
+    input_dir: str,
+    output_dir: str,
+    pattern: str = "*.tif",
+    threshold: float = 0,
+    min_area: float = 10,
+    simplify_tolerance: Optional[float] = None,
+    class_values: Optional[List[int]] = None,
+    attribute_name: str = "class",
+    output_format: str = "geojson",
+    merge_output: bool = False,
+    merge_filename: str = "merged_vectors",
+) -> Optional[gpd.GeoDataFrame]:
     """
     Batch convert multiple raster files to vector polygons.
 
@@ -2251,21 +2261,21 @@ def raster_to_vector_batch(
 
 
 def vector_to_raster(
-    vector_path,
-    output_path=None,
-    reference_raster=None,
-    attribute_field=None,
-    output_shape=None,
-    transform=None,
-    pixel_size=None,
-    bounds=None,
-    crs=None,
-    all_touched=False,
-    fill_value=0,
-    dtype=np.uint8,
-    nodata=None,
-    plot_result=False,
-):
+    vector_path: Union[str, gpd.GeoDataFrame],
+    output_path: Optional[str] = None,
+    reference_raster: Optional[str] = None,
+    attribute_field: Optional[str] = None,
+    output_shape: Optional[Tuple[int, int]] = None,
+    transform: Optional[Any] = None,
+    pixel_size: Optional[float] = None,
+    bounds: Optional[List[float]] = None,
+    crs: Optional[str] = None,
+    all_touched: bool = False,
+    fill_value: Union[int, float] = 0,
+    dtype: Any = np.uint8,
+    nodata: Optional[Union[int, float]] = None,
+    plot_result: bool = False,
+) -> np.ndarray:
     """
     Convert vector data to a raster.
 
@@ -4787,7 +4797,7 @@ def masks_to_vector(
         return gdf
 
 
-def read_vector(source, layer=None, **kwargs):
+def read_vector(source: str, layer: Optional[str] = None, **kwargs: Any) -> gpd.GeoDataFrame:
     """Reads vector data from various formats including GeoParquet.
 
     This function dynamically determines the file type based on extension
@@ -4862,7 +4872,7 @@ def read_vector(source, layer=None, **kwargs):
         raise ValueError(f"Could not read from source '{source}': {str(e)}")
 
 
-def read_raster(source, band=None, masked=True, **kwargs):
+def read_raster(source: str, band: Optional[Union[int, List[int]]] = None, masked: bool = True, **kwargs: Any) -> xr.DataArray:
     """Reads raster data from various formats using rioxarray.
 
     This function reads raster data from local files or URLs into a rioxarray
@@ -4927,7 +4937,7 @@ def read_raster(source, band=None, masked=True, **kwargs):
         raise ValueError(f"Error reading raster data: {str(e)}")
 
 
-def temp_file_path(ext):
+def temp_file_path(ext: str) -> str:
     """Returns a temporary file path.
 
     Args:
@@ -5184,7 +5194,7 @@ def region_groups(
         return da, df
 
 
-def add_geometric_properties(data, properties=None, area_unit="m2", length_unit="m"):
+def add_geometric_properties(data: gpd.GeoDataFrame, properties: Optional[List[str]] = None, area_unit: str = "m2", length_unit: str = "m") -> gpd.GeoDataFrame:
     """Calculates geometric properties and adds them to the GeoDataFrame.
 
     This function calculates various geometric properties of features in a
@@ -6622,7 +6632,7 @@ def orthogonalize(
         return gdf
 
 
-def inspect_pth_file(pth_path):
+def inspect_pth_file(pth_path: str) -> Dict[str, Any]:
     """
     Inspect a PyTorch .pth model file to determine its architecture.
 
@@ -6774,7 +6784,7 @@ def inspect_pth_file(pth_path):
         print(f"Error loading the model file: {str(e)}")
 
 
-def try_common_architectures(state_dict):
+def try_common_architectures(state_dict: Dict[str, Any]) -> Optional[str]:
     """
     Try to load the state_dict into common architectures to see which one fits.
 
@@ -6814,7 +6824,7 @@ def try_common_architectures(state_dict):
             print(f"- {name}: Failed to load - {str(e)}")
 
 
-def mosaic_geotiffs(input_dir, output_file, mask_file=None):
+def mosaic_geotiffs(input_dir: str, output_file: str, mask_file: Optional[str] = None) -> None:
     """Create a mosaic from all GeoTIFF files as a Cloud Optimized GeoTIFF (COG).
 
     This function identifies all GeoTIFF files in the specified directory,
@@ -6977,7 +6987,7 @@ def mosaic_geotiffs(input_dir, output_file, mask_file=None):
     return True
 
 
-def download_model_from_hf(model_path, repo_id=None):
+def download_model_from_hf(model_path: str, repo_id: Optional[str] = None) -> str:
     """
     Download the object detection model from Hugging Face.
 
@@ -7107,7 +7117,7 @@ def regularize(
     return gdf
 
 
-def vector_to_geojson(filename, output=None, **kwargs):
+def vector_to_geojson(filename: str, output: Optional[str] = None, **kwargs: Any) -> str:
     """Converts a vector file to a geojson file.
 
     Args:
@@ -7167,8 +7177,8 @@ def coords_to_xy(
     src_fp: str,
     coords: np.ndarray,
     coord_crs: str = "epsg:4326",
-    return_out_of_bounds=False,
-    **kwargs,
+    return_out_of_bounds: bool = False,
+    **kwargs: Any,
 ) -> np.ndarray:
     """Converts a list or array of coordinates to pixel coordinates, i.e., (col, row) coordinates.
 
@@ -7235,7 +7245,7 @@ def coords_to_xy(
         return output
 
 
-def boxes_to_vector(coords, src_crs, dst_crs="EPSG:4326", output=None, **kwargs):
+def boxes_to_vector(coords: Union[List[List[float]], np.ndarray], src_crs: str, dst_crs: str = "EPSG:4326", output: Optional[str] = None, **kwargs: Any) -> gpd.GeoDataFrame:
     """
     Convert a list of bounding box coordinates to vector data.
 
@@ -7269,16 +7279,16 @@ def boxes_to_vector(coords, src_crs, dst_crs="EPSG:4326", output=None, **kwargs)
 
 
 def rowcol_to_xy(
-    src_fp,
-    rows=None,
-    cols=None,
-    boxes=None,
-    zs=None,
-    offset="center",
-    output=None,
-    dst_crs="EPSG:4326",
-    **kwargs,
-):
+    src_fp: str,
+    rows: Optional[List[int]] = None,
+    cols: Optional[List[int]] = None,
+    boxes: Optional[List[List[int]]] = None,
+    zs: Optional[List[float]] = None,
+    offset: str = "center",
+    output: Optional[str] = None,
+    dst_crs: str = "EPSG:4326",
+    **kwargs: Any,
+) -> Tuple[List[float], List[float]]:
     """Converts a list of (row, col) coordinates to (x, y) coordinates.
 
     Args:
@@ -7325,8 +7335,8 @@ def rowcol_to_xy(
 
 
 def bbox_to_xy(
-    src_fp: str, coords: list, coord_crs: str = "epsg:4326", **kwargs
-) -> list:
+    src_fp: str, coords: List[float], coord_crs: str = "epsg:4326", **kwargs: Any
+) -> List[float]:
     """Converts a list of coordinates to pixel coordinates, i.e., (col, row) coordinates.
         Note that map bbox coords is [minx, miny, maxx, maxy] from bottomleft to topright
         While rasterio bbox coords is [minx, max, maxx, min] from topleft to bottomright
@@ -7416,8 +7426,8 @@ def bbox_to_xy(
 
 
 def geojson_to_xy(
-    src_fp: str, geojson: str, coord_crs: str = "epsg:4326", **kwargs
-) -> list:
+    src_fp: str, geojson: str, coord_crs: str = "epsg:4326", **kwargs: Any
+) -> List[List[float]]:
     """Converts a geojson file or a dictionary of feature collection to a list of pixel coordinates.
 
     Args:
@@ -7435,7 +7445,7 @@ def geojson_to_xy(
     return coords_to_xy(src_fp, coords, src_crs, **kwargs)
 
 
-def write_colormap(image, colormap, output=None):
+def write_colormap(image: Union[str, np.ndarray], colormap: Union[str, Dict], output: Optional[str] = None) -> Optional[str]:
     """Write a colormap to an image.
 
     Args:
@@ -7448,7 +7458,7 @@ def write_colormap(image, colormap, output=None):
     leafmap.write_image_colormap(image, colormap, output)
 
 
-def plot_performance_metrics(history_path, figsize=(15, 5), verbose=True):
+def plot_performance_metrics(history_path: str, figsize: Tuple[int, int] = (15, 5), verbose: bool = True) -> None:
     """Plot performance metrics from a history object.
 
     Args:
@@ -7541,7 +7551,7 @@ def plot_prediction_comparison(
     original_colormap: Optional[str] = None,
     indexes: Optional[List[int]] = None,
     divider: Optional[float] = None,
-):
+) -> None:
     """Plot original image, prediction, and optional ground truth side by side.
 
     Supports input as file paths, NumPy arrays, or PIL Images. For multi-band
@@ -7755,7 +7765,7 @@ def stack_bands(
     return output_file
 
 
-def empty_cache():
+def empty_cache() -> None:
     """Empty the cache of the current device."""
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

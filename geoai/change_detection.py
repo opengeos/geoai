@@ -2,13 +2,15 @@
 
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 from rasterio.windows import from_bounds
 from skimage.transform import resize
-import matplotlib.pyplot as plt
-import cv2
 from torchange.models.segment_any_change import AnyChange, show_change_masks
+
 from .utils import download_file
 
 

@@ -2,25 +2,21 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, List, Dict, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cv2
+import geopandas as gpd
 import numpy as np
 import rasterio
 import torch
-import geopandas as gpd
 from PIL import Image
-from rasterio.windows import Window
 from rasterio.warp import transform_bounds
-from shapely.geometry import box, Polygon
+from rasterio.windows import Window
+from shapely.geometry import Polygon, box
 from tqdm import tqdm
-from transformers import (
-    CLIPSegForImageSegmentation,
-    CLIPSegProcessor,
-    AutoModelForMaskGeneration,
-    AutoProcessor,
-    pipeline,
-)
+from transformers import (AutoModelForMaskGeneration, AutoProcessor,
+                          CLIPSegForImageSegmentation, CLIPSegProcessor,
+                          pipeline)
 
 
 @dataclass
@@ -548,9 +544,8 @@ class GroundedSAM:
                                                 if detection.mask is not None:
                                                     # Apply gaussian blur to reduce blockiness
                                                     try:
-                                                        from scipy.ndimage import (
-                                                            gaussian_filter,
-                                                        )
+                                                        from scipy.ndimage import \
+                                                            gaussian_filter
 
                                                         smoothed_mask = gaussian_filter(
                                                             detection.mask.astype(
