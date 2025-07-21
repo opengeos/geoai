@@ -14,9 +14,13 @@ from rasterio.warp import transform_bounds
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box
 from tqdm import tqdm
-from transformers import (AutoModelForMaskGeneration, AutoProcessor,
-                          CLIPSegForImageSegmentation, CLIPSegProcessor,
-                          pipeline)
+from transformers import (
+    AutoModelForMaskGeneration,
+    AutoProcessor,
+    CLIPSegForImageSegmentation,
+    CLIPSegProcessor,
+    pipeline,
+)
 
 
 @dataclass
@@ -544,8 +548,9 @@ class GroundedSAM:
                                                 if detection.mask is not None:
                                                     # Apply gaussian blur to reduce blockiness
                                                     try:
-                                                        from scipy.ndimage import \
-                                                            gaussian_filter
+                                                        from scipy.ndimage import (
+                                                            gaussian_filter,
+                                                        )
 
                                                         smoothed_mask = gaussian_filter(
                                                             detection.mask.astype(

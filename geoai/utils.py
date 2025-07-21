@@ -11,8 +11,17 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from collections.abc import Iterable
 from pathlib import Path
-from typing import (Any, Callable, Dict, Generator, Iterator, List, Optional,
-                    Tuple, Union)
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 # Third-Party Libraries
 import cv2
@@ -921,7 +930,9 @@ def regularization(
         return regularized_buildings
 
 
-def hybrid_regularization(building_polygons: Union[gpd.GeoDataFrame, List[Polygon]]) -> Union[gpd.GeoDataFrame, List[Polygon]]:
+def hybrid_regularization(
+    building_polygons: Union[gpd.GeoDataFrame, List[Polygon]],
+) -> Union[gpd.GeoDataFrame, List[Polygon]]:
     """
     A comprehensive hybrid approach to building footprint regularization.
 
@@ -1032,10 +1043,10 @@ def hybrid_regularization(building_polygons: Union[gpd.GeoDataFrame, List[Polygo
 
 
 def adaptive_regularization(
-    building_polygons: Union[gpd.GeoDataFrame, List[Polygon]], 
-    simplify_tolerance: float = 0.5, 
-    area_threshold: float = 0.9, 
-    preserve_shape: bool = True
+    building_polygons: Union[gpd.GeoDataFrame, List[Polygon]],
+    simplify_tolerance: float = 0.5,
+    area_threshold: float = 0.9,
+    preserve_shape: bool = True,
 ) -> Union[gpd.GeoDataFrame, List[Polygon]]:
     """
     Adaptively regularizes building footprints based on their characteristics.
@@ -1408,7 +1419,9 @@ def get_raster_stats(raster_path: str, divide_by: float = 1.0) -> Dict[str, Any]
     return stats
 
 
-def print_raster_info(raster_path: str, show_preview: bool = True, figsize: Tuple[int, int] = (10, 8)) -> Optional[Dict[str, Any]]:
+def print_raster_info(
+    raster_path: str, show_preview: bool = True, figsize: Tuple[int, int] = (10, 8)
+) -> Optional[Dict[str, Any]]:
     """Print formatted information about a raster dataset and optionally show a preview.
 
     Args:
@@ -1573,7 +1586,9 @@ def get_vector_info(vector_path: str) -> Optional[Dict[str, Any]]:
     return info
 
 
-def print_vector_info(vector_path: str, show_preview: bool = True, figsize: Tuple[int, int] = (10, 8)) -> Optional[Dict[str, Any]]:
+def print_vector_info(
+    vector_path: str, show_preview: bool = True, figsize: Tuple[int, int] = (10, 8)
+) -> Optional[Dict[str, Any]]:
     """Print formatted information about a vector dataset and optionally show a preview.
 
     Args:
@@ -1696,7 +1711,9 @@ def get_vector_info_ogr(vector_path: str) -> Optional[Dict[str, Any]]:
     return info
 
 
-def analyze_vector_attributes(vector_path: str, attribute_name: str) -> Optional[Dict[str, Any]]:
+def analyze_vector_attributes(
+    vector_path: str, attribute_name: str
+) -> Optional[Dict[str, Any]]:
     """Analyze a specific attribute in a vector dataset and create a histogram.
 
     Args:
@@ -1773,7 +1790,10 @@ def analyze_vector_attributes(vector_path: str, attribute_name: str) -> Optional
 
 
 def visualize_vector_by_attribute(
-    vector_path: str, attribute_name: str, cmap: str = "viridis", figsize: Tuple[int, int] = (10, 8)
+    vector_path: str,
+    attribute_name: str,
+    cmap: str = "viridis",
+    figsize: Tuple[int, int] = (10, 8),
 ) -> bool:
     """Create a thematic map visualization of vector data based on an attribute.
 
@@ -1822,12 +1842,12 @@ def visualize_vector_by_attribute(
 
 
 def clip_raster_by_bbox(
-    input_raster: str, 
-    output_raster: str, 
-    bbox: List[float], 
-    bands: Optional[List[int]] = None, 
-    bbox_type: str = "geo", 
-    bbox_crs: Optional[str] = None
+    input_raster: str,
+    output_raster: str,
+    bbox: List[float],
+    bands: Optional[List[int]] = None,
+    bbox_type: str = "geo",
+    bbox_crs: Optional[str] = None,
 ) -> str:
     """
     Clip a raster dataset using a bounding box and optionally select specific bands.
@@ -4797,7 +4817,9 @@ def masks_to_vector(
         return gdf
 
 
-def read_vector(source: str, layer: Optional[str] = None, **kwargs: Any) -> gpd.GeoDataFrame:
+def read_vector(
+    source: str, layer: Optional[str] = None, **kwargs: Any
+) -> gpd.GeoDataFrame:
     """Reads vector data from various formats including GeoParquet.
 
     This function dynamically determines the file type based on extension
@@ -4872,7 +4894,12 @@ def read_vector(source: str, layer: Optional[str] = None, **kwargs: Any) -> gpd.
         raise ValueError(f"Could not read from source '{source}': {str(e)}")
 
 
-def read_raster(source: str, band: Optional[Union[int, List[int]]] = None, masked: bool = True, **kwargs: Any) -> xr.DataArray:
+def read_raster(
+    source: str,
+    band: Optional[Union[int, List[int]]] = None,
+    masked: bool = True,
+    **kwargs: Any,
+) -> xr.DataArray:
     """Reads raster data from various formats using rioxarray.
 
     This function reads raster data from local files or URLs into a rioxarray
@@ -5194,7 +5221,12 @@ def region_groups(
         return da, df
 
 
-def add_geometric_properties(data: gpd.GeoDataFrame, properties: Optional[List[str]] = None, area_unit: str = "m2", length_unit: str = "m") -> gpd.GeoDataFrame:
+def add_geometric_properties(
+    data: gpd.GeoDataFrame,
+    properties: Optional[List[str]] = None,
+    area_unit: str = "m2",
+    length_unit: str = "m",
+) -> gpd.GeoDataFrame:
     """Calculates geometric properties and adds them to the GeoDataFrame.
 
     This function calculates various geometric properties of features in a
@@ -6824,7 +6856,9 @@ def try_common_architectures(state_dict: Dict[str, Any]) -> Optional[str]:
             print(f"- {name}: Failed to load - {str(e)}")
 
 
-def mosaic_geotiffs(input_dir: str, output_file: str, mask_file: Optional[str] = None) -> None:
+def mosaic_geotiffs(
+    input_dir: str, output_file: str, mask_file: Optional[str] = None
+) -> None:
     """Create a mosaic from all GeoTIFF files as a Cloud Optimized GeoTIFF (COG).
 
     This function identifies all GeoTIFF files in the specified directory,
@@ -7117,7 +7151,9 @@ def regularize(
     return gdf
 
 
-def vector_to_geojson(filename: str, output: Optional[str] = None, **kwargs: Any) -> str:
+def vector_to_geojson(
+    filename: str, output: Optional[str] = None, **kwargs: Any
+) -> str:
     """Converts a vector file to a geojson file.
 
     Args:
@@ -7245,7 +7281,13 @@ def coords_to_xy(
         return output
 
 
-def boxes_to_vector(coords: Union[List[List[float]], np.ndarray], src_crs: str, dst_crs: str = "EPSG:4326", output: Optional[str] = None, **kwargs: Any) -> gpd.GeoDataFrame:
+def boxes_to_vector(
+    coords: Union[List[List[float]], np.ndarray],
+    src_crs: str,
+    dst_crs: str = "EPSG:4326",
+    output: Optional[str] = None,
+    **kwargs: Any,
+) -> gpd.GeoDataFrame:
     """
     Convert a list of bounding box coordinates to vector data.
 
@@ -7445,7 +7487,11 @@ def geojson_to_xy(
     return coords_to_xy(src_fp, coords, src_crs, **kwargs)
 
 
-def write_colormap(image: Union[str, np.ndarray], colormap: Union[str, Dict], output: Optional[str] = None) -> Optional[str]:
+def write_colormap(
+    image: Union[str, np.ndarray],
+    colormap: Union[str, Dict],
+    output: Optional[str] = None,
+) -> Optional[str]:
     """Write a colormap to an image.
 
     Args:
@@ -7458,7 +7504,9 @@ def write_colormap(image: Union[str, np.ndarray], colormap: Union[str, Dict], ou
     leafmap.write_image_colormap(image, colormap, output)
 
 
-def plot_performance_metrics(history_path: str, figsize: Tuple[int, int] = (15, 5), verbose: bool = True) -> None:
+def plot_performance_metrics(
+    history_path: str, figsize: Tuple[int, int] = (15, 5), verbose: bool = True
+) -> None:
     """Plot performance metrics from a history object.
 
     Args:

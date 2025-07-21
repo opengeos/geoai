@@ -35,7 +35,9 @@ except ImportError:
     SMP_AVAILABLE = False
 
 
-def get_instance_segmentation_model(num_classes: int = 2, num_channels: int = 3, pretrained: bool = True) -> torch.nn.Module:
+def get_instance_segmentation_model(
+    num_classes: int = 2, num_channels: int = 3, pretrained: bool = True
+) -> torch.nn.Module:
     """
     Get Mask R-CNN model with custom input channels and output classes.
 
@@ -130,7 +132,13 @@ def get_instance_segmentation_model(num_classes: int = 2, num_channels: int = 3,
 class ObjectDetectionDataset(Dataset):
     """Dataset for object detection from GeoTIFF images and labels."""
 
-    def __init__(self, image_paths: List[str], label_paths: List[str], transforms: Optional[Callable] = None, num_channels: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        image_paths: List[str],
+        label_paths: List[str],
+        transforms: Optional[Callable] = None,
+        num_channels: Optional[int] = None,
+    ) -> None:
         """
         Initialize dataset.
 
@@ -280,7 +288,9 @@ class Compose:
         """
         self.transforms = transforms
 
-    def __call__(self, image: torch.Tensor, target: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    def __call__(
+        self, image: torch.Tensor, target: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         for t in self.transforms:
             image, target = t(image, target)
         return image, target
@@ -289,7 +299,9 @@ class Compose:
 class ToTensor:
     """Convert numpy.ndarray to tensor."""
 
-    def __call__(self, image: torch.Tensor, target: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    def __call__(
+        self, image: torch.Tensor, target: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Apply transform to image and target.
 
@@ -315,7 +327,9 @@ class RandomHorizontalFlip:
         """
         self.prob = prob
 
-    def __call__(self, image: torch.Tensor, target: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    def __call__(
+        self, image: torch.Tensor, target: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         if random.random() < self.prob:
             # Flip image
             image = torch.flip(image, dims=[2])  # Flip along width dimension
@@ -353,7 +367,9 @@ def get_transform(train: bool) -> torchvision.transforms.Compose:
     return Compose(transforms)
 
 
-def collate_fn(batch: List[Tuple[torch.Tensor, Dict[str, torch.Tensor]]]) -> Tuple[Tuple[torch.Tensor, ...], Tuple[Dict[str, torch.Tensor], ...]]:
+def collate_fn(
+    batch: List[Tuple[torch.Tensor, Dict[str, torch.Tensor]]],
+) -> Tuple[Tuple[torch.Tensor, ...], Tuple[Dict[str, torch.Tensor], ...]]:
     """
     Custom collate function for batching samples.
 
@@ -426,7 +442,9 @@ def train_one_epoch(
     return avg_loss
 
 
-def evaluate(model: torch.nn.Module, data_loader: DataLoader, device: torch.device) -> Dict[str, float]:
+def evaluate(
+    model: torch.nn.Module, data_loader: DataLoader, device: torch.device
+) -> Dict[str, float]:
     """
     Evaluate the model on the validation set.
 
@@ -502,7 +520,13 @@ def evaluate(model: torch.nn.Module, data_loader: DataLoader, device: torch.devi
     return {"loss": avg_loss, "IoU": avg_iou}
 
 
-def visualize_predictions(model: torch.nn.Module, dataset: Dataset, device: torch.device, num_samples: int = 5, output_dir: Optional[str] = None) -> None:
+def visualize_predictions(
+    model: torch.nn.Module,
+    dataset: Dataset,
+    device: torch.device,
+    num_samples: int = 5,
+    output_dir: Optional[str] = None,
+) -> None:
     """
     Visualize model predictions.
 
@@ -1577,7 +1601,9 @@ class SemanticSegmentationDataset(Dataset):
                     # Convert to RGB and return 3 channels
                     return 3
 
-    def _resize_image_and_mask(self, image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _resize_image_and_mask(
+        self, image: np.ndarray, mask: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Resize image and mask to target size."""
         if self.target_size is None:
             return image, mask
@@ -1615,7 +1641,9 @@ class SemanticSegmentationDataset(Dataset):
 
         return image, mask
 
-    def _pad_to_size(self, tensor: torch.Tensor, target_size: Tuple[int, int]) -> torch.Tensor:
+    def _pad_to_size(
+        self, tensor: torch.Tensor, target_size: Tuple[int, int]
+    ) -> torch.Tensor:
         """Pad tensor to target size with zeros."""
         target_h, target_w = target_size
 
@@ -1738,7 +1766,9 @@ class SemanticTransforms:
     def __init__(self, transforms: List[Callable]) -> None:
         self.transforms = transforms
 
-    def __call__(self, image: torch.Tensor, mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         for t in self.transforms:
             image, mask = t(image, mask)
         return image, mask
@@ -1747,7 +1777,9 @@ class SemanticTransforms:
 class SemanticToTensor:
     """Convert numpy.ndarray to tensor for semantic segmentation."""
 
-    def __call__(self, image: torch.Tensor, mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         return image, mask
 
 
@@ -1757,7 +1789,9 @@ class SemanticRandomHorizontalFlip:
     def __init__(self, prob: float = 0.5) -> None:
         self.prob = prob
 
-    def __call__(self, image: torch.Tensor, mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         if random.random() < self.prob:
             # Flip image and mask along width dimension
             image = torch.flip(image, dims=[2])
@@ -1881,7 +1915,12 @@ def get_smp_model(
         )
 
 
-def dice_coefficient(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1e-6, num_classes: Optional[int] = None) -> float:
+def dice_coefficient(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    smooth: float = 1e-6,
+    num_classes: Optional[int] = None,
+) -> float:
     """
     Calculate Dice coefficient for segmentation (binary or multi-class).
 
@@ -2033,7 +2072,13 @@ def train_semantic_one_epoch(
     return avg_loss
 
 
-def evaluate_semantic(model: torch.nn.Module, data_loader: DataLoader, device: torch.device, criterion: Any, num_classes: int = 2) -> Dict[str, float]:
+def evaluate_semantic(
+    model: torch.nn.Module,
+    data_loader: DataLoader,
+    device: torch.device,
+    criterion: Any,
+    num_classes: int = 2,
+) -> Dict[str, float]:
     """
     Evaluate the semantic segmentation model on the validation set.
 

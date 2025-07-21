@@ -16,8 +16,10 @@ import torch
 from huggingface_hub import hf_hub_download
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box
-from torchvision.models.detection import (fasterrcnn_resnet50_fpn_v2,
-                                          maskrcnn_resnet50_fpn)
+from torchvision.models.detection import (
+    fasterrcnn_resnet50_fpn_v2,
+    maskrcnn_resnet50_fpn,
+)
 from tqdm import tqdm
 
 # Local Imports
@@ -316,7 +318,9 @@ class ObjectDetector:
         # Set model to evaluation mode
         self.model.eval()
 
-    def download_model_from_hf(self, model_path: Optional[str] = None, repo_id: Optional[str] = None) -> str:
+    def download_model_from_hf(
+        self, model_path: Optional[str] = None, repo_id: Optional[str] = None
+    ) -> str:
         """
         Download the object detection model from Hugging Face.
 
@@ -478,7 +482,9 @@ class ObjectDetector:
 
         return polygons
 
-    def filter_overlapping_polygons(self, gdf: gpd.GeoDataFrame, **kwargs: Any) -> gpd.GeoDataFrame:
+    def filter_overlapping_polygons(
+        self, gdf: gpd.GeoDataFrame, **kwargs: Any
+    ) -> gpd.GeoDataFrame:
         """
         Filter overlapping polygons using non-maximum suppression.
 
@@ -535,7 +541,9 @@ class ObjectDetector:
 
         return gdf.iloc[keep_indices]
 
-    def filter_edge_objects(self, gdf: gpd.GeoDataFrame, raster_path: str, edge_buffer: int = 10) -> gpd.GeoDataFrame:
+    def filter_edge_objects(
+        self, gdf: gpd.GeoDataFrame, raster_path: str, edge_buffer: int = 10
+    ) -> gpd.GeoDataFrame:
         """
         Filter out object detections that fall in padding/edge areas of the image.
 
@@ -1060,7 +1068,12 @@ class ObjectDetector:
         return gdf
 
     def save_masks_as_geotiff(
-        self, raster_path: str, output_path: Optional[str] = None, batch_size: int = 4, verbose: bool = False, **kwargs: Any
+        self,
+        raster_path: str,
+        output_path: Optional[str] = None,
+        batch_size: int = 4,
+        verbose: bool = False,
+        **kwargs: Any,
     ) -> str:
         """
         Process a raster file to extract object masks and save as GeoTIFF.
@@ -1323,7 +1336,9 @@ class ObjectDetector:
         from shapely.geometry import MultiPolygon, Polygon, box
         from tqdm import tqdm
 
-        def get_angle(p1: Tuple[float, float], p2: Tuple[float, float], p3: Tuple[float, float]) -> float:
+        def get_angle(
+            p1: Tuple[float, float], p2: Tuple[float, float], p3: Tuple[float, float]
+        ) -> float:
             """Calculate angle between three points in degrees (0-180)"""
             a = np.array(p1)
             b = np.array(p2)
@@ -1510,7 +1525,11 @@ class ObjectDetector:
         return result_gdf
 
     def visualize_results(
-        self, raster_path: str, gdf: Optional[gpd.GeoDataFrame] = None, output_path: Optional[str] = None, figsize: Tuple[int, int] = (12, 12)
+        self,
+        raster_path: str,
+        gdf: Optional[gpd.GeoDataFrame] = None,
+        output_path: Optional[str] = None,
+        figsize: Tuple[int, int] = (12, 12),
     ) -> bool:
         """
         Visualize object detection results with proper coordinate transformation.
@@ -1657,7 +1676,9 @@ class ObjectDetector:
                 has_confidence = False
 
         # Function to convert coordinates
-        def geo_to_pixel(geometry: Any, transform: Any) -> Optional[Tuple[List[float], List[float]]]:
+        def geo_to_pixel(
+            geometry: Any, transform: Any
+        ) -> Optional[Tuple[List[float], List[float]]]:
             """Convert geometry to pixel coordinates using the provided transform."""
             if geometry.is_empty:
                 return None
@@ -2199,7 +2220,9 @@ class ObjectDetector:
         import concurrent.futures
         from functools import partial
 
-        def process_component(args: Tuple[int, np.ndarray, np.ndarray, Any, float, int, Optional[int]]) -> Optional[Dict[str, Any]]:
+        def process_component(
+            args: Tuple[int, np.ndarray, np.ndarray, Any, float, int, Optional[int]],
+        ) -> Optional[Dict[str, Any]]:
             """
             Helper function to process a single component
             """
@@ -2406,7 +2429,11 @@ class CarDetector(ObjectDetector):
     """
 
     def __init__(
-        self, model_path: str = "car_detection_usa.pth", repo_id: Optional[str] = None, model: Optional[Any] = None, device: Optional[str] = None
+        self,
+        model_path: str = "car_detection_usa.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        device: Optional[str] = None,
     ) -> None:
         """
         Initialize the object extractor.
@@ -2431,7 +2458,11 @@ class ShipDetector(ObjectDetector):
     """
 
     def __init__(
-        self, model_path: str = "ship_detection.pth", repo_id: Optional[str] = None, model: Optional[Any] = None, device: Optional[str] = None
+        self,
+        model_path: str = "ship_detection.pth",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        device: Optional[str] = None,
     ) -> None:
         """
         Initialize the object extractor.
@@ -2619,8 +2650,7 @@ class AgricultureFieldDelineator(ObjectDetector):
         """
         import torchvision
         from torchvision.models.detection import maskrcnn_resnet50_fpn
-        from torchvision.models.detection.backbone_utils import \
-            resnet_fpn_backbone
+        from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
         if model is not None:
             return model
@@ -2661,7 +2691,12 @@ class AgricultureFieldDelineator(ObjectDetector):
         model.to(self.device)
         return model
 
-    def preprocess_sentinel_bands(self, image_data: np.ndarray, band_selection: Optional[List[int]] = None, use_ndvi: Optional[bool] = None) -> torch.Tensor:
+    def preprocess_sentinel_bands(
+        self,
+        image_data: np.ndarray,
+        band_selection: Optional[List[int]] = None,
+        use_ndvi: Optional[bool] = None,
+    ) -> torch.Tensor:
         """
         Preprocess Sentinel-2 band data for model input.
 
@@ -2723,7 +2758,12 @@ class AgricultureFieldDelineator(ObjectDetector):
 
         return image_tensor
 
-    def update_band_stats(self, raster_path: str, band_selection: Optional[List[int]] = None, sample_size: int = 1000) -> Dict[str, List[float]]:
+    def update_band_stats(
+        self,
+        raster_path: str,
+        band_selection: Optional[List[int]] = None,
+        sample_size: int = 1000,
+    ) -> Dict[str, List[float]]:
         """
         Update band statistics from the input Sentinel-2 raster.
 
