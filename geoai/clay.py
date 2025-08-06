@@ -14,12 +14,10 @@ import torch
 import cv2
 import rasterio
 import warnings
-from typing import Optional, Union, Tuple, Dict, List, Any
-from pathlib import Path
+from typing import Optional, Union, Tuple, Dict, Any
 
 try:
     from claymodel.model import ClayMAEModule
-    from claymodel.utils import posemb_sincos_2d_with_gsd
     from torchvision.transforms import v2
     import yaml
     from box import Box
@@ -27,11 +25,8 @@ try:
 except ImportError:
     CLAY_AVAILABLE = False
 
-from .common import (
-    check_file_path,
+from .utils import (
     download_file,
-    transform_coords,
-    reproject,
 )
 
 
@@ -123,7 +118,7 @@ class Clay:
                 "Please install: pip install claymodel torch torchvision pyyaml python-box"
             )
         
-        self.checkpoint_path = check_file_path(checkpoint_path, make_dirs=False)
+        self.checkpoint_path = os.path.abspath(checkpoint_path)
         if not os.path.exists(self.checkpoint_path):
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
         
@@ -219,32 +214,33 @@ class Clay:
             )
             return 'naip'
     
-    def _get_raster_center_latlon(self, src: rasterio.DatasetReader) -> Tuple[float, float]:
-        """Get the center lat/lon of the raster."""
+    def _get_raster_bounds_wgs84(self, src: rasterio.DatasetReader) -> Tuple[float, float, float, float]:
+        """Get the WGS84 bounds of the raster."""
         bounds = src.bounds
-        center_x = (bounds.left + bounds.right) / 2
-        center_y = (bounds.bottom + bounds.top) / 2
         
         # Transform to WGS84 if needed
         if src.crs != 'EPSG:4326':
-            lon, lat = transform_coords(
-                [(center_x, center_y)], 
-                src.crs, 
-                'EPSG:4326'
-            )[0]
-        else:
-            lon, lat = center_x, center_y
+            from rasterio.warp import transform as transform_coords
+            # Transform all four corners
+            xs = [bounds.left, bounds.right, bounds.left, bounds.right]
+            ys = [bounds.bottom, bounds.bottom, bounds.top, bounds.top]
+            transformed_xs, transformed_ys = transform_coords(src.crs, 'EPSG:4326', xs, ys)
             
-        return lat, lon
+            min_lon, max_lon = min(transformed_xs), max(transformed_xs)
+            min_lat, max_lat = min(transformed_ys), max(transformed_ys)
+            
+            return min_lon, min_lat, max_lon, max_lat
+        else:
+            return bounds.left, bounds.bottom, bounds.right, bounds.top
     
     def _prepare_datacube(
         self, 
         image: np.ndarray, 
         sensor_type: str,
-        lat: float, 
-        lon: float, 
+        bounds: Tuple[float, float, float, float], 
         date: Optional[datetime.datetime] = None,
-        gsd_override: Optional[float] = None
+        gsd_override: Optional[float] = None,
+        add_batch_dim: bool = True
     ) -> Dict[str, torch.Tensor]:
         """
         Prepare datacube for Clay model input.
@@ -252,10 +248,10 @@ class Clay:
         Args:
             image: Input image array [H, W, C]
             sensor_type: Detected sensor type
-            lat: Latitude of image center
-            lon: Longitude of image center  
+            bounds: Image bounds as (min_lon, min_lat, max_lon, max_lat) in WGS84
             date: Image acquisition date
             gsd_override: Override GSD value
+            add_batch_dim: Whether to add batch dimension
             
         Returns:
             Datacube dictionary for Clay model
@@ -292,27 +288,37 @@ class Clay:
         
         # Normalize
         transform = v2.Compose([v2.Normalize(mean=means, std=stds)])
-        pixels = transform(pixels).unsqueeze(0)  # Add batch dimension
+        pixels = transform(pixels)
+        if add_batch_dim:
+            pixels = pixels.unsqueeze(0)  # Add batch dimension
         
         # Prepare temporal encoding
         time_norm = normalize_timestamp(date)
         
         # Prepare spatial encoding
-        lat_norm, lon_norm = normalize_latlon(lat, lon)
+        lat_norm, lon_norm = normalize_latlon(bounds)
+        
+        # Create temporal and spatial tensors
+        time_tensor = torch.tensor(
+            time_norm + time_norm,  # Clay expects 4 elements: [week, hour, week, hour]
+            dtype=torch.float32,
+            device=self.device
+        )
+        latlon_tensor = torch.tensor(
+            lat_norm + lon_norm,  # Clay expects 4 elements: [sin_lat, cos_lat, sin_lon, cos_lon]
+            dtype=torch.float32,
+            device=self.device
+        )
+        
+        if add_batch_dim:
+            time_tensor = time_tensor.unsqueeze(0)
+            latlon_tensor = latlon_tensor.unsqueeze(0)
         
         # Create datacube
         datacube = {
             'pixels': pixels.to(self.device),
-            'time': torch.tensor(
-                time_norm + time_norm,  # Clay expects 4 elements: [week, hour, week, hour]
-                dtype=torch.float32,
-                device=self.device
-            ).unsqueeze(0),
-            'latlon': torch.tensor(
-                lat_norm + lon_norm,  # Clay expects 4 elements: [sin_lat, cos_lat, sin_lon, cos_lon]
-                dtype=torch.float32,
-                device=self.device
-            ).unsqueeze(0),
+            'time': time_tensor,
+            'latlon': latlon_tensor,
             'gsd': torch.tensor(gsd, device=self.device),
             'waves': torch.tensor(wavelengths, device=self.device)
         }
@@ -356,8 +362,8 @@ class Clay:
                     if sensor_type is None:
                         sensor_type = self._detect_sensor_type(src, source)
                     
-                    # Get image center coordinates
-                    lat, lon = self._get_raster_center_latlon(src)
+                    # Get image bounds
+                    bounds = self._get_raster_bounds_wgs84(src)
                     
             except Exception:
                 # Fallback to OpenCV for regular images
@@ -368,13 +374,13 @@ class Clay:
                 
                 # Use defaults for non-geospatial images
                 sensor_type = sensor_type or 'naip'
-                lat, lon = 0.0, 0.0  # Default coordinates
+                bounds = (0.0, 0.0, 0.01, 0.01)  # Default small bounds
                 self.raster_profile = None
                 
         elif isinstance(source, np.ndarray):
             image = source
             sensor_type = sensor_type or 'naip'
-            lat, lon = 0.0, 0.0
+            bounds = (0.0, 0.0, 0.01, 0.01)  # Default small bounds
             self.raster_profile = None
             
         else:
@@ -394,18 +400,21 @@ class Clay:
         self.source = source if isinstance(source, str) else None
         self.image = image
         self.sensor_type = sensor_type
-        self.lat = lat
-        self.lon = lon
+        self.bounds = bounds
         self.date = date
         self.gsd_override = gsd_override
         
+        # Calculate center for display
+        center_lon = (bounds[0] + bounds[2]) / 2
+        center_lat = (bounds[1] + bounds[3]) / 2
         print(f"Set image: shape={image.shape}, sensor={sensor_type}, "
-              f"lat={lat:.4f}, lon={lon:.4f}")
+              f"bounds={bounds}, center_lat={center_lat:.4f}, center_lon={center_lon:.4f}")
     
-    def generate_embeddings(
+    def predict(
         self, 
         tile_size: int = 256,
-        overlap: float = 0.0
+        overlap: float = 0.0,
+        only_cls_token: bool = False
     ) -> Dict[str, Any]:
         """
         Generate embeddings for the loaded image.
@@ -413,6 +422,7 @@ class Clay:
         Args:
             tile_size: Size of tiles for processing large images
             overlap: Overlap fraction between tiles (0.0 to 1.0)
+            only_cls_token: If True, return only CLS token embeddings (first token)
             
         Returns:
             Dictionary containing embeddings and metadata
@@ -437,22 +447,25 @@ class Clay:
             
             # Generate single embedding
             datacube = self._prepare_datacube(
-                image, self.sensor_type, self.lat, self.lon, 
-                self.date, self.gsd_override
+                image, self.sensor_type, self.bounds, 
+                self.date, self.gsd_override, add_batch_dim=True
             )
             
             with torch.no_grad():
                 encoded_patches, _, _, _ = self.module.model.encoder(datacube)
-                # Extract class token (global embedding)
-                embedding = encoded_patches[:, 0, :].cpu().numpy()
+                if only_cls_token:
+                    # Extract only class token (global embedding)
+                    embedding = encoded_patches[:, 0, :].cpu().numpy()
+                else:
+                    # Return full sequence
+                    embedding = encoded_patches.cpu().numpy()
             
             return {
                 'embeddings': embedding,
                 'tile_coords': [(0, 0, h, w)],
                 'image_shape': (h, w),
                 'sensor_type': self.sensor_type,
-                'lat': self.lat,
-                'lon': self.lon,
+                'bounds': self.bounds,
                 'date': self.date.isoformat() if self.date else None,
                 'num_tiles': 1
             }
@@ -470,14 +483,19 @@ class Clay:
                     
                     # Prepare datacube for this tile
                     datacube = self._prepare_datacube(
-                        tile, self.sensor_type, self.lat, self.lon,
-                        self.date, self.gsd_override
+                        tile, self.sensor_type, self.bounds,
+                        self.date, self.gsd_override, add_batch_dim=True
                     )
                     
                     # Generate embedding
                     with torch.no_grad():
                         encoded_patches, _, _, _ = self.module.model.encoder(datacube)
-                        embedding = encoded_patches[:, 0, :].cpu().numpy()
+                        if only_cls_token:
+                            # Extract only class token (global embedding)
+                            embedding = encoded_patches[:, 0, :].cpu().numpy()
+                        else:
+                            # Return full sequence
+                            embedding = encoded_patches.cpu().numpy()
                     
                     embeddings.append(embedding)
                     tile_coords.append((x, y, x+tile_size, y+tile_size))
@@ -487,8 +505,7 @@ class Clay:
                 'tile_coords': tile_coords,
                 'image_shape': (h, w),
                 'sensor_type': self.sensor_type,
-                'lat': self.lat,
-                'lon': self.lon,
+                'bounds': self.bounds,
                 'date': self.date.isoformat() if self.date else None,
                 'num_tiles': len(embeddings)
             }
@@ -507,7 +524,8 @@ class Clay:
             output_path: Output file path
             format: Output format ('npz', 'pt')
         """
-        output_path = check_file_path(output_path)
+        output_path = os.path.abspath(output_path)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
         if format == 'npz':
             np.savez_compressed(
@@ -516,8 +534,7 @@ class Clay:
                 tile_coords=np.array(embeddings_result['tile_coords']),
                 image_shape=np.array(embeddings_result['image_shape']),
                 sensor_type=embeddings_result['sensor_type'],
-                lat=embeddings_result['lat'],
-                lon=embeddings_result['lon'],
+                bounds=np.array(embeddings_result['bounds']),
                 date=embeddings_result['date'],
                 num_tiles=embeddings_result['num_tiles']
             )
@@ -527,6 +544,426 @@ class Clay:
             raise ValueError(f"Unsupported format: {format}")
         
         print(f"Saved embeddings to {output_path}")
+
+    def _prepare_batch_datacube(
+        self, 
+        images: list, 
+        sensor_types: list,
+        bounds_list: list, 
+        dates: list,
+        gsd_overrides: list
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Prepare batch datacube for Clay model input.
+        
+        Args:
+            images: List of image arrays [H, W, C]
+            sensor_types: List of sensor types
+            bounds_list: List of image bounds
+            dates: List of acquisition dates
+            gsd_overrides: List of GSD overrides
+            
+        Returns:
+            Batched datacube dictionary for Clay model
+        """
+        batch_pixels = []
+        batch_times = []
+        batch_latlons = []
+        batch_gsds = []
+        batch_waves = []
+        
+        for image, sensor_type, bounds, date, gsd_override in zip(
+            images, sensor_types, bounds_list, dates, gsd_overrides
+        ):
+            datacube = self._prepare_datacube(
+                image, sensor_type, bounds, date, gsd_override, add_batch_dim=False
+            )
+            
+            batch_pixels.append(datacube['pixels'])
+            batch_times.append(datacube['time'])
+            batch_latlons.append(datacube['latlon'])
+            batch_gsds.append(datacube['gsd'])
+            batch_waves.append(datacube['waves'])
+        
+        # Stack tensors to create batch
+        return {
+            'pixels': torch.stack(batch_pixels),
+            'time': torch.stack(batch_times),
+            'latlon': torch.stack(batch_latlons),
+            'gsd': torch.stack(batch_gsds),
+            'waves': torch.stack(batch_waves)
+        }
+    
+    def _process_batch_images(
+        self,
+        sources: list,
+        sensor_types: list,
+        dates: list,
+        gsd_overrides: list
+    ) -> Tuple[list, list, list, list, list]:
+        """
+        Process a batch of images and extract metadata.
+        
+        Returns:
+            Tuple of (images, sensor_types, bounds_list, dates, gsd_overrides)
+        """
+        images = []
+        processed_sensor_types = []
+        bounds_list = []
+        processed_dates = []
+        processed_gsd_overrides = []
+        
+        for source, sensor_type, date, gsd_override in zip(
+            sources, sensor_types, dates, gsd_overrides
+        ):
+            # Process each image similar to set_image but without storing state
+            if isinstance(source, str):
+                if source.startswith("http"):
+                    source = download_file(source)
+                
+                if not os.path.exists(source):
+                    raise ValueError(f"Input path {source} does not exist.")
+                
+                # Read with rasterio for geospatial images
+                try:
+                    with rasterio.open(source) as src:
+                        # Read all bands
+                        image = src.read()  # Shape: [C, H, W]
+                        image = np.transpose(image, (1, 2, 0))  # Convert to [H, W, C]
+                        
+                        # Detect sensor type
+                        if sensor_type is None:
+                            sensor_type = self._detect_sensor_type(src, source)
+                        
+                        # Get image bounds
+                        bounds = self._get_raster_bounds_wgs84(src)
+                        
+                except Exception:
+                    # Fallback to OpenCV for regular images
+                    image = cv2.imread(source)
+                    if image is None:
+                        raise ValueError(f"Could not read image: {source}")
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                    
+                    # Use defaults for non-geospatial images
+                    sensor_type = sensor_type or 'naip'
+                    bounds = (0.0, 0.0, 0.01, 0.01)  # Default small bounds
+                    
+            elif isinstance(source, np.ndarray):
+                image = source
+                sensor_type = sensor_type or 'naip'
+                bounds = (0.0, 0.0, 0.01, 0.01)  # Default small bounds
+                
+            else:
+                raise ValueError("Source must be a file path or numpy array")
+            
+            # Parse date if string
+            if isinstance(date, str):
+                try:
+                    date = datetime.datetime.fromisoformat(date.replace('Z', '+00:00'))
+                except ValueError:
+                    date = datetime.datetime.now()
+                    warnings.warn(f"Could not parse date: {date}. Using current time.")
+            elif date is None:
+                date = datetime.datetime.now()
+            
+            images.append(image)
+            processed_sensor_types.append(sensor_type)
+            bounds_list.append(bounds)
+            processed_dates.append(date)
+            processed_gsd_overrides.append(gsd_override)
+        
+        return images, processed_sensor_types, bounds_list, processed_dates, processed_gsd_overrides
+    
+    def _needs_tiling(self, source: Union[str, np.ndarray], tile_size: int) -> bool:
+        """Check if an image needs tiling based on its size."""
+        try:
+            if isinstance(source, np.ndarray):
+                h, w = source.shape[:2]
+                return h > tile_size or w > tile_size
+            
+            with rasterio.open(source) as src:
+                return src.height > tile_size or src.width > tile_size
+        except Exception:
+            # If we can't determine size, assume it might need tiling
+            return True
+    
+    def _generate_sequential(
+        self,
+        sources: list,
+        output_dir: Optional[str],
+        sensor_types: list,
+        dates: list,
+        gsd_overrides: list,
+        tile_size: int,
+        overlap: float,
+        save: bool,
+        format: str,
+        only_cls_token: bool
+    ) -> Union[Dict[str, Any], list]:
+        """Fall back to sequential processing for complex cases."""
+        results = []
+        for i, (source, sensor_type, date, gsd_override) in enumerate(
+            zip(sources, sensor_types, dates, gsd_overrides)
+        ):
+            # Set image
+            self.set_image(source, sensor_type, date, gsd_override)
+            
+            # Generate embeddings
+            result = self.predict(tile_size, overlap, only_cls_token)
+            
+            # Save if requested
+            if save:
+                if isinstance(source, str):
+                    base_name = os.path.splitext(os.path.basename(source))[0]
+                else:
+                    base_name = f"image_{i:04d}"
+                
+                output_path = os.path.join(output_dir, f"{base_name}_embeddings.{format}")
+                self.save_embeddings(result, output_path, format)
+            
+            results.append(result)
+        
+        # Return single result or list
+        if len(results) == 1:
+            return results[0]
+        return results
+
+    def generate(
+        self,
+        sources: Union[str, list],
+        output_dir: Optional[str] = None,
+        sensor_types: Optional[Union[str, list]] = None,
+        dates: Optional[Union[str, datetime.datetime, list]] = None,
+        gsd_overrides: Optional[Union[float, list]] = None,
+        tile_size: int = 256,
+        overlap: float = 0.0,
+        save: bool = True,
+        format: str = 'npz',
+        only_cls_token: bool = False,
+        batch_size: int = 8
+    ) -> Union[Dict[str, Any], list]:
+        """
+        Generate embeddings for one or multiple images with true batch processing.
+        
+        Args:
+            sources: Single image path/array or list of image paths/arrays
+            output_dir: Directory to save embeddings (required if save=True)
+            sensor_types: Single sensor type or list of sensor types
+            dates: Single date or list of dates
+            gsd_overrides: Single GSD override or list of GSD overrides
+            tile_size: Size of tiles for processing large images
+            overlap: Overlap fraction between tiles (0.0 to 1.0)
+            save: Whether to save embeddings to disk
+            format: Output format ('npz', 'pt')
+            only_cls_token: If True, return only CLS token embeddings
+            batch_size: Number of images to process simultaneously in model
+            
+        Returns:
+            Single embeddings dict or list of embeddings dicts
+        """
+        # Normalize inputs to lists
+        if not isinstance(sources, list):
+            sources = [sources]
+        
+        if sensor_types is not None and not isinstance(sensor_types, list):
+            sensor_types = [sensor_types] * len(sources)
+        elif sensor_types is None:
+            sensor_types = [None] * len(sources)
+        
+        if dates is not None and not isinstance(dates, list):
+            dates = [dates] * len(sources)
+        elif dates is None:
+            dates = [None] * len(sources)
+            
+        if gsd_overrides is not None and not isinstance(gsd_overrides, list):
+            gsd_overrides = [gsd_overrides] * len(sources)
+        elif gsd_overrides is None:
+            gsd_overrides = [None] * len(sources)
+        
+        # Validate parameters
+        if save and output_dir is None:
+            raise ValueError("output_dir is required when save=True")
+        
+        if save:
+            output_dir = os.path.abspath(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
+        
+        # For single image or when any image needs tiling, fall back to sequential processing
+        if len(sources) == 1 or any(self._needs_tiling(src, tile_size) for src in sources):
+            return self._generate_sequential(
+                sources, output_dir, sensor_types, dates, gsd_overrides,
+                tile_size, overlap, save, format, only_cls_token
+            )
+        
+        # Process in batches for true model-level batching
+        all_results = []
+        
+        for i in range(0, len(sources), batch_size):
+            batch_sources = sources[i:i+batch_size]
+            batch_sensor_types = sensor_types[i:i+batch_size]
+            batch_dates = dates[i:i+batch_size]
+            batch_gsd_overrides = gsd_overrides[i:i+batch_size]
+            
+            # Process batch images
+            images, proc_sensor_types, bounds_list, proc_dates, proc_gsd_overrides = self._process_batch_images(
+                batch_sources, batch_sensor_types, batch_dates, batch_gsd_overrides
+            )
+            
+            # Prepare batch datacube
+            batch_datacube = self._prepare_batch_datacube(
+                images, proc_sensor_types, bounds_list, proc_dates, proc_gsd_overrides
+            )
+            
+            # Generate batch embeddings
+            with torch.no_grad():
+                encoded_patches, _, _, _ = self.module.model.encoder(batch_datacube)
+                if only_cls_token:
+                    # Extract only class tokens (global embeddings)
+                    batch_embeddings = encoded_patches[:, 0, :].cpu().numpy()
+                else:
+                    # Return full sequences
+                    batch_embeddings = encoded_patches.cpu().numpy()
+            
+            # Create individual results
+            for j, (source, image, sensor_type, bounds, date) in enumerate(
+                zip(batch_sources, images, proc_sensor_types, bounds_list, proc_dates)
+            ):
+                h, w = image.shape[:2]
+                embedding = batch_embeddings[j:j+1]  # Keep batch dimension for consistency
+                
+                result = {
+                    'embeddings': embedding,
+                    'tile_coords': [(0, 0, h, w)],
+                    'image_shape': (h, w),
+                    'sensor_type': sensor_type,
+                    'bounds': bounds,
+                    'date': date.isoformat() if date else None,
+                    'num_tiles': 1
+                }
+                
+                # Save if requested
+                if save:
+                    if isinstance(source, str):
+                        base_name = os.path.splitext(os.path.basename(source))[0]
+                    else:
+                        base_name = f"image_{i+j:04d}"
+                    
+                    output_path = os.path.join(output_dir, f"{base_name}_embeddings.{format}")
+                    self.save_embeddings(result, output_path, format)
+                
+                all_results.append(result)
+        
+        # Return single result or list
+        if len(all_results) == 1:
+            return all_results[0]
+        return all_results
+
+    def generate_from_dir(
+        self,
+        image_dir: str,
+        output_dir: str,
+        metadata_dir: Optional[str] = None,
+        batch_size: int = 1,
+        tile_size: int = 256,
+        overlap: float = 0.0,
+        format: str = 'npz',
+        only_cls_token: bool = False,
+        sink_callback: Optional[callable] = None
+    ):
+        """
+        Generate embeddings for all images in a directory.
+        
+        Args:
+            image_dir: Directory containing images
+            output_dir: Directory to save embeddings
+            metadata_dir: Directory containing metadata files (optional)
+            batch_size: Number of images to process at once
+            tile_size: Size of tiles for processing large images
+            overlap: Overlap fraction between tiles (0.0 to 1.0)
+            format: Output format ('npz', 'pt')
+            only_cls_token: If True, return only CLS token embeddings (first token)
+            sink_callback: Optional callable(filename, embeddings) called after each batch
+        """
+        image_dir = os.path.abspath(image_dir)
+        output_dir = os.path.abspath(output_dir)
+        
+        if not os.path.exists(image_dir):
+            raise ValueError(f"Image directory does not exist: {image_dir}")
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Get all image files
+        image_extensions = {'.tif', '.tiff', '.jpg', '.jpeg', '.png', '.bmp'}
+        image_files = []
+        
+        for root, dirs, files in os.walk(image_dir):
+            for file in files:
+                if any(file.lower().endswith(ext) for ext in image_extensions):
+                    image_files.append(os.path.join(root, file))
+        
+        if not image_files:
+            print(f"No image files found in {image_dir}")
+            return
+        
+        print(f"Found {len(image_files)} images to process")
+        
+        # Process in batches
+        for i in range(0, len(image_files), batch_size):
+            batch_files = image_files[i:i+batch_size]
+            batch_sensor_types = []
+            batch_dates = []
+            batch_gsd_overrides = []
+            
+            # Load metadata for batch if metadata_dir provided
+            for img_file in batch_files:
+                sensor_type = None
+                date = None
+                gsd_override = None
+                
+                if metadata_dir:
+                    base_name = os.path.splitext(os.path.basename(img_file))[0]
+                    metadata_file = os.path.join(metadata_dir, f"{base_name}.yaml")
+                    
+                    if os.path.exists(metadata_file):
+                        try:
+                            with open(metadata_file, 'r') as f:
+                                metadata = yaml.safe_load(f)
+                                sensor_type = metadata.get('sensor_type')
+                                date_str = metadata.get('date')
+                                if date_str:
+                                    try:
+                                        date = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                    except ValueError:
+                                        pass
+                                gsd_override = metadata.get('gsd')
+                        except Exception as e:
+                            print(f"Warning: Could not load metadata for {img_file}: {e}")
+                
+                batch_sensor_types.append(sensor_type)
+                batch_dates.append(date)
+                batch_gsd_overrides.append(gsd_override)
+            
+            # Process batch
+            print(f"Processing batch {i//batch_size + 1}/{(len(image_files) + batch_size - 1)//batch_size}")
+            
+            try:
+                self.generate(
+                    sources=batch_files,
+                    output_dir=output_dir,
+                    sensor_types=batch_sensor_types,
+                    dates=batch_dates,
+                    gsd_overrides=batch_gsd_overrides,
+                    tile_size=tile_size,
+                    overlap=overlap,
+                    save=True,
+                    format=format
+                )
+            except Exception as e:
+                print(f"Error processing batch {i//batch_size + 1}: {e}")
+                continue
+        
+        print(f"Finished processing all images. Embeddings saved to {output_dir}")
 
 
 def load_embeddings(file_path: str) -> Dict[str, Any]:
@@ -541,16 +978,29 @@ def load_embeddings(file_path: str) -> Dict[str, Any]:
     """
     if file_path.endswith('.npz'):
         data = np.load(file_path, allow_pickle=True)
-        return {
-            'embeddings': data['embeddings'],
-            'tile_coords': data['tile_coords'].tolist(),
-            'image_shape': tuple(data['image_shape']),
-            'sensor_type': str(data['sensor_type']),
-            'lat': float(data['lat']),
-            'lon': float(data['lon']),
-            'date': str(data['date']) if data['date'] != 'None' else None,
-            'num_tiles': int(data['num_tiles'])
-        }
+        # Handle both old format (lat/lon) and new format (bounds)
+        if 'bounds' in data:
+            return {
+                'embeddings': data['embeddings'],
+                'tile_coords': data['tile_coords'].tolist(),
+                'image_shape': tuple(data['image_shape']),
+                'sensor_type': str(data['sensor_type']),
+                'bounds': tuple(data['bounds']),
+                'date': str(data['date']) if data['date'] != 'None' else None,
+                'num_tiles': int(data['num_tiles'])
+            }
+        else:
+            # Legacy format with lat/lon
+            return {
+                'embeddings': data['embeddings'],
+                'tile_coords': data['tile_coords'].tolist(),
+                'image_shape': tuple(data['image_shape']),
+                'sensor_type': str(data['sensor_type']),
+                'lat': float(data['lat']),
+                'lon': float(data['lon']),
+                'date': str(data['date']) if data['date'] != 'None' else None,
+                'num_tiles': int(data['num_tiles'])
+            }
     elif file_path.endswith('.pt'):
         return torch.load(file_path, map_location='cpu')
     else:
