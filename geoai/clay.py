@@ -25,9 +25,6 @@ except ImportError:
 from .utils import download_file
 
 
-
-
-
 def normalize_timestamp(date):
     """Normaize the timestamp for clay. Taken from https://github.com/Clay-foundation/stacchip/blob/main/stacchip/processors/prechip.py"""
     week = date.isocalendar().week * 2 * np.pi / 52
@@ -50,94 +47,102 @@ def normalize_latlon(bounds):
 def validate_metadata(metadata: Dict[str, Any]) -> None:
     """
     Validate metadata structure for custom sensor configurations.
-    
+
     Args:
         metadata: Metadata dictionary to validate
-        
+
     Raises:
         ValueError: If metadata structure is invalid
     """
-    required_keys = ['band_order', 'gsd', 'bands']
+    required_keys = ["band_order", "gsd", "bands"]
     for key in required_keys:
         if key not in metadata:
             raise ValueError(f"Missing required key: {key}")
-    
-    band_order = metadata['band_order']
+
+    band_order = metadata["band_order"]
     if not isinstance(band_order, list) or not band_order:
         raise ValueError("band_order must be a non-empty list")
-    
+
     num_bands = len(band_order)
-    
+
     # Validate bands structure
-    bands = metadata['bands']
-    required_band_keys = ['mean', 'std', 'wavelength']
+    bands = metadata["bands"]
+    required_band_keys = ["mean", "std", "wavelength"]
     for band_key in required_band_keys:
         if band_key not in bands:
             raise ValueError(f"Missing required bands key: {band_key}")
-        
+
         band_dict = bands[band_key]
         if not isinstance(band_dict, dict):
             raise ValueError(f"bands.{band_key} must be a dictionary")
-        
+
         # Check all bands are present
         for band in band_order:
             if band not in band_dict:
                 raise ValueError(f"Missing {band_key} value for band: {band}")
-        
+
         # Check no extra bands
         if len(band_dict) != num_bands:
-            raise ValueError(f"bands.{band_key} has {len(band_dict)} entries but expected {num_bands}")
+            raise ValueError(
+                f"bands.{band_key} has {len(band_dict)} entries but expected {num_bands}"
+            )
 
 
-def load_metadata(sensor_name: Optional[str] = None, custom_metadata: Optional[Dict[str, Any]] = None) -> Box:
+def load_metadata(
+    sensor_name: Optional[str] = None, custom_metadata: Optional[Dict[str, Any]] = None
+) -> Box:
     """
     Load sensor metadata from config file or validate custom metadata.
-    
+
     Args:
         sensor_name: Name of sensor to load from config file
         custom_metadata: Custom metadata dictionary (takes priority over sensor_name)
-        
+
     Returns:
         Box object containing sensor metadata
-        
+
     Raises:
         ValueError: If neither parameter provided or metadata invalid
     """
     if custom_metadata is not None:
         validate_metadata(custom_metadata)
         return Box(custom_metadata)
-    
+
     if sensor_name is None:
         raise ValueError("Must provide either sensor_name or custom_metadata")
-    
+
     # Load from config file
-    config_path = os.path.join(os.path.dirname(__file__), 'config', 'clay_metadata.yaml')
+    config_path = os.path.join(
+        os.path.dirname(__file__), "config", "clay_metadata.yaml"
+    )
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Sensor metadata config file not found: {config_path}")
-    
-    with open(config_path, 'r') as f:
+
+    with open(config_path, "r") as f:
         all_metadata = yaml.safe_load(f)
-    
+
     if sensor_name not in all_metadata:
         available_sensors = list(all_metadata.keys())
-        raise ValueError(f"Unknown sensor: {sensor_name}. Available sensors: {available_sensors}")
-    
+        raise ValueError(
+            f"Unknown sensor: {sensor_name}. Available sensors: {available_sensors}"
+        )
+
     return Box(all_metadata[sensor_name])
 
 
 class Clay:
     """
     Clay foundation model wrapper for generating geospatial embeddings.
-    
+
     This class provides a simplified interface to generate rich spectral embeddings from
     geospatial imagery using the Clay foundation model.
     """
-    
+
     def __init__(
         self,
         checkpoint_path: Optional[str] = None,
-        model_size: str = 'large',
-        sensor_name: str = '',
+        model_size: str = "large",
+        sensor_name: str = "",
         custom_metadata: Optional[Dict[str, Any]] = None,
         device: str = "auto",
     ):
@@ -156,43 +161,53 @@ class Clay:
                 "Clay model dependencies not available. "
                 "Please install: pip install claymodel torch torchvision pyyaml python-box"
             )
-        
+
         # Set default checkpoint path if not provided
         if checkpoint_path is None:
             cache_dir = os.path.expanduser("~/.cache/clay")
             checkpoint_path = os.path.join(cache_dir, "clay-v1.5.ckpt")
-        
+
         self.checkpoint_path = checkpoint_path
         self.model_size = model_size
-        
+
         # Set device
         if device == "auto":
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = torch.device(device)
-        
+
         # Handle metadata loading with warnings
-        if custom_metadata is not None and sensor_name != '':
-            print(f"Warning: Using custom metadata for processing, but sensor name '{sensor_name}' will be retained in saved embeddings")
-        
-        if custom_metadata is None and sensor_name == '':
-            sensor_name = 'sentinel-2-l2a'
-            print("Warning: No sensor name or custom metadata provided, defaulting to 'sentinel-2-l2a'")
-        
+        if custom_metadata is not None and sensor_name != "":
+            print(
+                f"Warning: Using custom metadata for processing, but sensor name '{sensor_name}' will be retained in saved embeddings"
+            )
+
+        if custom_metadata is None and sensor_name == "":
+            sensor_name = "sentinel-2-l2a"
+            print(
+                "Warning: No sensor name or custom metadata provided, defaulting to 'sentinel-2-l2a'"
+            )
+
         self.sensor_name = sensor_name
-        self.metadata = load_metadata(sensor_name if sensor_name else None, custom_metadata)
-        
+        self.metadata = load_metadata(
+            sensor_name if sensor_name else None, custom_metadata
+        )
+
         # Load model
         self._load_model()
-        
+
     def _load_model(self):
         """Load the Clay model from checkpoint."""
         # Check if checkpoint exists, if not download from HuggingFace
         if not os.path.exists(self.checkpoint_path):
-            print(f"Checkpoint not found at {self.checkpoint_path}, downloading from HuggingFace...")
+            print(
+                f"Checkpoint not found at {self.checkpoint_path}, downloading from HuggingFace..."
+            )
             url = "https://huggingface.co/made-with-clay/Clay/resolve/main/v1.5/clay-v1.5.ckpt"
-            self.checkpoint_path = download_file(url, self.checkpoint_path, overwrite=False, unzip=False)
-        
+            self.checkpoint_path = download_file(
+                url, self.checkpoint_path, overwrite=False, unzip=False
+            )
+
         torch.set_default_device(self.device)
         self.module = ClayMAEModule.load_from_checkpoint(
             checkpoint_path=self.checkpoint_path,
@@ -203,13 +218,13 @@ class Clay:
             shuffle=False,
         )
         self.module.eval()
-    
+
     def prepare_datacube(
-        self, 
-        image: np.ndarray, 
-        bounds: Tuple[float, float, float, float], 
+        self,
+        image: np.ndarray,
+        bounds: Tuple[float, float, float, float],
         date: datetime.datetime,
-        gsd: Optional[float] = None
+        gsd: Optional[float] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Prepare datacube for Clay model input.
@@ -219,26 +234,26 @@ class Clay:
             bounds: Image bounds as (min_lon, min_lat, max_lon, max_lat) in WGS84
             date: Image acquisition date
             gsd: Ground sample distance override
-            
+
         Returns:
             Datacube dictionary for Clay model
         """
         # Get sensor metadata
         band_order = self.metadata.band_order
         gsd = gsd if gsd is not None else self.metadata.gsd
-        
+
         # Extract normalization parameters
         means = [self.metadata.bands.mean[band] for band in band_order]
         stds = [self.metadata.bands.std[band] for band in band_order]
         wavelengths = [self.metadata.bands.wavelength[band] for band in band_order]
-        
+
         # Convert to tensor and transpose to [C, H, W]
         pixels = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
 
         # Normalize
         transform = v2.Compose([v2.Normalize(mean=means, std=stds)])
         pixels = transform(pixels).unsqueeze(0)  # Add batch dimension
-        
+
         # Prepare temporal encoding
         time_norm = normalize_timestamp(date)
 
@@ -249,16 +264,16 @@ class Clay:
         time_tensor = torch.tensor(
             time_norm + time_norm,  # Clay expects 4 elements: [week, hour, week, hour]
             dtype=torch.float32,
-            device=self.device
+            device=self.device,
         ).unsqueeze(0)
-        
+
         latlon_tensor = torch.tensor(
             lat_norm
             + lon_norm,  # Clay expects 4 elements: [sin_lat, cos_lat, sin_lon, cos_lon]
             dtype=torch.float32,
-            device=self.device
+            device=self.device,
         ).unsqueeze(0)
-        
+
         # Create datacube
         datacube = {
             "pixels": pixels.to(self.device),
@@ -269,30 +284,30 @@ class Clay:
         }
 
         return datacube
-    
+
     def generate(
-        self, 
-        image: np.ndarray, 
-        bounds: Tuple[float, float, float, float], 
+        self,
+        image: np.ndarray,
+        bounds: Tuple[float, float, float, float],
         date: datetime.datetime,
         gsd: Optional[float] = None,
-        only_cls_token: bool = False
+        only_cls_token: bool = False,
     ) -> np.ndarray:
         """
         Generate embeddings for a single image.
-        
+
         Args:
             image: Input image array [H, W, C]
             bounds: Image bounds as (min_lon, min_lat, max_lon, max_lat) in WGS84
             date: Image acquisition date
             gsd: Ground sample distance override
             only_cls_token: If True, return only CLS token embeddings
-            
+
         Returns:
             Embedding array
         """
         datacube = self.prepare_datacube(image, bounds, date, gsd)
-        
+
         with torch.no_grad():
             encoded_patches, _, _, _ = self.module.model.encoder(datacube)
             if only_cls_token:
@@ -301,17 +316,17 @@ class Clay:
             else:
                 # Return full sequence
                 embedding = encoded_patches.cpu().numpy()
-        
+
         return embedding
-    
+
     def save_embeddings(
-        self, 
+        self,
         embeddings: np.ndarray,
         bounds: Tuple[float, float, float, float],
         date: datetime.datetime,
         image_shape: Tuple[int, int],
         output_path: str,
-        format: str = 'npz'
+        format: str = "npz",
     ):
         """
         Save embeddings to file.
@@ -333,25 +348,19 @@ class Clay:
                 bounds=np.array(bounds),
                 date=date.isoformat(),
                 image_shape=np.array(image_shape),
-                sensor_type=self.sensor_name
+                sensor_type=self.sensor_name,
             )
-        elif format == 'pt':
+        elif format == "pt":
             data = {
-                'embeddings': torch.from_numpy(embeddings),
-                'bounds': bounds,
-                'date': date.isoformat(),
-                'image_shape': image_shape,
-                'sensor_type': self.sensor_name
+                "embeddings": torch.from_numpy(embeddings),
+                "bounds": bounds,
+                "date": date.isoformat(),
+                "image_shape": image_shape,
+                "sensor_type": self.sensor_name,
             }
             torch.save(data, output_path)
         else:
             raise ValueError(f"Unsupported format: {format}")
-
-    
-    
-    
-
-
 
 
 def load_embeddings(file_path: str) -> Dict[str, Any]:
