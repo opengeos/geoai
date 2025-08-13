@@ -99,19 +99,20 @@ def load_metadata(
     Raises:
         ValueError: If neither parameter provided or metadata invalid
     """
-    if custom_metadata is not None:
-        validate_metadata(custom_metadata)
-        return Box(custom_metadata)
-
-    if sensor_name is None:
-        raise ValueError("Must provide either sensor_name or custom_metadata")
-
     # Load from config file
     config_path = os.path.join(
         os.path.dirname(__file__), "config", "clay_metadata.yaml"
     )
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Sensor metadata config file not found: {config_path}")
+    
+    if custom_metadata is not None:
+        validate_metadata(custom_metadata)
+        return config_path, Box(custom_metadata)
+
+    if sensor_name is None:
+        raise ValueError("Must provide either sensor_name or custom_metadata")
+
 
     with open(config_path, "r") as f:
         all_metadata = yaml.safe_load(f)
@@ -122,7 +123,7 @@ def load_metadata(
             f"Unknown sensor: {sensor_name}. Available sensors: {available_sensors}"
         )
 
-    return Box(all_metadata[sensor_name])
+    return config_path, Box(all_metadata[sensor_name])
 
 
 class Clay:
@@ -179,7 +180,7 @@ class Clay:
             )
 
         self.sensor_name = sensor_name
-        self.metadata = load_metadata(
+        self.config_path, self.metadata = load_metadata(
             sensor_name if sensor_name else None, custom_metadata
         )
 
@@ -204,6 +205,7 @@ class Clay:
         self.module = ClayMAEModule.load_from_checkpoint(
             checkpoint_path=self.checkpoint_path,
             model_size=self.model_size,
+            metadata_path=self.config_path,
             dolls=[16, 32, 64, 128, 256, 768, 1024],
             doll_weights=[1, 1, 1, 1, 1, 1, 1],
             mask_ratio=0.0,
