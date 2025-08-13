@@ -20,8 +20,6 @@ import yaml
 from box import Box
 
 
-
-
 def normalize_timestamp(date):
     """Normaize the timestamp for clay. Taken from https://github.com/Clay-foundation/stacchip/blob/main/stacchip/processors/prechip.py"""
     week = date.isocalendar().week * 2 * np.pi / 52
@@ -153,7 +151,7 @@ class Clay:
             custom_metadata: Custom metadata dictionary (takes priority over sensor_name)
             device: Device to run model on ('auto', 'cuda', 'cpu')
         """
-        
+
         # Set default checkpoint path if not provided
         if checkpoint_path is None:
             cache_dir = os.path.expanduser("~/.cache/clay")
