@@ -216,8 +216,8 @@ class Clay:
     def prepare_datacube(
         self,
         image: np.ndarray,
-        bounds: Tuple[float, float, float, float],
-        date: datetime.datetime,
+        bounds: Optional[Tuple[float, float, float, float]] = None,
+        date: Optional[datetime.datetime] = None,
         gsd: Optional[float] = None,
     ) -> Dict[str, torch.Tensor]:
         """
@@ -249,24 +249,27 @@ class Clay:
         pixels = transform(pixels).unsqueeze(0)  # Add batch dimension
 
         # Prepare temporal encoding
-        time_norm = normalize_timestamp(date)
+        if date is not None:
+            week_norm, hour_norm = normalize_timestamp(date)
+            time_tensor = torch.tensor(
+                week_norm + hour_norm,  # Clay expects 4 elements: [week_sin, week_cos, hour_sin, hour_cos]
+                dtype=torch.float32,
+                device=self.device,
+            ).unsqueeze(0)
+        else:
+            time_tensor = torch.zeros(1, 4, dtype=torch.float32, device=self.device)
 
         # Prepare spatial encoding
-        lat_norm, lon_norm = normalize_latlon(bounds)
-
-        # Create temporal and spatial tensors
-        time_tensor = torch.tensor(
-            time_norm + time_norm,  # Clay expects 4 elements: [week, hour, week, hour]
-            dtype=torch.float32,
-            device=self.device,
-        ).unsqueeze(0)
-
-        latlon_tensor = torch.tensor(
-            lat_norm
-            + lon_norm,  # Clay expects 4 elements: [sin_lat, cos_lat, sin_lon, cos_lon]
-            dtype=torch.float32,
-            device=self.device,
-        ).unsqueeze(0)
+        if bounds is not None:
+            lat_norm, lon_norm = normalize_latlon(bounds)
+            latlon_tensor = torch.tensor(
+                lat_norm
+                + lon_norm,  # Clay expects 4 elements: [sin_lat, cos_lat, sin_lon, cos_lon]
+                dtype=torch.float32,
+                device=self.device,
+            ).unsqueeze(0)
+        else:
+            latlon_tensor = torch.zeros(1, 4, dtype=torch.float32, device=self.device)
 
         # Create datacube
         datacube = {
@@ -282,8 +285,8 @@ class Clay:
     def generate(
         self,
         image: np.ndarray,
-        bounds: Tuple[float, float, float, float],
-        date: datetime.datetime,
+        bounds: Optional[Tuple[float, float, float, float]] = None,
+        date: Optional[datetime.datetime] = None,
         gsd: Optional[float] = None,
         only_cls_token: bool = False,
     ) -> np.ndarray:
