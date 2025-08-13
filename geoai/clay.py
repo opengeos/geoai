@@ -294,7 +294,7 @@ class Clay:
         date: Optional[datetime.datetime] = None,
         gsd: Optional[float] = None,
         only_cls_token: bool = False,
-    ) -> np.ndarray:
+    ) -> torch.Tensor:
         """
         Generate embeddings for a single image.
 
@@ -314,10 +314,10 @@ class Clay:
             encoded_patches, _, _, _ = self.module.model.encoder(datacube)
             if only_cls_token:
                 # Extract only class token (global embedding)
-                embedding = encoded_patches[:, 0, :].cpu().numpy()
+                embedding = encoded_patches[:, 0, :]
             else:
                 # Return full sequence
-                embedding = encoded_patches.cpu().numpy()
+                embedding = encoded_patches
 
         return embedding
 
