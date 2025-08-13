@@ -193,6 +193,8 @@ class Clay:
             print(
                 f"Checkpoint not found at {self.checkpoint_path}, downloading from HuggingFace..."
             )
+            # Ensure parent directory exists
+            os.makedirs(os.path.dirname(self.checkpoint_path), exist_ok=True)
             url = "https://huggingface.co/made-with-clay/Clay/resolve/main/v1.5/clay-v1.5.ckpt"
             self.checkpoint_path = download_file(
                 url, self.checkpoint_path, overwrite=False, unzip=False
