@@ -12,17 +12,14 @@ import numpy as np
 import torch
 from typing import Optional, Tuple, Dict, Any, Union
 
-try:
-    from claymodel.module import ClayMAEModule
-    from torchvision.transforms import v2
-    import yaml
-    from box import Box
 
-    CLAY_AVAILABLE = True
-except ImportError:
-    CLAY_AVAILABLE = False
-
+from claymodel.module import ClayMAEModule
 from .utils import download_file
+from torchvision.transforms import v2
+import yaml
+from box import Box
+
+
 
 
 def normalize_timestamp(date):
@@ -156,12 +153,7 @@ class Clay:
             custom_metadata: Custom metadata dictionary (takes priority over sensor_name)
             device: Device to run model on ('auto', 'cuda', 'cpu')
         """
-        if not CLAY_AVAILABLE:
-            raise ImportError(
-                "Clay model dependencies not available. "
-                "Please install: pip install claymodel torch torchvision pyyaml python-box"
-            )
-
+        
         # Set default checkpoint path if not provided
         if checkpoint_path is None:
             cache_dir = os.path.expanduser("~/.cache/clay")

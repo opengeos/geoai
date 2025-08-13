@@ -1,5 +1,6 @@
 albumentations
 buildingregulariser
+git+https://github.com/Clay-foundation/model.git
 contextily
 datasets>=3.0
 ever-beta
