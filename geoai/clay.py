@@ -215,7 +215,7 @@ class Clay:
 
     def prepare_datacube(
         self,
-        image: np.ndarray,
+        image: Union[np.ndarray, torch.Tensor],
         bounds: Optional[Tuple[float, float, float, float]] = None,
         date: Optional[datetime.datetime] = None,
         gsd: Optional[float] = None,
@@ -242,7 +242,12 @@ class Clay:
         wavelengths = [self.metadata.bands.wavelength[band] for band in band_order]
 
         # Convert to tensor and transpose to [C, H, W]
-        pixels = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
+        if isinstance(image, torch.Tensor):
+            pixels = image.float()
+            if pixels.dim() == 3 and pixels.shape[-1] != pixels.shape[0]:  # [H, W, C] format
+                pixels = pixels.permute(2, 0, 1)
+        else:
+            pixels = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
 
         # Normalize
         transform = v2.Compose([v2.Normalize(mean=means, std=stds)])
@@ -284,7 +289,7 @@ class Clay:
 
     def generate(
         self,
-        image: np.ndarray,
+        image: Union[np.ndarray, torch.Tensor],
         bounds: Optional[Tuple[float, float, float, float]] = None,
         date: Optional[datetime.datetime] = None,
         gsd: Optional[float] = None,
