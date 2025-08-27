@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'geoai'))
+#sys.path.append(os.path.join(os.path.dirname(__file__), 'geoai'))
 
 import geopandas as gpd
 import numpy as np

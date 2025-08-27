@@ -27,3 +27,4 @@ torchgeo
 torchinfo
 tqdm
 transformers
+'stackstac[viz]'
