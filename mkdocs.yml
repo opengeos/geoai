@@ -131,6 +131,7 @@ nav:
           - examples/train_water_detection.ipynb
           - examples/water_dynamics.ipynb
           - examples/wetland_mapping.ipynb
+          - examples/wetland_dynamics.ipynb
           - examples/regularization.ipynb
           - examples/globe_projection.ipynb
           - examples/samgeo.ipynb
