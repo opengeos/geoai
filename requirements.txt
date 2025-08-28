@@ -1,3 +1,4 @@
+'stackstac[viz]'
 albumentations
 buildingregulariser
 contextily
@@ -27,4 +28,3 @@ torchgeo
 torchinfo
 tqdm
 transformers
-'stackstac[viz]'

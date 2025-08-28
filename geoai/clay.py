@@ -105,14 +105,13 @@ def load_metadata(
     )
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Sensor metadata config file not found: {config_path}")
-    
+
     if custom_metadata is not None:
         validate_metadata(custom_metadata)
         return config_path, Box(custom_metadata)
 
     if sensor_name is None:
         raise ValueError("Must provide either sensor_name or custom_metadata")
-
 
     with open(config_path, "r") as f:
         all_metadata = yaml.safe_load(f)
@@ -244,7 +243,9 @@ class Clay:
         # Convert to tensor and transpose to [C, H, W]
         if isinstance(image, torch.Tensor):
             pixels = image.float()
-            if pixels.dim() == 3 and pixels.shape[-1] != pixels.shape[0]:  # [H, W, C] format
+            if (
+                pixels.dim() == 3 and pixels.shape[-1] != pixels.shape[0]
+            ):  # [H, W, C] format
                 pixels = pixels.permute(2, 0, 1)
         else:
             pixels = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
@@ -257,7 +258,8 @@ class Clay:
         if date is not None:
             week_norm, hour_norm = normalize_timestamp(date)
             time_tensor = torch.tensor(
-                week_norm + hour_norm,  # Clay expects 4 elements: [week_sin, week_cos, hour_sin, hour_cos]
+                week_norm
+                + hour_norm,  # Clay expects 4 elements: [week_sin, week_cos, hour_sin, hour_cos]
                 dtype=torch.float32,
                 device=self.device,
             ).unsqueeze(0)

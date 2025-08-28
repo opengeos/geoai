@@ -1,6 +1,7 @@
 import sys
 import os
-#sys.path.append(os.path.join(os.path.dirname(__file__), 'geoai'))
+
+# sys.path.append(os.path.join(os.path.dirname(__file__), 'geoai'))
 
 import geopandas as gpd
 import numpy as np
@@ -101,29 +102,14 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 # Create custom metadata for just the 4 bands we're using
 custom_metadata = {
-    "band_order": ['blue', 'green', 'red', 'nir'],
+    "band_order": ["blue", "green", "red", "nir"],
     "rgb_indices": [2, 1, 0],
     "gsd": 10,
     "bands": {
-        "mean": {
-            "blue": 1105.0,
-            "green": 1355.0,
-            "red": 1552.0,
-            "nir": 2743.0
-        },
-        "std": {
-            "blue": 1809.0,
-            "green": 1757.0,
-            "red": 1888.0,
-            "nir": 1742.0
-        },
-        "wavelength": {
-            "blue": 0.493,
-            "green": 0.56,
-            "red": 0.665,
-            "nir": 0.842
-        }
-    }
+        "mean": {"blue": 1105.0, "green": 1355.0, "red": 1552.0, "nir": 2743.0},
+        "std": {"blue": 1809.0, "green": 1757.0, "red": 1888.0, "nir": 1742.0},
+        "wavelength": {"blue": 0.493, "green": 0.56, "red": 0.665, "nir": 0.842},
+    },
 }
 
 clay_model = Clay(custom_metadata=custom_metadata, device=str(device))
@@ -132,13 +118,12 @@ clay_model = Clay(custom_metadata=custom_metadata, device=str(device))
 # First convert stack bounds back to WGS84
 proj_bounds = (bounds[0], bounds[1], bounds[2], bounds[3])
 bounds_gdf = gpd.GeoDataFrame(
-    geometry=[Point(bounds[0], bounds[1]), Point(bounds[2], bounds[3])],
-    crs=epsg_str
+    geometry=[Point(bounds[0], bounds[1]), Point(bounds[2], bounds[3])], crs=epsg_str
 ).to_crs("EPSG:4326")
 
 wgs84_bounds = (
     bounds_gdf.iloc[0].geometry.x,  # min_lon
-    bounds_gdf.iloc[0].geometry.y,  # min_lat  
+    bounds_gdf.iloc[0].geometry.y,  # min_lat
     bounds_gdf.iloc[1].geometry.x,  # max_lon
     bounds_gdf.iloc[1].geometry.y,  # max_lat
 )
@@ -150,23 +135,23 @@ datetimes = stack.time.values.astype("datetime64[s]").tolist()
 for i, datetime_obj in enumerate(datetimes):
     # Extract image for this time step [H, W, C]
     image = stack[i].values.transpose(1, 2, 0)  # Convert from [C, H, W] to [H, W, C]
-    
+
     # Convert numpy datetime64 to Python datetime
-    if hasattr(datetime_obj, 'astype'):
-        timestamp = datetime_obj.astype('datetime64[s]').astype('int')
+    if hasattr(datetime_obj, "astype"):
+        timestamp = datetime_obj.astype("datetime64[s]").astype("int")
         date = datetime.datetime.fromtimestamp(timestamp)
     else:
         date = datetime_obj
-    
+
     # Generate embedding using geoai wrapper
     embedding = clay_model.generate(
         image=image,
         bounds=wgs84_bounds,
         date=date,
         gsd=gsd,
-        only_cls_token=True  # Get only the class token (global embedding)
+        only_cls_token=True,  # Get only the class token (global embedding)
     )
-    
+
     embeddings_list.append(embedding.cpu().numpy())
 
 # Stack all embeddings
