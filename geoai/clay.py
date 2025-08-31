@@ -215,7 +215,12 @@ class Clay:
     def prepare_datacube(
         self,
         image: Union[np.ndarray, torch.Tensor],
-        bounds: Optional[Union[Tuple[float, float, float, float], List[Tuple[float, float, float, float]]]] = None,
+        bounds: Optional[
+            Union[
+                Tuple[float, float, float, float],
+                List[Tuple[float, float, float, float]],
+            ]
+        ] = None,
         date: Optional[Union[datetime.datetime, List[datetime.datetime]]] = None,
         gsd: Optional[float] = None,
     ) -> Dict[str, torch.Tensor]:
@@ -253,14 +258,22 @@ class Clay:
                 if pixels.shape[-1] != pixels.shape[1]:  # [B, H, W, C] format
                     pixels = pixels.permute(0, 3, 1, 2)  # -> [B, C, H, W]
             else:
-                if pixels.dim() == 3 and pixels.shape[-1] != pixels.shape[0]:  # [H, W, C] format
+                if (
+                    pixels.dim() == 3 and pixels.shape[-1] != pixels.shape[0]
+                ):  # [H, W, C] format
                     pixels = pixels.permute(2, 0, 1)  # -> [C, H, W]
                 pixels = pixels.unsqueeze(0)  # Add batch dimension -> [1, C, H, W]
         else:
             if is_batch:
-                pixels = torch.from_numpy(image.astype(np.float32)).permute(0, 3, 1, 2)  # [B, H, W, C] -> [B, C, H, W]
+                pixels = torch.from_numpy(image.astype(np.float32)).permute(
+                    0, 3, 1, 2
+                )  # [B, H, W, C] -> [B, C, H, W]
             else:
-                pixels = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1).unsqueeze(0)  # [H, W, C] -> [1, C, H, W]
+                pixels = (
+                    torch.from_numpy(image.astype(np.float32))
+                    .permute(2, 0, 1)
+                    .unsqueeze(0)
+                )  # [H, W, C] -> [1, C, H, W]
 
         # Normalize
         transform = v2.Compose([v2.Normalize(mean=means, std=stds)])
@@ -272,13 +285,21 @@ class Clay:
         if date is not None:
             if is_batch:
                 if not isinstance(date, list):
-                    raise ValueError("For batch processing, date must be a list of datetime objects")
+                    raise ValueError(
+                        "For batch processing, date must be a list of datetime objects"
+                    )
                 if len(date) != batch_size:
-                    raise ValueError(f"Number of dates ({len(date)}) must match batch size ({batch_size})")
-                
+                    raise ValueError(
+                        f"Number of dates ({len(date)}) must match batch size ({batch_size})"
+                    )
+
                 times = [normalize_timestamp(d) for d in date]
-                week_cos_sin = torch.tensor([t[0] for t in times], dtype=torch.float32, device=self.device)  # [B, 2]
-                hour_cos_sin = torch.tensor([t[1] for t in times], dtype=torch.float32, device=self.device)  # [B, 2]
+                week_cos_sin = torch.tensor(
+                    [t[0] for t in times], dtype=torch.float32, device=self.device
+                )  # [B, 2]
+                hour_cos_sin = torch.tensor(
+                    [t[1] for t in times], dtype=torch.float32, device=self.device
+                )  # [B, 2]
                 time_tensor = torch.cat([week_cos_sin, hour_cos_sin], dim=1)  # [B, 4]
             else:
                 week_norm, hour_norm = normalize_timestamp(date)
@@ -288,19 +309,29 @@ class Clay:
                     device=self.device,
                 ).unsqueeze(0)
         else:
-            time_tensor = torch.zeros(batch_size, 4, dtype=torch.float32, device=self.device)
+            time_tensor = torch.zeros(
+                batch_size, 4, dtype=torch.float32, device=self.device
+            )
 
         # Prepare spatial encoding
         if bounds is not None:
             if is_batch:
                 if not isinstance(bounds, list):
-                    raise ValueError("For batch processing, bounds must be a list of bound tuples")
+                    raise ValueError(
+                        "For batch processing, bounds must be a list of bound tuples"
+                    )
                 if len(bounds) != batch_size:
-                    raise ValueError(f"Number of bounds ({len(bounds)}) must match batch size ({batch_size})")
-                
+                    raise ValueError(
+                        f"Number of bounds ({len(bounds)}) must match batch size ({batch_size})"
+                    )
+
                 latlons = [normalize_latlon(b) for b in bounds]
-                lat_cos_sin = torch.tensor([ll[0] for ll in latlons], dtype=torch.float32, device=self.device)  # [B, 2]
-                lon_cos_sin = torch.tensor([ll[1] for ll in latlons], dtype=torch.float32, device=self.device)  # [B, 2]
+                lat_cos_sin = torch.tensor(
+                    [ll[0] for ll in latlons], dtype=torch.float32, device=self.device
+                )  # [B, 2]
+                lon_cos_sin = torch.tensor(
+                    [ll[1] for ll in latlons], dtype=torch.float32, device=self.device
+                )  # [B, 2]
                 latlon_tensor = torch.cat([lat_cos_sin, lon_cos_sin], dim=1)  # [B, 4]
             else:
                 lat_norm, lon_norm = normalize_latlon(bounds)
@@ -310,14 +341,18 @@ class Clay:
                     device=self.device,
                 ).unsqueeze(0)
         else:
-            latlon_tensor = torch.zeros(batch_size, 4, dtype=torch.float32, device=self.device)
+            latlon_tensor = torch.zeros(
+                batch_size, 4, dtype=torch.float32, device=self.device
+            )
 
         # Create datacube
         datacube = {
             "pixels": pixels.to(self.device),
             "time": time_tensor,
             "latlon": latlon_tensor,
-            "gsd": torch.full((batch_size,), gsd, dtype=torch.float32, device=self.device),
+            "gsd": torch.full(
+                (batch_size,), gsd, dtype=torch.float32, device=self.device
+            ),
             "waves": torch.tensor(wavelengths, dtype=torch.float32, device=self.device),
         }
 
@@ -326,7 +361,12 @@ class Clay:
     def generate(
         self,
         image: Union[np.ndarray, torch.Tensor],
-        bounds: Optional[Union[Tuple[float, float, float, float], List[Tuple[float, float, float, float]]]] = None,
+        bounds: Optional[
+            Union[
+                Tuple[float, float, float, float],
+                List[Tuple[float, float, float, float]],
+            ]
+        ] = None,
         date: Optional[Union[datetime.datetime, List[datetime.datetime]]] = None,
         gsd: Optional[float] = None,
         only_cls_token: bool = False,
