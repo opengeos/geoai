@@ -215,18 +215,18 @@ class Clay:
     def prepare_datacube(
         self,
         image: Union[np.ndarray, torch.Tensor],
-        bounds: Optional[Tuple[float, float, float, float]] = None,
-        date: Optional[datetime.datetime] = None,
+        bounds: Optional[Union[Tuple[float, float, float, float], List[Tuple[float, float, float, float]]]] = None,
+        date: Optional[Union[datetime.datetime, List[datetime.datetime]]] = None,
         gsd: Optional[float] = None,
     ) -> Dict[str, torch.Tensor]:
         """
-        Prepare datacube for Clay model input.
+        Prepare datacube for Clay model input (single image or batch).
 
         Args:
-            image: Input image array [H, W, C]
-            bounds: Image bounds as (min_lon, min_lat, max_lon, max_lat) in WGS84
-            date: Image acquisition date
-            gsd: Ground sample distance override
+            image: Input image array [H, W, C] for single image or [B, H, W, C] for batch
+            bounds: Image bounds as (min_lon, min_lat, max_lon, max_lat) in WGS84, or list of bounds for batch
+            date: Image acquisition date, or list of dates for batch
+            gsd: Ground sample distance override (same for all images in batch)
 
         Returns:
             Datacube dictionary for Clay model
@@ -240,51 +240,85 @@ class Clay:
         stds = [self.metadata.bands.std[band] for band in band_order]
         wavelengths = [self.metadata.bands.wavelength[band] for band in band_order]
 
-        # Convert to tensor and transpose to [C, H, W]
+        # Determine if this is a batch
+        if isinstance(image, torch.Tensor):
+            is_batch = image.dim() == 4
+        else:
+            is_batch = len(image.shape) == 4
+
+        # Convert to tensor and handle dimensions
         if isinstance(image, torch.Tensor):
             pixels = image.float()
-            if (
-                pixels.dim() == 3 and pixels.shape[-1] != pixels.shape[0]
-            ):  # [H, W, C] format
-                pixels = pixels.permute(2, 0, 1)
+            if is_batch:
+                if pixels.shape[-1] != pixels.shape[1]:  # [B, H, W, C] format
+                    pixels = pixels.permute(0, 3, 1, 2)  # -> [B, C, H, W]
+            else:
+                if pixels.dim() == 3 and pixels.shape[-1] != pixels.shape[0]:  # [H, W, C] format
+                    pixels = pixels.permute(2, 0, 1)  # -> [C, H, W]
+                pixels = pixels.unsqueeze(0)  # Add batch dimension -> [1, C, H, W]
         else:
-            pixels = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
+            if is_batch:
+                pixels = torch.from_numpy(image.astype(np.float32)).permute(0, 3, 1, 2)  # [B, H, W, C] -> [B, C, H, W]
+            else:
+                pixels = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1).unsqueeze(0)  # [H, W, C] -> [1, C, H, W]
 
         # Normalize
         transform = v2.Compose([v2.Normalize(mean=means, std=stds)])
-        pixels = transform(pixels).unsqueeze(0)  # Add batch dimension
+        pixels = transform(pixels)
+
+        batch_size = pixels.shape[0]
 
         # Prepare temporal encoding
         if date is not None:
-            week_norm, hour_norm = normalize_timestamp(date)
-            time_tensor = torch.tensor(
-                week_norm
-                + hour_norm,  # Clay expects 4 elements: [week_sin, week_cos, hour_sin, hour_cos]
-                dtype=torch.float32,
-                device=self.device,
-            ).unsqueeze(0)
+            if is_batch:
+                if not isinstance(date, list):
+                    raise ValueError("For batch processing, date must be a list of datetime objects")
+                if len(date) != batch_size:
+                    raise ValueError(f"Number of dates ({len(date)}) must match batch size ({batch_size})")
+                
+                times = [normalize_timestamp(d) for d in date]
+                week_cos_sin = torch.tensor([t[0] for t in times], dtype=torch.float32, device=self.device)  # [B, 2]
+                hour_cos_sin = torch.tensor([t[1] for t in times], dtype=torch.float32, device=self.device)  # [B, 2]
+                time_tensor = torch.cat([week_cos_sin, hour_cos_sin], dim=1)  # [B, 4]
+            else:
+                week_norm, hour_norm = normalize_timestamp(date)
+                time_tensor = torch.tensor(
+                    week_norm + hour_norm,
+                    dtype=torch.float32,
+                    device=self.device,
+                ).unsqueeze(0)
         else:
-            time_tensor = torch.zeros(1, 4, dtype=torch.float32, device=self.device)
+            time_tensor = torch.zeros(batch_size, 4, dtype=torch.float32, device=self.device)
 
         # Prepare spatial encoding
         if bounds is not None:
-            lat_norm, lon_norm = normalize_latlon(bounds)
-            latlon_tensor = torch.tensor(
-                lat_norm
-                + lon_norm,  # Clay expects 4 elements: [sin_lat, cos_lat, sin_lon, cos_lon]
-                dtype=torch.float32,
-                device=self.device,
-            ).unsqueeze(0)
+            if is_batch:
+                if not isinstance(bounds, list):
+                    raise ValueError("For batch processing, bounds must be a list of bound tuples")
+                if len(bounds) != batch_size:
+                    raise ValueError(f"Number of bounds ({len(bounds)}) must match batch size ({batch_size})")
+                
+                latlons = [normalize_latlon(b) for b in bounds]
+                lat_cos_sin = torch.tensor([ll[0] for ll in latlons], dtype=torch.float32, device=self.device)  # [B, 2]
+                lon_cos_sin = torch.tensor([ll[1] for ll in latlons], dtype=torch.float32, device=self.device)  # [B, 2]
+                latlon_tensor = torch.cat([lat_cos_sin, lon_cos_sin], dim=1)  # [B, 4]
+            else:
+                lat_norm, lon_norm = normalize_latlon(bounds)
+                latlon_tensor = torch.tensor(
+                    lat_norm + lon_norm,
+                    dtype=torch.float32,
+                    device=self.device,
+                ).unsqueeze(0)
         else:
-            latlon_tensor = torch.zeros(1, 4, dtype=torch.float32, device=self.device)
+            latlon_tensor = torch.zeros(batch_size, 4, dtype=torch.float32, device=self.device)
 
         # Create datacube
         datacube = {
             "pixels": pixels.to(self.device),
             "time": time_tensor,
             "latlon": latlon_tensor,
-            "gsd": torch.tensor(gsd, device=self.device),
-            "waves": torch.tensor(wavelengths, device=self.device),
+            "gsd": torch.full((batch_size,), gsd, dtype=torch.float32, device=self.device),
+            "waves": torch.tensor(wavelengths, dtype=torch.float32, device=self.device),
         }
 
         return datacube
@@ -292,23 +326,23 @@ class Clay:
     def generate(
         self,
         image: Union[np.ndarray, torch.Tensor],
-        bounds: Optional[Tuple[float, float, float, float]] = None,
-        date: Optional[datetime.datetime] = None,
+        bounds: Optional[Union[Tuple[float, float, float, float], List[Tuple[float, float, float, float]]]] = None,
+        date: Optional[Union[datetime.datetime, List[datetime.datetime]]] = None,
         gsd: Optional[float] = None,
         only_cls_token: bool = False,
     ) -> torch.Tensor:
         """
-        Generate embeddings for a single image.
+        Generate embeddings for single image or batch of images.
 
         Args:
-            image: Input image array [H, W, C]
-            bounds: Image bounds as (min_lon, min_lat, max_lon, max_lat) in WGS84
-            date: Image acquisition date
-            gsd: Ground sample distance override
+            image: Input image array [H, W, C] for single image or [B, H, W, C] for batch
+            bounds: Image bounds as (min_lon, min_lat, max_lon, max_lat) in WGS84, or list of bounds for batch
+            date: Image acquisition date, or list of dates for batch
+            gsd: Ground sample distance override (same for all images in batch)
             only_cls_token: If True, return only CLS token embeddings
 
         Returns:
-            Embedding array
+            Embedding array [1, seq_len, embed_dim] for single image or [B, seq_len, embed_dim] for batch
         """
         datacube = self.prepare_datacube(image, bounds, date, gsd)
 

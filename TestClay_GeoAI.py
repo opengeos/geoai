@@ -128,34 +128,37 @@ wgs84_bounds = (
     bounds_gdf.iloc[1].geometry.y,  # max_lat
 )
 
-# Process each image through Clay model
-embeddings_list = []
+# Process all images as a batch through Clay model
 datetimes = stack.time.values.astype("datetime64[s]").tolist()
 
-for i, datetime_obj in enumerate(datetimes):
-    # Extract image for this time step [H, W, C]
-    image = stack[i].values.transpose(1, 2, 0)  # Convert from [C, H, W] to [H, W, C]
-
-    # Convert numpy datetime64 to Python datetime
+# Convert numpy datetime64 to Python datetime objects
+dates_list = []
+for datetime_obj in datetimes:
     if hasattr(datetime_obj, "astype"):
         timestamp = datetime_obj.astype("datetime64[s]").astype("int")
         date = datetime.datetime.fromtimestamp(timestamp)
     else:
         date = datetime_obj
+    dates_list.append(date)
 
-    # Generate embedding using geoai wrapper
-    embedding = clay_model.generate(
-        image=image,
-        bounds=wgs84_bounds,
-        date=date,
-        gsd=gsd,
-        only_cls_token=True,  # Get only the class token (global embedding)
-    )
+# Prepare batched data
+# Convert stack data from [B, C, H, W] to [B, H, W, C] for Clay model
+batch_images = torch.from_numpy(stack.values).permute(0, 2, 3, 1)  # [B, H, W, C]
 
-    embeddings_list.append(embedding.cpu().numpy())
+# Create list of bounds (same bounds for all images in this case)
+bounds_list = [wgs84_bounds] * len(dates_list)
 
-# Stack all embeddings
-embeddings = np.vstack(embeddings_list)
+# Generate embeddings using batch processing
+embeddings_tensor = clay_model.generate(
+    image=batch_images,
+    bounds=bounds_list,
+    date=dates_list,
+    gsd=gsd,
+    only_cls_token=True,  # Get only the class token (global embedding)
+)
+
+# Convert to numpy for downstream processing
+embeddings = embeddings_tensor.cpu().numpy()
 
 print(f"Generated embeddings shape: {embeddings.shape}")
 
