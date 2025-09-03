@@ -1,9 +1,11 @@
+'stackstac[viz]'
 albumentations
 buildingregulariser
 contextily
 datasets>=3.0
 ever-beta
 geopandas
+git+https://github.com/Clay-foundation/model.git
 huggingface_hub
 jupyter-server-proxy
 leafmap
