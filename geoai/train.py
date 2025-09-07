@@ -3163,11 +3163,17 @@ def semantic_segmentation(
 
     # Detect file format based on extension
     input_ext = os.path.splitext(input_path)[1].lower()
-    is_geotiff = input_ext in [".tif", ".tiff"]
+    is_geotiff = input_ext in [".tif", ".tiff", ".jp2", ".img"]
+    formats = {
+        ".tif": "GeoTIFF",
+        ".tiff": "GeoTIFF",
+        ".jp2": "JP2OpenJPEG",
+        ".img": "IMG",
+    }
 
     if not quiet:
         print(
-            f"Input file format: {'GeoTIFF' if is_geotiff else 'Regular image'} ({input_ext})"
+            f"Input file format: {formats[input_ext] if is_geotiff else 'Regular image'} ({input_ext})"
         )
 
     # Load model
