@@ -2063,7 +2063,7 @@ def train_semantic_one_epoch(
             elapsed_time = time.time() - start_time
             if verbose:
                 print(
-                    f"Epoch: {epoch}, Batch: {i}/{num_batches}, Loss: {loss.item():.4f}, Time: {elapsed_time:.2f}s"
+                    f"Epoch: {epoch + 1}, Batch: {i + 1}/{num_batches}, Loss: {loss.item():.4f}, Time: {elapsed_time:.2f}s"
                 )
             start_time = time.time()
 

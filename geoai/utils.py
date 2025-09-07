@@ -3149,6 +3149,11 @@ def export_geotiff_tiles_batch(
     Raises:
         ValueError: If no images or masks found, or if counts don't match
     """
+
+    import logging
+
+    logging.getLogger("rasterio").setLevel(logging.ERROR)
+
     # Default extensions if not provided
     if image_extensions is None:
         image_extensions = [".tif", ".tiff", ".jpg", ".jpeg", ".png", ".jp2", ".img"]
