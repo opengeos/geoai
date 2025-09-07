@@ -3,6 +3,7 @@ __pycache__/
 private/
 *.py[cod]
 *$py.class
+*.jp2
 
 # C extensions
 *.so

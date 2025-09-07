@@ -143,6 +143,7 @@ nav:
           - examples/building_detection_lidar.ipynb
           - examples/instance_segmentation.ipynb
           - examples/change_detection.ipynb
+          - examples/JPEG2000.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb

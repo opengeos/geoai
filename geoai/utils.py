@@ -2620,6 +2620,11 @@ def export_geotiff_tiles(
         create_overview (bool): Whether to create an overview image of all tiles
         skip_empty_tiles (bool): If True, skip tiles with no features
     """
+
+    import logging
+
+    logging.getLogger("rasterio").setLevel(logging.ERROR)
+
     # Create output directories
     os.makedirs(out_folder, exist_ok=True)
     image_dir = os.path.join(out_folder, "images")
