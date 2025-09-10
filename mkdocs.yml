@@ -146,6 +146,7 @@ nav:
           - examples/JPEG2000.ipynb
           - examples/DINOv3.ipynb
           - examples/DINOv3_visualization.ipynb
+          - examples/AlphaEarth.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
