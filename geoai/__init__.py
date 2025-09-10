@@ -100,3 +100,4 @@ def set_proj_lib_path(verbose=False):
 #     set_proj_lib_path()
 
 from .geoai import *
+from .dinov3 import DINOv3GeoProcessor, create_similarity_map, analyze_image_patches
