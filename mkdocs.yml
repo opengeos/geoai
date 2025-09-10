@@ -144,6 +144,8 @@ nav:
           - examples/instance_segmentation.ipynb
           - examples/change_detection.ipynb
           - examples/JPEG2000.ipynb
+          - examples/DINOv3.ipynb
+          - examples/DINOv3_visualization.ipynb
           #   - examples/samgeo/satellite.ipynb
           #   - examples/samgeo/automatic_mask_generator.ipynb
           #   - examples/samgeo/automatic_mask_generator_hq.ipynb
@@ -168,10 +170,12 @@ nav:
           - change_detection module: change_detection.md
           - classify module: classify.md
           - detectron2 module: detectron2.md
+          - DINOv3 module: dinov3.md
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
           - hf module: hf.md
+          - map_widgets module: map_widgets.md
           - sam module: sam.md
           - segmentation module: segmentation.md
           - train module: train.md
