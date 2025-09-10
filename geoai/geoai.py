@@ -41,6 +41,7 @@ from .train import (
     train_segmentation_model,
 )
 from .utils import *
+from .map_widgets import DINOv3GUI
 
 
 class Map(leafmap.Map):
@@ -49,6 +50,16 @@ class Map(leafmap.Map):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the Map class."""
         super().__init__(*args, **kwargs)
+
+    def add_dinov3_gui(
+        self,
+        raster: str,
+        processor: "DINOv3GeoProcessor",
+        features: torch.Tensor,
+        **kwargs: Any,
+    ) -> None:
+        """Add a DINOv3 GUI to the map."""
+        return DINOv3GUI(raster, processor, features, host_map=self, **kwargs)
 
 
 class MapLibre(maplibregl.Map):

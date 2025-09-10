@@ -396,11 +396,17 @@ def dict_to_rioxarray(data_dict: Dict) -> xr.DataArray:
     """
 
     from affine import Affine
+    from collections import namedtuple
+
+    BoundingBox = namedtuple("BoundingBox", ["minx", "maxx", "miny", "maxy"])
 
     # Extract components from the dictionary
     crs = data_dict["crs"]
     bounds = data_dict["bounds"]
     image_tensor = data_dict["image"]
+
+    if hasattr(bounds, "left"):
+        bounds = BoundingBox(bounds.left, bounds.right, bounds.bottom, bounds.top)
 
     # Convert tensor to numpy array if needed
     if hasattr(image_tensor, "numpy"):
