@@ -2390,7 +2390,7 @@ def train_segmentation_model(
             ) from e
         else:
             raise
-    
+
     # Initialize model
     model = get_smp_model(
         architecture=architecture,
@@ -2515,8 +2515,6 @@ def train_segmentation_model(
 
         except Exception as e:
             raise RuntimeError(f"Failed to load checkpoint: {str(e)}")
-    
-
 
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     if start_epoch > 0:
