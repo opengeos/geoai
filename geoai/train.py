@@ -2129,6 +2129,7 @@ def train_segmentation_model(
     images_dir: str,
     labels_dir: str,
     output_dir: str,
+    pretrained_model_path: Optional[str] = None,
     architecture: str = "unet",
     encoder_name: str = "resnet34",
     encoder_weights: Optional[str] = "imagenet",
@@ -2163,6 +2164,8 @@ def train_segmentation_model(
         images_dir (str): Directory containing image GeoTIFF files.
         labels_dir (str): Directory containing label GeoTIFF files.
         output_dir (str): Directory to save model checkpoints and results.
+        pretrained_model_path (str, optional): Path to a .pth file to load as a
+            pretrained model for continued training. Defaults to None.
         architecture (str): Model architecture ('unet', 'deeplabv3', 'deeplabv3plus', 'fpn',
             'pspnet', 'linknet', 'manet'). Defaults to 'unet'.
         encoder_name (str): Encoder backbone name (e.g., 'resnet34', 'resnet50', 'efficientnet-b0').
@@ -2387,7 +2390,7 @@ def train_segmentation_model(
             ) from e
         else:
             raise
-
+    
     # Initialize model
     model = get_smp_model(
         architecture=architecture,
@@ -2425,6 +2428,45 @@ def train_segmentation_model(
     val_ious = []
     val_dices = []
     start_epoch = 0
+
+    # Load pretrained model if provided
+    if pretrained_model_path:
+        if not os.path.exists(pretrained_model_path):
+            raise FileNotFoundError(
+                f"Pretrained model file not found: {pretrained_model_path}"
+            )
+
+        print(f"Loading pretrained model from: {pretrained_model_path}")
+        try:
+            # Check if it's a full checkpoint or just model weights
+            checkpoint = torch.load(pretrained_model_path, map_location=device)
+
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                # It's a checkpoint with extra information
+                model.load_state_dict(checkpoint["model_state_dict"])
+
+                if resume_training:
+                    # Resume from checkpoint
+                    start_epoch = checkpoint.get("epoch", 0) + 1
+                    best_iou = checkpoint.get("best_iou", 0)
+
+                    if "optimizer_state_dict" in checkpoint:
+                        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+                    if "scheduler_state_dict" in checkpoint:
+                        lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+                    print(f"Resuming training from epoch {start_epoch}")
+                    print(f"Previous best IoU: {best_iou:.4f}")
+            else:
+                # Assume it's just the model weights
+                model.load_state_dict(checkpoint)
+
+            print("Pretrained model loaded successfully")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load pretrained model: {str(e)}")
+    else:
+        print(f"Starting training with {architecture} + {encoder_name}")
 
     # Load checkpoint if provided
     if checkpoint_path is not None:
@@ -2473,8 +2515,9 @@ def train_segmentation_model(
 
         except Exception as e:
             raise RuntimeError(f"Failed to load checkpoint: {str(e)}")
+    
 
-    print(f"Starting training with {architecture} + {encoder_name}")
+
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     if start_epoch > 0:
         print(f"Resuming from epoch {start_epoch}/{num_epochs}")
@@ -3417,6 +3460,7 @@ def train_instance_segmentation_model(
     images_dir: str,
     labels_dir: str,
     output_dir: str,
+    pretrained_model_path: Optional[str] = None,
     num_classes: int = 2,
     num_channels: int = 3,
     batch_size: int = 4,
@@ -3438,6 +3482,7 @@ def train_instance_segmentation_model(
         images_dir (str): Directory containing image GeoTIFF files.
         labels_dir (str): Directory containing label GeoTIFF files.
         output_dir (str): Directory to save model checkpoints and results.
+        pretrained_model_path (str, optional): Path to a .pth file to load as a pretrained model for continued training. Defaults to None.
         num_classes (int): Number of classes (including background). Defaults to 2.
         num_channels (int): Number of input channels. Defaults to 3.
         batch_size (int): Batch size for training. Defaults to 4.
@@ -3464,6 +3509,7 @@ def train_instance_segmentation_model(
         output_dir=output_dir,
         num_channels=num_channels,
         model=model,
+        pretrained_model_path=pretrained_model_path,
         batch_size=batch_size,
         num_epochs=num_epochs,
         learning_rate=learning_rate,

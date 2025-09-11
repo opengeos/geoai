@@ -64,6 +64,11 @@ exclude = [
 ]
 max-line-length = 88
 
+[tool.uv.workspace]
+members = [
+    "geoai",
+]
+
 
 [project.urls]
 Homepage = "https://github.com/opengeos/geoai"
