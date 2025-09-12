@@ -64,7 +64,7 @@ def view_raster(
     client_args: Optional[Dict] = {"cors_all": False},
     basemap: Optional[str] = "OpenStreetMap",
     basemap_args: Optional[Dict] = None,
-    backend: Optional[str] = "folium",
+    backend: Optional[str] = "ipyleaflet",
     **kwargs: Any,
 ) -> Any:
     """
@@ -87,6 +87,7 @@ def view_raster(
         client_args (Optional[Dict], optional): Additional arguments for the client. Defaults to {"cors_all": False}.
         basemap (Optional[str], optional): The basemap to use. Defaults to "OpenStreetMap".
         basemap_args (Optional[Dict], optional): Additional arguments for the basemap. Defaults to None.
+        backend (Optional[str], optional): The backend to use. Defaults to "ipyleaflet".
         **kwargs (Any): Additional keyword arguments.
 
     Returns:
