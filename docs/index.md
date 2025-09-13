@@ -4,7 +4,7 @@
 [![image](https://static.pepy.tech/badge/geoai-py)](https://pepy.tech/project/geoai-py)
 [![image](https://img.shields.io/conda/vn/conda-forge/geoai.svg)](https://anaconda.org/conda-forge/geoai)
 [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/geoai.svg)](https://anaconda.org/conda-forge/geoai)
-[![Conda Recipe](https://img.shields.io/badge/recipe-geoai-green.svg)](https://github.com/giswqs/geoai-py-feedstock)
+[![Conda Recipe](https://img.shields.io/badge/recipe-geoai-green.svg)](https://github.com/conda-forge/geoai-py-feedstock)
 [![image](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://tinyurl.com/GeoAI-Tutorials)
 
