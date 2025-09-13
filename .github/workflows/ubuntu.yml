@@ -14,7 +14,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                python-version: ["3.10", "3.11", "3.12"]
+                python-version: ["3.10", "3.11", "3.12", "3.13"]
 
         steps:
             - uses: actions/checkout@v5
@@ -38,9 +38,9 @@ jobs:
 
             - name: Install optional dependencies
               run: |
-                #   uv pip install --find-links https://girder.github.io/large_image_wheels gdal pyproj
-                  uv pip install pytest
-                  uv pip install "geoai-py[extra]"
+                  #   uv pip install --find-links https://girder.github.io/large_image_wheels gdal pyproj
+                    uv pip install pytest
+                    uv pip install "geoai-py[extra]"
 
             # - name: Test import
             #   run: |
