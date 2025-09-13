@@ -38,9 +38,9 @@ jobs:
 
             - name: Install optional dependencies
               run: |
-                  #   uv pip install --find-links https://girder.github.io/large_image_wheels gdal pyproj
-                    uv pip install pytest
-                    uv pip install "geoai-py[extra]"
+                  uv pip install --find-links https://girder.github.io/large_image_wheels gdal pyproj
+                  uv pip install pytest
+                  uv pip install "geoai-py[extra]"
 
             # - name: Test import
             #   run: |

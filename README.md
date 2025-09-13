@@ -28,7 +28,7 @@ GeoAI addresses the growing demand for accessible AI tools in geospatial researc
 
 ## 📝 Statement of Need
 
-The integration of artificial intelligence with geospatial data analysis has become increasingly critical across numerous scientific disciplines, from environmental monitoring and urban planning to disaster response and climate research [@Li2022; @Mai2024]. However, applying AI techniques to geospatial data presents unique challenges including data preprocessing complexities, specialized model architectures, and the need for domain-specific knowledge in both machine learning and geographic information systems [@Zhu2017; @Ma2019].
+The integration of artificial intelligence with geospatial data analysis has become increasingly critical across numerous scientific disciplines, from environmental monitoring and urban planning to disaster response and climate research. However, applying AI techniques to geospatial data presents unique challenges including data preprocessing complexities, specialized model architectures, and the need for domain-specific knowledge in both machine learning and geographic information systems.
 
 Existing solutions often require researchers to navigate fragmented ecosystems of tools, combining general-purpose machine learning libraries with specialized geospatial packages, leading to steep learning curves and reproducibility challenges. While packages like TorchGeo and TerraTorch provide excellent foundational tools for geospatial deep learning, there remains a gap for comprehensive, high-level interfaces that can democratize access to advanced AI techniques for the broader geospatial community.
 
