@@ -6,7 +6,7 @@ This guide covers various methods for installing GeoAI on different platforms wi
 
 GeoAI requires:
 
--   Python 3.9 or above
+-   Python 3.10 or above
 -   The required dependencies will be installed automatically
 
 ## 🚀 Recommended Installation Methods
@@ -123,9 +123,8 @@ print(geoai.__version__)
 
 If you encounter installation problems:
 
-1. Check the [FAQ section](https://opengeoai.org/faq) of our documentation
-2. Search for similar issues in our [GitHub Issues](https://github.com/opengeos/geoai/issues)
-3. Ask for help in our [GitHub Discussions](https://github.com/opengeos/geoai/discussions)
+1. Search for similar issues in our [GitHub Issues](https://github.com/opengeos/geoai/issues)
+2. Ask for help in our [GitHub Discussions](https://github.com/opengeos/geoai/discussions)
 
 ## 🔄 Upgrading
 
