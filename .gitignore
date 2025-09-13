@@ -4,6 +4,7 @@ private/
 *.py[cod]
 *$py.class
 *.jp2
+tests/data/
 
 # C extensions
 *.so
