@@ -139,6 +139,10 @@ class DINOv3GeoProcessor:
                     repo_or_dir=self.dinov3_location,
                     model=self.model_name,
                     source=self.dinov3_source,
+                    pretrained=False,  # <-- critical: prevents downloading official weights
+                    weights=None,  # <-- be explicit; some hubs honor this
+                    trust_repo=True,  # optional: avoids interactivity prompts
+                    skip_validation=True,  # optional: speeds things up
                 )
                 # Load state dict manually
                 state_dict = torch.load(weights_path, map_location=self.device)
