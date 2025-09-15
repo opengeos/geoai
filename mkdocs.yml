@@ -145,6 +145,7 @@ nav:
           - examples/DINOv3.ipynb
           - examples/DINOv3_visualization.ipynb
           - examples/AlphaEarth.ipynb
+          - examples/AI_agents.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -154,10 +155,12 @@ nav:
           - classify module: classify.md
           - detectron2 module: detectron2.md
           - DINOv3 module: dinov3.md
+          - geo_agent module: geo_agent.md
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
           - hf module: hf.md
+          - map_tools module: map_tools.md
           - map_widgets module: map_widgets.md
           - sam module: sam.md
           - segmentation module: segmentation.md
