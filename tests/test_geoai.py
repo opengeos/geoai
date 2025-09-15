@@ -26,19 +26,19 @@ class TestGeoai(unittest.TestCase):
         """Test that the package imports correctly."""
         self.assertIsNotNone(geoai)
         self.assertTrue(hasattr(geoai, "Map"))
-        self.assertTrue(hasattr(geoai, "MapLibre"))
+        self.assertTrue(hasattr(geoai, "LeafMap"))
 
     def test_map_creation(self):
         """Test Map class instantiation."""
         # Test basic map creation
-        m = geoai.Map()
-        self.assertIsInstance(m, geoai.Map)
+        m = geoai.LeafMap()
+        self.assertIsInstance(m, geoai.LeafMap)
 
     def test_maplibre_creation(self):
         """Test MapLibre class instantiation."""
         # Test basic MapLibre creation
-        m = geoai.MapLibre()
-        self.assertIsInstance(m, geoai.MapLibre)
+        m = geoai.Map()
+        self.assertIsInstance(m, geoai.Map)
 
     def test_test_data_exists(self):
         """Test that test data files exist."""
