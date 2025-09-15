@@ -1,3 +1,3 @@
 # geo_agents module
 
-::: geoai.agents.geo_agent
+::: geoai.agents.geo_agents

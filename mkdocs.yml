@@ -155,7 +155,7 @@ nav:
           - classify module: classify.md
           - detectron2 module: detectron2.md
           - DINOv3 module: dinov3.md
-          - geo_agent module: geo_agent.md
+          - geo_agents module: geo_agents.md
           - geoai module: geoai.md
           - download module: download.md
           - extract module: extract.md
