@@ -37,6 +37,7 @@ dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
 extra = ["overturemaps"]
+agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
 
 [tool.distutils.bdist_wheel]
 universal = true

@@ -44,7 +44,7 @@ from .utils import *
 from .map_widgets import DINOv3GUI
 
 
-class Map(leafmap.Map):
+class LeafMap(leafmap.Map):
     """A subclass of leafmap.Map for GeoAI applications."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -62,16 +62,16 @@ class Map(leafmap.Map):
         return DINOv3GUI(raster, processor, features, host_map=self, **kwargs)
 
 
-class MapLibre(maplibregl.Map):
+class Map(maplibregl.Map):
     """A subclass of maplibregl.Map for GeoAI applications."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize the MapLibre class."""
+        """Initialize the Map class."""
         super().__init__(*args, **kwargs)
 
 
 def create_vector_data(
-    m: Optional[Map] = None,
+    m: Optional[LeafMap] = None,
     properties: Optional[Dict[str, List[Any]]] = None,
     time_format: str = "%Y%m%dT%H%M%S",
     column_widths: Optional[List[int]] = (9, 3),
@@ -153,7 +153,7 @@ def create_vector_data(
 
 
 def edit_vector_data(
-    m: Optional[Map] = None,
+    m: Optional[LeafMap] = None,
     filename: str = None,
     properties: Optional[Dict[str, List[Any]]] = None,
     time_format: str = "%Y%m%dT%H%M%S",
