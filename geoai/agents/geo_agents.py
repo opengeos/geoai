@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import io
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Optional
 
 import ipywidgets as widgets
 import leafmap.maplibregl as leafmap
@@ -16,7 +14,6 @@ from strands import Agent
 from strands.models.ollama import OllamaModel
 
 from .map_tools import MapSession, MapTools
-
 
 try:
     import nest_asyncio
@@ -65,14 +62,45 @@ class GeoAgent(Agent):
             name="Leafmap Visualization Agent",
             model=ollama_model,
             tools=[
+                # Core navigation tools
+                self.tools.fly_to,
                 self.tools.create_map,
+                self.tools.zoom_to,
+                self.tools.jump_to,
+                # Essential layer tools
                 self.tools.add_basemap,
                 self.tools.add_vector,
-                self.tools.fly_to,
+                self.tools.add_raster,
                 self.tools.add_cog_layer,
                 self.tools.remove_layer,
+                self.tools.get_layer_names,
+                self.tools.set_terrain,
+                self.tools.remove_terrain,
+                self.tools.add_overture_3d_buildings,
+                self.tools.set_paint_property,
+                self.tools.set_layout_property,
+                self.tools.set_color,
+                self.tools.set_opacity,
+                self.tools.set_visibility,
+                # self.tools.save_map,
+                # Basic interaction tools
+                self.tools.add_marker,
+                self.tools.set_pitch,
             ],
-            system_prompt="When asked to add COG layer, use the add_cog_layer tool",
+            system_prompt="You are a map control agent. Call tools with MINIMAL parameters only.\n\n"
+            + "CRITICAL: Treat all kwargs parameters as optional parameters.\n"
+            + "CRITICAL: NEVER include optional parameters unless user explicitly asks for them.\n\n"
+            + "TOOL CALL RULES:\n"
+            + "- zoom_to(zoom=N) - ONLY zoom parameter, OMIT options completely\n"
+            + "- add_cog_layer(url='X') - NEVER include bands, nodata, opacity, etc.\n"
+            + "- fly_to(longitude=N, latitude=N) - NEVER include zoom parameter\n"
+            + "- add_basemap(name='X') - NEVER include any other parameters\n"
+            + "- add_marker(lng_lat=[lon,lat]) - NEVER include popup or options\n\n"
+            + "- remove_layer(name='X') - call get_layer_names() to get the layer name closest to"
+            + "the name of the layer you want to remove before calling this tool\n\n"
+            + "- add_overture_3d_buildings(kwargs={}) - kwargs parameter required by tool validation\n"
+            + "FORBIDDEN: Optional parameters, string representations like '{}' or '[1,2,3]'\n"
+            + "REQUIRED: Minimal tool calls with only what's absolutely necessary",
             callback_handler=None,
         )
 
