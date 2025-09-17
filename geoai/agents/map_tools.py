@@ -115,7 +115,7 @@ class MapTools:
         visible: bool = True,
         bands: Optional[List[int]] = None,
         nodata: Optional[Union[int, float]] = 0,
-        titiler_endpoint: str = "https://titiler.xyz",
+        titiler_endpoint: str = "https://giswqs-titiler-endpoint.hf.space",
     ) -> str:
         """Add a Cloud Optimized GeoTIFF (COG) layer to the map.
 
@@ -127,7 +127,7 @@ class MapTools:
             visible: Whether the layer is initially visible (default: True).
             bands: Optional list of band indices to display.
             nodata: No data value (default: 0).
-            titiler_endpoint: TiTiler endpoint URL (default: "https://titiler.xyz").
+            titiler_endpoint: TiTiler endpoint URL (default: "https://giswqs-titiler-endpoint.hf.space").
 
         Returns:
             Confirmation message with COG URL.
