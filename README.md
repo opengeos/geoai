@@ -12,6 +12,8 @@
 
 **A powerful Python package for integrating artificial intelligence with geospatial data analysis and visualization**
 
+**A brief [example](https://t.me/PythonPortal/4850) of how it works**
+
 ## 📖 Introduction
 
 [GeoAI](https://opengeoai.org) is a comprehensive Python package designed to bridge artificial intelligence (AI) and geospatial data analysis, providing researchers and practitioners with intuitive tools for applying machine learning techniques to geographic data. The package offers a unified framework for processing satellite imagery, aerial photographs, and vector data using state-of-the-art deep learning models. GeoAI integrates popular AI frameworks including [PyTorch](https://pytorch.org), [Transformers](https://github.com/huggingface/transformers), [PyTorch Segmentation Models](https://github.com/qubvel-org/segmentation_models.pytorch), and specialized geospatial libraries like [torchange](https://github.com/Z-Zheng/pytorch-change-models), enabling users to perform complex geospatial analyses with minimal code.
@@ -125,3 +127,5 @@ We gratefully acknowledge the support of the following organizations:
 
 -   [NASA](https://www.nasa.gov): This research is partially supported by the National Aeronautics and Space Administration (NASA) through Grant No. 80NSSC22K1742, awarded under the [Open Source Tools, Frameworks, and Libraries Program](https://bit.ly/3RVBRcQ).
 -   [AmericaView](https://americaview.org): This work is also partially supported by the U.S. Geological Survey through Grant/Cooperative Agreement No. G23AP00683 (GY23-GY27) in collaboration with AmericaView.
+
+
