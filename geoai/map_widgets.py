@@ -1,6 +1,7 @@
 """Interactive widget for GeoAI."""
 
 import ipywidgets as widgets
+
 from .utils import dict_to_image, dict_to_rioxarray
 
 
@@ -28,14 +29,13 @@ class DINOv3GUI(widgets.VBox):
             colormap_options (list): The colormap options.
             raster_args (dict): The raster arguments.
 
-        Returns:
-            None
-
         Example:
             >>> processor = DINOv3GeoProcessor()
             >>> features, h_patches, w_patches = processor.extract_features(raster)
             >>> gui = DINOv3GUI(raster, processor, features, host_map=m)
         """
+        super().__init__()
+
         if raster_args is None:
             raster_args = {}
 

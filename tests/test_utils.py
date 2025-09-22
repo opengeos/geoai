@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from geoai import utils
+
 from .test_fixtures import get_test_data_paths
 
 

@@ -182,7 +182,6 @@ def view_image(
         image (Union[np.ndarray, torch.Tensor]): The image to visualize.
         transpose (bool, optional): Whether to transpose the image. Defaults to False.
         bdx (Optional[int], optional): The band index to visualize. Defaults to None.
-        scale_factor (float, optional): The scale factor to apply to the image. Defaults to 1.0.
         figsize (Tuple[int, int], optional): The size of the figure. Defaults to (10, 5).
         axis_off (bool, optional): Whether to turn off the axis. Defaults to True.
         title (Optional[str], optional): The title of the plot. Defaults to None.
@@ -396,8 +395,9 @@ def dict_to_rioxarray(data_dict: Dict) -> xr.DataArray:
         xr.DataArray: The xarray DataArray.
     """
 
-    from affine import Affine
     from collections import namedtuple
+
+    from affine import Affine
 
     BoundingBox = namedtuple("BoundingBox", ["minx", "maxx", "miny", "maxy"])
 
@@ -710,7 +710,7 @@ def view_vector_interactive(
         tiles_args (dict, optional): Additional arguments for the localtileserver client.
             get_folium_tile_layer function. Defaults to None.
         **kwargs: Additional keyword arguments to pass to GeoDataFrame.explore() function.
-        See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html
+            See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html
 
     Returns:
         folium.Map: The map object with the vector data added.
@@ -2508,7 +2508,7 @@ def batch_vector_to_raster(
     fill_value=0,
     dtype=np.uint8,
     nodata=None,
-):
+) -> List[str]:
     """
     Batch convert vector data to multiple rasters based on different extents or reference rasters.
 
@@ -2527,7 +2527,7 @@ def batch_vector_to_raster(
         nodata (int): No data value for the output raster.
 
     Returns:
-        list: List of paths to the created raster files.
+        List[str]: List of paths to the created raster files.
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -3128,7 +3128,7 @@ def export_geotiff_tiles_batch(
     skip_empty_tiles=False,
     image_extensions=None,
     mask_extensions=None,
-):
+) -> Dict[str, Any]:
     """
     Export georeferenced GeoTIFF tiles from folders of images and masks.
 
@@ -3156,7 +3156,7 @@ def export_geotiff_tiles_batch(
         mask_extensions (list): List of mask file extensions to process (default: common raster/vector formats)
 
     Returns:
-        dict: Dictionary containing batch processing statistics
+        Dict[str, Any]: Dictionary containing batch processing statistics
 
     Raises:
         ValueError: If no images or masks found, or if counts don't match
@@ -3631,7 +3631,7 @@ def _process_image_mask_pair(
 
 def create_overview_image(
     src, tile_coordinates, output_path, tile_size, stride, geojson_path=None
-):
+) -> str:
     """Create an overview image showing all tiles and their status, with optional GeoJSON export.
 
     Args:
@@ -3782,7 +3782,7 @@ def create_overview_image(
 
 def export_tiles_to_geojson(
     tile_coordinates, src, output_path, tile_size=None, stride=None
-):
+) -> str:
     """
     Export tile rectangles directly to GeoJSON without creating an overview image.
 
@@ -4630,14 +4630,14 @@ def export_training_data(
 
 
 def masks_to_vector(
-    mask_path,
-    output_path=None,
-    simplify_tolerance=1.0,
-    mask_threshold=0.5,
-    min_object_area=100,
-    max_object_area=None,
-    nms_iou_threshold=0.5,
-):
+    mask_path: str,
+    output_path: Optional[str] = None,
+    simplify_tolerance: float = 1.0,
+    mask_threshold: float = 0.5,
+    min_object_area: int = 100,
+    max_object_area: Optional[int] = None,
+    nms_iou_threshold: float = 0.5,
+) -> Any:
     """
     Convert a building mask GeoTIFF to vector polygons and save as a vector dataset.
 
@@ -4651,7 +4651,7 @@ def masks_to_vector(
         nms_iou_threshold: IoU threshold for non-maximum suppression (default: self.nms_iou_threshold)
 
     Returns:
-        GeoDataFrame with building footprints
+        Any: GeoDataFrame with building footprints
     """
     # Set default output path if not provided
     # if output_path is None:
@@ -5654,7 +5654,7 @@ def orthogonalize(
     min_segments=4,
     area_tolerance=0.7,
     detect_triangles=True,
-):
+) -> Any:
     """
     Orthogonalizes object masks in a GeoTIFF file.
 
@@ -5678,7 +5678,7 @@ def orthogonalize(
         detect_triangles (bool, optional): If True, performs additional check to avoid creating triangular shapes.
 
     Returns:
-        geopandas.GeoDataFrame: A GeoDataFrame containing the orthogonalized features.
+        Any: A GeoDataFrame containing the orthogonalized features.
     """
 
     from functools import partial
@@ -7085,8 +7085,8 @@ def regularize(
     num_cores: int = 1,
     include_metadata: bool = False,
     output_path: Optional[str] = None,
-    **kwargs,
-) -> gpd.GeoDataFrame:
+    **kwargs: Any,
+) -> Any:
     """Regularizes polygon geometries in a GeoDataFrame by aligning edges.
 
     Aligns edges to be parallel or perpendicular (optionally also 45 degrees)
