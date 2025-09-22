@@ -2508,7 +2508,7 @@ def batch_vector_to_raster(
     fill_value=0,
     dtype=np.uint8,
     nodata=None,
-):
+) -> List[str]:
     """
     Batch convert vector data to multiple rasters based on different extents or reference rasters.
 
@@ -3128,7 +3128,7 @@ def export_geotiff_tiles_batch(
     skip_empty_tiles=False,
     image_extensions=None,
     mask_extensions=None,
-):
+) -> Dict[str, Any]:
     """
     Export georeferenced GeoTIFF tiles from folders of images and masks.
 
@@ -3631,7 +3631,7 @@ def _process_image_mask_pair(
 
 def create_overview_image(
     src, tile_coordinates, output_path, tile_size, stride, geojson_path=None
-):
+) -> str:
     """Create an overview image showing all tiles and their status, with optional GeoJSON export.
 
     Args:
@@ -3782,7 +3782,7 @@ def create_overview_image(
 
 def export_tiles_to_geojson(
     tile_coordinates, src, output_path, tile_size=None, stride=None
-):
+) -> str:
     """
     Export tile rectangles directly to GeoJSON without creating an overview image.
 
@@ -4637,7 +4637,7 @@ def masks_to_vector(
     min_object_area: int = 100,
     max_object_area: Optional[int] = None,
     nms_iou_threshold: float = 0.5,
-):
+) -> Any:
     """
     Convert a building mask GeoTIFF to vector polygons and save as a vector dataset.
 
@@ -5654,7 +5654,7 @@ def orthogonalize(
     min_segments=4,
     area_tolerance=0.7,
     detect_triangles=True,
-):
+) -> Any:
     """
     Orthogonalizes object masks in a GeoTIFF file.
 

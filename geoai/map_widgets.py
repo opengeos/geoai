@@ -29,9 +29,6 @@ class DINOv3GUI(widgets.VBox):
             colormap_options (list): The colormap options.
             raster_args (dict): The raster arguments.
 
-        Returns:
-            None
-
         Example:
             >>> processor = DINOv3GeoProcessor()
             >>> features, h_patches, w_patches = processor.extract_features(raster)
