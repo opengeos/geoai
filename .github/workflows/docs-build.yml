@@ -10,6 +10,8 @@ jobs:
         strategy:
             matrix:
                 python-version: ["3.12"]
+        env:
+            TITILER_ENDPOINT: ${{ secrets.TITILER_ENDPOINT }}
 
         steps:
             - uses: actions/checkout@v5

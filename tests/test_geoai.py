@@ -5,9 +5,11 @@
 import os
 import unittest
 
-import geoai
 import rasterio
+
+import geoai
 from geoai import classify, extract, utils
+
 from .test_fixtures import get_test_data_paths
 
 

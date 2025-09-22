@@ -26,6 +26,7 @@ from .download import (
 )
 from .extract import *
 from .hf import *
+from .map_widgets import DINOv3GUI
 from .segment import *
 from .train import (
     get_instance_segmentation_model,
@@ -41,7 +42,6 @@ from .train import (
     train_segmentation_model,
 )
 from .utils import *
-from .map_widgets import DINOv3GUI
 
 
 class LeafMap(leafmap.Map):
