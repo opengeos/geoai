@@ -37,6 +37,8 @@ class DINOv3GUI(widgets.VBox):
             >>> features, h_patches, w_patches = processor.extract_features(raster)
             >>> gui = DINOv3GUI(raster, processor, features, host_map=m)
         """
+        super().__init__()
+
         if raster_args is None:
             raster_args = {}
 

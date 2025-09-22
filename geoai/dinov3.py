@@ -46,7 +46,6 @@ class DINOv3GeoProcessor:
                  See https://github.com/facebookresearch/dinov3 for more details.
             weights_path: Path to model weights (optional)
             device: Torch device to use
-            dinov3_location: Path to DINOv3 repository
         """
 
         dinov3_github_location = "facebookresearch/dinov3"

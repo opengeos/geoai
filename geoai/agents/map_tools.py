@@ -224,7 +224,6 @@ class MapTools:
 
         Args:
             pitch (float): The pitch value to set.
-            **kwargs (Any): Additional keyword arguments to control the pitch.
 
         Returns:
             None
@@ -496,7 +495,7 @@ class MapTools:
         array_args=None,
         client_args={"cors_all": True},
         overwrite: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ):
         """Add a local raster dataset to the map.
             If you are using this function in JupyterHub on a remote server
@@ -523,12 +522,6 @@ class MapTools:
                 the palette when plotting a single band. Defaults to None.
             nodata (float, optional): The value from the band to use to interpret
                 as not valid data. Defaults to None.
-            attribution (str, optional): Attribution for the source raster. This
-                defaults to a message about it being a local file.. Defaults to None.
-            layer_name (str, optional): The layer name to use. Defaults to 'Raster'.
-            layer_index (int, optional): The index of the layer. Defaults to None.
-            zoom_to_layer (bool, optional): Whether to zoom to the extent of the
-                layer. Defaults to True.
             visible (bool, optional): Whether the layer is visible. Defaults to True.
             opacity (float, optional): The opacity of the layer. Defaults to 1.0.
             array_args (dict, optional): Additional arguments to pass to
@@ -570,8 +563,8 @@ class MapTools:
         remove_port: bool = True,
         preview: bool = False,
         overwrite: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> str:
         """Render the map to an HTML page.
 
         Args:
@@ -756,7 +749,6 @@ class MapTools:
         Adds a marker to the map.
 
         Args:
-            marker (Marker, optional): A Marker object. Defaults to None.
             lng_lat (List[Union[float, float]]): A list of two floats
                 representing the longitude and latitude of the marker.
             popup (Optional[str], optional): The text to display in a popup when
@@ -891,7 +883,6 @@ class MapTools:
         Args:
             zoom (float): The zoom level to zoom to.
             options (Dict[str, Any], optional): Additional options to control the zoom. Defaults to {}.
-            **kwargs (Any): Additional keyword arguments to control the zoom.
 
         Returns:
             None
@@ -1059,7 +1050,7 @@ class MapTools:
         dpi: Optional[Union[str, float]] = "figure",
         transparent: Optional[bool] = False,
         position: str = "bottom-right",
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """
         Add a colorbar to the map.
@@ -1186,7 +1177,7 @@ class MapTools:
         return f"Video added: {layer_id}"
 
     @tool
-    def add_nlcd(self, years: list = [2023], add_legend: bool = True, **kwargs) -> None:
+    def add_nlcd(self, years: list = [2023], add_legend: bool = True, **kwargs: Any) -> None:
         """
         Adds National Land Cover Database (NLCD) data to the map.
 
