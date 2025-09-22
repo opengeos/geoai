@@ -16,8 +16,10 @@ import torch
 from huggingface_hub import hf_hub_download
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box
-from torchvision.models.detection import (fasterrcnn_resnet50_fpn_v2,
-                                          maskrcnn_resnet50_fpn)
+from torchvision.models.detection import (
+    fasterrcnn_resnet50_fpn_v2,
+    maskrcnn_resnet50_fpn,
+)
 from tqdm import tqdm
 
 # Local Imports
@@ -2648,8 +2650,7 @@ class AgricultureFieldDelineator(ObjectDetector):
         """
         import torchvision
         from torchvision.models.detection import maskrcnn_resnet50_fpn
-        from torchvision.models.detection.backbone_utils import \
-            resnet_fpn_backbone
+        from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
         if model is not None:
             return model

@@ -11,8 +11,7 @@ from rasterio.windows import from_bounds
 from skimage.transform import resize
 
 try:
-    from torchange.models.segment_any_change import (AnyChange,
-                                                     show_change_masks)
+    from torchange.models.segment_any_change import AnyChange, show_change_masks
 except ImportError:
     print("torchange requires Python 3.11 or higher")
 
