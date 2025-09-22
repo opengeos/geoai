@@ -2216,8 +2216,7 @@
 
               <details class="quote">
                 <summary>Source code in <code>geoai/map_widgets.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  7</span>
-<span class="normal">  8</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  8</span>
 <span class="normal">  9</span>
 <span class="normal"> 10</span>
 <span class="normal"> 11</span>
@@ -2407,14 +2406,13 @@
 <span class="sd">            colormap_options (list): The colormap options.</span>
 <span class="sd">            raster_args (dict): The raster arguments.</span>
 
-<span class="sd">        Returns:</span>
-<span class="sd">            None</span>
-
 <span class="sd">        Example:</span>
 <span class="sd">            &gt;&gt;&gt; processor = DINOv3GeoProcessor()</span>
 <span class="sd">            &gt;&gt;&gt; features, h_patches, w_patches = processor.extract_features(raster)</span>
 <span class="sd">            &gt;&gt;&gt; gui = DINOv3GUI(raster, processor, features, host_map=m)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
         <span class="k">if</span> <span class="n">raster_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">raster_args</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -2708,28 +2706,6 @@
     </table>
 
 
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>None</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
 <details class="example" open>
   <summary>Example</summary>
   <blockquote>
@@ -2745,8 +2721,7 @@ gui = DINOv3GUI(raster, processor, features, host_map=m)</p>
 
             <details class="quote">
               <summary>Source code in <code>geoai/map_widgets.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 10</span>
-<span class="normal"> 11</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 11</span>
 <span class="normal"> 12</span>
 <span class="normal"> 13</span>
 <span class="normal"> 14</span>
@@ -2930,14 +2905,13 @@ gui = DINOv3GUI(raster, processor, features, host_map=m)</p>
 <span class="sd">        colormap_options (list): The colormap options.</span>
 <span class="sd">        raster_args (dict): The raster arguments.</span>
 
-<span class="sd">    Returns:</span>
-<span class="sd">        None</span>
-
 <span class="sd">    Example:</span>
 <span class="sd">        &gt;&gt;&gt; processor = DINOv3GeoProcessor()</span>
 <span class="sd">        &gt;&gt;&gt; features, h_patches, w_patches = processor.extract_features(raster)</span>
 <span class="sd">        &gt;&gt;&gt; gui = DINOv3GUI(raster, processor, features, host_map=m)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
     <span class="k">if</span> <span class="n">raster_args</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">raster_args</span> <span class="o">=</span> <span class="p">{}</span>
 
