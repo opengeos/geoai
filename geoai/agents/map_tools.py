@@ -1177,7 +1177,9 @@ class MapTools:
         return f"Video added: {layer_id}"
 
     @tool
-    def add_nlcd(self, years: list = [2023], add_legend: bool = True, **kwargs: Any) -> None:
+    def add_nlcd(
+        self, years: list = [2023], add_legend: bool = True, **kwargs: Any
+    ) -> None:
         """
         Adds National Land Cover Database (NLCD) data to the map.
 
