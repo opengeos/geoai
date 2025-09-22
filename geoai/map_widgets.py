@@ -1,6 +1,7 @@
 """Interactive widget for GeoAI."""
 
 import ipywidgets as widgets
+
 from .utils import dict_to_image, dict_to_rioxarray
 
 

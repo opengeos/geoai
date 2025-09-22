@@ -8,22 +8,21 @@ import json
 import math
 import os
 import sys
-from typing import Tuple, Optional, Dict, List, Union
+from typing import Dict, List, Optional, Tuple, Union
 
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
+import rasterio
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as transforms
-import rasterio
-from rasterio.windows import Window
-from rasterio.io import DatasetReader
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-
 from huggingface_hub import hf_hub_download
+from PIL import Image
+from rasterio.io import DatasetReader
+from rasterio.windows import Window
 
-from .utils import get_device, coords_to_xy, dict_to_image, dict_to_rioxarray
+from .utils import coords_to_xy, dict_to_image, dict_to_rioxarray, get_device
 
 
 class DINOv3GeoProcessor:

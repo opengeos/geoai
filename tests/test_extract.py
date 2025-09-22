@@ -6,6 +6,7 @@ import os
 import unittest
 
 from geoai import extract
+
 from .test_fixtures import get_test_data_paths
 
 

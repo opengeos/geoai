@@ -11,17 +11,8 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from collections.abc import Iterable
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generator,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import (Any, Callable, Dict, Generator, Iterator, List, Optional,
+                    Tuple, Union)
 
 # Third-Party Libraries
 import cv2
@@ -396,8 +387,9 @@ def dict_to_rioxarray(data_dict: Dict) -> xr.DataArray:
         xr.DataArray: The xarray DataArray.
     """
 
-    from affine import Affine
     from collections import namedtuple
+
+    from affine import Affine
 
     BoundingBox = namedtuple("BoundingBox", ["minx", "maxx", "miny", "maxy"])
 
