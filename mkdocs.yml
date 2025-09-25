@@ -144,6 +144,7 @@ nav:
           - examples/JPEG2000.ipynb
           - examples/DINOv3.ipynb
           - examples/DINOv3_visualization.ipynb
+          - examples/DINOv3_wetlands.ipynb
           - examples/AlphaEarth.ipynb
           - examples/AI_agents.ipynb
     - Workshops:
