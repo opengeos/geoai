@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any, Callable, Optional
 
+import boto3
 import ipywidgets as widgets
 import leafmap.maplibregl as leafmap
+from botocore.config import Config as BotocoreConfig
 from ipyevents import Event
 from IPython.display import display
 from strands import Agent
+from strands.models import BedrockModel
+from strands.models.anthropic import AnthropicModel
 from strands.models.ollama import OllamaModel
+from strands.models.openai import OpenAIModel
 
 from .map_tools import MapSession, MapTools
 
@@ -21,6 +27,112 @@ try:
     nest_asyncio.apply()
 except Exception:
     pass
+
+
+def create_ollama_model(
+    host: str = "http://localhost:11434",
+    model_id: str = "llama3.1",
+    **kwargs: Any,
+) -> OllamaModel:
+    """Create an Ollama model.
+
+    Args:
+        host: Ollama host URL.
+        model_id: Ollama model ID.
+        **kwargs: Additional keyword arguments for the Ollama model.
+
+    Returns:
+        OllamaModel: An Ollama model.
+    """
+    return OllamaModel(host=host, model_id=model_id, **kwargs)
+
+
+def create_openai_model(
+    model_id: str = "gpt-4o-mini",
+    api_key: str = None,
+    **kwargs: Any,
+) -> OpenAIModel:
+    """Create an OpenAI model.
+
+    Args:
+        model_id: OpenAI model ID.
+        api_key: OpenAI API key.
+        **kwargs: Additional keyword arguments for the OpenAI model.
+
+    Returns:
+        OpenAIModel: An OpenAI model.
+    """
+
+    if api_key is not None:
+        try:
+            api_key = os.getenv("OPENAI_API_KEY", None)
+            if api_key is None:
+                raise ValueError("OPENAI_API_KEY is not set")
+        except Exception as e:
+            raise ValueError("OPENAI_API_KEY is not set")
+
+    client_args = kwargs.get("client_args", {})
+    if "api_key" not in client_args:
+        client_args["api_key"] = api_key
+
+    return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
+
+
+def create_anthropic_model(
+    model_id: str = "claude-sonnet-4-20250514",
+    api_key: str = None,
+    **kwargs: Any,
+) -> AnthropicModel:
+    """Create an Anthropic model.
+
+    Args:
+        model_id: Anthropic model ID. Defaults to "claude-sonnet-4-20250514".
+            For a complete list of supported models,
+            see https://docs.claude.com/en/docs/about-claude/models/overview.
+        api_key: Anthropic API key.
+        **kwargs: Additional keyword arguments for the Anthropic model.
+    """
+
+    if api_key is not None:
+        try:
+            api_key = os.getenv("ANTHROPIC_API_KEY", None)
+            if api_key is None:
+                raise ValueError("ANTHROPIC_API_KEY is not set")
+        except Exception as e:
+            raise ValueError("ANTHROPIC_API_KEY is not set")
+
+    client_args = kwargs.get("client_args", {})
+    if "api_key" not in client_args:
+        client_args["api_key"] = api_key
+
+    return AnthropicModel(client_args=client_args, model_id=model_id, **kwargs)
+
+
+def create_bedrock_model(
+    model_id: str = "anthropic.claude-sonnet-4-20250514-v1:0",
+    region_name: str = None,
+    boto_session: Optional[boto3.Session] = None,
+    boto_client_config: Optional[BotocoreConfig] = None,
+    **kwargs: Any,
+) -> BedrockModel:
+    """Create a Bedrock model.
+
+    Args:
+        model_id: Bedrock model ID. Run the following command to get the model ID:
+            aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'
+        region_name: Bedrock region name.
+        boto_session: Bedrock boto session.
+        boto_client_config: Bedrock boto client config.
+        **kwargs: Additional keyword arguments for the Bedrock model.
+    """
+
+    return BedrockModel(
+        model_id=model_id,
+        region_name=region_name,
+        boto_session=boto_session,
+        boto_client_config=boto_client_config,
+        **kwargs,
+    )
 
 
 def _ensure_loop() -> asyncio.AbstractEventLoop:
@@ -39,28 +151,44 @@ class GeoAgent(Agent):
     """Geospatial AI agent with interactive mapping capabilities."""
 
     def __init__(
-        self, *, model_id: str = "llama3.1", map_instance: Optional[leafmap.Map] = None
+        self,
+        *,
+        model: str = "llama3.1",
+        map_instance: Optional[leafmap.Map] = None,
+        **kwargs: Any,
     ) -> None:
         """Initialize the GeoAgent.
 
         Args:
-            model_id: Ollama model identifier (default: "llama3.1").
+            model: Model identifier (default: "llama3.1").
             map_instance: Optional existing map instance.
+            **kwargs: Additional keyword arguments for the model.
         """
         self.session: MapSession = MapSession(map_instance)
         self.tools: MapTools = MapTools(self.session)
 
         # --- save a model factory we can call each turn ---
-        self._model_factory: Callable[[], OllamaModel] = lambda: OllamaModel(
-            host="http://localhost:11434", model_id=model_id
-        )
+        if model == "llama3.1":
+            self._model_factory: Callable[[], OllamaModel] = (
+                lambda: create_ollama_model(
+                    host="http://localhost:11434", model_id=model, **kwargs
+                )
+            )
+        elif isinstance(model, str):
+            self._model_factory: Callable[[], BedrockModel] = (
+                lambda: create_bedrock_model(model_id=model, **kwargs)
+            )
+        elif type(model) in [OpenAIModel, AnthropicModel, OllamaModel]:
+            self._model_factory: Callable[[], model] = lambda: model
+        else:
+            raise ValueError(f"Invalid model: {model}")
 
         # build initial model (first turn)
-        ollama_model: OllamaModel = self._model_factory()
+        model = self._model_factory()
 
         super().__init__(
             name="Leafmap Visualization Agent",
-            model=ollama_model,
+            model=model,
             tools=[
                 # Core navigation tools
                 self.tools.fly_to,
@@ -107,16 +235,30 @@ class GeoAgent(Agent):
     def ask(self, prompt: str) -> str:
         """Send a single-turn prompt to the agent.
 
+        Runs entirely on the same thread/event loop as the Agent
+        to avoid cross-loop asyncio object issues.
+
         Args:
             prompt: The text prompt to send to the agent.
 
         Returns:
             The agent's response as a string.
         """
-        _ensure_loop()
+        # Ensure there's an event loop bound to this thread (Jupyter-safe)
+        loop = _ensure_loop()
+
+        # Preserve existing conversation messages
+        existing_messages = self.messages.copy()
+
+        # Create a fresh model but keep conversation history
         self.model = self._model_factory()
 
-        result = self(prompt)
+        # Restore the conversation messages
+        self.messages = existing_messages
+
+        # Execute the prompt using the Agent's async API on this loop
+        # Avoid Agent.__call__ since it spins a new thread+loop
+        result = loop.run_until_complete(self.invoke_async(prompt))
         return getattr(result, "final_text", str(result))
 
     def show_ui(self, *, height: int = 700) -> None:
