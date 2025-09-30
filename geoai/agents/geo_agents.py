@@ -16,7 +16,7 @@ from IPython.display import display
 from strands import Agent
 from strands.models import BedrockModel
 from strands.models.anthropic import AnthropicModel
-from strands.models.ollama import OllamaModel
+from strands.models.ollama import OllamaModel as _OllamaModel
 from strands.models.openai import OpenAIModel
 
 from .map_tools import MapSession, MapTools
@@ -29,9 +29,35 @@ except Exception:
     pass
 
 
+class OllamaModel(_OllamaModel):
+    """Fixed OllamaModel that ensures proper model_id handling."""
+
+    async def stream(self, *args, **kwargs):
+        """Override stream to ensure model_id is passed as string."""
+        # Patch the ollama client to handle model object correctly
+        import ollama
+
+        # Save original method if not already saved
+        if not hasattr(ollama.AsyncClient, "_original_chat"):
+            ollama.AsyncClient._original_chat = ollama.AsyncClient.chat
+
+            async def fixed_chat(self, **chat_kwargs):
+                # If model is an OllamaModel object, extract the model_id
+                if "model" in chat_kwargs and hasattr(chat_kwargs["model"], "config"):
+                    chat_kwargs["model"] = chat_kwargs["model"].config["model_id"]
+                return await ollama.AsyncClient._original_chat(self, **chat_kwargs)
+
+            ollama.AsyncClient.chat = fixed_chat
+
+        # Call the original stream method
+        async for chunk in super().stream(*args, **kwargs):
+            yield chunk
+
+
 def create_ollama_model(
     host: str = "http://localhost:11434",
     model_id: str = "llama3.1",
+    client_args: dict = None,
     **kwargs: Any,
 ) -> OllamaModel:
     """Create an Ollama model.
@@ -39,17 +65,21 @@ def create_ollama_model(
     Args:
         host: Ollama host URL.
         model_id: Ollama model ID.
+        client_args: Client arguments for the Ollama model.
         **kwargs: Additional keyword arguments for the Ollama model.
 
     Returns:
         OllamaModel: An Ollama model.
     """
-    return OllamaModel(host=host, model_id=model_id, **kwargs)
+    if client_args is None:
+        client_args = {}
+    return OllamaModel(host=host, model_id=model_id, client_args=client_args, **kwargs)
 
 
 def create_openai_model(
     model_id: str = "gpt-4o-mini",
     api_key: str = None,
+    client_args: dict = None,
     **kwargs: Any,
 ) -> OpenAIModel:
     """Create an OpenAI model.
@@ -57,22 +87,24 @@ def create_openai_model(
     Args:
         model_id: OpenAI model ID.
         api_key: OpenAI API key.
+        client_args: Client arguments for the OpenAI model.
         **kwargs: Additional keyword arguments for the OpenAI model.
 
     Returns:
         OpenAIModel: An OpenAI model.
     """
 
-    if api_key is not None:
+    if api_key is None:
         try:
             api_key = os.getenv("OPENAI_API_KEY", None)
             if api_key is None:
                 raise ValueError("OPENAI_API_KEY is not set")
-        except Exception as e:
+        except Exception:
             raise ValueError("OPENAI_API_KEY is not set")
 
-    client_args = kwargs.get("client_args", {})
-    if "api_key" not in client_args:
+    if client_args is None:
+        client_args = kwargs.get("client_args", {})
+    if "api_key" not in client_args and api_key is not None:
         client_args["api_key"] = api_key
 
     return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
@@ -81,6 +113,7 @@ def create_openai_model(
 def create_anthropic_model(
     model_id: str = "claude-sonnet-4-20250514",
     api_key: str = None,
+    client_args: dict = None,
     **kwargs: Any,
 ) -> AnthropicModel:
     """Create an Anthropic model.
@@ -90,19 +123,21 @@ def create_anthropic_model(
             For a complete list of supported models,
             see https://docs.claude.com/en/docs/about-claude/models/overview.
         api_key: Anthropic API key.
+        client_args: Client arguments for the Anthropic model.
         **kwargs: Additional keyword arguments for the Anthropic model.
     """
 
-    if api_key is not None:
+    if api_key is None:
         try:
             api_key = os.getenv("ANTHROPIC_API_KEY", None)
             if api_key is None:
                 raise ValueError("ANTHROPIC_API_KEY is not set")
-        except Exception as e:
+        except Exception:
             raise ValueError("ANTHROPIC_API_KEY is not set")
 
-    client_args = kwargs.get("client_args", {})
-    if "api_key" not in client_args:
+    if client_args is None:
+        client_args = kwargs.get("client_args", {})
+    if "api_key" not in client_args and api_key is not None:
         client_args["api_key"] = api_key
 
     return AnthropicModel(client_args=client_args, model_id=model_id, **kwargs)
@@ -178,8 +213,34 @@ class GeoAgent(Agent):
             self._model_factory: Callable[[], BedrockModel] = (
                 lambda: create_bedrock_model(model_id=model, **kwargs)
             )
-        elif type(model) in [OpenAIModel, AnthropicModel, OllamaModel]:
-            self._model_factory: Callable[[], model] = lambda: model
+        elif isinstance(model, OllamaModel):
+            # Extract configuration from existing OllamaModel and create new instances
+            model_id = model.config["model_id"]
+            host = model.host
+            client_args = model.client_args
+            self._model_factory: Callable[[], OllamaModel] = (
+                lambda: create_ollama_model(
+                    host=host, model_id=model_id, client_args=client_args, **kwargs
+                )
+            )
+        elif isinstance(model, OpenAIModel):
+            # Extract configuration from existing OpenAIModel and create new instances
+            model_id = model.config["model_id"]
+            client_args = model.client_args.copy()
+            self._model_factory: Callable[[], OpenAIModel] = (
+                lambda mid=model_id, client_args=client_args: create_openai_model(
+                    model_id=mid, client_args=client_args, **kwargs
+                )
+            )
+        elif isinstance(model, AnthropicModel):
+            # Extract configuration from existing AnthropicModel and create new instances
+            model_id = model.config["model_id"]
+            client_args = model.client_args.copy()
+            self._model_factory: Callable[[], AnthropicModel] = (
+                lambda mid=model_id, client_args=client_args: create_anthropic_model(
+                    model_id=mid, client_args=client_args, **kwargs
+                )
+            )
         else:
             raise ValueError(f"Invalid model: {model}")
 
