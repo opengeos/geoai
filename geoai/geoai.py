@@ -8,7 +8,6 @@ logging.getLogger("maplibre").setLevel(logging.ERROR)
 import leafmap
 import leafmap.maplibregl as maplibregl
 
-from .change_detection import ChangeDetection
 from .classify import classify_image, classify_images, train_classifier
 from .download import (
     download_naip,
