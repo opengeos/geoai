@@ -3878,7 +3878,9 @@ def lightly_embed_images(
     print(f"Generating embeddings for images in: {data_dir}")
     print(f"Using pretrained model: {model_path}")
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
     # Generate embeddings using Lightly Train
     lightly_train.embed(
