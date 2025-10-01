@@ -3763,6 +3763,7 @@ def lightly_train_model(
 def load_lightly_pretrained_model(
     model_path: str,
     model_architecture: str = "torchvision/resnet50",
+    device: str = None,
 ) -> torch.nn.Module:
     """
     Load a pretrained model from Lightly Train.
@@ -3771,6 +3772,7 @@ def load_lightly_pretrained_model(
         model_path (str): Path to the pretrained model file (.pt format).
         model_architecture (str): Architecture of the model to load.
             Default is "torchvision/resnet50".
+        device (torch.device): Device to train on.
 
     Returns:
         torch.nn.Module: Loaded pretrained model ready for fine-tuning.
@@ -3821,10 +3823,10 @@ def load_lightly_pretrained_model(
 
     # Load the pretrained weights
     try:
-        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+        state_dict = torch.load(model_path, map_location=device, weights_only=True)
     except TypeError:
         # For backward compatibility with older PyTorch versions
-        state_dict = torch.load(model_path, map_location="cpu")
+        state_dict = torch.load(model_path, map_location=device)
     model.load_state_dict(state_dict)
 
     print(f"Successfully loaded pretrained model: {model_architecture}")
