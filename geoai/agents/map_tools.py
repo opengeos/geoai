@@ -115,7 +115,7 @@ class MapTools:
         visible: bool = True,
         bands: Optional[List[int]] = None,
         nodata: Optional[Union[int, float]] = 0,
-        titiler_endpoint: str = "https://giswqs-titiler-endpoint.hf.space",
+        titiler_endpoint: str = None,
     ) -> str:
         """Add a Cloud Optimized GeoTIFF (COG) layer to the map.
 

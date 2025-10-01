@@ -190,6 +190,8 @@ class GeoAgent(Agent):
         *,
         model: str = "llama3.1",
         map_instance: Optional[leafmap.Map] = None,
+        system_prompt: str = "default",
+        model_args: dict = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the GeoAgent.
@@ -197,21 +199,25 @@ class GeoAgent(Agent):
         Args:
             model: Model identifier (default: "llama3.1").
             map_instance: Optional existing map instance.
+            model_args: Additional keyword arguments for the model.
             **kwargs: Additional keyword arguments for the model.
         """
         self.session: MapSession = MapSession(map_instance)
         self.tools: MapTools = MapTools(self.session)
 
+        if model_args is None:
+            model_args = {}
+
         # --- save a model factory we can call each turn ---
         if model == "llama3.1":
             self._model_factory: Callable[[], OllamaModel] = (
                 lambda: create_ollama_model(
-                    host="http://localhost:11434", model_id=model, **kwargs
+                    host="http://localhost:11434", model_id=model, **model_args
                 )
             )
         elif isinstance(model, str):
             self._model_factory: Callable[[], BedrockModel] = (
-                lambda: create_bedrock_model(model_id=model, **kwargs)
+                lambda: create_bedrock_model(model_id=model, **model_args)
             )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
@@ -220,7 +226,7 @@ class GeoAgent(Agent):
             client_args = model.client_args
             self._model_factory: Callable[[], OllamaModel] = (
                 lambda: create_ollama_model(
-                    host=host, model_id=model_id, client_args=client_args, **kwargs
+                    host=host, model_id=model_id, client_args=client_args, **model_args
                 )
             )
         elif isinstance(model, OpenAIModel):
@@ -229,7 +235,7 @@ class GeoAgent(Agent):
             client_args = model.client_args.copy()
             self._model_factory: Callable[[], OpenAIModel] = (
                 lambda mid=model_id, client_args=client_args: create_openai_model(
-                    model_id=mid, client_args=client_args, **kwargs
+                    model_id=mid, client_args=client_args, **model_args
                 )
             )
         elif isinstance(model, AnthropicModel):
@@ -238,7 +244,7 @@ class GeoAgent(Agent):
             client_args = model.client_args.copy()
             self._model_factory: Callable[[], AnthropicModel] = (
                 lambda mid=model_id, client_args=client_args: create_anthropic_model(
-                    model_id=mid, client_args=client_args, **kwargs
+                    model_id=mid, client_args=client_args, **model_args
                 )
             )
         else:
@@ -246,6 +252,28 @@ class GeoAgent(Agent):
 
         # build initial model (first turn)
         model = self._model_factory()
+
+        if system_prompt == "default":
+            system_prompt = """
+            You are a map control agent. Call tools with MINIMAL parameters only.
+
+            CRITICAL: Treat all kwargs parameters as optional parameters.
+            CRITICAL: NEVER include optional parameters unless user explicitly asks for them.
+
+            TOOL CALL RULES:
+            - zoom_to(zoom=N) - ONLY zoom parameter, OMIT options completely
+            - add_cog_layer(url='X') - NEVER include bands, nodata, opacity, etc.
+            - fly_to(longitude=N, latitude=N) - NEVER include zoom parameter
+            - add_basemap(name='X') - NEVER include any other parameters
+            - add_marker(lng_lat=[lon,lat]) - NEVER include popup or options
+
+            - remove_layer(name='X') - call get_layer_names() to get the layer name closest to
+            the name of the layer you want to remove before calling this tool
+
+            - add_overture_3d_buildings(kwargs={}) - kwargs parameter required by tool validation
+            FORBIDDEN: Optional parameters, string representations like '{}' or '[1,2,3]'
+            REQUIRED: Minimal tool calls with only what's absolutely necessary
+            """
 
         super().__init__(
             name="Leafmap Visualization Agent",
@@ -276,20 +304,7 @@ class GeoAgent(Agent):
                 self.tools.add_marker,
                 self.tools.set_pitch,
             ],
-            system_prompt="You are a map control agent. Call tools with MINIMAL parameters only.\n\n"
-            + "CRITICAL: Treat all kwargs parameters as optional parameters.\n"
-            + "CRITICAL: NEVER include optional parameters unless user explicitly asks for them.\n\n"
-            + "TOOL CALL RULES:\n"
-            + "- zoom_to(zoom=N) - ONLY zoom parameter, OMIT options completely\n"
-            + "- add_cog_layer(url='X') - NEVER include bands, nodata, opacity, etc.\n"
-            + "- fly_to(longitude=N, latitude=N) - NEVER include zoom parameter\n"
-            + "- add_basemap(name='X') - NEVER include any other parameters\n"
-            + "- add_marker(lng_lat=[lon,lat]) - NEVER include popup or options\n\n"
-            + "- remove_layer(name='X') - call get_layer_names() to get the layer name closest to"
-            + "the name of the layer you want to remove before calling this tool\n\n"
-            + "- add_overture_3d_buildings(kwargs={}) - kwargs parameter required by tool validation\n"
-            + "FORBIDDEN: Optional parameters, string representations like '{}' or '[1,2,3]'\n"
-            + "REQUIRED: Minimal tool calls with only what's absolutely necessary",
+            system_prompt=system_prompt,
             callback_handler=None,
         )
 
@@ -389,7 +404,7 @@ class GeoAgent(Agent):
                 ),
                 (
                     "Add GeoJSON",
-                    "Add vector layer: https://github.com/opengeos/datasets/releases/download/us/us_states.geojson",
+                    "Add GeoJSON layer: https://github.com/opengeos/datasets/releases/download/us/us_states.geojson",
                 ),
                 ("Remove layer", "Remove layer OpenTopoMap"),
                 ("Save map", "Save the map as demo.html and return the path"),
