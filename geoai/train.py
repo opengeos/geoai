@@ -34,6 +34,14 @@ try:
 except ImportError:
     SMP_AVAILABLE = False
 
+# Additional imports for Lightly Train
+try:
+    import lightly_train
+
+    LIGHTLY_TRAIN_AVAILABLE = True
+except ImportError:
+    LIGHTLY_TRAIN_AVAILABLE = False
+
 
 def get_instance_segmentation_model(
     num_classes: int = 2, num_channels: int = 3, pretrained: bool = True
@@ -3646,3 +3654,241 @@ def instance_segmentation_batch(
             continue
 
     print(f"Batch processing completed. Results saved to {output_dir}")
+
+
+def lightly_train_model(
+    data_dir: str,
+    output_dir: str,
+    model: str = "torchvision/resnet50",
+    method: str = "dinov2_distillation",
+    epochs: int = 100,
+    batch_size: int = 64,
+    learning_rate: float = 1e-4,
+    **kwargs: Any,
+) -> str:
+    """
+    Train a model using Lightly Train for self-supervised pretraining.
+
+    Args:
+        data_dir (str): Directory containing unlabeled images for training.
+        output_dir (str): Directory to save training outputs and model checkpoints.
+        model (str): Model architecture to train. Supports models from torchvision,
+            timm, ultralytics, etc. Default is "torchvision/resnet50".
+        method (str): Self-supervised learning method. Options include:
+            "dinov2_distillation" (recommended), "dinov2", "dino", "simclr".
+            Default is "dinov2_distillation".
+        epochs (int): Number of training epochs. Default is 100.
+        batch_size (int): Batch size for training. Default is 64.
+        learning_rate (float): Learning rate for training. Default is 1e-4.
+        **kwargs: Additional arguments passed to lightly_train.train().
+
+    Returns:
+        str: Path to the exported model file.
+
+    Raises:
+        ImportError: If lightly-train is not installed.
+        ValueError: If data_dir does not exist or is empty.
+
+    Example:
+        >>> model_path = lightly_train_model(
+        ...     data_dir="path/to/unlabeled/images",
+        ...     output_dir="path/to/output",
+        ...     model="torchvision/resnet50",
+        ...     epochs=50
+        ... )
+        >>> print(f"Pretrained model saved to: {model_path}")
+    """
+    if not LIGHTLY_TRAIN_AVAILABLE:
+        raise ImportError(
+            "lightly-train is not installed. Please install it with: "
+            "pip install lightly-train"
+        )
+
+    if not os.path.exists(data_dir):
+        raise ValueError(f"Data directory does not exist: {data_dir}")
+
+    # Check if data directory contains images
+    image_extensions = ["*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff", "*.bmp"]
+    image_files = []
+    for ext in image_extensions:
+        image_files.extend(glob.glob(os.path.join(data_dir, "**", ext), recursive=True))
+
+    if not image_files:
+        raise ValueError(f"No image files found in {data_dir}")
+
+    print(f"Found {len(image_files)} images in {data_dir}")
+    print(f"Starting self-supervised pretraining with {method} method...")
+
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Train the model using Lightly Train
+    lightly_train.train(
+        out=output_dir,
+        data=data_dir,
+        model=model,
+        method=method,
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        **kwargs,
+    )
+
+    # Return path to the exported model
+    exported_model_path = os.path.join(
+        output_dir, "exported_models", "exported_last.pt"
+    )
+
+    if os.path.exists(exported_model_path):
+        print(
+            f"Model training completed. Exported model saved to: {exported_model_path}"
+        )
+        return exported_model_path
+    else:
+        # Check for alternative export paths
+        possible_paths = [
+            os.path.join(output_dir, "exported_models", "exported_best.pt"),
+            os.path.join(output_dir, "checkpoints", "last.ckpt"),
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                print(f"Model training completed. Exported model saved to: {path}")
+                return path
+
+        print(f"Model training completed. Output saved to: {output_dir}")
+        return output_dir
+
+
+def load_lightly_pretrained_model(
+    model_path: str,
+    model_architecture: str = "torchvision/resnet50",
+) -> torch.nn.Module:
+    """
+    Load a pretrained model from Lightly Train.
+
+    Args:
+        model_path (str): Path to the pretrained model file (.pt format).
+        model_architecture (str): Architecture of the model to load.
+            Default is "torchvision/resnet50".
+
+    Returns:
+        torch.nn.Module: Loaded pretrained model ready for fine-tuning.
+
+    Raises:
+        FileNotFoundError: If model_path does not exist.
+        ImportError: If required libraries are not available.
+
+    Example:
+        >>> model = load_lightly_pretrained_model(
+        ...     model_path="path/to/pretrained_model.pt",
+        ...     model_architecture="torchvision/resnet50"
+        ... )
+        >>> # Fine-tune the model with your existing training pipeline
+    """
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+
+    print(f"Loading pretrained model from: {model_path}")
+
+    # Load the model based on architecture
+    if model_architecture.startswith("torchvision/"):
+        model_name = model_architecture.replace("torchvision/", "")
+
+        # Import the model from torchvision
+        if hasattr(torchvision.models, model_name):
+            model = getattr(torchvision.models, model_name)()
+        else:
+            raise ValueError(f"Unknown torchvision model: {model_name}")
+
+    elif model_architecture.startswith("timm/"):
+        try:
+            import timm
+
+            model_name = model_architecture.replace("timm/", "")
+            model = timm.create_model(model_name)
+        except ImportError:
+            raise ImportError(
+                "timm is required for TIMM models. Install with: pip install timm"
+            )
+
+    else:
+        # For other architectures, try to import from torchvision as default
+        try:
+            model = getattr(torchvision.models, model_architecture)()
+        except AttributeError:
+            raise ValueError(f"Unsupported model architecture: {model_architecture}")
+
+    # Load the pretrained weights
+    state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+    model.load_state_dict(state_dict)
+
+    print(f"Successfully loaded pretrained model: {model_architecture}")
+    return model
+
+
+def lightly_embed_images(
+    data_dir: str,
+    model_path: str,
+    output_path: str,
+    model_architecture: str = "torchvision/resnet50",
+    batch_size: int = 64,
+    **kwargs: Any,
+) -> str:
+    """
+    Generate embeddings for images using a Lightly Train pretrained model.
+
+    Args:
+        data_dir (str): Directory containing images to embed.
+        model_path (str): Path to the pretrained model file.
+        output_path (str): Path to save the embeddings (as .npy or .pt file).
+        model_architecture (str): Architecture of the pretrained model.
+            Default is "torchvision/resnet50".
+        batch_size (int): Batch size for embedding generation. Default is 64.
+        **kwargs: Additional arguments passed to lightly_train.embed().
+
+    Returns:
+        str: Path to the saved embeddings file.
+
+    Raises:
+        ImportError: If lightly-train is not installed.
+        FileNotFoundError: If data_dir or model_path does not exist.
+
+    Example:
+        >>> embeddings_path = lightly_embed_images(
+        ...     data_dir="path/to/images",
+        ...     model_path="path/to/pretrained_model.pt",
+        ...     output_path="path/to/embeddings.npy",
+        ...     batch_size=32
+        ... )
+        >>> print(f"Embeddings saved to: {embeddings_path}")
+    """
+    if not LIGHTLY_TRAIN_AVAILABLE:
+        raise ImportError(
+            "lightly-train is not installed. Please install it with: "
+            "pip install lightly-train"
+        )
+
+    if not os.path.exists(data_dir):
+        raise FileNotFoundError(f"Data directory does not exist: {data_dir}")
+
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file does not exist: {model_path}")
+
+    print(f"Generating embeddings for images in: {data_dir}")
+    print(f"Using pretrained model: {model_path}")
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Generate embeddings using Lightly Train
+    lightly_train.embed(
+        out=output_path,
+        data=data_dir,
+        checkpoint=model_path,
+        model=model_architecture,
+        batch_size=batch_size,
+        **kwargs,
+    )
+
+    print(f"Embeddings saved to: {output_path}")
+    return output_path
