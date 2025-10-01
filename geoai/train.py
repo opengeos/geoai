@@ -3820,7 +3820,11 @@ def load_lightly_pretrained_model(
             raise ValueError(f"Unsupported model architecture: {model_architecture}")
 
     # Load the pretrained weights
-    state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+    try:
+        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+    except TypeError:
+        # For backward compatibility with older PyTorch versions
+        state_dict = torch.load(model_path, map_location="cpu")
     model.load_state_dict(state_dict)
 
     print(f"Successfully loaded pretrained model: {model_architecture}")
