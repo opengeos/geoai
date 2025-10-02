@@ -2625,6 +2625,8 @@ def semantic_inference_on_geotiff(
     num_channels: int = 3,
     num_classes: int = 2,
     device: Optional[torch.device] = None,
+    probability_path: Optional[str] = None,
+    probability_threshold: Optional[float] = None,
     quiet: bool = False,
     **kwargs: Any,
 ) -> Tuple[str, float]:
@@ -2641,6 +2643,11 @@ def semantic_inference_on_geotiff(
         num_channels (int): Number of channels to use from the input image.
         num_classes (int): Number of classes in the model output.
         device (torch.device, optional): Device to run inference on.
+        probability_path (str, optional): Path to save probability map. If provided,
+            the normalized class probabilities will be saved as a multi-band raster.
+        probability_threshold (float, optional): Probability threshold for binary classification.
+            Only used when num_classes=2. If provided, pixels with class 1 probability >= threshold
+            are classified as class 1, otherwise class 0. If None (default), uses argmax.
         quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
@@ -2811,10 +2818,19 @@ def semantic_inference_on_geotiff(
                     / count_accumulator[valid_pixels]
                 )
 
-            # Take argmax to get final class predictions
-            mask[valid_pixels] = np.argmax(
-                normalized_probs[:, valid_pixels], axis=0
-            ).astype(np.uint8)
+            # Apply threshold for binary classification or use argmax
+            if probability_threshold is not None and num_classes == 2:
+                # Use threshold: classify as class 1 if probability >= threshold
+                mask[valid_pixels] = (
+                    normalized_probs[1, valid_pixels] >= probability_threshold
+                ).astype(np.uint8)
+                if not quiet:
+                    print(f"Using probability threshold: {probability_threshold}")
+            else:
+                # Take argmax to get final class predictions
+                mask[valid_pixels] = np.argmax(
+                    normalized_probs[:, valid_pixels], axis=0
+                ).astype(np.uint8)
 
             # Check class distribution in predictions (summary only)
             unique_classes, class_counts = np.unique(
@@ -2839,6 +2855,29 @@ def semantic_inference_on_geotiff(
         if not quiet:
             print(f"Saved prediction to {output_path}")
 
+        # Save probability map if requested
+        if probability_path is not None:
+            prob_dir = os.path.abspath(os.path.dirname(probability_path))
+            os.makedirs(prob_dir, exist_ok=True)
+
+            # Prepare probability output metadata
+            prob_meta = meta.copy()
+            prob_meta.update({"count": num_classes, "dtype": "float32"})
+
+            # Save normalized probabilities
+            with rasterio.open(probability_path, "w", **prob_meta) as dst:
+                for class_idx in range(num_classes):
+                    # Normalize probabilities
+                    prob_band = np.zeros((height, width), dtype=np.float32)
+                    prob_band[valid_pixels] = (
+                        prob_accumulator[class_idx, valid_pixels]
+                        / count_accumulator[valid_pixels]
+                    )
+                    dst.write(prob_band, class_idx + 1)
+
+            if not quiet:
+                print(f"Saved probability map to {probability_path}")
+
         return output_path, inference_time
 
 
@@ -2853,6 +2892,8 @@ def semantic_inference_on_image(
     num_classes: int = 2,
     device: Optional[torch.device] = None,
     binary_output: bool = True,
+    probability_path: Optional[str] = None,
+    probability_threshold: Optional[float] = None,
     quiet: bool = False,
     **kwargs: Any,
 ) -> Tuple[str, float]:
@@ -2870,6 +2911,11 @@ def semantic_inference_on_image(
         num_classes (int): Number of classes in the model output.
         device (torch.device, optional): Device to run inference on.
         binary_output (bool): If True, convert multi-class output to binary (class > 0).
+        probability_path (str, optional): Path to save probability map. If provided,
+            the normalized class probabilities will be saved as a multi-band raster.
+        probability_threshold (float, optional): Probability threshold for binary classification.
+            Only used when num_classes=2. If provided, pixels with class 1 probability >= threshold
+            are classified as class 1, otherwise class 0. If None (default), uses argmax.
         quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
@@ -3056,10 +3102,19 @@ def semantic_inference_on_image(
                     / count_accumulator[valid_pixels]
                 )
 
-            # Take argmax to get final class predictions
-            mask[valid_pixels] = np.argmax(
-                normalized_probs[:, valid_pixels], axis=0
-            ).astype(np.uint8)
+            # Apply threshold for binary classification or use argmax
+            if probability_threshold is not None and num_classes == 2:
+                # Use threshold: classify as class 1 if probability >= threshold
+                mask[valid_pixels] = (
+                    normalized_probs[1, valid_pixels] >= probability_threshold
+                ).astype(np.uint8)
+                if not quiet:
+                    print(f"Using probability threshold: {probability_threshold}")
+            else:
+                # Take argmax to get final class predictions
+                mask[valid_pixels] = np.argmax(
+                    normalized_probs[:, valid_pixels], axis=0
+                ).astype(np.uint8)
 
             # Check class distribution in predictions before binary conversion
             unique_classes, class_counts = np.unique(mask, return_counts=True)
@@ -3116,6 +3171,40 @@ def semantic_inference_on_image(
             if not quiet:
                 print(f"Saved prediction to {output_path}")
 
+        # Save probability map if requested
+        if probability_path is not None:
+            prob_dir = os.path.abspath(os.path.dirname(probability_path))
+            os.makedirs(prob_dir, exist_ok=True)
+
+            # For regular images, we'll save as a multi-channel TIFF
+            # since we need to preserve floating point values
+            import rasterio
+            from rasterio.transform import from_bounds
+
+            # Create a simple affine transform (identity transform for pixel coordinates)
+            transform = from_bounds(0, 0, width, height, width, height)
+
+            # Prepare probability output metadata
+            prob_meta = {
+                "driver": "GTiff",
+                "height": height,
+                "width": width,
+                "count": num_classes,
+                "dtype": "float32",
+                "transform": transform,
+            }
+
+            # Save normalized probabilities
+            with rasterio.open(probability_path, "w", **prob_meta) as dst:
+                for class_idx in range(num_classes):
+                    # Normalize probabilities
+                    prob_band = np.zeros((height, width), dtype=np.float32)
+                    prob_band[valid_pixels] = normalized_probs[class_idx, valid_pixels]
+                    dst.write(prob_band, class_idx + 1)
+
+            if not quiet:
+                print(f"Saved probability map to {probability_path}")
+
         return output_path, inference_time
 
 
@@ -3131,6 +3220,8 @@ def semantic_segmentation(
     overlap: int = 256,
     batch_size: int = 4,
     device: Optional[torch.device] = None,
+    probability_path: Optional[str] = None,
+    probability_threshold: Optional[float] = None,
     quiet: bool = False,
     **kwargs: Any,
 ) -> None:
@@ -3152,6 +3243,12 @@ def semantic_segmentation(
         overlap (int): Overlap between adjacent windows.
         batch_size (int): Batch size for inference.
         device (torch.device, optional): Device to run inference on.
+        probability_path (str, optional): Path to save probability map. If provided,
+            the normalized class probabilities will be saved as a multi-band raster.
+        probability_threshold (float, optional): Probability threshold for binary classification.
+            Only used when num_classes=2. If provided, pixels with class 1 probability >= threshold
+            are classified as class 1, otherwise class 0. If None (default), uses argmax.
+            Must be between 0 and 1.
         quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
@@ -3205,6 +3302,15 @@ def semantic_segmentation(
     model.to(device)
     model.eval()
 
+    # Validate probability_threshold
+    if probability_threshold is not None:
+        if not (0 <= probability_threshold <= 1):
+            raise ValueError("probability_threshold must be between 0 and 1")
+        if num_classes != 2:
+            raise ValueError(
+                "probability_threshold is only supported for binary classification (num_classes=2)"
+            )
+
     # Use appropriate inference function based on file format
     if is_geotiff:
         semantic_inference_on_geotiff(
@@ -3217,6 +3323,8 @@ def semantic_segmentation(
             num_channels=num_channels,
             num_classes=num_classes,
             device=device,
+            probability_path=probability_path,
+            probability_threshold=probability_threshold,
             quiet=quiet,
             **kwargs,
         )
@@ -3235,6 +3343,8 @@ def semantic_segmentation(
             num_classes=num_classes,
             device=device,
             binary_output=True,  # Convert to binary output for better visualization
+            probability_path=probability_path,
+            probability_threshold=probability_threshold,
             quiet=quiet,
             **kwargs,
         )
