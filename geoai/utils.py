@@ -7522,7 +7522,11 @@ def write_colormap(
 
 
 def plot_performance_metrics(
-    history_path: str, figsize: Tuple[int, int] = (15, 5), verbose: bool = True, save_path: Optional[str] = None, kwargs: Optional[Dict] = None
+    history_path: str,
+    figsize: Tuple[int, int] = (15, 5),
+    verbose: bool = True,
+    save_path: Optional[str] = None,
+    kwargs: Optional[Dict] = None,
 ) -> None:
     """Plot performance metrics from a history object.
 
@@ -7598,9 +7602,6 @@ def plot_performance_metrics(
         if val_dice_key in history:
             print(f"Best Dice: {max(history[val_dice_key]):.4f}")
             print(f"Final Dice: {history[val_dice_key][-1]:.4f}")
-
-
-
 
 
 def get_device() -> torch.device:
