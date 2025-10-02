@@ -7522,7 +7522,11 @@ def write_colormap(
 
 
 def plot_performance_metrics(
-    history_path: str, figsize: Tuple[int, int] = (15, 5), verbose: bool = True
+    history_path: str,
+    figsize: Tuple[int, int] = (15, 5),
+    verbose: bool = True,
+    save_path: Optional[str] = None,
+    kwargs: Optional[Dict] = None,
 ) -> None:
     """Plot performance metrics from a history object.
 
@@ -7531,6 +7535,8 @@ def plot_performance_metrics(
         figsize: The figure size.
         verbose: Whether to print the best and final metrics.
     """
+    if kwargs is None:
+        kwargs = {}
     history = torch.load(history_path)
 
     # Handle different key naming conventions
@@ -7579,6 +7585,14 @@ def plot_performance_metrics(
         plt.grid(True)
 
     plt.tight_layout()
+
+    if save_path:
+        if "dpi" not in kwargs:
+            kwargs["dpi"] = 150
+        if "bbox_inches" not in kwargs:
+            kwargs["bbox_inches"] = "tight"
+        plt.savefig(save_path, **kwargs)
+
     plt.show()
 
     if verbose:
