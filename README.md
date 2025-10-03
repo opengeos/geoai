@@ -103,13 +103,17 @@ Comprehensive documentation is available at [https://opengeoai.org](https://open
 
 ## 📺 Video Tutorials
 
-Check out this 2-hour video tutorial on using GeoAI for geospatial data analysis and visualization.
+### GeoAI Made Easy: Learn the Python Package Step-by-Step (Beginner Friendly)
 
-[![cover](https://github.com/user-attachments/assets/1c14e651-65b9-41ae-b42d-3ad028b3eeb8)](https://youtu.be/jdK-cleFUkc)
+[![intro](https://github.com/user-attachments/assets/7e60ce05-573d-4d0d-9876-5289b87e5136)](https://youtu.be/VIl29Rca6zE&list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 
-To learn more about GeoAI, you can watch the following video tutorials:
+### GeoAI Workshop: Unlocking the Power of GeoAI with Python
 
-[![cover](https://github.com/user-attachments/assets/3cde9547-ab62-4d70-b23a-3e5ed27c7407)](https://tinyurl.com/GeoAI-Tutorials)
+[![cover](https://github.com/user-attachments/assets/1c14e651-65b9-41ae-b42d-3ad028b3eeb8)](https://youtu.be/jdK-cleFUkc&list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
+
+### GeoAI Tutorials Playlist
+
+[![cover](https://github.com/user-attachments/assets/3cde9547-ab62-4d70-b23a-3e5ed27c7407)](https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 
 ## 🤝 Contributing
 
