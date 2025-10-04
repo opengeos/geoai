@@ -7,6 +7,9 @@ private/
 tests/data/
 CLAUDE.md
 AI_AGENTS.md
+docs/examples/timm_output/
+docs/examples/timm_seg_output/
+docs/examples/timm_buildings/
 
 # C extensions
 *.so
