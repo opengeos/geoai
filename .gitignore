@@ -5,6 +5,8 @@ private/
 *$py.class
 *.jp2
 tests/data/
+CLAUDE.md
+AI_AGENTS.md
 
 # C extensions
 *.so
