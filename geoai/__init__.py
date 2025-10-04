@@ -101,3 +101,23 @@ def set_proj_lib_path(verbose=False):
 
 from .dinov3 import DINOv3GeoProcessor, analyze_image_patches, create_similarity_map
 from .geoai import *
+
+from .timm_train import (
+    get_timm_model,
+    modify_first_conv_for_channels,
+    TimmClassifier,
+    RemoteSensingDataset,
+    train_timm_classifier,
+    predict_with_timm,
+    list_timm_models,
+)
+
+from .timm_segment import (
+    TimmSegmentationModel,
+    SegmentationDataset,
+    train_timm_segmentation,
+    predict_segmentation,
+    train_timm_segmentation_model,
+    timm_semantic_segmentation,
+    push_timm_model_to_hub,
+)
