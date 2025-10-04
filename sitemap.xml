@@ -73,6 +73,14 @@
          <lastmod>2025-10-04</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/timm_segment/</loc>
+         <lastmod>2025-10-04</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/timm_train/</loc>
+         <lastmod>2025-10-04</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/train/</loc>
          <lastmod>2025-10-04</lastmod>
     </url>
@@ -254,6 +262,14 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_solar_panel_detection/</loc>
+         <lastmod>2025-10-04</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/train_timm_classifier/</loc>
+         <lastmod>2025-10-04</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/train_timm_segmentation/</loc>
          <lastmod>2025-10-04</lastmod>
     </url>
     <url>
