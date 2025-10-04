@@ -3115,8 +3115,9 @@ def export_geotiff_tiles(
 
 def export_geotiff_tiles_batch(
     images_folder,
-    masks_folder,
-    output_folder,
+    masks_folder=None,
+    masks_file=None,
+    output_folder=None,
     tile_size=256,
     stride=128,
     class_value_field="class",
@@ -3128,21 +3129,34 @@ def export_geotiff_tiles_batch(
     skip_empty_tiles=False,
     image_extensions=None,
     mask_extensions=None,
+    match_by_name=True,
 ) -> Dict[str, Any]:
     """
-    Export georeferenced GeoTIFF tiles from folders of images and masks.
+    Export georeferenced GeoTIFF tiles from images and masks.
 
-    This function processes multiple image-mask pairs from input folders,
-    generating tiles for each pair. All image tiles are saved to a single
-    'images' folder and all mask tiles to a single 'masks' folder.
+    This function supports three mask input modes:
+    1. Single vector file covering all images (masks_file parameter)
+    2. Multiple vector files, one per image (masks_folder parameter)
+    3. Multiple raster mask files (masks_folder parameter)
 
-    Images and masks are paired by their sorted order (alphabetically), not by
-    filename matching. The number of images and masks must be equal.
+    For mode 1 (single vector file), specify masks_file path. The function will
+    use spatial intersection to determine which features apply to each image.
+
+    For mode 2/3 (multiple mask files), specify masks_folder path. Images and masks
+    are paired either by matching filenames (match_by_name=True) or by sorted order
+    (match_by_name=False).
+
+    All image tiles are saved to a single 'images' folder and all mask tiles to a
+    single 'masks' folder within the output directory.
 
     Args:
         images_folder (str): Path to folder containing raster images
-        masks_folder (str): Path to folder containing classification masks/vectors
-        output_folder (str): Path to output folder
+        masks_folder (str, optional): Path to folder containing classification masks/vectors.
+            Use this for multiple mask files (one per image or raster masks).
+        masks_file (str, optional): Path to a single vector file covering all images.
+            Use this for a single GeoJSON/Shapefile that covers multiple images.
+        output_folder (str, optional): Path to output folder. If None, creates 'tiles'
+            subfolder in images_folder.
         tile_size (int): Size of tiles in pixels (square)
         stride (int): Step size between tiles
         class_value_field (str): Field containing class values (for vector data)
@@ -3154,17 +3168,60 @@ def export_geotiff_tiles_batch(
         skip_empty_tiles (bool): If True, skip tiles with no features
         image_extensions (list): List of image file extensions to process (default: common raster formats)
         mask_extensions (list): List of mask file extensions to process (default: common raster/vector formats)
+        match_by_name (bool): If True, match image and mask files by base filename.
+            If False, match by sorted order (alphabetically). Only applies when masks_folder is used.
 
     Returns:
         Dict[str, Any]: Dictionary containing batch processing statistics
 
     Raises:
-        ValueError: If no images or masks found, or if counts don't match
+        ValueError: If no images found, or if masks_folder and masks_file are both specified,
+            or if neither is specified, or if counts don't match when using masks_folder with
+            match_by_name=False.
+
+    Examples:
+        # Single vector file covering all images
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     masks_file='data/buildings.geojson',
+        ...     output_folder='output/tiles'
+        ... )
+
+        # Multiple vector files, matched by filename
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     masks_folder='data/masks',
+        ...     output_folder='output/tiles',
+        ...     match_by_name=True
+        ... )
+
+        # Multiple mask files, matched by sorted order
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     masks_folder='data/masks',
+        ...     output_folder='output/tiles',
+        ...     match_by_name=False
+        ... )
     """
 
     import logging
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
+
+    # Validate input parameters
+    if masks_folder is not None and masks_file is not None:
+        raise ValueError(
+            "Cannot specify both masks_folder and masks_file. Please use only one."
+        )
+
+    if masks_folder is None and masks_file is None:
+        raise ValueError(
+            "Must specify either masks_folder or masks_file for mask data source."
+        )
+
+    # Default output folder if not specified
+    if output_folder is None:
+        output_folder = os.path.join(images_folder, "tiles")
 
     # Default extensions if not provided
     if image_extensions is None:
@@ -3202,30 +3259,88 @@ def export_geotiff_tiles_batch(
         pattern = os.path.join(images_folder, f"*{ext}")
         image_files.extend(glob.glob(pattern))
 
-    # Get list of mask files
-    mask_files = []
-    for ext in mask_extensions:
-        pattern = os.path.join(masks_folder, f"*{ext}")
-        mask_files.extend(glob.glob(pattern))
-
     # Sort files for consistent processing
     image_files.sort()
-    mask_files.sort()
 
     if not image_files:
         raise ValueError(
             f"No image files found in {images_folder} with extensions {image_extensions}"
         )
 
-    if not mask_files:
-        raise ValueError(
-            f"No mask files found in {masks_folder} with extensions {mask_extensions}"
-        )
+    # Handle different mask input modes
+    use_single_mask_file = masks_file is not None
+    mask_files = []
+    image_mask_pairs = []
 
-    if len(image_files) != len(mask_files):
-        raise ValueError(
-            f"Number of image files ({len(image_files)}) does not match number of mask files ({len(mask_files)})"
-        )
+    if use_single_mask_file:
+        # Mode 1: Single vector file covering all images
+        if not os.path.exists(masks_file):
+            raise ValueError(f"Mask file not found: {masks_file}")
+
+        # Load the single mask file once - will be spatially filtered per image
+        single_mask_gdf = gpd.read_file(masks_file)
+
+        if not quiet:
+            print(f"Using single mask file: {masks_file}")
+            print(
+                f"Mask contains {len(single_mask_gdf)} features in CRS: {single_mask_gdf.crs}"
+            )
+
+        # Create pairs with the same mask file for all images
+        for image_file in image_files:
+            image_mask_pairs.append((image_file, masks_file, single_mask_gdf))
+
+    else:
+        # Mode 2/3: Multiple mask files (vector or raster)
+        # Get list of mask files
+        for ext in mask_extensions:
+            pattern = os.path.join(masks_folder, f"*{ext}")
+            mask_files.extend(glob.glob(pattern))
+
+        # Sort files for consistent processing
+        mask_files.sort()
+
+        if not mask_files:
+            raise ValueError(
+                f"No mask files found in {masks_folder} with extensions {mask_extensions}"
+            )
+
+        # Match images to masks
+        if match_by_name:
+            # Match by base filename
+            image_dict = {
+                os.path.splitext(os.path.basename(f))[0]: f for f in image_files
+            }
+            mask_dict = {
+                os.path.splitext(os.path.basename(f))[0]: f for f in mask_files
+            }
+
+            # Find matching pairs
+            for img_base, img_path in image_dict.items():
+                if img_base in mask_dict:
+                    image_mask_pairs.append((img_path, mask_dict[img_base], None))
+                else:
+                    if not quiet:
+                        print(f"Warning: No mask found for image {img_base}")
+
+            if not image_mask_pairs:
+                raise ValueError(
+                    "No matching image-mask pairs found when matching by filename. "
+                    "Check that image and mask files have matching base names."
+                )
+
+        else:
+            # Match by sorted order
+            if len(image_files) != len(mask_files):
+                raise ValueError(
+                    f"Number of image files ({len(image_files)}) does not match "
+                    f"number of mask files ({len(mask_files)}) when matching by sorted order. "
+                    f"Use match_by_name=True for filename-based matching."
+                )
+
+            # Create pairs by sorted order
+            for image_file, mask_file in zip(image_files, mask_files):
+                image_mask_pairs.append((image_file, mask_file, None))
 
     # Initialize batch statistics
     batch_stats = {
@@ -3239,23 +3354,24 @@ def export_geotiff_tiles_batch(
     }
 
     if not quiet:
-        print(
-            f"Found {len(image_files)} image files and {len(mask_files)} mask files to process"
-        )
-        print(f"Processing batch from {images_folder} and {masks_folder}")
+        if use_single_mask_file:
+            print(f"Found {len(image_files)} image files to process")
+            print(f"Using single mask file: {masks_file}")
+        else:
+            print(f"Found {len(image_mask_pairs)} matching image-mask pairs to process")
+            print(f"Processing batch from {images_folder} and {masks_folder}")
         print(f"Output folder: {output_folder}")
         print("-" * 60)
 
     # Global tile counter for unique naming
     global_tile_counter = 0
 
-    # Process each image-mask pair by sorted order
-    for idx, (image_file, mask_file) in enumerate(
+    # Process each image-mask pair
+    for idx, (image_file, mask_file, mask_gdf) in enumerate(
         tqdm(
-            zip(image_files, mask_files),
+            image_mask_pairs,
             desc="Processing image pairs",
             disable=quiet,
-            total=len(image_files),
         )
     ):
         batch_stats["total_image_pairs"] += 1
@@ -3267,9 +3383,12 @@ def export_geotiff_tiles_batch(
             if not quiet:
                 print(f"\nProcessing: {base_name}")
                 print(f"  Image: {os.path.basename(image_file)}")
-                print(f"  Mask: {os.path.basename(mask_file)}")
+                if use_single_mask_file:
+                    print(f"  Mask: {os.path.basename(mask_file)} (spatially filtered)")
+                else:
+                    print(f"  Mask: {os.path.basename(mask_file)}")
 
-            # Process the image-mask pair manually to get direct control over tile saving
+            # Process the image-mask pair
             tiles_generated = _process_image_mask_pair(
                 image_file=image_file,
                 mask_file=mask_file,
@@ -3285,6 +3404,8 @@ def export_geotiff_tiles_batch(
                 all_touched=all_touched,
                 skip_empty_tiles=skip_empty_tiles,
                 quiet=quiet,
+                mask_gdf=mask_gdf,  # Pass pre-loaded GeoDataFrame if using single mask
+                use_single_mask_file=use_single_mask_file,
             )
 
             # Update counters
@@ -3362,9 +3483,15 @@ def _process_image_mask_pair(
     all_touched=True,
     skip_empty_tiles=False,
     quiet=False,
+    mask_gdf=None,
+    use_single_mask_file=False,
 ):
     """
     Process a single image-mask pair and save tiles directly to output directories.
+
+    Args:
+        mask_gdf (GeoDataFrame, optional): Pre-loaded GeoDataFrame when using single mask file
+        use_single_mask_file (bool): If True, spatially filter mask_gdf to image bounds
 
     Returns:
         dict: Statistics for this image-mask pair
@@ -3433,11 +3560,36 @@ def _process_image_mask_pair(
         else:
             # Load vector class data
             try:
-                gdf = gpd.read_file(mask_file)
+                if use_single_mask_file and mask_gdf is not None:
+                    # Using pre-loaded single mask file - spatially filter to image bounds
+                    # Get image bounds
+                    image_bounds = box(*src.bounds)
+                    image_gdf = gpd.GeoDataFrame(
+                        {"geometry": [image_bounds]}, crs=src.crs
+                    )
 
-                # Always reproject to match raster CRS
-                if gdf.crs != src.crs:
-                    gdf = gdf.to_crs(src.crs)
+                    # Reproject mask if needed
+                    if mask_gdf.crs != src.crs:
+                        mask_gdf_reprojected = mask_gdf.to_crs(src.crs)
+                    else:
+                        mask_gdf_reprojected = mask_gdf
+
+                    # Spatially filter features that intersect with image bounds
+                    gdf = mask_gdf_reprojected[
+                        mask_gdf_reprojected.intersects(image_bounds)
+                    ].copy()
+
+                    if not quiet and len(gdf) > 0:
+                        print(
+                            f"  Filtered to {len(gdf)} features intersecting image bounds"
+                        )
+                else:
+                    # Load individual mask file
+                    gdf = gpd.read_file(mask_file)
+
+                    # Always reproject to match raster CRS
+                    if gdf.crs != src.crs:
+                        gdf = gdf.to_crs(src.crs)
 
                 # Apply buffer if specified
                 if buffer_radius > 0:
