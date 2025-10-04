@@ -149,6 +149,8 @@ nav:
           - examples/DINOv3_wetlands.ipynb
           - examples/AlphaEarth.ipynb
           - examples/AI_agents.ipynb
+          - examples/train_timm_classifier.ipynb
+          - examples/train_timm_segmentation.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -167,5 +169,7 @@ nav:
           - map_widgets module: map_widgets.md
           - sam module: sam.md
           - segmentation module: segmentation.md
+          - timm_train module: timm_train.md
+          - timm_segment module: timm_segment.md
           - train module: train.md
           - utils module: utils.md

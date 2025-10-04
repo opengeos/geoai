@@ -21,6 +21,7 @@ rioxarray
 scikit-image
 scikit-learn
 # segment-geospatial
+timm
 torch
 # torchange
 torchgeo
