@@ -1,0 +1,11 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+    - family-names: Wu
+      given-names: Qiusheng
+      orcid: https://orcid.org/0000-0001-5437-4073
+title: "GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization"
+version: 0.14.0
+doi: 10.21105/joss.09025
+date-released: 2025-10-05
+url: "https://github.com/opengeos/goeai"

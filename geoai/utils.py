@@ -3125,7 +3125,6 @@ def export_geotiff_tiles_batch(
     max_tiles=None,
     quiet=False,
     all_touched=True,
-    create_overview=False,
     skip_empty_tiles=False,
     image_extensions=None,
     mask_extensions=None,
@@ -3609,9 +3608,6 @@ def _process_image_mask_pair(
         tile_index = 0
         for y in range(num_tiles_y):
             for x in range(num_tiles_x):
-                if tile_index >= max_tiles:
-                    break
-
                 # Calculate window coordinates
                 window_x = x * stride
                 window_y = y * stride
@@ -3714,8 +3710,11 @@ def _process_image_mask_pair(
 
                 # Skip tile if no features and skip_empty_tiles is True
                 if skip_empty_tiles and not has_features:
-                    tile_index += 1
                     continue
+
+                # Check if we've reached max_tiles before saving
+                if tile_index >= max_tiles:
+                    break
 
                 # Generate unique tile name
                 tile_name = f"{base_name}_{global_tile_counter + tile_index:06d}"
@@ -3779,6 +3778,179 @@ def _process_image_mask_pair(
                 break
 
     return stats
+
+
+def display_training_tiles(
+    output_dir,
+    num_tiles=6,
+    figsize=(18, 6),
+    cmap="gray",
+    save_path=None,
+):
+    """
+    Display image and mask tile pairs from training data output.
+
+    Args:
+        output_dir (str): Path to output directory containing 'images' and 'masks' subdirectories
+        num_tiles (int): Number of tile pairs to display (default: 6)
+        figsize (tuple): Figure size as (width, height) in inches (default: (18, 6))
+        cmap (str): Colormap for mask display (default: 'gray')
+        save_path (str, optional): If provided, save figure to this path instead of displaying
+
+    Returns:
+        tuple: (fig, axes) matplotlib figure and axes objects
+
+    Example:
+        >>> fig, axes = display_training_tiles('output/tiles', num_tiles=6)
+        >>> # Or save to file
+        >>> display_training_tiles('output/tiles', num_tiles=4, save_path='tiles_preview.png')
+    """
+    import matplotlib.pyplot as plt
+
+    # Get list of image tiles
+    images_dir = os.path.join(output_dir, "images")
+    if not os.path.exists(images_dir):
+        raise ValueError(f"Images directory not found: {images_dir}")
+
+    image_tiles = sorted(os.listdir(images_dir))[:num_tiles]
+
+    if not image_tiles:
+        raise ValueError(f"No image tiles found in {images_dir}")
+
+    # Limit to available tiles
+    num_tiles = min(num_tiles, len(image_tiles))
+
+    # Create figure with subplots
+    fig, axes = plt.subplots(2, num_tiles, figsize=figsize)
+
+    # Handle case where num_tiles is 1
+    if num_tiles == 1:
+        axes = axes.reshape(2, 1)
+
+    for idx, tile_name in enumerate(image_tiles):
+        # Load and display image tile
+        image_path = os.path.join(output_dir, "images", tile_name)
+        with rasterio.open(image_path) as src:
+            show(src, ax=axes[0, idx], title=f"Image {idx+1}")
+
+        # Load and display mask tile
+        mask_path = os.path.join(output_dir, "masks", tile_name)
+        if os.path.exists(mask_path):
+            with rasterio.open(mask_path) as src:
+                show(src, ax=axes[1, idx], title=f"Mask {idx+1}", cmap=cmap)
+        else:
+            axes[1, idx].text(
+                0.5,
+                0.5,
+                "Mask not found",
+                ha="center",
+                va="center",
+                transform=axes[1, idx].transAxes,
+            )
+            axes[1, idx].set_title(f"Mask {idx+1}")
+
+    plt.tight_layout()
+
+    # Save or show
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Figure saved to: {save_path}")
+    else:
+        plt.show()
+
+    return fig, axes
+
+
+def display_image_with_vector(
+    image_path,
+    vector_path,
+    figsize=(16, 8),
+    vector_color="red",
+    vector_linewidth=1,
+    vector_facecolor="none",
+    save_path=None,
+):
+    """
+    Display a raster image alongside the same image with vector overlay.
+
+    Args:
+        image_path (str): Path to raster image file
+        vector_path (str): Path to vector file (GeoJSON, Shapefile, etc.)
+        figsize (tuple): Figure size as (width, height) in inches (default: (16, 8))
+        vector_color (str): Edge color for vector features (default: 'red')
+        vector_linewidth (float): Line width for vector features (default: 1)
+        vector_facecolor (str): Fill color for vector features (default: 'none')
+        save_path (str, optional): If provided, save figure to this path instead of displaying
+
+    Returns:
+        tuple: (fig, axes, info_dict) where info_dict contains image and vector metadata
+
+    Example:
+        >>> fig, axes, info = display_image_with_vector(
+        ...     'image.tif',
+        ...     'buildings.geojson',
+        ...     vector_color='blue'
+        ... )
+        >>> print(f"Number of features: {info['num_features']}")
+    """
+    import matplotlib.pyplot as plt
+
+    # Validate inputs
+    if not os.path.exists(image_path):
+        raise ValueError(f"Image file not found: {image_path}")
+    if not os.path.exists(vector_path):
+        raise ValueError(f"Vector file not found: {vector_path}")
+
+    # Create figure
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+
+    # Load and display image
+    with rasterio.open(image_path) as src:
+        # Plot image only
+        show(src, ax=ax1, title="Image")
+
+        # Load vector data
+        vector_data = gpd.read_file(vector_path)
+
+        # Reproject to image CRS if needed
+        if vector_data.crs != src.crs:
+            vector_data = vector_data.to_crs(src.crs)
+
+        # Plot image with vector overlay
+        show(
+            src,
+            ax=ax2,
+            title=f"Image with {len(vector_data)} Vector Features",
+        )
+        vector_data.plot(
+            ax=ax2,
+            facecolor=vector_facecolor,
+            edgecolor=vector_color,
+            linewidth=vector_linewidth,
+        )
+
+        # Collect metadata
+        info = {
+            "image_shape": src.shape,
+            "image_crs": src.crs,
+            "image_bounds": src.bounds,
+            "num_features": len(vector_data),
+            "vector_crs": vector_data.crs,
+            "vector_bounds": vector_data.total_bounds,
+        }
+
+    plt.tight_layout()
+
+    # Save or show
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Figure saved to: {save_path}")
+    else:
+        plt.show()
+
+    return fig, (ax1, ax2), info
 
 
 def create_overview_image(
