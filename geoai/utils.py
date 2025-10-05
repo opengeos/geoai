@@ -3324,6 +3324,7 @@ def export_geotiff_tiles_batch(
     image_extensions=None,
     mask_extensions=None,
     match_by_name=True,
+    metadata_format="PASCAL_VOC",
 ) -> Dict[str, Any]:
     """
     Export georeferenced GeoTIFF tiles from images and masks.
@@ -3364,6 +3365,8 @@ def export_geotiff_tiles_batch(
         mask_extensions (list): List of mask file extensions to process (default: common raster/vector formats)
         match_by_name (bool): If True, match image and mask files by base filename.
             If False, match by sorted order (alphabetically). Only applies when masks_folder is used.
+        metadata_format (str): Annotation format - "PASCAL_VOC" (XML), "COCO" (JSON), or "YOLO" (TXT).
+            Default is "PASCAL_VOC".
 
     Returns:
         Dict[str, Any]: Dictionary containing batch processing statistics
@@ -3446,6 +3449,19 @@ def export_geotiff_tiles_batch(
     output_masks_dir = os.path.join(output_folder, "masks")
     os.makedirs(output_images_dir, exist_ok=True)
     os.makedirs(output_masks_dir, exist_ok=True)
+
+    # Create annotation directory based on metadata format
+    if metadata_format in ["PASCAL_VOC", "COCO"]:
+        ann_dir = os.path.join(output_folder, "annotations")
+        os.makedirs(ann_dir, exist_ok=True)
+
+    # Initialize COCO annotations dictionary
+    coco_annotations = None
+    if metadata_format == "COCO":
+        coco_annotations = {"images": [], "annotations": [], "categories": []}
+
+    # Initialize YOLO class set
+    yolo_classes = set() if metadata_format == "YOLO" else None
 
     # Get list of image files
     image_files = []
@@ -3600,6 +3616,13 @@ def export_geotiff_tiles_batch(
                 quiet=quiet,
                 mask_gdf=mask_gdf,  # Pass pre-loaded GeoDataFrame if using single mask
                 use_single_mask_file=use_single_mask_file,
+                metadata_format=metadata_format,
+                ann_dir=(
+                    ann_dir
+                    if "ann_dir" in locals()
+                    and metadata_format in ["PASCAL_VOC", "COCO"]
+                    else None
+                ),
             )
 
             # Update counters
@@ -3621,6 +3644,23 @@ def export_geotiff_tiles_batch(
                 }
             )
 
+            # Aggregate COCO annotations
+            if metadata_format == "COCO" and "coco_data" in tiles_generated:
+                coco_data = tiles_generated["coco_data"]
+                # Add images and annotations
+                coco_annotations["images"].extend(coco_data.get("images", []))
+                coco_annotations["annotations"].extend(coco_data.get("annotations", []))
+                # Merge categories (avoid duplicates)
+                for cat in coco_data.get("categories", []):
+                    if not any(
+                        c["id"] == cat["id"] for c in coco_annotations["categories"]
+                    ):
+                        coco_annotations["categories"].append(cat)
+
+            # Aggregate YOLO classes
+            if metadata_format == "YOLO" and "yolo_classes" in tiles_generated:
+                yolo_classes.update(tiles_generated["yolo_classes"])
+
         except Exception as e:
             if not quiet:
                 print(f"ERROR processing {base_name}: {e}")
@@ -3628,6 +3668,33 @@ def export_geotiff_tiles_batch(
                 {"image": image_file, "mask": mask_file, "error": str(e)}
             )
             batch_stats["errors"] += 1
+
+    # Save aggregated COCO annotations
+    if metadata_format == "COCO" and coco_annotations:
+        import json
+
+        coco_path = os.path.join(ann_dir, "instances.json")
+        with open(coco_path, "w") as f:
+            json.dump(coco_annotations, f, indent=2)
+        if not quiet:
+            print(f"\nSaved COCO annotations: {coco_path}")
+            print(
+                f"  Images: {len(coco_annotations['images'])}, "
+                f"Annotations: {len(coco_annotations['annotations'])}, "
+                f"Categories: {len(coco_annotations['categories'])}"
+            )
+
+    # Save aggregated YOLO classes
+    if metadata_format == "YOLO" and yolo_classes:
+        classes_path = os.path.join(output_folder, "labels", "classes.txt")
+        os.makedirs(os.path.dirname(classes_path), exist_ok=True)
+        sorted_classes = sorted(yolo_classes)
+        with open(classes_path, "w") as f:
+            for cls in sorted_classes:
+                f.write(f"{cls}\n")
+        if not quiet:
+            print(f"\nSaved YOLO classes: {classes_path}")
+            print(f"  Total classes: {len(sorted_classes)}")
 
     # Print batch summary
     if not quiet:
@@ -3652,6 +3719,10 @@ def export_geotiff_tiles_batch(
         print(f"Output saved to: {output_folder}")
         print(f"  Images: {output_images_dir}")
         print(f"  Masks: {output_masks_dir}")
+        if metadata_format in ["PASCAL_VOC", "COCO"]:
+            print(f"  Annotations: {ann_dir}")
+        elif metadata_format == "YOLO":
+            print(f"  Labels: {os.path.join(output_folder, 'labels')}")
 
         # List failed files if any
         if batch_stats["failed_files"]:
@@ -3679,6 +3750,8 @@ def _process_image_mask_pair(
     quiet=False,
     mask_gdf=None,
     use_single_mask_file=False,
+    metadata_format="PASCAL_VOC",
+    ann_dir=None,
 ):
     """
     Process a single image-mask pair and save tiles directly to output directories.
@@ -3710,6 +3783,13 @@ def _process_image_mask_pair(
         "tiles_with_features": 0,
         "errors": 0,
     }
+
+    # Initialize COCO/YOLO tracking for this image
+    if metadata_format == "COCO":
+        stats["coco_data"] = {"images": [], "annotations": [], "categories": []}
+        coco_ann_id = 0
+    if metadata_format == "YOLO":
+        stats["yolo_classes"] = set()
 
     # Open the input raster
     with rasterio.open(image_file) as src:
@@ -3964,6 +4044,197 @@ def _process_image_mask_pair(
                     if not quiet:
                         print(f"ERROR saving label GeoTIFF: {e}")
                     stats["errors"] += 1
+
+                # Generate annotation metadata based on format
+                if metadata_format == "PASCAL_VOC" and ann_dir:
+                    # Create PASCAL VOC XML annotation
+                    from lxml import etree as ET
+
+                    annotation = ET.Element("annotation")
+                    ET.SubElement(annotation, "folder").text = os.path.basename(
+                        output_images_dir
+                    )
+                    ET.SubElement(annotation, "filename").text = f"{tile_name}.tif"
+                    ET.SubElement(annotation, "path").text = image_path
+
+                    source = ET.SubElement(annotation, "source")
+                    ET.SubElement(source, "database").text = "GeoAI"
+
+                    size = ET.SubElement(annotation, "size")
+                    ET.SubElement(size, "width").text = str(tile_size)
+                    ET.SubElement(size, "height").text = str(tile_size)
+                    ET.SubElement(size, "depth").text = str(image_data.shape[0])
+
+                    ET.SubElement(annotation, "segmented").text = "1"
+
+                    # Find connected components for instance segmentation
+                    from scipy import ndimage
+
+                    for class_id in np.unique(label_mask):
+                        if class_id == 0:
+                            continue
+
+                        class_mask = (label_mask == class_id).astype(np.uint8)
+                        labeled_array, num_features = ndimage.label(class_mask)
+
+                        for instance_id in range(1, num_features + 1):
+                            instance_mask = labeled_array == instance_id
+                            coords = np.argwhere(instance_mask)
+
+                            if len(coords) == 0:
+                                continue
+
+                            ymin, xmin = coords.min(axis=0)
+                            ymax, xmax = coords.max(axis=0)
+
+                            obj = ET.SubElement(annotation, "object")
+                            class_name = next(
+                                (k for k, v in class_to_id.items() if v == class_id),
+                                str(class_id),
+                            )
+                            ET.SubElement(obj, "name").text = str(class_name)
+                            ET.SubElement(obj, "pose").text = "Unspecified"
+                            ET.SubElement(obj, "truncated").text = "0"
+                            ET.SubElement(obj, "difficult").text = "0"
+
+                            bndbox = ET.SubElement(obj, "bndbox")
+                            ET.SubElement(bndbox, "xmin").text = str(int(xmin))
+                            ET.SubElement(bndbox, "ymin").text = str(int(ymin))
+                            ET.SubElement(bndbox, "xmax").text = str(int(xmax))
+                            ET.SubElement(bndbox, "ymax").text = str(int(ymax))
+
+                    # Save XML file
+                    xml_path = os.path.join(ann_dir, f"{tile_name}.xml")
+                    tree = ET.ElementTree(annotation)
+                    tree.write(xml_path, pretty_print=True, encoding="utf-8")
+
+                elif metadata_format == "COCO":
+                    # Add COCO image entry
+                    image_id = int(global_tile_counter + tile_index)
+                    stats["coco_data"]["images"].append(
+                        {
+                            "id": image_id,
+                            "file_name": f"{tile_name}.tif",
+                            "width": int(tile_size),
+                            "height": int(tile_size),
+                        }
+                    )
+
+                    # Add COCO categories (only once per unique class)
+                    for class_val, class_id in class_to_id.items():
+                        if not any(
+                            c["id"] == class_id
+                            for c in stats["coco_data"]["categories"]
+                        ):
+                            stats["coco_data"]["categories"].append(
+                                {
+                                    "id": int(class_id),
+                                    "name": str(class_val),
+                                    "supercategory": "object",
+                                }
+                            )
+
+                    # Add COCO annotations (instance segmentation)
+                    from scipy import ndimage
+                    from skimage import measure
+
+                    for class_id in np.unique(label_mask):
+                        if class_id == 0:
+                            continue
+
+                        class_mask = (label_mask == class_id).astype(np.uint8)
+                        labeled_array, num_features = ndimage.label(class_mask)
+
+                        for instance_id in range(1, num_features + 1):
+                            instance_mask = (labeled_array == instance_id).astype(
+                                np.uint8
+                            )
+                            coords = np.argwhere(instance_mask)
+
+                            if len(coords) == 0:
+                                continue
+
+                            ymin, xmin = coords.min(axis=0)
+                            ymax, xmax = coords.max(axis=0)
+
+                            bbox = [
+                                int(xmin),
+                                int(ymin),
+                                int(xmax - xmin),
+                                int(ymax - ymin),
+                            ]
+                            area = int(np.sum(instance_mask))
+
+                            # Find contours for segmentation
+                            contours = measure.find_contours(instance_mask, 0.5)
+                            segmentation = []
+                            for contour in contours:
+                                contour = np.flip(contour, axis=1)
+                                segmentation_points = contour.ravel().tolist()
+                                if len(segmentation_points) >= 6:
+                                    segmentation.append(segmentation_points)
+
+                            if segmentation:
+                                stats["coco_data"]["annotations"].append(
+                                    {
+                                        "id": int(coco_ann_id),
+                                        "image_id": int(image_id),
+                                        "category_id": int(class_id),
+                                        "bbox": bbox,
+                                        "area": area,
+                                        "segmentation": segmentation,
+                                        "iscrowd": 0,
+                                    }
+                                )
+                                coco_ann_id += 1
+
+                elif metadata_format == "YOLO":
+                    # Create YOLO labels directory if needed
+                    labels_dir = os.path.join(
+                        os.path.dirname(output_images_dir), "labels"
+                    )
+                    os.makedirs(labels_dir, exist_ok=True)
+
+                    # Generate YOLO annotation file
+                    yolo_path = os.path.join(labels_dir, f"{tile_name}.txt")
+                    from scipy import ndimage
+
+                    with open(yolo_path, "w") as yolo_file:
+                        for class_id in np.unique(label_mask):
+                            if class_id == 0:
+                                continue
+
+                            # Track class for classes.txt
+                            class_name = next(
+                                (k for k, v in class_to_id.items() if v == class_id),
+                                str(class_id),
+                            )
+                            stats["yolo_classes"].add(class_name)
+
+                            class_mask = (label_mask == class_id).astype(np.uint8)
+                            labeled_array, num_features = ndimage.label(class_mask)
+
+                            for instance_id in range(1, num_features + 1):
+                                instance_mask = labeled_array == instance_id
+                                coords = np.argwhere(instance_mask)
+
+                                if len(coords) == 0:
+                                    continue
+
+                                ymin, xmin = coords.min(axis=0)
+                                ymax, xmax = coords.max(axis=0)
+
+                                # Convert to YOLO format (normalized center coordinates)
+                                x_center = ((xmin + xmax) / 2) / tile_size
+                                y_center = ((ymin + ymax) / 2) / tile_size
+                                width = (xmax - xmin) / tile_size
+                                height = (ymax - ymin) / tile_size
+
+                                # YOLO uses 0-based class indices
+                                yolo_class_id = class_id - 1
+                                yolo_file.write(
+                                    f"{yolo_class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n"
+                                )
 
                 tile_index += 1
                 if tile_index >= max_tiles:
