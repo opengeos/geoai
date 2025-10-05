@@ -3617,7 +3617,12 @@ def export_geotiff_tiles_batch(
                 mask_gdf=mask_gdf,  # Pass pre-loaded GeoDataFrame if using single mask
                 use_single_mask_file=use_single_mask_file,
                 metadata_format=metadata_format,
-                ann_dir=ann_dir if "ann_dir" in locals() and metadata_format in ["PASCAL_VOC", "COCO"] else None,
+                ann_dir=(
+                    ann_dir
+                    if "ann_dir" in locals()
+                    and metadata_format in ["PASCAL_VOC", "COCO"]
+                    else None
+                ),
             )
 
             # Update counters
