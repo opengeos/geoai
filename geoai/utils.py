@@ -2615,6 +2615,7 @@ def export_geotiff_tiles(
     all_touched=True,
     create_overview=False,
     skip_empty_tiles=False,
+    metadata_format="PASCAL_VOC",
 ):
     """
     Export georeferenced GeoTIFF tiles and labels from raster and classification data.
@@ -2632,6 +2633,7 @@ def export_geotiff_tiles(
         all_touched (bool): Whether to use all_touched=True in rasterization (for vector data)
         create_overview (bool): Whether to create an overview image of all tiles
         skip_empty_tiles (bool): If True, skip tiles with no features
+        metadata_format (str): Output metadata format (PASCAL_VOC, COCO, YOLO). Default: PASCAL_VOC
     """
 
     import logging
@@ -2644,8 +2646,16 @@ def export_geotiff_tiles(
     os.makedirs(image_dir, exist_ok=True)
     label_dir = os.path.join(out_folder, "labels")
     os.makedirs(label_dir, exist_ok=True)
-    ann_dir = os.path.join(out_folder, "annotations")
-    os.makedirs(ann_dir, exist_ok=True)
+
+    # Create annotation directory based on metadata format
+    if metadata_format in ["PASCAL_VOC", "COCO"]:
+        ann_dir = os.path.join(out_folder, "annotations")
+        os.makedirs(ann_dir, exist_ok=True)
+
+    # Initialize COCO annotations dictionary
+    if metadata_format == "COCO":
+        coco_annotations = {"images": [], "annotations": [], "categories": []}
+        ann_id = 0
 
     # Determine if class data is raster or vector
     is_class_data_raster = False
@@ -2719,6 +2729,17 @@ def export_geotiff_tiles(
 
                 # Create class mapping
                 class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
+
+                # Populate COCO categories
+                if metadata_format == "COCO":
+                    for cls_val in unique_classes:
+                        coco_annotations["categories"].append(
+                            {
+                                "id": class_to_id[int(cls_val)],
+                                "name": str(int(cls_val)),
+                                "supercategory": "object",
+                            }
+                        )
         else:
             # Load vector class data
             try:
@@ -2748,12 +2769,33 @@ def export_geotiff_tiles(
                         )
                     # Create class mapping
                     class_to_id = {cls: i + 1 for i, cls in enumerate(unique_classes)}
+
+                    # Populate COCO categories
+                    if metadata_format == "COCO":
+                        for cls_val in unique_classes:
+                            coco_annotations["categories"].append(
+                                {
+                                    "id": class_to_id[cls_val],
+                                    "name": str(cls_val),
+                                    "supercategory": "object",
+                                }
+                            )
                 else:
                     if not quiet:
                         print(
                             f"WARNING: '{class_value_field}' not found in vector data. Using default class ID 1."
                         )
                     class_to_id = {1: 1}  # Default mapping
+
+                    # Populate COCO categories with default
+                    if metadata_format == "COCO":
+                        coco_annotations["categories"].append(
+                            {
+                                "id": 1,
+                                "name": "object",
+                                "supercategory": "object",
+                            }
+                        )
             except Exception as e:
                 raise ValueError(f"Error processing vector data: {e}")
 
@@ -2970,72 +3012,186 @@ def export_geotiff_tiles(
                     pbar.write(f"ERROR saving label GeoTIFF: {e}")
                     stats["errors"] += 1
 
-                # Create XML annotation for object detection if using vector class data
+                # Create annotations for object detection if using vector class data
                 if (
                     not is_class_data_raster
                     and "gdf" in locals()
                     and len(window_features) > 0
                 ):
-                    # Create XML annotation
-                    root = ET.Element("annotation")
-                    ET.SubElement(root, "folder").text = "images"
-                    ET.SubElement(root, "filename").text = f"tile_{tile_index:06d}.tif"
+                    if metadata_format == "PASCAL_VOC":
+                        # Create XML annotation
+                        root = ET.Element("annotation")
+                        ET.SubElement(root, "folder").text = "images"
+                        ET.SubElement(root, "filename").text = (
+                            f"tile_{tile_index:06d}.tif"
+                        )
 
-                    size = ET.SubElement(root, "size")
-                    ET.SubElement(size, "width").text = str(tile_size)
-                    ET.SubElement(size, "height").text = str(tile_size)
-                    ET.SubElement(size, "depth").text = str(image_data.shape[0])
+                        size = ET.SubElement(root, "size")
+                        ET.SubElement(size, "width").text = str(tile_size)
+                        ET.SubElement(size, "height").text = str(tile_size)
+                        ET.SubElement(size, "depth").text = str(image_data.shape[0])
 
-                    # Add georeference information
-                    geo = ET.SubElement(root, "georeference")
-                    ET.SubElement(geo, "crs").text = str(src.crs)
-                    ET.SubElement(geo, "transform").text = str(
-                        window_transform
-                    ).replace("\n", "")
-                    ET.SubElement(geo, "bounds").text = (
-                        f"{minx}, {miny}, {maxx}, {maxy}"
-                    )
+                        # Add georeference information
+                        geo = ET.SubElement(root, "georeference")
+                        ET.SubElement(geo, "crs").text = str(src.crs)
+                        ET.SubElement(geo, "transform").text = str(
+                            window_transform
+                        ).replace("\n", "")
+                        ET.SubElement(geo, "bounds").text = (
+                            f"{minx}, {miny}, {maxx}, {maxy}"
+                        )
 
-                    # Add objects
-                    for idx, feature in window_features.iterrows():
-                        # Get feature class
-                        if class_value_field in feature:
-                            class_val = feature[class_value_field]
-                        else:
-                            class_val = "object"
+                        # Add objects
+                        for idx, feature in window_features.iterrows():
+                            # Get feature class
+                            if class_value_field in feature:
+                                class_val = feature[class_value_field]
+                            else:
+                                class_val = "object"
 
-                        # Get geometry bounds in pixel coordinates
-                        geom = feature.geometry.intersection(window_bounds)
-                        if not geom.is_empty:
-                            # Get bounds in world coordinates
-                            minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+                            # Get geometry bounds in pixel coordinates
+                            geom = feature.geometry.intersection(window_bounds)
+                            if not geom.is_empty:
+                                # Get bounds in world coordinates
+                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
 
-                            # Convert to pixel coordinates
-                            col_min, row_min = ~window_transform * (minx_f, maxy_f)
-                            col_max, row_max = ~window_transform * (maxx_f, miny_f)
+                                # Convert to pixel coordinates
+                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
+                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
 
-                            # Ensure coordinates are within tile bounds
-                            xmin = max(0, min(tile_size, int(col_min)))
-                            ymin = max(0, min(tile_size, int(row_min)))
-                            xmax = max(0, min(tile_size, int(col_max)))
-                            ymax = max(0, min(tile_size, int(row_max)))
+                                # Ensure coordinates are within tile bounds
+                                xmin = max(0, min(tile_size, int(col_min)))
+                                ymin = max(0, min(tile_size, int(row_min)))
+                                xmax = max(0, min(tile_size, int(col_max)))
+                                ymax = max(0, min(tile_size, int(row_max)))
 
-                            # Only add if the box has non-zero area
-                            if xmax > xmin and ymax > ymin:
-                                obj = ET.SubElement(root, "object")
-                                ET.SubElement(obj, "name").text = str(class_val)
-                                ET.SubElement(obj, "difficult").text = "0"
+                                # Only add if the box has non-zero area
+                                if xmax > xmin and ymax > ymin:
+                                    obj = ET.SubElement(root, "object")
+                                    ET.SubElement(obj, "name").text = str(class_val)
+                                    ET.SubElement(obj, "difficult").text = "0"
 
-                                bbox = ET.SubElement(obj, "bndbox")
-                                ET.SubElement(bbox, "xmin").text = str(xmin)
-                                ET.SubElement(bbox, "ymin").text = str(ymin)
-                                ET.SubElement(bbox, "xmax").text = str(xmax)
-                                ET.SubElement(bbox, "ymax").text = str(ymax)
+                                    bbox = ET.SubElement(obj, "bndbox")
+                                    ET.SubElement(bbox, "xmin").text = str(xmin)
+                                    ET.SubElement(bbox, "ymin").text = str(ymin)
+                                    ET.SubElement(bbox, "xmax").text = str(xmax)
+                                    ET.SubElement(bbox, "ymax").text = str(ymax)
 
-                    # Save XML
-                    tree = ET.ElementTree(root)
-                    xml_path = os.path.join(ann_dir, f"tile_{tile_index:06d}.xml")
-                    tree.write(xml_path)
+                        # Save XML
+                        tree = ET.ElementTree(root)
+                        xml_path = os.path.join(ann_dir, f"tile_{tile_index:06d}.xml")
+                        tree.write(xml_path)
+
+                    elif metadata_format == "COCO":
+                        # Add image info
+                        image_id = tile_index
+                        coco_annotations["images"].append(
+                            {
+                                "id": image_id,
+                                "file_name": f"tile_{tile_index:06d}.tif",
+                                "width": tile_size,
+                                "height": tile_size,
+                                "crs": str(src.crs),
+                                "transform": str(window_transform),
+                            }
+                        )
+
+                        # Add annotations for each feature
+                        for _, feature in window_features.iterrows():
+                            # Get feature class
+                            if class_value_field in feature:
+                                class_val = feature[class_value_field]
+                                category_id = class_to_id.get(class_val, 1)
+                            else:
+                                category_id = 1
+
+                            # Get geometry bounds
+                            geom = feature.geometry.intersection(window_bounds)
+                            if not geom.is_empty:
+                                # Get bounds in world coordinates
+                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+
+                                # Convert to pixel coordinates
+                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
+                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
+
+                                # Ensure coordinates are within tile bounds
+                                xmin = max(0, min(tile_size, int(col_min)))
+                                ymin = max(0, min(tile_size, int(row_min)))
+                                xmax = max(0, min(tile_size, int(col_max)))
+                                ymax = max(0, min(tile_size, int(row_max)))
+
+                                # Skip if box is too small
+                                if xmax - xmin < 1 or ymax - ymin < 1:
+                                    continue
+
+                                width = xmax - xmin
+                                height = ymax - ymin
+
+                                # Add annotation
+                                ann_id += 1
+                                coco_annotations["annotations"].append(
+                                    {
+                                        "id": ann_id,
+                                        "image_id": image_id,
+                                        "category_id": category_id,
+                                        "bbox": [xmin, ymin, width, height],
+                                        "area": width * height,
+                                        "iscrowd": 0,
+                                    }
+                                )
+
+                    elif metadata_format == "YOLO":
+                        # Create YOLO format annotations
+                        yolo_annotations = []
+
+                        for _, feature in window_features.iterrows():
+                            # Get feature class
+                            if class_value_field in feature:
+                                class_val = feature[class_value_field]
+                                # YOLO uses 0-indexed class IDs
+                                class_id = class_to_id.get(class_val, 1) - 1
+                            else:
+                                class_id = 0
+
+                            # Get geometry bounds
+                            geom = feature.geometry.intersection(window_bounds)
+                            if not geom.is_empty:
+                                # Get bounds in world coordinates
+                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+
+                                # Convert to pixel coordinates
+                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
+                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
+
+                                # Ensure coordinates are within tile bounds
+                                xmin = max(0, min(tile_size, col_min))
+                                ymin = max(0, min(tile_size, row_min))
+                                xmax = max(0, min(tile_size, col_max))
+                                ymax = max(0, min(tile_size, row_max))
+
+                                # Skip if box is too small
+                                if xmax - xmin < 1 or ymax - ymin < 1:
+                                    continue
+
+                                # Calculate normalized coordinates (YOLO format)
+                                x_center = ((xmin + xmax) / 2) / tile_size
+                                y_center = ((ymin + ymax) / 2) / tile_size
+                                width = (xmax - xmin) / tile_size
+                                height = (ymax - ymin) / tile_size
+
+                                # Add YOLO annotation line
+                                yolo_annotations.append(
+                                    f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}"
+                                )
+
+                        # Save YOLO annotations to text file
+                        if yolo_annotations:
+                            yolo_path = os.path.join(
+                                label_dir, f"tile_{tile_index:06d}.txt"
+                            )
+                            with open(yolo_path, "w") as f:
+                                f.write("\n".join(yolo_annotations))
 
                 # Update progress bar
                 pbar.update(1)
@@ -3052,6 +3208,39 @@ def export_geotiff_tiles(
 
         # Close progress bar
         pbar.close()
+
+        # Save COCO annotations if applicable
+        if metadata_format == "COCO":
+            try:
+                with open(os.path.join(ann_dir, "instances.json"), "w") as f:
+                    json.dump(coco_annotations, f, indent=2)
+                if not quiet:
+                    print(
+                        f"Saved COCO annotations: {len(coco_annotations['images'])} images, "
+                        f"{len(coco_annotations['annotations'])} annotations, "
+                        f"{len(coco_annotations['categories'])} categories"
+                    )
+            except Exception as e:
+                if not quiet:
+                    print(f"ERROR saving COCO annotations: {e}")
+                stats["errors"] += 1
+
+        # Save YOLO classes file if applicable
+        if metadata_format == "YOLO":
+            try:
+                # Create classes.txt with class names
+                classes_path = os.path.join(out_folder, "classes.txt")
+                # Sort by class ID to ensure correct order
+                sorted_classes = sorted(class_to_id.items(), key=lambda x: x[1])
+                with open(classes_path, "w") as f:
+                    for class_val, _ in sorted_classes:
+                        f.write(f"{class_val}\n")
+                if not quiet:
+                    print(f"Saved YOLO classes file with {len(class_to_id)} classes")
+            except Exception as e:
+                if not quiet:
+                    print(f"ERROR saving YOLO classes file: {e}")
+                stats["errors"] += 1
 
         # Create overview image if requested
         if create_overview and stats["tile_coordinates"]:
