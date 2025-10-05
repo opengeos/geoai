@@ -617,6 +617,7 @@ def train_timm_segmentation_model(
     images_dir: str,
     labels_dir: str,
     output_dir: str,
+    input_format: str = "directory",
     encoder_name: str = "resnet50",
     architecture: str = "unet",
     encoder_weights: str = "imagenet",
@@ -647,9 +648,17 @@ def train_timm_segmentation_model(
     the dataset creation automatically, similar to train_segmentation_model.
 
     Args:
-        images_dir (str): Directory containing image GeoTIFF files.
-        labels_dir (str): Directory containing label GeoTIFF files.
+        images_dir (str): Directory containing image GeoTIFF files (for 'directory' format),
+            or root directory containing images/ subdirectory (for 'yolo' format),
+            or directory containing images (for 'coco' format).
+        labels_dir (str): Directory containing label GeoTIFF files (for 'directory' format),
+            or path to COCO annotations JSON file (for 'coco' format),
+            or not used (for 'yolo' format - labels are in images_dir/labels/).
         output_dir (str): Directory to save model checkpoints and results.
+        input_format (str): Input data format - 'directory' (default), 'coco', or 'yolo'.
+            - 'directory': Standard directory structure with separate images_dir and labels_dir
+            - 'coco': COCO JSON format (labels_dir should be path to instances.json)
+            - 'yolo': YOLO format (images_dir is root with images/ and labels/ subdirectories)
         encoder_name (str): Name of timm encoder (e.g., 'resnet50', 'efficientnet_b3').
         architecture (str): Segmentation architecture ('unet', 'unetplusplus', 'deeplabv3',
             'deeplabv3plus', 'fpn', 'pspnet', 'linknet', 'manet', 'pan').
@@ -679,6 +688,7 @@ def train_timm_segmentation_model(
     """
     import glob
     from sklearn.model_selection import train_test_split
+    from .train import parse_coco_annotations, parse_yolo_annotations
 
     if not LIGHTNING_AVAILABLE:
         raise ImportError(
@@ -689,20 +699,38 @@ def train_timm_segmentation_model(
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    # Get image and label paths
-    image_paths = sorted(
-        glob.glob(os.path.join(images_dir, "*.tif"))
-        + glob.glob(os.path.join(images_dir, "*.tiff"))
-    )
-    label_paths = sorted(
-        glob.glob(os.path.join(labels_dir, "*.tif"))
-        + glob.glob(os.path.join(labels_dir, "*.tiff"))
-    )
+    # Get image and label paths based on input format
+    if input_format.lower() == "coco":
+        # Parse COCO format annotations
+        if verbose:
+            print(f"Loading COCO format annotations from {labels_dir}")
+        # For COCO format, labels_dir is path to instances.json
+        # Labels are typically in a "labels" directory parallel to "annotations"
+        coco_root = os.path.dirname(os.path.dirname(labels_dir))  # Go up two levels
+        labels_directory = os.path.join(coco_root, "labels")
+        image_paths, label_paths = parse_coco_annotations(
+            labels_dir, images_dir, labels_directory
+        )
+    elif input_format.lower() == "yolo":
+        # Parse YOLO format annotations
+        if verbose:
+            print(f"Loading YOLO format data from {images_dir}")
+        image_paths, label_paths = parse_yolo_annotations(images_dir)
+    else:
+        # Default: directory format
+        image_paths = sorted(
+            glob.glob(os.path.join(images_dir, "*.tif"))
+            + glob.glob(os.path.join(images_dir, "*.tiff"))
+        )
+        label_paths = sorted(
+            glob.glob(os.path.join(labels_dir, "*.tif"))
+            + glob.glob(os.path.join(labels_dir, "*.tiff"))
+        )
 
     if len(image_paths) == 0:
-        raise ValueError(f"No images found in {images_dir}")
+        raise ValueError(f"No images found")
     if len(label_paths) == 0:
-        raise ValueError(f"No labels found in {labels_dir}")
+        raise ValueError(f"No labels found")
     if len(image_paths) != len(label_paths):
         raise ValueError(
             f"Number of images ({len(image_paths)}) doesn't match "
