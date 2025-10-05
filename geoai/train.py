@@ -35,6 +35,89 @@ except ImportError:
     SMP_AVAILABLE = False
 
 
+def parse_coco_annotations(
+    coco_json_path: str, images_dir: str, labels_dir: str
+) -> Tuple[List[str], List[str]]:
+    """
+    Parse COCO format annotations and return lists of image and label paths.
+
+    Args:
+        coco_json_path (str): Path to COCO annotations JSON file (instances.json).
+        images_dir (str): Directory containing image files.
+        labels_dir (str): Directory containing label mask files.
+
+    Returns:
+        Tuple[List[str], List[str]]: Lists of image paths and corresponding label paths.
+    """
+    import json
+
+    with open(coco_json_path, "r") as f:
+        coco_data = json.load(f)
+
+    # Create mapping from image_id to filename
+    image_files = []
+    label_files = []
+
+    for img_info in coco_data["images"]:
+        img_filename = img_info["file_name"]
+        img_path = os.path.join(images_dir, img_filename)
+
+        # Derive label filename (same as image filename)
+        label_path = os.path.join(labels_dir, img_filename)
+
+        if os.path.exists(img_path) and os.path.exists(label_path):
+            image_files.append(img_path)
+            label_files.append(label_path)
+
+    return image_files, label_files
+
+
+def parse_yolo_annotations(
+    data_dir: str, images_subdir: str = "images", labels_subdir: str = "labels"
+) -> Tuple[List[str], List[str]]:
+    """
+    Parse YOLO format annotations and return lists of image and label paths.
+
+    YOLO format structure:
+    - data_dir/images/: Contains image files (.tif, .png, .jpg)
+    - data_dir/labels/: Contains label masks (.tif, .png) and YOLO .txt files
+    - data_dir/classes.txt: Class names (one per line)
+
+    Args:
+        data_dir (str): Root directory containing YOLO-format data.
+        images_subdir (str): Subdirectory name for images. Defaults to 'images'.
+        labels_subdir (str): Subdirectory name for labels. Defaults to 'labels'.
+
+    Returns:
+        Tuple[List[str], List[str]]: Lists of image paths and corresponding label paths.
+    """
+    images_dir = os.path.join(data_dir, images_subdir)
+    labels_dir = os.path.join(data_dir, labels_subdir)
+
+    if not os.path.exists(images_dir):
+        raise FileNotFoundError(f"Images directory not found: {images_dir}")
+    if not os.path.exists(labels_dir):
+        raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
+
+    # Get all image files
+    image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+    image_files = []
+    label_files = []
+
+    for img_file in os.listdir(images_dir):
+        if img_file.lower().endswith(image_extensions):
+            img_path = os.path.join(images_dir, img_file)
+
+            # Find corresponding label mask (same filename)
+            label_path = os.path.join(labels_dir, img_file)
+
+            if os.path.exists(label_path):
+                image_files.append(img_path)
+                label_files.append(label_path)
+
+    return sorted(image_files), sorted(label_files)
+
+
 def get_instance_segmentation_model(
     num_classes: int = 2, num_channels: int = 3, pretrained: bool = True
 ) -> torch.nn.Module:
@@ -617,6 +700,7 @@ def train_MaskRCNN_model(
     images_dir: str,
     labels_dir: str,
     output_dir: str,
+    input_format: str = "directory",
     num_channels: int = 3,
     model: Optional[torch.nn.Module] = None,
     pretrained: bool = True,
@@ -640,9 +724,17 @@ def train_MaskRCNN_model(
     the backbone or to continue training from a specific checkpoint.
 
     Args:
-        images_dir (str): Directory containing image GeoTIFF files.
-        labels_dir (str): Directory containing label GeoTIFF files.
+        images_dir (str): Directory containing image GeoTIFF files (for 'directory' format),
+            or root directory containing images/ subdirectory (for 'yolo' format),
+            or directory containing images (for 'coco' format).
+        labels_dir (str): Directory containing label GeoTIFF files (for 'directory' format),
+            or path to COCO annotations JSON file (for 'coco' format),
+            or not used (for 'yolo' format - labels are in images_dir/labels/).
         output_dir (str): Directory to save model checkpoints and results.
+        input_format (str): Input data format - 'directory' (default), 'coco', or 'yolo'.
+            - 'directory': Standard directory structure with separate images_dir and labels_dir
+            - 'coco': COCO JSON format (labels_dir should be path to instances.json)
+            - 'yolo': YOLO format (images_dir is root with images/ and labels/ subdirectories)
         num_channels (int, optional): Number of input channels. If None, auto-detected.
             Defaults to 3.
         model (torch.nn.Module, optional): Predefined model. If None, a new model is created.
@@ -688,44 +780,62 @@ def train_MaskRCNN_model(
         device = get_device()
     print(f"Using device: {device}")
 
-    # Get all image and label files
-    # Support multiple image formats: GeoTIFF, PNG, JPG, JPEG, TIF, TIFF
-    image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
-    label_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+    # Get all image and label files based on input format
+    if input_format.lower() == "coco":
+        # Parse COCO format annotations
+        if verbose:
+            print(f"Loading COCO format annotations from {labels_dir}")
+        # For COCO format, labels_dir is path to instances.json
+        # Labels are typically in a "labels" directory parallel to "annotations"
+        coco_root = os.path.dirname(os.path.dirname(labels_dir))  # Go up two levels
+        labels_directory = os.path.join(coco_root, "labels")
+        image_files, label_files = parse_coco_annotations(
+            labels_dir, images_dir, labels_directory
+        )
+    elif input_format.lower() == "yolo":
+        # Parse YOLO format annotations
+        if verbose:
+            print(f"Loading YOLO format data from {images_dir}")
+        image_files, label_files = parse_yolo_annotations(images_dir)
+    else:
+        # Default: directory format
+        # Support multiple image formats: GeoTIFF, PNG, JPG, JPEG, TIF, TIFF
+        image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+        label_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
 
-    image_files = sorted(
-        [
-            os.path.join(images_dir, f)
-            for f in os.listdir(images_dir)
-            if f.lower().endswith(image_extensions)
-        ]
-    )
-    label_files = sorted(
-        [
-            os.path.join(labels_dir, f)
-            for f in os.listdir(labels_dir)
-            if f.lower().endswith(label_extensions)
-        ]
-    )
+        image_files = sorted(
+            [
+                os.path.join(images_dir, f)
+                for f in os.listdir(images_dir)
+                if f.lower().endswith(image_extensions)
+            ]
+        )
+        label_files = sorted(
+            [
+                os.path.join(labels_dir, f)
+                for f in os.listdir(labels_dir)
+                if f.lower().endswith(label_extensions)
+            ]
+        )
+
+        # Ensure matching files
+        if len(image_files) != len(label_files):
+            print("Warning: Number of image files and label files don't match!")
+            # Find matching files by basename
+            basenames = [os.path.basename(f) for f in image_files]
+            label_files = [
+                os.path.join(labels_dir, os.path.basename(f))
+                for f in image_files
+                if os.path.exists(os.path.join(labels_dir, os.path.basename(f)))
+            ]
+            image_files = [
+                f
+                for f, b in zip(image_files, basenames)
+                if os.path.exists(os.path.join(labels_dir, b))
+            ]
+            print(f"Using {len(image_files)} matching files")
 
     print(f"Found {len(image_files)} image files and {len(label_files)} label files")
-
-    # Ensure matching files
-    if len(image_files) != len(label_files):
-        print("Warning: Number of image files and label files don't match!")
-        # Find matching files by basename
-        basenames = [os.path.basename(f) for f in image_files]
-        label_files = [
-            os.path.join(labels_dir, os.path.basename(f))
-            for f in image_files
-            if os.path.exists(os.path.join(labels_dir, os.path.basename(f)))
-        ]
-        image_files = [
-            f
-            for f, b in zip(image_files, basenames)
-            if os.path.exists(os.path.join(labels_dir, b))
-        ]
-        print(f"Using {len(image_files)} matching files")
 
     # Split data into train and validation sets
     train_imgs, val_imgs, train_labels, val_labels = train_test_split(
@@ -2129,6 +2239,7 @@ def train_segmentation_model(
     images_dir: str,
     labels_dir: str,
     output_dir: str,
+    input_format: str = "directory",
     architecture: str = "unet",
     encoder_name: str = "resnet34",
     encoder_weights: Optional[str] = "imagenet",
@@ -2160,9 +2271,17 @@ def train_segmentation_model(
     this approach treats the task as pixel-level binary classification.
 
     Args:
-        images_dir (str): Directory containing image GeoTIFF files.
-        labels_dir (str): Directory containing label GeoTIFF files.
+        images_dir (str): Directory containing image GeoTIFF files (for 'directory' format),
+            or root directory containing images/ subdirectory (for 'yolo' format),
+            or directory containing images (for 'coco' format).
+        labels_dir (str): Directory containing label GeoTIFF files (for 'directory' format),
+            or path to COCO annotations JSON file (for 'coco' format),
+            or not used (for 'yolo' format - labels are in images_dir/labels/).
         output_dir (str): Directory to save model checkpoints and results.
+        input_format (str): Input data format - 'directory' (default), 'coco', or 'yolo'.
+            - 'directory': Standard directory structure with separate images_dir and labels_dir
+            - 'coco': COCO JSON format (labels_dir should be path to instances.json)
+            - 'yolo': YOLO format (images_dir is root with images/ and labels/ subdirectories)
         architecture (str): Model architecture ('unet', 'deeplabv3', 'deeplabv3plus', 'fpn',
             'pspnet', 'linknet', 'manet'). Defaults to 'unet'.
         encoder_name (str): Encoder backbone name (e.g., 'resnet34', 'resnet50', 'efficientnet-b0').
@@ -2225,44 +2344,62 @@ def train_segmentation_model(
         device = get_device()
     print(f"Using device: {device}")
 
-    # Get all image and label files
-    # Support multiple image formats: GeoTIFF, PNG, JPG, JPEG, TIF, TIFF
-    image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
-    label_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+    # Get all image and label files based on input format
+    if input_format.lower() == "coco":
+        # Parse COCO format annotations
+        if verbose:
+            print(f"Loading COCO format annotations from {labels_dir}")
+        # For COCO format, labels_dir is path to instances.json
+        # Labels are typically in a "labels" directory parallel to "annotations"
+        coco_root = os.path.dirname(os.path.dirname(labels_dir))  # Go up two levels
+        labels_directory = os.path.join(coco_root, "labels")
+        image_files, label_files = parse_coco_annotations(
+            labels_dir, images_dir, labels_directory
+        )
+    elif input_format.lower() == "yolo":
+        # Parse YOLO format annotations
+        if verbose:
+            print(f"Loading YOLO format data from {images_dir}")
+        image_files, label_files = parse_yolo_annotations(images_dir)
+    else:
+        # Default: directory format
+        # Support multiple image formats: GeoTIFF, PNG, JPG, JPEG, TIF, TIFF
+        image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+        label_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
 
-    image_files = sorted(
-        [
-            os.path.join(images_dir, f)
-            for f in os.listdir(images_dir)
-            if f.lower().endswith(image_extensions)
-        ]
-    )
-    label_files = sorted(
-        [
-            os.path.join(labels_dir, f)
-            for f in os.listdir(labels_dir)
-            if f.lower().endswith(label_extensions)
-        ]
-    )
+        image_files = sorted(
+            [
+                os.path.join(images_dir, f)
+                for f in os.listdir(images_dir)
+                if f.lower().endswith(image_extensions)
+            ]
+        )
+        label_files = sorted(
+            [
+                os.path.join(labels_dir, f)
+                for f in os.listdir(labels_dir)
+                if f.lower().endswith(label_extensions)
+            ]
+        )
+
+        # Ensure matching files
+        if len(image_files) != len(label_files):
+            print("Warning: Number of image files and label files don't match!")
+            # Find matching files by basename
+            basenames = [os.path.basename(f) for f in image_files]
+            label_files = [
+                os.path.join(labels_dir, os.path.basename(f))
+                for f in image_files
+                if os.path.exists(os.path.join(labels_dir, os.path.basename(f)))
+            ]
+            image_files = [
+                f
+                for f, b in zip(image_files, basenames)
+                if os.path.exists(os.path.join(labels_dir, b))
+            ]
+            print(f"Using {len(image_files)} matching files")
 
     print(f"Found {len(image_files)} image files and {len(label_files)} label files")
-
-    # Ensure matching files
-    if len(image_files) != len(label_files):
-        print("Warning: Number of image files and label files don't match!")
-        # Find matching files by basename
-        basenames = [os.path.basename(f) for f in image_files]
-        label_files = [
-            os.path.join(labels_dir, os.path.basename(f))
-            for f in image_files
-            if os.path.exists(os.path.join(labels_dir, os.path.basename(f)))
-        ]
-        image_files = [
-            f
-            for f, b in zip(image_files, basenames)
-            if os.path.exists(os.path.join(labels_dir, b))
-        ]
-        print(f"Using {len(image_files)} matching files")
 
     if len(image_files) == 0:
         raise FileNotFoundError("No matching image and label files found")
@@ -3527,6 +3664,7 @@ def train_instance_segmentation_model(
     images_dir: str,
     labels_dir: str,
     output_dir: str,
+    input_format: str = "directory",
     num_classes: int = 2,
     num_channels: int = 3,
     batch_size: int = 4,
@@ -3545,9 +3683,17 @@ def train_instance_segmentation_model(
     This is a wrapper function for train_MaskRCNN_model with clearer naming.
 
     Args:
-        images_dir (str): Directory containing image GeoTIFF files.
-        labels_dir (str): Directory containing label GeoTIFF files.
+        images_dir (str): Directory containing image GeoTIFF files (for 'directory' format),
+            or root directory containing images/ subdirectory (for 'yolo' format),
+            or directory containing images (for 'coco' format).
+        labels_dir (str): Directory containing label GeoTIFF files (for 'directory' format),
+            or path to COCO annotations JSON file (for 'coco' format),
+            or not used (for 'yolo' format - labels are in images_dir/labels/).
         output_dir (str): Directory to save model checkpoints and results.
+        input_format (str): Input data format - 'directory' (default), 'coco', or 'yolo'.
+            - 'directory': Standard directory structure with separate images_dir and labels_dir
+            - 'coco': COCO JSON format (labels_dir should be path to instances.json)
+            - 'yolo': YOLO format (images_dir is root with images/ and labels/ subdirectories)
         num_classes (int): Number of classes (including background). Defaults to 2.
         num_channels (int): Number of input channels. Defaults to 3.
         batch_size (int): Batch size for training. Defaults to 4.
@@ -3572,6 +3718,7 @@ def train_instance_segmentation_model(
         images_dir=images_dir,
         labels_dir=labels_dir,
         output_dir=output_dir,
+        input_format=input_format,
         num_channels=num_channels,
         model=model,
         batch_size=batch_size,
