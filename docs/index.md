@@ -36,6 +36,12 @@ GeoAI addresses this need by providing a unified, user-friendly interface that a
 
 The package's design philosophy emphasizes simplicity without sacrificing functionality, enabling users to perform sophisticated analyses such as building footprint extraction from satellite imagery, land cover classification, and change detection with just a few lines of code. By integrating cutting-edge AI models and providing seamless access to major geospatial data sources, GeoAI significantly lowers the barrier to entry for geospatial AI applications while maintaining the flexibility needed for advanced research applications.
 
+## Citations
+
+If you find GeoAI useful in your research, please consider citing the following paper to support my work. Thank you for your support.
+
+-   Wu, Q. (2025). GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization. _Journal of Open Source Software_, 9025. [https://doi.org/10.21105/joss.09025](https://github.com/openjournals/joss-papers/blob/joss.09025/joss.09025/10.21105.joss.09025.pdf) (Under Review)
+
 ## 🚀 Key Features
 
 ### 📊 Advanced Geospatial Data Visualization
