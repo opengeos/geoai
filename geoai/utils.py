@@ -751,6 +751,12 @@ def view_vector_interactive(
         },
     }
 
+    # Make it compatible with binder and JupyterHub
+    if os.environ.get("JUPYTERHUB_SERVICE_PREFIX") is not None:
+        os.environ["LOCALTILESERVER_CLIENT_PREFIX"] = (
+            f"{os.environ['JUPYTERHUB_SERVICE_PREFIX'].lstrip('/')}/proxy/{{port}}"
+        )
+
     basemap_layer_name = None
     raster_layer = None
 
