@@ -3772,7 +3772,7 @@ def load_lightly_pretrained_model(
         model_path (str): Path to the pretrained model file (.pt format).
         model_architecture (str): Architecture of the model to load.
             Default is "torchvision/resnet50".
-        device (torch.device): Device to train on.
+        device (str): Device to load the model on. If None, uses CPU.
 
     Returns:
         torch.nn.Module: Loaded pretrained model ready for fine-tuning.
@@ -3784,7 +3784,8 @@ def load_lightly_pretrained_model(
     Example:
         >>> model = load_lightly_pretrained_model(
         ...     model_path="path/to/pretrained_model.pt",
-        ...     model_architecture="torchvision/resnet50"
+        ...     model_architecture="torchvision/resnet50",
+        ...     device="cuda"
         ... )
         >>> # Fine-tune the model with your existing training pipeline
     """
