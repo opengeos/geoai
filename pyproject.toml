@@ -36,7 +36,7 @@ exclude = ["docs*"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-extra = ["overturemaps", "torchange"]
+extra = ["overturemaps", "torchange", "lightly-train"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
 
 [tool.distutils.bdist_wheel]
