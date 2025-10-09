@@ -152,6 +152,7 @@ nav:
           - examples/AI_agents.ipynb
           - examples/train_timm_classifier.ipynb
           - examples/train_timm_segmentation.ipynb
+          - examples/lightly_train_self_supervised.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb

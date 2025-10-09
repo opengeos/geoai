@@ -561,7 +561,15 @@ class ChangeDetection:
 
         return fig
 
-    def visualize_results(self, image1_path, image2_path, binary_path, prob_path):
+    def visualize_results(
+        self,
+        image1_path,
+        image2_path,
+        binary_path,
+        prob_path,
+        title1="Earlier Image",
+        title2="Later Image",
+    ):
         """Create enhanced visualization with probability analysis."""
 
         # Load data
@@ -594,11 +602,11 @@ class ChangeDetection:
 
         # Row 1: Original and overlays
         axes[0, 0].imshow(img1_crop)
-        axes[0, 0].set_title("2019 Image", fontweight="bold")
+        axes[0, 0].set_title(title1, fontweight="bold")
         axes[0, 0].axis("off")
 
         axes[0, 1].imshow(img2_crop)
-        axes[0, 1].set_title("2022 Image", fontweight="bold")
+        axes[0, 1].set_title(title2, fontweight="bold")
         axes[0, 1].axis("off")
 
         # Binary overlay
@@ -708,6 +716,8 @@ class ChangeDetection:
         image2_path,
         binary_path,
         prob_path,
+        title1="Earlier Image",
+        title2="Later Image",
         output_path="split_comparison.png",
     ):
         """Create a split comparison visualization showing before/after with change overlay."""
@@ -742,7 +752,7 @@ class ChangeDetection:
         # Create split comparison
         fig, ax = plt.subplots(1, 1, figsize=(15, 10))
 
-        # Create combined image - left half is 2019, right half is 2022
+        # Create combined image - left half is earlier, right half is later
         combined_img = np.zeros_like(img1)
         combined_img[:, : w // 2] = img1[:, : w // 2]
         combined_img[:, w // 2 :] = img2[:, w // 2 :]
@@ -763,7 +773,7 @@ class ChangeDetection:
         ax.text(
             w // 4,
             50,
-            "2019",
+            title1,
             fontsize=20,
             color="white",
             ha="center",
@@ -772,7 +782,7 @@ class ChangeDetection:
         ax.text(
             3 * w // 4,
             50,
-            "2022",
+            title2,
             fontsize=20,
             color="white",
             ha="center",
