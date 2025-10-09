@@ -2605,7 +2605,7 @@ def batch_vector_to_raster(
 def export_geotiff_tiles(
     in_raster,
     out_folder,
-    in_class_data,
+    in_class_data=None,
     tile_size=256,
     stride=128,
     class_value_field="class",
@@ -2623,7 +2623,8 @@ def export_geotiff_tiles(
     Args:
         in_raster (str): Path to input raster image
         out_folder (str): Path to output folder
-        in_class_data (str): Path to classification data - can be vector file or raster
+        in_class_data (str, optional): Path to classification data - can be vector file or raster.
+            If None, only image tiles will be exported without labels. Defaults to None.
         tile_size (int): Size of tiles in pixels (square)
         stride (int): Step size between tiles
         class_value_field (str): Field containing class values (for vector data)
@@ -2644,36 +2645,42 @@ def export_geotiff_tiles(
     os.makedirs(out_folder, exist_ok=True)
     image_dir = os.path.join(out_folder, "images")
     os.makedirs(image_dir, exist_ok=True)
-    label_dir = os.path.join(out_folder, "labels")
-    os.makedirs(label_dir, exist_ok=True)
 
-    # Create annotation directory based on metadata format
-    if metadata_format in ["PASCAL_VOC", "COCO"]:
-        ann_dir = os.path.join(out_folder, "annotations")
-        os.makedirs(ann_dir, exist_ok=True)
+    # Only create label and annotation directories if class data is provided
+    if in_class_data is not None:
+        label_dir = os.path.join(out_folder, "labels")
+        os.makedirs(label_dir, exist_ok=True)
 
-    # Initialize COCO annotations dictionary
-    if metadata_format == "COCO":
-        coco_annotations = {"images": [], "annotations": [], "categories": []}
-        ann_id = 0
+        # Create annotation directory based on metadata format
+        if metadata_format in ["PASCAL_VOC", "COCO"]:
+            ann_dir = os.path.join(out_folder, "annotations")
+            os.makedirs(ann_dir, exist_ok=True)
 
-    # Determine if class data is raster or vector
+        # Initialize COCO annotations dictionary
+        if metadata_format == "COCO":
+            coco_annotations = {"images": [], "annotations": [], "categories": []}
+            ann_id = 0
+
+    # Determine if class data is raster or vector (only if class data provided)
     is_class_data_raster = False
-    if isinstance(in_class_data, str):
-        file_ext = Path(in_class_data).suffix.lower()
-        # Common raster extensions
-        if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
-            try:
-                with rasterio.open(in_class_data) as src:
-                    is_class_data_raster = True
+    if in_class_data is not None:
+        if isinstance(in_class_data, str):
+            file_ext = Path(in_class_data).suffix.lower()
+            # Common raster extensions
+            if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
+                try:
+                    with rasterio.open(in_class_data) as src:
+                        is_class_data_raster = True
+                        if not quiet:
+                            print(f"Detected in_class_data as raster: {in_class_data}")
+                            print(f"Raster CRS: {src.crs}")
+                            print(f"Raster dimensions: {src.width} x {src.height}")
+                except Exception:
+                    is_class_data_raster = False
                     if not quiet:
-                        print(f"Detected in_class_data as raster: {in_class_data}")
-                        print(f"Raster CRS: {src.crs}")
-                        print(f"Raster dimensions: {src.width} x {src.height}")
-            except Exception:
-                is_class_data_raster = False
-                if not quiet:
-                    print(f"Unable to open {in_class_data} as raster, trying as vector")
+                        print(
+                            f"Unable to open {in_class_data} as raster, trying as vector"
+                        )
 
     # Open the input raster
     with rasterio.open(in_raster) as src:
@@ -2693,10 +2700,10 @@ def export_geotiff_tiles(
         if max_tiles is None:
             max_tiles = total_tiles
 
-        # Process classification data
+        # Process classification data (only if class data provided)
         class_to_id = {}
 
-        if is_class_data_raster:
+        if in_class_data is not None and is_class_data_raster:
             # Load raster class data
             with rasterio.open(in_class_data) as class_src:
                 # Check if raster CRS matches
@@ -2740,7 +2747,7 @@ def export_geotiff_tiles(
                                 "supercategory": "object",
                             }
                         )
-        else:
+        elif in_class_data is not None:
             # Load vector class data
             try:
                 gdf = gpd.read_file(in_class_data)
@@ -2862,8 +2869,8 @@ def export_geotiff_tiles(
                 label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
                 has_features = False
 
-                # Process classification data to create labels
-                if is_class_data_raster:
+                # Process classification data to create labels (only if class data provided)
+                if in_class_data is not None and is_class_data_raster:
                     # For raster class data
                     with rasterio.open(in_class_data) as class_src:
                         # Calculate window in class raster
@@ -2913,7 +2920,7 @@ def export_geotiff_tiles(
                             except Exception as e:
                                 pbar.write(f"Error reading class raster window: {e}")
                                 stats["errors"] += 1
-                else:
+                elif in_class_data is not None:
                     # For vector class data
                     # Find features that intersect with window
                     window_features = gdf[gdf.intersects(window_bounds)]
@@ -2956,8 +2963,8 @@ def export_geotiff_tiles(
                                     pbar.write(f"Error rasterizing feature {idx}: {e}")
                                     stats["errors"] += 1
 
-                # Skip tile if no features and skip_empty_tiles is True
-                if skip_empty_tiles and not has_features:
+                # Skip tile if no features and skip_empty_tiles is True (only when class data provided)
+                if in_class_data is not None and skip_empty_tiles and not has_features:
                     pbar.update(1)
                     tile_index += 1
                     continue
@@ -2988,33 +2995,35 @@ def export_geotiff_tiles(
                     pbar.write(f"ERROR saving image GeoTIFF: {e}")
                     stats["errors"] += 1
 
-                # Create profile for label GeoTIFF
-                label_profile = {
-                    "driver": "GTiff",
-                    "height": tile_size,
-                    "width": tile_size,
-                    "count": 1,
-                    "dtype": "uint8",
-                    "crs": src.crs,
-                    "transform": window_transform,
-                }
+                # Export label as GeoTIFF (only if class data provided)
+                if in_class_data is not None:
+                    # Create profile for label GeoTIFF
+                    label_profile = {
+                        "driver": "GTiff",
+                        "height": tile_size,
+                        "width": tile_size,
+                        "count": 1,
+                        "dtype": "uint8",
+                        "crs": src.crs,
+                        "transform": window_transform,
+                    }
 
-                # Export label as GeoTIFF
-                label_path = os.path.join(label_dir, f"tile_{tile_index:06d}.tif")
-                try:
-                    with rasterio.open(label_path, "w", **label_profile) as dst:
-                        dst.write(label_mask.astype(np.uint8), 1)
+                    label_path = os.path.join(label_dir, f"tile_{tile_index:06d}.tif")
+                    try:
+                        with rasterio.open(label_path, "w", **label_profile) as dst:
+                            dst.write(label_mask.astype(np.uint8), 1)
 
-                    if has_features:
-                        stats["tiles_with_features"] += 1
-                        stats["feature_pixels"] += np.count_nonzero(label_mask)
-                except Exception as e:
-                    pbar.write(f"ERROR saving label GeoTIFF: {e}")
-                    stats["errors"] += 1
+                        if has_features:
+                            stats["tiles_with_features"] += 1
+                            stats["feature_pixels"] += np.count_nonzero(label_mask)
+                    except Exception as e:
+                        pbar.write(f"ERROR saving label GeoTIFF: {e}")
+                        stats["errors"] += 1
 
                 # Create annotations for object detection if using vector class data
                 if (
-                    not is_class_data_raster
+                    in_class_data is not None
+                    and not is_class_data_raster
                     and "gdf" in locals()
                     and len(window_features) > 0
                 ):
@@ -3209,8 +3218,8 @@ def export_geotiff_tiles(
         # Close progress bar
         pbar.close()
 
-        # Save COCO annotations if applicable
-        if metadata_format == "COCO":
+        # Save COCO annotations if applicable (only if class data provided)
+        if in_class_data is not None and metadata_format == "COCO":
             try:
                 with open(os.path.join(ann_dir, "instances.json"), "w") as f:
                     json.dump(coco_annotations, f, indent=2)
@@ -3225,8 +3234,8 @@ def export_geotiff_tiles(
                     print(f"ERROR saving COCO annotations: {e}")
                 stats["errors"] += 1
 
-        # Save YOLO classes file if applicable
-        if metadata_format == "YOLO":
+        # Save YOLO classes file if applicable (only if class data provided)
+        if in_class_data is not None and metadata_format == "YOLO":
             try:
                 # Create classes.txt with class names
                 classes_path = os.path.join(out_folder, "classes.txt")
@@ -3259,13 +3268,14 @@ def export_geotiff_tiles(
         if not quiet:
             print("\n------- Export Summary -------")
             print(f"Total tiles exported: {stats['total_tiles']}")
-            print(
-                f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
-            )
-            if stats["tiles_with_features"] > 0:
+            if in_class_data is not None:
                 print(
-                    f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
+                    f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
                 )
+                if stats["tiles_with_features"] > 0:
+                    print(
+                        f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
+                    )
             if stats["errors"] > 0:
                 print(f"Errors encountered: {stats['errors']}")
             print(f"Output saved to: {out_folder}")
@@ -3274,7 +3284,6 @@ def export_geotiff_tiles(
             if stats["total_tiles"] > 0:
                 print("\n------- Georeference Verification -------")
                 sample_image = os.path.join(image_dir, f"tile_0.tif")
-                sample_label = os.path.join(label_dir, f"tile_0.tif")
 
                 if os.path.exists(sample_image):
                     try:
@@ -3290,19 +3299,22 @@ def export_geotiff_tiles(
                     except Exception as e:
                         print(f"Error verifying image georeference: {e}")
 
-                if os.path.exists(sample_label):
-                    try:
-                        with rasterio.open(sample_label) as lbl:
-                            print(f"Label CRS: {lbl.crs}")
-                            print(f"Label transform: {lbl.transform}")
-                            print(
-                                f"Label has georeference: {lbl.crs is not None and lbl.transform is not None}"
-                            )
-                            print(
-                                f"Label dimensions: {lbl.width}x{lbl.height}, {lbl.count} bands, {lbl.dtypes[0]} type"
-                            )
-                    except Exception as e:
-                        print(f"Error verifying label georeference: {e}")
+                # Only verify label if class data was provided
+                if in_class_data is not None:
+                    sample_label = os.path.join(label_dir, f"tile_0.tif")
+                    if os.path.exists(sample_label):
+                        try:
+                            with rasterio.open(sample_label) as lbl:
+                                print(f"Label CRS: {lbl.crs}")
+                                print(f"Label transform: {lbl.transform}")
+                                print(
+                                    f"Label has georeference: {lbl.crs is not None and lbl.transform is not None}"
+                                )
+                                print(
+                                    f"Label dimensions: {lbl.width}x{lbl.height}, {lbl.count} bands, {lbl.dtypes[0]} type"
+                                )
+                        except Exception as e:
+                            print(f"Error verifying label georeference: {e}")
 
         # Return statistics dictionary for further processing if needed
         return stats
@@ -3323,33 +3335,38 @@ def export_geotiff_tiles_batch(
     skip_empty_tiles=False,
     image_extensions=None,
     mask_extensions=None,
-    match_by_name=True,
+    match_by_name=False,
     metadata_format="PASCAL_VOC",
 ) -> Dict[str, Any]:
     """
-    Export georeferenced GeoTIFF tiles from images and masks.
+    Export georeferenced GeoTIFF tiles from images and optionally masks.
 
-    This function supports three mask input modes:
-    1. Single vector file covering all images (masks_file parameter)
-    2. Multiple vector files, one per image (masks_folder parameter)
-    3. Multiple raster mask files (masks_folder parameter)
+    This function supports four modes:
+    1. Images only (no masks) - when neither masks_file nor masks_folder is provided
+    2. Single vector file covering all images (masks_file parameter)
+    3. Multiple vector files, one per image (masks_folder parameter)
+    4. Multiple raster mask files (masks_folder parameter)
 
-    For mode 1 (single vector file), specify masks_file path. The function will
+    For mode 1 (images only), only image tiles will be exported without labels.
+
+    For mode 2 (single vector file), specify masks_file path. The function will
     use spatial intersection to determine which features apply to each image.
 
-    For mode 2/3 (multiple mask files), specify masks_folder path. Images and masks
+    For mode 3/4 (multiple mask files), specify masks_folder path. Images and masks
     are paired either by matching filenames (match_by_name=True) or by sorted order
     (match_by_name=False).
 
-    All image tiles are saved to a single 'images' folder and all mask tiles to a
-    single 'masks' folder within the output directory.
+    All image tiles are saved to a single 'images' folder and all mask tiles (if provided)
+    to a single 'masks' folder within the output directory.
 
     Args:
         images_folder (str): Path to folder containing raster images
         masks_folder (str, optional): Path to folder containing classification masks/vectors.
-            Use this for multiple mask files (one per image or raster masks).
+            Use this for multiple mask files (one per image or raster masks). If not provided
+            and masks_file is also not provided, only image tiles will be exported.
         masks_file (str, optional): Path to a single vector file covering all images.
-            Use this for a single GeoJSON/Shapefile that covers multiple images.
+            Use this for a single GeoJSON/Shapefile that covers multiple images. If not provided
+            and masks_folder is also not provided, only image tiles will be exported.
         output_folder (str, optional): Path to output folder. If None, creates 'tiles'
             subfolder in images_folder.
         tile_size (int): Size of tiles in pixels (square)
@@ -3373,10 +3390,15 @@ def export_geotiff_tiles_batch(
 
     Raises:
         ValueError: If no images found, or if masks_folder and masks_file are both specified,
-            or if neither is specified, or if counts don't match when using masks_folder with
-            match_by_name=False.
+            or if counts don't match when using masks_folder with match_by_name=False.
 
     Examples:
+        # Images only (no masks)
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     output_folder='output/tiles'
+        ... )
+
         # Single vector file covering all images
         >>> stats = export_geotiff_tiles_batch(
         ...     images_folder='data/images',
@@ -3411,11 +3433,6 @@ def export_geotiff_tiles_batch(
             "Cannot specify both masks_folder and masks_file. Please use only one."
         )
 
-    if masks_folder is None and masks_file is None:
-        raise ValueError(
-            "Must specify either masks_folder or masks_file for mask data source."
-        )
-
     # Default output folder if not specified
     if output_folder is None:
         output_folder = os.path.join(images_folder, "tiles")
@@ -3446,22 +3463,37 @@ def export_geotiff_tiles_batch(
     # Create output folder structure
     os.makedirs(output_folder, exist_ok=True)
     output_images_dir = os.path.join(output_folder, "images")
-    output_masks_dir = os.path.join(output_folder, "masks")
     os.makedirs(output_images_dir, exist_ok=True)
-    os.makedirs(output_masks_dir, exist_ok=True)
 
-    # Create annotation directory based on metadata format
-    if metadata_format in ["PASCAL_VOC", "COCO"]:
+    # Only create masks directory if masks are provided
+    output_masks_dir = None
+    if masks_folder is not None or masks_file is not None:
+        output_masks_dir = os.path.join(output_folder, "masks")
+        os.makedirs(output_masks_dir, exist_ok=True)
+
+    # Create annotation directory based on metadata format (only if masks are provided)
+    ann_dir = None
+    if (masks_folder is not None or masks_file is not None) and metadata_format in [
+        "PASCAL_VOC",
+        "COCO",
+    ]:
         ann_dir = os.path.join(output_folder, "annotations")
         os.makedirs(ann_dir, exist_ok=True)
 
-    # Initialize COCO annotations dictionary
+    # Initialize COCO annotations dictionary (only if masks are provided)
     coco_annotations = None
-    if metadata_format == "COCO":
+    if (
+        masks_folder is not None or masks_file is not None
+    ) and metadata_format == "COCO":
         coco_annotations = {"images": [], "annotations": [], "categories": []}
 
-    # Initialize YOLO class set
-    yolo_classes = set() if metadata_format == "YOLO" else None
+    # Initialize YOLO class set (only if masks are provided)
+    yolo_classes = (
+        set()
+        if (masks_folder is not None or masks_file is not None)
+        and metadata_format == "YOLO"
+        else None
+    )
 
     # Get list of image files
     image_files = []
@@ -3479,10 +3511,16 @@ def export_geotiff_tiles_batch(
 
     # Handle different mask input modes
     use_single_mask_file = masks_file is not None
+    has_masks = masks_file is not None or masks_folder is not None
     mask_files = []
     image_mask_pairs = []
 
-    if use_single_mask_file:
+    if not has_masks:
+        # Mode 0: No masks - create pairs with None for mask
+        for image_file in image_files:
+            image_mask_pairs.append((image_file, None, None))
+
+    elif use_single_mask_file:
         # Mode 1: Single vector file covering all images
         if not os.path.exists(masks_file):
             raise ValueError(f"Mask file not found: {masks_file}")
@@ -3534,10 +3572,21 @@ def export_geotiff_tiles_batch(
                         print(f"Warning: No mask found for image {img_base}")
 
             if not image_mask_pairs:
-                raise ValueError(
+                # Provide detailed error message with found files
+                image_bases = list(image_dict.keys())
+                mask_bases = list(mask_dict.keys())
+                error_msg = (
                     "No matching image-mask pairs found when matching by filename. "
-                    "Check that image and mask files have matching base names."
+                    "Check that image and mask files have matching base names.\n"
+                    f"Found {len(image_bases)} image(s): "
+                    f"{', '.join(image_bases[:5]) if image_bases else 'None found'}"
+                    f"{'...' if len(image_bases) > 5 else ''}\n"
+                    f"Found {len(mask_bases)} mask(s): "
+                    f"{', '.join(mask_bases[:5]) if mask_bases else 'None found'}"
+                    f"{'...' if len(mask_bases) > 5 else ''}\n"
+                    "Tip: Set match_by_name=False to match by sorted order, or ensure filenames match."
                 )
+                raise ValueError(error_msg)
 
         else:
             # Match by sorted order
@@ -3564,7 +3613,11 @@ def export_geotiff_tiles_batch(
     }
 
     if not quiet:
-        if use_single_mask_file:
+        if not has_masks:
+            print(
+                f"Found {len(image_files)} image files to process (images only, no masks)"
+            )
+        elif use_single_mask_file:
             print(f"Found {len(image_files)} image files to process")
             print(f"Using single mask file: {masks_file}")
         else:
@@ -3593,10 +3646,15 @@ def export_geotiff_tiles_batch(
             if not quiet:
                 print(f"\nProcessing: {base_name}")
                 print(f"  Image: {os.path.basename(image_file)}")
-                if use_single_mask_file:
-                    print(f"  Mask: {os.path.basename(mask_file)} (spatially filtered)")
+                if mask_file is not None:
+                    if use_single_mask_file:
+                        print(
+                            f"  Mask: {os.path.basename(mask_file)} (spatially filtered)"
+                        )
+                    else:
+                        print(f"  Mask: {os.path.basename(mask_file)}")
                 else:
-                    print(f"  Mask: {os.path.basename(mask_file)}")
+                    print(f"  Mask: None (images only)")
 
             # Process the image-mask pair
             tiles_generated = _process_image_mask_pair(
@@ -3718,11 +3776,12 @@ def export_geotiff_tiles_batch(
 
         print(f"Output saved to: {output_folder}")
         print(f"  Images: {output_images_dir}")
-        print(f"  Masks: {output_masks_dir}")
-        if metadata_format in ["PASCAL_VOC", "COCO"]:
-            print(f"  Annotations: {ann_dir}")
-        elif metadata_format == "YOLO":
-            print(f"  Labels: {os.path.join(output_folder, 'labels')}")
+        if output_masks_dir is not None:
+            print(f"  Masks: {output_masks_dir}")
+            if metadata_format in ["PASCAL_VOC", "COCO"] and ann_dir is not None:
+                print(f"  Annotations: {ann_dir}")
+            elif metadata_format == "YOLO":
+                print(f"  Labels: {os.path.join(output_folder, 'labels')}")
 
         # List failed files if any
         if batch_stats["failed_files"]:
@@ -3765,9 +3824,9 @@ def _process_image_mask_pair(
     """
     import warnings
 
-    # Determine if mask data is raster or vector
+    # Determine if mask data is raster or vector (only if mask_file is provided)
     is_class_data_raster = False
-    if isinstance(mask_file, str):
+    if mask_file is not None and isinstance(mask_file, str):
         file_ext = Path(mask_file).suffix.lower()
         # Common raster extensions
         if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
@@ -3801,10 +3860,10 @@ def _process_image_mask_pair(
         if max_tiles is None:
             max_tiles = total_tiles
 
-        # Process classification data
+        # Process classification data (only if mask_file is provided)
         class_to_id = {}
 
-        if is_class_data_raster:
+        if mask_file is not None and is_class_data_raster:
             # Load raster class data
             with rasterio.open(mask_file) as class_src:
                 # Check if raster CRS matches
@@ -3831,7 +3890,7 @@ def _process_image_mask_pair(
 
                 # Create class mapping
                 class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
-        else:
+        elif mask_file is not None:
             # Load vector class data
             try:
                 if use_single_mask_file and mask_gdf is not None:
@@ -3907,12 +3966,12 @@ def _process_image_mask_pair(
 
                 window_bounds = box(minx, miny, maxx, maxy)
 
-                # Create label mask
+                # Create label mask (only if mask_file is provided)
                 label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
                 has_features = False
 
-                # Process classification data to create labels
-                if is_class_data_raster:
+                # Process classification data to create labels (only if mask_file is provided)
+                if mask_file is not None and is_class_data_raster:
                     # For raster class data
                     with rasterio.open(mask_file) as class_src:
                         # Get corresponding window in class raster
@@ -3945,7 +4004,7 @@ def _process_image_mask_pair(
                             if not quiet:
                                 print(f"Error reading class raster window: {e}")
                             stats["errors"] += 1
-                else:
+                elif mask_file is not None:
                     # For vector class data
                     # Find features that intersect with window
                     window_features = gdf[gdf.intersects(window_bounds)]
@@ -3983,8 +4042,8 @@ def _process_image_mask_pair(
                                         print(f"Error rasterizing feature {idx}: {e}")
                                     stats["errors"] += 1
 
-                # Skip tile if no features and skip_empty_tiles is True
-                if skip_empty_tiles and not has_features:
+                # Skip tile if no features and skip_empty_tiles is True (only applies when masks are provided)
+                if mask_file is not None and skip_empty_tiles and not has_features:
                     continue
 
                 # Check if we've reached max_tiles before saving
@@ -4021,32 +4080,37 @@ def _process_image_mask_pair(
                         print(f"ERROR saving image GeoTIFF: {e}")
                     stats["errors"] += 1
 
-                # Create profile for label GeoTIFF
-                label_profile = {
-                    "driver": "GTiff",
-                    "height": tile_size,
-                    "width": tile_size,
-                    "count": 1,
-                    "dtype": "uint8",
-                    "crs": src.crs,
-                    "transform": window_transform,
-                }
+                # Export label as GeoTIFF (only if mask_file and output_masks_dir are provided)
+                if mask_file is not None and output_masks_dir is not None:
+                    # Create profile for label GeoTIFF
+                    label_profile = {
+                        "driver": "GTiff",
+                        "height": tile_size,
+                        "width": tile_size,
+                        "count": 1,
+                        "dtype": "uint8",
+                        "crs": src.crs,
+                        "transform": window_transform,
+                    }
 
-                # Export label as GeoTIFF
-                label_path = os.path.join(output_masks_dir, f"{tile_name}.tif")
-                try:
-                    with rasterio.open(label_path, "w", **label_profile) as dst:
-                        dst.write(label_mask.astype(np.uint8), 1)
+                    label_path = os.path.join(output_masks_dir, f"{tile_name}.tif")
+                    try:
+                        with rasterio.open(label_path, "w", **label_profile) as dst:
+                            dst.write(label_mask.astype(np.uint8), 1)
 
-                    if has_features:
-                        stats["tiles_with_features"] += 1
-                except Exception as e:
-                    if not quiet:
-                        print(f"ERROR saving label GeoTIFF: {e}")
-                    stats["errors"] += 1
+                        if has_features:
+                            stats["tiles_with_features"] += 1
+                    except Exception as e:
+                        if not quiet:
+                            print(f"ERROR saving label GeoTIFF: {e}")
+                        stats["errors"] += 1
 
-                # Generate annotation metadata based on format
-                if metadata_format == "PASCAL_VOC" and ann_dir:
+                # Generate annotation metadata based on format (only if mask_file is provided)
+                if (
+                    mask_file is not None
+                    and metadata_format == "PASCAL_VOC"
+                    and ann_dir
+                ):
                     # Create PASCAL VOC XML annotation
                     from lxml import etree as ET
 
@@ -4108,7 +4172,7 @@ def _process_image_mask_pair(
                     tree = ET.ElementTree(annotation)
                     tree.write(xml_path, pretty_print=True, encoding="utf-8")
 
-                elif metadata_format == "COCO":
+                elif mask_file is not None and metadata_format == "COCO":
                     # Add COCO image entry
                     image_id = int(global_tile_counter + tile_index)
                     stats["coco_data"]["images"].append(
@@ -4188,7 +4252,7 @@ def _process_image_mask_pair(
                                 )
                                 coco_ann_id += 1
 
-                elif metadata_format == "YOLO":
+                elif mask_file is not None and metadata_format == "YOLO":
                     # Create YOLO labels directory if needed
                     labels_dir = os.path.join(
                         os.path.dirname(output_images_dir), "labels"
