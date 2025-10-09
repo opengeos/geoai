@@ -3932,7 +3932,10 @@ def lightly_train_model(
         model (str): Model architecture to train. Supports models from torchvision,
             timm, ultralytics, etc. Default is "torchvision/resnet50".
         method (str): Self-supervised learning method. Options include:
-            "dinov2_distillation" (recommended), "dinov2", "dino", "simclr".
+            - "simclr": Works with CNN models (ResNet, EfficientNet, etc.)
+            - "dino": Works with both CNNs and ViTs
+            - "dinov2": Requires ViT models only
+            - "dinov2_distillation": Requires ViT models only (recommended for ViTs)
             Default is "dinov2_distillation".
         epochs (int): Number of training epochs. Default is 100.
         batch_size (int): Batch size for training. Default is 64.
@@ -3944,16 +3947,30 @@ def lightly_train_model(
 
     Raises:
         ImportError: If lightly-train is not installed.
-        ValueError: If data_dir does not exist or is empty.
+        ValueError: If data_dir does not exist, is empty, or incompatible model/method.
+
+    Note:
+        Model/Method compatibility:
+        - CNN models (ResNet, EfficientNet): Use "simclr" or "dino"
+        - ViT models: Use "dinov2", "dinov2_distillation", or "dino"
 
     Example:
+        >>> # For CNN models (ResNet, EfficientNet)
         >>> model_path = lightly_train_model(
         ...     data_dir="path/to/unlabeled/images",
         ...     output_dir="path/to/output",
         ...     model="torchvision/resnet50",
+        ...     method="simclr",  # Use simclr for CNNs
         ...     epochs=50
         ... )
-        >>> print(f"Pretrained model saved to: {model_path}")
+        >>> # For ViT models
+        >>> model_path = lightly_train_model(
+        ...     data_dir="path/to/unlabeled/images",
+        ...     output_dir="path/to/output",
+        ...     model="timm/vit_base_patch16_224",
+        ...     method="dinov2",  # dinov2 requires ViT
+        ...     epochs=50
+        ... )
     """
     if not LIGHTLY_TRAIN_AVAILABLE:
         raise ImportError(
@@ -3973,11 +3990,46 @@ def lightly_train_model(
     if not image_files:
         raise ValueError(f"No image files found in {data_dir}")
 
+    # Validate model/method compatibility
+    is_vit_model = "vit" in model.lower() or "vision_transformer" in model.lower()
+
+    if method in ["dinov2", "dinov2_distillation"] and not is_vit_model:
+        raise ValueError(
+            f"Method '{method}' requires a Vision Transformer (ViT) model, but got '{model}'.\n"
+            f"Solutions:\n"
+            f"  1. Use a ViT model: model='timm/vit_base_patch16_224'\n"
+            f"  2. Use a CNN-compatible method: method='simclr' or method='dino'\n"
+            f"\nFor CNN models (ResNet, EfficientNet), use 'simclr' or 'dino'.\n"
+            f"For ViT models, use 'dinov2', 'dinov2_distillation', or 'dino'."
+        )
+
     print(f"Found {len(image_files)} images in {data_dir}")
     print(f"Starting self-supervised pretraining with {method} method...")
+    print(f"Model: {model}")
 
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
+
+    # Detect if running in notebook environment and set appropriate configuration
+    def is_notebook():
+        try:
+            from IPython import get_ipython
+
+            if get_ipython() is not None:
+                return True
+        except (ImportError, NameError):
+            pass
+        return False
+
+    # Force single-device training in notebooks to avoid DDP strategy issues
+    if is_notebook():
+        # Only override if not explicitly set by user
+        if "accelerator" not in kwargs:
+            # Use CPU in notebooks to avoid DDP incompatibility
+            # Users can still override by passing accelerator='gpu'
+            kwargs["accelerator"] = "cpu"
+        if "devices" not in kwargs:
+            kwargs["devices"] = 1  # Force single device
 
     # Train the model using Lightly Train
     lightly_train.train(
@@ -3987,7 +4039,6 @@ def lightly_train_model(
         method=method,
         epochs=epochs,
         batch_size=batch_size,
-        learning_rate=learning_rate,
         **kwargs,
     )
 
@@ -4095,7 +4146,7 @@ def lightly_embed_images(
     data_dir: str,
     model_path: str,
     output_path: str,
-    model_architecture: str = "torchvision/resnet50",
+    model_architecture: str = None,  # Deprecated, kept for backwards compatibility
     batch_size: int = 64,
     **kwargs: Any,
 ) -> str:
@@ -4104,12 +4155,14 @@ def lightly_embed_images(
 
     Args:
         data_dir (str): Directory containing images to embed.
-        model_path (str): Path to the pretrained model file.
-        output_path (str): Path to save the embeddings (as .npy or .pt file).
-        model_architecture (str): Architecture of the pretrained model.
-            Default is "torchvision/resnet50".
+        model_path (str): Path to the pretrained model checkpoint file (.ckpt).
+        output_path (str): Path to save the embeddings (as .pt file).
+        model_architecture (str): Architecture of the pretrained model (deprecated,
+            kept for backwards compatibility but not used). The model architecture
+            is automatically loaded from the checkpoint.
         batch_size (int): Batch size for embedding generation. Default is 64.
         **kwargs: Additional arguments passed to lightly_train.embed().
+            Supported kwargs include: image_size, num_workers, accelerator, etc.
 
     Returns:
         str: Path to the saved embeddings file.
@@ -4118,11 +4171,15 @@ def lightly_embed_images(
         ImportError: If lightly-train is not installed.
         FileNotFoundError: If data_dir or model_path does not exist.
 
+    Note:
+        The model_path should point to a .ckpt file from the training output,
+        typically located at: output_dir/checkpoints/last.ckpt
+
     Example:
         >>> embeddings_path = lightly_embed_images(
         ...     data_dir="path/to/images",
-        ...     model_path="path/to/pretrained_model.pt",
-        ...     output_path="path/to/embeddings.npy",
+        ...     model_path="output_dir/checkpoints/last.ckpt",
+        ...     output_path="embeddings.pt",
         ...     batch_size=32
         ... )
         >>> print(f"Embeddings saved to: {embeddings_path}")
@@ -4147,11 +4204,11 @@ def lightly_embed_images(
         os.makedirs(output_dir, exist_ok=True)
 
     # Generate embeddings using Lightly Train
+    # Note: model_architecture is not used - it's inferred from the checkpoint
     lightly_train.embed(
         out=output_path,
         data=data_dir,
         checkpoint=model_path,
-        model=model_architecture,
         batch_size=batch_size,
         **kwargs,
     )
