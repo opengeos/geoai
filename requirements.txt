@@ -7,7 +7,6 @@ geopandas
 huggingface_hub
 jupyter-server-proxy
 leafmap
-lightly-train
 localtileserver
 mapclassify
 maplibre
