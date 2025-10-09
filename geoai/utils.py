@@ -3578,9 +3578,11 @@ def export_geotiff_tiles_batch(
                 error_msg = (
                     "No matching image-mask pairs found when matching by filename. "
                     "Check that image and mask files have matching base names.\n"
-                    f"Found {len(image_bases)} image(s): {', '.join(image_bases[:5])}"
+                    f"Found {len(image_bases)} image(s): "
+                    f"{', '.join(image_bases[:5]) if image_bases else 'None found'}"
                     f"{'...' if len(image_bases) > 5 else ''}\n"
-                    f"Found {len(mask_bases)} mask(s): {', '.join(mask_bases[:5])}"
+                    f"Found {len(mask_bases)} mask(s): "
+                    f"{', '.join(mask_bases[:5]) if mask_bases else 'None found'}"
                     f"{'...' if len(mask_bases) > 5 else ''}\n"
                     "Tip: Set match_by_name=False to match by sorted order, or ensure filenames match."
                 )
