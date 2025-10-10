@@ -9,12 +9,16 @@ import numpy as np
 # Add the current directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+
 def test_super_resolution_import():
     """Test importing the super-resolution module."""
     try:
         # Import directly from the module file to avoid __init__.py dependencies
         import importlib.util
-        spec = importlib.util.spec_from_file_location("super_resolution", "geoai/super_resolution.py")
+
+        spec = importlib.util.spec_from_file_location(
+            "super_resolution", "geoai/super_resolution.py"
+        )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
@@ -22,14 +26,15 @@ def test_super_resolution_import():
         create_super_resolution_model = module.create_super_resolution_model
 
         # Make them available globally for other tests
-        globals()['SuperResolutionModel'] = SuperResolutionModel
-        globals()['create_super_resolution_model'] = create_super_resolution_model
+        globals()["SuperResolutionModel"] = SuperResolutionModel
+        globals()["create_super_resolution_model"] = create_super_resolution_model
 
         print("OK Super-resolution module imported successfully")
         return True
     except Exception as e:
         print(f"FAIL Failed to import super-resolution module: {e}")
         return False
+
 
 def test_model_initialization():
     """Test model initialization."""
@@ -46,6 +51,7 @@ def test_model_initialization():
     except Exception as e:
         print(f"FAIL Model initialization failed: {e}")
         return False
+
 
 def test_forward_pass():
     """Test forward pass through the model."""
@@ -66,14 +72,19 @@ def test_forward_pass():
             output = model.model(dummy_input)
 
         expected_height, expected_width = height * 2, width * 2
-        assert output.shape == (batch_size, channels, expected_height, expected_width), \
-            f"Expected shape {(batch_size, channels, expected_height, expected_width)}, got {output.shape}"
+        assert output.shape == (
+            batch_size,
+            channels,
+            expected_height,
+            expected_width,
+        ), f"Expected shape {(batch_size, channels, expected_height, expected_width)}, got {output.shape}"
 
         print("OK Forward pass successful")
         return True
     except Exception as e:
         print(f"FAIL Forward pass failed: {e}")
         return False
+
 
 def test_create_function():
     """Test the convenience creation function."""
@@ -84,6 +95,7 @@ def test_create_function():
     except Exception as e:
         print(f"FAIL Convenience function failed: {e}")
         return False
+
 
 def test_save_load_model():
     """Test saving and loading model."""
@@ -106,6 +118,7 @@ def test_save_load_model():
     except Exception as e:
         print(f"FAIL Save/load failed: {e}")
         return False
+
 
 def main():
     """Run all tests."""
@@ -137,6 +150,7 @@ def main():
     else:
         print("❌ Some tests failed. Please check the implementation.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

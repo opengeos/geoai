@@ -31,6 +31,7 @@ class TestSuperResolution(unittest.TestCase):
         """Test that super_resolution module imports correctly."""
         try:
             from geoai import super_resolution
+
             self.assertTrue(hasattr(super_resolution, "SuperResolutionModel"))
         except ImportError as e:
             self.fail(f"Failed to import super_resolution module: {e}")
@@ -171,7 +172,9 @@ class TestSuperResolution(unittest.TestCase):
 
             # Create a 1024x1024 test image
             data = np.random.randint(0, 256, (3, 1024, 1024), dtype=np.uint8)
-            transform = rasterio.transform.from_bounds(-122.5, 37.7, -122.3, 37.9, 1024, 1024)
+            transform = rasterio.transform.from_bounds(
+                -122.5, 37.7, -122.3, 37.9, 1024, 1024
+            )
 
             with rasterio.open(
                 large_image_path,
@@ -211,7 +214,9 @@ class TestSuperResolution(unittest.TestCase):
 
             # Create a simple test image
             data = np.random.randint(0, 256, (3, 64, 64), dtype=np.uint8)
-            transform = rasterio.transform.from_bounds(-122.5, 37.7, -122.3, 37.9, 64, 64)
+            transform = rasterio.transform.from_bounds(
+                -122.5, 37.7, -122.3, 37.9, 64, 64
+            )
 
             test_image_path = os.path.join(test_dir, "test.tif")
             with rasterio.open(
@@ -229,9 +234,9 @@ class TestSuperResolution(unittest.TestCase):
 
             # Test evaluation (this will use the untrained model)
             try:
-                results = self.sr_model.evaluate(test_dir, metrics=['psnr'])
-                self.assertIn('psnr', results)
-                self.assertIsInstance(results['psnr'], (int, float))
+                results = self.sr_model.evaluate(test_dir, metrics=["psnr"])
+                self.assertIn("psnr", results)
+                self.assertIsInstance(results["psnr"], (int, float))
             except ImportError:
                 # Skip if scikit-image is not available
                 self.skipTest("scikit-image not available for evaluation")
@@ -246,7 +251,7 @@ class TestSuperResolution(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             self.sr_model.load_model("nonexistent.pth")
 
-    @patch('torch.cuda.is_available', return_value=False)
+    @patch("torch.cuda.is_available", return_value=False)
     def test_cpu_fallback(self, mock_cuda):
         """Test CPU fallback when CUDA is not available."""
         model = SuperResolutionModel(device=None)  # Should default to CPU

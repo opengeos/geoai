@@ -86,12 +86,14 @@ class SRCNN(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 32, kernel_size=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, num_channels, kernel_size=5, padding=2)
+            nn.Conv2d(32, num_channels, kernel_size=5, padding=2),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Bicubic upsampling first
-        x = F.interpolate(x, scale_factor=self.upscale_factor, mode='bicubic', align_corners=False)
+        x = F.interpolate(
+            x, scale_factor=self.upscale_factor, mode="bicubic", align_corners=False
+        )
         # Then refine with CNN
         x = self.layers(x)
         return x
@@ -104,7 +106,9 @@ class GeospatialSRDataset(Dataset):
         self.image_dir = Path(image_dir)
         self.upscale_factor = upscale_factor
         self.patch_size = patch_size
-        self.image_files = list(self.image_dir.glob("*.tif")) + list(self.image_dir.glob("*.tiff"))
+        self.image_files = list(self.image_dir.glob("*.tif")) + list(
+            self.image_dir.glob("*.tiff")
+        )
 
     def __len__(self) -> int:
         return len(self.image_files)
@@ -123,17 +127,19 @@ class GeospatialSRDataset(Dataset):
 
             # Create low-resolution version
             hr_image = torch.from_numpy(image)
-            lr_image = F.interpolate(hr_image.unsqueeze(0),
-                                   scale_factor=1/self.upscale_factor,
-                                   mode='bicubic',
-                                   align_corners=False).squeeze(0)
+            lr_image = F.interpolate(
+                hr_image.unsqueeze(0),
+                scale_factor=1 / self.upscale_factor,
+                mode="bicubic",
+                align_corners=False,
+            ).squeeze(0)
 
             # Random crop to patch size
             if hr_image.shape[-1] > self.patch_size:
                 i = np.random.randint(0, hr_image.shape[-2] - self.patch_size)
                 j = np.random.randint(0, hr_image.shape[-1] - self.patch_size)
-                hr_image = hr_image[:, i:i+self.patch_size, j:j+self.patch_size]
-                lr_image = lr_image[:, i:i+self.patch_size, j:j+self.patch_size]
+                hr_image = hr_image[:, i : i + self.patch_size, j : j + self.patch_size]
+                lr_image = lr_image[:, i : i + self.patch_size, j : j + self.patch_size]
 
             return lr_image, hr_image
 
@@ -141,11 +147,13 @@ class GeospatialSRDataset(Dataset):
 class SuperResolutionModel:
     """Super-resolution model for geospatial imagery enhancement."""
 
-    def __init__(self,
-                 model_type: str = "esrgan",
-                 upscale_factor: int = 4,
-                 device: Optional[str] = None,
-                 num_channels: int = 3):
+    def __init__(
+        self,
+        model_type: str = "esrgan",
+        upscale_factor: int = 4,
+        device: Optional[str] = None,
+        num_channels: int = 3,
+    ):
         """
         Initialize super-resolution model.
 
@@ -161,7 +169,7 @@ class SuperResolutionModel:
 
         # Setup device
         if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = torch.device(device)
 
@@ -172,7 +180,9 @@ class SuperResolutionModel:
         # Loss functions
         self.criterion = nn.MSELoss()
 
-        logger.info(f"Initialized {model_type} model with {upscale_factor}x upscaling on {self.device}")
+        logger.info(
+            f"Initialized {model_type} model with {upscale_factor}x upscaling on {self.device}"
+        )
 
     def _create_model(self) -> nn.Module:
         """Create the appropriate model architecture."""
@@ -190,8 +200,8 @@ class SuperResolutionModel:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
         checkpoint = torch.load(model_path, map_location=self.device)
-        if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-            self.model.load_state_dict(checkpoint['state_dict'])
+        if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+            self.model.load_state_dict(checkpoint["state_dict"])
         else:
             self.model.load_state_dict(checkpoint)
 
@@ -201,20 +211,25 @@ class SuperResolutionModel:
     def save_model(self, model_path: str) -> None:
         """Save model weights."""
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        torch.save({
-            'state_dict': self.model.state_dict(),
-            'model_type': self.model_type,
-            'upscale_factor': self.upscale_factor
-        }, model_path)
+        torch.save(
+            {
+                "state_dict": self.model.state_dict(),
+                "model_type": self.model_type,
+                "upscale_factor": self.upscale_factor,
+            },
+            model_path,
+        )
         logger.info(f"Saved model to {model_path}")
 
-    def train(self,
-              train_dir: str,
-              val_dir: Optional[str] = None,
-              epochs: int = 100,
-              batch_size: int = 16,
-              learning_rate: float = 1e-4,
-              save_path: Optional[str] = None) -> Dict[str, List[float]]:
+    def train(
+        self,
+        train_dir: str,
+        val_dir: Optional[str] = None,
+        epochs: int = 100,
+        batch_size: int = 16,
+        learning_rate: float = 1e-4,
+        save_path: Optional[str] = None,
+    ) -> Dict[str, List[float]]:
         """Train the super-resolution model."""
 
         # Create datasets
@@ -230,13 +245,15 @@ class SuperResolutionModel:
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
 
         # Training history
-        history = {'train_loss': [], 'val_loss': []}
+        history = {"train_loss": [], "val_loss": []}
 
         self.model.train()
         for epoch in range(epochs):
             epoch_loss = 0.0
 
-            for lr_images, hr_images in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
+            for lr_images, hr_images in tqdm(
+                train_loader, desc=f"Epoch {epoch+1}/{epochs}"
+            ):
                 lr_images = lr_images.to(self.device)
                 hr_images = hr_images.to(self.device)
 
@@ -249,13 +266,15 @@ class SuperResolutionModel:
                 epoch_loss += loss.item()
 
             avg_train_loss = epoch_loss / len(train_loader)
-            history['train_loss'].append(avg_train_loss)
+            history["train_loss"].append(avg_train_loss)
 
             # Validation
             if val_loader:
                 val_loss = self._validate(val_loader)
-                history['val_loss'].append(val_loss)
-                logger.info(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}, Val Loss = {val_loss:.4f}")
+                history["val_loss"].append(val_loss)
+                logger.info(
+                    f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}, Val Loss = {val_loss:.4f}"
+                )
             else:
                 logger.info(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}")
 
@@ -285,11 +304,13 @@ class SuperResolutionModel:
         self.model.train()
         return val_loss / len(val_loader)
 
-    def enhance_image(self,
-                     input_path: str,
-                     output_path: Optional[str] = None,
-                     tile_size: int = 512,
-                     overlap: int = 32) -> Union[str, np.ndarray]:
+    def enhance_image(
+        self,
+        input_path: str,
+        output_path: Optional[str] = None,
+        tile_size: int = 512,
+        overlap: int = 32,
+    ) -> Union[str, np.ndarray]:
         """
         Enhance image resolution.
 
@@ -334,21 +355,25 @@ class SuperResolutionModel:
                 new_height, new_width = enhanced.shape[1], enhanced.shape[2]
                 new_transform = from_bounds(
                     transform[2],  # left
-                    transform[5] - (transform[4] * height * self.upscale_factor),  # bottom
-                    transform[2] + (transform[0] * width * self.upscale_factor),  # right
+                    transform[5]
+                    - (transform[4] * height * self.upscale_factor),  # bottom
+                    transform[2]
+                    + (transform[0] * width * self.upscale_factor),  # right
                     transform[5],  # top
                     new_width,
-                    new_height
+                    new_height,
                 )
 
-                meta.update({
-                    'height': new_height,
-                    'width': new_width,
-                    'transform': new_transform,
-                    'count': 3
-                })
+                meta.update(
+                    {
+                        "height": new_height,
+                        "width": new_width,
+                        "transform": new_transform,
+                        "count": 3,
+                    }
+                )
 
-                with rasterio.open(output_path, 'w', **meta) as dst:
+                with rasterio.open(output_path, "w", **meta) as dst:
                     dst.write(enhanced)
 
                 return output_path
@@ -367,10 +392,9 @@ class SuperResolutionModel:
 
         return enhanced
 
-    def _process_tiled(self,
-                      image: np.ndarray,
-                      tile_size: int,
-                      overlap: int) -> np.ndarray:
+    def _process_tiled(
+        self, image: np.ndarray, tile_size: int, overlap: int
+    ) -> np.ndarray:
         """Process large images in tiles."""
         _, height, width = image.shape
         enhanced_height = height * self.upscale_factor
@@ -392,15 +416,18 @@ class SuperResolutionModel:
                 # Pad if necessary
                 if tile.shape[1] < tile_size or tile.shape[2] < tile_size:
                     padded = np.zeros((3, tile_size, tile_size), dtype=np.float32)
-                    padded[:, :tile.shape[1], :tile.shape[2]] = tile
+                    padded[:, : tile.shape[1], : tile.shape[2]] = tile
                     tile = padded
 
                 # Enhance tile
                 enhanced_tile = self._enhance_single_tile(tile)
 
                 # Remove padding
-                enhanced_tile = enhanced_tile[:, :min(tile_size, y_end-y)*self.upscale_factor,
-                                            :min(tile_size, x_end-x)*self.upscale_factor]
+                enhanced_tile = enhanced_tile[
+                    :,
+                    : min(tile_size, y_end - y) * self.upscale_factor,
+                    : min(tile_size, x_end - x) * self.upscale_factor,
+                ]
 
                 # Place in output
                 ey_start = y * self.upscale_factor
@@ -412,7 +439,9 @@ class SuperResolutionModel:
 
         return enhanced
 
-    def evaluate(self, test_dir: str, metrics: List[str] = ['psnr', 'ssim']) -> Dict[str, float]:
+    def evaluate(
+        self, test_dir: str, metrics: List[str] = ["psnr", "ssim"]
+    ) -> Dict[str, float]:
         """Evaluate model performance on test data."""
         from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
@@ -434,13 +463,15 @@ class SuperResolutionModel:
                 hr_np = hr_images.cpu().numpy().squeeze(0)
 
                 # Calculate metrics
-                if 'psnr' in metrics:
+                if "psnr" in metrics:
                     psnr = peak_signal_noise_ratio(hr_np, sr_np, data_range=1.0)
-                    results['psnr'].append(psnr)
+                    results["psnr"].append(psnr)
 
-                if 'ssim' in metrics:
-                    ssim = structural_similarity(hr_np, sr_np, data_range=1.0, multichannel=True)
-                    results['ssim'].append(ssim)
+                if "ssim" in metrics:
+                    ssim = structural_similarity(
+                        hr_np, sr_np, data_range=1.0, multichannel=True
+                    )
+                    results["ssim"].append(ssim)
 
         # Average results
         for metric in results:
@@ -449,8 +480,10 @@ class SuperResolutionModel:
         return results
 
 
-def create_super_resolution_model(model_type: str = "esrgan",
-                                upscale_factor: int = 4,
-                                **kwargs) -> SuperResolutionModel:
+def create_super_resolution_model(
+    model_type: str = "esrgan", upscale_factor: int = 4, **kwargs
+) -> SuperResolutionModel:
     """Convenience function to create a super-resolution model."""
-    return SuperResolutionModel(model_type=model_type, upscale_factor=upscale_factor, **kwargs)
+    return SuperResolutionModel(
+        model_type=model_type, upscale_factor=upscale_factor, **kwargs
+    )
