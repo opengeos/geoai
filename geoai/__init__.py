@@ -121,3 +121,5 @@ from .timm_segment import (
     timm_semantic_segmentation,
     push_timm_model_to_hub,
 )
+
+from .super_resolution import SuperResolutionModel, create_super_resolution_model
