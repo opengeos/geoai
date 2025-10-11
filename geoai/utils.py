@@ -485,8 +485,9 @@ def calc_iou(
         iou_per_class = []
 
         for class_idx in range(num_classes):
-            # Skip ignored class
+            # Handle ignored class by appending np.nan
             if ignore_index is not None and class_idx == ignore_index:
+                iou_per_class.append(np.nan)
                 continue
 
             # Create binary masks for current class
