@@ -614,8 +614,9 @@ def calc_f1_score(
         f1_per_class = []
 
         for class_idx in range(num_classes):
-            # Skip ignored class
+            # Mark ignored class with np.nan
             if ignore_index is not None and class_idx == ignore_index:
+                f1_per_class.append(np.nan)
                 continue
 
             # Create binary masks for current class
