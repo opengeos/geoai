@@ -8786,7 +8786,11 @@ def plot_performance_metrics(
     val_loss_key = "val_losses" if "val_losses" in history else "val_loss"
     val_iou_key = "val_ious" if "val_ious" in history else "val_iou"
     # Support both new (f1) and old (dice) key formats for backward compatibility
-    val_f1_key = "val_f1s" if "val_f1s" in history else ("val_dices" if "val_dices" in history else "val_dice")
+    val_f1_key = (
+        "val_f1s"
+        if "val_f1s" in history
+        else ("val_dices" if "val_dices" in history else "val_dice")
+    )
 
     # Determine number of subplots based on available metrics
     has_f1 = val_f1_key in history
