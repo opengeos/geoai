@@ -2033,14 +2033,14 @@ def get_smp_model(
         )
 
 
-def dice_coefficient(
+def f1_score(
     pred: torch.Tensor,
     target: torch.Tensor,
     smooth: float = 1e-6,
     num_classes: Optional[int] = None,
 ) -> float:
     """
-    Calculate Dice coefficient for segmentation (binary or multi-class).
+    Calculate F1 score (also known as Dice coefficient) for segmentation (binary or multi-class).
 
     Args:
         pred (torch.Tensor): Predicted mask (probabilities or logits) with shape [C, H, W] or [H, W].
@@ -2049,7 +2049,7 @@ def dice_coefficient(
         num_classes (int, optional): Number of classes. If None, auto-detected.
 
     Returns:
-        float: Mean Dice coefficient across all classes.
+        float: Mean F1 score across all classes.
     """
     # Convert predictions to class predictions
     if pred.dim() == 3:  # [C, H, W] format
@@ -2064,8 +2064,8 @@ def dice_coefficient(
     if num_classes is None:
         num_classes = max(pred_classes.max().item(), target.max().item()) + 1
 
-    # Calculate Dice for each class and average
-    dice_scores = []
+    # Calculate F1 score for each class and average
+    f1_scores = []
     for class_id in range(num_classes):
         pred_class = (pred_classes == class_id).float()
         target_class = (target == class_id).float()
@@ -2074,10 +2074,10 @@ def dice_coefficient(
         union = pred_class.sum() + target_class.sum()
 
         if union > 0:
-            dice = (2.0 * intersection + smooth) / (union + smooth)
-            dice_scores.append(dice.item())
+            f1 = (2.0 * intersection + smooth) / (union + smooth)
+            f1_scores.append(f1.item())
 
-    return sum(dice_scores) / len(dice_scores) if dice_scores else 0.0
+    return sum(f1_scores) / len(f1_scores) if f1_scores else 0.0
 
 
 def iou_coefficient(
@@ -2208,12 +2208,12 @@ def evaluate_semantic(
         num_classes (int): Number of classes for evaluation metrics.
 
     Returns:
-        dict: Evaluation metrics including loss, IoU, and Dice.
+        dict: Evaluation metrics including loss, IoU, and F1.
     """
     model.eval()
 
     total_loss = 0
-    dice_scores = []
+    f1_scores = []
     iou_scores = []
     num_batches = len(data_loader)
 
@@ -2230,17 +2230,17 @@ def evaluate_semantic(
 
             # Calculate metrics for each sample in the batch
             for pred, target in zip(outputs, targets):
-                dice = dice_coefficient(pred, target, num_classes=num_classes)
+                f1 = f1_score(pred, target, num_classes=num_classes)
                 iou = iou_coefficient(pred, target, num_classes=num_classes)
-                dice_scores.append(dice)
+                f1_scores.append(f1)
                 iou_scores.append(iou)
 
     # Calculate metrics
     avg_loss = total_loss / num_batches
-    avg_dice = sum(dice_scores) / len(dice_scores) if dice_scores else 0
+    avg_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0
     avg_iou = sum(iou_scores) / len(iou_scores) if iou_scores else 0
 
-    return {"loss": avg_loss, "Dice": avg_dice, "IoU": avg_iou}
+    return {"loss": avg_loss, "F1": avg_f1, "IoU": avg_iou}
 
 
 def train_segmentation_model(
@@ -2550,7 +2550,7 @@ def train_segmentation_model(
         print(f"Using {torch.cuda.device_count()} GPUs for training")
         model = torch.nn.DataParallel(model)
 
-    # Set up loss function (CrossEntropyLoss for multi-class, can also use DiceLoss)
+    # Set up loss function (CrossEntropyLoss for multi-class, can also use F1Loss)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Set up optimizer
@@ -2568,7 +2568,7 @@ def train_segmentation_model(
     train_losses = []
     val_losses = []
     val_ious = []
-    val_dices = []
+    val_f1s = []
     start_epoch = 0
 
     # Load checkpoint if provided
@@ -2604,8 +2604,11 @@ def train_segmentation_model(
                         val_losses = checkpoint["val_losses"]
                     if "val_ious" in checkpoint:
                         val_ious = checkpoint["val_ious"]
-                    if "val_dices" in checkpoint:
-                        val_dices = checkpoint["val_dices"]
+                    if "val_f1s" in checkpoint:
+                        val_f1s = checkpoint["val_f1s"]
+                    # Also check for old val_dices format for backward compatibility
+                    elif "val_dices" in checkpoint:
+                        val_f1s = checkpoint["val_dices"]
 
                     print(f"Resuming training from epoch {start_epoch}")
                     print(f"Previous best IoU: {best_iou:.4f}")
@@ -2645,7 +2648,7 @@ def train_segmentation_model(
         )
         val_losses.append(eval_metrics["loss"])
         val_ious.append(eval_metrics["IoU"])
-        val_dices.append(eval_metrics["Dice"])
+        val_f1s.append(eval_metrics["F1"])
 
         # Update learning rate
         lr_scheduler.step(eval_metrics["loss"])
@@ -2656,7 +2659,7 @@ def train_segmentation_model(
             f"Train Loss: {train_loss:.4f}, "
             f"Val Loss: {eval_metrics['loss']:.4f}, "
             f"Val IoU: {eval_metrics['IoU']:.4f}, "
-            f"Val Dice: {eval_metrics['Dice']:.4f}"
+            f"Val F1: {eval_metrics['F1']:.4f}"
         )
 
         # Save best model
@@ -2681,7 +2684,7 @@ def train_segmentation_model(
                     "train_losses": train_losses,
                     "val_losses": val_losses,
                     "val_ious": val_ious,
-                    "val_dices": val_dices,
+                    "val_f1s": val_f1s,
                 },
                 os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}.pth"),
             )
@@ -2694,7 +2697,7 @@ def train_segmentation_model(
         "train_losses": train_losses,
         "val_losses": val_losses,
         "val_ious": val_ious,
-        "val_dices": val_dices,
+        "val_f1s": val_f1s,
     }
     torch.save(history, os.path.join(output_dir, "training_history.pth"))
 
@@ -2710,7 +2713,7 @@ def train_segmentation_model(
         f.write(f"Total epochs: {num_epochs}\n")
         f.write(f"Best validation IoU: {best_iou:.4f}\n")
         f.write(f"Final validation IoU: {val_ious[-1]:.4f}\n")
-        f.write(f"Final validation Dice: {val_dices[-1]:.4f}\n")
+        f.write(f"Final validation F1: {val_f1s[-1]:.4f}\n")
         f.write(f"Final validation loss: {val_losses[-1]:.4f}\n")
 
     print(f"Training complete! Best IoU: {best_iou:.4f}")
@@ -2739,10 +2742,10 @@ def train_segmentation_model(
             plt.grid(True)
 
             plt.subplot(1, 3, 3)
-            plt.plot(val_dices, label="Val Dice")
-            plt.title("Dice Score")
+            plt.plot(val_f1s, label="Val F1")
+            plt.title("F1 Score")
             plt.xlabel("Epoch")
-            plt.ylabel("Dice")
+            plt.ylabel("F1")
             plt.legend()
             plt.grid(True)
 

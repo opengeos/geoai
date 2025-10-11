@@ -8785,12 +8785,13 @@ def plot_performance_metrics(
     train_loss_key = "train_losses" if "train_losses" in history else "train_loss"
     val_loss_key = "val_losses" if "val_losses" in history else "val_loss"
     val_iou_key = "val_ious" if "val_ious" in history else "val_iou"
-    val_dice_key = "val_dices" if "val_dices" in history else "val_dice"
+    # Support both new (f1) and old (dice) key formats for backward compatibility
+    val_f1_key = "val_f1s" if "val_f1s" in history else ("val_dices" if "val_dices" in history else "val_dice")
 
     # Determine number of subplots based on available metrics
-    has_dice = val_dice_key in history
-    n_plots = 3 if has_dice else 2
-    figsize = (15, 5) if has_dice else (10, 5)
+    has_f1 = val_f1_key in history
+    n_plots = 3 if has_f1 else 2
+    figsize = (15, 5) if has_f1 else (10, 5)
 
     plt.figure(figsize=figsize)
 
@@ -8816,13 +8817,13 @@ def plot_performance_metrics(
     plt.legend()
     plt.grid(True)
 
-    # Plot Dice if available
-    if has_dice:
+    # Plot F1 if available
+    if has_f1:
         plt.subplot(1, n_plots, 3)
-        plt.plot(history[val_dice_key], label="Val Dice")
-        plt.title("Dice Score")
+        plt.plot(history[val_f1_key], label="Val F1")
+        plt.title("F1 Score")
         plt.xlabel("Epoch")
-        plt.ylabel("Dice")
+        plt.ylabel("F1")
         plt.legend()
         plt.grid(True)
 
@@ -8841,9 +8842,9 @@ def plot_performance_metrics(
         if val_iou_key in history:
             print(f"Best IoU: {max(history[val_iou_key]):.4f}")
             print(f"Final IoU: {history[val_iou_key][-1]:.4f}")
-        if val_dice_key in history:
-            print(f"Best Dice: {max(history[val_dice_key]):.4f}")
-            print(f"Final Dice: {history[val_dice_key][-1]:.4f}")
+        if val_f1_key in history:
+            print(f"Best F1: {max(history[val_f1_key]):.4f}")
+            print(f"Final F1: {history[val_f1_key][-1]:.4f}")
 
 
 def get_device() -> torch.device:
