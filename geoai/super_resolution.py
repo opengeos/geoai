@@ -139,8 +139,12 @@ class GeospatialSRDataset(Dataset):
                 i = np.random.randint(0, hr_image.shape[-2] - self.patch_size)
                 j = np.random.randint(0, hr_image.shape[-1] - self.patch_size)
                 hr_image = hr_image[:, i : i + self.patch_size, j : j + self.patch_size]
-                lr_image = lr_image[:, i : i + self.patch_size, j : j + self.patch_size]
-
+                # Scale indices and patch size for LR image
+                lr_i = i // self.upscale_factor
+                lr_j = j // self.upscale_factor
+                lr_patch_size = self.patch_size // self.upscale_factor
+                lr_image = lr_image[:, lr_i : lr_i + lr_patch_size, lr_j : lr_j + lr_patch_size]
+                
             return lr_image, hr_image
 
 
@@ -158,7 +162,7 @@ class SuperResolutionModel:
         Initialize super-resolution model.
 
         Args:
-            model_type: Type of model ('esrgan', 'srcnn', 'edsr')
+            model_type: Type of model ('esrgan', 'srcnn')
             upscale_factor: Upscaling factor (2, 4, 8)
             device: Computing device ('cuda', 'cpu', 'mps')
             num_channels: Number of input channels
@@ -354,12 +358,12 @@ class SuperResolutionModel:
                 # Update metadata for enhanced image
                 new_height, new_width = enhanced.shape[1], enhanced.shape[2]
                 new_transform = from_bounds(
-                    transform[2],  # left
-                    transform[5]
-                    - (transform[4] * height * self.upscale_factor),  # bottom
-                    transform[2]
-                    + (transform[0] * width * self.upscale_factor),  # right
-                    transform[5],  # top
+                    transform.c,  # left
+                    transform.f
+                    - (transform.e * height * self.upscale_factor),  # bottom
+                    transform.c
+                    + (transform.a * width * self.upscale_factor),  # right
+                    transform.f,  # top
                     new_width,
                     new_height,
                 )
@@ -469,7 +473,7 @@ class SuperResolutionModel:
 
                 if "ssim" in metrics:
                     ssim = structural_similarity(
-                        hr_np, sr_np, data_range=1.0, multichannel=True
+                        hr_np, sr_np, data_range=1.0, channel_axis=0
                     )
                     results["ssim"].append(ssim)
 

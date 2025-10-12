@@ -11,7 +11,7 @@ import numpy as np
 import rasterio
 import torch
 
-from geoai import SuperResolutionModel, create_super_resolution_model
+from geoai.super_resolution import SuperResolutionModel, create_super_resolution_model
 
 from .test_fixtures import get_test_data_paths
 
