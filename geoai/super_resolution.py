@@ -143,8 +143,10 @@ class GeospatialSRDataset(Dataset):
                 lr_i = i // self.upscale_factor
                 lr_j = j // self.upscale_factor
                 lr_patch_size = self.patch_size // self.upscale_factor
-                lr_image = lr_image[:, lr_i : lr_i + lr_patch_size, lr_j : lr_j + lr_patch_size]
-                
+                lr_image = lr_image[
+                    :, lr_i : lr_i + lr_patch_size, lr_j : lr_j + lr_patch_size
+                ]
+
             return lr_image, hr_image
 
 
@@ -361,8 +363,7 @@ class SuperResolutionModel:
                     transform.c,  # left
                     transform.f
                     - (transform.e * height * self.upscale_factor),  # bottom
-                    transform.c
-                    + (transform.a * width * self.upscale_factor),  # right
+                    transform.c + (transform.a * width * self.upscale_factor),  # right
                     transform.f,  # top
                     new_width,
                     new_height,
