@@ -2269,6 +2269,7 @@ def train_segmentation_model(
     target_size: Optional[Tuple[int, int]] = None,
     resize_mode: str = "resize",
     num_workers: Optional[int] = None,
+    early_stopping_patience: Optional[int] = None,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -2321,6 +2322,8 @@ def train_segmentation_model(
             'resize' - Resize images to target_size (may change aspect ratio)
             'pad' - Pad images to target_size (preserves aspect ratio). Defaults to 'resize'.
         num_workers (int): Number of workers for data loading. If None, uses 0 on macOS and Windows, 8 otherwise.
+        early_stopping_patience (int, optional): Number of epochs with no improvement after which
+            training will be stopped. If None, early stopping is disabled. Defaults to None.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -2570,6 +2573,7 @@ def train_segmentation_model(
     val_ious = []
     val_f1s = []
     start_epoch = 0
+    epochs_without_improvement = 0
 
     # Load checkpoint if provided
     if checkpoint_path is not None:
@@ -2662,11 +2666,23 @@ def train_segmentation_model(
             f"Val F1: {eval_metrics['F1']:.4f}"
         )
 
-        # Save best model
+        # Save best model and check for early stopping
         if eval_metrics["IoU"] > best_iou:
             best_iou = eval_metrics["IoU"]
+            epochs_without_improvement = 0
             print(f"Saving best model with IoU: {best_iou:.4f}")
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
+        else:
+            epochs_without_improvement += 1
+            if (
+                early_stopping_patience is not None
+                and epochs_without_improvement >= early_stopping_patience
+            ):
+                print(
+                    f"\nEarly stopping triggered after {epochs_without_improvement} epochs without improvement"
+                )
+                print(f"Best validation IoU: {best_iou:.4f}")
+                break
 
         # Save checkpoint every 10 epochs (if not save_best_only)
         if not save_best_only and ((epoch + 1) % 10 == 0 or epoch == num_epochs - 1):
