@@ -3049,6 +3049,13 @@ def export_geotiff_tiles(
             coco_annotations = {"images": [], "annotations": [], "categories": []}
             ann_id = 0
 
+    existing_tiles = sorted([f for f in os.listdir(image_dir) if f.endswith(".tif")])
+    if existing_tiles:
+        last_tile = existing_tiles[-1]
+        start_id = int(os.path.splitext(last_tile)[0].split("_")[-1]) + 1
+    else:
+        start_id = 0
+
     # Determine if class data is raster or vector (only if class data provided)
     is_class_data_raster = False
     if in_class_data is not None:
@@ -3211,7 +3218,14 @@ def export_geotiff_tiles(
         }
 
         # Process tiles
-        tile_index = 0
+        tile_index = start_id
+        max_tiles = max_tiles+start_id
+
+        print('====================================================')
+        print('From start id:', start_id)
+        print('Max tiles:', max_tiles)
+        print('====================================================')
+        
         for y in range(num_tiles_y):
             for x in range(num_tiles_x):
                 if tile_index >= max_tiles:
