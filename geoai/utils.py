@@ -3219,13 +3219,13 @@ def export_geotiff_tiles(
 
         # Process tiles
         tile_index = start_id
-        max_tiles = max_tiles+start_id
+        max_tiles = max_tiles + start_id
 
-        print('====================================================')
-        print('From start id:', start_id)
-        print('Max tiles:', max_tiles)
-        print('====================================================')
-        
+        print("====================================================")
+        print("From start id:", start_id)
+        print("Max tiles:", max_tiles)
+        print("====================================================")
+
         for y in range(num_tiles_y):
             for x in range(num_tiles_x):
                 if tile_index >= max_tiles:
