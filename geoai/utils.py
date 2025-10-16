@@ -8765,17 +8765,39 @@ def write_colormap(
 
 def plot_performance_metrics(
     history_path: str,
-    figsize: Tuple[int, int] = (15, 5),
+    figsize: Optional[Tuple[int, int]] = None,
     verbose: bool = True,
     save_path: Optional[str] = None,
+    csv_path: Optional[str] = None,
     kwargs: Optional[Dict] = None,
-) -> None:
-    """Plot performance metrics from a history object.
+) -> pd.DataFrame:
+    """Plot performance metrics from a training history object and return as DataFrame.
+
+    This function loads training history, plots available metrics (loss, IoU, F1,
+    precision, recall), optionally exports to CSV, and returns all metrics as a
+    pandas DataFrame for further analysis.
 
     Args:
-        history_path: The history object to plot.
-        figsize: The figure size.
-        verbose: Whether to print the best and final metrics.
+        history_path (str): Path to the saved training history (.pth file).
+        figsize (Optional[Tuple[int, int]]): Figure size in inches. If None,
+            automatically determined based on number of metrics.
+        verbose (bool): Whether to print best and final metric values. Defaults to True.
+        save_path (Optional[str]): Path to save the plot image. If None, plot is not saved.
+        csv_path (Optional[str]): Path to export metrics as CSV. If None, CSV is not exported.
+        kwargs (Optional[Dict]): Additional keyword arguments for plt.savefig().
+
+    Returns:
+        pd.DataFrame: DataFrame containing all metrics with columns for epoch and each metric.
+            Columns include: 'epoch', 'train_loss', 'val_loss', 'val_iou', 'val_f1',
+            'val_precision', 'val_recall' (depending on availability in history).
+
+    Example:
+        >>> df = plot_performance_metrics(
+        ...     'training_history.pth',
+        ...     save_path='metrics_plot.png',
+        ...     csv_path='metrics.csv'
+        ... )
+        >>> print(df.head())
     """
     if kwargs is None:
         kwargs = {}
@@ -8791,64 +8813,129 @@ def plot_performance_metrics(
         if "val_f1s" in history
         else ("val_dices" if "val_dices" in history else "val_dice")
     )
+    # Add support for precision and recall
+    val_precision_key = (
+        "val_precisions" if "val_precisions" in history else "val_precision"
+    )
+    val_recall_key = "val_recalls" if "val_recalls" in history else "val_recall"
 
-    # Determine number of subplots based on available metrics
-    has_f1 = val_f1_key in history
-    n_plots = 3 if has_f1 else 2
-    figsize = (15, 5) if has_f1 else (10, 5)
+    # Collect available metrics for plotting
+    available_metrics = []
+    metric_info = {
+        "Loss": (train_loss_key, val_loss_key, ["Train Loss", "Val Loss"]),
+        "IoU": (val_iou_key, None, ["Val IoU"]),
+        "F1": (val_f1_key, None, ["Val F1"]),
+        "Precision": (val_precision_key, None, ["Val Precision"]),
+        "Recall": (val_recall_key, None, ["Val Recall"]),
+    }
 
-    plt.figure(figsize=figsize)
+    for metric_name, (key1, key2, labels) in metric_info.items():
+        if key1 in history or (key2 and key2 in history):
+            available_metrics.append((metric_name, key1, key2, labels))
 
-    # Plot loss
-    plt.subplot(1, n_plots, 1)
+    # Determine number of subplots and figure size
+    n_plots = len(available_metrics)
+    if figsize is None:
+        figsize = (5 * n_plots, 5)
+
+    # Create DataFrame for all metrics
+    n_epochs = 0
+    df_data = {}
+
+    # Add epochs
+    if "epochs" in history:
+        df_data["epoch"] = history["epochs"]
+        n_epochs = len(history["epochs"])
+    elif train_loss_key in history:
+        n_epochs = len(history[train_loss_key])
+        df_data["epoch"] = list(range(1, n_epochs + 1))
+
+    # Add all available metrics to DataFrame
     if train_loss_key in history:
-        plt.plot(history[train_loss_key], label="Train Loss")
+        df_data["train_loss"] = history[train_loss_key]
     if val_loss_key in history:
-        plt.plot(history[val_loss_key], label="Val Loss")
-    plt.title("Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.grid(True)
-
-    # Plot IoU
-    plt.subplot(1, n_plots, 2)
+        df_data["val_loss"] = history[val_loss_key]
     if val_iou_key in history:
-        plt.plot(history[val_iou_key], label="Val IoU")
-    plt.title("IoU Score")
-    plt.xlabel("Epoch")
-    plt.ylabel("IoU")
-    plt.legend()
-    plt.grid(True)
+        df_data["val_iou"] = history[val_iou_key]
+    if val_f1_key in history:
+        df_data["val_f1"] = history[val_f1_key]
+    if val_precision_key in history:
+        df_data["val_precision"] = history[val_precision_key]
+    if val_recall_key in history:
+        df_data["val_recall"] = history[val_recall_key]
 
-    # Plot F1 if available
-    if has_f1:
-        plt.subplot(1, n_plots, 3)
-        plt.plot(history[val_f1_key], label="Val F1")
-        plt.title("F1 Score")
-        plt.xlabel("Epoch")
-        plt.ylabel("F1")
-        plt.legend()
-        plt.grid(True)
+    # Create DataFrame
+    df = pd.DataFrame(df_data)
 
-    plt.tight_layout()
+    # Export to CSV if requested
+    if csv_path:
+        df.to_csv(csv_path, index=False)
+        if verbose:
+            print(f"Metrics exported to: {csv_path}")
 
-    if save_path:
-        if "dpi" not in kwargs:
-            kwargs["dpi"] = 150
-        if "bbox_inches" not in kwargs:
-            kwargs["bbox_inches"] = "tight"
-        plt.savefig(save_path, **kwargs)
+    # Create plots
+    if n_plots > 0:
+        fig, axes = plt.subplots(1, n_plots, figsize=figsize)
+        if n_plots == 1:
+            axes = [axes]
 
-    plt.show()
+        for idx, (metric_name, key1, key2, labels) in enumerate(available_metrics):
+            ax = axes[idx]
 
+            if metric_name == "Loss":
+                # Special handling for loss (has both train and val)
+                if key1 in history:
+                    ax.plot(history[key1], label=labels[0])
+                if key2 and key2 in history:
+                    ax.plot(history[key2], label=labels[1])
+            else:
+                # Single metric plots
+                if key1 in history:
+                    ax.plot(history[key1], label=labels[0])
+
+            ax.set_title(metric_name)
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel(metric_name)
+            ax.legend()
+            ax.grid(True)
+
+        plt.tight_layout()
+
+        if save_path:
+            if "dpi" not in kwargs:
+                kwargs["dpi"] = 150
+            if "bbox_inches" not in kwargs:
+                kwargs["bbox_inches"] = "tight"
+            plt.savefig(save_path, **kwargs)
+
+        plt.show()
+
+    # Print summary statistics
     if verbose:
+        print("\n=== Performance Metrics Summary ===")
         if val_iou_key in history:
-            print(f"Best IoU: {max(history[val_iou_key]):.4f}")
-            print(f"Final IoU: {history[val_iou_key][-1]:.4f}")
+            print(
+                f"IoU     - Best: {max(history[val_iou_key]):.4f} | Final: {history[val_iou_key][-1]:.4f}"
+            )
         if val_f1_key in history:
-            print(f"Best F1: {max(history[val_f1_key]):.4f}")
-            print(f"Final F1: {history[val_f1_key][-1]:.4f}")
+            print(
+                f"F1      - Best: {max(history[val_f1_key]):.4f} | Final: {history[val_f1_key][-1]:.4f}"
+            )
+        if val_precision_key in history:
+            print(
+                f"Precision - Best: {max(history[val_precision_key]):.4f} | Final: {history[val_precision_key][-1]:.4f}"
+            )
+        if val_recall_key in history:
+            print(
+                f"Recall  - Best: {max(history[val_recall_key]):.4f} | Final: {history[val_recall_key][-1]:.4f}"
+            )
+        if val_loss_key in history:
+            print(
+                f"Val Loss - Best: {min(history[val_loss_key]):.4f} | Final: {history[val_loss_key][-1]:.4f}"
+            )
+        print("===================================\n")
+
+    return df
 
 
 def get_device() -> torch.device:
