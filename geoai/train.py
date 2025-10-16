@@ -3205,7 +3205,9 @@ def semantic_inference_on_geotiff(
                         dst.write(prob_band, 1)
 
                     if not quiet:
-                        print(f"Saved class {class_idx} probability to {class_prob_path}")
+                        print(
+                            f"Saved class {class_idx} probability to {class_prob_path}"
+                        )
 
         return output_path, inference_time
 
@@ -3566,7 +3568,9 @@ def semantic_inference_on_image(
                         dst.write(prob_band, 1)
 
                     if not quiet:
-                        print(f"Saved class {class_idx} probability to {class_prob_path}")
+                        print(
+                            f"Saved class {class_idx} probability to {class_prob_path}"
+                        )
 
         return output_path, inference_time
 
