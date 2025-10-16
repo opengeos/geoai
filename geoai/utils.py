@@ -8816,7 +8816,9 @@ def plot_performance_metrics(
         else ("val_dices" if "val_dices" in history else "val_dice")
     )
     # Add support for precision and recall
-    val_precision_key = "val_precisions" if "val_precisions" in history else "val_precision"
+    val_precision_key = (
+        "val_precisions" if "val_precisions" in history else "val_precision"
+    )
     val_recall_key = "val_recalls" if "val_recalls" in history else "val_recall"
 
     # Collect available metrics for plotting
@@ -8914,15 +8916,25 @@ def plot_performance_metrics(
     if verbose:
         print("\n=== Performance Metrics Summary ===")
         if val_iou_key in history:
-            print(f"IoU     - Best: {max(history[val_iou_key]):.4f} | Final: {history[val_iou_key][-1]:.4f}")
+            print(
+                f"IoU     - Best: {max(history[val_iou_key]):.4f} | Final: {history[val_iou_key][-1]:.4f}"
+            )
         if val_f1_key in history:
-            print(f"F1      - Best: {max(history[val_f1_key]):.4f} | Final: {history[val_f1_key][-1]:.4f}")
+            print(
+                f"F1      - Best: {max(history[val_f1_key]):.4f} | Final: {history[val_f1_key][-1]:.4f}"
+            )
         if val_precision_key in history:
-            print(f"Precision - Best: {max(history[val_precision_key]):.4f} | Final: {history[val_precision_key][-1]:.4f}")
+            print(
+                f"Precision - Best: {max(history[val_precision_key]):.4f} | Final: {history[val_precision_key][-1]:.4f}"
+            )
         if val_recall_key in history:
-            print(f"Recall  - Best: {max(history[val_recall_key]):.4f} | Final: {history[val_recall_key][-1]:.4f}")
+            print(
+                f"Recall  - Best: {max(history[val_recall_key]):.4f} | Final: {history[val_recall_key][-1]:.4f}"
+            )
         if val_loss_key in history:
-            print(f"Val Loss - Best: {min(history[val_loss_key]):.4f} | Final: {history[val_loss_key][-1]:.4f}")
+            print(
+                f"Val Loss - Best: {min(history[val_loss_key]):.4f} | Final: {history[val_loss_key][-1]:.4f}"
+            )
         print("===================================\n")
 
     return df

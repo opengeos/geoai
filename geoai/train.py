@@ -2347,7 +2347,9 @@ def evaluate_semantic(
     avg_loss = total_loss / num_batches
     avg_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0
     avg_iou = sum(iou_scores) / len(iou_scores) if iou_scores else 0
-    avg_precision = sum(precision_scores) / len(precision_scores) if precision_scores else 0
+    avg_precision = (
+        sum(precision_scores) / len(precision_scores) if precision_scores else 0
+    )
     avg_recall = sum(recall_scores) / len(recall_scores) if recall_scores else 0
 
     return {
