@@ -2925,6 +2925,7 @@ def semantic_inference_on_geotiff(
     device: Optional[torch.device] = None,
     probability_path: Optional[str] = None,
     probability_threshold: Optional[float] = None,
+    save_class_probabilities: bool = False,
     quiet: bool = False,
     **kwargs: Any,
 ) -> Tuple[str, float]:
@@ -2946,6 +2947,8 @@ def semantic_inference_on_geotiff(
         probability_threshold (float, optional): Probability threshold for binary classification.
             Only used when num_classes=2. If provided, pixels with class 1 probability >= threshold
             are classified as class 1, otherwise class 0. If None (default), uses argmax.
+        save_class_probabilities (bool): If True and probability_path is provided, saves each
+            class probability as a separate single-band file. Defaults to False.
         quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
@@ -3162,7 +3165,7 @@ def semantic_inference_on_geotiff(
             prob_meta = meta.copy()
             prob_meta.update({"count": num_classes, "dtype": "float32"})
 
-            # Save normalized probabilities
+            # Save normalized probabilities as multi-band raster
             with rasterio.open(probability_path, "w", **prob_meta) as dst:
                 for class_idx in range(num_classes):
                     # Normalize probabilities
@@ -3175,6 +3178,34 @@ def semantic_inference_on_geotiff(
 
             if not quiet:
                 print(f"Saved probability map to {probability_path}")
+
+            # Save individual class probabilities if requested
+            if save_class_probabilities:
+                # Prepare single-band metadata
+                single_band_meta = meta.copy()
+                single_band_meta.update({"count": 1, "dtype": "float32"})
+
+                # Get base filename and extension
+                prob_base = os.path.splitext(probability_path)[0]
+                prob_ext = os.path.splitext(probability_path)[1]
+
+                for class_idx in range(num_classes):
+                    # Create filename for this class
+                    class_prob_path = f"{prob_base}_class_{class_idx}{prob_ext}"
+
+                    # Normalize probabilities
+                    prob_band = np.zeros((height, width), dtype=np.float32)
+                    prob_band[valid_pixels] = (
+                        prob_accumulator[class_idx, valid_pixels]
+                        / count_accumulator[valid_pixels]
+                    )
+
+                    # Save single-band file
+                    with rasterio.open(class_prob_path, "w", **single_band_meta) as dst:
+                        dst.write(prob_band, 1)
+
+                    if not quiet:
+                        print(f"Saved class {class_idx} probability to {class_prob_path}")
 
         return output_path, inference_time
 
@@ -3192,6 +3223,7 @@ def semantic_inference_on_image(
     binary_output: bool = True,
     probability_path: Optional[str] = None,
     probability_threshold: Optional[float] = None,
+    save_class_probabilities: bool = False,
     quiet: bool = False,
     **kwargs: Any,
 ) -> Tuple[str, float]:
@@ -3214,6 +3246,8 @@ def semantic_inference_on_image(
         probability_threshold (float, optional): Probability threshold for binary classification.
             Only used when num_classes=2. If provided, pixels with class 1 probability >= threshold
             are classified as class 1, otherwise class 0. If None (default), uses argmax.
+        save_class_probabilities (bool): If True and probability_path is provided, saves each
+            class probability as a separate single-band file. Defaults to False.
         quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
@@ -3492,7 +3526,7 @@ def semantic_inference_on_image(
                 "transform": transform,
             }
 
-            # Save normalized probabilities
+            # Save normalized probabilities as multi-band raster
             with rasterio.open(probability_path, "w", **prob_meta) as dst:
                 for class_idx in range(num_classes):
                     # Normalize probabilities
@@ -3502,6 +3536,37 @@ def semantic_inference_on_image(
 
             if not quiet:
                 print(f"Saved probability map to {probability_path}")
+
+            # Save individual class probabilities if requested
+            if save_class_probabilities:
+                # Prepare single-band metadata
+                single_band_meta = {
+                    "driver": "GTiff",
+                    "height": height,
+                    "width": width,
+                    "count": 1,
+                    "dtype": "float32",
+                    "transform": transform,
+                }
+
+                # Get base filename and extension
+                prob_base = os.path.splitext(probability_path)[0]
+                prob_ext = os.path.splitext(probability_path)[1]
+
+                for class_idx in range(num_classes):
+                    # Create filename for this class
+                    class_prob_path = f"{prob_base}_class_{class_idx}{prob_ext}"
+
+                    # Normalize probabilities
+                    prob_band = np.zeros((height, width), dtype=np.float32)
+                    prob_band[valid_pixels] = normalized_probs[class_idx, valid_pixels]
+
+                    # Save single-band file
+                    with rasterio.open(class_prob_path, "w", **single_band_meta) as dst:
+                        dst.write(prob_band, 1)
+
+                    if not quiet:
+                        print(f"Saved class {class_idx} probability to {class_prob_path}")
 
         return output_path, inference_time
 
@@ -3520,6 +3585,7 @@ def semantic_segmentation(
     device: Optional[torch.device] = None,
     probability_path: Optional[str] = None,
     probability_threshold: Optional[float] = None,
+    save_class_probabilities: bool = False,
     quiet: bool = False,
     **kwargs: Any,
 ) -> None:
@@ -3542,11 +3608,16 @@ def semantic_segmentation(
         batch_size (int): Batch size for inference.
         device (torch.device, optional): Device to run inference on.
         probability_path (str, optional): Path to save probability map. If provided,
-            the normalized class probabilities will be saved as a multi-band raster.
+            the normalized class probabilities will be saved as a multi-band raster
+            where each band contains probabilities for each class.
         probability_threshold (float, optional): Probability threshold for binary classification.
             Only used when num_classes=2. If provided, pixels with class 1 probability >= threshold
             are classified as class 1, otherwise class 0. If None (default), uses argmax.
             Must be between 0 and 1.
+        save_class_probabilities (bool): If True and probability_path is provided, saves each
+            class probability as a separate single-band file. Files will be named like
+            "probability_class_0.tif", "probability_class_1.tif", etc. in the same directory
+            as probability_path. Defaults to False.
         quiet (bool): If True, suppress progress bar. Defaults to False.
         **kwargs: Additional arguments.
 
@@ -3623,6 +3694,7 @@ def semantic_segmentation(
             device=device,
             probability_path=probability_path,
             probability_threshold=probability_threshold,
+            save_class_probabilities=save_class_probabilities,
             quiet=quiet,
             **kwargs,
         )
@@ -3643,6 +3715,7 @@ def semantic_segmentation(
             binary_output=True,  # Convert to binary output for better visualization
             probability_path=probability_path,
             probability_threshold=probability_threshold,
+            save_class_probabilities=save_class_probabilities,
             quiet=quiet,
             **kwargs,
         )
