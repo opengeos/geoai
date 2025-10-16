@@ -8799,8 +8799,6 @@ def plot_performance_metrics(
         ... )
         >>> print(df.head())
     """
-    import pandas as pd
-
     if kwargs is None:
         kwargs = {}
     history = torch.load(history_path)
