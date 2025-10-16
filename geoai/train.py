@@ -2127,6 +2127,108 @@ def iou_coefficient(
     return sum(iou_scores) / len(iou_scores) if iou_scores else 0.0
 
 
+def precision_score(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    smooth: float = 1e-6,
+    num_classes: Optional[int] = None,
+) -> float:
+    """
+    Calculate precision score for segmentation (binary or multi-class).
+
+    Precision = TP / (TP + FP), where:
+    - TP (True Positives): Correctly predicted positive pixels
+    - FP (False Positives): Incorrectly predicted positive pixels
+
+    Args:
+        pred (torch.Tensor): Predicted mask (probabilities or logits) with shape [C, H, W] or [H, W].
+        target (torch.Tensor): Ground truth mask with shape [H, W].
+        smooth (float): Smoothing factor to avoid division by zero.
+        num_classes (int, optional): Number of classes. If None, auto-detected.
+
+    Returns:
+        float: Mean precision score across all classes.
+    """
+    # Convert predictions to class predictions
+    if pred.dim() == 3:  # [C, H, W] format
+        pred = torch.softmax(pred, dim=0)
+        pred_classes = torch.argmax(pred, dim=0)
+    elif pred.dim() == 2:  # [H, W] format
+        pred_classes = pred
+    else:
+        raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
+
+    # Auto-detect number of classes if not provided
+    if num_classes is None:
+        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
+
+    # Calculate precision for each class and average
+    precision_scores = []
+    for class_id in range(num_classes):
+        pred_class = (pred_classes == class_id).float()
+        target_class = (target == class_id).float()
+
+        true_positives = (pred_class * target_class).sum()
+        predicted_positives = pred_class.sum()
+
+        if predicted_positives > 0:
+            precision = (true_positives + smooth) / (predicted_positives + smooth)
+            precision_scores.append(precision.item())
+
+    return sum(precision_scores) / len(precision_scores) if precision_scores else 0.0
+
+
+def recall_score(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    smooth: float = 1e-6,
+    num_classes: Optional[int] = None,
+) -> float:
+    """
+    Calculate recall score (also known as sensitivity) for segmentation (binary or multi-class).
+
+    Recall = TP / (TP + FN), where:
+    - TP (True Positives): Correctly predicted positive pixels
+    - FN (False Negatives): Incorrectly predicted negative pixels
+
+    Args:
+        pred (torch.Tensor): Predicted mask (probabilities or logits) with shape [C, H, W] or [H, W].
+        target (torch.Tensor): Ground truth mask with shape [H, W].
+        smooth (float): Smoothing factor to avoid division by zero.
+        num_classes (int, optional): Number of classes. If None, auto-detected.
+
+    Returns:
+        float: Mean recall score across all classes.
+    """
+    # Convert predictions to class predictions
+    if pred.dim() == 3:  # [C, H, W] format
+        pred = torch.softmax(pred, dim=0)
+        pred_classes = torch.argmax(pred, dim=0)
+    elif pred.dim() == 2:  # [H, W] format
+        pred_classes = pred
+    else:
+        raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
+
+    # Auto-detect number of classes if not provided
+    if num_classes is None:
+        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
+
+    # Calculate recall for each class and average
+    recall_scores = []
+    for class_id in range(num_classes):
+        pred_class = (pred_classes == class_id).float()
+        target_class = (target == class_id).float()
+
+        true_positives = (pred_class * target_class).sum()
+        actual_positives = target_class.sum()
+
+        if actual_positives > 0:
+            recall = (true_positives + smooth) / (actual_positives + smooth)
+            recall_scores.append(recall.item())
+
+    return sum(recall_scores) / len(recall_scores) if recall_scores else 0.0
+
+
 def train_semantic_one_epoch(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -2208,13 +2310,15 @@ def evaluate_semantic(
         num_classes (int): Number of classes for evaluation metrics.
 
     Returns:
-        dict: Evaluation metrics including loss, IoU, and F1.
+        dict: Evaluation metrics including loss, IoU, F1, precision, and recall.
     """
     model.eval()
 
     total_loss = 0
     f1_scores = []
     iou_scores = []
+    precision_scores = []
+    recall_scores = []
     num_batches = len(data_loader)
 
     with torch.no_grad():
@@ -2232,15 +2336,27 @@ def evaluate_semantic(
             for pred, target in zip(outputs, targets):
                 f1 = f1_score(pred, target, num_classes=num_classes)
                 iou = iou_coefficient(pred, target, num_classes=num_classes)
+                precision = precision_score(pred, target, num_classes=num_classes)
+                recall = recall_score(pred, target, num_classes=num_classes)
                 f1_scores.append(f1)
                 iou_scores.append(iou)
+                precision_scores.append(precision)
+                recall_scores.append(recall)
 
     # Calculate metrics
     avg_loss = total_loss / num_batches
     avg_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0
     avg_iou = sum(iou_scores) / len(iou_scores) if iou_scores else 0
+    avg_precision = sum(precision_scores) / len(precision_scores) if precision_scores else 0
+    avg_recall = sum(recall_scores) / len(recall_scores) if recall_scores else 0
 
-    return {"loss": avg_loss, "F1": avg_f1, "IoU": avg_iou}
+    return {
+        "loss": avg_loss,
+        "F1": avg_f1,
+        "IoU": avg_iou,
+        "Precision": avg_precision,
+        "Recall": avg_recall,
+    }
 
 
 def train_segmentation_model(
@@ -2572,6 +2688,8 @@ def train_segmentation_model(
     val_losses = []
     val_ious = []
     val_f1s = []
+    val_precisions = []
+    val_recalls = []
     start_epoch = 0
     epochs_without_improvement = 0
 
@@ -2613,6 +2731,10 @@ def train_segmentation_model(
                     # Also check for old val_dices format for backward compatibility
                     elif "val_dices" in checkpoint:
                         val_f1s = checkpoint["val_dices"]
+                    if "val_precisions" in checkpoint:
+                        val_precisions = checkpoint["val_precisions"]
+                    if "val_recalls" in checkpoint:
+                        val_recalls = checkpoint["val_recalls"]
 
                     print(f"Resuming training from epoch {start_epoch}")
                     print(f"Previous best IoU: {best_iou:.4f}")
@@ -2653,6 +2775,8 @@ def train_segmentation_model(
         val_losses.append(eval_metrics["loss"])
         val_ious.append(eval_metrics["IoU"])
         val_f1s.append(eval_metrics["F1"])
+        val_precisions.append(eval_metrics["Precision"])
+        val_recalls.append(eval_metrics["Recall"])
 
         # Update learning rate
         lr_scheduler.step(eval_metrics["loss"])
@@ -2663,7 +2787,9 @@ def train_segmentation_model(
             f"Train Loss: {train_loss:.4f}, "
             f"Val Loss: {eval_metrics['loss']:.4f}, "
             f"Val IoU: {eval_metrics['IoU']:.4f}, "
-            f"Val F1: {eval_metrics['F1']:.4f}"
+            f"Val F1: {eval_metrics['F1']:.4f}, "
+            f"Val Precision: {eval_metrics['Precision']:.4f}, "
+            f"Val Recall: {eval_metrics['Recall']:.4f}"
         )
 
         # Save best model and check for early stopping
@@ -2701,6 +2827,8 @@ def train_segmentation_model(
                     "val_losses": val_losses,
                     "val_ious": val_ious,
                     "val_f1s": val_f1s,
+                    "val_precisions": val_precisions,
+                    "val_recalls": val_recalls,
                 },
                 os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}.pth"),
             )
@@ -2714,6 +2842,8 @@ def train_segmentation_model(
         "val_losses": val_losses,
         "val_ious": val_ious,
         "val_f1s": val_f1s,
+        "val_precisions": val_precisions,
+        "val_recalls": val_recalls,
     }
     torch.save(history, os.path.join(output_dir, "training_history.pth"))
 
@@ -2730,6 +2860,8 @@ def train_segmentation_model(
         f.write(f"Best validation IoU: {best_iou:.4f}\n")
         f.write(f"Final validation IoU: {val_ious[-1]:.4f}\n")
         f.write(f"Final validation F1: {val_f1s[-1]:.4f}\n")
+        f.write(f"Final validation Precision: {val_precisions[-1]:.4f}\n")
+        f.write(f"Final validation Recall: {val_recalls[-1]:.4f}\n")
         f.write(f"Final validation loss: {val_losses[-1]:.4f}\n")
 
     print(f"Training complete! Best IoU: {best_iou:.4f}")
