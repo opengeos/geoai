@@ -607,6 +607,7 @@ class STACAgent(Agent):
         system_prompt: str = "default",
         endpoint: str = "https://planetarycomputer.microsoft.com/api/stac/v1",
         model_args: dict = None,
+        map_instance: Optional[leafmap.Map] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the STAC Agent.
@@ -616,9 +617,11 @@ class STACAgent(Agent):
             system_prompt: System prompt for the agent (default: "default").
             endpoint: STAC API endpoint URL. Defaults to Microsoft Planetary Computer.
             model_args: Additional keyword arguments for the model.
+            map_instance: Optional leafmap.Map instance for visualization. If None, creates a new one.
             **kwargs: Additional keyword arguments for the Agent.
         """
         self.stac_tools: STACTools = STACTools(endpoint=endpoint)
+        self.map_instance = map_instance if map_instance is not None else leafmap.Map()
 
         if model_args is None:
             model_args = {}
@@ -670,7 +673,7 @@ class STACAgent(Agent):
 
         if system_prompt == "default":
             system_prompt = """
-            You are a STAC catalog search agent. When users ask to find or search for imagery:
+            You are a STAC catalog search agent. Follow these steps EXACTLY for every search:
 
             STEP 1: Determine the collection ID
             Common collections:
@@ -686,27 +689,39 @@ class STACAgent(Agent):
             - Extract the most relevant collection ID from the response
             - Use that collection ID in the next step
 
-            STEP 2: If they mention a location name (e.g., "San Francisco", "New York"), call geocode_location(location_name).
-            Extract the bbox array from the response.
+            STEP 2: Check if user mentioned a location
+            If the query contains ANY location name (e.g., "Paris", "San Francisco", "New York", "California", "Tokyo"):
+            - REQUIRED: Call geocode_location("<location_name>") FIRST
+            - Extract the bbox array from the response
+            - This bbox MUST be included in search_items()
 
-            STEP 3: Call search_items() with ONLY these parameters:
+            Location words include: city names, state names, country names, region names, place names
+            Examples: "Paris", "New York", "California", "Seattle", "San Francisco", "Tokyo", "London"
+
+            STEP 3: Build search_items() parameters
             - collection: REQUIRED - the collection ID from Step 1
-            - bbox: OPTIONAL - ONLY if user explicitly mentioned a location name or coordinates
-            - time_range: OPTIONAL - ONLY if user explicitly mentioned dates, months, or years (e.g., "in 2024", "August 2024", "from June to September")
+            - bbox: REQUIRED if Step 2 found a location, otherwise omit entirely
+            - time_range: REQUIRED if query has dates/months/years, otherwise omit entirely
             - max_items: default to 1
 
-            CRITICAL RULES FOR PARAMETERS:
-            - Do NOT add time_range unless the user's query contains explicit temporal information (dates, months, years, or time periods)
-            - Do NOT add bbox unless the user's query contains a location name or coordinates
-            - Do NOT infer or assume dates/times that were not mentioned by the user
-            - Omit optional parameters entirely - do not pass null or empty values
+            CRITICAL RULES:
+            - If location mentioned → MUST call geocode_location() → MUST include bbox in search_items()
+            - If dates mentioned → MUST include time_range in search_items()
+            - If NO location → omit bbox parameter
+            - If NO dates → omit time_range parameter
 
             Examples:
-            - "Show me NAIP imagery for New York" → geocode + bbox, NO time_range
-            - "Find Sentinel-2 imagery in August 2024" → time_range, NO bbox
-            - "Find Landsat over Paris from June to July 2023" → geocode + bbox + time_range
-            - "Show me MODIS data for California" → list_collections(filter_keyword="modis") + geocode + bbox
-            - "Find building footprints in Seattle" → list_collections(filter_keyword="building") + geocode + bbox
+            - "Show me NAIP imagery for New York"
+              → geocode_location("New York") → search_items(collection="naip", bbox=[...])
+
+            - "Find Sentinel-2 imagery in August 2024"
+              → search_items(collection="sentinel-2-l2a", time_range="2024-08-01/2024-08-31")
+
+            - "Find Landsat over Paris from June to July 2023"
+              → geocode_location("Paris") → search_items(collection="landsat-c2-l2", bbox=[...], time_range="2023-06-01/2023-07-31")
+
+            - "Show me MODIS data for California"
+              → list_collections(filter_keyword="modis") → geocode_location("California") → search_items(collection="modis-...", bbox=[...])
 
             STEP 4: After calling search_items(), extract the FIRST item from the response and return it as JSON.
 
@@ -746,26 +761,49 @@ class STACAgent(Agent):
 
     def _extract_search_items_payload(self, result: Any) -> Optional[Dict[str, Any]]:
         """Return the parsed payload from the search_items tool, if available."""
+        # Try to get tool_results from the result object
         tool_results = getattr(result, "tool_results", None)
-        if not tool_results:
-            return None
-
-        for tool_result in tool_results:
-            if getattr(tool_result, "tool_name", "") != "search_items":
-                continue
-
-            payload = getattr(tool_result, "result", None)
-            if payload is None:
-                continue
-
-            if isinstance(payload, str):
-                try:
-                    payload = json.loads(payload)
-                except json.JSONDecodeError:
+        if tool_results:
+            for tool_result in tool_results:
+                if getattr(tool_result, "tool_name", "") != "search_items":
                     continue
 
-            if isinstance(payload, dict):
-                return payload
+                payload = getattr(tool_result, "result", None)
+                if payload is None:
+                    continue
+
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except json.JSONDecodeError:
+                        continue
+
+                if isinstance(payload, dict):
+                    return payload
+
+        # Alternative: check messages for tool results
+        messages = getattr(self, "messages", [])
+        for msg in reversed(messages):  # Check recent messages first
+            # Handle dict-style messages
+            if isinstance(msg, dict):
+                role = msg.get("role")
+                content = msg.get("content", [])
+
+                # Look for tool results in user messages (strands pattern)
+                if role == "user" and isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict) and "toolResult" in item:
+                            tool_result = item["toolResult"]
+                            if tool_result.get("status") == "success":
+                                result_content = tool_result.get("content", [])
+                                if isinstance(result_content, list) and result_content:
+                                    text_content = result_content[0].get("text", "")
+                                    try:
+                                        payload = json.loads(text_content)
+                                        if "items" in payload and payload.get("items"):
+                                            return payload
+                                    except json.JSONDecodeError:
+                                        continue
 
         return None
 
@@ -878,3 +916,314 @@ class STACAgent(Agent):
         except json.JSONDecodeError:
             print("Could not extract item data from agent response")
             return None
+
+    def _visualize_stac_item(self, item: Dict[str, Any]) -> None:
+        """Visualize a STAC item on the map.
+
+        Args:
+            item: STAC item dictionary with id, collection, assets, etc.
+        """
+        if not item or "id" not in item or "collection" not in item:
+            return
+
+        # Get the collection and item ID
+        collection = item.get("collection")
+        item_id = item.get("id")
+
+        # Determine which assets to display based on collection
+        assets = None
+        if collection == "sentinel-2-l2a":
+            assets = ["B04", "B03", "B02"]  # True color RGB
+        elif collection == "landsat-c2-l2":
+            assets = ["red", "green", "blue"]  # Landsat RGB
+        elif collection == "naip":
+            assets = ["image"]  # NAIP 4-band imagery
+        elif "sentinel-1" in collection:
+            assets = ["vv"]  # Sentinel-1 VV polarization
+        else:
+            # Try to find common asset names
+            if "assets" in item:
+                asset_keys = [
+                    a.get("key") for a in item["assets"] if isinstance(a, dict)
+                ]
+                # Look for visual or RGB assets
+                for possible in ["visual", "rendered_preview", "image", "data"]:
+                    if possible in asset_keys:
+                        assets = [possible]
+                        break
+                # If still no assets, use first few assets
+                if not assets and asset_keys:
+                    assets = asset_keys[:1]
+
+        if not assets:
+            return
+
+        try:
+            # Add the STAC layer to the map
+            layer_name = f"{collection[:20]}_{item_id[:15]}"
+            self.map_instance.add_stac_layer(
+                collection=collection,
+                item=item_id,
+                assets=assets,
+                name=layer_name,
+                before_id=self.map_instance.first_symbol_layer_id,
+            )
+        except Exception as e:
+            print(f"Could not visualize item on map: {e}")
+
+    def show_ui(self, *, height: int = 700) -> None:
+        """Display an interactive UI with map and chat interface for STAC searches.
+
+        Args:
+            height: Height of the UI in pixels (default: 700).
+        """
+        m = self.map_instance
+        if not hasattr(m, "container") or m.container is None:
+            m.create_container()
+
+        map_panel = widgets.VBox(
+            [
+                widgets.HTML("<h3 style='margin:0 0 8px 0'>Map</h3>"),
+                m.container,
+            ],
+            layout=widgets.Layout(
+                flex="2 1 0%",
+                min_width="520px",
+                border="1px solid #ddd",
+                padding="8px",
+                height=f"{height}px",
+                overflow="hidden",
+            ),
+        )
+
+        # ----- chat widgets -----
+        session_id = str(uuid.uuid4())[:8]
+        title = widgets.HTML(
+            f"<h3 style='margin:0'>STAC Search Agent</h3>"
+            f"<p style='margin:4px 0 8px;color:#666'>Session: {session_id}</p>"
+        )
+        log = widgets.HTML(
+            value="<div style='color:#777'>No messages yet. Try searching for satellite imagery!</div>",
+            layout=widgets.Layout(
+                border="1px solid #ddd",
+                padding="8px",
+                height="520px",
+                overflow_y="auto",
+            ),
+        )
+        inp = widgets.Textarea(
+            placeholder="Search for satellite/aerial imagery (e.g., 'Find Sentinel-2 imagery over Paris in summer 2024')",
+            layout=widgets.Layout(width="99%", height="90px"),
+        )
+        btn_send = widgets.Button(
+            description="Search",
+            button_style="primary",
+            icon="search",
+            layout=widgets.Layout(width="120px"),
+        )
+        btn_stop = widgets.Button(
+            description="Stop", icon="stop", layout=widgets.Layout(width="120px")
+        )
+        btn_clear = widgets.Button(
+            description="Clear", icon="trash", layout=widgets.Layout(width="120px")
+        )
+        status = widgets.HTML("<span style='color:#666'>Ready to search.</span>")
+
+        examples = widgets.Dropdown(
+            options=[
+                ("— Example Searches —", ""),
+                (
+                    "Sentinel-2 over SF",
+                    "Find Sentinel-2 imagery over San Francisco in August 2024",
+                ),
+                ("NAIP for NYC", "Show me NAIP aerial imagery for New York City"),
+                (
+                    "Landsat over Paris",
+                    "Find Landsat imagery over Paris from June to July 2023",
+                ),
+                ("MODIS for California", "Show me MODIS data for California"),
+                ("Building footprints", "Find building footprints in Seattle"),
+                ("Land cover data", "Get land cover data for Washington DC"),
+                ("Sentinel-1 SAR", "Find Sentinel-1 SAR imagery over Tokyo in 2024"),
+            ],
+            value="",
+            layout=widgets.Layout(width="auto"),
+        )
+
+        # --- state kept on self so it persists ---
+        self._ui = SimpleNamespace(
+            messages=[],
+            map_panel=map_panel,
+            title=title,
+            log=log,
+            inp=inp,
+            btn_send=btn_send,
+            btn_stop=btn_stop,
+            btn_clear=btn_clear,
+            status=status,
+            examples=examples,
+        )
+        self._pending = {"fut": None}
+        self._executor = ThreadPoolExecutor(max_workers=1)
+
+        def _esc(s: str) -> str:
+            """Escape HTML characters in a string."""
+            return (
+                s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\n", "<br/>")
+            )
+
+        def _append(role: str, msg: str) -> None:
+            """Append a message to the chat log."""
+            self._ui.messages.append((role, msg))
+            parts = []
+            for r, mm in self._ui.messages:
+                if r == "user":
+                    parts.append(
+                        f"<div style='margin:6px 0;padding:6px 8px;border-radius:8px;background:#eef;'><b>You</b>: {_esc(mm)}</div>"
+                    )
+                else:
+                    parts.append(
+                        f"<div style='margin:6px 0;padding:6px 8px;border-radius:8px;background:#f7f7f7;'><b>Agent</b>: {_esc(mm)}</div>"
+                    )
+            self._ui.log.value = (
+                "<div>"
+                + (
+                    "".join(parts)
+                    if parts
+                    else "<div style='color:#777'>No messages yet.</div>"
+                )
+                + "</div>"
+            )
+
+        def _lock(lock: bool) -> None:
+            """Lock or unlock UI controls."""
+            self._ui.btn_send.disabled = lock
+            self._ui.btn_stop.disabled = not lock
+            self._ui.btn_clear.disabled = lock
+            self._ui.inp.disabled = lock
+            self._ui.examples.disabled = lock
+
+        def _on_send(_: Any = None) -> None:
+            """Handle send button click or Enter key press."""
+            text = self._ui.inp.value.strip()
+            if not text:
+                return
+            _append("user", text)
+            _lock(True)
+            self._ui.status.value = "<span style='color:#0a7'>Searching…</span>"
+            try:
+                # Get the structured search result directly
+                item_data = self.search_and_get_first_item(text)
+
+                if item_data is not None:
+                    # Visualize on map
+                    self._visualize_stac_item(item_data)
+
+                    # Format response for display
+                    formatted_response = (
+                        f"Found item: {item_data['id']}\n"
+                        f"Collection: {item_data['collection']}\n"
+                        f"Date: {item_data.get('datetime', 'N/A')}\n"
+                        f"✓ Added to map"
+                    )
+                    _append("assistant", formatted_response)
+                else:
+                    _append(
+                        "assistant",
+                        "No items found. Try adjusting your search query or date range.",
+                    )
+
+                self._ui.status.value = "<span style='color:#0a7'>Done.</span>"
+            except Exception as e:
+                _append("assistant", f"[error] {type(e).__name__}: {e}")
+                self._ui.status.value = (
+                    "<span style='color:#c00'>Finished with an issue.</span>"
+                )
+            finally:
+                self._ui.inp.value = ""
+                _lock(False)
+
+        def _on_stop(_: Any = None) -> None:
+            """Handle stop button click."""
+            fut = self._pending.get("fut")
+            if fut and not fut.done():
+                self._pending["fut"] = None
+                self._ui.status.value = (
+                    "<span style='color:#c00'>Stop requested.</span>"
+                )
+                _lock(False)
+
+        def _on_clear(_: Any = None) -> None:
+            """Handle clear button click."""
+            self._ui.messages.clear()
+            self._ui.log.value = "<div style='color:#777'>No messages yet.</div>"
+            self._ui.status.value = "<span style='color:#666'>Cleared.</span>"
+
+        def _on_example_change(change: dict[str, Any]) -> None:
+            """Handle example dropdown selection change."""
+            if change["name"] == "value" and change["new"]:
+                self._ui.inp.value = change["new"]
+                self._ui.examples.value = ""
+                self._ui.inp.send({"method": "focus"})
+
+        # keep handler refs
+        self._handlers = SimpleNamespace(
+            on_send=_on_send,
+            on_stop=_on_stop,
+            on_clear=_on_clear,
+            on_example_change=_on_example_change,
+        )
+
+        # wire events
+        self._ui.btn_send.on_click(self._handlers.on_send)
+        self._ui.btn_stop.on_click(self._handlers.on_stop)
+        self._ui.btn_clear.on_click(self._handlers.on_clear)
+        self._ui.examples.observe(self._handlers.on_example_change, names="value")
+
+        # Ctrl+Enter on textarea
+        self._keyev = Event(
+            source=self._ui.inp, watched_events=["keyup"], prevent_default_action=False
+        )
+
+        def _on_key(e: dict[str, Any]) -> None:
+            """Handle keyboard events on the input textarea."""
+            if (
+                e.get("type") == "keyup"
+                and e.get("key") == "Enter"
+                and e.get("ctrlKey")
+            ):
+                if self._ui.inp.value.endswith("\n"):
+                    self._ui.inp.value = self._ui.inp.value[:-1]
+                self._handlers.on_send()
+
+        # store callback too
+        self._on_key_cb: Callable[[dict[str, Any]], None] = _on_key
+        self._keyev.on_dom_event(self._on_key_cb)
+
+        buttons = widgets.HBox(
+            [
+                self._ui.btn_send,
+                self._ui.btn_stop,
+                self._ui.btn_clear,
+                widgets.Box(
+                    [self._ui.examples], layout=widgets.Layout(margin="0 0 0 auto")
+                ),
+            ]
+        )
+        right = widgets.VBox(
+            [
+                self._ui.title,
+                self._ui.log,
+                self._ui.inp,
+                buttons,
+                self._ui.status,
+            ],
+            layout=widgets.Layout(flex="1 1 0%", min_width="360px"),
+        )
+        root = widgets.HBox(
+            [map_panel, right], layout=widgets.Layout(width="100%", gap="8px")
+        )
+        display(root)
