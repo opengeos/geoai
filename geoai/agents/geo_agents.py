@@ -5,7 +5,7 @@ import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 import boto3
 import ipywidgets as widgets
@@ -20,6 +20,7 @@ from strands.models.ollama import OllamaModel as _OllamaModel
 from strands.models.openai import OpenAIModel
 
 from .map_tools import MapSession, MapTools
+from .stac_tools import STACTools
 
 try:
     import nest_asyncio
@@ -593,3 +594,232 @@ class GeoAgent(Agent):
             [map_panel, right], layout=widgets.Layout(width="100%", gap="8px")
         )
         display(root)
+
+
+class STACAgent(Agent):
+    """AI agent for searching and interacting with STAC catalogs."""
+
+    def __init__(
+        self,
+        *,
+        model: str = "llama3.1",
+        system_prompt: str = "default",
+        endpoint: str = "https://planetarycomputer.microsoft.com/api/stac/v1",
+        model_args: dict = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the STAC Agent.
+
+        Args:
+            model: Model identifier (default: "llama3.1").
+            system_prompt: System prompt for the agent (default: "default").
+            endpoint: STAC API endpoint URL. Defaults to Microsoft Planetary Computer.
+            model_args: Additional keyword arguments for the model.
+            **kwargs: Additional keyword arguments for the Agent.
+        """
+        self.tools: STACTools = STACTools(endpoint=endpoint)
+
+        if model_args is None:
+            model_args = {}
+
+        # --- save a model factory we can call each turn ---
+        if model == "llama3.1":
+            self._model_factory: Callable[[], OllamaModel] = (
+                lambda: create_ollama_model(
+                    host="http://localhost:11434", model_id=model, **model_args
+                )
+            )
+        elif isinstance(model, str):
+            self._model_factory: Callable[[], BedrockModel] = (
+                lambda: create_bedrock_model(model_id=model, **model_args)
+            )
+        elif isinstance(model, OllamaModel):
+            # Extract configuration from existing OllamaModel and create new instances
+            model_id = model.config["model_id"]
+            host = model.host
+            client_args = model.client_args
+            self._model_factory: Callable[[], OllamaModel] = (
+                lambda: create_ollama_model(
+                    host=host, model_id=model_id, client_args=client_args, **model_args
+                )
+            )
+        elif isinstance(model, OpenAIModel):
+            # Extract configuration from existing OpenAIModel and create new instances
+            model_id = model.config["model_id"]
+            client_args = model.client_args.copy()
+            self._model_factory: Callable[[], OpenAIModel] = (
+                lambda mid=model_id, client_args=client_args: create_openai_model(
+                    model_id=mid, client_args=client_args, **model_args
+                )
+            )
+        elif isinstance(model, AnthropicModel):
+            # Extract configuration from existing AnthropicModel and create new instances
+            model_id = model.config["model_id"]
+            client_args = model.client_args.copy()
+            self._model_factory: Callable[[], AnthropicModel] = (
+                lambda mid=model_id, client_args=client_args: create_anthropic_model(
+                    model_id=mid, client_args=client_args, **model_args
+                )
+            )
+        else:
+            raise ValueError(f"Invalid model: {model}")
+
+        # build initial model (first turn)
+        model = self._model_factory()
+
+        if system_prompt == "default":
+            system_prompt = """
+            You are a STAC catalog search agent. When users ask to find or search for imagery:
+
+            STEP 1: If they mention a location name, call geocode_location(location_name)
+            Extract the bbox array from the response.
+
+            STEP 2: Call search_items() with:
+            - collection: use "sentinel-2-l2a" for Sentinel-2, "landsat-c2-l2" for Landsat, "naip" for aerial imagery
+            - bbox: use the array from geocode_location (e.g., [-122.5, 37.7, -122.4, 37.8])
+            - time_range: convert dates to "YYYY-MM-DD/YYYY-MM-DD" format
+            - max_items: default to 5
+
+            STEP 3: After calling search_items(), extract the FIRST item from the response and return it as JSON.
+
+            YOUR FINAL RESPONSE MUST BE VALID JSON ONLY. No explanatory text before or after.
+
+            Format: Return the first item from the "items" array in the tool response:
+            {
+              "id": "item_id_from_response",
+              "collection": "collection_from_response",
+              "datetime": "datetime_from_response",
+              "bbox": [west, south, east, north],
+              "assets": [
+                {"key": "asset_key", "title": "title"}
+              ],
+              "properties": {}
+            }
+
+            CRITICAL:
+            - Return ONLY the JSON object, nothing else
+            - Use actual values from the tool response
+            - If no items found, return: {"error": "No items found"}
+            """
+
+        super().__init__(
+            name="STAC Search Agent",
+            model=model,
+            tools=[
+                self.tools.list_collections,
+                self.tools.search_items,
+                self.tools.get_item_info,
+                self.tools.geocode_location,
+                self.tools.get_common_collections,
+            ],
+            system_prompt=system_prompt,
+            callback_handler=None,
+        )
+
+    def ask(self, prompt: str) -> str:
+        """Send a single-turn prompt to the agent.
+
+        Args:
+            prompt: The text prompt to send to the agent.
+
+        Returns:
+            The agent's response as a string (JSON format for search queries).
+        """
+        # Ensure there's an event loop bound to this thread (Jupyter-safe)
+        loop = _ensure_loop()
+
+        # Preserve existing conversation messages
+        existing_messages = self.messages.copy()
+
+        # Create a fresh model but keep conversation history
+        self.model = self._model_factory()
+
+        # Restore the conversation messages
+        self.messages = existing_messages
+
+        # Execute the prompt using the Agent's async API on this loop
+        result = loop.run_until_complete(self.invoke_async(prompt))
+        return getattr(result, "final_text", str(result))
+
+    def search_and_get_first_item(self, prompt: str) -> Optional[Dict[str, Any]]:
+        """Search for imagery and return the first item as a structured dict.
+
+        This method sends a search query to the agent, extracts the search results
+        directly from the tool calls, and returns the first item as a STACItemInfo-compatible
+        dictionary.
+
+        Args:
+            prompt: Natural language search query (e.g., "Find Sentinel-2 imagery
+                    over San Francisco in September 2024").
+
+        Returns:
+            Dictionary containing STACItemInfo fields (id, collection, datetime,
+            bbox, assets, properties), or None if no results found.
+
+        Example:
+            >>> agent = STACAgent()
+            >>> item = agent.search_and_get_first_item(
+            ...     "Find Sentinel-2 imagery over Paris in summer 2023"
+            ... )
+            >>> print(item['id'])
+            >>> print(item['assets'][0]['href'])
+        """
+        import json
+
+        # Ensure there's an event loop
+        loop = _ensure_loop()
+
+        # Preserve existing messages
+        existing_messages = self.messages.copy()
+
+        # Create fresh model
+        self.model = self._model_factory()
+
+        # Restore messages
+        self.messages = existing_messages
+
+        # Execute the prompt and capture the agent result
+        result = loop.run_until_complete(self.invoke_async(prompt))
+
+        # Look through the tool results to find search_items response
+        if hasattr(result, "tool_results") and result.tool_results:
+            for tool_result in result.tool_results:
+                if (
+                    hasattr(tool_result, "tool_name")
+                    and tool_result.tool_name == "search_items"
+                ):
+                    try:
+                        # Parse the tool result
+                        search_result = json.loads(tool_result.result)
+
+                        # Extract first item
+                        if "items" in search_result and len(search_result["items"]) > 0:
+                            first_item = search_result["items"][0]
+                            return first_item
+                        else:
+                            print("No items found in search results")
+                            return None
+
+                    except json.JSONDecodeError as e:
+                        print(f"Failed to parse tool result: {e}")
+                        return None
+
+        # Fallback: try to parse the final text response
+        response = getattr(result, "final_text", str(result))
+
+        try:
+            item_data = json.loads(response)
+
+            if "error" in item_data:
+                print(f"Search error: {item_data['error']}")
+                return None
+
+            if not all(k in item_data for k in ["id", "collection"]):
+                print("Response missing required fields (id, collection)")
+                return None
+
+            return item_data
+
+        except json.JSONDecodeError:
+            print("Could not extract item data from agent response")
+            return None
