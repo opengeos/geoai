@@ -762,7 +762,9 @@ class STACAgent(Agent):
             ...     "Find Sentinel-2 imagery over Paris in summer 2023"
             ... )
             >>> print(item['id'])
-            >>> print(item['assets'][0]['href'])
+            >>> print(item['assets'][0]['key'])    # or 'title'
+            # To get the asset 'href', use get_item_info with the asset key:
+            # href = agent.get_item_info(item['id'], asset_key=item['assets'][0]['key'])['href']
         """
         import json
 
