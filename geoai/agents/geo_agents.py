@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -671,14 +672,26 @@ class STACAgent(Agent):
             system_prompt = """
             You are a STAC catalog search agent. When users ask to find or search for imagery:
 
-            STEP 1: If they mention a location name, call geocode_location(location_name)
+            STEP 1: If they mention a location name (e.g., "San Francisco", "New York"), call geocode_location(location_name).
             Extract the bbox array from the response.
 
-            STEP 2: Call search_items() with:
-            - collection: use "sentinel-2-l2a" for Sentinel-2, "landsat-c2-l2" for Landsat, "naip" for aerial imagery
-            - bbox: use the array from geocode_location (e.g., [-122.5, 37.7, -122.4, 37.8])
-            - time_range: convert dates to "YYYY-MM-DD/YYYY-MM-DD" format
-            - max_items: default to 5
+            STEP 2: Call search_items() with ONLY these parameters:
+            - collection: REQUIRED - use "sentinel-2-l2a" for Sentinel-2, "landsat-c2-l2" for Landsat, "naip" for aerial imagery
+            - bbox: OPTIONAL - ONLY if user explicitly mentioned a location name or coordinates
+            - time_range: OPTIONAL - ONLY if user explicitly mentioned dates, months, or years (e.g., "in 2024", "August 2024", "from June to September")
+            - max_items: default to 1
+
+            CRITICAL RULES FOR PARAMETERS:
+            - Do NOT add time_range unless the user's query contains explicit temporal information (dates, months, years, or time periods)
+            - Do NOT add bbox unless the user's query contains a location name or coordinates
+            - Do NOT infer or assume dates/times that were not mentioned by the user
+            - Omit optional parameters entirely - do not pass null or empty values
+
+            Examples:
+            - "Show me NAIP imagery for New York" → include bbox, NO time_range
+            - "Find Sentinel-2 imagery in August 2024" → include time_range, NO bbox
+            - "Find Landsat over Paris from June to July 2023" → include both bbox and time_range
+            - "Show me NAIP imagery" → NO bbox, NO time_range
 
             STEP 3: After calling search_items(), extract the FIRST item from the response and return it as JSON.
 
@@ -706,15 +719,40 @@ class STACAgent(Agent):
             name="STAC Search Agent",
             model=model,
             tools=[
-                self.tools.list_collections,
-                self.tools.search_items,
-                self.tools.get_item_info,
-                self.tools.geocode_location,
-                self.tools.get_common_collections,
+                self.stac_tools.list_collections,
+                self.stac_tools.search_items,
+                self.stac_tools.get_item_info,
+                self.stac_tools.geocode_location,
+                self.stac_tools.get_common_collections,
             ],
             system_prompt=system_prompt,
             callback_handler=None,
         )
+
+    def _extract_search_items_payload(self, result: Any) -> Optional[Dict[str, Any]]:
+        """Return the parsed payload from the search_items tool, if available."""
+        tool_results = getattr(result, "tool_results", None)
+        if not tool_results:
+            return None
+
+        for tool_result in tool_results:
+            if getattr(tool_result, "tool_name", "") != "search_items":
+                continue
+
+            payload = getattr(tool_result, "result", None)
+            if payload is None:
+                continue
+
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+
+            if isinstance(payload, dict):
+                return payload
+
+        return None
 
     def ask(self, prompt: str) -> str:
         """Send a single-turn prompt to the agent.
@@ -739,6 +777,18 @@ class STACAgent(Agent):
 
         # Execute the prompt using the Agent's async API on this loop
         result = loop.run_until_complete(self.invoke_async(prompt))
+
+        search_payload = self._extract_search_items_payload(result)
+        if search_payload is not None:
+            if "error" in search_payload:
+                return json.dumps({"error": search_payload["error"]}, indent=2)
+
+            items = search_payload.get("items") or []
+            if items:
+                return json.dumps(items[0], indent=2)
+
+            return json.dumps({"error": "No items found"}, indent=2)
+
         return getattr(result, "final_text", str(result))
 
     def search_and_get_first_item(self, prompt: str) -> Optional[Dict[str, Any]]:
@@ -766,8 +816,6 @@ class STACAgent(Agent):
             # To get the asset 'href', use get_item_info with the asset key:
             # href = agent.get_item_info(item['id'], asset_key=item['assets'][0]['key'])['href']
         """
-        import json
-
         # Ensure there's an event loop
         loop = _ensure_loop()
 
@@ -783,28 +831,18 @@ class STACAgent(Agent):
         # Execute the prompt and capture the agent result
         result = loop.run_until_complete(self.invoke_async(prompt))
 
-        # Look through the tool results to find search_items response
-        if hasattr(result, "tool_results") and result.tool_results:
-            for tool_result in result.tool_results:
-                if (
-                    hasattr(tool_result, "tool_name")
-                    and tool_result.tool_name == "search_items"
-                ):
-                    try:
-                        # Parse the tool result
-                        search_result = json.loads(tool_result.result)
+        search_payload = self._extract_search_items_payload(result)
+        if search_payload is not None:
+            if "error" in search_payload:
+                print(f"Search error: {search_payload['error']}")
+                return None
 
-                        # Extract first item
-                        if "items" in search_result and len(search_result["items"]) > 0:
-                            first_item = search_result["items"][0]
-                            return first_item
-                        else:
-                            print("No items found in search results")
-                            return None
+            items = search_payload.get("items") or []
+            if items:
+                return items[0]
 
-                    except json.JSONDecodeError as e:
-                        print(f"Failed to parse tool result: {e}")
-                        return None
+            print("No items found in search results")
+            return None
 
         # Fallback: try to parse the final text response
         response = getattr(result, "final_text", str(result))

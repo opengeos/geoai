@@ -1,7 +1,8 @@
 """Tools for STAC catalog search and interaction."""
 
+import ast
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from strands import tool
 
@@ -102,11 +103,11 @@ class STACTools:
     def search_items(
         self,
         collection: str,
-        bbox: Optional[List[float]] = None,
+        bbox: Optional[Union[str, List[float]]] = None,
         time_range: Optional[str] = None,
-        query: Optional[Dict[str, Any]] = None,
-        limit: Optional[int] = 10,
-        max_items: Optional[int] = None,
+        query: Optional[Union[str, Dict[str, Any]]] = None,
+        limit: Optional[Union[str, int]] = 10,
+        max_items: Optional[Union[str, int]] = 1,
     ) -> str:
         """Search for STAC items in the Planetary Computer catalog.
 
@@ -126,6 +127,16 @@ class STACTools:
             JSON string containing search results with item details including IDs, URLs, and metadata.
         """
         try:
+
+            if isinstance(bbox, str):
+                bbox = ast.literal_eval(bbox)
+            if isinstance(query, str):
+                query = ast.literal_eval(query)
+            if isinstance(limit, str):
+                limit = ast.literal_eval(limit)
+            if isinstance(max_items, str):
+                max_items = ast.literal_eval(max_items)
+
             # Search using existing function
             items = pc_stac_search(
                 collection=collection,
