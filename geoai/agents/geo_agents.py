@@ -672,11 +672,25 @@ class STACAgent(Agent):
             system_prompt = """
             You are a STAC catalog search agent. When users ask to find or search for imagery:
 
-            STEP 1: If they mention a location name (e.g., "San Francisco", "New York"), call geocode_location(location_name).
+            STEP 1: Determine the collection ID
+            Common collections:
+            - "sentinel-2-l2a" for Sentinel-2 or Sentinel
+            - "landsat-c2-l2" for Landsat
+            - "naip" for NAIP or aerial imagery
+            - "sentinel-1-grd" for Sentinel-1 or SAR
+            - "aster-l1t" for ASTER
+            - "cop-dem-glo-30" for DEM or elevation
+
+            If the user asks for a collection NOT in the list above (e.g., "MODIS", "HLS", "building footprints", "land cover"):
+            - Call list_collections(filter_keyword="<keyword>") using a relevant keyword from the user's query
+            - Extract the most relevant collection ID from the response
+            - Use that collection ID in the next step
+
+            STEP 2: If they mention a location name (e.g., "San Francisco", "New York"), call geocode_location(location_name).
             Extract the bbox array from the response.
 
-            STEP 2: Call search_items() with ONLY these parameters:
-            - collection: REQUIRED - use "sentinel-2-l2a" for Sentinel-2, "landsat-c2-l2" for Landsat, "naip" for aerial imagery
+            STEP 3: Call search_items() with ONLY these parameters:
+            - collection: REQUIRED - the collection ID from Step 1
             - bbox: OPTIONAL - ONLY if user explicitly mentioned a location name or coordinates
             - time_range: OPTIONAL - ONLY if user explicitly mentioned dates, months, or years (e.g., "in 2024", "August 2024", "from June to September")
             - max_items: default to 1
@@ -688,12 +702,13 @@ class STACAgent(Agent):
             - Omit optional parameters entirely - do not pass null or empty values
 
             Examples:
-            - "Show me NAIP imagery for New York" → include bbox, NO time_range
-            - "Find Sentinel-2 imagery in August 2024" → include time_range, NO bbox
-            - "Find Landsat over Paris from June to July 2023" → include both bbox and time_range
-            - "Show me NAIP imagery" → NO bbox, NO time_range
+            - "Show me NAIP imagery for New York" → geocode + bbox, NO time_range
+            - "Find Sentinel-2 imagery in August 2024" → time_range, NO bbox
+            - "Find Landsat over Paris from June to July 2023" → geocode + bbox + time_range
+            - "Show me MODIS data for California" → list_collections(filter_keyword="modis") + geocode + bbox
+            - "Find building footprints in Seattle" → list_collections(filter_keyword="building") + geocode + bbox
 
-            STEP 3: After calling search_items(), extract the FIRST item from the response and return it as JSON.
+            STEP 4: After calling search_items(), extract the FIRST item from the response and return it as JSON.
 
             YOUR FINAL RESPONSE MUST BE VALID JSON ONLY. No explanatory text before or after.
 
