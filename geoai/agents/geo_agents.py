@@ -617,7 +617,7 @@ class STACAgent(Agent):
             model_args: Additional keyword arguments for the model.
             **kwargs: Additional keyword arguments for the Agent.
         """
-        self.tools: STACTools = STACTools(endpoint=endpoint)
+        self.stac_tools: STACTools = STACTools(endpoint=endpoint)
 
         if model_args is None:
             model_args = {}
