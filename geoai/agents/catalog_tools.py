@@ -276,11 +276,11 @@ class CatalogTools:
                 (result_df["end_date"].notna()) & (result_df["end_date"] >= start_date)
             ]
 
-        if end_date and "state_date" in result_df.columns:
-            # Keep datasets where state_date <= end_date (dataset has data before end_date)
+        if end_date and "start_date" in result_df.columns:
+            # Keep datasets where start_date <= end_date (dataset has data before end_date)
             result_df = result_df[
-                (result_df["state_date"].notna())
-                & (result_df["state_date"] <= end_date)
+                (result_df["start_date"].notna())
+                & (result_df["start_date"] <= end_date)
             ]
 
         # Limit results
