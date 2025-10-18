@@ -130,6 +130,10 @@ class STACTools:
 
             if isinstance(bbox, str):
                 bbox = ast.literal_eval(bbox)
+            # Fix nested list issue: [[x,y,z,w]] -> [x,y,z,w]
+            if isinstance(bbox, list) and len(bbox) == 1 and isinstance(bbox[0], list):
+                bbox = bbox[0]
+
             if isinstance(query, str):
                 query = ast.literal_eval(query)
             if isinstance(limit, str):
@@ -145,6 +149,7 @@ class STACTools:
                 query=query,
                 limit=limit,
                 max_items=max_items,
+                quiet=True,
                 endpoint=self.endpoint,
             )
 
@@ -211,6 +216,7 @@ class STACTools:
                 query={"id": {"eq": item_id}},
                 limit=1,
                 max_items=1,
+                quiet=True,
                 endpoint=self.endpoint,
             )
 

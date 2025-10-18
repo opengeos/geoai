@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, Optional
 
@@ -22,13 +20,6 @@ from strands.models.openai import OpenAIModel
 
 from .map_tools import MapSession, MapTools
 from .stac_tools import STACTools
-
-try:
-    import nest_asyncio
-
-    nest_asyncio.apply()
-except Exception:
-    pass
 
 
 class OllamaModel(_OllamaModel):
@@ -172,18 +163,6 @@ def create_bedrock_model(
     )
 
 
-def _ensure_loop() -> asyncio.AbstractEventLoop:
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop
-
-
 class GeoAgent(Agent):
     """Geospatial AI agent with interactive mapping capabilities."""
 
@@ -313,30 +292,14 @@ class GeoAgent(Agent):
     def ask(self, prompt: str) -> str:
         """Send a single-turn prompt to the agent.
 
-        Runs entirely on the same thread/event loop as the Agent
-        to avoid cross-loop asyncio object issues.
-
         Args:
             prompt: The text prompt to send to the agent.
 
         Returns:
             The agent's response as a string.
         """
-        # Ensure there's an event loop bound to this thread (Jupyter-safe)
-        loop = _ensure_loop()
-
-        # Preserve existing conversation messages
-        existing_messages = self.messages.copy()
-
-        # Create a fresh model but keep conversation history
-        self.model = self._model_factory()
-
-        # Restore the conversation messages
-        self.messages = existing_messages
-
-        # Execute the prompt using the Agent's async API on this loop
-        # Avoid Agent.__call__ since it spins a new thread+loop
-        result = loop.run_until_complete(self.invoke_async(prompt))
+        # Use strands' built-in __call__ method which now supports multiple calls
+        result = self(prompt)
         return getattr(result, "final_text", str(result))
 
     def show_ui(self, *, height: int = 700) -> None:
@@ -351,7 +314,10 @@ class GeoAgent(Agent):
             m.create_container()
 
         map_panel = widgets.VBox(
-            [widgets.HTML("<h3 style='margin:0 0 8px 0'>Map</h3>"), m.container],
+            [
+                widgets.HTML("<h3 style='margin:0 0 8px 0'>Map</h3>"),
+                m.floating_sidebar_widget,
+            ],
             layout=widgets.Layout(
                 flex="2 1 0%",
                 min_width="520px",
@@ -429,7 +395,6 @@ class GeoAgent(Agent):
             examples=examples,
         )
         self._pending = {"fut": None}
-        self._executor = ThreadPoolExecutor(max_workers=1)
 
         def _esc(s: str) -> str:
             """Escape HTML characters in a string.
@@ -816,20 +781,8 @@ class STACAgent(Agent):
         Returns:
             The agent's response as a string (JSON format for search queries).
         """
-        # Ensure there's an event loop bound to this thread (Jupyter-safe)
-        loop = _ensure_loop()
-
-        # Preserve existing conversation messages
-        existing_messages = self.messages.copy()
-
-        # Create a fresh model but keep conversation history
-        self.model = self._model_factory()
-
-        # Restore the conversation messages
-        self.messages = existing_messages
-
-        # Execute the prompt using the Agent's async API on this loop
-        result = loop.run_until_complete(self.invoke_async(prompt))
+        # Use strands' built-in __call__ method which now supports multiple calls
+        result = self(prompt)
 
         search_payload = self._extract_search_items_payload(result)
         if search_payload is not None:
@@ -851,6 +804,16 @@ class STACAgent(Agent):
         directly from the tool calls, and returns the first item as a STACItemInfo-compatible
         dictionary.
 
+        Note: This method uses LLM inference which adds ~5-10 seconds overhead.
+        For faster searches, use STACTools directly:
+            >>> from geoai.agents import STACTools
+            >>> tools = STACTools()
+            >>> result = tools.search_items(
+            ...     collection="sentinel-2-l2a",
+            ...     bbox=[-122.5, 37.7, -122.4, 37.8],
+            ...     time_range="2024-08-01/2024-08-31"
+            ... )
+
         Args:
             prompt: Natural language search query (e.g., "Find Sentinel-2 imagery
                     over San Francisco in September 2024").
@@ -866,23 +829,9 @@ class STACAgent(Agent):
             ... )
             >>> print(item['id'])
             >>> print(item['assets'][0]['key'])    # or 'title'
-            # To get the asset 'href', use get_item_info with the asset key:
-            # href = agent.get_item_info(item['id'], asset_key=item['assets'][0]['key'])['href']
         """
-        # Ensure there's an event loop
-        loop = _ensure_loop()
-
-        # Preserve existing messages
-        existing_messages = self.messages.copy()
-
-        # Create fresh model
-        self.model = self._model_factory()
-
-        # Restore messages
-        self.messages = existing_messages
-
-        # Execute the prompt and capture the agent result
-        result = loop.run_until_complete(self.invoke_async(prompt))
+        # Use strands' built-in __call__ method which now supports multiple calls
+        result = self(prompt)
 
         search_payload = self._extract_search_items_payload(result)
         if search_payload is not None:
@@ -984,7 +933,7 @@ class STACAgent(Agent):
         map_panel = widgets.VBox(
             [
                 widgets.HTML("<h3 style='margin:0 0 8px 0'>Map</h3>"),
-                m.container,
+                m.floating_sidebar_widget,
             ],
             layout=widgets.Layout(
                 flex="2 1 0%",
@@ -1064,7 +1013,6 @@ class STACAgent(Agent):
             examples=examples,
         )
         self._pending = {"fut": None}
-        self._executor = ThreadPoolExecutor(max_workers=1)
 
         def _esc(s: str) -> str:
             """Escape HTML characters in a string."""
