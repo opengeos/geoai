@@ -199,14 +199,16 @@ class STACTools:
                 # Try to fix common JSON formatting issues from LLM
                 query_str = query.strip()
                 # Fix missing closing braces
-                if query_str.count('{') > query_str.count('}'):
-                    query_str = query_str + '}' * (query_str.count('{') - query_str.count('}'))
+                if query_str.count("{") > query_str.count("}"):
+                    query_str = query_str + "}" * (
+                        query_str.count("{") - query_str.count("}")
+                    )
                 # Fix extra closing braces
-                elif query_str.count('}') > query_str.count('{'):
+                elif query_str.count("}") > query_str.count("{"):
                     # Remove extra closing braces from the end
-                    extra_braces = query_str.count('}') - query_str.count('{')
+                    extra_braces = query_str.count("}") - query_str.count("{")
                     for _ in range(extra_braces):
-                        query_str = query_str.rstrip('}')
+                        query_str = query_str.rstrip("}")
                 query = ast.literal_eval(query_str)
             if isinstance(limit, str):
                 limit = ast.literal_eval(limit)
