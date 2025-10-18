@@ -639,11 +639,14 @@ class STACAgent(Agent):
         if system_prompt == "default":
             system_prompt = """You are a STAC search agent. Follow these steps EXACTLY:
 
-1. Determine collection ID:
-   - "sentinel-2-l2a" for Sentinel-2
+1. Determine collection ID based on data type:
+   - "sentinel-2-l2a" for Sentinel-2 or optical satellite imagery
    - "landsat-c2-l2" for Landsat
-   - "naip" for NAIP
-   - "sentinel-1-grd" for Sentinel-1/SAR
+   - "naip" for NAIP or aerial imagery (USA only)
+   - "sentinel-1-grd" for Sentinel-1 or SAR/radar
+   - "cop-dem-glo-30" for DEM, elevation, or terrain data
+   - "aster-l1t" for ASTER
+   For other data (e.g., MODIS, land cover): call list_collections(filter_keyword="<keyword>")
 
 2. If location mentioned:
    - Call geocode_location("<name>") FIRST
@@ -675,8 +678,12 @@ Examples:
 4. Return first item as JSON:
 {"id": "...", "collection": "...", "datetime": "...", "bbox": [...], "assets": [...]}
 
-If no items: {"error": "No items found"}
-NO explanatory text - ONLY JSON."""
+ERROR HANDLING:
+- If no items found: {"error": "No items found"}
+- If tool result too large: {"error": "Result too large, try narrower search"}
+- If tool error: {"error": "Search failed: <error message>"}
+
+CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
 
         super().__init__(
             name="STAC Search Agent",
@@ -727,13 +734,21 @@ NO explanatory text - ONLY JSON."""
                     for item in content:
                         if isinstance(item, dict) and "toolResult" in item:
                             tool_result = item["toolResult"]
+                            # Check if this is a search_items result
+                            # We need to look at the preceding assistant message to identify the tool
                             if tool_result.get("status") == "success":
                                 result_content = tool_result.get("content", [])
                                 if isinstance(result_content, list) and result_content:
                                     text_content = result_content[0].get("text", "")
                                     try:
                                         payload = json.loads(text_content)
-                                        if "items" in payload and payload.get("items"):
+                                        # Return ANY search_items payload, even if items is empty
+                                        # This is identified by having "query" and "collection" fields
+                                        if (
+                                            "query" in payload
+                                            and "collection" in payload
+                                            and "items" in payload
+                                        ):
                                             return payload
                                     except json.JSONDecodeError:
                                         continue
@@ -847,6 +862,8 @@ NO explanatory text - ONLY JSON."""
         collection = item.get("collection")
         item_id = item.get("id")
 
+        kwargs = {}
+
         # Determine which assets to display based on collection
         assets = None
         if collection == "sentinel-2-l2a":
@@ -857,6 +874,14 @@ NO explanatory text - ONLY JSON."""
             assets = ["image"]  # NAIP 4-band imagery
         elif "sentinel-1" in collection:
             assets = ["vv"]  # Sentinel-1 VV polarization
+        elif collection == "cop-dem-glo-30":
+            assets = ["data"]
+            kwargs["colormap_name"] = "terrain"
+        elif collection == "aster-l1t":
+            assets = ["VNIR"]  # ASTER L1T imagery
+        elif collection == "3dep-lidar-hag":
+            assets = ["data"]
+            kwargs["colormap_name"] = "terrain"
         else:
             # Try to find common asset names
             if "assets" in item:
@@ -864,7 +889,7 @@ NO explanatory text - ONLY JSON."""
                     a.get("key") for a in item["assets"] if isinstance(a, dict)
                 ]
                 # Look for visual or RGB assets
-                for possible in ["visual", "rendered_preview", "image", "data"]:
+                for possible in ["visual", "image", "data"]:
                     if possible in asset_keys:
                         assets = [possible]
                         break
@@ -873,8 +898,7 @@ NO explanatory text - ONLY JSON."""
                     assets = asset_keys[:1]
 
         if not assets:
-            return
-
+            return None
         try:
             # Add the STAC layer to the map
             layer_name = f"{collection[:20]}_{item_id[:15]}"
@@ -884,9 +908,12 @@ NO explanatory text - ONLY JSON."""
                 assets=assets,
                 name=layer_name,
                 before_id=self.map_instance.first_symbol_layer_id,
+                **kwargs,
             )
+            return assets  # Return the assets that were visualized
         except Exception as e:
             print(f"Could not visualize item on map: {e}")
+            return None
 
     def show_ui(self, *, height: int = 700) -> None:
         """Display an interactive UI with map and chat interface for STAC searches.
@@ -953,7 +980,6 @@ NO explanatory text - ONLY JSON."""
                     "Sentinel-2 over Las Vegas",
                     "Find Sentinel-2 imagery over Las Vegas in August 2025",
                 ),
-                ("NAIP for NYC", "Show me NAIP aerial imagery for New York City"),
                 (
                     "Landsat over Paris",
                     "Find Landsat imagery over Paris from June to July 2025",
@@ -962,10 +988,13 @@ NO explanatory text - ONLY JSON."""
                     "Landsat with <10% cloud cover",
                     "Find Landsat imagery over Paris with <10% cloud cover in June 2025",
                 ),
-                ("MODIS for California", "Show me MODIS data for California"),
-                ("Building footprints", "Find building footprints in Seattle"),
-                ("Land cover data", "Get land cover data for Washington DC"),
-                ("Sentinel-1 SAR", "Find Sentinel-1 SAR imagery over Tokyo in 2024"),
+                ("NAIP for NYC", "Show me NAIP aerial imagery for New York City"),
+                ("DEM for Seattle", "Show me DEM data for Seattle"),
+                (
+                    "3DEP Lidar HAG",
+                    "Show me data over Austin from 3dep-lidar-hag collection",
+                ),
+                ("ASTER for Tokyo", "Show me ASTER imagery for Tokyo"),
             ],
             value="",
             layout=widgets.Layout(width="auto"),
@@ -1040,15 +1069,21 @@ NO explanatory text - ONLY JSON."""
 
                 if item_data is not None:
                     # Visualize on map
-                    self._visualize_stac_item(item_data)
+                    visualized_assets = self._visualize_stac_item(item_data)
 
                     # Format response for display
                     formatted_response = (
                         f"Found item: {item_data['id']}\n"
                         f"Collection: {item_data['collection']}\n"
                         f"Date: {item_data.get('datetime', 'N/A')}\n"
-                        f"✓ Added to map"
                     )
+
+                    if visualized_assets:
+                        assets_str = ", ".join(visualized_assets)
+                        formatted_response += f"✓ Added to map (assets: {assets_str})"
+                    else:
+                        formatted_response += "✓ Added to map"
+
                     _append("assistant", formatted_response)
                 else:
                     _append(
