@@ -1,4 +1,6 @@
+from .catalog_tools import CatalogTools
 from .geo_agents import (
+    CatalogAgent,
     GeoAgent,
     STACAgent,
     create_ollama_model,

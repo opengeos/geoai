@@ -151,6 +151,7 @@ nav:
           - examples/AlphaEarth.ipynb
           - examples/AI_agents.ipynb
           - examples/STAC_agents.ipynb
+          - examples/catalog_search_agent.ipynb
           - examples/train_timm_classifier.ipynb
           - examples/train_timm_segmentation.ipynb
           - examples/lightly_train_self_supervised.ipynb
