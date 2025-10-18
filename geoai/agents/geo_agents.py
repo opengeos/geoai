@@ -18,6 +18,7 @@ from strands.models.anthropic import AnthropicModel
 from strands.models.ollama import OllamaModel as _OllamaModel
 from strands.models.openai import OpenAIModel
 
+from .catalog_tools import CatalogTools
 from .map_tools import MapSession, MapTools
 from .stac_tools import STACTools
 
@@ -1182,3 +1183,238 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             [map_panel, right], layout=widgets.Layout(width="100%", gap="8px")
         )
         display(root)
+
+
+class CatalogAgent(Agent):
+    """AI agent for searching data catalogs with natural language queries."""
+
+    def __init__(
+        self,
+        *,
+        model: str = "llama3.1",
+        system_prompt: str = "default",
+        catalog_url: Optional[str] = None,
+        catalog_df: Optional[Any] = None,
+        model_args: dict = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the Catalog Agent.
+
+        Args:
+            model: Model identifier (default: "llama3.1").
+            system_prompt: System prompt for the agent (default: "default").
+            catalog_url: URL to a catalog file (TSV, CSV, or JSON). Use JSON format for spatial search support.
+                Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/heads/master/gee_catalog.json"
+            catalog_df: Pre-loaded catalog as a pandas DataFrame.
+            model_args: Additional keyword arguments for the model.
+            **kwargs: Additional keyword arguments for the Agent.
+        """
+        self.catalog_tools: CatalogTools = CatalogTools(
+            catalog_url=catalog_url, catalog_df=catalog_df
+        )
+
+        if model_args is None:
+            model_args = {}
+
+        # --- save a model factory we can call each turn ---
+        if model == "llama3.1":
+            self._model_factory: Callable[[], OllamaModel] = (
+                lambda: create_ollama_model(
+                    host="http://localhost:11434", model_id=model, **model_args
+                )
+            )
+        elif isinstance(model, str):
+            self._model_factory: Callable[[], BedrockModel] = (
+                lambda: create_bedrock_model(model_id=model, **model_args)
+            )
+        elif isinstance(model, OllamaModel):
+            # Extract configuration from existing OllamaModel and create new instances
+            model_id = model.config["model_id"]
+            host = model.host
+            client_args = model.client_args
+            self._model_factory: Callable[[], OllamaModel] = (
+                lambda: create_ollama_model(
+                    host=host, model_id=model_id, client_args=client_args, **model_args
+                )
+            )
+        elif isinstance(model, OpenAIModel):
+            # Extract configuration from existing OpenAIModel and create new instances
+            model_id = model.config["model_id"]
+            client_args = model.client_args.copy()
+            self._model_factory: Callable[[], OpenAIModel] = (
+                lambda mid=model_id, client_args=client_args: create_openai_model(
+                    model_id=mid, client_args=client_args, **model_args
+                )
+            )
+        elif isinstance(model, AnthropicModel):
+            # Extract configuration from existing AnthropicModel and create new instances
+            model_id = model.config["model_id"]
+            client_args = model.client_args.copy()
+            self._model_factory: Callable[[], AnthropicModel] = (
+                lambda mid=model_id, client_args=client_args: create_anthropic_model(
+                    model_id=mid, client_args=client_args, **model_args
+                )
+            )
+        else:
+            raise ValueError(f"Invalid model: {model}")
+
+        # build initial model (first turn)
+        model = self._model_factory()
+
+        if system_prompt == "default":
+            system_prompt = """You are a data catalog search agent. Your job is to help users find datasets from a data catalog.
+
+IMPORTANT: Follow these steps EXACTLY:
+
+1. Understand the user's query:
+   - What type of data are they looking for? (e.g., landcover, elevation, imagery)
+   - Are they searching for a specific geographic region? (e.g., California, San Francisco, bounding box)
+   - Are they filtering by time period? (e.g., "from 2020", "between 2015-2020", "recent data")
+   - Are they filtering by provider? (e.g., NASA, USGS)
+   - Are they filtering by dataset type? (e.g., image, image_collection, table)
+
+2. Use the appropriate tool:
+   - search_by_region: PREFERRED for spatial queries - search datasets covering a geographic region
+     * Use location parameter for place names (e.g., "California", "San Francisco")
+     * Use bbox parameter for coordinates [west, south, east, north]
+     * Can combine with keywords, dataset_type, provider, start_date, end_date filters
+   - search_datasets: For keyword-only searches without spatial filter
+     * Can filter by start_date and end_date for temporal queries
+   - geocode_location: Convert location names to coordinates (called automatically by search_by_region)
+   - get_dataset_info: Get details about a specific dataset by ID
+   - list_dataset_types: Show available dataset types
+   - list_providers: Show available data providers
+   - get_catalog_stats: Get overall catalog statistics
+
+3. Search strategy:
+   - SPATIAL QUERIES: If user mentions ANY location or region, IMMEDIATELY use search_by_region
+     * Pass location names directly to the location parameter - DO NOT ask user for bbox coordinates
+     * Examples of locations: California, San Francisco, New York, Paris, any city/state/country name
+     * search_by_region will automatically geocode location names - you don't need to call geocode_location separately
+   - TEMPORAL QUERIES: If user mentions ANY time period, ALWAYS add start_date/end_date parameters
+     * "from 2022" or "since 2022" or "2022 onwards" → start_date="2022-01-01"
+     * "until 2023" or "before 2023" → end_date="2023-12-31"
+     * "between 2020 and 2023" → start_date="2020-01-01", end_date="2023-12-31"
+     * "recent" or "latest" → start_date="2020-01-01"
+     * Time indicators: from, since, after, before, until, between, onwards, recent, latest
+   - KEYWORD QUERIES: If no location mentioned, use search_datasets
+   - Extract key search terms from the user's query
+   - Use keywords parameter for the main search terms
+   - Use dataset_type parameter if user specifies type (image, table, etc.)
+   - Use provider parameter if user specifies provider (NASA, USGS, etc.)
+   - Default max_results is 10, but can be adjusted
+
+CRITICAL RULES:
+1. NEVER ask the user to provide bbox coordinates. If they mention a location name, pass it directly to search_by_region(location="name")
+2. ALWAYS add start_date or end_date when user mentions ANY time period (from, since, onwards, recent, etc.)
+3. Convert years to YYYY-MM-DD format: 2022 → "2022-01-01"
+
+4. Examples:
+   - "Find landcover datasets covering California" → search_by_region(location="California", keywords="landcover")
+   - "Show elevation data for San Francisco" → search_by_region(location="San Francisco", keywords="elevation")
+   - "Find datasets in bbox [-122, 37, -121, 38]" → search_by_region(bbox=[-122, 37, -121, 38])
+   - "Find landcover datasets from NASA" → search_datasets(keywords="landcover", provider="NASA")
+   - "Show me elevation data" → search_datasets(keywords="elevation")
+   - "What types of datasets are available?" → list_dataset_types()
+   - "Find image collections about forests" → search_datasets(keywords="forest", dataset_type="image_collection")
+   - "Find landcover data from 2020 onwards" → search_datasets(keywords="landcover", start_date="2020-01-01")
+   - "Show California datasets between 2015 and 2020" → search_by_region(location="California", start_date="2015-01-01", end_date="2020-12-31")
+   - "Find recent elevation data" → search_datasets(keywords="elevation", start_date="2020-01-01")
+
+5. Return results clearly:
+   - Summarize the number of results found
+   - List the top results with their EXACT IDs and titles FROM THE TOOL RESPONSE
+   - Mention key information like provider, type, geographic coverage, and date range if available
+   - For spatial searches, mention the search region
+
+ERROR HANDLING:
+- If no results found: Suggest trying different keywords, broader region, or removing filters
+- If location not found: Suggest alternative spellings or try a broader region
+- If tool error: Explain the error and suggest alternatives
+
+CRITICAL RULES - MUST FOLLOW:
+1. NEVER make up or hallucinate dataset IDs, titles, or any other information
+2. ONLY report datasets that appear in the actual tool response
+3. Copy dataset IDs and titles EXACTLY as they appear in the tool response
+4. If a field is null/None in the tool response, say "N/A" or omit it - DO NOT guess
+5. DO NOT use your training data knowledge about Earth Engine datasets
+6. DO NOT fill in missing information from your knowledge
+7. If unsure, say "Information not available in results"
+
+Example of CORRECT behavior:
+Tool returns: {"id": "AAFC/ACI", "title": "Canada AAFC Annual Crop Inventory"}
+Your response: "Found dataset: AAFC/ACI - Canada AAFC Annual Crop Inventory"
+
+Example of INCORRECT behavior (DO NOT DO THIS):
+Tool returns: {"id": "AAFC/ACI", "title": "Canada AAFC Annual Crop Inventory"}
+Your response: "Found dataset: USGS/NED - USGS Elevation Data"  ← WRONG! This ID wasn't in the tool response!"""
+
+        super().__init__(
+            name="Catalog Search Agent",
+            model=model,
+            tools=[
+                self.catalog_tools.search_datasets,
+                self.catalog_tools.search_by_region,
+                self.catalog_tools.get_dataset_info,
+                self.catalog_tools.geocode_location,
+                self.catalog_tools.list_dataset_types,
+                self.catalog_tools.list_providers,
+                self.catalog_tools.get_catalog_stats,
+            ],
+            system_prompt=system_prompt,
+            callback_handler=None,
+        )
+
+    def ask(self, prompt: str) -> str:
+        """Send a single-turn prompt to the agent.
+
+        Args:
+            prompt: The text prompt to send to the agent.
+
+        Returns:
+            The agent's response as a string.
+        """
+        # Use strands' built-in __call__ method which now supports multiple calls
+        result = self(prompt)
+        return getattr(result, "final_text", str(result))
+
+    def search_datasets(
+        self,
+        keywords: Optional[str] = None,
+        dataset_type: Optional[str] = None,
+        provider: Optional[str] = None,
+        max_results: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Search for datasets and return structured results.
+
+        This method directly uses the CatalogTools without LLM inference for faster searches.
+
+        Args:
+            keywords: Keywords to search for.
+            dataset_type: Filter by dataset type.
+            provider: Filter by provider.
+            max_results: Maximum number of results to return.
+
+        Returns:
+            List of dataset dictionaries.
+
+        Example:
+            >>> agent = CatalogAgent(catalog_url="...")
+            >>> datasets = agent.search_datasets(keywords="landcover", provider="NASA")
+            >>> for ds in datasets:
+            ...     print(ds['id'], ds['title'])
+        """
+        result_json = self.catalog_tools.search_datasets(
+            keywords=keywords,
+            dataset_type=dataset_type,
+            provider=provider,
+            max_results=max_results,
+        )
+
+        result = json.loads(result_json)
+
+        if "error" in result:
+            print(f"Search error: {result['error']}")
+            return []
+
+        return result.get("datasets", [])
