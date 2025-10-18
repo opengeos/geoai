@@ -1,5 +1,6 @@
 """This module provides functions to download data, including NAIP imagery and building data from Overture Maps."""
 
+import datetime
 import logging
 import os
 import subprocess
@@ -819,6 +820,7 @@ def pc_stac_search(
     query: Optional[Dict[str, Any]] = None,
     limit: int = 10,
     max_items: Optional[int] = None,
+    quiet: bool = False,
     endpoint: str = "https://planetarycomputer.microsoft.com/api/stac/v1",
 ) -> List["pystac.Item"]:
     """
@@ -839,6 +841,7 @@ def pc_stac_search(
         limit (int, optional): Number of items to return per page. Defaults to 10.
         max_items (int, optional): Maximum total number of items to return.
             Defaults to None (returns all matching items).
+        quiet: bool, optional): Whether to suppress print statements. Defaults to False.
         endpoint (str, optional): STAC API endpoint URL.
             Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".
 
@@ -896,7 +899,8 @@ def pc_stac_search(
     except Exception as e:
         raise Exception(f"Error retrieving search results: {str(e)}")
 
-    print(f"Found {len(items)} items matching search criteria")
+    if not quiet:
+        print(f"Found {len(items)} items matching search criteria")
 
     return items
 
