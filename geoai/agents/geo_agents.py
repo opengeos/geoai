@@ -637,78 +637,46 @@ class STACAgent(Agent):
         model = self._model_factory()
 
         if system_prompt == "default":
-            system_prompt = """
-            You are a STAC catalog search agent. Follow these steps EXACTLY for every search:
+            system_prompt = """You are a STAC search agent. Follow these steps EXACTLY:
 
-            STEP 1: Determine the collection ID
-            Common collections:
-            - "sentinel-2-l2a" for Sentinel-2 or Sentinel
-            - "landsat-c2-l2" for Landsat
-            - "naip" for NAIP or aerial imagery
-            - "sentinel-1-grd" for Sentinel-1 or SAR
-            - "aster-l1t" for ASTER
-            - "cop-dem-glo-30" for DEM or elevation
+1. Determine collection ID:
+   - "sentinel-2-l2a" for Sentinel-2
+   - "landsat-c2-l2" for Landsat
+   - "naip" for NAIP
+   - "sentinel-1-grd" for Sentinel-1/SAR
 
-            If the user asks for a collection NOT in the list above (e.g., "MODIS", "HLS", "building footprints", "land cover"):
-            - Call list_collections(filter_keyword="<keyword>") using a relevant keyword from the user's query
-            - Extract the most relevant collection ID from the response
-            - Use that collection ID in the next step
+2. If location mentioned:
+   - Call geocode_location("<name>") FIRST
+   - WAIT for the response
+   - Extract the "bbox" array from the JSON response
+   - This bbox is [west, south, east, north] format
 
-            STEP 2: Check if user mentioned a location
-            If the query contains ANY location name (e.g., "Paris", "San Francisco", "New York", "California", "Tokyo"):
-            - REQUIRED: Call geocode_location("<location_name>") FIRST
-            - Extract the bbox array from the response
-            - This bbox MUST be included in search_items()
+3. Call search_items():
+   - collection: REQUIRED
+   - bbox: Use the EXACT bbox array from geocode_location (REQUIRED if location mentioned)
+   - time_range: "YYYY-MM-DD/YYYY-MM-DD" format if dates mentioned
+   - query: Use for cloud cover filtering (see examples)
+   - max_items: 1
 
-            Location words include: city names, state names, country names, region names, place names
-            Examples: "Paris", "New York", "California", "Seattle", "San Francisco", "Tokyo", "London"
+Cloud cover filtering:
+   - "<10% cloud": query={"eo:cloud_cover": {"lt": 10}}
+   - "<20% cloud": query={"eo:cloud_cover": {"lt": 20}}
+   - "<5% cloud": query={"eo:cloud_cover": {"lt": 5}}
 
-            STEP 3: Build search_items() parameters
-            - collection: REQUIRED - the collection ID from Step 1
-            - bbox: REQUIRED if Step 2 found a location, otherwise omit entirely
-            - time_range: REQUIRED if query has dates/months/years, otherwise omit entirely
-            - max_items: default to 1
+Examples:
+1. "Find Landsat over Paris from June to July 2023"
+   geocode_location("Paris") → {"bbox": [2.224, 48.815, 2.469, 48.902], ...}
+   search_items(collection="landsat-c2-l2", bbox=[2.224, 48.815, 2.469, 48.902], time_range="2023-06-01/2023-07-31")
 
-            CRITICAL RULES:
-            - If location mentioned → MUST call geocode_location() → MUST include bbox in search_items()
-            - If dates mentioned → MUST include time_range in search_items()
-            - If NO location → omit bbox parameter
-            - If NO dates → omit time_range parameter
+2. "Find Landsat with <10% cloud cover over Paris"
+   geocode_location("Paris") → {"bbox": [2.224, 48.815, 2.469, 48.902], ...}
+   search_items(collection="landsat-c2-l2", bbox=[2.224, 48.815, 2.469, 48.902], query={"eo:cloud_cover": {"lt": 10}})
 
-            Examples:
-            - "Show me NAIP imagery for New York"
-              → geocode_location("New York") → search_items(collection="naip", bbox=[...])
+4. Return first item as JSON:
+{"id": "...", "collection": "...", "datetime": "...", "bbox": [...], "assets": [...]}
 
-            - "Find Sentinel-2 imagery in August 2024"
-              → search_items(collection="sentinel-2-l2a", time_range="2024-08-01/2024-08-31")
-
-            - "Find Landsat over Paris from June to July 2023"
-              → geocode_location("Paris") → search_items(collection="landsat-c2-l2", bbox=[...], time_range="2023-06-01/2023-07-31")
-
-            - "Show me MODIS data for California"
-              → list_collections(filter_keyword="modis") → geocode_location("California") → search_items(collection="modis-...", bbox=[...])
-
-            STEP 4: After calling search_items(), extract the FIRST item from the response and return it as JSON.
-
-            YOUR FINAL RESPONSE MUST BE VALID JSON ONLY. No explanatory text before or after.
-
-            Format: Return the first item from the "items" array in the tool response:
-            {
-              "id": "item_id_from_response",
-              "collection": "collection_from_response",
-              "datetime": "datetime_from_response",
-              "bbox": [west, south, east, north],
-              "assets": [
-                {"key": "asset_key", "title": "title"}
-              ],
-              "properties": {}
-            }
-
-            CRITICAL:
-            - Return ONLY the JSON object, nothing else
-            - Use actual values from the tool response
-            - If no items found, return: {"error": "No items found"}
-            """
+If no items: {"error": "No items found"}
+NO explanatory text - ONLY JSON."""
 
         super().__init__(
             name="STAC Search Agent",
@@ -982,13 +950,17 @@ class STACAgent(Agent):
             options=[
                 ("— Example Searches —", ""),
                 (
-                    "Sentinel-2 over SF",
-                    "Find Sentinel-2 imagery over San Francisco in August 2024",
+                    "Sentinel-2 over Las Vegas",
+                    "Find Sentinel-2 imagery over Las Vegas in August 2025",
                 ),
                 ("NAIP for NYC", "Show me NAIP aerial imagery for New York City"),
                 (
                     "Landsat over Paris",
-                    "Find Landsat imagery over Paris from June to July 2023",
+                    "Find Landsat imagery over Paris from June to July 2025",
+                ),
+                (
+                    "Landsat with <10% cloud cover",
+                    "Find Landsat imagery over Paris with <10% cloud cover in June 2025",
                 ),
                 ("MODIS for California", "Show me MODIS data for California"),
                 ("Building footprints", "Find building footprints in Seattle"),

@@ -19,6 +19,65 @@ from .stac_models import (
 class STACTools:
     """Collection of tools for searching and interacting with STAC catalogs."""
 
+    # Common location cache to avoid repeated geocoding
+    _LOCATION_CACHE = {
+        "san francisco": {
+            "name": "San Francisco",
+            "bbox": [-122.5155, 37.7034, -122.3549, 37.8324],
+            "center": [-122.4194, 37.7749],
+        },
+        "new york": {
+            "name": "New York",
+            "bbox": [-74.0479, 40.6829, -73.9067, 40.8820],
+            "center": [-73.9352, 40.7306],
+        },
+        "new york city": {
+            "name": "New York City",
+            "bbox": [-74.0479, 40.6829, -73.9067, 40.8820],
+            "center": [-73.9352, 40.7306],
+        },
+        "paris": {
+            "name": "Paris",
+            "bbox": [2.2241, 48.8156, 2.4698, 48.9022],
+            "center": [2.3522, 48.8566],
+        },
+        "london": {
+            "name": "London",
+            "bbox": [-0.5103, 51.2868, 0.3340, 51.6919],
+            "center": [-0.1276, 51.5074],
+        },
+        "tokyo": {
+            "name": "Tokyo",
+            "bbox": [139.5694, 35.5232, 139.9182, 35.8173],
+            "center": [139.6917, 35.6895],
+        },
+        "los angeles": {
+            "name": "Los Angeles",
+            "bbox": [-118.6682, 33.7037, -118.1553, 34.3373],
+            "center": [-118.2437, 34.0522],
+        },
+        "chicago": {
+            "name": "Chicago",
+            "bbox": [-87.9401, 41.6445, -87.5241, 42.0230],
+            "center": [-87.6298, 41.8781],
+        },
+        "seattle": {
+            "name": "Seattle",
+            "bbox": [-122.4595, 47.4810, -122.2244, 47.7341],
+            "center": [-122.3321, 47.6062],
+        },
+        "california": {
+            "name": "California",
+            "bbox": [-124.4820, 32.5288, -114.1315, 42.0095],
+            "center": [-119.4179, 36.7783],
+        },
+        "las vegas": {
+            "name": "Las Vegas",
+            "bbox": [-115.3711, 35.9630, -114.9372, 36.2610],
+            "center": [-115.1400, 36.1177],
+        },
+    }
+
     def __init__(
         self,
         endpoint: str = "https://planetarycomputer.microsoft.com/api/stac/v1",
@@ -29,6 +88,8 @@ class STACTools:
             endpoint: STAC API endpoint URL. Defaults to Microsoft Planetary Computer.
         """
         self.endpoint = endpoint
+        # Runtime cache for geocoding results
+        self._geocode_cache = {}
 
     @tool(
         description="List and search available STAC collections from Planetary Computer"
@@ -135,7 +196,18 @@ class STACTools:
                 bbox = bbox[0]
 
             if isinstance(query, str):
-                query = ast.literal_eval(query)
+                # Try to fix common JSON formatting issues from LLM
+                query_str = query.strip()
+                # Fix missing closing braces
+                if query_str.count('{') > query_str.count('}'):
+                    query_str = query_str + '}' * (query_str.count('{') - query_str.count('}'))
+                # Fix extra closing braces
+                elif query_str.count('}') > query_str.count('{'):
+                    # Remove extra closing braces from the end
+                    extra_braces = query_str.count('}') - query_str.count('{')
+                    for _ in range(extra_braces):
+                        query_str = query_str.rstrip('}')
+                query = ast.literal_eval(query_str)
             if isinstance(limit, str):
                 limit = ast.literal_eval(limit)
             if isinstance(max_items, str):
@@ -267,9 +339,24 @@ class STACTools:
             JSON string with location info including bounding box and center coordinates.
         """
         try:
+            # Check static cache first (common locations)
+            location_key = location_name.lower().strip()
+            if location_key in self._LOCATION_CACHE:
+                cached = self._LOCATION_CACHE[location_key]
+                location_info = LocationInfo(
+                    name=cached["name"],
+                    bbox=cached["bbox"],
+                    center=cached["center"],
+                )
+                return json.dumps(location_info.model_dump(), indent=2)
+
+            # Check runtime cache
+            if location_key in self._geocode_cache:
+                return self._geocode_cache[location_key]
+
+            # Geocode using Nominatim
             import requests
 
-            # Use Nominatim for geocoding (OpenStreetMap)
             url = "https://nominatim.openstreetmap.org/search"
             params = {
                 "q": location_name,
@@ -284,7 +371,11 @@ class STACTools:
             results = response.json()
 
             if not results:
-                return json.dumps({"error": f"Location '{location_name}' not found"})
+                error_result = json.dumps(
+                    {"error": f"Location '{location_name}' not found"}
+                )
+                self._geocode_cache[location_key] = error_result
+                return error_result
 
             result = results[0]
             bbox = [
@@ -301,7 +392,11 @@ class STACTools:
                 center=center,
             )
 
-            return json.dumps(location_info.model_dump(), indent=2)
+            result_json = json.dumps(location_info.model_dump(), indent=2)
+            # Cache the result
+            self._geocode_cache[location_key] = result_json
+
+            return result_json
 
         except Exception as e:
             return json.dumps({"error": f"Geocoding error: {str(e)}"})
