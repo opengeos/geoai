@@ -23,6 +23,42 @@ from .map_tools import MapSession, MapTools
 from .stac_tools import STACTools
 
 
+class UICallbackHandler:
+    """Callback handler that updates UI status widget with agent progress.
+
+    This handler intercepts tool calls and progress events to provide
+    real-time feedback without overwhelming the user.
+    """
+
+    def __init__(self, status_widget=None):
+        """Initialize the callback handler.
+
+        Args:
+            status_widget: Optional ipywidgets.HTML widget to update with status.
+        """
+        self.status_widget = status_widget
+        self.current_tool = None
+
+    def __call__(self, **kwargs):
+        """Handle callback events from the agent.
+
+        Args:
+            **kwargs: Event data from the agent execution.
+        """
+        # Track when tools are being called
+        if "current_tool_use" in kwargs and kwargs["current_tool_use"].get("name"):
+            tool_name = kwargs["current_tool_use"]["name"]
+            self.current_tool = tool_name
+
+            # Update status widget if available
+            if self.status_widget is not None:
+                # Make tool names more user-friendly
+                friendly_name = tool_name.replace("_", " ").title()
+                self.status_widget.value = (
+                    f"<span style='color:#0a7'>⚙️ {friendly_name}...</span>"
+                )
+
+
 class OllamaModel(_OllamaModel):
     """Fixed OllamaModel that ensures proper model_id handling."""
 
@@ -462,7 +498,14 @@ class GeoAgent(Agent):
             _lock(True)
             self._ui.status.value = "<span style='color:#0a7'>Running…</span>"
             try:
-                out = self.ask(text)  # fresh Agent/model per call, silent
+                # Create a callback handler that updates the status widget
+                callback_handler = UICallbackHandler(status_widget=self._ui.status)
+
+                # Temporarily set callback_handler for this call
+                old_callback = self.callback_handler
+                self.callback_handler = callback_handler
+
+                out = self.ask(text)  # fresh Agent/model per call, with callback
                 _append("assistant", out)
                 self._ui.status.value = "<span style='color:#0a7'>Done.</span>"
             except Exception as e:
@@ -471,6 +514,8 @@ class GeoAgent(Agent):
                     "<span style='color:#c00'>Finished with an issue.</span>"
                 )
             finally:
+                # Restore old callback handler
+                self.callback_handler = old_callback
                 self._ui.inp.value = ""
                 _lock(False)
 
@@ -1065,10 +1110,22 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             _lock(True)
             self._ui.status.value = "<span style='color:#0a7'>Searching…</span>"
             try:
-                # Get the structured search result directly
+                # Create a callback handler that updates the status widget
+                callback_handler = UICallbackHandler(status_widget=self._ui.status)
+
+                # Temporarily set callback_handler for this call
+                old_callback = self.callback_handler
+                self.callback_handler = callback_handler
+
+                # Get the structured search result directly (will show progress via callback)
                 item_data = self.search_and_get_first_item(text)
 
                 if item_data is not None:
+                    # Update status for visualization step
+                    self._ui.status.value = (
+                        "<span style='color:#0a7'>Adding to map...</span>"
+                    )
+
                     # Visualize on map
                     visualized_assets = self._visualize_stac_item(item_data)
 
@@ -1099,6 +1156,8 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
                     "<span style='color:#c00'>Finished with an issue.</span>"
                 )
             finally:
+                # Restore old callback handler
+                self.callback_handler = old_callback
                 self._ui.inp.value = ""
                 _lock(False)
 
