@@ -55,7 +55,9 @@ class UICallbackHandler:
                 # Make tool names more user-friendly
                 friendly_name = tool_name.replace("_", " ").title()
                 self.status_widget.value = (
-                    f"<span style='color:#0a7'>⚙️ {friendly_name}...</span>"
+                    f"<span style='color:#0a7'>"
+                    f"<i class='fas fa-spinner fa-spin' style='font-size:1.2em'></i> "
+                    f"{friendly_name}...</span>"
                 )
 
 
@@ -396,7 +398,10 @@ class GeoAgent(Agent):
         btn_clear = widgets.Button(
             description="Clear", icon="trash", layout=widgets.Layout(width="120px")
         )
-        status = widgets.HTML("<span style='color:#666'>Ready.</span>")
+        status = widgets.HTML(
+            "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'>"
+            "<span style='color:#666'>Ready.</span>"
+        )
 
         examples = widgets.Dropdown(
             options=[
@@ -1017,7 +1022,10 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
         btn_clear = widgets.Button(
             description="Clear", icon="trash", layout=widgets.Layout(width="120px")
         )
-        status = widgets.HTML("<span style='color:#666'>Ready to search.</span>")
+        status = widgets.HTML(
+            "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'>"
+            "<span style='color:#666'>Ready to search.</span>"
+        )
 
         examples = widgets.Dropdown(
             options=[
