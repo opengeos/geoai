@@ -55,7 +55,10 @@ class UICallbackHandler:
                 # Make tool names more user-friendly
                 friendly_name = tool_name.replace("_", " ").title()
                 self.status_widget.value = (
-                    f"<span style='color:#0a7'>⚙️ {friendly_name}...</span>"
+                    f"<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'>"
+                    f"<span style='color:#0a7'>"
+                    f"<i class='fas fa-spinner fa-spin' style='font-size:1.2em'></i> "
+                    f"{friendly_name}...</span>"
                 )
 
 
