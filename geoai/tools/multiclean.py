@@ -206,11 +206,8 @@ def clean_raster(
     )
 
     # Convert NaN back to nodata if needed
-    if nodata is not None and fill_nan:
-        # If fill_nan is True, there should be no NaN values
-        pass
-    elif nodata is not None:
-        # Convert NaN back to nodata value
+    if nodata is not None:
+        # Convert any remaining NaN values back to nodata value
         if np.isnan(cleaned).any():
             cleaned = np.nan_to_num(cleaned, nan=nodata)
 
