@@ -134,5 +134,5 @@ try:
         compare_masks,
     )
 except ImportError:
-    # Tools not available (missing dependencies)
+    # MultiClean not available (missing dependency)
     pass
