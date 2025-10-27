@@ -121,3 +121,18 @@ from .timm_segment import (
     timm_semantic_segmentation,
     push_timm_model_to_hub,
 )
+
+# Import tools subpackage
+from . import tools
+
+# Expose commonly used tools at package level for convenience
+try:
+    from .tools import (
+        clean_segmentation_mask,
+        clean_raster,
+        clean_raster_batch,
+        compare_masks,
+    )
+except ImportError:
+    # Tools not available (missing dependencies)
+    pass
