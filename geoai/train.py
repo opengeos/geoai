@@ -2532,10 +2532,12 @@ def train_segmentation_model(
             'resize' - Resize images to target_size (may change aspect ratio)
             'pad' - Pad images to target_size (preserves aspect ratio). Defaults to 'resize'.
         num_workers (int): Number of workers for data loading. If None, uses 0 on macOS and Windows, 8 otherwise.
-        early_stopping_patience (int, optional): Number of epochs with no improvement after which
-            training will be stopped. If None, early stopping is disabled. Defaults to None.
-        train_transforms (callable, optional): Custom transforms for training data augmentation.
+            Both image and mask should be torch.Tensor objects. The image tensor is expected to be in
+            CHW format (channels, height, width), and the mask tensor in HW format (height, width).
+            If None, uses default transforms (horizontal flip with 0.5 probability). Defaults to None.
+        val_transforms (callable, optional): Custom transforms for validation data.
             Should be a callable that accepts (image, mask) tensors and returns transformed (image, mask).
+            The image tensor is expected to be in CHW format (channels, height, width), and the mask tensor in HW format (height, width).
             Both image and mask should be torch.Tensor objects. If None, uses default transforms
             (horizontal flip with 0.5 probability). Defaults to None.
         val_transforms (callable, optional): Custom transforms for validation data.
