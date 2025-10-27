@@ -13,7 +13,8 @@ from skimage.transform import resize
 try:
     from torchange.models.segment_any_change import AnyChange, show_change_masks
 except ImportError:
-    print("torchange requires Python 3.11 or higher")
+    AnyChange = None
+    show_change_masks = None
 
 from .utils import download_file
 
@@ -36,6 +37,13 @@ class ChangeDetection:
 
     def _init_model(self):
         """Initialize the AnyChange model."""
+        if AnyChange is None:
+            raise ImportError(
+                "The 'torchange' package is required for change detection. "
+                "Please install it using: pip install torchange\n"
+                "Note: torchange requires Python 3.11 or higher."
+            )
+
         if self.sam_checkpoint is None:
             self.sam_checkpoint = download_checkpoint(self.sam_model_type)
 
@@ -551,6 +559,13 @@ class ChangeDetection:
         Returns:
             matplotlib.figure.Figure: The figure object
         """
+        if show_change_masks is None:
+            raise ImportError(
+                "The 'torchange' package is required for change detection visualization. "
+                "Please install it using: pip install torchange\n"
+                "Note: torchange requires Python 3.11 or higher."
+            )
+
         change_masks, img1, img2 = self.detect_changes(
             image1_path, image2_path, return_results=True
         )
