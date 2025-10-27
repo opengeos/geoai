@@ -28,3 +28,4 @@ torchgeo
 torchinfo
 tqdm
 transformers
+tokenizers>=0.22.1
