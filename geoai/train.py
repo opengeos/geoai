@@ -1917,6 +1917,96 @@ class SemanticRandomHorizontalFlip:
         return image, mask
 
 
+class SemanticRandomVerticalFlip:
+    """Random vertical flip transform for semantic segmentation."""
+
+    def __init__(self, prob: float = 0.5) -> None:
+        self.prob = prob
+
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if random.random() < self.prob:
+            # Flip image and mask along height dimension
+            image = torch.flip(image, dims=[1])
+            mask = torch.flip(mask, dims=[0])
+        return image, mask
+
+
+class SemanticRandomRotation90:
+    """Random 90-degree rotation transform for semantic segmentation."""
+
+    def __init__(self, prob: float = 0.5) -> None:
+        self.prob = prob
+
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if random.random() < self.prob:
+            # Randomly rotate by 90, 180, or 270 degrees
+            k = random.randint(1, 3)
+            image = torch.rot90(image, k, dims=[1, 2])
+            mask = torch.rot90(mask, k, dims=[0, 1])
+        return image, mask
+
+
+class SemanticBrightnessAdjustment:
+    """Random brightness adjustment transform for semantic segmentation."""
+
+    def __init__(
+        self, brightness_range: Tuple[float, float] = (0.8, 1.2), prob: float = 0.5
+    ) -> None:
+        """
+        Initialize brightness adjustment transform.
+
+        Args:
+            brightness_range: Tuple of (min, max) brightness factors.
+            prob: Probability of applying the transform.
+        """
+        self.brightness_range = brightness_range
+        self.prob = prob
+
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if random.random() < self.prob:
+            # Apply random brightness adjustment
+            factor = self.brightness_range[0] + random.random() * (
+                self.brightness_range[1] - self.brightness_range[0]
+            )
+            image = torch.clamp(image * factor, 0, 1)
+        return image, mask
+
+
+class SemanticContrastAdjustment:
+    """Random contrast adjustment transform for semantic segmentation."""
+
+    def __init__(
+        self, contrast_range: Tuple[float, float] = (0.8, 1.2), prob: float = 0.5
+    ) -> None:
+        """
+        Initialize contrast adjustment transform.
+
+        Args:
+            contrast_range: Tuple of (min, max) contrast factors.
+            prob: Probability of applying the transform.
+        """
+        self.contrast_range = contrast_range
+        self.prob = prob
+
+    def __call__(
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if random.random() < self.prob:
+            # Apply random contrast adjustment
+            factor = self.contrast_range[0] + random.random() * (
+                self.contrast_range[1] - self.contrast_range[0]
+            )
+            mean = image.mean(dim=(1, 2), keepdim=True)
+            image = torch.clamp((image - mean) * factor + mean, 0, 1)
+        return image, mask
+
+
 def get_semantic_transform(train: bool) -> Any:
     """
     Get transforms for semantic segmentation data augmentation.
@@ -2388,6 +2478,8 @@ def train_segmentation_model(
     resize_mode: str = "resize",
     num_workers: Optional[int] = None,
     early_stopping_patience: Optional[int] = None,
+    train_transforms: Optional[Callable] = None,
+    val_transforms: Optional[Callable] = None,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -2440,8 +2532,17 @@ def train_segmentation_model(
             'resize' - Resize images to target_size (may change aspect ratio)
             'pad' - Pad images to target_size (preserves aspect ratio). Defaults to 'resize'.
         num_workers (int): Number of workers for data loading. If None, uses 0 on macOS and Windows, 8 otherwise.
-        early_stopping_patience (int, optional): Number of epochs with no improvement after which
-            training will be stopped. If None, early stopping is disabled. Defaults to None.
+            Both image and mask should be torch.Tensor objects. The image tensor is expected to be in
+            CHW format (channels, height, width), and the mask tensor in HW format (height, width).
+            If None, uses default transforms (horizontal flip with 0.5 probability). Defaults to None.
+        val_transforms (callable, optional): Custom transforms for validation data.
+            Should be a callable that accepts (image, mask) tensors and returns transformed (image, mask).
+            The image tensor is expected to be in CHW format (channels, height, width), and the mask tensor in HW format (height, width).
+            Both image and mask should be torch.Tensor objects. If None, uses default transforms
+            (horizontal flip with 0.5 probability). Defaults to None.
+        val_transforms (callable, optional): Custom transforms for validation data.
+            Should be a callable that accepts (image, mask) tensors and returns transformed (image, mask).
+            If None, uses default transforms (no augmentation). Defaults to None.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -2584,10 +2685,22 @@ def train_segmentation_model(
                 print("No resizing needed.")
 
     # Create datasets
+    # Use custom transforms if provided, otherwise use default transforms
+    train_transform = (
+        train_transforms
+        if train_transforms is not None
+        else get_semantic_transform(train=True)
+    )
+    val_transform = (
+        val_transforms
+        if val_transforms is not None
+        else get_semantic_transform(train=False)
+    )
+
     train_dataset = SemanticSegmentationDataset(
         train_imgs,
         train_labels,
-        transforms=get_semantic_transform(train=True),
+        transforms=train_transform,
         num_channels=num_channels,
         target_size=target_size,
         resize_mode=resize_mode,
@@ -2596,7 +2709,7 @@ def train_segmentation_model(
     val_dataset = SemanticSegmentationDataset(
         val_imgs,
         val_labels,
-        transforms=get_semantic_transform(train=False),
+        transforms=val_transform,
         num_channels=num_channels,
         target_size=target_size,
         resize_mode=resize_mode,

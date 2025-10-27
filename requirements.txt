@@ -22,9 +22,10 @@ scikit-image
 scikit-learn
 # segment-geospatial
 timm
+tokenizers>=0.22.1
 torch
 # torchange
 torchgeo
 torchinfo
 tqdm
-transformers
+transformers>=4.57.1
