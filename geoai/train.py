@@ -1953,7 +1953,9 @@ class SemanticRandomRotation90:
 class SemanticBrightnessAdjustment:
     """Random brightness adjustment transform for semantic segmentation."""
 
-    def __init__(self, brightness_range: Tuple[float, float] = (0.8, 1.2), prob: float = 0.5) -> None:
+    def __init__(
+        self, brightness_range: Tuple[float, float] = (0.8, 1.2), prob: float = 0.5
+    ) -> None:
         """
         Initialize brightness adjustment transform.
 
@@ -1979,7 +1981,9 @@ class SemanticBrightnessAdjustment:
 class SemanticContrastAdjustment:
     """Random contrast adjustment transform for semantic segmentation."""
 
-    def __init__(self, contrast_range: Tuple[float, float] = (0.8, 1.2), prob: float = 0.5) -> None:
+    def __init__(
+        self, contrast_range: Tuple[float, float] = (0.8, 1.2), prob: float = 0.5
+    ) -> None:
         """
         Initialize contrast adjustment transform.
 
@@ -2686,7 +2690,9 @@ def train_segmentation_model(
         else get_semantic_transform(train=True)
     )
     val_transform = (
-        val_transforms if val_transforms is not None else get_semantic_transform(train=False)
+        val_transforms
+        if val_transforms is not None
+        else get_semantic_transform(train=False)
     )
 
     train_dataset = SemanticSegmentationDataset(
