@@ -220,7 +220,9 @@ def clean_raster(
     )
 
     # Write cleaned raster
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    output_dir = os.path.dirname(os.path.abspath(output_path))
+    if output_dir and output_dir != os.path.abspath(os.sep):
+        os.makedirs(output_dir, exist_ok=True)
     with rasterio.open(output_path, "w", **profile) as dst:
         dst.write(cleaned, 1)
 
