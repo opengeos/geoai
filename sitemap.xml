@@ -2,406 +2,406 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://opengeoai.org/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/change_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/changelog/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/classify/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/contributing/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/detectron2/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/dinov3/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/download/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/extract/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/geo_agents/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/geoai/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/hf/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/installation/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/map_tools/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/map_widgets/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/sam/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/segment/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/segmentation/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/timm_segment/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/timm_train/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/train/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/utils/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/AI_agents/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/AlphaEarth/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/DINOv3/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/DINOv3_visualization/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/DINOv3_wetlands/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/JPEG2000/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/STAC_agents/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/_template/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/batch_segmentation/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/building_detection_lidar/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/building_footprints_africa/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/building_footprints_china/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/building_footprints_usa/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/building_regularization/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/car_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/catalog_search_agent/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/change_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/clean_segmentation_results/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/cloud_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/create_training_data/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/create_vector/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/data_visualization/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/download_data/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/download_naip/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/download_sentinel2/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/edit_vector/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/export_training_data_formats/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/geometric_properties/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/globe_projection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/grounded_sam/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/image_chips/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/image_tiling/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/instance_segmentation/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/lightly_train_self_supervised/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/load_model_checkpoint/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/parking_spot_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/planetary_computer/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/regularization/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/ship_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/solar_panel_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/text_prompt_segmentation/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_building_footprints_usa/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_car_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_instance_segmentation_model/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_landcover_classification/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_object_detection_model/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_segmentation_model/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_ship_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_solar_panel_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_timm_classifier/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_timm_segmentation/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/train_water_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/view_metadata/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/water_detection/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/water_detection_s2/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/water_dynamics/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/wetland_dynamics/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/wetland_mapping/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/dataviz/lidar_viz/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/dataviz/raster_viz/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/dataviz/vector_viz/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/rastervision/semantic_segmentation/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/arcgis/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/automatic_mask_generator/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/automatic_mask_generator_hq/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/box_prompts/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/fast_sam/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/input_prompts/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/input_prompts_hq/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/maxar_open_data/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/satellite-predictor/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/satellite/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/swimming_pools/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/text_prompts/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/examples/samgeo/text_prompts_batch/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/workshops/AWS_2025/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/workshops/GeoAI_Workshop_2025/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
     <url>
          <loc>https://opengeoai.org/workshops/TNView_2025/</loc>
-         <lastmod>2025-10-27</lastmod>
+         <lastmod>2025-10-30</lastmod>
     </url>
 </urlset>
