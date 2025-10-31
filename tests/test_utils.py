@@ -70,6 +70,91 @@ class TestUtilsFunctions(unittest.TestCase):
         except ImportError as e:
             self.fail(f"Failed to import geoai.utils: {e}")
 
+    def test_focal_loss_exists(self):
+        """Test that FocalLoss class exists."""
+        self.assertTrue(hasattr(utils, "FocalLoss"))
+
+    def test_focal_loss_init(self):
+        """Test FocalLoss initialization."""
+        import torch
+        
+        # Test basic initialization
+        loss_fn = utils.FocalLoss()
+        self.assertIsInstance(loss_fn, torch.nn.Module)
+        self.assertEqual(loss_fn.alpha, 1.0)
+        self.assertEqual(loss_fn.gamma, 2.0)
+        self.assertEqual(loss_fn.ignore_index, -100)
+        
+        # Test custom parameters
+        loss_fn = utils.FocalLoss(alpha=0.5, gamma=3.0, ignore_index=0)
+        self.assertEqual(loss_fn.alpha, 0.5)
+        self.assertEqual(loss_fn.gamma, 3.0)
+        self.assertEqual(loss_fn.ignore_index, 0)
+        
+        # Test with ignore_index=False
+        loss_fn = utils.FocalLoss(ignore_index=False)
+        self.assertEqual(loss_fn.ignore_index, False)
+
+    def test_focal_loss_forward(self):
+        """Test FocalLoss forward pass."""
+        import torch
+        
+        loss_fn = utils.FocalLoss()
+        
+        # Create sample inputs
+        batch_size, num_classes, height, width = 2, 3, 4, 4
+        inputs = torch.randn(batch_size, num_classes, height, width)
+        targets = torch.randint(0, num_classes, (batch_size, height, width))
+        
+        # Test forward pass
+        loss = loss_fn(inputs, targets)
+        self.assertIsInstance(loss, torch.Tensor)
+        self.assertTrue(loss.ndim == 0)  # Scalar loss
+        self.assertTrue(loss.item() >= 0)  # Loss should be non-negative
+
+    def test_get_loss_function_exists(self):
+        """Test that get_loss_function exists."""
+        self.assertTrue(hasattr(utils, "get_loss_function"))
+
+    def test_get_loss_function_crossentropy(self):
+        """Test get_loss_function with CrossEntropy."""
+        import torch
+        
+        loss_fn = utils.get_loss_function("crossentropy", num_classes=3)
+        self.assertIsInstance(loss_fn, torch.nn.CrossEntropyLoss)
+
+    def test_get_loss_function_focal(self):
+        """Test get_loss_function with Focal loss."""
+        import torch
+        
+        loss_fn = utils.get_loss_function("focal", num_classes=3, focal_alpha=0.5, focal_gamma=2.5)
+        self.assertIsInstance(loss_fn, utils.FocalLoss)
+        self.assertEqual(loss_fn.alpha, 0.5)
+        self.assertEqual(loss_fn.gamma, 2.5)
+
+    def test_get_loss_function_with_class_weights(self):
+        """Test get_loss_function with class weights."""
+        import torch
+        
+        weights = torch.tensor([1.0, 2.0, 3.0])
+        loss_fn = utils.get_loss_function(
+            "crossentropy", 
+            num_classes=3, 
+            use_class_weights=True,
+            class_weights=weights
+        )
+        self.assertIsInstance(loss_fn, torch.nn.CrossEntropyLoss)
+        self.assertIsNotNone(loss_fn.weight)
+
+    def test_get_loss_function_invalid(self):
+        """Test get_loss_function with invalid loss name."""
+        with self.assertRaises(ValueError):
+            utils.get_loss_function("invalid_loss", num_classes=3)
+
+    def test_compute_class_weights_exists(self):
+        """Test that compute_class_weights function exists."""
+        self.assertTrue(hasattr(utils, "compute_class_weights"))
+
 
 if __name__ == "__main__":
     unittest.main()

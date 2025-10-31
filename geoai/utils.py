@@ -771,6 +771,296 @@ def calc_segmentation_metrics(
     return results
 
 
+class FocalLoss(torch.nn.Module):
+    """
+    Focal Loss for addressing class imbalance in segmentation.
+    
+    Reference: Lin, T. Y., Goyal, P., Girshick, R., He, K., & Dollár, P. (2017).
+    Focal loss for dense object detection. ICCV.
+    """
+    
+    def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100, reduction='mean', weight=None):
+        """
+        Initialize Focal Loss.
+        
+        Args:
+            alpha (float): Weighting factor in range (0,1) to balance positive vs negative examples
+                or a list of weights for each class. Default: 1.0
+            gamma (float): Exponent of the modulating factor (1 - p_t)^gamma. Default: 2.0
+            ignore_index (int or bool): Specifies a target value that is ignored and does not 
+                contribute to the input gradient. If False, no pixels are ignored. Default: -100
+            reduction (str): Specifies the reduction to apply to the output: 
+                'none' | 'mean' | 'sum'. Default: 'mean'
+            weight (torch.Tensor, optional): Manual rescaling weight for each class. Default: None
+        """
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+        self.weight = weight  # Class weights tensor
+        
+    def forward(self, inputs, targets):
+        """
+        Compute focal loss.
+        
+        Args:
+            inputs: Tensor of shape [N, C, H, W] where C is number of classes
+            targets: Tensor of shape [N, H, W] with class indices
+            
+        Returns:
+            torch.Tensor: Computed focal loss
+        """
+        import torch.nn.functional as F
+        
+        # Handle ignore_index parameter - if False, disable ignoring
+        if self.ignore_index is False:
+            ignore_idx = -100  # Use a value that won't match any target
+        else:
+            ignore_idx = self.ignore_index
+        
+        # Apply log_softmax to get log probabilities
+        log_pt = F.log_softmax(inputs, dim=1)
+        
+        # Use NLL loss with ignore_index and class weights to handle ignored pixels properly
+        ce_loss = F.nll_loss(log_pt, targets, ignore_index=ignore_idx, weight=self.weight, reduction='none')
+        
+        # Get probabilities by exponentiating the negative cross entropy
+        pt = torch.exp(-ce_loss)
+        
+        # Apply focal loss formula: FL = -alpha * (1-pt)^gamma * log(pt)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+        
+        # Handle reduction
+        if self.reduction == 'mean':
+            # Only average over non-ignored pixels
+            if ignore_idx != -100:
+                valid_mask = (targets != ignore_idx)
+                if valid_mask.sum() > 0:
+                    return focal_loss[valid_mask].mean()
+                else:
+                    return torch.tensor(0.0, device=inputs.device, requires_grad=True)
+            else:
+                return focal_loss.mean()
+        elif self.reduction == 'sum':
+            if ignore_idx != -100:
+                valid_mask = (targets != ignore_idx)
+                return focal_loss[valid_mask].sum()
+            else:
+                return focal_loss.sum()
+        else:
+            return focal_loss
+
+
+def get_loss_function(loss_name: str, 
+                     ignore_index: Union[int, bool] = -100, 
+                     num_classes: int = 2,
+                     use_class_weights: bool = False,
+                     class_weights: Optional[torch.Tensor] = None,
+                     focal_alpha: float = 1.0,
+                     focal_gamma: float = 2.0,
+                     device: Optional[torch.device] = None) -> torch.nn.Module:
+    """
+    Get loss function based on name and parameters.
+    
+    Args:
+        loss_name (str): Name of loss function ('crossentropy' or 'focal')
+        ignore_index (int or bool): Index to ignore in loss calculation, or False to disable 
+            ignoring. Default: -100
+        num_classes (int): Number of classes. Default: 2
+        use_class_weights (bool): Whether to use class weights. Default: False
+        class_weights (torch.Tensor, optional): Pre-computed class weights. Default: None
+        focal_alpha (float): Alpha parameter for focal loss. Default: 1.0
+        focal_gamma (float): Gamma parameter for focal loss. Default: 2.0
+        device (torch.device, optional): Device to move weights to. Default: None
+        
+    Returns:
+        torch.nn.Module: Configured loss function
+        
+    Raises:
+        ValueError: If loss_name is not supported
+    """
+    
+    if loss_name.lower() == 'crossentropy':
+        weights = class_weights if use_class_weights else None
+        if weights is not None and device is not None:
+            weights = weights.to(device)
+        
+        # Handle ignore_index parameter
+        if ignore_index == False:
+            ignore_idx = -100
+        else:
+            ignore_idx = ignore_index
+            
+        print(f"🎯 CrossEntropy Loss: Class weights {'ENABLED' if weights is not None else 'DISABLED'}")
+        return torch.nn.CrossEntropyLoss(weight=weights, ignore_index=ignore_idx)
+    
+    elif loss_name.lower() == 'focal':
+        weights = class_weights if use_class_weights else None
+        if weights is not None and device is not None:
+            weights = weights.to(device)
+        print(f"🎯 Focal Loss: Alpha={focal_alpha}, Gamma={focal_gamma}, Class weights={'ENABLED' if weights is not None else 'DISABLED'}")
+        return FocalLoss(alpha=focal_alpha, gamma=focal_gamma, ignore_index=ignore_index, weight=weights)
+    
+    else:
+        raise ValueError(f"Unknown loss function: {loss_name}. "
+                        f"Supported: 'crossentropy', 'focal'")
+
+
+def compute_class_weights(labels_dir: str, 
+                         num_classes: int,
+                         ignore_index: int = -100,
+                         custom_multipliers: Optional[Dict[int, float]] = None,
+                         max_weight: float = 50.0,
+                         use_inverse_frequency: bool = True) -> torch.Tensor:
+    """
+    Compute class weights for imbalanced datasets with optional custom multipliers and maximum weight cap.
+    
+    Args:
+        labels_dir (str): Directory containing label files
+        num_classes (int): Number of classes
+        ignore_index (int): Index to ignore when computing weights. Default: -100
+        custom_multipliers (dict, optional): Custom multipliers/weights for specific classes.
+            - If use_inverse_frequency=True: Applied as multipliers after inverse frequency calculation
+            - If use_inverse_frequency=False: Used as pure custom weights (all other classes get weight 1.0)
+            Default: None
+        max_weight (float): Maximum allowed weight value. Defaults to 50.0.
+        use_inverse_frequency (bool): Whether to compute inverse frequency weights first. 
+            - True (default): Compute inverse freq + apply custom multipliers
+            - False: Use uniform weights (1.0) + apply custom weights only for specified classes
+            Default: True
+            
+    Returns:
+        torch.Tensor: Class weights tensor of shape (num_classes,)
+        
+    Examples:
+        >>> # Compute inverse frequency weights
+        >>> weights = compute_class_weights("labels/", num_classes=5)
+        
+        >>> # Compute with custom multipliers to boost rare classes
+        >>> weights = compute_class_weights(
+        ...     "labels/", 
+        ...     num_classes=5,
+        ...     custom_multipliers={0: 0.5, 4: 2.0}  # Reduce class 0, boost class 4
+        ... )
+        
+        >>> # Use pure custom weights without inverse frequency
+        >>> weights = compute_class_weights(
+        ...     "labels/", 
+        ...     num_classes=5,
+        ...     custom_multipliers={0: 0.5, 1: 1.5, 2: 2.0},
+        ...     use_inverse_frequency=False
+        ... )
+    """
+    from collections import Counter
+    import os
+    
+    # Count pixels for each class
+    class_counts = Counter()
+    total_pixels = 0
+    
+    # Get all label files
+    label_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+    label_files = [
+        os.path.join(labels_dir, f)
+        for f in os.listdir(labels_dir)
+        if f.lower().endswith(label_extensions)
+    ]
+    
+    print(f"Computing class weights from {len(label_files)} label files...")
+    
+    for label_file in label_files:
+        try:
+            if label_file.lower().endswith((".tif", ".tiff")):
+                # Load GeoTIFF using rasterio
+                with rasterio.open(label_file) as src:
+                    labels = src.read(1)
+            else:
+                # Load regular image using PIL
+                from PIL import Image
+                with Image.open(label_file) as img:
+                    if img.mode != 'L':
+                        img = img.convert('L')
+                    labels = np.array(img)
+            
+            # Count valid pixels (not ignore_index)
+            valid_pixels = labels[labels != ignore_index] if ignore_index >= 0 else labels
+            pixel_counts = Counter(valid_pixels.flatten())
+            
+            for class_id, count in pixel_counts.items():
+                class_counts[class_id] += count
+                total_pixels += count
+                
+        except Exception as e:
+            print(f"Warning: Could not process {label_file}: {e}")
+            continue
+    
+    if total_pixels == 0:
+        print("Warning: No valid pixels found. Using uniform weights.")
+        return torch.ones(num_classes)
+    
+    # Initialize weights based on method choice
+    weights = torch.ones(num_classes)
+    
+    if use_inverse_frequency:
+        # Compute weights using inverse frequency
+        for class_id in range(num_classes):
+            # Skip weight computation for ignore_index
+            if ignore_index >= 0 and class_id == ignore_index:
+                weights[class_id] = 0.0
+                continue
+                
+            if class_id in class_counts and class_counts[class_id] > 0:
+                weights[class_id] = total_pixels / (num_classes * class_counts[class_id])
+    else:
+        # Use uniform weights (1.0 for all classes, 0.0 for ignore_index)
+        for class_id in range(num_classes):
+            if ignore_index >= 0 and class_id == ignore_index:
+                weights[class_id] = 0.0
+            else:
+                weights[class_id] = 1.0
+
+    # Apply custom multipliers/weights if provided
+    if custom_multipliers:
+        if use_inverse_frequency:
+            print(f"\n🎯 Custom Class Weight Multipliers Configuration:")
+            print(f"   ✅ Custom multipliers ENABLED: {custom_multipliers}")
+            print("   📝 Applied as multipliers to inverse frequency weights")
+        else:
+            print(f"\n🎯 Pure Custom Class Weights Configuration:")
+            print(f"   ✅ Custom weights ENABLED: {custom_multipliers}")
+            print("   📝 Used as pure weights (no inverse frequency computation)")
+        
+        for class_id, multiplier in custom_multipliers.items():
+            if 0 <= class_id < num_classes:
+                original_weight = weights[class_id].item()
+                
+                if use_inverse_frequency:
+                    # Apply as multiplier to existing inverse frequency weight
+                    weights[class_id] *= multiplier
+                else:
+                    # Apply as pure custom weight (overwrites the default 1.0)
+                    weights[class_id] = multiplier
+                    
+                new_weight = weights[class_id].item()
+                print(f"   Class {class_id}: {original_weight:.4f} -> {new_weight:.4f}")
+
+    # Apply maximum weight cap to prevent extreme values
+    weights_capped = False
+    print(f"\n🔒 Applying maximum weight cap of {max_weight}...")
+    for class_id in range(num_classes):
+        if weights[class_id] > max_weight:
+            original_weight = weights[class_id].item()
+            weights[class_id] = max_weight
+            weights_capped = True
+            print(f"   Class {class_id}: Capped weight from {original_weight:.4f} to {max_weight:.4f}")
+    
+    if not weights_capped:
+        print(f"   ✅ No weights exceeded the maximum cap of {max_weight}")
+
+    return weights
+
+
 def dict_to_rioxarray(data_dict: Dict) -> xr.DataArray:
     """Convert a dictionary to a xarray DataArray. The dictionary should contain the
     following keys: "crs", "bounds", and "image". It can be generated from a TorchGeo
@@ -3003,6 +3293,7 @@ def export_geotiff_tiles(
     all_touched=True,
     create_overview=False,
     skip_empty_tiles=False,
+    min_feature_ratio=False,
     metadata_format="PASCAL_VOC",
 ):
     """
@@ -3022,6 +3313,10 @@ def export_geotiff_tiles(
         all_touched (bool): Whether to use all_touched=True in rasterization (for vector data)
         create_overview (bool): Whether to create an overview image of all tiles
         skip_empty_tiles (bool): If True, skip tiles with no features
+        min_feature_ratio (float or False): Minimum ratio of non-background pixels required in a tile.
+            - False: Disable ratio filtering (original behavior)
+            - 0.0-1.0: Minimum ratio of labeled pixels required to keep tile
+            Only applies when skip_empty_tiles=True and in_class_data is provided. Default: False
         metadata_format (str): Output metadata format (PASCAL_VOC, COCO, YOLO). Default: PASCAL_VOC
     """
 
@@ -3208,6 +3503,8 @@ def export_geotiff_tiles(
             "feature_pixels": 0,
             "errors": 0,
             "tile_coordinates": [],  # For overview image
+            "skipped_empty": 0,
+            "skipped_background_heavy": 0,
         }
 
         # Process tiles
@@ -3352,10 +3649,28 @@ def export_geotiff_tiles(
                                     stats["errors"] += 1
 
                 # Skip tile if no features and skip_empty_tiles is True (only when class data provided)
-                if in_class_data is not None and skip_empty_tiles and not has_features:
-                    pbar.update(1)
-                    tile_index += 1
-                    continue
+                if in_class_data is not None and skip_empty_tiles:
+                    if not has_features:
+                        stats["skipped_empty"] += 1
+                        pbar.update(1)
+                        tile_index += 1
+                        continue
+                    
+                    # Apply min_feature_ratio filtering if enabled
+                    if min_feature_ratio is not False:
+                        # Validate parameter
+                        if not isinstance(min_feature_ratio, (int, float)) or not (0.0 <= min_feature_ratio <= 1.0):
+                            raise ValueError("min_feature_ratio must be False or a float between 0.0 and 1.0")
+                        
+                        total_pixels = label_mask.size
+                        feature_pixels = np.sum(label_mask > 0)  # Non-background pixels
+                        feature_ratio = feature_pixels / total_pixels
+                        
+                        if feature_ratio < min_feature_ratio:
+                            stats["skipped_background_heavy"] += 1
+                            pbar.update(1)
+                            tile_index += 1
+                            continue
 
                 # Read image data
                 image_data = src.read(window=window)
@@ -3654,19 +3969,27 @@ def export_geotiff_tiles(
 
         # Report results
         if not quiet:
-            print("\n------- Export Summary -------")
-            print(f"Total tiles exported: {stats['total_tiles']}")
+            print("\n📊 Tile Generation Summary:")
+            print(f"   ✅ Generated tiles: {stats['total_tiles']}")
             if in_class_data is not None:
                 print(
-                    f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
+                    f"   🎨 Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
                 )
                 if stats["tiles_with_features"] > 0:
                     print(
-                        f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
+                        f"   📈 Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
                     )
+                if stats["skipped_empty"] > 0:
+                    print(f"   🗑️  Skipped empty tiles: {stats['skipped_empty']}")
+                if min_feature_ratio is not False and stats["skipped_background_heavy"] > 0:
+                    print(f"   🎯 Skipped background-heavy tiles: {stats['skipped_background_heavy']}")
+                    print(f"   📈 Feature ratio threshold: {min_feature_ratio:.1%}")
+                    print(f"   💪 Improved training balance by filtering {stats['skipped_background_heavy'] + stats['skipped_empty']} low-content tiles")
+                elif min_feature_ratio is False:
+                    print(f"   ℹ️  Background ratio filtering: DISABLED")
             if stats["errors"] > 0:
-                print(f"Errors encountered: {stats['errors']}")
-            print(f"Output saved to: {out_folder}")
+                print(f"   ⚠️  Errors encountered: {stats['errors']}")
+            print(f"\n💾 Output saved to: {out_folder}")
 
             # Verify georeference in a sample image and label
             if stats["total_tiles"] > 0:
