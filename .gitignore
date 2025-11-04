@@ -18,6 +18,8 @@ docs/examples/timm_buildings/
 **/*.zip
 **/*.las
 *.geojson
+*.gpkg
+*.csv
 docs/examples/*.md
 *.xml
 docs/examples/output/
