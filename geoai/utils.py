@@ -1094,8 +1094,9 @@ def view_vector(
 
 def view_vector_interactive(
     vector_data: Union[str, gpd.GeoDataFrame],
-    layer_name: str = "Vector Layer",
+    layer_name: str = "Vector",
     tiles_args: Optional[Dict] = None,
+    opacity: float = 0.7,
     **kwargs: Any,
 ) -> Any:
     """
@@ -1110,6 +1111,7 @@ def view_vector_interactive(
         layer_name (str, optional): The name of the layer. Defaults to "Vector Layer".
         tiles_args (dict, optional): Additional arguments for the localtileserver client.
             get_folium_tile_layer function. Defaults to None.
+        opacity (float, optional): The opacity of the layer. Defaults to 0.7.
         **kwargs: Additional keyword arguments to pass to GeoDataFrame.explore() function.
             See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html
 
@@ -1124,9 +1126,8 @@ def view_vector_interactive(
         >>> roads = gpd.read_file("roads.shp")
         >>> view_vector_interactive(roads, figsize=(12, 8))
     """
-    import folium
-    import folium.plugins as plugins
-    from leafmap import cog_tile
+
+    from leafmap.foliumap import Map
     from localtileserver import TileClient, get_folium_tile_layer
 
     google_tiles = {
@@ -1161,6 +1162,8 @@ def view_vector_interactive(
     basemap_layer_name = None
     raster_layer = None
 
+    m = Map()
+
     if "tiles" in kwargs and isinstance(kwargs["tiles"], str):
         if kwargs["tiles"].title() in google_tiles:
             basemap_layer_name = google_tiles[kwargs["tiles"].title()]["name"]
@@ -1171,14 +1174,17 @@ def view_vector_interactive(
                 tiles_args = {}
             if kwargs["tiles"].lower().startswith("http"):
                 basemap_layer_name = "Remote Raster"
-                kwargs["tiles"] = cog_tile(kwargs["tiles"], **tiles_args)
-                kwargs["attr"] = "TiTiler"
+                m.add_geotiff(kwargs["tiles"], name=basemap_layer_name, **tiles_args)
             else:
                 basemap_layer_name = "Local Raster"
                 client = TileClient(kwargs["tiles"])
                 raster_layer = get_folium_tile_layer(client, **tiles_args)
-                kwargs["tiles"] = raster_layer.tiles
-                kwargs["attr"] = "localtileserver"
+                m.add_tile_layer(
+                    raster_layer.tiles,
+                    name=basemap_layer_name,
+                    attribution="localtileserver",
+                    **tiles_args,
+                )
 
     if "max_zoom" not in kwargs:
         kwargs["max_zoom"] = 30
@@ -1193,23 +1199,18 @@ def view_vector_interactive(
     if not isinstance(vector_data, gpd.GeoDataFrame):
         raise TypeError("Input data must be a GeoDataFrame")
 
-    layer_control = kwargs.pop("layer_control", True)
-    fullscreen_control = kwargs.pop("fullscreen_control", True)
+    if "column" in kwargs:
+        if "legend_position" not in kwargs:
+            kwargs["legend_position"] = "bottomleft"
+        if "cmap" not in kwargs:
+            kwargs["cmap"] = "viridis"
+        m.add_data(vector_data, layer_name=layer_name, opacity=opacity, **kwargs)
 
-    m = vector_data.explore(**kwargs)
+    else:
+        m.add_gdf(vector_data, layer_name=layer_name, opacity=opacity, **kwargs)
 
-    # Change the layer name
-    for layer in m._children.values():
-        if isinstance(layer, folium.GeoJson):
-            layer.layer_name = layer_name
-        if isinstance(layer, folium.TileLayer) and basemap_layer_name:
-            layer.layer_name = basemap_layer_name
-
-    if layer_control:
-        m.add_child(folium.LayerControl())
-
-    if fullscreen_control:
-        plugins.Fullscreen().add_to(m)
+    m.add_layer_control()
+    m.add_opacity_control()
 
     return m
 
