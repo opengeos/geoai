@@ -87,6 +87,12 @@ If you find GeoAI useful in your research, please consider citing the following 
 pip install geoai-py
 ```
 
+To install with optional dependencies for additional features (e.g., change detection with torchange):
+
+```bash
+pip install geoai-py[extra]
+```
+
 ### Using conda
 
 ```bash

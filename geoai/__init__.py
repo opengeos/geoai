@@ -136,3 +136,10 @@ try:
 except ImportError:
     # MultiClean not available (missing dependency)
     pass
+
+# Import change detection functionality
+try:
+    from .change_detection import ChangeDetection
+except ImportError:
+    # torchange not available (missing dependency)
+    pass
