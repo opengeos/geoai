@@ -1436,8 +1436,12 @@ def instance_segmentation_inference_on_geotiff(
         # Apply Non-Maximum Suppression to handle overlapping detections
         if len(all_detections) > 0:
             # Convert to tensors for NMS
-            boxes = torch.tensor([det["box"] for det in all_detections])
-            scores = torch.tensor([det["score"] for det in all_detections])
+            boxes = torch.tensor(
+                [det["box"] for det in all_detections], dtype=torch.float32
+            )
+            scores = torch.tensor(
+                [det["score"] for det in all_detections], dtype=torch.float32
+            )
 
             # Apply NMS with IoU threshold
             nms_threshold = 0.3  # IoU threshold for NMS
