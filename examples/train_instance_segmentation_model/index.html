@@ -3543,9 +3543,37 @@ test_raster_path = geoai.download_file(test_raster_url)</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">geoai</span><span class="o">.</span><span class="n">view_vector_interactive</span><span class="p">(</span><span class="n">train_vector_path</span><span class="p">,</span> <span class="n">tiles</span><span class="o">=</span><span class="n">train_raster_path</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">style_dict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#ff0000"</span><span class="p">,</span>
+    <span class="s2">"weight"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="s2">"opacity"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="c1"># "fill": True,</span>
+    <span class="c1"># "fillColor": "#ffffff",</span>
+    <span class="s2">"fillOpacity"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="c1"># "dashArray": "9"</span>
+    <span class="c1"># "clickable": True,</span>
+<span class="p">}</span>
+<span class="n">style_function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">style_dict</span>
+
+<span class="n">geoai</span><span class="o">.</span><span class="n">view_vector_interactive</span><span class="p">(</span>
+    <span class="n">train_vector_path</span><span class="p">,</span> <span class="n">tiles</span><span class="o">=</span><span class="n">train_raster_path</span><span class="p">,</span> <span class="n">style_function</span><span class="o">=</span><span class="n">style_function</span>
+<span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-6">geoai.view_vector_interactive(train_vector_path, tiles=train_raster_path)</div>
+<div class="clipboard-copy-txt" id="cell-6">style_dict = {
+    "color": "#ff0000",
+    "weight": 2,
+    "opacity": 1,
+    # "fill": True,
+    # "fillColor": "#ffffff",
+    "fillOpacity": 0,
+    # "dashArray": "9"
+    # "clickable": True,
+}
+style_function = lambda x: style_dict
+
+geoai.view_vector_interactive(
+    train_vector_path, tiles=train_raster_path, style_function=style_function
+)</div>
 </div>
 </div>
 </div>
@@ -4411,7 +4439,7 @@ gdf = geoai.orthogonalize(masks_path, output_vector_path, epsilon=2)</div>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 4, 2025 00:48:34 UTC"><span class="timeago" datetime="2025-10-04T00:48:34+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 4, 2025 00:48:34 UTC">2025-10-04</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 5, 2025 23:50:51 UTC"><span class="timeago" datetime="2025-11-05T23:50:51+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 5, 2025 23:50:51 UTC">2025-11-05</span>
   </span>
 
     
