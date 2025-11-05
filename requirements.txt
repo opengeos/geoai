@@ -6,7 +6,7 @@ ever-beta
 geopandas
 huggingface_hub
 jupyter-server-proxy
-leafmap
+leafmap>=0.57.0
 localtileserver
 mapclassify
 maplibre
