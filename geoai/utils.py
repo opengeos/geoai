@@ -1178,6 +1178,7 @@ def view_vector_interactive(
             else:
                 basemap_layer_name = "Local Raster"
                 client = TileClient(kwargs["tiles"])
+                raster_layer = get_folium_tile_layer(client, **tiles_args)
                 m.add_tile_layer(
                     raster_layer.tiles,
                     name=basemap_layer_name,
