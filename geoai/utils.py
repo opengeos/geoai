@@ -64,7 +64,7 @@ def view_raster(
     client_args: Optional[Dict] = {"cors_all": False},
     basemap: Optional[str] = "OpenStreetMap",
     basemap_args: Optional[Dict] = None,
-    backend: Optional[str] = "ipyleaflet",
+    backend: Optional[str] = "folium",
     **kwargs: Any,
 ) -> Any:
     """
@@ -87,7 +87,7 @@ def view_raster(
         client_args (Optional[Dict], optional): Additional arguments for the client. Defaults to {"cors_all": False}.
         basemap (Optional[str], optional): The basemap to use. Defaults to "OpenStreetMap".
         basemap_args (Optional[Dict], optional): Additional arguments for the basemap. Defaults to None.
-        backend (Optional[str], optional): The backend to use. Defaults to "ipyleaflet".
+        backend (Optional[str], optional): The backend to use. Defaults to "folium".
         **kwargs (Any): Additional keyword arguments.
 
     Returns:
@@ -123,26 +123,39 @@ def view_raster(
     if isinstance(source, dict):
         source = dict_to_image(source)
 
-    if (
-        isinstance(source, str)
-        and source.lower().endswith(".tif")
-        and source.startswith("http")
-    ):
-        if indexes is not None:
-            kwargs["bidx"] = indexes
-        if colormap is not None:
-            kwargs["colormap_name"] = colormap
-        if attribution is None:
-            attribution = "TiTiler"
+    if isinstance(source, str) and source.startswith("http"):
+        if backend == "folium":
 
-        m.add_cog_layer(
-            source,
-            name=layer_name,
-            opacity=opacity,
-            attribution=attribution,
-            zoom_to_layer=zoom_to_layer,
-            **kwargs,
-        )
+            m.add_geotiff(
+                url=source,
+                name=layer_name,
+                opacity=opacity,
+                attribution=attribution,
+                fit_bounds=zoom_to_layer,
+                palette=colormap,
+                vmin=vmin,
+                vmax=vmax,
+                **kwargs,
+            )
+            m.add_layer_control()
+            m.add_opacity_control()
+
+        else:
+            if indexes is not None:
+                kwargs["bidx"] = indexes
+            if colormap is not None:
+                kwargs["colormap_name"] = colormap
+            if attribution is None:
+                attribution = "TiTiler"
+
+            m.add_cog_layer(
+                source,
+                name=layer_name,
+                opacity=opacity,
+                attribution=attribution,
+                zoom_to_layer=zoom_to_layer,
+                **kwargs,
+            )
     else:
         m.add_raster(
             source=source,
