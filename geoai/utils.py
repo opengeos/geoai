@@ -3601,8 +3601,8 @@ def export_geotiff_tiles(
                             aug_image = aug_image.astype(image_data.dtype)
 
                             # Generate unique tile ID for augmented version
-                            # Use a simpler numbering scheme: base_id * 1000 + aug_idx
-                            aug_tile_id = tile_index * 1000 + aug_idx + 1
+                            # Use a collision-free numbering scheme: (tile_index * (augmentation_count + 1)) + aug_idx + 1
+                            aug_tile_id = (tile_index * (augmentation_count + 1)) + aug_idx + 1
 
                             # Save augmented tile
                             save_tile(
