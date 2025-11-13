@@ -3572,10 +3572,10 @@ def export_geotiff_tiles(
 
                         # Ensure uint8 data type for albumentations
                         # Albumentations expects uint8 for most transforms
-                        if img_for_aug.dtype != np.uint8:
-                            # Scale to 0-255 range if needed
-                            if img_for_aug.max() <= 1.0:
-                                img_for_aug = (img_for_aug * 255).astype(np.uint8)
+                        if not np.issubdtype(img_for_aug.dtype, np.uint8):
+                            # If image is float, scale to 0-255 and convert to uint8
+                            if np.issubdtype(img_for_aug.dtype, np.floating):
+                                img_for_aug = (img_for_aug * 255).clip(0, 255).astype(np.uint8)
                             else:
                                 img_for_aug = img_for_aug.astype(np.uint8)
 
