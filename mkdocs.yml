@@ -60,6 +60,7 @@ plugins:
                   "examples/*_detection.ipynb",
                   "examples/building_footprints_*.ipynb",
                   "examples/data_visualization.ipynb",
+                  "examples/data_augmentation.ipynb",
                   "examples/train_*.ipynb",
                   "examples/water_dynamics.ipynb",
                   "examples/wetland_mapping.ipynb",
@@ -110,6 +111,7 @@ nav:
           - examples/image_tiling.ipynb
           - examples/create_training_data.ipynb
           - examples/export_training_data_formats.ipynb
+          - examples/data_augmentation.ipynb
           - examples/building_footprints_usa.ipynb
           - examples/building_footprints_africa.ipynb
           - examples/building_footprints_china.ipynb
@@ -157,6 +159,7 @@ nav:
           - examples/lightly_train_self_supervised.ipynb
           - examples/clean_segmentation_results.ipynb
           - examples/cloud_detection.ipynb
+          - examples/data_augmentation.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb

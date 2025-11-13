@@ -3004,6 +3004,82 @@ def batch_vector_to_raster(
     return output_files
 
 
+def get_default_augmentation_transforms(
+    tile_size: int = 256,
+    include_normalize: bool = False,
+    mean: Tuple[float, float, float] = (0.485, 0.456, 0.406),
+    std: Tuple[float, float, float] = (0.229, 0.224, 0.225),
+) -> Any:
+    """
+    Get default data augmentation transforms for geospatial imagery using albumentations.
+
+    This function returns a composition of augmentation transforms commonly used
+    for remote sensing and geospatial data. The transforms include geometric
+    transformations (flips, rotations) and photometric adjustments (brightness,
+    contrast, saturation).
+
+    Args:
+        tile_size (int): Target size for tiles. Defaults to 256.
+        include_normalize (bool): Whether to include normalization transform.
+            Defaults to False. Set to True if using for training with pretrained models.
+        mean (tuple): Mean values for normalization (RGB). Defaults to ImageNet values.
+        std (tuple): Standard deviation for normalization (RGB). Defaults to ImageNet values.
+
+    Returns:
+        albumentations.Compose: A composition of augmentation transforms.
+
+    Example:
+        >>> import albumentations as A
+        >>> # Get default transforms
+        >>> transform = get_default_augmentation_transforms()
+        >>> # Apply to image and mask
+        >>> augmented = transform(image=image, mask=mask)
+        >>> aug_image = augmented['image']
+        >>> aug_mask = augmented['mask']
+    """
+    try:
+        import albumentations as A
+    except ImportError:
+        raise ImportError(
+            "albumentations is required for data augmentation. "
+            "Install it with: pip install albumentations"
+        )
+
+    transforms_list = [
+        # Geometric transforms
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.ShiftScaleRotate(
+            shift_limit=0.1,
+            scale_limit=0.1,
+            rotate_limit=45,
+            border_mode=0,
+            p=0.5,
+        ),
+        # Photometric transforms
+        A.RandomBrightnessContrast(
+            brightness_limit=0.2,
+            contrast_limit=0.2,
+            p=0.5,
+        ),
+        A.HueSaturationValue(
+            hue_shift_limit=10,
+            sat_shift_limit=20,
+            val_shift_limit=10,
+            p=0.3,
+        ),
+        A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),
+        A.GaussianBlur(blur_limit=(3, 5), p=0.2),
+    ]
+
+    # Add normalization if requested
+    if include_normalize:
+        transforms_list.append(A.Normalize(mean=mean, std=std))
+
+    return A.Compose(transforms_list)
+
+
 def export_geotiff_tiles(
     in_raster,
     out_folder,
@@ -3018,6 +3094,9 @@ def export_geotiff_tiles(
     create_overview=False,
     skip_empty_tiles=False,
     metadata_format="PASCAL_VOC",
+    apply_augmentation=False,
+    augmentation_count=3,
+    augmentation_transforms=None,
 ):
     """
     Export georeferenced GeoTIFF tiles and labels from raster and classification data.
@@ -3037,11 +3116,53 @@ def export_geotiff_tiles(
         create_overview (bool): Whether to create an overview image of all tiles
         skip_empty_tiles (bool): If True, skip tiles with no features
         metadata_format (str): Output metadata format (PASCAL_VOC, COCO, YOLO). Default: PASCAL_VOC
+        apply_augmentation (bool): If True, generate augmented versions of each tile.
+            This will create multiple variants of each tile using data augmentation techniques.
+            Defaults to False.
+        augmentation_count (int): Number of augmented versions to generate per tile
+            (only used if apply_augmentation=True). Defaults to 3.
+        augmentation_transforms (albumentations.Compose, optional): Custom augmentation transforms.
+            If None and apply_augmentation=True, uses default transforms from
+            get_default_augmentation_transforms(). Should be an albumentations.Compose object.
+            Defaults to None.
+
+    Returns:
+        None: Tiles and labels are saved to out_folder.
+
+    Example:
+        >>> # Export tiles without augmentation
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif')
+        >>>
+        >>> # Export tiles with default augmentation (3 augmented versions per tile)
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif',
+        ...                      apply_augmentation=True)
+        >>>
+        >>> # Export with custom augmentation
+        >>> import albumentations as A
+        >>> custom_transform = A.Compose([
+        ...     A.HorizontalFlip(p=0.5),
+        ...     A.RandomBrightnessContrast(p=0.5),
+        ... ])
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif',
+        ...                      apply_augmentation=True,
+        ...                      augmentation_count=5,
+        ...                      augmentation_transforms=custom_transform)
     """
 
     import logging
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
+
+    # Initialize augmentation transforms if needed
+    if apply_augmentation:
+        if augmentation_transforms is None:
+            augmentation_transforms = get_default_augmentation_transforms(
+                tile_size=tile_size
+            )
+        if not quiet:
+            print(
+                f"Data augmentation enabled: generating {augmentation_count} augmented versions per tile"
+            )
 
     # Create output directories
     os.makedirs(out_folder, exist_ok=True)
@@ -3374,53 +3495,130 @@ def export_geotiff_tiles(
                 # Read image data
                 image_data = src.read(window=window)
 
-                # Export image as GeoTIFF
-                image_path = os.path.join(image_dir, f"tile_{tile_index:06d}.tif")
+                # Helper function to save a single tile (original or augmented)
+                def save_tile(
+                    img_data,
+                    lbl_mask,
+                    tile_id,
+                    img_profile,
+                    window_trans,
+                    is_augmented=False,
+                ):
+                    """Save a single image and label tile."""
+                    # Export image as GeoTIFF
+                    image_path = os.path.join(image_dir, f"tile_{tile_id:06d}.tif")
 
-                # Create profile for image GeoTIFF
-                image_profile = src.profile.copy()
-                image_profile.update(
-                    {
-                        "height": tile_size,
-                        "width": tile_size,
-                        "count": image_data.shape[0],
-                        "transform": window_transform,
-                    }
+                    # Update profile
+                    img_profile_copy = img_profile.copy()
+                    img_profile_copy.update(
+                        {
+                            "height": tile_size,
+                            "width": tile_size,
+                            "count": img_data.shape[0],
+                            "transform": window_trans,
+                        }
+                    )
+
+                    # Save image as GeoTIFF
+                    try:
+                        with rasterio.open(image_path, "w", **img_profile_copy) as dst:
+                            dst.write(img_data)
+                        stats["total_tiles"] += 1
+                    except Exception as e:
+                        pbar.write(f"ERROR saving image GeoTIFF: {e}")
+                        stats["errors"] += 1
+                        return
+
+                    # Export label as GeoTIFF (only if class data provided)
+                    if in_class_data is not None:
+                        # Create profile for label GeoTIFF
+                        label_profile = {
+                            "driver": "GTiff",
+                            "height": tile_size,
+                            "width": tile_size,
+                            "count": 1,
+                            "dtype": "uint8",
+                            "crs": src.crs,
+                            "transform": window_trans,
+                        }
+
+                        label_path = os.path.join(label_dir, f"tile_{tile_id:06d}.tif")
+                        try:
+                            with rasterio.open(label_path, "w", **label_profile) as dst:
+                                dst.write(lbl_mask.astype(np.uint8), 1)
+
+                            if not is_augmented and np.any(lbl_mask > 0):
+                                stats["tiles_with_features"] += 1
+                                stats["feature_pixels"] += np.count_nonzero(lbl_mask)
+                        except Exception as e:
+                            pbar.write(f"ERROR saving label GeoTIFF: {e}")
+                            stats["errors"] += 1
+
+                # Save original tile
+                save_tile(
+                    image_data,
+                    label_mask,
+                    tile_index,
+                    src.profile,
+                    window_transform,
+                    is_augmented=False,
                 )
 
-                # Save image as GeoTIFF
-                try:
-                    with rasterio.open(image_path, "w", **image_profile) as dst:
-                        dst.write(image_data)
-                    stats["total_tiles"] += 1
-                except Exception as e:
-                    pbar.write(f"ERROR saving image GeoTIFF: {e}")
-                    stats["errors"] += 1
+                # Generate and save augmented tiles if enabled
+                if apply_augmentation:
+                    for aug_idx in range(augmentation_count):
+                        # Prepare image for augmentation (convert from CHW to HWC)
+                        img_for_aug = np.transpose(image_data, (1, 2, 0))
 
-                # Export label as GeoTIFF (only if class data provided)
-                if in_class_data is not None:
-                    # Create profile for label GeoTIFF
-                    label_profile = {
-                        "driver": "GTiff",
-                        "height": tile_size,
-                        "width": tile_size,
-                        "count": 1,
-                        "dtype": "uint8",
-                        "crs": src.crs,
-                        "transform": window_transform,
-                    }
+                        # Ensure uint8 data type for albumentations
+                        # Albumentations expects uint8 for most transforms
+                        if img_for_aug.dtype != np.uint8:
+                            # Scale to 0-255 range if needed
+                            if img_for_aug.max() <= 1.0:
+                                img_for_aug = (img_for_aug * 255).astype(np.uint8)
+                            else:
+                                img_for_aug = img_for_aug.astype(np.uint8)
 
-                    label_path = os.path.join(label_dir, f"tile_{tile_index:06d}.tif")
-                    try:
-                        with rasterio.open(label_path, "w", **label_profile) as dst:
-                            dst.write(label_mask.astype(np.uint8), 1)
+                        # Apply augmentation
+                        try:
+                            if in_class_data is not None:
+                                # Augment both image and mask
+                                augmented = augmentation_transforms(
+                                    image=img_for_aug, mask=label_mask
+                                )
+                                aug_image = augmented["image"]
+                                aug_mask = augmented["mask"]
+                            else:
+                                # Augment only image
+                                augmented = augmentation_transforms(image=img_for_aug)
+                                aug_image = augmented["image"]
+                                aug_mask = label_mask
 
-                        if has_features:
-                            stats["tiles_with_features"] += 1
-                            stats["feature_pixels"] += np.count_nonzero(label_mask)
-                    except Exception as e:
-                        pbar.write(f"ERROR saving label GeoTIFF: {e}")
-                        stats["errors"] += 1
+                            # Convert back from HWC to CHW
+                            aug_image = np.transpose(aug_image, (2, 0, 1))
+
+                            # Ensure correct dtype for saving
+                            aug_image = aug_image.astype(image_data.dtype)
+
+                            # Generate unique tile ID for augmented version
+                            # Use a simpler numbering scheme: base_id * 1000 + aug_idx
+                            aug_tile_id = tile_index * 1000 + aug_idx + 1
+
+                            # Save augmented tile
+                            save_tile(
+                                aug_image,
+                                aug_mask,
+                                aug_tile_id,
+                                src.profile,
+                                window_transform,
+                                is_augmented=True,
+                            )
+
+                        except Exception as e:
+                            pbar.write(
+                                f"ERROR applying augmentation {aug_idx} to tile {tile_index}: {e}"
+                            )
+                            stats["errors"] += 1
 
                 # Create annotations for object detection if using vector class data
                 if (
