@@ -2015,17 +2015,39 @@ def get_semantic_transform(train: bool) -> Any:
     """
     Get transforms for semantic segmentation data augmentation.
 
+    This function returns default data augmentation transforms for training
+    semantic segmentation models. The transforms include geometric transformations
+    (horizontal/vertical flips, rotations) and photometric adjustments (brightness,
+    contrast) that are commonly used in remote sensing tasks.
+
     Args:
         train (bool): Whether to include training-specific transforms.
+            If True, applies augmentations (flips, rotations, brightness/contrast adjustments).
+            If False, only converts to tensor (for validation).
 
     Returns:
         SemanticTransforms: Composed transforms.
+
+    Example:
+        >>> train_transform = get_semantic_transform(train=True)
+        >>> val_transform = get_semantic_transform(train=False)
     """
     transforms = []
     transforms.append(SemanticToTensor())
 
     if train:
+        # Geometric transforms - preserve spatial structure
         transforms.append(SemanticRandomHorizontalFlip(0.5))
+        transforms.append(SemanticRandomVerticalFlip(0.5))
+        transforms.append(SemanticRandomRotation90(0.5))
+
+        # Photometric transforms - improve model robustness
+        transforms.append(
+            SemanticBrightnessAdjustment(brightness_range=(0.8, 1.2), prob=0.5)
+        )
+        transforms.append(
+            SemanticContrastAdjustment(contrast_range=(0.8, 1.2), prob=0.5)
+        )
 
     return SemanticTransforms(transforms)
 
