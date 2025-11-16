@@ -231,10 +231,8 @@ class GeoAgent(Agent):
         # --- save a model factory we can call each turn ---
         if isinstance(model, str) and (":" in model or model.startswith("llama")):
             # treat ANY "llama..." model id as Ollama
-            self._model_factory = (
-                lambda m=model: create_ollama_model(
-                    host="http://localhost:11434", model_id=m, **model_args
-                )
+            self._model_factory = lambda m=model: create_ollama_model(
+                host="http://localhost:11434", model_id=m, **model_args
             )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
@@ -266,8 +264,8 @@ class GeoAgent(Agent):
             )
         elif isinstance(model, str):
             # Only Bedrock IDs here, not LLaMA
-            self._model_factory = (
-                lambda m=model: create_bedrock_model(model_id=m, **model_args)
+            self._model_factory = lambda m=model: create_bedrock_model(
+                model_id=m, **model_args
             )
         else:
             raise ValueError(f"Invalid model: {model}")
@@ -647,10 +645,8 @@ class STACAgent(Agent):
         # --- save a model factory we can call each turn ---
         if isinstance(model, str) and (":" in model or model.startswith("llama")):
             # treat ANY "llama..." model id as Ollama
-            self._model_factory = (
-                lambda m=model: create_ollama_model(
-                    host="http://localhost:11434", model_id=m, **model_args
-                )
+            self._model_factory = lambda m=model: create_ollama_model(
+                host="http://localhost:11434", model_id=m, **model_args
             )
 
         elif isinstance(model, OllamaModel):
@@ -683,8 +679,8 @@ class STACAgent(Agent):
             )
         elif isinstance(model, str):
             # Only Bedrock IDs here, not LLaMA
-            self._model_factory = (
-                lambda m=model: create_bedrock_model(model_id=m, **model_args)
+            self._model_factory = lambda m=model: create_bedrock_model(
+                model_id=m, **model_args
             )
         else:
             raise ValueError(f"Invalid model: {model}")
@@ -1291,10 +1287,8 @@ class CatalogAgent(Agent):
         # --- save a model factory we can call each turn ---
         if isinstance(model, str) and (":" in model or model.startswith("llama")):
             # treat ANY "llama..." model id as Ollama
-            self._model_factory = (
-                lambda m=model: create_ollama_model(
-                    host="http://localhost:11434", model_id=m, **model_args
-                )
+            self._model_factory = lambda m=model: create_ollama_model(
+                host="http://localhost:11434", model_id=m, **model_args
             )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
@@ -1326,8 +1320,8 @@ class CatalogAgent(Agent):
             )
         elif isinstance(model, str):
             # Only Bedrock IDs here, not LLaMA
-            self._model_factory = (
-                lambda m=model: create_bedrock_model(model_id=m, **model_args)
+            self._model_factory = lambda m=model: create_bedrock_model(
+                model_id=m, **model_args
             )
         else:
             raise ValueError(f"Invalid model: {model}")
