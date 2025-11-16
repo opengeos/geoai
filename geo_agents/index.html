@@ -3520,8 +3520,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1255</span>
-<span class="normal">1256</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1256</span>
 <span class="normal">1257</span>
 <span class="normal">1258</span>
 <span class="normal">1259</span>
@@ -3752,7 +3751,8 @@
 <span class="normal">1484</span>
 <span class="normal">1485</span>
 <span class="normal">1486</span>
-<span class="normal">1487</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CatalogAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">1487</span>
+<span class="normal">1488</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CatalogAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AI agent for searching data catalogs with natural language queries.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -3784,15 +3784,10 @@
             <span class="n">model_args</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="c1"># --- save a model factory we can call each turn ---</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">OllamaModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
-                    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
-                <span class="p">)</span>
-            <span class="p">)</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">BedrockModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">model</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;llama&quot;</span><span class="p">)):</span>
+            <span class="c1"># treat ANY &quot;llama...&quot; model id as Ollama</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
+                <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">OllamaModel</span><span class="p">):</span>
             <span class="c1"># Extract configuration from existing OllamaModel and create new instances</span>
@@ -3821,6 +3816,11 @@
                 <span class="k">lambda</span> <span class="n">mid</span><span class="o">=</span><span class="n">model_id</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">:</span> <span class="n">create_anthropic_model</span><span class="p">(</span>
                     <span class="n">model_id</span><span class="o">=</span><span class="n">mid</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
                 <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># Only Bedrock IDs here, not LLaMA</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span>
+                <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid model: </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -4129,8 +4129,7 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1258</span>
-<span class="normal">1259</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1259</span>
 <span class="normal">1260</span>
 <span class="normal">1261</span>
 <span class="normal">1262</span>
@@ -4304,7 +4303,8 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 <span class="normal">1430</span>
 <span class="normal">1431</span>
 <span class="normal">1432</span>
-<span class="normal">1433</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1433</span>
+<span class="normal">1434</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -4333,15 +4333,10 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
             <span class="n">model_args</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="c1"># --- save a model factory we can call each turn ---</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">OllamaModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
-                    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
-                <span class="p">)</span>
-            <span class="p">)</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">BedrockModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">model</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;llama&quot;</span><span class="p">)):</span>
+            <span class="c1"># treat ANY &quot;llama...&quot; model id as Ollama</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
+                <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">OllamaModel</span><span class="p">):</span>
             <span class="c1"># Extract configuration from existing OllamaModel and create new instances</span>
@@ -4370,6 +4365,11 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
                 <span class="k">lambda</span> <span class="n">mid</span><span class="o">=</span><span class="n">model_id</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">:</span> <span class="n">create_anthropic_model</span><span class="p">(</span>
                     <span class="n">model_id</span><span class="o">=</span><span class="n">mid</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
                 <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># Only Bedrock IDs here, not LLaMA</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span>
+                <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid model: </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -4556,8 +4556,7 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1435</span>
-<span class="normal">1436</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1436</span>
 <span class="normal">1437</span>
 <span class="normal">1438</span>
 <span class="normal">1439</span>
@@ -4567,7 +4566,8 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 <span class="normal">1443</span>
 <span class="normal">1444</span>
 <span class="normal">1445</span>
-<span class="normal">1446</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1446</span>
+<span class="normal">1447</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -4718,8 +4718,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1448</span>
-<span class="normal">1449</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1449</span>
 <span class="normal">1450</span>
 <span class="normal">1451</span>
 <span class="normal">1452</span>
@@ -4757,7 +4756,8 @@ for ds in datasets:
 <span class="normal">1484</span>
 <span class="normal">1485</span>
 <span class="normal">1486</span>
-<span class="normal">1487</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_datasets</span><span class="p">(</span>
+<span class="normal">1487</span>
+<span class="normal">1488</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_datasets</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">keywords</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dataset_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5274,15 +5274,10 @@ for ds in datasets:
             <span class="n">model_args</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="c1"># --- save a model factory we can call each turn ---</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">OllamaModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
-                    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
-                <span class="p">)</span>
-            <span class="p">)</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">BedrockModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">model</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;llama&quot;</span><span class="p">)):</span>
+            <span class="c1"># treat ANY &quot;llama...&quot; model id as Ollama</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
+                <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">OllamaModel</span><span class="p">):</span>
             <span class="c1"># Extract configuration from existing OllamaModel and create new instances</span>
@@ -5311,6 +5306,11 @@ for ds in datasets:
                 <span class="k">lambda</span> <span class="n">mid</span><span class="o">=</span><span class="n">model_id</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">:</span> <span class="n">create_anthropic_model</span><span class="p">(</span>
                     <span class="n">model_id</span><span class="o">=</span><span class="n">mid</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
                 <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># Only Bedrock IDs here, not LLaMA</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span>
+                <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid model: </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -5912,15 +5912,10 @@ for ds in datasets:
         <span class="n">model_args</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="c1"># --- save a model factory we can call each turn ---</span>
-    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">OllamaModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
-                <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
-            <span class="p">)</span>
-        <span class="p">)</span>
-    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">BedrockModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">model</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;llama&quot;</span><span class="p">)):</span>
+        <span class="c1"># treat ANY &quot;llama...&quot; model id as Ollama</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
+            <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">OllamaModel</span><span class="p">):</span>
         <span class="c1"># Extract configuration from existing OllamaModel and create new instances</span>
@@ -5949,6 +5944,11 @@ for ds in datasets:
             <span class="k">lambda</span> <span class="n">mid</span><span class="o">=</span><span class="n">model_id</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">:</span> <span class="n">create_anthropic_model</span><span class="p">(</span>
                 <span class="n">model_id</span><span class="o">=</span><span class="n">mid</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="c1"># Only Bedrock IDs here, not LLaMA</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span>
+            <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
         <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid model: </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -7541,7 +7541,8 @@ for ds in datasets:
 <span class="normal">1249</span>
 <span class="normal">1250</span>
 <span class="normal">1251</span>
-<span class="normal">1252</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">STACAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">1252</span>
+<span class="normal">1253</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">STACAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AI agent for searching and interacting with STAC catalogs.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -7571,16 +7572,12 @@ for ds in datasets:
             <span class="n">model_args</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="c1"># --- save a model factory we can call each turn ---</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">OllamaModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
-                    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
-                <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">model</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;llama&quot;</span><span class="p">)):</span>
+            <span class="c1"># treat ANY &quot;llama...&quot; model id as Ollama</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
+                <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">BedrockModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span><span class="p">)</span>
-            <span class="p">)</span>
+
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">OllamaModel</span><span class="p">):</span>
             <span class="c1"># Extract configuration from existing OllamaModel and create new instances</span>
             <span class="n">model_id</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;model_id&quot;</span><span class="p">]</span>
@@ -7608,6 +7605,11 @@ for ds in datasets:
                 <span class="k">lambda</span> <span class="n">mid</span><span class="o">=</span><span class="n">model_id</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">:</span> <span class="n">create_anthropic_model</span><span class="p">(</span>
                     <span class="n">model_id</span><span class="o">=</span><span class="n">mid</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
                 <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># Only Bedrock IDs here, not LLaMA</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span>
+                <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid model: </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -8453,7 +8455,8 @@ for ds in datasets:
 <span class="normal">748</span>
 <span class="normal">749</span>
 <span class="normal">750</span>
-<span class="normal">751</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">751</span>
+<span class="normal">752</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -8480,16 +8483,12 @@ for ds in datasets:
             <span class="n">model_args</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="c1"># --- save a model factory we can call each turn ---</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">OllamaModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
-                    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
-                <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">model</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;llama&quot;</span><span class="p">)):</span>
+            <span class="c1"># treat ANY &quot;llama...&quot; model id as Ollama</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_ollama_model</span><span class="p">(</span>
+                <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">BedrockModel</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="k">lambda</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span><span class="p">)</span>
-            <span class="p">)</span>
+
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">OllamaModel</span><span class="p">):</span>
             <span class="c1"># Extract configuration from existing OllamaModel and create new instances</span>
             <span class="n">model_id</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;model_id&quot;</span><span class="p">]</span>
@@ -8517,6 +8516,11 @@ for ds in datasets:
                 <span class="k">lambda</span> <span class="n">mid</span><span class="o">=</span><span class="n">model_id</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">:</span> <span class="n">create_anthropic_model</span><span class="p">(</span>
                     <span class="n">model_id</span><span class="o">=</span><span class="n">mid</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="n">client_args</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
                 <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># Only Bedrock IDs here, not LLaMA</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_bedrock_model</span><span class="p">(</span>
+                <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid model: </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -8662,8 +8666,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">809</span>
-<span class="normal">810</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">810</span>
 <span class="normal">811</span>
 <span class="normal">812</span>
 <span class="normal">813</span>
@@ -8685,7 +8688,8 @@ for ds in datasets:
 <span class="normal">829</span>
 <span class="normal">830</span>
 <span class="normal">831</span>
-<span class="normal">832</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">832</span>
+<span class="normal">833</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -8824,8 +8828,7 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">834</span>
-<span class="normal">835</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">835</span>
 <span class="normal">836</span>
 <span class="normal">837</span>
 <span class="normal">838</span>
@@ -8891,7 +8894,8 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 <span class="normal">898</span>
 <span class="normal">899</span>
 <span class="normal">900</span>
-<span class="normal">901</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_and_get_first_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="normal">901</span>
+<span class="normal">902</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_and_get_first_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Search for imagery and return the first item as a structured dict.</span>
 
 <span class="sd">    This method sends a search query to the agent, extracts the search results</span>
@@ -9012,8 +9016,7 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 969</span>
-<span class="normal"> 970</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 970</span>
 <span class="normal"> 971</span>
 <span class="normal"> 972</span>
 <span class="normal"> 973</span>
@@ -9295,7 +9298,8 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 <span class="normal">1249</span>
 <span class="normal">1250</span>
 <span class="normal">1251</span>
-<span class="normal">1252</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">1252</span>
+<span class="normal">1253</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display an interactive UI with map and chat interface for STAC searches.</span>
 
 <span class="sd">    Args:</span>
