@@ -11,6 +11,7 @@ AGENTS.md
 docs/examples/timm_output/
 docs/examples/timm_seg_output/
 docs/examples/timm_buildings/
+docs/workshops/**/*.txt
 
 # C extensions
 *.so
