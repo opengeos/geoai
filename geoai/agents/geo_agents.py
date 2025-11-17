@@ -473,7 +473,7 @@ class GeoAgent(Agent):
                         f"<div style='margin:6px 0;padding:6px 8px;border-radius:8px;background:#f7f7f7;'><b>Agent</b>: {_esc(mm)}</div>"
                     )
             self._ui.log.value = (
-                "<div>"
+                "<div style='height:100%; overflow-y:auto;'>"
                 + (
                     "".join(parts)
                     if parts
@@ -1093,7 +1093,7 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
                         f"<div style='margin:6px 0;padding:6px 8px;border-radius:8px;background:#f7f7f7;'><b>Agent</b>: {_esc(mm)}</div>"
                     )
             self._ui.log.value = (
-                "<div>"
+                "<div style='height:100%; overflow-y:auto;'>"
                 + (
                     "".join(parts)
                     if parts
