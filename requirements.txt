@@ -11,6 +11,7 @@ localtileserver
 mapclassify
 maplibre
 opencv-python-headless
+opensr-model
 overturemaps
 planetary-computer
 psutil
@@ -29,4 +30,3 @@ torchgeo
 torchinfo
 tqdm
 transformers>=4.57.1
-opensr-model

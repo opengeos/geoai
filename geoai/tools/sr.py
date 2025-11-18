@@ -49,9 +49,7 @@ def super_resolution(
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Download configuration YAML from GitHub
-    config_url = (
-        "https://raw.githubusercontent.com/ESAOpenSR/opensr-model/refs/heads/main/opensr_model/configs/config_10m.yaml"
-    )
+    config_url = "https://raw.githubusercontent.com/ESAOpenSR/opensr-model/refs/heads/main/opensr_model/configs/config_10m.yaml"
     print("Downloading model configuration from:", config_url)
     response = requests.get(config_url)
     config = OmegaConf.load(StringIO(response.text))
@@ -62,9 +60,7 @@ def super_resolution(
 
     # Load only the specified RGB+NIR bands
     lr_tensor, profile = load_image_tensor(
-        image_path=input_lr_path,
-        device=device,
-        bands=rgb_nir_bands
+        image_path=input_lr_path, device=device, bands=rgb_nir_bands
     )
 
     # Generate super-resolution tensor
@@ -117,9 +113,7 @@ def save_geotiff(data: np.ndarray, reference_profile: dict, output_path: str):
 
 
 def load_image_tensor(
-    image_path: str,
-    device: str,
-    bands: list[int]
+    image_path: str, device: str, bands: list[int]
 ) -> Tuple[torch.Tensor, dict]:
     """
     Load only specified bands of a multispectral GeoTIFF as a PyTorch tensor.
@@ -142,7 +136,9 @@ def load_image_tensor(
     with rasterio.open(image_path) as src:
         n_bands = src.count
         if min(bands) < 1 or max(bands) > n_bands:
-            raise ValueError(f"Input image has {n_bands} bands, requested bands {bands} out of range.")
+            raise ValueError(
+                f"Input image has {n_bands} bands, requested bands {bands} out of range."
+            )
         image = src.read(bands)  # shape: (4, H, W)
         profile = src.profile
 
