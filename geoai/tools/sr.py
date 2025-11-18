@@ -23,31 +23,34 @@ def super_resolution(
     input_lr_path: str,
     output_sr_path: str,
     output_uncertainty_path: str,
+    rgb_nir_bands: list[int] = [3, 2, 1, 4],  # Default example: R=3,G=2,B=1,NIR=4
     sampling_steps: int = 100,
     n_variations: int = 25,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Perform super-resolution on a multispectral GeoTIFF using OpenSR latent diffusion.
+    Perform super-resolution on RGB+NIR bands of a multispectral GeoTIFF using OpenSR latent diffusion.
 
     Args:
         input_lr_path (str): Path to the input low-resolution GeoTIFF.
         output_sr_path (str): Path to save the super-resolution GeoTIFF.
         output_uncertainty_path (str): Path to save the uncertainty map GeoTIFF.
+        rgb_nir_bands (list[int]): List of 4 band indices corresponding to [R, G, B, NIR].
         sampling_steps (int): Number of diffusion sampling steps. Default is 100.
         n_variations (int): Number of samples to compute uncertainty. Default is 25.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: Tuple containing:
-            - sr_image: Super-resolution image as a NumPy array (C, H, W).
-            - uncertainty: Uncertainty map as a NumPy array (H, W).
+            - sr_image: Super-resolution image as a NumPy array (4, H, W)
+            - uncertainty: Uncertainty map as a NumPy array (H, W)
     """
-    # Determine computation device
+    if len(rgb_nir_bands) != 4:
+        raise ValueError("rgb_nir_bands must be a list of 4 integers: [R, G, B, NIR]")
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Download configuration YAML from GitHub
     config_url = (
-        "https://raw.githubusercontent.com/ESAOpenSR/opensr-model/refs/heads/main/"
-        "opensr_model/configs/config_10m.yaml"
+        "https://raw.githubusercontent.com/ESAOpenSR/opensr-model/refs/heads/main/opensr_model/configs/config_10m.yaml"
     )
     print("Downloading model configuration from:", config_url)
     response = requests.get(config_url)
@@ -57,15 +60,15 @@ def super_resolution(
     model = opensr_model.SRLatentDiffusion(config, device=device)
     model.load_pretrained(config.ckpt_version)
 
-    # Load low-resolution image as tensor
+    # Load only the specified RGB+NIR bands
     lr_tensor, profile = load_image_tensor(
-        image_path=input_lr_path, device=device, max_bands=4
+        image_path=input_lr_path,
+        device=device,
+        bands=rgb_nir_bands
     )
 
     # Generate super-resolution tensor
     sr_tensor = model.forward(lr_tensor, sampling_steps=sampling_steps)
-
-    # Convert tensor to NumPy array for saving
     sr_image = sr_tensor.squeeze(0).cpu().numpy().astype(np.float32)
     save_geotiff(sr_image, profile, output_sr_path)
     print("Saved super-resolution image to:", output_sr_path)
@@ -113,42 +116,36 @@ def save_geotiff(data: np.ndarray, reference_profile: dict, output_path: str):
         dst.write(data.astype(np.float32))
 
 
-def load_image_tensor(image_path: str, device: str, max_bands: int) -> Tuple[torch.Tensor, dict]:
+def load_image_tensor(
+    image_path: str,
+    device: str,
+    bands: list[int]
+) -> Tuple[torch.Tensor, dict]:
     """
-    Load a multispectral GeoTIFF as a PyTorch tensor with a batch dimension.
+    Load only specified bands of a multispectral GeoTIFF as a PyTorch tensor.
 
     Args:
         image_path (str): Path to input GeoTIFF.
         device (str): Device to move the tensor to ('cpu' or 'cuda').
-        max_bands (int): Number of bands to read from the image.
+        bands (list[int]): List of 1-based band indices to read.
 
     Returns:
-        Tuple[torch.Tensor, dict]: Tuple containing:
-            - Tensor with shape (1, C, H, W)
-            - Rasterio profile dictionary
+        Tuple[torch.Tensor, dict]: Tensor (1, C, H, W) and rasterio profile.
 
     Raises:
         FileNotFoundError: If input image does not exist.
-        ValueError: If input image has fewer bands than max_bands.
+        ValueError: If any band index is out of range.
     """
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Input image does not exist: {image_path}")
 
-    # Read image and profile using rasterio
     with rasterio.open(image_path) as src:
-        image = src.read()  # shape: (C, H, W)
+        n_bands = src.count
+        if min(bands) < 1 or max(bands) > n_bands:
+            raise ValueError(f"Input image has {n_bands} bands, requested bands {bands} out of range.")
+        image = src.read(bands)  # shape: (4, H, W)
         profile = src.profile
 
-    # Check band count
-    if image.shape[0] < max_bands:
-        raise ValueError(
-            f"Input image has {image.shape[0]} bands, but {max_bands} required."
-        )
-
-    # Select first max_bands bands and convert to float32
-    image = image[:max_bands].astype(np.float32)
-
-    # Convert to PyTorch tensor and add batch dimension
+    image = image.astype(np.float32)
     tensor = torch.from_numpy(image).unsqueeze(0).to(device)
-
     return tensor, profile
