@@ -136,3 +136,24 @@ try:
 except ImportError:
     # MultiClean not available (missing dependency)
     pass
+
+try:
+    from .tools import (
+        predict_cloud_mask,
+        predict_cloud_mask_from_raster,
+        predict_cloud_mask_batch,
+        calculate_cloud_statistics,
+        create_cloud_free_mask,
+        check_omnicloudmask_available,
+        CLEAR,
+        THICK_CLOUD,
+        THIN_CLOUD,
+        CLOUD_SHADOW,
+    )
+except ImportError:
+    pass
+
+try:
+    from .tools import super_resolution
+except ImportError:
+    pass
