@@ -14,6 +14,7 @@ import torch
 import numpy as np
 import rasterio
 import requests
+from rasterio.transform import Affine
 from io import StringIO
 from omegaconf import OmegaConf
 
@@ -32,6 +33,7 @@ def super_resolution(
     rgb_nir_bands: list[int] = [3, 2, 1, 4],  # Default example: R=3,G=2,B=1,NIR=4
     sampling_steps: int = 100,
     n_variations: int = 25,
+    scale: int = 4,  # OpenSR scaling factor, e.g., 10m -> 2.5m
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Perform super-resolution on RGB+NIR bands of a multispectral GeoTIFF using OpenSR latent diffusion.
@@ -43,6 +45,9 @@ def super_resolution(
         rgb_nir_bands (list[int]): List of 4 band indices corresponding to [R, G, B, NIR].
         sampling_steps (int): Number of diffusion sampling steps. Default is 100.
         n_variations (int): Number of samples to compute uncertainty. Default is 25.
+        scale (int, optional): Super-resolution scale factor. Default is 4.
+            This adjusts the affine transform to ensure georeference matches 
+            the original image.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: Tuple containing:
@@ -79,48 +84,59 @@ def super_resolution(
     # Generate super-resolution tensor
     sr_tensor = model.forward(lr_tensor, sampling_steps=sampling_steps)
     sr_image = sr_tensor.squeeze(0).cpu().numpy().astype(np.float32)
-    save_geotiff(sr_image, profile, output_sr_path)
+    save_geotiff(sr_image, profile, output_sr_path,scale)
     print("Saved super-resolution image to:", output_sr_path)
 
     # Compute uncertainty map
     unc_tensor = model.uncertainty_map(lr_tensor, n_variations=n_variations)
     uncertainty = unc_tensor.squeeze(0).cpu().numpy().astype(np.float32)
-    save_geotiff(uncertainty, profile, output_uncertainty_path)
+    save_geotiff(uncertainty, profile, output_uncertainty_path,scale)
     print("Saved uncertainty map to:", output_uncertainty_path)
 
     return sr_image, uncertainty
 
 
-def save_geotiff(data: np.ndarray, reference_profile: dict, output_path: str):
+def save_geotiff(data: np.ndarray, reference_profile: dict, output_path: str, scale: int = 4):
     """
-    Save a 2D or 3D NumPy array as a GeoTIFF using a reference metadata profile.
+    Save a 2D or 3D NumPy array as a GeoTIFF with super-resolution scaling 
+    and corrected georeference.
 
     Args:
-        data (np.ndarray): Image array to save. Shape can be (C, H, W) or (H, W).
-        reference_profile (dict): Rasterio metadata from a reference image.
+        data (np.ndarray): Image array to save. Can be:
+            - 2D array (H, W) for a single-band image
+            - 3D array (C, H, W) for multi-band images (e.g., RGB+NIR)
+        reference_profile (dict): Rasterio metadata from a reference GeoTIFF. 
+            Used to preserve CRS, transform, and other metadata.
         output_path (str): Path to save the output GeoTIFF.
+        scale (int, optional): Super-resolution scale factor. Default is 4.
+            This adjusts the affine transform to ensure georeference matches 
+            the original image.
 
     Returns:
         None
+            Writes the image to disk at the specified output path.
     """
-    # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    # Add channel dimension if missing (for 2D arrays)
     if data.ndim == 2:
         data = data[np.newaxis, ...]
 
-    # Copy and update raster metadata
+    # Update profile and transform
     profile = reference_profile.copy()
+    old_transform = profile['transform']
+    new_transform = Affine(
+        old_transform.a / scale, old_transform.b, old_transform.c,
+        old_transform.d, old_transform.e / scale, old_transform.f
+    )
     profile.update(
         dtype=rasterio.float32,
         count=data.shape[0],
         height=data.shape[1],
         width=data.shape[2],
-        compress="lzw",
+        compress='lzw',
+        transform=new_transform
     )
 
-    # Write data to GeoTIFF
     with rasterio.open(output_path, "w", **profile) as dst:
         dst.write(data.astype(np.float32))
 
