@@ -16,7 +16,13 @@ import rasterio
 import requests
 from io import StringIO
 from omegaconf import OmegaConf
-import opensr_model
+
+try:
+    import opensr_model
+
+    OPENSR_MODEL_AVAILABLE = True
+except ImportError:
+    OPENSR_MODEL_AVAILABLE = False
 
 
 def super_resolution(
@@ -45,6 +51,13 @@ def super_resolution(
     """
     if len(rgb_nir_bands) != 4:
         raise ValueError("rgb_nir_bands must be a list of 4 integers: [R, G, B, NIR]")
+
+    if not OPENSR_MODEL_AVAILABLE:
+        raise ImportError(
+            "The 'opensr-model' package is required for super-resolution. "
+            "Please install it using: pip install opensr-model\n"
+            "Or install GeoAI with the sr optional dependency: pip install geoai-py[sr]"
+        )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
