@@ -142,4 +142,5 @@ except ImportError:
 try:
     from .tools import super_resolution
 except ImportError:
+    # super_resolution not available (missing dependency)
     pass
