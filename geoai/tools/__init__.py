@@ -72,4 +72,5 @@ try:
 
     __all__.extend(["super_resolution"])
 except ImportError:
+    # Super resolution not installed - function will not be available
     pass
