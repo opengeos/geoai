@@ -70,7 +70,12 @@ def super_resolution(
     # Download configuration YAML from GitHub
     config_url = "https://raw.githubusercontent.com/ESAOpenSR/opensr-model/refs/heads/main/opensr_model/configs/config_10m.yaml"
     print("Downloading model configuration from:", config_url)
-    response = requests.get(config_url)
+    try:
+        response = requests.get(config_url)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"Error downloading model configuration: {e}")
+        raise
     config = OmegaConf.load(StringIO(response.text))
 
     # Initialize latent diffusion model and load pretrained weights
