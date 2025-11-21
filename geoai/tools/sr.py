@@ -116,7 +116,9 @@ def save_geotiff(
 
     Returns:
         None
-            Writes the image to disk at the specified output path.
+
+    Note:
+        Writes the image to disk at the specified output path.
     """
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
