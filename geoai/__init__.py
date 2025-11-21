@@ -136,3 +136,11 @@ try:
 except ImportError:
     # MultiClean not available (missing dependency)
     pass
+
+# Removed redundant cloud mask imports; these are already available via the tools subpackage.
+
+try:
+    from .tools import super_resolution
+except ImportError:
+    # super_resolution not available (missing dependency)
+    pass

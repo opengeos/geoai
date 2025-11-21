@@ -38,6 +38,7 @@ dependencies = {file = ["requirements.txt"]}
 [project.optional-dependencies]
 extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
+sr = ["opensr-model"]
 
 [tool.distutils.bdist_wheel]
 universal = true
