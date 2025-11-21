@@ -65,7 +65,7 @@ except ImportError:
     pass
 
 
-# super resolution (optional dependency)
+# Super Resolution integration (optional dependency)
 
 try:
     from .sr import super_resolution
