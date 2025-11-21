@@ -57,7 +57,11 @@ def super_resolution(
     if len(rgb_nir_bands) != 4:
         raise ValueError("rgb_nir_bands must be a list of 4 integers: [R, G, B, NIR]")
     if not all(isinstance(b, int) for b in rgb_nir_bands):
-        raise ValueError("All elements of rgb_nir_bands must be integers. Received: {}".format(rgb_nir_bands))
+        raise ValueError(
+            "All elements of rgb_nir_bands must be integers. Received: {}".format(
+                rgb_nir_bands
+            )
+        )
     if not OPENSR_MODEL_AVAILABLE:
         raise ImportError(
             "The 'opensr-model' package is required for super-resolution. "
