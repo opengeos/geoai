@@ -4,7 +4,7 @@ Landcover Classification Training Module
 This module extends the base geoai training functionality with specialized
 components for discrete landcover classification, including:
 - Enhanced loss functions with boundary weighting
-- Per-class frequency weighting for imbalanced datasets  
+- Per-class frequency weighting for imbalanced datasets
 - Configurable ignore_index handling
 - Additional validation metrics
 
@@ -28,10 +28,10 @@ import torch.nn.functional as F
 class FocalLoss(nn.Module):
     """
     Focal Loss for addressing class imbalance in segmentation.
-    
+
     Reference: Lin, T. Y., Goyal, P., Girshick, R., He, K., & Dollár, P. (2017).
     Focal loss for dense object detection. ICCV.
-    
+
     Args:
         alpha: Weighting factor in range (0,1) to balance positive/negative examples
         gamma: Exponent of the modulating factor (1 - p_t)^gamma
@@ -39,44 +39,47 @@ class FocalLoss(nn.Module):
         reduction: Specifies the reduction to apply to the output
         weight: Manual rescaling weight given to each class
     """
-    
-    def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100, reduction='mean', weight=None):
+
+    def __init__(
+        self, alpha=1.0, gamma=2.0, ignore_index=-100, reduction="mean", weight=None
+    ):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
         self.ignore_index = ignore_index
         self.reduction = reduction
         self.weight = weight
-        
+
     def forward(self, inputs, targets):
         """
         Forward pass of focal loss.
-        
+
         Args:
             inputs: Predictions (N, C, H, W) where C = number of classes
             targets: Ground truth (N, H, W) with class indices
-            
+
         Returns:
             Loss value
         """
         # Get class probabilities
         ce_loss = F.cross_entropy(
-            inputs, targets, 
+            inputs,
+            targets,
             weight=self.weight,
-            ignore_index=self.ignore_index, 
-            reduction='none'
+            ignore_index=self.ignore_index,
+            reduction="none",
         )
-        
+
         # Get probability of true class
         p_t = torch.exp(-ce_loss)
-        
+
         # Calculate focal loss
         focal_loss = self.alpha * (1 - p_t) ** self.gamma * ce_loss
-        
+
         # Apply reduction
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             return focal_loss.mean()
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             return focal_loss.sum()
         else:
             return focal_loss
@@ -85,10 +88,10 @@ class FocalLoss(nn.Module):
 class LandcoverCrossEntropyLoss(nn.Module):
     """
     Enhanced CrossEntropyLoss with optional ignore_index and class weights.
-    
+
     This extends the standard CrossEntropyLoss with more flexible ignore_index
     handling, specifically designed for landcover classification tasks.
-    
+
     Args:
         weight: Manual rescaling weight given to each class
         ignore_index: Specifies a target value that is ignored (default: None)
@@ -96,7 +99,7 @@ class LandcoverCrossEntropyLoss(nn.Module):
             - int: Specific class index to ignore (e.g., 0 for background)
         reduction: Specifies the reduction to apply ('mean', 'sum', 'none')
     """
-    
+
     def __init__(
         self,
         weight: Optional[torch.Tensor] = None,
@@ -107,15 +110,15 @@ class LandcoverCrossEntropyLoss(nn.Module):
         self.weight = weight
         self.ignore_index = ignore_index if ignore_index is not None else -100
         self.reduction = reduction
-    
+
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
         Compute cross entropy loss.
-        
+
         Args:
             input: Predictions (N, C, H, W) where C = number of classes
             target: Ground truth (N, H, W) with class indices
-        
+
         Returns:
             Loss value
         """
@@ -139,12 +142,12 @@ def landcover_iou(
 ) -> Union[float, Tuple[float, List[float], List[int]]]:
     """
     Calculate IoU for landcover classification with multiple weighting options.
-    
+
     Supports three IoU calculation modes:
     1. "mean": Simple mean IoU across all classes
-    2. "perclass_frequency": Weight by per-class pixel frequency  
+    2. "perclass_frequency": Weight by per-class pixel frequency
     3. "boundary_weighted": Weight by distance to class boundaries
-    
+
     Args:
         pred: Predicted classes (N, H, W) or logits (N, C, H, W)
         target: Ground truth (N, H, W)
@@ -153,50 +156,52 @@ def landcover_iou(
         smooth: Smoothing factor to avoid division by zero
         mode: IoU calculation mode ("mean", "perclass_frequency", "boundary_weighted")
         boundary_weight_map: Optional boundary weights (N, H, W)
-    
+
     Returns:
         If mode == "mean": float (mean IoU)
         If mode == "perclass_frequency": tuple (weighted IoU, per-class IoUs, class counts)
         If mode == "boundary_weighted": float (boundary-weighted IoU)
     """
-    
+
     # Convert logits to class predictions if needed
     if pred.dim() == 4:
         pred = torch.argmax(pred, dim=1)
-    
+
     # Ensure correct shape
-    assert pred.shape == target.shape, f"Shape mismatch: pred {pred.shape}, target {target.shape}"
-    
+    assert (
+        pred.shape == target.shape
+    ), f"Shape mismatch: pred {pred.shape}, target {target.shape}"
+
     # Create mask for valid pixels
     if ignore_index is not None:
         valid_mask = target != ignore_index
     else:
         valid_mask = torch.ones_like(target, dtype=torch.bool)
-    
+
     # Simple mean IoU
     if mode == "mean":
         ious = []
         for cls in range(num_classes):
             if ignore_index is not None and cls == ignore_index:
                 continue
-            
+
             pred_cls = (pred == cls) & valid_mask
             target_cls = (target == cls) & valid_mask
-            
+
             intersection = (pred_cls & target_cls).sum().float()
             union = (pred_cls | target_cls).sum().float()
-            
+
             if union > 0:
                 iou = (intersection + smooth) / (union + smooth)
                 ious.append(iou.item())
-        
+
         return sum(ious) / len(ious) if ious else 0.0
-    
+
     # Per-class frequency weighted IoU
     elif mode == "perclass_frequency":
         ious = []
         class_counts = []
-        
+
         # Filter out ignore_index from target
         if ignore_index is not None:
             target_filtered = target[valid_mask]
@@ -204,21 +209,21 @@ def landcover_iou(
         else:
             target_filtered = target.view(-1)
             pred_filtered = pred.view(-1)
-        
+
         total_valid_pixels = target_filtered.numel()
-        
+
         for cls in range(num_classes):
             if ignore_index is not None and cls == ignore_index:
                 continue
-            
+
             pred_cls = pred_filtered == cls
             target_cls = target_filtered == cls
-            
+
             intersection = (pred_cls & target_cls).sum().float()
             union = (pred_cls | target_cls).sum().float()
-            
+
             class_pixel_count = target_cls.sum().item()
-            
+
             if union > 0:
                 iou = (intersection + smooth) / (union + smooth)
                 ious.append(iou.item())
@@ -226,53 +231,57 @@ def landcover_iou(
             else:
                 ious.append(0.0)
                 class_counts.append(0)
-        
+
         # Calculate frequency-weighted IoU
         if sum(class_counts) > 0:
             weights = [count / total_valid_pixels for count in class_counts]
             weighted_iou = sum(iou * weight for iou, weight in zip(ious, weights))
         else:
             weighted_iou = 0.0
-        
+
         return weighted_iou, ious, class_counts
-    
+
     # Boundary-weighted IoU
     elif mode == "boundary_weighted":
         if boundary_weight_map is None:
             raise ValueError("boundary_weight_map required for boundary_weighted mode")
-        
+
         ious = []
         weights = []
-        
+
         for cls in range(num_classes):
             if ignore_index is not None and cls == ignore_index:
                 continue
-            
+
             pred_cls = (pred == cls) & valid_mask
             target_cls = (target == cls) & valid_mask
-            
+
             # Weight by boundary map
-            weighted_intersection = (pred_cls & target_cls).float() * boundary_weight_map
+            weighted_intersection = (
+                pred_cls & target_cls
+            ).float() * boundary_weight_map
             weighted_union = (pred_cls | target_cls).float() * boundary_weight_map
-            
+
             intersection_sum = weighted_intersection.sum()
             union_sum = weighted_union.sum()
-            
+
             if union_sum > 0:
                 iou = (intersection_sum + smooth) / (union_sum + smooth)
                 weight = union_sum.item()
                 ious.append(iou.item())
                 weights.append(weight)
-        
+
         if sum(weights) > 0:
             weighted_iou = sum(iou * w for iou, w in zip(ious, weights)) / sum(weights)
         else:
             weighted_iou = 0.0
-        
+
         return weighted_iou
-    
+
     else:
-        raise ValueError(f"Unknown mode: {mode}. Use 'mean', 'perclass_frequency', or 'boundary_weighted'")
+        raise ValueError(
+            f"Unknown mode: {mode}. Use 'mean', 'perclass_frequency', or 'boundary_weighted'"
+        )
 
 
 def get_landcover_loss_function(
@@ -287,7 +296,7 @@ def get_landcover_loss_function(
 ) -> nn.Module:
     """
     Get loss function configured for landcover classification.
-    
+
     Args:
         loss_name: Name of loss function ("crossentropy", "focal", "dice", "combo")
         num_classes: Number of classes
@@ -297,35 +306,35 @@ def get_landcover_loss_function(
         focal_alpha: Alpha parameter for focal loss
         focal_gamma: Gamma parameter for focal loss
         device: Device to place loss function on
-    
+
     Returns:
         Configured loss function
     """
-    
+
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     loss_name = loss_name.lower()
-    
+
     if loss_name == "crossentropy":
         weights = class_weights if use_class_weights else None
         if weights is not None:
             weights = weights.to(device)
-        
+
         return LandcoverCrossEntropyLoss(
             weight=weights,
             ignore_index=ignore_index,
             reduction="mean",
         )
-    
+
     elif loss_name == "focal":
         weights = class_weights if use_class_weights else None
         if weights is not None:
             weights = weights.to(device)
-        
+
         # Use -100 as default ignore_index for compatibility
         idx = ignore_index if ignore_index is not None else -100
-        
+
         return FocalLoss(
             alpha=focal_alpha,
             gamma=focal_gamma,
@@ -333,16 +342,16 @@ def get_landcover_loss_function(
             reduction="mean",
             weight=weights,
         )
-    
+
     else:
         # Fall back to standard PyTorch loss
         weights = class_weights if use_class_weights else None
         if weights is not None:
             weights = weights.to(device)
-        
+
         # Use -100 as default ignore_index for compatibility
         idx = ignore_index if ignore_index is not None else -100
-        
+
         return nn.CrossEntropyLoss(
             weight=weights,
             ignore_index=idx,
@@ -360,7 +369,7 @@ def compute_class_weights(
 ) -> torch.Tensor:
     """
     Compute class weights for imbalanced datasets with optional custom multipliers and maximum weight cap.
-    
+
     Args:
         labels_dir: Directory containing label files
         num_classes: Number of classes
@@ -372,18 +381,18 @@ def compute_class_weights(
         use_inverse_frequency: Whether to compute inverse frequency weights.
             - True (default): Compute inverse frequency weights, then apply custom multipliers
             - False: Use uniform weights (1.0) for all classes, then apply custom multipliers
-    
+
     Returns:
         Tensor of class weights (num_classes,) with custom adjustments and maximum weight cap applied
     """
     import os
     import rasterio
     from collections import Counter
-    
+
     # Count pixels for each class
     class_counts = Counter()
     total_pixels = 0
-    
+
     # Get all label files
     label_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
     label_files = [
@@ -391,9 +400,9 @@ def compute_class_weights(
         for f in os.listdir(labels_dir)
         if f.lower().endswith(label_extensions)
     ]
-    
+
     print(f"Computing class weights from {len(label_files)} label files...")
-    
+
     for label_file in label_files:
         try:
             with rasterio.open(label_file) as src:
@@ -407,13 +416,13 @@ def compute_class_weights(
         except Exception as e:
             print(f"Warning: Could not read {label_file}: {e}")
             continue
-    
+
     if total_pixels == 0:
         raise ValueError("No valid pixels found in label files")
-    
+
     # Initialize weights
     weights = torch.ones(num_classes)
-    
+
     if use_inverse_frequency:
         # Compute inverse frequency weights
         for class_id in range(num_classes):
@@ -424,7 +433,7 @@ def compute_class_weights(
                 weights[class_id] = total_pixels / class_counts[class_id]
             else:
                 weights[class_id] = 0.0
-        
+
         # Normalize to have mean weight of 1.0
         non_zero_weights = weights[weights > 0]
         if len(non_zero_weights) > 0:
@@ -442,10 +451,12 @@ def compute_class_weights(
             if class_id < 0 or class_id >= num_classes:
                 print(f"Warning: Invalid class_id {class_id}, skipping")
                 continue
-            
+
             original_weight = weights[class_id].item()
             weights[class_id] = weights[class_id] * multiplier
-            print(f"  Class {class_id}: {original_weight:.4f} × {multiplier} = {weights[class_id].item():.4f}")
+            print(
+                f"  Class {class_id}: {original_weight:.4f} × {multiplier} = {weights[class_id].item():.4f}"
+            )
     else:
         print("\nℹ️  No custom multipliers provided, using computed weights as-is")
 
@@ -454,10 +465,12 @@ def compute_class_weights(
     print(f"\n🔒 Applying maximum weight cap of {max_weight}...")
     for class_id in range(num_classes):
         if weights[class_id] > max_weight:
-            print(f"  Class {class_id}: {weights[class_id].item():.4f} → {max_weight} (capped)")
+            print(
+                f"  Class {class_id}: {weights[class_id].item():.4f} → {max_weight} (capped)"
+            )
             weights[class_id] = max_weight
             weights_capped = True
-    
+
     if not weights_capped:
         print("  No weights exceeded the cap")
 
@@ -466,12 +479,14 @@ def compute_class_weights(
     for class_id in range(num_classes):
         pixel_count = class_counts.get(class_id, 0)
         percent = (pixel_count / total_pixels * 100) if total_pixels > 0 else 0
-        print(f"  Class {class_id}: weight={weights[class_id].item():.4f}, "
-              f"pixels={pixel_count:,} ({percent:.2f}%)")
-    
+        print(
+            f"  Class {class_id}: weight={weights[class_id].item():.4f}, "
+            f"pixels={pixel_count:,} ({percent:.2f}%)"
+        )
+
     if ignore_index is not None and 0 <= ignore_index < num_classes:
         print(f"\n⚠️  Note: Class {ignore_index} (ignore_index) has weight 0.0")
-    
+
     return weights
 
 
@@ -516,10 +531,10 @@ def train_segmentation_landcover(
 ) -> torch.nn.Module:
     """
     Train a semantic segmentation model with landcover-specific enhancements.
-    
+
     This is a standalone version that wraps geoai.train.train_segmentation_model
     with landcover-specific loss functions, class weights, and metrics.
-    
+
     Args:
         images_dir: Directory containing training images
         labels_dir: Directory containing training labels
@@ -562,16 +577,16 @@ def train_segmentation_landcover(
             Higher values = more focus on boundaries (0.01-100 range)
         training_callback: Optional callback function for automatic metric tracking
         **kwargs: Additional arguments passed to base training function
-    
+
     Returns:
         Trained model
-        
+
     Example:
         >>> from landcover_train import train_segmentation_landcover
-        >>> 
+        >>>
         >>> model = train_segmentation_landcover(
         ...     images_dir="tiles/images",
-        ...     labels_dir="tiles/labels", 
+        ...     labels_dir="tiles/labels",
         ...     output_dir="models/landcover_001",
         ...     num_classes=5,
         ...     loss_function="focal",
@@ -584,27 +599,25 @@ def train_segmentation_landcover(
         ...     boundary_alpha=2.0,  # Moderate boundary emphasis
         ... )
     """
-    
+
     # Import geoai training function
     try:
         from geoai.train import train_segmentation_model
     except ImportError:
-        raise ImportError(
-            "geoai package not found. Install with: pip install geoai-py"
-        )
-    
+        raise ImportError("geoai package not found. Install with: pip install geoai-py")
+
     # Convert ignore_index to format expected by base function
     # Base function uses Union[int, bool], we use Optional[int]
     ignore_idx_param = ignore_index if ignore_index is not None else False
-    
+
     # Compute class weights if requested
     class_weights = None
     if use_class_weights:
         if verbose:
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("COMPUTING CLASS WEIGHTS")
-            print("="*60)
-        
+            print("=" * 60)
+
         class_weights = compute_class_weights(
             labels_dir=labels_dir,
             num_classes=num_classes,
@@ -613,10 +626,10 @@ def train_segmentation_landcover(
             max_weight=max_class_weight,
             use_inverse_frequency=use_inverse_frequency,
         )
-        
+
         if verbose:
-            print("="*60 + "\n")
-    
+            print("=" * 60 + "\n")
+
     # Call base training function with enhanced parameters
     model = train_segmentation_model(
         images_dir=images_dir,
@@ -657,16 +670,16 @@ def train_segmentation_landcover(
         training_callback=training_callback,
         **kwargs,
     )
-    
+
     return model
 
 
 # Export main functions
 __all__ = [
-    'FocalLoss',
-    'LandcoverCrossEntropyLoss',
-    'landcover_iou',
-    'get_landcover_loss_function',
-    'compute_class_weights',
-    'train_segmentation_landcover',
+    "FocalLoss",
+    "LandcoverCrossEntropyLoss",
+    "landcover_iou",
+    "get_landcover_loss_function",
+    "compute_class_weights",
+    "train_segmentation_landcover",
 ]
