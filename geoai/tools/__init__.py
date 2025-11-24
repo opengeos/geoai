@@ -63,3 +63,14 @@ try:
 except ImportError:
     # OmniCloudMask not installed - functions will not be available
     pass
+
+
+# Super Resolution integration (optional dependency)
+
+try:
+    from .sr import super_resolution
+
+    __all__.extend(["super_resolution"])
+except ImportError:
+    # Super resolution not installed - function will not be available
+    pass
