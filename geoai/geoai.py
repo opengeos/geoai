@@ -44,6 +44,8 @@ from .train import (
     train_segmentation_model,
 )
 from .utils import *
+from .landcover_utils import *
+from .landcover_train import *
 
 
 class LeafMap(leafmap.Map):
