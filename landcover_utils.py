@@ -43,7 +43,7 @@ export_geotiff_tiles() - Enhanced Tile Generation:
 
 - IMPROVED STATISTICS: Enhanced tracking and reporting
   - tiles_skipped_ratio: Count of tiles filtered by feature ratio
-  - tiles_skipped_empty: Count of completely empty tiles  
+  - tiles_skipped_empty: Count of completely empty tiles
   - Separate counters for different skip reasons
 
 - BETTER OUTPUT: Reduced verbosity while maintaining functionality
@@ -59,7 +59,7 @@ export_geotiff_tiles(raster, folder, mask, skip_empty_tiles=True)
 # Light filtering (keep tiles with ≥5% features)
 export_geotiff_tiles(raster, folder, mask, skip_empty_tiles=True, min_feature_ratio=0.05)
 
-# Moderate filtering (keep tiles with ≥15% features) 
+# Moderate filtering (keep tiles with ≥15% features)
 export_geotiff_tiles(raster, folder, mask, skip_empty_tiles=True, min_feature_ratio=0.15)
 
 # Aggressive filtering (keep tiles with ≥25% features)
@@ -3045,18 +3045,22 @@ def export_geotiff_tiles(
                     pbar.update(1)
                     tile_index += 1
                     continue
-                
+
                 # Additionally skip tiles with insufficient feature pixels if min_feature_ratio is set
                 if skip_empty_tiles and has_features and min_feature_ratio is not False:
                     # Validate min_feature_ratio parameter
-                    if not isinstance(min_feature_ratio, (int, float)) or not (0.0 <= min_feature_ratio <= 1.0):
+                    if not isinstance(min_feature_ratio, (int, float)) or not (
+                        0.0 <= min_feature_ratio <= 1.0
+                    ):
                         if not quiet:
-                            pbar.write(f"Warning: Invalid min_feature_ratio {min_feature_ratio}. Must be between 0.0 and 1.0. Skipping ratio filtering.")
+                            pbar.write(
+                                f"Warning: Invalid min_feature_ratio {min_feature_ratio}. Must be between 0.0 and 1.0. Skipping ratio filtering."
+                            )
                     else:
                         feature_pixel_count = np.count_nonzero(label_mask)
                         total_pixels = tile_size * tile_size
                         actual_feature_ratio = feature_pixel_count / total_pixels
-                        
+
                         # Skip tiles with too few feature pixels
                         if actual_feature_ratio < min_feature_ratio:
                             stats["tiles_skipped_ratio"] += 1
@@ -3367,7 +3371,9 @@ def export_geotiff_tiles(
             if stats["tiles_skipped_empty"] > 0:
                 print(f"Tiles skipped (no features): {stats['tiles_skipped_empty']}")
             if stats["tiles_skipped_ratio"] > 0:
-                print(f"Tiles skipped (insufficient feature ratio): {stats['tiles_skipped_ratio']}")
+                print(
+                    f"Tiles skipped (insufficient feature ratio): {stats['tiles_skipped_ratio']}"
+                )
                 if min_feature_ratio is not False:
                     print(f"  Required minimum feature ratio: {min_feature_ratio:.1%}")
             if stats["tiles_with_features"] > 0:
