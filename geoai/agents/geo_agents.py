@@ -202,6 +202,7 @@ def create_bedrock_model(
         **kwargs,
     )
 
+
 def create_gemini_model(
     model_id: str = "gemini-2.5-flash",
     api_key: str = None,
@@ -234,6 +235,7 @@ def create_gemini_model(
         client_args["api_key"] = api_key
 
     return GeminiModel(client_args=client_args, model_id=model_id, **kwargs)
+
 
 class GeoAgent(Agent):
     """Geospatial AI agent with interactive mapping capabilities."""
