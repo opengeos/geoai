@@ -221,7 +221,7 @@ def create_gemini_model(
         GeminiModel: A Gemini model.
     """
 
-    if api_key is None and "api_key" not in client_args:
+    if api_key is None and (client_args is None or "api_key" not in client_args):
         try:
             api_key = os.getenv("GOOGLE_API_KEY", None)
             if api_key is None:
