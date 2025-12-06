@@ -17,6 +17,7 @@ from strands.models import BedrockModel
 from strands.models.anthropic import AnthropicModel
 from strands.models.ollama import OllamaModel as _OllamaModel
 from strands.models.openai import OpenAIModel
+from strands.models.gemini import GeminiModel
 
 from .catalog_tools import CatalogTools
 from .map_tools import MapSession, MapTools
@@ -202,6 +203,40 @@ def create_bedrock_model(
     )
 
 
+def create_gemini_model(
+    model_id: str = "gemini-2.5-flash",
+    api_key: str = None,
+    client_args: dict = None,
+    **kwargs: Any,
+) -> GeminiModel:
+    """Create a Gemini model.
+
+    Args:
+        model_id: Gemini model ID.
+        api_key: Gemini API key.
+        client_args: Client arguments for the Gemini model.
+        **kwargs: Additional keyword arguments for the Gemini model.
+
+    Returns:
+        GeminiModel: A Gemini model.
+    """
+
+    if api_key is None and (client_args is None or "api_key" not in client_args):
+        try:
+            api_key = os.getenv("GOOGLE_API_KEY", None)
+            if api_key is None:
+                raise ValueError("GOOGLE_API_KEY is not set")
+        except Exception:
+            raise ValueError("GOOGLE_API_KEY is not set")
+
+    if client_args is None:
+        client_args = kwargs.get("client_args", {})
+    if "api_key" not in client_args and api_key is not None:
+        client_args["api_key"] = api_key
+
+    return GeminiModel(client_args=client_args, model_id=model_id, **kwargs)
+
+
 class GeoAgent(Agent):
     """Geospatial AI agent with interactive mapping capabilities."""
 
@@ -259,6 +294,15 @@ class GeoAgent(Agent):
             client_args = model.client_args.copy()
             self._model_factory: Callable[[], AnthropicModel] = (
                 lambda mid=model_id, client_args=client_args: create_anthropic_model(
+                    model_id=mid, client_args=client_args, **model_args
+                )
+            )
+        elif isinstance(model, GeminiModel):
+            # Extract configuration from existing GeminiModel and create new instances
+            model_id = model.config["model_id"]
+            client_args = model.client_args.copy()
+            self._model_factory: Callable[[], GeminiModel] = (
+                lambda mid=model_id, client_args=client_args: create_gemini_model(
                     model_id=mid, client_args=client_args, **model_args
                 )
             )
