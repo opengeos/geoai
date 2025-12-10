@@ -859,6 +859,13 @@ class MoondreamGeo:
             **kwargs,
         )
 
+    def get_last_result(self) -> Dict[str, Any]:
+
+        if hasattr(self, "last_result") and "gdf" in self.last_result:
+            return self.last_result["gdf"]
+        else:
+            return None
+
 
 def moondream_caption(
     source: Union[str, Image.Image, np.ndarray],

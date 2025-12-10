@@ -277,6 +277,7 @@ def moondream_gui(
     m.add(point_layer)
     m.detection_layer = detection_layer
     m.point_layer = point_layer
+    m.last_result_as_gdf = None
 
     # Widget styling
     widget_width = "300px"
@@ -376,7 +377,7 @@ def moondream_gui(
             width=widget_width,
             padding=padding,
             max_width=widget_width,
-            min_height="50px",
+            min_height="0px",
             max_height="300px",
             overflow="auto",
         ),
@@ -425,7 +426,7 @@ def moondream_gui(
             caption_length.layout.display = "none"
         elif mode == "Detect":
             text_prompt.layout.display = "flex"
-            text_prompt.placeholder = "Object type to detect (e.g., car, building)..."
+            text_prompt.placeholder = "Object type to detect (e.g., building, trees)..."
             caption_length.layout.display = "none"
         elif mode == "Point":
             text_prompt.layout.display = "flex"
@@ -552,6 +553,7 @@ def moondream_gui(
                 return
 
             try:
+
                 if mode == "Caption":
                     update_output(f"Generating caption ({caption_length.value})...")
 
@@ -563,6 +565,7 @@ def moondream_gui(
                     caption_text = result.get("caption", str(result))
                     update_output(f"Caption ({caption_length.value}):\n{caption_text}")
                     m.last_result = result
+                    m.last_result_as_gdf = None
 
                 elif mode == "Query":
                     if len(text_prompt.value) == 0:
@@ -604,6 +607,8 @@ def moondream_gui(
                     if num_objects > 0:
                         add_detection_boxes(result, colorpicker.value)
                     m.last_result = result
+                    if "gdf" in result and len(result["gdf"]) > 0:
+                        m.last_result_as_gdf = result["gdf"].to_crs("EPSG:4326")
 
                 elif mode == "Point":
                     if len(text_prompt.value) == 0:
@@ -626,7 +631,8 @@ def moondream_gui(
                             result, colorpicker.value, opacity_slider.value
                         )
                     m.last_result = result
-
+                    if "gdf" in result and len(result["gdf"]) > 0:
+                        m.last_result_as_gdf = result["gdf"].to_crs("EPSG:4326")
             except Exception as e:
                 import traceback
 
