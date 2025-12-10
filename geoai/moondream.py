@@ -355,6 +355,7 @@ class MoondreamGeo:
                 "transform": None,
                 "bounds": None,
             }
+            return image, self._metadata
 
     def _normalize_image(self, data: np.ndarray) -> np.ndarray:
         """Normalize image data to 0-255 range using percentile stretching.
