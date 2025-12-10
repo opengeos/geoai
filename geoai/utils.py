@@ -224,8 +224,6 @@ def view_image(
     plt.show()
     plt.close()
 
-    return ax
-
 
 def plot_images(
     images: Iterable[torch.Tensor],
