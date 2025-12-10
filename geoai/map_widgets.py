@@ -271,12 +271,7 @@ def moondream_gui(
     m.point_markers = []
     m.bbox_layers = []
 
-    detection_layer = ipyleaflet.LayerGroup(layers=[], name="Detections")
-    point_layer = ipyleaflet.LayerGroup(layers=[], name="Points")
-    m.add(detection_layer)
-    m.add(point_layer)
-    m.detection_layer = detection_layer
-    m.point_layer = point_layer
+# Removed unused LayerGroups for detections and points.
     m.last_result_as_gdf = None
 
     # Widget styling
