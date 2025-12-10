@@ -28,7 +28,6 @@ from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QColorDialog,
     QScrollArea,
-    QSizePolicy,
 )
 from qgis.PyQt.QtGui import QColor
 
