@@ -144,3 +144,16 @@ try:
 except ImportError:
     # super_resolution not available (missing dependency)
     pass
+
+# Moondream Vision Language Model
+try:
+    from .moondream import (
+        MoondreamGeo,
+        moondream_caption,
+        moondream_query,
+        moondream_detect,
+        moondream_point,
+    )
+except ImportError:
+    # Moondream not available (missing dependency)
+    pass
