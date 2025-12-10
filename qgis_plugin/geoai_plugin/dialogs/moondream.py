@@ -33,7 +33,6 @@ from qgis.PyQt.QtGui import QColor
 from qgis.core import (
     QgsProject,
     QgsVectorLayer,
-    QgsRasterLayer,
 )
 from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
