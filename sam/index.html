@@ -9672,7 +9672,9 @@ Defaults to 255.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1052</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1050</span>
+<span class="normal">1051</span>
+<span class="normal">1052</span>
 <span class="normal">1053</span>
 <span class="normal">1054</span>
 <span class="normal">1055</span>
@@ -9772,9 +9774,7 @@ Defaults to 255.</p>
 <span class="normal">1149</span>
 <span class="normal">1150</span>
 <span class="normal">1151</span>
-<span class="normal">1152</span>
-<span class="normal">1153</span>
-<span class="normal">1154</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">adaptive_regularization</span><span class="p">(</span>
+<span class="normal">1152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">adaptive_regularization</span><span class="p">(</span>
     <span class="n">building_polygons</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">]],</span>
     <span class="n">simplify_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
     <span class="n">area_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.9</span><span class="p">,</span>
@@ -10021,7 +10021,9 @@ Defaults to 'm'.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">5241</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">5239</span>
+<span class="normal">5240</span>
+<span class="normal">5241</span>
 <span class="normal">5242</span>
 <span class="normal">5243</span>
 <span class="normal">5244</span>
@@ -10424,9 +10426,7 @@ Defaults to 'm'.</p>
 <span class="normal">5641</span>
 <span class="normal">5642</span>
 <span class="normal">5643</span>
-<span class="normal">5644</span>
-<span class="normal">5645</span>
-<span class="normal">5646</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_geometric_properties</span><span class="p">(</span>
+<span class="normal">5644</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_geometric_properties</span><span class="p">(</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">,</span>
     <span class="n">properties</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">area_unit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;m2&quot;</span><span class="p">,</span>
@@ -10924,7 +10924,9 @@ Defaults to 'm'.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1721</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1719</span>
+<span class="normal">1720</span>
+<span class="normal">1721</span>
 <span class="normal">1722</span>
 <span class="normal">1723</span>
 <span class="normal">1724</span>
@@ -10997,9 +10999,7 @@ Defaults to 'm'.</p>
 <span class="normal">1791</span>
 <span class="normal">1792</span>
 <span class="normal">1793</span>
-<span class="normal">1794</span>
-<span class="normal">1795</span>
-<span class="normal">1796</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">analyze_vector_attributes</span><span class="p">(</span>
+<span class="normal">1794</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">analyze_vector_attributes</span><span class="p">(</span>
     <span class="n">vector_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">attribute_name</span><span class="p">:</span> <span class="nb">str</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Analyze a specific attribute in a vector dataset and create a histogram.</span>
@@ -11312,7 +11312,9 @@ Can include {vector_name} and {index} placeholders.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2499</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2497</span>
+<span class="normal">2498</span>
+<span class="normal">2499</span>
 <span class="normal">2500</span>
 <span class="normal">2501</span>
 <span class="normal">2502</span>
@@ -11407,9 +11409,7 @@ Can include {vector_name} and {index} placeholders.</p>
 <span class="normal">2591</span>
 <span class="normal">2592</span>
 <span class="normal">2593</span>
-<span class="normal">2594</span>
-<span class="normal">2595</span>
-<span class="normal">2596</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">batch_vector_to_raster</span><span class="p">(</span>
+<span class="normal">2594</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">batch_vector_to_raster</span><span class="p">(</span>
     <span class="n">vector_path</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">,</span>
     <span class="n">attribute_field</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -11617,7 +11617,9 @@ Can include {vector_name} and {index} placeholders.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7396</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7394</span>
+<span class="normal">7395</span>
+<span class="normal">7396</span>
 <span class="normal">7397</span>
 <span class="normal">7398</span>
 <span class="normal">7399</span>
@@ -11703,9 +11705,7 @@ Can include {vector_name} and {index} placeholders.</p>
 <span class="normal">7479</span>
 <span class="normal">7480</span>
 <span class="normal">7481</span>
-<span class="normal">7482</span>
-<span class="normal">7483</span>
-<span class="normal">7484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">bbox_to_xy</span><span class="p">(</span>
+<span class="normal">7482</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">bbox_to_xy</span><span class="p">(</span>
     <span class="n">src_fp</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">coords</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">coord_crs</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;epsg:4326&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a list of coordinates to pixel coordinates, i.e., (col, row) coordinates.</span>
@@ -11935,7 +11935,9 @@ Can include {vector_name} and {index} placeholders.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7301</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7299</span>
+<span class="normal">7300</span>
+<span class="normal">7301</span>
 <span class="normal">7302</span>
 <span class="normal">7303</span>
 <span class="normal">7304</span>
@@ -11969,9 +11971,7 @@ Can include {vector_name} and {index} placeholders.</p>
 <span class="normal">7332</span>
 <span class="normal">7333</span>
 <span class="normal">7334</span>
-<span class="normal">7335</span>
-<span class="normal">7336</span>
-<span class="normal">7337</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">boxes_to_vector</span><span class="p">(</span>
+<span class="normal">7335</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">boxes_to_vector</span><span class="p">(</span>
     <span class="n">coords</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
     <span class="n">src_crs</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">dst_crs</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;EPSG:4326&quot;</span><span class="p">,</span>
@@ -12105,7 +12105,9 @@ mean for the whole dataset for computing individual stds.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">346</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
@@ -12140,9 +12142,7 @@ mean for the whole dataset for computing individual stds.</p>
 <span class="normal">378</span>
 <span class="normal">379</span>
 <span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calc_stats</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">divide_by</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="normal">381</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calc_stats</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">divide_by</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the statistics (mean and std) for the entire dataset.</span>
 
@@ -12416,7 +12416,9 @@ mean for the whole dataset for computing individual stds.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1851</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1849</span>
+<span class="normal">1850</span>
+<span class="normal">1851</span>
 <span class="normal">1852</span>
 <span class="normal">1853</span>
 <span class="normal">1854</span>
@@ -12603,9 +12605,7 @@ mean for the whole dataset for computing individual stds.</p>
 <span class="normal">2035</span>
 <span class="normal">2036</span>
 <span class="normal">2037</span>
-<span class="normal">2038</span>
-<span class="normal">2039</span>
-<span class="normal">2040</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">clip_raster_by_bbox</span><span class="p">(</span>
+<span class="normal">2038</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">clip_raster_by_bbox</span><span class="p">(</span>
     <span class="n">input_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">bbox</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
@@ -12936,7 +12936,9 @@ mean for the whole dataset for computing individual stds.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7229</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7227</span>
+<span class="normal">7228</span>
+<span class="normal">7229</span>
 <span class="normal">7230</span>
 <span class="normal">7231</span>
 <span class="normal">7232</span>
@@ -13003,9 +13005,7 @@ mean for the whole dataset for computing individual stds.</p>
 <span class="normal">7293</span>
 <span class="normal">7294</span>
 <span class="normal">7295</span>
-<span class="normal">7296</span>
-<span class="normal">7297</span>
-<span class="normal">7298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">coords_to_xy</span><span class="p">(</span>
+<span class="normal">7296</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">coords_to_xy</span><span class="p">(</span>
     <span class="n">src_fp</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">coords</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">coord_crs</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;epsg:4326&quot;</span><span class="p">,</span>
@@ -13231,7 +13231,9 @@ mean for the whole dataset for computing individual stds.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3632</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3630</span>
+<span class="normal">3631</span>
+<span class="normal">3632</span>
 <span class="normal">3633</span>
 <span class="normal">3634</span>
 <span class="normal">3635</span>
@@ -13377,9 +13379,7 @@ mean for the whole dataset for computing individual stds.</p>
 <span class="normal">3775</span>
 <span class="normal">3776</span>
 <span class="normal">3777</span>
-<span class="normal">3778</span>
-<span class="normal">3779</span>
-<span class="normal">3780</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_overview_image</span><span class="p">(</span>
+<span class="normal">3778</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_overview_image</span><span class="p">(</span>
     <span class="n">src</span><span class="p">,</span> <span class="n">tile_coordinates</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">tile_size</span><span class="p">,</span> <span class="n">stride</span><span class="p">,</span> <span class="n">geojson_path</span><span class="o">=</span><span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create an overview image showing all tiles and their status, with optional GeoJSON export.</span>
@@ -13821,7 +13821,9 @@ mean for the whole dataset for computing individual stds.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1192</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1190</span>
+<span class="normal">1191</span>
+<span class="normal">1192</span>
 <span class="normal">1193</span>
 <span class="normal">1194</span>
 <span class="normal">1195</span>
@@ -13910,9 +13912,7 @@ mean for the whole dataset for computing individual stds.</p>
 <span class="normal">1278</span>
 <span class="normal">1279</span>
 <span class="normal">1280</span>
-<span class="normal">1281</span>
-<span class="normal">1282</span>
-<span class="normal">1283</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_split_map</span><span class="p">(</span>
+<span class="normal">1281</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_split_map</span><span class="p">(</span>
     <span class="n">left_layer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;TERRAIN&quot;</span><span class="p">,</span>
     <span class="n">right_layer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;OpenTopoMap&quot;</span><span class="p">,</span>
     <span class="n">left_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -14151,7 +14151,9 @@ Common options include:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">490</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
 <span class="normal">491</span>
 <span class="normal">492</span>
 <span class="normal">493</span>
@@ -14196,9 +14198,7 @@ Common options include:
 <span class="normal">532</span>
 <span class="normal">533</span>
 <span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dict_to_image</span><span class="p">(</span>
+<span class="normal">535</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dict_to_image</span><span class="p">(</span>
     <span class="n">data_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a dictionary containing spatial data to a rasterio dataset or save it to</span>
@@ -14324,7 +14324,9 @@ dataset sampler.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">386</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
 <span class="normal">387</span>
 <span class="normal">388</span>
 <span class="normal">389</span>
@@ -14423,9 +14425,7 @@ dataset sampler.</p>
 <span class="normal">482</span>
 <span class="normal">483</span>
 <span class="normal">484</span>
-<span class="normal">485</span>
-<span class="normal">486</span>
-<span class="normal">487</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dict_to_rioxarray</span><span class="p">(</span><span class="n">data_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">:</span>
+<span class="normal">485</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dict_to_rioxarray</span><span class="p">(</span><span class="n">data_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a dictionary to a xarray DataArray. The dictionary should contain the</span>
 <span class="sd">    following keys: &quot;crs&quot;, &quot;bounds&quot;, and &quot;image&quot;. It can be generated from a TorchGeo</span>
 <span class="sd">    dataset sampler.</span>
@@ -14653,7 +14653,9 @@ If not provided, the filename from the URL will be used.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1286</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1284</span>
+<span class="normal">1285</span>
+<span class="normal">1286</span>
 <span class="normal">1287</span>
 <span class="normal">1288</span>
 <span class="normal">1289</span>
@@ -14711,9 +14713,7 @@ If not provided, the filename from the URL will be used.</p>
 <span class="normal">1341</span>
 <span class="normal">1342</span>
 <span class="normal">1343</span>
-<span class="normal">1344</span>
-<span class="normal">1345</span>
-<span class="normal">1346</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_file</span><span class="p">(</span>
+<span class="normal">1344</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_file</span><span class="p">(</span>
     <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -14866,7 +14866,9 @@ If not provided, the filename from the URL will be used.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7041</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7039</span>
+<span class="normal">7040</span>
+<span class="normal">7041</span>
 <span class="normal">7042</span>
 <span class="normal">7043</span>
 <span class="normal">7044</span>
@@ -14895,9 +14897,7 @@ If not provided, the filename from the URL will be used.</p>
 <span class="normal">7067</span>
 <span class="normal">7068</span>
 <span class="normal">7069</span>
-<span class="normal">7070</span>
-<span class="normal">7071</span>
-<span class="normal">7072</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_model_from_hf</span><span class="p">(</span><span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">repo_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">7070</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_model_from_hf</span><span class="p">(</span><span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">repo_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Download the object detection model from Hugging Face.</span>
 
@@ -14951,12 +14951,12 @@ If not provided, the filename from the URL will be used.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7847</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7845</span>
+<span class="normal">7846</span>
+<span class="normal">7847</span>
 <span class="normal">7848</span>
 <span class="normal">7849</span>
-<span class="normal">7850</span>
-<span class="normal">7851</span>
-<span class="normal">7852</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">empty_cache</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">7850</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">empty_cache</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Empty the cache of the current device.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
@@ -15191,7 +15191,9 @@ If not provided, the filename from the URL will be used.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2599</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2597</span>
+<span class="normal">2598</span>
+<span class="normal">2599</span>
 <span class="normal">2600</span>
 <span class="normal">2601</span>
 <span class="normal">2602</span>
@@ -15703,9 +15705,7 @@ If not provided, the filename from the URL will be used.</p>
 <span class="normal">3108</span>
 <span class="normal">3109</span>
 <span class="normal">3110</span>
-<span class="normal">3111</span>
-<span class="normal">3112</span>
-<span class="normal">3113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_geotiff_tiles</span><span class="p">(</span>
+<span class="normal">3111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_geotiff_tiles</span><span class="p">(</span>
     <span class="n">in_raster</span><span class="p">,</span>
     <span class="n">out_folder</span><span class="p">,</span>
     <span class="n">in_class_data</span><span class="p">,</span>
@@ -16532,7 +16532,9 @@ filename matching. The number of images and masks must be equal.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3116</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3114</span>
+<span class="normal">3115</span>
+<span class="normal">3116</span>
 <span class="normal">3117</span>
 <span class="normal">3118</span>
 <span class="normal">3119</span>
@@ -16761,9 +16763,7 @@ filename matching. The number of images and masks must be equal.</p>
 <span class="normal">3342</span>
 <span class="normal">3343</span>
 <span class="normal">3344</span>
-<span class="normal">3345</span>
-<span class="normal">3346</span>
-<span class="normal">3347</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_geotiff_tiles_batch</span><span class="p">(</span>
+<span class="normal">3345</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_geotiff_tiles_batch</span><span class="p">(</span>
     <span class="n">images_folder</span><span class="p">,</span>
     <span class="n">masks_folder</span><span class="p">,</span>
     <span class="n">output_folder</span><span class="p">,</span>
@@ -17135,7 +17135,9 @@ filename matching. The number of images and masks must be equal.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3783</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3781</span>
+<span class="normal">3782</span>
+<span class="normal">3783</span>
 <span class="normal">3784</span>
 <span class="normal">3785</span>
 <span class="normal">3786</span>
@@ -17235,9 +17237,7 @@ filename matching. The number of images and masks must be equal.</p>
 <span class="normal">3880</span>
 <span class="normal">3881</span>
 <span class="normal">3882</span>
-<span class="normal">3883</span>
-<span class="normal">3884</span>
-<span class="normal">3885</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_tiles_to_geojson</span><span class="p">(</span>
+<span class="normal">3883</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_tiles_to_geojson</span><span class="p">(</span>
     <span class="n">tile_coordinates</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">tile_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -17777,7 +17777,9 @@ filename matching. The number of images and masks must be equal.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3888</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">3886</span>
+<span class="normal">3887</span>
+<span class="normal">3888</span>
 <span class="normal">3889</span>
 <span class="normal">3890</span>
 <span class="normal">3891</span>
@@ -18516,9 +18518,7 @@ filename matching. The number of images and masks must be equal.</p>
 <span class="normal">4624</span>
 <span class="normal">4625</span>
 <span class="normal">4626</span>
-<span class="normal">4627</span>
-<span class="normal">4628</span>
-<span class="normal">4629</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_training_data</span><span class="p">(</span>
+<span class="normal">4627</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_training_data</span><span class="p">(</span>
     <span class="n">in_raster</span><span class="p">,</span>
     <span class="n">out_folder</span><span class="p">,</span>
     <span class="n">in_class_data</span><span class="p">,</span>
@@ -19368,7 +19368,9 @@ filename matching. The number of images and masks must be equal.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7194</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7192</span>
+<span class="normal">7193</span>
+<span class="normal">7194</span>
 <span class="normal">7195</span>
 <span class="normal">7196</span>
 <span class="normal">7197</span>
@@ -19398,9 +19400,7 @@ filename matching. The number of images and masks must be equal.</p>
 <span class="normal">7221</span>
 <span class="normal">7222</span>
 <span class="normal">7223</span>
-<span class="normal">7224</span>
-<span class="normal">7225</span>
-<span class="normal">7226</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">geojson_to_coords</span><span class="p">(</span>
+<span class="normal">7224</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">geojson_to_coords</span><span class="p">(</span>
     <span class="n">geojson</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">src_crs</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;epsg:4326&quot;</span><span class="p">,</span> <span class="n">dst_crs</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;epsg:4326&quot;</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a geojson file or a dictionary of feature collection to a list of centroid coordinates.</span>
@@ -19557,7 +19557,9 @@ filename matching. The number of images and masks must be equal.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7487</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7485</span>
+<span class="normal">7486</span>
+<span class="normal">7487</span>
 <span class="normal">7488</span>
 <span class="normal">7489</span>
 <span class="normal">7490</span>
@@ -19572,9 +19574,7 @@ filename matching. The number of images and masks must be equal.</p>
 <span class="normal">7499</span>
 <span class="normal">7500</span>
 <span class="normal">7501</span>
-<span class="normal">7502</span>
-<span class="normal">7503</span>
-<span class="normal">7504</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">geojson_to_xy</span><span class="p">(</span>
+<span class="normal">7502</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">geojson_to_xy</span><span class="p">(</span>
     <span class="n">src_fp</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">geojson</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">coord_crs</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;epsg:4326&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a geojson file or a dictionary of feature collection to a list of pixel coordinates.</span>
@@ -19615,7 +19615,9 @@ CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7607</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7605</span>
+<span class="normal">7606</span>
+<span class="normal">7607</span>
 <span class="normal">7608</span>
 <span class="normal">7609</span>
 <span class="normal">7610</span>
@@ -19623,9 +19625,7 @@ CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
 <span class="normal">7612</span>
 <span class="normal">7613</span>
 <span class="normal">7614</span>
-<span class="normal">7615</span>
-<span class="normal">7616</span>
-<span class="normal">7617</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_device</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+<span class="normal">7615</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_device</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns the best available device for deep learning in the order:</span>
 <span class="sd">    CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</span>
@@ -19712,7 +19712,9 @@ CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1349</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1347</span>
+<span class="normal">1348</span>
+<span class="normal">1349</span>
 <span class="normal">1350</span>
 <span class="normal">1351</span>
 <span class="normal">1352</span>
@@ -19750,9 +19752,7 @@ CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
 <span class="normal">1384</span>
 <span class="normal">1385</span>
 <span class="normal">1386</span>
-<span class="normal">1387</span>
-<span class="normal">1388</span>
-<span class="normal">1389</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_info</span><span class="p">(</span><span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="normal">1387</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_info</span><span class="p">(</span><span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display basic information about a raster dataset.</span>
 
 <span class="sd">    Args:</span>
@@ -19870,7 +19870,9 @@ or None if the file cannot be opened</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1491</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1489</span>
+<span class="normal">1490</span>
+<span class="normal">1491</span>
 <span class="normal">1492</span>
 <span class="normal">1493</span>
 <span class="normal">1494</span>
@@ -19924,9 +19926,7 @@ or None if the file cannot be opened</p>
 <span class="normal">1542</span>
 <span class="normal">1543</span>
 <span class="normal">1544</span>
-<span class="normal">1545</span>
-<span class="normal">1546</span>
-<span class="normal">1547</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_info_gdal</span><span class="p">(</span><span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="normal">1545</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_info_gdal</span><span class="p">(</span><span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get basic information about a raster dataset using GDAL.</span>
 
 <span class="sd">    Args:</span>
@@ -20059,7 +20059,9 @@ or None if the file cannot be opened</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7754</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7752</span>
+<span class="normal">7753</span>
+<span class="normal">7754</span>
 <span class="normal">7755</span>
 <span class="normal">7756</span>
 <span class="normal">7757</span>
@@ -20068,9 +20070,7 @@ or None if the file cannot be opened</p>
 <span class="normal">7760</span>
 <span class="normal">7761</span>
 <span class="normal">7762</span>
-<span class="normal">7763</span>
-<span class="normal">7764</span>
-<span class="normal">7765</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_resolution</span><span class="p">(</span><span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="normal">7763</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_resolution</span><span class="p">(</span><span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get pixel resolution from the raster using rasterio.</span>
 
 <span class="sd">    Args:</span>
@@ -20182,7 +20182,9 @@ Defaults to 1.0, which keeps the original pixel</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1392</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1390</span>
+<span class="normal">1391</span>
+<span class="normal">1392</span>
 <span class="normal">1393</span>
 <span class="normal">1394</span>
 <span class="normal">1395</span>
@@ -20214,9 +20216,7 @@ Defaults to 1.0, which keeps the original pixel</p>
 <span class="normal">1421</span>
 <span class="normal">1422</span>
 <span class="normal">1423</span>
-<span class="normal">1424</span>
-<span class="normal">1425</span>
-<span class="normal">1426</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_stats</span><span class="p">(</span><span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">divide_by</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="normal">1424</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_raster_stats</span><span class="p">(</span><span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">divide_by</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate statistics for each band in a raster dataset.</span>
 
 <span class="sd">    This function computes min, max, mean, and standard deviation values</span>
@@ -20327,7 +20327,9 @@ Defaults to 1.0, which keeps the original pixel</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1550</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1548</span>
+<span class="normal">1549</span>
+<span class="normal">1550</span>
 <span class="normal">1551</span>
 <span class="normal">1552</span>
 <span class="normal">1553</span>
@@ -20368,9 +20370,7 @@ Defaults to 1.0, which keeps the original pixel</p>
 <span class="normal">1588</span>
 <span class="normal">1589</span>
 <span class="normal">1590</span>
-<span class="normal">1591</span>
-<span class="normal">1592</span>
-<span class="normal">1593</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_vector_info</span><span class="p">(</span><span class="n">vector_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="normal">1591</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_vector_info</span><span class="p">(</span><span class="n">vector_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display basic information about a vector dataset using GeoPandas.</span>
 
 <span class="sd">    Args:</span>
@@ -20491,7 +20491,9 @@ or None if the file cannot be opened</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1658</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1656</span>
+<span class="normal">1657</span>
+<span class="normal">1658</span>
 <span class="normal">1659</span>
 <span class="normal">1660</span>
 <span class="normal">1661</span>
@@ -20549,9 +20551,7 @@ or None if the file cannot be opened</p>
 <span class="normal">1713</span>
 <span class="normal">1714</span>
 <span class="normal">1715</span>
-<span class="normal">1716</span>
-<span class="normal">1717</span>
-<span class="normal">1718</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_vector_info_ogr</span><span class="p">(</span><span class="n">vector_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="normal">1716</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_vector_info_ogr</span><span class="p">(</span><span class="n">vector_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get basic information about a vector dataset using OGR.</span>
 
 <span class="sd">    Args:</span>
@@ -20689,7 +20689,9 @@ or None if the file cannot be opened</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 940</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 938</span>
+<span class="normal"> 939</span>
+<span class="normal"> 940</span>
 <span class="normal"> 941</span>
 <span class="normal"> 942</span>
 <span class="normal"> 943</span>
@@ -20796,9 +20798,7 @@ or None if the file cannot be opened</p>
 <span class="normal">1044</span>
 <span class="normal">1045</span>
 <span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
-<span class="normal">1049</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">hybrid_regularization</span><span class="p">(</span>
+<span class="normal">1047</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">hybrid_regularization</span><span class="p">(</span>
     <span class="n">building_polygons</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">]],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -20984,7 +20984,9 @@ or None if the file cannot be opened</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6684</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6682</span>
+<span class="normal">6683</span>
+<span class="normal">6684</span>
 <span class="normal">6685</span>
 <span class="normal">6686</span>
 <span class="normal">6687</span>
@@ -21131,9 +21133,7 @@ or None if the file cannot be opened</p>
 <span class="normal">6828</span>
 <span class="normal">6829</span>
 <span class="normal">6830</span>
-<span class="normal">6831</span>
-<span class="normal">6832</span>
-<span class="normal">6833</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inspect_pth_file</span><span class="p">(</span><span class="n">pth_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="normal">6831</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inspect_pth_file</span><span class="p">(</span><span class="n">pth_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Inspect a PyTorch .pth model file to determine its architecture.</span>
 
@@ -21336,7 +21336,9 @@ or None if the file cannot be opened</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1157</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1155</span>
+<span class="normal">1156</span>
+<span class="normal">1157</span>
 <span class="normal">1158</span>
 <span class="normal">1159</span>
 <span class="normal">1160</span>
@@ -21366,9 +21368,7 @@ or None if the file cannot be opened</p>
 <span class="normal">1184</span>
 <span class="normal">1185</span>
 <span class="normal">1186</span>
-<span class="normal">1187</span>
-<span class="normal">1188</span>
-<span class="normal">1189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">install_package</span><span class="p">(</span><span class="n">package</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">1187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">install_package</span><span class="p">(</span><span class="n">package</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Install a Python package.</span>
 
 <span class="sd">    Args:</span>
@@ -21573,7 +21573,9 @@ or None if the file cannot be opened</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4632</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4630</span>
+<span class="normal">4631</span>
+<span class="normal">4632</span>
 <span class="normal">4633</span>
 <span class="normal">4634</span>
 <span class="normal">4635</span>
@@ -21773,9 +21775,7 @@ or None if the file cannot be opened</p>
 <span class="normal">4829</span>
 <span class="normal">4830</span>
 <span class="normal">4831</span>
-<span class="normal">4832</span>
-<span class="normal">4833</span>
-<span class="normal">4834</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">masks_to_vector</span><span class="p">(</span>
+<span class="normal">4832</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">masks_to_vector</span><span class="p">(</span>
     <span class="n">mask_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">simplify_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
@@ -22103,7 +22103,9 @@ Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6876</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6874</span>
+<span class="normal">6875</span>
+<span class="normal">6876</span>
 <span class="normal">6877</span>
 <span class="normal">6878</span>
 <span class="normal">6879</span>
@@ -22263,9 +22265,7 @@ Defaults to None.</p>
 <span class="normal">7033</span>
 <span class="normal">7034</span>
 <span class="normal">7035</span>
-<span class="normal">7036</span>
-<span class="normal">7037</span>
-<span class="normal">7038</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mosaic_geotiffs</span><span class="p">(</span>
+<span class="normal">7036</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mosaic_geotiffs</span><span class="p">(</span>
     <span class="n">input_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mask_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a mosaic from all GeoTIFF files as a Cloud Optimized GeoTIFF (COG).</span>
@@ -22609,7 +22609,9 @@ area change. Default is 0.7 (allows reduction to 70% of original area).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">5649</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">5647</span>
+<span class="normal">5648</span>
+<span class="normal">5649</span>
 <span class="normal">5650</span>
 <span class="normal">5651</span>
 <span class="normal">5652</span>
@@ -23639,9 +23641,7 @@ area change. Default is 0.7 (allows reduction to 70% of original area).</p>
 <span class="normal">6676</span>
 <span class="normal">6677</span>
 <span class="normal">6678</span>
-<span class="normal">6679</span>
-<span class="normal">6680</span>
-<span class="normal">6681</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">orthogonalize</span><span class="p">(</span>
+<span class="normal">6679</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">orthogonalize</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
@@ -24833,7 +24833,9 @@ Credit to the torchgeo developers for the original implementation.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
 <span class="normal">275</span>
 <span class="normal">276</span>
 <span class="normal">277</span>
@@ -24900,9 +24902,7 @@ Credit to the torchgeo developers for the original implementation.</p>
 <span class="normal">338</span>
 <span class="normal">339</span>
 <span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_batch</span><span class="p">(</span>
+<span class="normal">341</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_batch</span><span class="p">(</span>
     <span class="n">batch</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="n">bright</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
     <span class="n">cols</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
@@ -25096,7 +25096,9 @@ Credit to the torchgeo developers for the original implementation.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">230</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
 <span class="normal">231</span>
 <span class="normal">232</span>
 <span class="normal">233</span>
@@ -25116,9 +25118,7 @@ Credit to the torchgeo developers for the original implementation.</p>
 <span class="normal">247</span>
 <span class="normal">248</span>
 <span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_images</span><span class="p">(</span>
+<span class="normal">250</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_images</span><span class="p">(</span>
     <span class="n">images</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">axs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">],</span>
     <span class="n">chnls</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
@@ -25249,7 +25249,9 @@ Credit to the torchgeo developers for the original implementation.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">255</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
 <span class="normal">256</span>
 <span class="normal">257</span>
 <span class="normal">258</span>
@@ -25263,9 +25265,7 @@ Credit to the torchgeo developers for the original implementation.</p>
 <span class="normal">266</span>
 <span class="normal">267</span>
 <span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_masks</span><span class="p">(</span>
+<span class="normal">269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_masks</span><span class="p">(</span>
     <span class="n">masks</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">axs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">],</span> <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Blues&quot;</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -25367,7 +25367,9 @@ Credit to the torchgeo developers for the original implementation.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7524</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7522</span>
+<span class="normal">7523</span>
+<span class="normal">7524</span>
 <span class="normal">7525</span>
 <span class="normal">7526</span>
 <span class="normal">7527</span>
@@ -25445,9 +25447,7 @@ Credit to the torchgeo developers for the original implementation.</p>
 <span class="normal">7599</span>
 <span class="normal">7600</span>
 <span class="normal">7601</span>
-<span class="normal">7602</span>
-<span class="normal">7603</span>
-<span class="normal">7604</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_performance_metrics</span><span class="p">(</span>
+<span class="normal">7602</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_performance_metrics</span><span class="p">(</span>
     <span class="n">history_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
     <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -25786,7 +25786,9 @@ The generated matplotlib figure object.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7620</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7618</span>
+<span class="normal">7619</span>
+<span class="normal">7620</span>
 <span class="normal">7621</span>
 <span class="normal">7622</span>
 <span class="normal">7623</span>
@@ -25915,9 +25917,7 @@ The generated matplotlib figure object.</p>
 <span class="normal">7746</span>
 <span class="normal">7747</span>
 <span class="normal">7748</span>
-<span class="normal">7749</span>
-<span class="normal">7750</span>
-<span class="normal">7751</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction_comparison</span><span class="p">(</span>
+<span class="normal">7749</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction_comparison</span><span class="p">(</span>
     <span class="n">original_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">],</span>
     <span class="n">prediction_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">],</span>
     <span class="n">ground_truth_image</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -26158,7 +26158,9 @@ Defaults to True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1429</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1427</span>
+<span class="normal">1428</span>
+<span class="normal">1429</span>
 <span class="normal">1430</span>
 <span class="normal">1431</span>
 <span class="normal">1432</span>
@@ -26215,9 +26217,7 @@ Defaults to True.</p>
 <span class="normal">1483</span>
 <span class="normal">1484</span>
 <span class="normal">1485</span>
-<span class="normal">1486</span>
-<span class="normal">1487</span>
-<span class="normal">1488</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">print_raster_info</span><span class="p">(</span>
+<span class="normal">1486</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">print_raster_info</span><span class="p">(</span>
     <span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">show_preview</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Print formatted information about a raster dataset and optionally show a preview.</span>
@@ -26386,7 +26386,9 @@ Defaults to True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1596</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1594</span>
+<span class="normal">1595</span>
+<span class="normal">1596</span>
 <span class="normal">1597</span>
 <span class="normal">1598</span>
 <span class="normal">1599</span>
@@ -26442,9 +26444,7 @@ Defaults to True.</p>
 <span class="normal">1649</span>
 <span class="normal">1650</span>
 <span class="normal">1651</span>
-<span class="normal">1652</span>
-<span class="normal">1653</span>
-<span class="normal">1654</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">print_vector_info</span><span class="p">(</span>
+<span class="normal">1652</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">print_vector_info</span><span class="p">(</span>
     <span class="n">vector_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">show_preview</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Print formatted information about a vector dataset and optionally show a preview.</span>
@@ -26723,7 +26723,9 @@ Defaults to True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2043</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2041</span>
+<span class="normal">2042</span>
+<span class="normal">2043</span>
 <span class="normal">2044</span>
 <span class="normal">2045</span>
 <span class="normal">2046</span>
@@ -26850,9 +26852,7 @@ Defaults to True.</p>
 <span class="normal">2167</span>
 <span class="normal">2168</span>
 <span class="normal">2169</span>
-<span class="normal">2170</span>
-<span class="normal">2171</span>
-<span class="normal">2172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">raster_to_vector</span><span class="p">(</span>
+<span class="normal">2170</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">raster_to_vector</span><span class="p">(</span>
     <span class="n">raster_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
@@ -27218,7 +27218,9 @@ Defaults to True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2175</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2173</span>
+<span class="normal">2174</span>
+<span class="normal">2175</span>
 <span class="normal">2176</span>
 <span class="normal">2177</span>
 <span class="normal">2178</span>
@@ -27328,9 +27330,7 @@ Defaults to True.</p>
 <span class="normal">2282</span>
 <span class="normal">2283</span>
 <span class="normal">2284</span>
-<span class="normal">2285</span>
-<span class="normal">2286</span>
-<span class="normal">2287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">raster_to_vector_batch</span><span class="p">(</span>
+<span class="normal">2285</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">raster_to_vector_batch</span><span class="p">(</span>
     <span class="n">input_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">pattern</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;*.tif&quot;</span><span class="p">,</span>
@@ -27613,7 +27613,9 @@ metadata preserved.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4914</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4912</span>
+<span class="normal">4913</span>
+<span class="normal">4914</span>
 <span class="normal">4915</span>
 <span class="normal">4916</span>
 <span class="normal">4917</span>
@@ -27678,9 +27680,7 @@ metadata preserved.</p>
 <span class="normal">4976</span>
 <span class="normal">4977</span>
 <span class="normal">4978</span>
-<span class="normal">4979</span>
-<span class="normal">4980</span>
-<span class="normal">4981</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_raster</span><span class="p">(</span>
+<span class="normal">4979</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_raster</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">band</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">masked</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -27901,7 +27901,9 @@ Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4837</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4835</span>
+<span class="normal">4836</span>
+<span class="normal">4837</span>
 <span class="normal">4838</span>
 <span class="normal">4839</span>
 <span class="normal">4840</span>
@@ -27973,9 +27975,7 @@ Defaults to None.</p>
 <span class="normal">4906</span>
 <span class="normal">4907</span>
 <span class="normal">4908</span>
-<span class="normal">4909</span>
-<span class="normal">4910</span>
-<span class="normal">4911</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_vector</span><span class="p">(</span>
+<span class="normal">4909</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_vector</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">layer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Reads vector data from various formats including GeoParquet.</span>
@@ -28279,7 +28279,9 @@ Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">5005</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">5003</span>
+<span class="normal">5004</span>
+<span class="normal">5005</span>
 <span class="normal">5006</span>
 <span class="normal">5007</span>
 <span class="normal">5008</span>
@@ -28510,9 +28512,7 @@ Defaults to None.</p>
 <span class="normal">5233</span>
 <span class="normal">5234</span>
 <span class="normal">5235</span>
-<span class="normal">5236</span>
-<span class="normal">5237</span>
-<span class="normal">5238</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">region_groups</span><span class="p">(</span>
+<span class="normal">5236</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">region_groups</span><span class="p">(</span>
     <span class="n">image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;xr.DataArray&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
     <span class="n">connectivity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">min_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
@@ -28887,7 +28887,9 @@ rotated rectangles.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">810</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">808</span>
+<span class="normal">809</span>
+<span class="normal">810</span>
 <span class="normal">811</span>
 <span class="normal">812</span>
 <span class="normal">813</span>
@@ -29012,9 +29014,7 @@ rotated rectangles.</p>
 <span class="normal">932</span>
 <span class="normal">933</span>
 <span class="normal">934</span>
-<span class="normal">935</span>
-<span class="normal">936</span>
-<span class="normal">937</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">regularization</span><span class="p">(</span>
+<span class="normal">935</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">regularization</span><span class="p">(</span>
     <span class="n">building_polygons</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">]],</span>
     <span class="n">angle_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">simplify_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
@@ -29463,7 +29463,9 @@ not saved. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7075</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7073</span>
+<span class="normal">7074</span>
+<span class="normal">7075</span>
 <span class="normal">7076</span>
 <span class="normal">7077</span>
 <span class="normal">7078</span>
@@ -29554,9 +29556,7 @@ not saved. Defaults to None.</p>
 <span class="normal">7163</span>
 <span class="normal">7164</span>
 <span class="normal">7165</span>
-<span class="normal">7166</span>
-<span class="normal">7167</span>
-<span class="normal">7168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">regularize</span><span class="p">(</span>
+<span class="normal">7166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">regularize</span><span class="p">(</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
     <span class="n">parallel_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
     <span class="n">target_crs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;pyproj.CRS&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -29854,7 +29854,9 @@ not saved. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7340</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7338</span>
+<span class="normal">7339</span>
+<span class="normal">7340</span>
 <span class="normal">7341</span>
 <span class="normal">7342</span>
 <span class="normal">7343</span>
@@ -29905,9 +29907,7 @@ not saved. Defaults to None.</p>
 <span class="normal">7388</span>
 <span class="normal">7389</span>
 <span class="normal">7390</span>
-<span class="normal">7391</span>
-<span class="normal">7392</span>
-<span class="normal">7393</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rowcol_to_xy</span><span class="p">(</span>
+<span class="normal">7391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rowcol_to_xy</span><span class="p">(</span>
     <span class="n">src_fp</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">rows</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">cols</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -30165,7 +30165,9 @@ not saved. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7768</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7766</span>
+<span class="normal">7767</span>
+<span class="normal">7768</span>
 <span class="normal">7769</span>
 <span class="normal">7770</span>
 <span class="normal">7771</span>
@@ -30239,9 +30241,7 @@ not saved. Defaults to None.</p>
 <span class="normal">7839</span>
 <span class="normal">7840</span>
 <span class="normal">7841</span>
-<span class="normal">7842</span>
-<span class="normal">7843</span>
-<span class="normal">7844</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
+<span class="normal">7842</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stack_bands</span><span class="p">(</span>
     <span class="n">input_files</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">resolution</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -30394,7 +30394,9 @@ not saved. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4984</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">4982</span>
+<span class="normal">4983</span>
+<span class="normal">4984</span>
 <span class="normal">4985</span>
 <span class="normal">4986</span>
 <span class="normal">4987</span>
@@ -30410,9 +30412,7 @@ not saved. Defaults to None.</p>
 <span class="normal">4997</span>
 <span class="normal">4998</span>
 <span class="normal">4999</span>
-<span class="normal">5000</span>
-<span class="normal">5001</span>
-<span class="normal">5002</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">temp_file_path</span><span class="p">(</span><span class="n">ext</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">5000</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">temp_file_path</span><span class="p">(</span><span class="n">ext</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a temporary file path.</span>
 
 <span class="sd">    Args:</span>
@@ -30484,7 +30484,9 @@ not saved. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6836</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6834</span>
+<span class="normal">6835</span>
+<span class="normal">6836</span>
 <span class="normal">6837</span>
 <span class="normal">6838</span>
 <span class="normal">6839</span>
@@ -30519,9 +30521,7 @@ not saved. Defaults to None.</p>
 <span class="normal">6868</span>
 <span class="normal">6869</span>
 <span class="normal">6870</span>
-<span class="normal">6871</span>
-<span class="normal">6872</span>
-<span class="normal">6873</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">try_common_architectures</span><span class="p">(</span><span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="normal">6871</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">try_common_architectures</span><span class="p">(</span><span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Try to load the state_dict into common architectures to see which one fits.</span>
 
@@ -30651,7 +30651,9 @@ not saved. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7171</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7169</span>
+<span class="normal">7170</span>
+<span class="normal">7171</span>
 <span class="normal">7172</span>
 <span class="normal">7173</span>
 <span class="normal">7174</span>
@@ -30669,9 +30671,7 @@ not saved. Defaults to None.</p>
 <span class="normal">7186</span>
 <span class="normal">7187</span>
 <span class="normal">7188</span>
-<span class="normal">7189</span>
-<span class="normal">7190</span>
-<span class="normal">7191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vector_to_geojson</span><span class="p">(</span>
+<span class="normal">7189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vector_to_geojson</span><span class="p">(</span>
     <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a vector file to a geojson file.</span>
@@ -30983,7 +30983,9 @@ If False, only pixels whose center is within the geometry will be burned in.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2290</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2288</span>
+<span class="normal">2289</span>
+<span class="normal">2290</span>
 <span class="normal">2291</span>
 <span class="normal">2292</span>
 <span class="normal">2293</span>
@@ -31187,9 +31189,7 @@ If False, only pixels whose center is within the geometry will be burned in.</p>
 <span class="normal">2491</span>
 <span class="normal">2492</span>
 <span class="normal">2493</span>
-<span class="normal">2494</span>
-<span class="normal">2495</span>
-<span class="normal">2496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vector_to_raster</span><span class="p">(</span>
+<span class="normal">2494</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vector_to_raster</span><span class="p">(</span>
     <span class="n">vector_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">],</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">reference_raster</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -31626,9 +31626,7 @@ If False, only pixels whose center is within the geometry will be burned in.</p>
 <span class="normal">222</span>
 <span class="normal">223</span>
 <span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span>
-<span class="normal">227</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_image</span><span class="p">(</span>
+<span class="normal">225</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_image</span><span class="p">(</span>
     <span class="n">image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
     <span class="n">transpose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">bdx</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -31687,8 +31685,6 @@ If False, only pixels whose center is within the geometry will be burned in.</p>
         <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-
-    <span class="k">return</span> <span class="n">ax</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -32627,7 +32623,9 @@ is not saved. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">540</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
 <span class="normal">541</span>
 <span class="normal">542</span>
 <span class="normal">543</span>
@@ -32776,9 +32774,7 @@ is not saved. Defaults to None.</p>
 <span class="normal">686</span>
 <span class="normal">687</span>
 <span class="normal">688</span>
-<span class="normal">689</span>
-<span class="normal">690</span>
-<span class="normal">691</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_vector</span><span class="p">(</span>
+<span class="normal">689</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_vector</span><span class="p">(</span>
     <span class="n">vector_data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">],</span>
     <span class="n">column</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;viridis&quot;</span><span class="p">,</span>
@@ -33072,7 +33068,9 @@ See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.ex
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">694</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">692</span>
+<span class="normal">693</span>
+<span class="normal">694</span>
 <span class="normal">695</span>
 <span class="normal">696</span>
 <span class="normal">697</span>
@@ -33183,9 +33181,7 @@ See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.ex
 <span class="normal">802</span>
 <span class="normal">803</span>
 <span class="normal">804</span>
-<span class="normal">805</span>
-<span class="normal">806</span>
-<span class="normal">807</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_vector_interactive</span><span class="p">(</span>
+<span class="normal">805</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">view_vector_interactive</span><span class="p">(</span>
     <span class="n">vector_data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">],</span>
     <span class="n">layer_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Vector Layer&quot;</span><span class="p">,</span>
     <span class="n">tiles_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -33423,7 +33419,9 @@ See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.ex
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1799</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1797</span>
+<span class="normal">1798</span>
+<span class="normal">1799</span>
 <span class="normal">1800</span>
 <span class="normal">1801</span>
 <span class="normal">1802</span>
@@ -33470,9 +33468,7 @@ See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.ex
 <span class="normal">1843</span>
 <span class="normal">1844</span>
 <span class="normal">1845</span>
-<span class="normal">1846</span>
-<span class="normal">1847</span>
-<span class="normal">1848</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_vector_by_attribute</span><span class="p">(</span>
+<span class="normal">1846</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_vector_by_attribute</span><span class="p">(</span>
     <span class="n">vector_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">attribute_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;viridis&quot;</span><span class="p">,</span>
@@ -33607,7 +33603,9 @@ See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.ex
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7507</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7505</span>
+<span class="normal">7506</span>
+<span class="normal">7507</span>
 <span class="normal">7508</span>
 <span class="normal">7509</span>
 <span class="normal">7510</span>
@@ -33619,9 +33617,7 @@ See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.ex
 <span class="normal">7516</span>
 <span class="normal">7517</span>
 <span class="normal">7518</span>
-<span class="normal">7519</span>
-<span class="normal">7520</span>
-<span class="normal">7521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">write_colormap</span><span class="p">(</span>
+<span class="normal">7519</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">write_colormap</span><span class="p">(</span>
     <span class="n">image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
     <span class="n">colormap</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">],</span>
     <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
