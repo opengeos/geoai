@@ -154,6 +154,7 @@ try:
         moondream_detect,
         moondream_point,
     )
+    from .map_widgets import moondream_gui
 except ImportError:
     # Moondream not available (missing dependency)
     pass
