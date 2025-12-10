@@ -465,8 +465,6 @@ def moondream_gui(
 
         if "gdf" in result and len(result["gdf"]) > 0:
             gdf = result["gdf"].copy()
-            if "Detections" in m.get_layer_names():
-                m.remove_layer(m.find_layer("Detections"))
             m.add_gdf(
                 gdf,
                 layer_name="Detections",
