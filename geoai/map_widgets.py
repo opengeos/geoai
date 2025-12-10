@@ -11,17 +11,6 @@ import ipywidgets as widgets
 from .utils import dict_to_image, dict_to_rioxarray
 
 
-def is_colab() -> bool:
-    """Tests if the code is being executed within Google Colab.
-
-    Returns:
-        bool: True if running in Google Colab, False otherwise.
-    """
-    import sys
-
-    return "google.colab" in sys.modules
-
-
 def random_string(string_length: int = 6) -> str:
     """Generate a random string of fixed length.
 
