@@ -81,7 +81,7 @@ pip install geoai-py torch torchvision
 
 ### Moondream Vision-Language Model
 
-1. Click `GeoAI` → `Moondream Vision-Language Model`
+1. Click `GeoAI` → `Moondream VLM`
 2. Load a Moondream model (default: vikhyatk/moondream2)
 3. Select a raster layer or browse for an image file
 4. Choose a mode:
