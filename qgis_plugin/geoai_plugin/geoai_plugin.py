@@ -6,7 +6,6 @@ integration, menu items, and toolbar buttons.
 """
 
 import os
-from pathlib import Path
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
