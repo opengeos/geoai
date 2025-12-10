@@ -7,7 +7,6 @@ vision-language model for geospatial image analysis in QGIS.
 
 import os
 import tempfile
-from typing import Optional
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
 from qgis.PyQt.QtWidgets import (
