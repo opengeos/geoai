@@ -7,18 +7,18 @@ author=Qiusheng Wu
 email=giswqs@gmail.com
 
 about=This plugin provides AI-powered geospatial analysis tools:
-    
+
     <b>Moondream Vision-Language Model:</b>
     - Caption: Generate descriptions of geospatial imagery
     - Query: Ask questions about images using natural language
     - Detect: Detect and locate objects with bounding boxes
     - Point: Locate specific objects with point markers
-    
+
     <b>Semantic Segmentation:</b>
     - Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
     - Run inference on raster imagery
     - Export results as vector or raster data
-    
+
     Requires the geoai-py Python package and PyTorch with CUDA support for optimal performance.
 
 tracker=https://github.com/opengeos/geoai/issues

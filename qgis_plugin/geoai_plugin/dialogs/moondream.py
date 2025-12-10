@@ -82,7 +82,9 @@ class MoondreamWorker(QThread):
                     source=self.source_path,
                     stream=False,
                 )
-                self.finished.emit({"type": "query", "result": result, "question": self.prompt})
+                self.finished.emit(
+                    {"type": "query", "result": result, "question": self.prompt}
+                )
 
             elif self.mode == "Detect":
                 self.progress.emit(f"Detecting: {self.prompt}")
@@ -90,7 +92,9 @@ class MoondreamWorker(QThread):
                     self.source_path,
                     self.prompt,
                 )
-                self.finished.emit({"type": "detect", "result": result, "object_type": self.prompt})
+                self.finished.emit(
+                    {"type": "detect", "result": result, "object_type": self.prompt}
+                )
 
             elif self.mode == "Point":
                 self.progress.emit(f"Locating: {self.prompt}")
@@ -98,7 +102,9 @@ class MoondreamWorker(QThread):
                     self.source_path,
                     self.prompt,
                 )
-                self.finished.emit({"type": "point", "result": result, "description": self.prompt})
+                self.finished.emit(
+                    {"type": "point", "result": result, "description": self.prompt}
+                )
 
         except Exception as e:
             self.error.emit(str(e))
@@ -151,10 +157,12 @@ class MoondreamDockWidget(QDockWidget):
 
         self.model_combo = QComboBox()
         self.model_combo.setStyleSheet(combo_style)
-        self.model_combo.addItems([
-            "vikhyatk/moondream2",
-            "moondream/moondream3-preview",
-        ])
+        self.model_combo.addItems(
+            [
+                "vikhyatk/moondream2",
+                "moondream/moondream3-preview",
+            ]
+        )
         model_layout.addRow("Model:", self.model_combo)
 
         self.device_combo = QComboBox()
@@ -347,6 +355,7 @@ class MoondreamDockWidget(QDockWidget):
             self.load_model_btn.setEnabled(False)
 
             from qgis.PyQt.QtWidgets import QApplication
+
             QApplication.processEvents()
 
             # Lazy import
@@ -403,7 +412,9 @@ class MoondreamDockWidget(QDockWidget):
                 source = self.image_path_edit.text()
 
             if not source:
-                QMessageBox.warning(self, "Warning", "Please select a layer or specify an image file.")
+                QMessageBox.warning(
+                    self, "Warning", "Please select a layer or specify an image file."
+                )
                 return
 
             if not os.path.exists(source):
@@ -530,7 +541,9 @@ class MoondreamDockWidget(QDockWidget):
         """Add detection results as a vector layer to QGIS."""
         try:
             temp_dir = tempfile.gettempdir()
-            temp_file = os.path.join(temp_dir, f"moondream_detect_{object_type.replace(' ', '_')}.geojson")
+            temp_file = os.path.join(
+                temp_dir, f"moondream_detect_{object_type.replace(' ', '_')}.geojson"
+            )
             gdf.to_file(temp_file, driver="GeoJSON")
 
             layer = QgsVectorLayer(temp_file, f"Detections: {object_type}", "ogr")
@@ -540,7 +553,12 @@ class MoondreamDockWidget(QDockWidget):
                 symbol.symbolLayer(0).setStrokeColor(self.result_color)
                 symbol.symbolLayer(0).setStrokeWidth(1.5)
                 symbol.symbolLayer(0).setFillColor(
-                    QColor(self.result_color.red(), self.result_color.green(), self.result_color.blue(), 50)
+                    QColor(
+                        self.result_color.red(),
+                        self.result_color.green(),
+                        self.result_color.blue(),
+                        50,
+                    )
                 )
                 QgsProject.instance().addMapLayer(layer)
                 self.iface.mapCanvas().refresh()
@@ -552,7 +570,9 @@ class MoondreamDockWidget(QDockWidget):
         """Add point results as a vector layer to QGIS."""
         try:
             temp_dir = tempfile.gettempdir()
-            temp_file = os.path.join(temp_dir, f"moondream_points_{description.replace(' ', '_')}.geojson")
+            temp_file = os.path.join(
+                temp_dir, f"moondream_points_{description.replace(' ', '_')}.geojson"
+            )
             gdf.to_file(temp_file, driver="GeoJSON")
 
             layer = QgsVectorLayer(temp_file, f"Points: {description}", "ogr")
@@ -579,7 +599,9 @@ class MoondreamDockWidget(QDockWidget):
             gdf = result.get("gdf")
             if gdf is not None and len(gdf) > 0:
                 file_path, _ = QFileDialog.getSaveFileName(
-                    self, "Save Results", "",
+                    self,
+                    "Save Results",
+                    "",
                     "GeoJSON (*.geojson);;Shapefile (*.shp);;GeoPackage (*.gpkg)",
                 )
                 if file_path:
@@ -590,12 +612,19 @@ class MoondreamDockWidget(QDockWidget):
                             gdf.to_file(file_path, driver="ESRI Shapefile")
                         else:
                             gdf.to_file(file_path)
-                        QMessageBox.information(self, "Success", f"Saved to:\n{file_path}")
+                        QMessageBox.information(
+                            self, "Success", f"Saved to:\n{file_path}"
+                        )
                     except Exception as e:
-                        QMessageBox.critical(self, "Error", f"Failed to save:\n{str(e)}")
+                        QMessageBox.critical(
+                            self, "Error", f"Failed to save:\n{str(e)}"
+                        )
         else:
             file_path, _ = QFileDialog.getSaveFileName(
-                self, "Save Results", "", "Text File (*.txt)",
+                self,
+                "Save Results",
+                "",
+                "Text File (*.txt)",
             )
             if file_path:
                 try:

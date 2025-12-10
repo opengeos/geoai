@@ -172,9 +172,13 @@ class GeoAIPlugin:
             try:
                 from .dialogs.moondream import MoondreamDockWidget
 
-                self._moondream_dock = MoondreamDockWidget(self.iface, self.iface.mainWindow())
+                self._moondream_dock = MoondreamDockWidget(
+                    self.iface, self.iface.mainWindow()
+                )
                 self._moondream_dock.setObjectName("GeoAIMoondreamDock")
-                self._moondream_dock.visibilityChanged.connect(self._on_moondream_visibility_changed)
+                self._moondream_dock.visibilityChanged.connect(
+                    self._on_moondream_visibility_changed
+                )
                 self.iface.addDockWidget(Qt.RightDockWidgetArea, self._moondream_dock)
                 self._moondream_dock.show()
                 self._moondream_dock.raise_()
@@ -206,10 +210,16 @@ class GeoAIPlugin:
             try:
                 from .dialogs.segmentation import SegmentationDockWidget
 
-                self._segmentation_dock = SegmentationDockWidget(self.iface, self.iface.mainWindow())
+                self._segmentation_dock = SegmentationDockWidget(
+                    self.iface, self.iface.mainWindow()
+                )
                 self._segmentation_dock.setObjectName("GeoAISegmentationDock")
-                self._segmentation_dock.visibilityChanged.connect(self._on_segmentation_visibility_changed)
-                self.iface.addDockWidget(Qt.RightDockWidgetArea, self._segmentation_dock)
+                self._segmentation_dock.visibilityChanged.connect(
+                    self._on_segmentation_visibility_changed
+                )
+                self.iface.addDockWidget(
+                    Qt.RightDockWidgetArea, self._segmentation_dock
+                )
                 self._segmentation_dock.show()
                 self._segmentation_dock.raise_()
                 return

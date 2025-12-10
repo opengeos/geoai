@@ -34,7 +34,9 @@ def get_qgis_plugin_dir() -> Path:
         if appdata:
             plugin_dir = Path(appdata) / "QGIS/QGIS3/profiles/default/python/plugins"
         else:
-            plugin_dir = home / "AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins"
+            plugin_dir = (
+                home / "AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins"
+            )
     else:
         raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
@@ -90,9 +92,7 @@ def remove_plugin(plugin_dir: Path) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Install or remove GeoAI QGIS Plugin"
-    )
+    parser = argparse.ArgumentParser(description="Install or remove GeoAI QGIS Plugin")
     parser.add_argument(
         "--remove",
         action="store_true",

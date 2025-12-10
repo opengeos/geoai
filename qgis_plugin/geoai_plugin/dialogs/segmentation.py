@@ -88,7 +88,9 @@ class TrainingWorker(QThread):
                 input_format=self.input_format,
                 architecture=self.architecture,
                 encoder_name=self.encoder_name,
-                encoder_weights=self.encoder_weights if self.encoder_weights != "None" else None,
+                encoder_weights=(
+                    self.encoder_weights if self.encoder_weights != "None" else None
+                ),
                 num_channels=self.num_channels,
                 num_classes=self.num_classes,
                 batch_size=self.batch_size,
@@ -103,6 +105,7 @@ class TrainingWorker(QThread):
 
         except Exception as e:
             import traceback
+
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
@@ -150,6 +153,7 @@ class TileExportWorker(QThread):
 
         except Exception as e:
             import traceback
+
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
@@ -220,6 +224,7 @@ class InferenceWorker(QThread):
 
         except Exception as e:
             import traceback
+
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
@@ -267,6 +272,7 @@ class VectorizeWorker(QThread):
 
         except Exception as e:
             import traceback
+
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
@@ -499,19 +505,36 @@ class SegmentationDockWidget(QDockWidget):
 
         self.architecture_combo = QComboBox()
         self.architecture_combo.setStyleSheet(self.combo_style)
-        self.architecture_combo.addItems([
-            "unet", "unetplusplus", "deeplabv3", "deeplabv3plus",
-            "fpn", "pspnet", "linknet", "manet", "segformer",
-        ])
+        self.architecture_combo.addItems(
+            [
+                "unet",
+                "unetplusplus",
+                "deeplabv3",
+                "deeplabv3plus",
+                "fpn",
+                "pspnet",
+                "linknet",
+                "manet",
+                "segformer",
+            ]
+        )
         arch_layout.addRow("Architecture:", self.architecture_combo)
 
         self.encoder_combo = QComboBox()
         self.encoder_combo.setStyleSheet(self.combo_style)
-        self.encoder_combo.addItems([
-            "resnet34", "resnet50", "resnet101", "resnet152",
-            "efficientnet-b0", "efficientnet-b1", "efficientnet-b2",
-            "mobilenet_v2", "vgg16",
-        ])
+        self.encoder_combo.addItems(
+            [
+                "resnet34",
+                "resnet50",
+                "resnet101",
+                "resnet152",
+                "efficientnet-b0",
+                "efficientnet-b1",
+                "efficientnet-b2",
+                "mobilenet_v2",
+                "vgg16",
+            ]
+        )
         arch_layout.addRow("Encoder:", self.encoder_combo)
 
         self.encoder_weights_combo = QComboBox()
@@ -645,19 +668,36 @@ class SegmentationDockWidget(QDockWidget):
 
         self.inf_architecture_combo = QComboBox()
         self.inf_architecture_combo.setStyleSheet(self.combo_style)
-        self.inf_architecture_combo.addItems([
-            "unet", "unetplusplus", "deeplabv3", "deeplabv3plus",
-            "fpn", "pspnet", "linknet", "manet", "segformer",
-        ])
+        self.inf_architecture_combo.addItems(
+            [
+                "unet",
+                "unetplusplus",
+                "deeplabv3",
+                "deeplabv3plus",
+                "fpn",
+                "pspnet",
+                "linknet",
+                "manet",
+                "segformer",
+            ]
+        )
         model_layout.addRow("Arch:", self.inf_architecture_combo)
 
         self.inf_encoder_combo = QComboBox()
         self.inf_encoder_combo.setStyleSheet(self.combo_style)
-        self.inf_encoder_combo.addItems([
-            "resnet34", "resnet50", "resnet101", "resnet152",
-            "efficientnet-b0", "efficientnet-b1", "efficientnet-b2",
-            "mobilenet_v2", "vgg16",
-        ])
+        self.inf_encoder_combo.addItems(
+            [
+                "resnet34",
+                "resnet50",
+                "resnet101",
+                "resnet152",
+                "efficientnet-b0",
+                "efficientnet-b1",
+                "efficientnet-b2",
+                "mobilenet_v2",
+                "vgg16",
+            ]
+        )
         model_layout.addRow("Encoder:", self.inf_encoder_combo)
 
         self.inf_num_channels_spin = QSpinBox()
@@ -810,7 +850,9 @@ class SegmentationDockWidget(QDockWidget):
         self.vectorize_btn.clicked.connect(self.vectorize_mask)
 
         # Sync architecture and encoder between train and inference tabs
-        self.architecture_combo.currentTextChanged.connect(self.sync_architecture_to_inference)
+        self.architecture_combo.currentTextChanged.connect(
+            self.sync_architecture_to_inference
+        )
         self.encoder_combo.currentTextChanged.connect(self.sync_encoder_to_inference)
         self.num_channels_spin.valueChanged.connect(self.sync_channels_to_inference)
         self.num_classes_spin.valueChanged.connect(self.sync_classes_to_inference)
@@ -825,7 +867,10 @@ class SegmentationDockWidget(QDockWidget):
                 self.labels_dir_edit.setText(os.path.join(output_dir, "labels"))
 
             # Auto-suggest model output directory
-            if not self.model_output_dir_edit.text() and self.tile_output_dir_edit.text():
+            if (
+                not self.model_output_dir_edit.text()
+                and self.tile_output_dir_edit.text()
+            ):
                 output_dir = self.tile_output_dir_edit.text()
                 parent_dir = os.path.dirname(output_dir)
                 self.model_output_dir_edit.setText(os.path.join(parent_dir, "models"))
@@ -871,12 +916,16 @@ class SegmentationDockWidget(QDockWidget):
 
     # Browse methods
     def browse_raster(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)"
+        )
         if file_path:
             self.raster_path_edit.setText(file_path)
 
     def browse_vector(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp);;All (*)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp);;All (*)"
+        )
         if file_path:
             self.vector_path_edit.setText(file_path)
 
@@ -901,34 +950,50 @@ class SegmentationDockWidget(QDockWidget):
             self.model_output_dir_edit.setText(dir_path)
 
     def browse_inf_raster(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)"
+        )
         if file_path:
             self.inf_raster_path_edit.setText(file_path)
 
     def browse_model(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Model", "", "PyTorch Model (*.pth *.pt);;All (*)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Model", "", "PyTorch Model (*.pth *.pt);;All (*)"
+        )
         if file_path:
             self.model_path_edit.setText(file_path)
 
     def browse_output(self):
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Output", "", "GeoTIFF (*.tif)")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Output", "", "GeoTIFF (*.tif)"
+        )
         if file_path:
             if not file_path.endswith(".tif"):
                 file_path += ".tif"
             self.output_path_edit.setText(file_path)
 
     def browse_vector_output(self):
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp)")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp)"
+        )
         if file_path:
             self.vector_output_edit.setText(file_path)
 
     # Export tiles
     def export_tiles(self):
         raster_layer = self.raster_layer_combo.currentLayer()
-        raster_path = raster_layer.source() if raster_layer and not self.raster_path_edit.text() else self.raster_path_edit.text()
+        raster_path = (
+            raster_layer.source()
+            if raster_layer and not self.raster_path_edit.text()
+            else self.raster_path_edit.text()
+        )
 
         vector_layer = self.vector_layer_combo.currentLayer()
-        vector_path = vector_layer.source() if vector_layer and not self.vector_path_edit.text() else self.vector_path_edit.text()
+        vector_path = (
+            vector_layer.source()
+            if vector_layer and not self.vector_path_edit.text()
+            else self.vector_path_edit.text()
+        )
 
         output_dir = self.tile_output_dir_edit.text()
 
@@ -941,7 +1006,9 @@ class SegmentationDockWidget(QDockWidget):
         self.log("Starting tile export...")
 
         self.tile_worker = TileExportWorker(
-            raster_path, vector_path, output_dir,
+            raster_path,
+            vector_path,
+            output_dir,
             self.tile_size_spin.value(),
             self.stride_spin.value(),
             self.buffer_spin.value(),
@@ -969,7 +1036,11 @@ class SegmentationDockWidget(QDockWidget):
         # Switch to Train tab
         self.tab_widget.setCurrentIndex(1)
 
-        QMessageBox.information(self, "Success", f"Tiles exported to:\n{output_dir}\n\nSwitched to Train tab.")
+        QMessageBox.information(
+            self,
+            "Success",
+            f"Tiles exported to:\n{output_dir}\n\nSwitched to Train tab.",
+        )
 
     def on_tile_export_error(self, error: str):
         self.tile_progress.setRange(0, 100)
@@ -993,7 +1064,9 @@ class SegmentationDockWidget(QDockWidget):
         self.log(f"Starting training: {self.architecture_combo.currentText()}")
 
         self.train_worker = TrainingWorker(
-            images_dir, labels_dir, output_dir,
+            images_dir,
+            labels_dir,
+            output_dir,
             self.architecture_combo.currentText(),
             self.encoder_combo.currentText(),
             self.encoder_weights_combo.currentText(),
@@ -1021,7 +1094,9 @@ class SegmentationDockWidget(QDockWidget):
         self.model_path_edit.setText(model_path)
 
         # Sync model settings to inference tab
-        self.inf_architecture_combo.setCurrentText(self.architecture_combo.currentText())
+        self.inf_architecture_combo.setCurrentText(
+            self.architecture_combo.currentText()
+        )
         self.inf_encoder_combo.setCurrentText(self.encoder_combo.currentText())
         self.inf_num_channels_spin.setValue(self.num_channels_spin.value())
         self.inf_num_classes_spin.setValue(self.num_classes_spin.value())
@@ -1029,7 +1104,11 @@ class SegmentationDockWidget(QDockWidget):
         # Switch to Inference tab
         self.tab_widget.setCurrentIndex(2)
 
-        QMessageBox.information(self, "Success", f"Model saved to:\n{model_path}\n\nSwitched to Inference tab.")
+        QMessageBox.information(
+            self,
+            "Success",
+            f"Model saved to:\n{model_path}\n\nSwitched to Inference tab.",
+        )
 
     def on_training_error(self, error: str):
         self.train_progress.setRange(0, 100)
@@ -1041,7 +1120,11 @@ class SegmentationDockWidget(QDockWidget):
     # Inference
     def run_inference(self):
         layer = self.inf_raster_layer_combo.currentLayer()
-        input_path = layer.source() if layer and not self.inf_raster_path_edit.text() else self.inf_raster_path_edit.text()
+        input_path = (
+            layer.source()
+            if layer and not self.inf_raster_path_edit.text()
+            else self.inf_raster_path_edit.text()
+        )
 
         model_path = self.model_path_edit.text()
         output_path = self.output_path_edit.text()
@@ -1054,10 +1137,14 @@ class SegmentationDockWidget(QDockWidget):
         self.inference_progress.setRange(0, 0)
         self.log("Starting inference...")
 
-        threshold = self.threshold_spin.value() if self.threshold_check.isChecked() else None
+        threshold = (
+            self.threshold_spin.value() if self.threshold_check.isChecked() else None
+        )
 
         self.inference_worker = InferenceWorker(
-            input_path, output_path, model_path,
+            input_path,
+            output_path,
+            model_path,
             self.inf_architecture_combo.currentText(),
             self.inf_encoder_combo.currentText(),
             self.inf_num_channels_spin.value(),
@@ -1114,10 +1201,13 @@ class SegmentationDockWidget(QDockWidget):
         self.inference_progress.setRange(0, 0)
         self.log("Vectorizing...")
 
-        min_area = self.min_area_spin.value() if self.min_area_spin.value() > 0 else None
+        min_area = (
+            self.min_area_spin.value() if self.min_area_spin.value() > 0 else None
+        )
 
         self.vectorize_worker = VectorizeWorker(
-            mask_path, vector_output,
+            mask_path,
+            vector_output,
             self.epsilon_spin.value(),
             min_area,
         )
@@ -1150,7 +1240,12 @@ class SegmentationDockWidget(QDockWidget):
 
     def closeEvent(self, event):
         """Handle widget close event."""
-        for worker in [self.train_worker, self.tile_worker, self.inference_worker, self.vectorize_worker]:
+        for worker in [
+            self.train_worker,
+            self.tile_worker,
+            self.inference_worker,
+            self.vectorize_worker,
+        ]:
             if worker and worker.isRunning():
                 worker.terminate()
                 worker.wait()
