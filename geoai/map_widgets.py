@@ -486,8 +486,6 @@ def moondream_gui(
             gdf["x"] = gdf.geometry.centroid.x
             gdf["y"] = gdf.geometry.centroid.y
 
-            if "Points" in m.get_layer_names():
-                m.remove_layer(m.find_layer("Points"))
             m.add_circle_markers_from_xy(
                 gdf,
                 "x",
