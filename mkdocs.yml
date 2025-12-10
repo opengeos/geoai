@@ -160,6 +160,7 @@ nav:
           - examples/clean_segmentation_results.ipynb
           - examples/cloud_detection.ipynb
           - examples/moondream.ipynb
+          - examples/moondream_gui.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb

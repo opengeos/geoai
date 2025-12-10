@@ -357,8 +357,6 @@ class MoondreamGeo:
             }
             return image, self._metadata
 
-        raise TypeError(f"Unsupported source type: {type(source)}")
-
     def _normalize_image(self, data: np.ndarray) -> np.ndarray:
         """Normalize image data to 0-255 range using percentile stretching.
 
@@ -819,6 +817,55 @@ class MoondreamGeo:
             dst.write(mask, 1)
 
         print(f"Saved mask to {output_path}")
+
+    def show_gui(
+        self,
+        basemap: str = "SATELLITE",
+        out_dir: Optional[str] = None,
+        opacity: float = 0.5,
+        **kwargs: Any,
+    ) -> Any:
+        """Display an interactive GUI for using Moondream with leafmap.
+
+        This method creates an interactive map interface for using Moondream
+        vision language model capabilities including:
+        - Image captioning (short, normal, long)
+        - Visual question answering (query)
+        - Object detection with bounding boxes
+        - Point detection for locating objects
+
+        Args:
+            basemap: The basemap to use. Defaults to "SATELLITE".
+            out_dir: The output directory for saving results.
+                Defaults to None (uses temp directory).
+            opacity: The opacity of overlay layers. Defaults to 0.5.
+            **kwargs: Additional keyword arguments passed to leafmap.Map().
+
+        Returns:
+            leafmap.Map: The interactive map with the Moondream GUI.
+
+        Example:
+            >>> moondream = MoondreamGeo()
+            >>> moondream.load_image("image.tif")
+            >>> m = moondream.show_gui()
+            >>> m
+        """
+        from .map_widgets import moondream_gui
+
+        return moondream_gui(
+            self,
+            basemap=basemap,
+            out_dir=out_dir,
+            opacity=opacity,
+            **kwargs,
+        )
+
+    def get_last_result(self) -> Dict[str, Any]:
+
+        if hasattr(self, "last_result") and "gdf" in self.last_result:
+            return self.last_result["gdf"]
+        else:
+            return None
 
 
 def moondream_caption(
