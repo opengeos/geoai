@@ -168,6 +168,9 @@ class MoondreamDockWidget(QDockWidget):
         self.device_combo = QComboBox()
         self.device_combo.setStyleSheet(combo_style)
         self.device_combo.addItems(["Auto", "cuda", "cpu", "mps"])
+        self.device_combo.setToolTip(
+            'Device to run the model on. "Auto" will select CUDA if available, otherwise CPU.'
+        )
         model_layout.addRow("Device:", self.device_combo)
 
         self.load_model_btn = QPushButton("Load Model")
