@@ -92,28 +92,13 @@ pip install geoai-py torch torchvision
 5. Click "Run Analysis"
 6. Results are displayed and optionally added to the map
 
-### Training a Segmentation Model
+### Segmentation Panel (Create Data, Train, Inference)
 
-1. Click `GeoAI` → `Train Segmentation Model`
-2. **Create Training Data** tab:
-   - Select input raster and vector labels
-   - Configure tile size and stride
-   - Export tiles to a directory
-3. **Train Model** tab:
-   - Select the images and labels directories
-   - Choose model architecture (U-Net, DeepLabV3+, etc.)
-   - Configure training parameters
-   - Start training
-
-### Running Inference
-
-1. Click `GeoAI` → `Run Segmentation Inference`
-2. Select input raster layer or file
-3. Specify the trained model path
-4. Configure inference parameters
-5. Click "Run Inference"
-6. Optionally vectorize the results
-
+1. Click `GeoAI` → `Segmentation` to open the Segmentation panel.
+2. Use the tabs at the top of the panel to switch between:
+   - **Create Training Data**: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.
+   - **Train Model**: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.
+   - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.
 ## Supported Model Architectures
 
 - U-Net
