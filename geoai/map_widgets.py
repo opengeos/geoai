@@ -259,7 +259,7 @@ def moondream_gui(
     m.detection_markers = []
     m.point_markers = []
 
-# Removed unused LayerGroups for detections and points.
+    # Removed unused LayerGroups for detections and points.
     m.last_result_as_gdf = None
 
     # Widget styling
