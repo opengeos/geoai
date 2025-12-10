@@ -12,9 +12,6 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QMenu, QToolBar, QMessageBox
 
-from qgis.core import Qgis
-
-
 class GeoAIPlugin:
     """GeoAI Plugin implementation class for QGIS."""
 
