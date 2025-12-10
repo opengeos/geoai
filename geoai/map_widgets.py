@@ -258,7 +258,6 @@ def moondream_gui(
     # Initialize marker storage for detection results
     m.detection_markers = []
     m.point_markers = []
-    m.bbox_layers = []
 
 # Removed unused LayerGroups for detections and points.
     m.last_result_as_gdf = None
