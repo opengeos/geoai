@@ -12,27 +12,31 @@
         <meta name="author" content="opengeos">
       
       
-        <link rel="canonical" href="https://opengeoai.org/examples/samgeo/text_prompts/">
+        <link rel="canonical" href="https://opengeoai.org/examples/moondream_gui/">
       
       
+        <link rel="prev" href="../moondream/">
+      
+      
+        <link rel="next" href="../../workshops/GeoAI_Workshop_2025/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/logo.ico">
+      <link rel="icon" href="../../assets/logo.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
     
     
       
-        <title>Text prompts - GeoAI</title>
+        <title>Moondream gui - GeoAI</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,11 +55,11 @@
       
     
     
-      <link rel="stylesheet" href="../../../css/timeago.css">
+      <link rel="stylesheet" href="../../css/timeago.css">
     
-      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#segmenting-remote-sensing-imagery-with-text-prompts-and-the-segment-anything-model-sam" class="md-skip">
+        <a href="#interactive-moondream-gui-with-leafmap" class="md-skip">
           Skip to content
         </a>
       
@@ -96,9 +100,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="GeoAI" class="md-header__button md-logo" aria-label="GeoAI" data-md-component="logo">
+    <a href="../.." title="GeoAI" class="md-header__button md-logo" aria-label="GeoAI" data-md-component="logo">
       
-  <img src="../../../assets/logo.png" alt="logo">
+  <img src="../../assets/logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -115,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Text prompts
+              Moondream gui
             
           </span>
         </div>
@@ -236,9 +240,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="GeoAI" class="md-nav__button md-logo" aria-label="GeoAI" data-md-component="logo">
+    <a href="../.." title="GeoAI" class="md-nav__button md-logo" aria-label="GeoAI" data-md-component="logo">
       
-  <img src="../../../assets/logo.png" alt="logo">
+  <img src="../../assets/logo.png" alt="logo">
 
     </a>
     GeoAI
@@ -265,7 +269,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -292,7 +296,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../installation/" class="md-nav__link">
+      <a href="../../installation/" class="md-nav__link">
         
   
   
@@ -319,7 +323,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/" class="md-nav__link">
+      <a href="../../contributing/" class="md-nav__link">
         
   
   
@@ -397,18 +401,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -429,7 +435,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -447,7 +453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../download_data/" class="md-nav__link">
+      <a href="../download_data/" class="md-nav__link">
         
   
   
@@ -475,7 +481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../download_sentinel2/" class="md-nav__link">
+      <a href="../download_sentinel2/" class="md-nav__link">
         
   
   
@@ -503,7 +509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../download_naip/" class="md-nav__link">
+      <a href="../download_naip/" class="md-nav__link">
         
   
   
@@ -531,7 +537,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../planetary_computer/" class="md-nav__link">
+      <a href="../planetary_computer/" class="md-nav__link">
         
   
   
@@ -559,7 +565,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../view_metadata/" class="md-nav__link">
+      <a href="../view_metadata/" class="md-nav__link">
         
   
   
@@ -587,7 +593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../create_vector/" class="md-nav__link">
+      <a href="../create_vector/" class="md-nav__link">
         
   
   
@@ -615,7 +621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../edit_vector/" class="md-nav__link">
+      <a href="../edit_vector/" class="md-nav__link">
         
   
   
@@ -643,7 +649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../image_chips/" class="md-nav__link">
+      <a href="../image_chips/" class="md-nav__link">
         
   
   
@@ -671,7 +677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../image_tiling/" class="md-nav__link">
+      <a href="../image_tiling/" class="md-nav__link">
         
   
   
@@ -699,7 +705,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../create_training_data/" class="md-nav__link">
+      <a href="../create_training_data/" class="md-nav__link">
         
   
   
@@ -727,7 +733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../export_training_data_formats/" class="md-nav__link">
+      <a href="../export_training_data_formats/" class="md-nav__link">
         
   
   
@@ -755,7 +761,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../data_augmentation/" class="md-nav__link">
+      <a href="../data_augmentation/" class="md-nav__link">
         
   
   
@@ -783,7 +789,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_footprints_usa/" class="md-nav__link">
+      <a href="../building_footprints_usa/" class="md-nav__link">
         
   
   
@@ -811,7 +817,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_footprints_africa/" class="md-nav__link">
+      <a href="../building_footprints_africa/" class="md-nav__link">
         
   
   
@@ -839,7 +845,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_footprints_china/" class="md-nav__link">
+      <a href="../building_footprints_china/" class="md-nav__link">
         
   
   
@@ -867,7 +873,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_regularization/" class="md-nav__link">
+      <a href="../building_regularization/" class="md-nav__link">
         
   
   
@@ -895,7 +901,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../geometric_properties/" class="md-nav__link">
+      <a href="../geometric_properties/" class="md-nav__link">
         
   
   
@@ -923,7 +929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../car_detection/" class="md-nav__link">
+      <a href="../car_detection/" class="md-nav__link">
         
   
   
@@ -951,7 +957,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ship_detection/" class="md-nav__link">
+      <a href="../ship_detection/" class="md-nav__link">
         
   
   
@@ -979,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../solar_panel_detection/" class="md-nav__link">
+      <a href="../solar_panel_detection/" class="md-nav__link">
         
   
   
@@ -1007,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../text_prompt_segmentation/" class="md-nav__link">
+      <a href="../text_prompt_segmentation/" class="md-nav__link">
         
   
   
@@ -1035,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../parking_spot_detection/" class="md-nav__link">
+      <a href="../parking_spot_detection/" class="md-nav__link">
         
   
   
@@ -1063,7 +1069,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../data_visualization/" class="md-nav__link">
+      <a href="../data_visualization/" class="md-nav__link">
         
   
   
@@ -1091,7 +1097,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_object_detection_model/" class="md-nav__link">
+      <a href="../train_object_detection_model/" class="md-nav__link">
         
   
   
@@ -1119,7 +1125,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_segmentation_model/" class="md-nav__link">
+      <a href="../train_segmentation_model/" class="md-nav__link">
         
   
   
@@ -1147,7 +1153,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_instance_segmentation_model/" class="md-nav__link">
+      <a href="../train_instance_segmentation_model/" class="md-nav__link">
         
   
   
@@ -1175,7 +1181,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_landcover_classification/" class="md-nav__link">
+      <a href="../train_landcover_classification/" class="md-nav__link">
         
   
   
@@ -1203,7 +1209,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_building_footprints_usa/" class="md-nav__link">
+      <a href="../train_building_footprints_usa/" class="md-nav__link">
         
   
   
@@ -1231,7 +1237,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_solar_panel_detection/" class="md-nav__link">
+      <a href="../train_solar_panel_detection/" class="md-nav__link">
         
   
   
@@ -1259,7 +1265,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_car_detection/" class="md-nav__link">
+      <a href="../train_car_detection/" class="md-nav__link">
         
   
   
@@ -1287,7 +1293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_ship_detection/" class="md-nav__link">
+      <a href="../train_ship_detection/" class="md-nav__link">
         
   
   
@@ -1315,7 +1321,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_water_detection/" class="md-nav__link">
+      <a href="../train_water_detection/" class="md-nav__link">
         
   
   
@@ -1343,7 +1349,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../water_dynamics/" class="md-nav__link">
+      <a href="../water_dynamics/" class="md-nav__link">
         
   
   
@@ -1371,7 +1377,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../wetland_mapping/" class="md-nav__link">
+      <a href="../wetland_mapping/" class="md-nav__link">
         
   
   
@@ -1399,7 +1405,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../wetland_dynamics/" class="md-nav__link">
+      <a href="../wetland_dynamics/" class="md-nav__link">
         
   
   
@@ -1427,7 +1433,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../regularization/" class="md-nav__link">
+      <a href="../regularization/" class="md-nav__link">
         
   
   
@@ -1455,7 +1461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../globe_projection/" class="md-nav__link">
+      <a href="../globe_projection/" class="md-nav__link">
         
   
   
@@ -1483,7 +1489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../samgeo/" class="md-nav__link">
         
   
   
@@ -1511,7 +1517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../grounded_sam/" class="md-nav__link">
+      <a href="../grounded_sam/" class="md-nav__link">
         
   
   
@@ -1539,7 +1545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../load_model_checkpoint/" class="md-nav__link">
+      <a href="../load_model_checkpoint/" class="md-nav__link">
         
   
   
@@ -1567,7 +1573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../water_detection/" class="md-nav__link">
+      <a href="../water_detection/" class="md-nav__link">
         
   
   
@@ -1595,7 +1601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../water_detection_s2/" class="md-nav__link">
+      <a href="../water_detection_s2/" class="md-nav__link">
         
   
   
@@ -1623,7 +1629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../batch_segmentation/" class="md-nav__link">
+      <a href="../batch_segmentation/" class="md-nav__link">
         
   
   
@@ -1651,7 +1657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../building_detection_lidar/" class="md-nav__link">
+      <a href="../building_detection_lidar/" class="md-nav__link">
         
   
   
@@ -1679,7 +1685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../instance_segmentation/" class="md-nav__link">
+      <a href="../instance_segmentation/" class="md-nav__link">
         
   
   
@@ -1707,7 +1713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../change_detection/" class="md-nav__link">
+      <a href="../change_detection/" class="md-nav__link">
         
   
   
@@ -1735,7 +1741,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../JPEG2000/" class="md-nav__link">
+      <a href="../JPEG2000/" class="md-nav__link">
         
   
   
@@ -1763,7 +1769,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../DINOv3/" class="md-nav__link">
+      <a href="../DINOv3/" class="md-nav__link">
         
   
   
@@ -1791,7 +1797,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../DINOv3_visualization/" class="md-nav__link">
+      <a href="../DINOv3_visualization/" class="md-nav__link">
         
   
   
@@ -1819,7 +1825,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../DINOv3_wetlands/" class="md-nav__link">
+      <a href="../DINOv3_wetlands/" class="md-nav__link">
         
   
   
@@ -1847,7 +1853,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../AlphaEarth/" class="md-nav__link">
+      <a href="../AlphaEarth/" class="md-nav__link">
         
   
   
@@ -1875,7 +1881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../AI_agents/" class="md-nav__link">
+      <a href="../AI_agents/" class="md-nav__link">
         
   
   
@@ -1903,7 +1909,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../STAC_agents/" class="md-nav__link">
+      <a href="../STAC_agents/" class="md-nav__link">
         
   
   
@@ -1931,7 +1937,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../catalog_search_agent/" class="md-nav__link">
+      <a href="../catalog_search_agent/" class="md-nav__link">
         
   
   
@@ -1959,7 +1965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_timm_classifier/" class="md-nav__link">
+      <a href="../train_timm_classifier/" class="md-nav__link">
         
   
   
@@ -1987,7 +1993,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../train_timm_segmentation/" class="md-nav__link">
+      <a href="../train_timm_segmentation/" class="md-nav__link">
         
   
   
@@ -2015,7 +2021,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../lightly_train_self_supervised/" class="md-nav__link">
+      <a href="../lightly_train_self_supervised/" class="md-nav__link">
         
   
   
@@ -2043,7 +2049,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clean_segmentation_results/" class="md-nav__link">
+      <a href="../clean_segmentation_results/" class="md-nav__link">
         
   
   
@@ -2071,7 +2077,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloud_detection/" class="md-nav__link">
+      <a href="../cloud_detection/" class="md-nav__link">
         
   
   
@@ -2099,7 +2105,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../moondream/" class="md-nav__link">
+      <a href="../moondream/" class="md-nav__link">
         
   
   
@@ -2124,10 +2130,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../moondream_gui/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Moondream gui
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2143,6 +2176,109 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import Libraries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#download-sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Download Sample Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initialize-moondream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialize Moondream
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#launch-the-interactive-gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Launch the Interactive GUI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Launch the Interactive GUI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2209,7 +2345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../workshops/GeoAI_Workshop_2025/" class="md-nav__link">
+      <a href="../../workshops/GeoAI_Workshop_2025/" class="md-nav__link">
         
   
   
@@ -2237,7 +2373,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../workshops/AWS_2025/" class="md-nav__link">
+      <a href="../../workshops/AWS_2025/" class="md-nav__link">
         
   
   
@@ -2265,7 +2401,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../workshops/TNView_2025/" class="md-nav__link">
+      <a href="../../workshops/TNView_2025/" class="md-nav__link">
         
   
   
@@ -2293,7 +2429,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../workshops/CANVAS_2025/" class="md-nav__link">
+      <a href="../../workshops/CANVAS_2025/" class="md-nav__link">
         
   
   
@@ -2321,7 +2457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../workshops/AGU_2025/" class="md-nav__link">
+      <a href="../../workshops/AGU_2025/" class="md-nav__link">
         
   
   
@@ -2403,7 +2539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../change_detection/" class="md-nav__link">
+      <a href="../../change_detection/" class="md-nav__link">
         
   
   
@@ -2431,7 +2567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../classify/" class="md-nav__link">
+      <a href="../../classify/" class="md-nav__link">
         
   
   
@@ -2459,7 +2595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../detectron2/" class="md-nav__link">
+      <a href="../../detectron2/" class="md-nav__link">
         
   
   
@@ -2487,7 +2623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../dinov3/" class="md-nav__link">
+      <a href="../../dinov3/" class="md-nav__link">
         
   
   
@@ -2515,7 +2651,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../geo_agents/" class="md-nav__link">
+      <a href="../../geo_agents/" class="md-nav__link">
         
   
   
@@ -2543,7 +2679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../geoai/" class="md-nav__link">
+      <a href="../../geoai/" class="md-nav__link">
         
   
   
@@ -2571,7 +2707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../download/" class="md-nav__link">
+      <a href="../../download/" class="md-nav__link">
         
   
   
@@ -2599,7 +2735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../extract/" class="md-nav__link">
+      <a href="../../extract/" class="md-nav__link">
         
   
   
@@ -2627,7 +2763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../hf/" class="md-nav__link">
+      <a href="../../hf/" class="md-nav__link">
         
   
   
@@ -2655,7 +2791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../map_tools/" class="md-nav__link">
+      <a href="../../map_tools/" class="md-nav__link">
         
   
   
@@ -2683,7 +2819,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../map_widgets/" class="md-nav__link">
+      <a href="../../map_widgets/" class="md-nav__link">
         
   
   
@@ -2711,7 +2847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../moondream.md" class="md-nav__link">
+      <a href="../../moondream.md" class="md-nav__link">
         
   
   
@@ -2739,7 +2875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../sam/" class="md-nav__link">
+      <a href="../../sam/" class="md-nav__link">
         
   
   
@@ -2767,7 +2903,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../segmentation/" class="md-nav__link">
+      <a href="../../segmentation/" class="md-nav__link">
         
   
   
@@ -2795,7 +2931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../timm_train/" class="md-nav__link">
+      <a href="../../timm_train/" class="md-nav__link">
         
   
   
@@ -2823,7 +2959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../timm_segment/" class="md-nav__link">
+      <a href="../../timm_segment/" class="md-nav__link">
         
   
   
@@ -2851,7 +2987,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../train/" class="md-nav__link">
+      <a href="../../train/" class="md-nav__link">
         
   
   
@@ -2879,7 +3015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../utils/" class="md-nav__link">
+      <a href="../../utils/" class="md-nav__link">
         
   
   
@@ -2934,10 +3070,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#install-dependencies" class="md-nav__link">
+  <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install dependencies
+        Features
       
     </span>
   </a>
@@ -2945,10 +3081,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#create-an-interactive-map" class="md-nav__link">
+  <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Create an interactive map
+        Installation
       
     </span>
   </a>
@@ -2956,10 +3092,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#download-a-sample-image" class="md-nav__link">
+  <a href="#import-libraries" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Download a sample image
+        Import Libraries
       
     </span>
   </a>
@@ -2967,10 +3103,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#initialize-langsam-class" class="md-nav__link">
+  <a href="#download-sample-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Initialize LangSAM class
+        Download Sample Data
       
     </span>
   </a>
@@ -2978,10 +3114,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#specify-text-prompts" class="md-nav__link">
+  <a href="#initialize-moondream" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Specify text prompts
+        Initialize Moondream
       
     </span>
   </a>
@@ -2989,35 +3125,30 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#segment-the-image" class="md-nav__link">
+  <a href="#launch-the-interactive-gui" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Segment the image
+        Launch the Interactive GUI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Launch the Interactive GUI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips:
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#visualize-the-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Visualize the results
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interactive-segmentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interactive segmentation
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3035,7 +3166,7 @@
               <article class="md-content__inner md-typeset">
                 
 
-    <a href="/examples/samgeo/text_prompts/text_prompts.ipynb" title="Download Notebook" class="md-content__button md-icon">
+    <a href="/examples/moondream_gui/moondream_gui.ipynb" title="Download Notebook" class="md-content__button md-icon">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z"/></svg>
     </a>
 
@@ -3484,33 +3615,37 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="segmenting-remote-sensing-imagery-with-text-prompts-and-the-segment-anything-model-sam">Segmenting remote sensing imagery with text prompts and the Segment Anything Model (SAM)<a class="anchor-link" href="#segmenting-remote-sensing-imagery-with-text-prompts-and-the-segment-anything-model-sam">¶</a></h1><p><a href="https://studiolab.sagemaker.aws/import/github/opengeos/segment-geospatial/blob/main/docs/examples/text_prompts.ipynb"><img alt="image" src="https://studiolab.sagemaker.aws/studiolab.svg"/></a>
-<a href="https://pccompute.westeurope.cloudapp.azure.com/compute/hub/user-redirect/git-pull?repo=https://github.com/opengeos/segment-geospatial&amp;urlpath=lab/tree/segment-geospatial/docs/examples/text_prompts.ipynb&amp;branch=main"><img alt="image" src="https://img.shields.io/badge/Open-Planetary%20Computer-black?style=flat&amp;logo=microsoft"/></a>
-<a href="https://colab.research.google.com/github/opengeos/segment-geospatial/blob/main/docs/examples/text_prompts.ipynb"><img alt="image" src="https://colab.research.google.com/assets/colab-badge.svg"/></a></p>
-<p>This notebook shows how to generate object masks from text prompts with the Segment Anything Model (SAM).</p>
-<p>Make sure you use GPU runtime for this notebook. For Google Colab, go to <code>Runtime</code> -&gt; <code>Change runtime type</code> and select <code>GPU</code> as the hardware accelerator.</p>
+<h1 id="interactive-moondream-gui-with-leafmap">Interactive Moondream GUI with Leafmap<a class="anchor-link" href="#interactive-moondream-gui-with-leafmap">¶</a></h1><p><a href="https://colab.research.google.com/github/opengeos/geoai/blob/main/docs/examples/moondream_gui.ipynb"><img alt="image" src="https://colab.research.google.com/assets/colab-badge.svg"/></a></p>
+<p>This notebook demonstrates how to use the interactive <a href="https://moondream.ai">Moondream</a> GUI for geospatial image analysis with leafmap.</p>
+<h2 id="features">Features<a class="anchor-link" href="#features">¶</a></h2><p>The Moondream GUI provides an interactive interface for:</p>
+<ul>
+<li><strong>Caption</strong>: Generate image descriptions (short, normal, or long)</li>
+<li><strong>Query</strong>: Ask questions about the image (visual Q&amp;A)</li>
+<li><strong>Detect</strong>: Detect objects and display bounding boxes on the map</li>
+<li><strong>Point</strong>: Locate objects and display point markers on the map</li>
+</ul>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="install-dependencies">Install dependencies<a class="anchor-link" href="#install-dependencies">¶</a></h2><p>Uncomment and run the following cell to install the required dependencies.</p>
+<h2 id="installation">Installation<a class="anchor-link" href="#installation">¶</a></h2><p>Uncomment and run the following cell to install the required packages.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3528,16 +3663,27 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># %pip install segment-geospatial groundingdino-py leafmap localtileserver</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># %pip install -U geoai-py</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-1"># %pip install segment-geospatial groundingdino-py leafmap localtileserver</div>
+<div class="clipboard-copy-txt" id="cell-1"># %pip install -U geoai-py</div>
 </div>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="import-libraries">Import Libraries<a class="anchor-link" href="#import-libraries">¶</a></h2>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3555,31 +3701,29 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">leafmap</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">samgeo</span><span class="w"> </span><span class="kn">import</span> <span class="n">tms_to_geotiff</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">samgeo.text_sam</span><span class="w"> </span><span class="kn">import</span> <span class="n">LangSAM</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">geoai</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">geoai</span><span class="w"> </span><span class="kn">import</span> <span class="n">MoondreamGeo</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-2">import leafmap
-from samgeo import tms_to_geotiff
-from samgeo.text_sam import LangSAM</div>
+<div class="clipboard-copy-txt" id="cell-2">import geoai
+from geoai import MoondreamGeo</div>
 </div>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="create-an-interactive-map">Create an interactive map<a class="anchor-link" href="#create-an-interactive-map">¶</a></h2>
+<h2 id="download-sample-data">Download Sample Data<a class="anchor-link" href="#download-sample-data">¶</a></h2><p>We'll use a sample parking lot image for this demonstration.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=6">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3597,31 +3741,31 @@ from samgeo.text_sam import LangSAM</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span> <span class="o">=</span> <span class="n">leafmap</span><span class="o">.</span><span class="n">Map</span><span class="p">(</span><span class="n">center</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">22.17615</span><span class="p">,</span> <span class="o">-</span><span class="mf">51.253043</span><span class="p">],</span> <span class="n">zoom</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="s2">"800px"</span><span class="p">)</span>
-<span class="n">m</span><span class="o">.</span><span class="n">add_basemap</span><span class="p">(</span><span class="s2">"SATELLITE"</span><span class="p">)</span>
-<span class="n">m</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">url</span> <span class="o">=</span> <span class="s2">"https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif"</span>
+<span class="n">image_path</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+<span class="n">image_path</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-3">m = leafmap.Map(center=[-22.17615, -51.253043], zoom=18, height="800px")
-m.add_basemap("SATELLITE")
-m</div>
+<div class="clipboard-copy-txt" id="cell-3">url = "https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif"
+image_path = geoai.download_file(url)
+image_path</div>
 </div>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="download-a-sample-image">Download a sample image<a class="anchor-link" href="#download-a-sample-image">¶</a></h2><p>Pan and zoom the map to select the area of interest. Use the draw tools to draw a polygon or rectangle on the map</p>
+<h2 id="initialize-moondream">Initialize Moondream<a class="anchor-link" href="#initialize-moondream">¶</a></h2><p>Create a MoondreamGeo instance and load the image.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3639,20 +3783,46 @@ m</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">bbox</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">user_roi_bounds</span><span class="p">()</span>
-<span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="n">bbox</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mf">51.2565</span><span class="p">,</span> <span class="o">-</span><span class="mf">22.1777</span><span class="p">,</span> <span class="o">-</span><span class="mf">51.2512</span><span class="p">,</span> <span class="o">-</span><span class="mf">22.175</span><span class="p">]</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">moondream</span> <span class="o">=</span> <span class="n">MoondreamGeo</span><span class="p">()</span>
+<span class="n">moondream</span><span class="o">.</span><span class="n">load_image</span><span class="p">(</span><span class="n">image_path</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-4">bbox = m.user_roi_bounds()
-if bbox is None:
-    bbox = [-51.2565, -22.1777, -51.2512, -22.175]</div>
+<div class="clipboard-copy-txt" id="cell-4">moondream = MoondreamGeo()
+moondream.load_image(image_path)</div>
 </div>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="launch-the-interactive-gui">Launch the Interactive GUI<a class="anchor-link" href="#launch-the-interactive-gui">¶</a></h2><p>The GUI provides the following controls:</p>
+<ul>
+<li><strong>Mode</strong>: Select between Caption, Query, Detect, or Point</li>
+<li><strong>Prompt</strong>: Enter text for Query, Detect, or Point modes</li>
+<li><strong>Length</strong>: Select caption length (short, normal, long) for Caption mode</li>
+<li><strong>Opacity</strong>: Adjust overlay opacity</li>
+<li><strong>Color</strong>: Choose color for detection boxes and point markers</li>
+<li><strong>Run</strong>: Execute the selected operation</li>
+<li><strong>Save</strong>: Save results to file</li>
+<li><strong>Reset</strong>: Clear all results and reset the interface</li>
+</ul>
+<h3 id="tips">Tips:<a class="anchor-link" href="#tips">¶</a></h3><ul>
+<li>For <strong>Detect</strong> mode, enter object types like "building", "trees"</li>
+<li>For <strong>Point</strong> mode, describe objects to locate like "green tree", "white building"</li>
+<li>For <strong>Query</strong> mode, ask questions like "How many buildings are in the image?"</li>
+<li>Detection results are displayed as bounding boxes on the map</li>
+<li>Point results are displayed as circle markers on the map</li>
+</ul>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=10">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3670,29 +3840,29 @@ if bbox is None:
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">image</span> <span class="o">=</span> <span class="s2">"Image.tif"</span>
-<span class="n">tms_to_geotiff</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="n">image</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">zoom</span><span class="o">=</span><span class="mi">19</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"Satellite"</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span> <span class="o">=</span> <span class="n">moondream</span><span class="o">.</span><span class="n">show_gui</span><span class="p">()</span>
+<span class="n">m</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-5">image = "Image.tif"
-tms_to_geotiff(output=image, bbox=bbox, zoom=19, source="Satellite", overwrite=True)</div>
+<div class="clipboard-copy-txt" id="cell-5">m = moondream.show_gui()
+m</div>
 </div>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=11">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>You can also use your own image. Uncomment and run the following cell to use your own image.</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/1788a644-3347-4587-96e7-e363bce95ec5"/></p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=12">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3710,492 +3880,13 @@ tms_to_geotiff(output=image, bbox=bbox, zoom=19, source="Satellite", overwrite=T
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># image = '/path/to/your/own/image.tif'</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">gdf</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">last_result_as_gdf</span>
+<span class="n">gdf</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-6"># image = '/path/to/your/own/image.tif'</div>
+<div class="clipboard-copy-txt" id="cell-6">gdf = m.last_result_as_gdf
+gdf</div>
 </div>
 </div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Display the downloaded image on the map.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-7">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">visible</span> <span class="o">=</span> <span class="kc">False</span>
-<span class="n">m</span><span class="o">.</span><span class="n">add_raster</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s2">"Image"</span><span class="p">)</span>
-<span class="n">m</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-7">m.layers[-1].visible = False
-m.add_raster(image, layer_name="Image")
-m</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="initialize-langsam-class">Initialize LangSAM class<a class="anchor-link" href="#initialize-langsam-class">¶</a></h2><p>The initialization of the LangSAM class might take a few minutes. The initialization downloads the model weights and sets up the model for inference.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-8">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span> <span class="o">=</span> <span class="n">LangSAM</span><span class="p">()</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-8">sam = LangSAM()</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="specify-text-prompts">Specify text prompts<a class="anchor-link" href="#specify-text-prompts">¶</a></h2>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-9">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">text_prompt</span> <span class="o">=</span> <span class="s2">"tree"</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-9">text_prompt = "tree"</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="segment-the-image">Segment the image<a class="anchor-link" href="#segment-the-image">¶</a></h2><p>Part of the model prediction includes setting appropriate thresholds for object detection and text association with the detected objects. These threshold values range from 0 to 1 and are set while calling the predict method of the LangSAM class.</p>
-<p><code>box_threshold</code>: This value is used for object detection in the image. A higher value makes the model more selective, identifying only the most confident object instances, leading to fewer overall detections. A lower value, conversely, makes the model more tolerant, leading to increased detections, including potentially less confident ones.</p>
-<p><code>text_threshold</code>: This value is used to associate the detected objects with the provided text prompt. A higher value requires a stronger association between the object and the text prompt, leading to more precise but potentially fewer associations. A lower value allows for looser associations, which could increase the number of associations but also introduce less precise matches.</p>
-<p>Remember to test different threshold values on your specific data. The optimal threshold can vary depending on the quality and nature of your images, as well as the specificity of your text prompts. Make sure to choose a balance that suits your requirements, whether that's precision or recall.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-10">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">text_prompt</span><span class="p">,</span> <span class="n">box_threshold</span><span class="o">=</span><span class="mf">0.24</span><span class="p">,</span> <span class="n">text_threshold</span><span class="o">=</span><span class="mf">0.24</span><span class="p">)</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-10">sam.predict(image, text_prompt, box_threshold=0.24, text_threshold=0.24)</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="visualize-the-results">Visualize the results<a class="anchor-link" href="#visualize-the-results">¶</a></h2><p>Show the result with bounding boxes on the map.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-11">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">show_anns</span><span class="p">(</span>
-    <span class="n">cmap</span><span class="o">=</span><span class="s2">"Greens"</span><span class="p">,</span>
-    <span class="n">box_color</span><span class="o">=</span><span class="s2">"red"</span><span class="p">,</span>
-    <span class="n">title</span><span class="o">=</span><span class="s2">"Automatic Segmentation of Trees"</span><span class="p">,</span>
-    <span class="n">blend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-11">sam.show_anns(
-    cmap="Greens",
-    box_color="red",
-    title="Automatic Segmentation of Trees",
-    blend=True,
-)</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><img alt="" src="https://i.imgur.com/ytKMTlA.png"/></p>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Show the result without bounding boxes on the map.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-12">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">show_anns</span><span class="p">(</span>
-    <span class="n">cmap</span><span class="o">=</span><span class="s2">"Greens"</span><span class="p">,</span>
-    <span class="n">add_boxes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
-    <span class="n">title</span><span class="o">=</span><span class="s2">"Automatic Segmentation of Trees"</span><span class="p">,</span>
-<span class="p">)</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-12">sam.show_anns(
-    cmap="Greens",
-    add_boxes=False,
-    alpha=0.5,
-    title="Automatic Segmentation of Trees",
-)</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><img alt="" src="https://i.imgur.com/3Iq2kt1.png"/></p>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Show the result as a grayscale image.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-13">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">show_anns</span><span class="p">(</span>
-    <span class="n">cmap</span><span class="o">=</span><span class="s2">"Greys_r"</span><span class="p">,</span>
-    <span class="n">add_boxes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-    <span class="n">title</span><span class="o">=</span><span class="s2">"Automatic Segmentation of Trees"</span><span class="p">,</span>
-    <span class="n">blend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">output</span><span class="o">=</span><span class="s2">"trees.tif"</span><span class="p">,</span>
-<span class="p">)</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-13">sam.show_anns(
-    cmap="Greys_r",
-    add_boxes=False,
-    alpha=1,
-    title="Automatic Segmentation of Trees",
-    blend=False,
-    output="trees.tif",
-)</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><img alt="" src="https://i.imgur.com/KtHwFbF.png"/></p>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Convert the result to a vector format.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-14">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">raster_to_vector</span><span class="p">(</span><span class="s2">"trees.tif"</span><span class="p">,</span> <span class="s2">"trees.shp"</span><span class="p">)</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-14">sam.raster_to_vector("trees.tif", "trees.shp")</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Show the results on the interactive map.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-15">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span><span class="o">.</span><span class="n">add_raster</span><span class="p">(</span><span class="s2">"trees.tif"</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s2">"Trees"</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="s2">"Greens"</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">style</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"color"</span><span class="p">:</span> <span class="s2">"#3388ff"</span><span class="p">,</span>
-    <span class="s2">"weight"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-    <span class="s2">"fillColor"</span><span class="p">:</span> <span class="s2">"#7c4185"</span><span class="p">,</span>
-    <span class="s2">"fillOpacity"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
-<span class="p">}</span>
-<span class="n">m</span><span class="o">.</span><span class="n">add_vector</span><span class="p">(</span><span class="s2">"trees.shp"</span><span class="p">,</span> <span class="n">layer_name</span><span class="o">=</span><span class="s2">"Vector"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">style</span><span class="p">)</span>
-<span class="n">m</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-15">m.add_raster("trees.tif", layer_name="Trees", palette="Greens", opacity=0.5, nodata=0)
-style = {
-    "color": "#3388ff",
-    "weight": 2,
-    "fillColor": "#7c4185",
-    "fillOpacity": 0.5,
-}
-m.add_vector("trees.shp", layer_name="Vector", style=style)
-m</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="interactive-segmentation">Interactive segmentation<a class="anchor-link" href="#interactive-segmentation">¶</a></h2>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-16">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">sam</span><span class="o">.</span><span class="n">show_map</span><span class="p">()</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-16">sam.show_map()</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><img alt="" src="https://i.imgur.com/wydt5Xt.gif"/></p>
 </div>
 </div>
 </div>
@@ -4229,7 +3920,7 @@ m</div>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 27, 2024 16:50:48 UTC"><span class="timeago" datetime="2024-07-27T16:50:48+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 27, 2024 16:50:48 UTC">2024-07-27</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 10, 2025 19:26:53 UTC"><span class="timeago" datetime="2025-12-10T19:26:53+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 10, 2025 19:26:53 UTC">2025-12-10</span>
   </span>
 
     
@@ -4239,7 +3930,7 @@ m</div>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 11, 2023 23:10:59 UTC"><span class="timeago" datetime="2023-10-11T23:10:59+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 11, 2023 23:10:59 UTC">2023-10-11</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 10, 2025 19:26:53 UTC"><span class="timeago" datetime="2025-12-10T19:26:53+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 10, 2025 19:26:53 UTC">2025-12-10</span>
   </span>
 
     
@@ -4299,14 +3990,14 @@ m</div>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "search.highlight", "search.share"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "search.highlight", "search.share"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
       
-        <script src="../../../js/timeago.min.js"></script>
+        <script src="../../js/timeago.min.js"></script>
       
-        <script src="../../../js/timeago_mkdocs_material.js"></script>
+        <script src="../../js/timeago_mkdocs_material.js"></script>
       
     
   </body>
