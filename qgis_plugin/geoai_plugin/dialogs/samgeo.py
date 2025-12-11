@@ -808,7 +808,9 @@ class SamGeoDockWidget(QDockWidget):
                 self.current_image_path = None
                 self.image_status.setText("Image: Failed to set (invalid layer)")
                 self.image_status.setStyleSheet("color: red;")
-                self.show_error("Failed to add image layer: The raster layer is invalid.")
+                self.show_error(
+                    "Failed to add image layer: The raster layer is invalid."
+                )
 
         except Exception as e:
             self.image_status.setText("Image: Failed to set")
