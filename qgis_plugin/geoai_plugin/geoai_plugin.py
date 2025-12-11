@@ -30,6 +30,7 @@ class GeoAIPlugin:
         # Dock widgets (lazy loaded)
         self._moondream_dock = None
         self._segmentation_dock = None
+        self._samgeo_dock = None
 
     def add_action(
         self,
@@ -101,6 +102,10 @@ class GeoAIPlugin:
         if not os.path.exists(segment_icon):
             segment_icon = ":/images/themes/default/mActionAddRasterLayer.svg"
 
+        samgeo_icon = os.path.join(icon_base, "samgeo.png")
+        if not os.path.exists(samgeo_icon):
+            samgeo_icon = ":/images/themes/default/mIconPolygonLayer.svg"
+
         about_icon = os.path.join(icon_base, "about.svg")
         if not os.path.exists(about_icon):
             about_icon = ":/images/themes/default/mActionHelpContents.svg"
@@ -121,6 +126,16 @@ class GeoAIPlugin:
             "Segmentation",
             self.toggle_segmentation_dock,
             status_tip="Toggle Segmentation Training & Inference panel",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add SamGeo action (checkable for dock toggle)
+        self.samgeo_action = self.add_action(
+            samgeo_icon,
+            "SamGeo",
+            self.toggle_samgeo_dock,
+            status_tip="Toggle SamGeo Segmentation panel (supports SAM1, SAM2, and SAM3 models)",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
@@ -167,6 +182,11 @@ class GeoAIPlugin:
             self.iface.removeDockWidget(self._segmentation_dock)
             self._segmentation_dock.deleteLater()
             self._segmentation_dock = None
+
+        if self._samgeo_dock:
+            self.iface.removeDockWidget(self._samgeo_dock)
+            self._samgeo_dock.deleteLater()
+            self._samgeo_dock = None
 
         # Remove actions from menu
         for action in self.actions:
@@ -258,6 +278,44 @@ class GeoAIPlugin:
         """Handle Segmentation dock visibility change."""
         self.segmentation_action.setChecked(visible)
 
+    def toggle_samgeo_dock(self):
+        """Toggle the SamGeo dock widget visibility."""
+        if self._samgeo_dock is None:
+            try:
+                from .dialogs.samgeo import SamGeoDockWidget
+
+                self._samgeo_dock = SamGeoDockWidget(
+                    self.iface, self.iface.mainWindow()
+                )
+                self._samgeo_dock.setObjectName("GeoAISamGeoDock")
+                self._samgeo_dock.visibilityChanged.connect(
+                    self._on_samgeo_visibility_changed
+                )
+                self.iface.addDockWidget(Qt.RightDockWidgetArea, self._samgeo_dock)
+                self._samgeo_dock.show()
+                self._samgeo_dock.raise_()
+                return
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self.iface.mainWindow(),
+                    "Error",
+                    f"Failed to create SamGeo panel:\n{str(e)}",
+                )
+                self.samgeo_action.setChecked(False)
+                return
+
+        # Toggle visibility
+        if self._samgeo_dock.isVisible():
+            self._samgeo_dock.hide()
+        else:
+            self._samgeo_dock.show()
+            self._samgeo_dock.raise_()
+
+    def _on_samgeo_visibility_changed(self, visible):
+        """Handle SamGeo dock visibility change."""
+        self.samgeo_action.setChecked(visible)
+
     def clear_gpu_memory(self):
         """Clear GPU memory and release CUDA resources."""
         import gc
@@ -325,6 +383,56 @@ class GeoAIPlugin:
             except Exception:
                 pass
 
+        # Clear SamGeo model if loaded
+        if self._samgeo_dock is not None:
+            try:
+                if hasattr(self._samgeo_dock, "sam"):
+                    sam_obj = self._samgeo_dock.sam
+                    if sam_obj is not None:
+                        # Clear the model
+                        if hasattr(sam_obj, "model") and sam_obj.model is not None:
+                            try:
+                                sam_obj.model.cpu()
+                            except Exception:
+                                pass
+                            try:
+                                for param in sam_obj.model.parameters():
+                                    param.data = None
+                                    if param.grad is not None:
+                                        param.grad = None
+                            except Exception:
+                                pass
+                            del sam_obj.model
+                            sam_obj.model = None
+
+                        # Clear any other attributes
+                        for attr in list(vars(sam_obj).keys()):
+                            try:
+                                setattr(sam_obj, attr, None)
+                            except Exception:
+                                # Ignore errors when clearing attributes; some may be read-only or protected.
+                                pass
+
+                        # Delete the sam object
+                        self._samgeo_dock.sam = None
+                        del sam_obj
+                        cleared_items.append("SamGeo model")
+
+                        # Update UI status
+                        if hasattr(self._samgeo_dock, "model_status"):
+                            self._samgeo_dock.model_status.setText("Model: Not loaded")
+                            self._samgeo_dock.model_status.setStyleSheet("color: gray;")
+                        if hasattr(self._samgeo_dock, "image_status"):
+                            self._samgeo_dock.image_status.setText("Image: Not set")
+                            self._samgeo_dock.image_status.setStyleSheet("color: gray;")
+                        # Also clear internal state for image and layer
+                        if hasattr(self._samgeo_dock, "current_image_path"):
+                            self._samgeo_dock.current_image_path = None
+                        if hasattr(self._samgeo_dock, "current_layer"):
+                            self._samgeo_dock.current_layer = None
+            except Exception:
+                pass
+
         # Run garbage collection multiple times
         for _ in range(5):
             gc.collect()
@@ -383,6 +491,7 @@ class GeoAIPlugin:
 <ul>
 <li><b>Moondream Vision-Language Model:</b> AI-powered image captioning, querying, object detection, and point localization</li>
 <li><b>Semantic Segmentation:</b> Train and run inference with deep learning models (U-Net, DeepLabV3+, FPN, etc.)</li>
+<li><b>SamGeo:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
 </ul>
 
 <h3>Links:</h3>

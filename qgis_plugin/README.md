@@ -17,12 +17,23 @@ The plugin provides **dockable panels** that can be attached to the left or righ
 - **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
 - **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results
 
+### SamGeo Panel (Segment Anything Model)
+- **Model Tab**: Load SAM models (SAM1, SAM2, or SAM3) with configurable backend and device settings
+- **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road")
+- **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
+- **Batch Tab**: Process multiple points interactively or from vector files/layers
+- **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)
+
+### GPU Memory Management
+- **Clear GPU Memory**: Release GPU memory and clear CUDA cache for all loaded models
+
 ## Requirements
 
 - QGIS 3.28 or later
 - Python 3.10+
 - PyTorch (with CUDA support for GPU acceleration)
 - geoai-py package
+- samgeo package (for SamGeo panel)
 
 ## Installation
 
@@ -70,18 +81,32 @@ python install.py --remove
 Before using the plugin, install the required Python packages in your QGIS Python environment:
 
 ```bash
-# Activate your QGIS Python environment (e.g., conda environment)
+conda create -n geo python=3.12
 conda activate geo
+conda install -c conda-forge qgis segment-geospatial geoai
+```
 
-# Install geoai and dependencies
-pip install geoai-py torch torchvision
+Some SamGeo dependencies are only available on PyPI. Run the following command to install all dependencies:
+
+```bash
+pip install -U "segment-geospatial[samgeo3]"
+```
+
+It is a bit tricky to install SAM 3 on Windows. Run the following commands on Windows to install SamGeo:
+
+```bash
+conda create -n geo python=3.12
+conda activate geo
+conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia
+conda install -c conda-forge qgis segment-geospatial geoai
+pip install "segment-geospatial[samgeo3]" triton-windows
 ```
 
 ## Usage
 
 ### Moondream Vision-Language Model
 
-1. Click `GeoAI` → `Moondream VLM`
+1. Click the **Moondream** button in the GeoAI toolbar (or `GeoAI` menu → `Moondream VLM`)
 2. Load a Moondream model (default: vikhyatk/moondream2)
 3. Select a raster layer or browse for an image file
 4. Choose a mode:
@@ -94,12 +119,39 @@ pip install geoai-py torch torchvision
 
 ### Segmentation Panel (Create Data, Train, Inference)
 
-1. Click `GeoAI` → `Segmentation` to open the Segmentation panel.
+1. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
 2. Use the tabs at the top of the panel to switch between:
    - **Create Training Data**: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.
    - **Train Model**: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.
    - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.
-## Supported Model Architectures
+
+### SamGeo Panel (Segment Anything Model)
+
+1. Click the **SamGeo** button in the GeoAI toolbar (or `GeoAI` menu → `SamGeo`)
+2. In the **Model** tab:
+   - Select the SAM model version (SamGeo3/SAM3, SamGeo2/SAM2, or SamGeo/SAM1)
+   - Configure backend (meta or transformers) and device (auto, cuda, cpu)
+   - Click "Load Model" to initialize the model
+   - Select a raster layer or browse for an image file and click "Set Image"
+3. Choose a segmentation method:
+   - **Text Tab**: Enter text prompts describing objects to segment (e.g., "tree, building")
+   - **Interactive Tab**:
+     - Click "Add Foreground Points" or "Add Background Points" and click on the map
+     - Or click "Draw Box" and drag a rectangle on the map
+     - Click "Segment by Points" or "Segment by Box"
+   - **Batch Tab**: Add multiple points interactively or load from a vector file/layer
+4. In the **Output** tab:
+   - Select output format (Raster GeoTIFF, Vector GeoPackage, or Vector Shapefile)
+   - For vector output, optionally enable regularization:
+     - Check "Regularize polygons (orthogonalize)"
+     - Set Epsilon (simplification tolerance) and Min Area (filter small polygons)
+   - Click "Save Masks" to export results
+
+### Clear GPU Memory
+
+Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache.
+
+## Supported Model Architectures (Segmentation)
 
 - U-Net
 - U-Net++
@@ -111,12 +163,18 @@ pip install geoai-py torch torchvision
 - MANet
 - SegFormer
 
-## Supported Encoders
+## Supported Encoders (Segmentation)
 
 - ResNet (34, 50, 101, 152)
 - EfficientNet (b0-b4)
 - MobileNetV2
 - VGG (16, 19)
+
+## Supported SAM Models (SamGeo)
+
+- **SamGeo3 (SAM3)**: Latest version with text prompts, point prompts, and box prompts
+- **SamGeo2 (SAM2)**: Improved version with better performance
+- **SamGeo (SAM1)**: Original Segment Anything Model
 
 ## License
 
@@ -125,5 +183,6 @@ MIT License - see [LICENSE](../LICENSE) for details.
 ## Links
 
 - [GeoAI Documentation](https://opengeoai.org)
+- [SamGeo Documentation](https://samgeo.gishub.org)
 - [GitHub Repository](https://github.com/opengeos/geoai)
 - [Report Issues](https://github.com/opengeos/geoai/issues)
