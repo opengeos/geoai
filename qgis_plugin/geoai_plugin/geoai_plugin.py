@@ -271,6 +271,7 @@ class GeoAIPlugin:
 
             torch = _torch
         except ImportError:
+            # PyTorch is optional; continue without GPU memory clearing if not installed.
             pass
 
         # Clear Moondream model if loaded
