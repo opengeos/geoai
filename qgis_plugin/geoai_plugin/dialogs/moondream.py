@@ -192,7 +192,7 @@ class MoondreamDockWidget(QDockWidget):
         layer_layout.addWidget(QLabel("Layer:"))
         self.layer_combo = QgsMapLayerComboBox()
         self.layer_combo.setFilters(QgsMapLayerProxyModel.RasterLayer)
-        self.layer_combo.setFixedHeight(input_height)
+        self.layer_combo.setFixedHeight(self.input_height)
         layer_layout.addWidget(self.layer_combo)
         image_layout.addLayout(layer_layout)
 
@@ -203,7 +203,7 @@ class MoondreamDockWidget(QDockWidget):
         self.image_path_edit.setStyleSheet(line_style)
         file_layout.addWidget(self.image_path_edit)
         self.browse_btn = QPushButton("...")
-        self.browse_btn.setFixedSize(30, input_height)
+        self.browse_btn.setFixedSize(30, self.input_height)
         file_layout.addWidget(self.browse_btn)
         image_layout.addLayout(file_layout)
 
