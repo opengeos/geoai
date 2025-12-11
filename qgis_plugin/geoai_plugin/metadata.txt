@@ -1,0 +1,42 @@
+[general]
+name=GeoAI
+qgisMinimumVersion=3.28
+description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model for image captioning, querying, object detection, and semantic segmentation model training and inference.
+version=0.1.0
+author=Qiusheng Wu
+email=giswqs@gmail.com
+
+about=This plugin provides AI-powered geospatial analysis tools:
+
+    <b>Moondream Vision-Language Model:</b>
+    - Caption: Generate descriptions of geospatial imagery
+    - Query: Ask questions about images using natural language
+    - Detect: Detect and locate objects with bounding boxes
+    - Point: Locate specific objects with point markers
+
+    <b>Semantic Segmentation:</b>
+    - Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
+    - Run inference on raster imagery
+    - Export results as vector or raster data
+
+    Requires the geoai-py Python package and PyTorch with CUDA support for optimal performance.
+
+tracker=https://github.com/opengeos/geoai/issues
+repository=https://github.com/opengeos/geoai
+
+hasProcessingProvider=no
+
+tags=ai, deep learning, segmentation, object detection, moondream, vision language model, machine learning, remote sensing, geospatial
+
+homepage=https://opengeoai.org
+category=Analysis
+icon=icons/icon.png
+
+experimental=True
+deprecated=False
+
+changelog=
+    0.1.0 - Initial release
+        - Moondream integration for image captioning, querying, detection, and pointing
+        - Semantic segmentation model training
+        - Semantic segmentation inference
