@@ -410,6 +410,7 @@ class GeoAIPlugin:
                             try:
                                 setattr(sam_obj, attr, None)
                             except Exception:
+                                # Ignore errors when clearing attributes; some may be read-only or protected.
                                 pass
 
                         # Delete the sam object
