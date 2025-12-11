@@ -141,11 +141,11 @@ class MoondreamDockWidget(QDockWidget):
         layout.setSpacing(5)
 
         # Consistent height for all input elements (24px)
-        input_height = 24
-        combo_style = f"QComboBox {{ min-height: {input_height}px; max-height: {input_height}px; }}"
-        line_style = f"QLineEdit {{ min-height: {input_height}px; max-height: {input_height}px; }}"
-        btn_style = f"QPushButton {{ min-height: {input_height}px; max-height: {input_height}px; }}"
-        spin_style = f"QSpinBox, QDoubleSpinBox {{ min-height: {input_height}px; max-height: {input_height}px; }}"
+        self.input_height = 24
+        combo_style = f"QComboBox {{ min-height: {self.input_height}px; max-height: {self.input_height}px; }}"
+        line_style = f"QLineEdit {{ min-height: {self.input_height}px; max-height: {self.input_height}px; }}"
+        btn_style = f"QPushButton {{ min-height: {self.input_height}px; max-height: {self.input_height}px; }}"
+        spin_style = f"QSpinBox, QDoubleSpinBox {{ min-height: {self.input_height}px; max-height: {self.input_height}px; }}"
 
         # Model Settings Group
         model_group = QGroupBox("Model Settings")
