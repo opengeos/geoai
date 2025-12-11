@@ -125,6 +125,23 @@ class GeoAIPlugin:
             parent=self.iface.mainWindow(),
         )
 
+        # Add separator to toolbar
+        self.toolbar.addSeparator()
+
+        # GPU cleanup icon - use QGIS default refresh/clear icon
+        gpu_icon = os.path.join(icon_base, "gpu.svg")
+        if not os.path.exists(gpu_icon):
+            gpu_icon = ":/images/themes/default/mActionRefresh.svg"
+
+        # Add Clear GPU action
+        self.add_action(
+            gpu_icon,
+            "Clear GPU Memory",
+            self.clear_gpu_memory,
+            status_tip="Release GPU memory and clear CUDA cache",
+            parent=self.iface.mainWindow(),
+        )
+
         # Add separator
         self.menu.addSeparator()
 
@@ -240,6 +257,119 @@ class GeoAIPlugin:
     def _on_segmentation_visibility_changed(self, visible):
         """Handle Segmentation dock visibility change."""
         self.segmentation_action.setChecked(visible)
+
+    def clear_gpu_memory(self):
+        """Clear GPU memory and release CUDA resources."""
+        import gc
+
+        cleared_items = []
+
+        # Import torch early to use for cleanup
+        torch = None
+        try:
+            import torch as _torch
+
+            torch = _torch
+        except ImportError:
+            pass
+
+        # Clear Moondream model if loaded
+        if self._moondream_dock is not None:
+            try:
+                if hasattr(self._moondream_dock, "moondream"):
+                    moondream_obj = self._moondream_dock.moondream
+                    if moondream_obj is not None:
+                        # Move model to CPU first to free GPU memory
+                        if (
+                            hasattr(moondream_obj, "model")
+                            and moondream_obj.model is not None
+                        ):
+                            try:
+                                moondream_obj.model.cpu()
+                            except Exception:
+                                pass
+                            # Clear all parameters
+                            try:
+                                for param in moondream_obj.model.parameters():
+                                    param.data = None
+                                    if param.grad is not None:
+                                        param.grad = None
+                            except Exception:
+                                pass
+                            del moondream_obj.model
+                            moondream_obj.model = None
+
+                        # Clear any other attributes
+                        for attr in list(vars(moondream_obj).keys()):
+                            try:
+                                setattr(moondream_obj, attr, None)
+                            except Exception:
+                                pass
+
+                        # Delete the moondream object
+                        self._moondream_dock.moondream = None
+                        del moondream_obj
+                        cleared_items.append("Moondream model")
+
+                        # Update UI status
+                        if hasattr(self._moondream_dock, "model_status"):
+                            self._moondream_dock.model_status.setText(
+                                "Model not loaded"
+                            )
+                            self._moondream_dock.model_status.setStyleSheet(
+                                "color: gray;"
+                            )
+                        if hasattr(self._moondream_dock, "run_btn"):
+                            self._moondream_dock.run_btn.setEnabled(False)
+            except Exception:
+                pass
+
+        # Run garbage collection multiple times
+        for _ in range(5):
+            gc.collect()
+
+        # Clear PyTorch CUDA cache
+        if torch is not None and torch.cuda.is_available():
+            try:
+                # Synchronize first
+                torch.cuda.synchronize()
+                # Empty cache
+                torch.cuda.empty_cache()
+                # IPC collect if available
+                if hasattr(torch.cuda, "ipc_collect"):
+                    torch.cuda.ipc_collect()
+                # Run gc and empty cache again
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
+                cleared_items.append("CUDA cache")
+
+                # Get memory info for display
+                allocated = torch.cuda.memory_allocated() / 1024**2
+                reserved = torch.cuda.memory_reserved() / 1024**2
+                memory_info = f"\n\nGPU Memory:\n  Allocated: {allocated:.1f} MB\n  Reserved: {reserved:.1f} MB"
+
+                if allocated > 100:  # More than 100MB still allocated
+                    memory_info += "\n\nNote: Some GPU memory may still be held by PyTorch's memory allocator. Restart QGIS to fully release all GPU memory."
+            except Exception as e:
+                memory_info = f"\n\nError clearing CUDA: {str(e)}"
+        elif torch is None:
+            memory_info = "\n\nPyTorch not installed."
+        else:
+            memory_info = "\n\nNo CUDA GPU available."
+
+        if cleared_items:
+            message = f"Cleared: {', '.join(cleared_items)}{memory_info}"
+        else:
+            message = f"No models loaded to clear.{memory_info}"
+
+        self.iface.statusBarIface().showMessage("GPU memory cleared", 3000)
+        QMessageBox.information(
+            self.iface.mainWindow(),
+            "Clear GPU Memory",
+            message,
+        )
 
     def show_about(self):
         """Display the about dialog."""
