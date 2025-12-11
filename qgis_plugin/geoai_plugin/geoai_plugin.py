@@ -135,7 +135,7 @@ class GeoAIPlugin:
             samgeo_icon,
             "SamGeo",
             self.toggle_samgeo_dock,
-            status_tip="Toggle SamGeo Segmentation panel (SAM, SAM2, SAM3)",
+            status_tip="Toggle SamGeo Segmentation panel (supports SAM1, SAM2, and SAM3 models)",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
