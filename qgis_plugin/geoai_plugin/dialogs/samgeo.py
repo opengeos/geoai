@@ -792,19 +792,23 @@ class SamGeoDockWidget(QDockWidget):
             QCoreApplication.processEvents()
 
             self.sam.set_image(file_path)
-            self.current_image_path = file_path
-            self.current_layer = None
-
-            self.image_status.setText(f"Image: {os.path.basename(file_path)}")
-            self.image_status.setStyleSheet("color: green;")
-            self.log_message(f"Image set from file: {file_path}")
 
             # Optionally add the layer to the map
             layer = QgsRasterLayer(file_path, os.path.basename(file_path))
             if layer.isValid():
                 QgsProject.instance().addMapLayer(layer)
                 self.current_layer = layer
+                self.current_image_path = file_path
+                self.image_status.setText(f"Image: {os.path.basename(file_path)}")
+                self.image_status.setStyleSheet("color: green;")
+                self.log_message(f"Image set from file: {file_path}")
                 self.refresh_layers()
+            else:
+                self.current_layer = None
+                self.current_image_path = None
+                self.image_status.setText("Image: Failed to set (invalid layer)")
+                self.image_status.setStyleSheet("color: red;")
+                self.show_error("Failed to add image layer: The raster layer is invalid.")
 
         except Exception as e:
             self.image_status.setText("Image: Failed to set")
