@@ -917,7 +917,7 @@ class SamGeoDockWidget(QDockWidget):
             # Update list widget
             label_text = "FG" if foreground else "BG"
             item = QListWidgetItem(f"{label_text}: ({px:.1f}, {py:.1f})")
-            item.setForeground(Qt.green if foreground else Qt.red)
+            item.setForeground(QColor("green") if foreground else QColor("red"))
             self.points_list.addItem(item)
 
     def clear_points(self):
