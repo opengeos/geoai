@@ -424,6 +424,11 @@ class GeoAIPlugin:
                         if hasattr(self._samgeo_dock, "image_status"):
                             self._samgeo_dock.image_status.setText("Image: Not set")
                             self._samgeo_dock.image_status.setStyleSheet("color: gray;")
+                        # Also clear internal state for image and layer
+                        if hasattr(self._samgeo_dock, "current_image_path"):
+                            self._samgeo_dock.current_image_path = None
+                        if hasattr(self._samgeo_dock, "current_layer"):
+                            self._samgeo_dock.current_layer = None
             except Exception:
                 pass
 
