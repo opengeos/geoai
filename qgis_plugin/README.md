@@ -135,7 +135,7 @@ pip install "segment-geospatial[samgeo3]" triton-windows
    - Select a raster layer or browse for an image file and click "Set Image"
 3. Choose a segmentation method:
    - **Text Tab**: Enter text prompts describing objects to segment (e.g., "tree, building")
-   - **Interactive Tab**: 
+   - **Interactive Tab**:
      - Click "Add Foreground Points" or "Add Background Points" and click on the map
      - Or click "Draw Box" and drag a rectangle on the map
      - Click "Segment by Points" or "Segment by Box"
@@ -143,7 +143,7 @@ pip install "segment-geospatial[samgeo3]" triton-windows
 4. In the **Output** tab:
    - Select output format (Raster GeoTIFF, Vector GeoPackage, or Vector Shapefile)
    - For vector output, optionally enable regularization:
-     - Check "Regularize polygons (orthogonalize)" 
+     - Check "Regularize polygons (orthogonalize)"
      - Set Epsilon (simplification tolerance) and Min Area (filter small polygons)
    - Click "Save Masks" to export results
 
