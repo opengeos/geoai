@@ -956,7 +956,7 @@ class SamGeoDockWidget(QDockWidget):
             item = QListWidgetItem(
                 f"Point {len(self.batch_point_coords)}: ({px:.1f}, {py:.1f})"
             )
-            item.setForeground(Qt.green)
+            item.setForeground(QColor("green"))
             self.batch_points_list.addItem(item)
 
             # Update count label
