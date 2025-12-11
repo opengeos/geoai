@@ -11,7 +11,7 @@ from qgis.gui import QgsMapTool, QgsRubberBand, QgsVertexMarker
 class PointPromptTool(QgsMapTool):
     """Map tool for adding point prompts."""
 
-    point_added = pyqtSignal(object, bool)  # point, is_foreground
+    # Removed unused point_added signal
 
     def __init__(self, canvas, plugin, batch_mode=False):
         """Initialize the point prompt tool.
