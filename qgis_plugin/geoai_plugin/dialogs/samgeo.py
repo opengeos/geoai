@@ -1374,6 +1374,8 @@ class SamGeoDockWidget(QDockWidget):
                                 driver = "GeoJSON"
                             elif output_path.endswith(".gpkg"):
                                 driver = "GPKG"
+                            elif output_path.endswith(".shp"):
+                                driver = "ESRI Shapefile"
                             else:
                                 driver = None
                             gdf.to_file(output_path, driver=driver)
