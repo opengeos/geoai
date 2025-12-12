@@ -161,7 +161,7 @@ nav:
           - examples/cloud_detection.ipynb
           - examples/moondream.ipynb
           - examples/moondream_gui.ipynb
-          - examples/AutoML.ipynb
+          - examples/AutoModel.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
