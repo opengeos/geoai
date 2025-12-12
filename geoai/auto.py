@@ -1932,7 +1932,7 @@ def show_depth(
         Matplotlib figure object.
 
     Example:
-        >>> result = geoai.depth_estimation("aerial.tif", output_path="depth.tif")
+        >>> result = geoai.auto.depth_estimation("aerial.tif", output_path="depth.tif")
         >>> fig = show_depth("aerial.tif", result["depth"])
     """
     import matplotlib.pyplot as plt
