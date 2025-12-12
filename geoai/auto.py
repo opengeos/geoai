@@ -757,7 +757,13 @@ class AutoGeoModel:
             metadata = None
 
         # Check if we need tiled processing (not for classification tasks)
-        _, height, width = data.shape if data.ndim == 3 else (1, *data.shape)
+        if data.ndim == 3:
+            _, height, width = data.shape
+        elif data.ndim == 2:
+            height, width = data.shape
+            _ = 1
+        else:
+            raise ValueError(f"Unexpected data shape: {data.shape}")
 
         # Classification tasks should not use tiled processing
         use_tiled = (
