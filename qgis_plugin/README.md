@@ -125,6 +125,8 @@ python install.py --remove
 
 Sample dataset: [parking_lot.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif)
 
+Steps:
+
 1. Click the **Moondream** button in the GeoAI toolbar (or `GeoAI` menu → `Moondream VLM`)
 2. Load a Moondream model (default: vikhyatk/moondream2)
 3. Select a raster layer or browse for an image file
@@ -146,6 +148,8 @@ Sample datasets:
 -   [naip_test_buildings.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.tif)
 -   [naip_test_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.geojson)
 
+Steps:
+
 1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to the conda environment.
 2. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
 3. Use the tabs at the top of the panel to switch between:
@@ -163,6 +167,8 @@ Sample datasets:
 ### SamGeo Panel (Segment Anything Model)
 
 Sample dataset: [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
+
+Steps:
 
 1. Click the **SamGeo** button in the GeoAI toolbar (or `GeoAI` menu → `SamGeo`)
 2. In the **Model** tab:

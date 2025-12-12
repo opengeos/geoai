@@ -125,6 +125,8 @@ python install.py --remove
 
 Sample dataset: [parking_lot.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif)
 
+Steps:
+
 1. Click the **Moondream** button in the GeoAI toolbar (or `GeoAI` menu → `Moondream VLM`)
 2. Load a Moondream model (default: vikhyatk/moondream2)
 3. Select a raster layer or browse for an image file
@@ -165,6 +167,8 @@ Steps:
 ### SamGeo Panel (Segment Anything Model)
 
 Sample dataset: [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
+
+Steps:
 
 1. Click the **SamGeo** button in the GeoAI toolbar (or `GeoAI` menu → `SamGeo`)
 2. In the **Model** tab:
