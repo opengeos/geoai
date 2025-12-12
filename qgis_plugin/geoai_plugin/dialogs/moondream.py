@@ -359,7 +359,10 @@ class MoondreamDockWidget(QDockWidget):
             QApplication.processEvents()
 
             # Lazy import
-            from geoai import MoondreamGeo
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
+            MoondreamGeo = geoai.MoondreamGeo
 
             model_name = self.model_combo.currentText()
             device = self.device_combo.currentText()
