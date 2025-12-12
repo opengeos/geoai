@@ -40,7 +40,7 @@ The package's design philosophy emphasizes simplicity without sacrificing functi
 
 If you find GeoAI useful in your research, please consider citing the following paper to support my work. Thank you for your support.
 
--   Wu, Q. (2025). GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization. _Journal of Open Source Software_, 9025. [https://doi.org/10.21105/joss.09025](https://github.com/openjournals/joss-papers/blob/joss.09025/joss.09025/10.21105.joss.09025.pdf) (Under Review)
+-   Wu, Q. (2025). GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization. _Journal of Open Source Software_, 9025. [https://doi.org/10.21105/joss.09025](https://github.com/openjournals/joss-papers/blob/joss.09605/joss.09605/10.21105.joss.09605.pdf) (Under Review)
 
 ## 🚀 Key Features
 
@@ -98,6 +98,12 @@ conda install -c conda-forge geoai
 ```bash
 mamba install -c conda-forge geoai
 ```
+
+## ⚙️ QGIS Plugin
+
+Check out the [QGIS Plugin](https://opengeoai.org/qgis_plugin/) page if you are interested in using GeoAI with QGIS.
+
+[![demo](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)
 
 ## 📋 Documentation
 
