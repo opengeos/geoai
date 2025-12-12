@@ -254,6 +254,7 @@ class AutoGeoImageProcessor:
                     ):
                         return self.load_geotiff(source, window, bands)
             except (rasterio.RasterioIOError, rasterio.errors.RasterioIOError):
+                # If opening as GeoTIFF fails, fall back to loading as a regular image.
                 pass
 
             # Load as regular image
