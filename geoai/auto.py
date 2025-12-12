@@ -1863,7 +1863,7 @@ def show_segmentation(
         Matplotlib figure object.
 
     Example:
-        >>> result = geoai.semantic_segmentation("aerial.tif", output_path="seg.tif")
+        >>> result = geoai.auto.semantic_segmentation("aerial.tif", output_path="seg.tif")
         >>> fig = show_segmentation("aerial.tif", result["mask"])
     """
     import matplotlib.pyplot as plt
