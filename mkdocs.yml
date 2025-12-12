@@ -161,6 +161,7 @@ nav:
           - examples/cloud_detection.ipynb
           - examples/moondream.ipynb
           - examples/moondream_gui.ipynb
+          - examples/AutoModel.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -168,6 +169,7 @@ nav:
           - workshops/CANVAS_2025.ipynb
           - workshops/AGU_2025.ipynb
     - API Reference:
+          - auto module: auto.md
           - change_detection module: change_detection.md
           - classify module: classify.md
           - detectron2 module: detectron2.md
