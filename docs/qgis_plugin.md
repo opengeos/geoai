@@ -1,12 +1,18 @@
 # QGIS Plugin for GeoAI
 
-A QGIS plugin providing AI-powered geospatial analysis tools from the [geoai](https://github.com/opengeos/geoai) package.
+A QGIS plugin providing AI-powered geospatial analysis tools from the [geoai](https://github.com/opengeos/geoai) package. The plugin bundles several model-driven workflows (Moondream VLM, segmentation training/inference, SamGeo) into dockable panels so you can keep QGIS as the main workspace while experimenting with GeoAI.
 
-![demo](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)
+## Quick Start
+
+1. Create a fresh conda environment (`conda create -n geo python=3.12`) and install QGIS plus GeoAI dependencies as described below.
+2. Install the GeoAI QGIS plugin either from the script (`python install.py`) or by copying the `qgis_plugin` folder into your QGIS profile.
+3. Restart QGIS, enable the plugin under `Plugins` → `Manage and Install Plugins...`, and open one of the panels from the GeoAI toolbar to begin experimenting with sample datasets.
+
+[![demo](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)
 
 ## Features
 
-The plugin provides **dockable panels** that can be attached to the left or right side of QGIS.
+Each tool lives inside a dockable panel that can be attached to either side of the QGIS interface, so you can keep layers, maps, and models visible simultaneously.
 
 ### Moondream Vision-Language Model Panel
 
@@ -19,7 +25,7 @@ The plugin provides **dockable panels** that can be attached to the left or righ
 
 -   **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
 -   **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
--   **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results
+-   **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.
 
 ### SamGeo Panel (Segment Anything Model)
 
@@ -43,51 +49,11 @@ The plugin provides **dockable panels** that can be attached to the left or righ
 
 ## Installation
 
-### Option 1: Install from Plugin Manager (Recommended)
+### Install QGIS and Python Packages
 
-1. Open QGIS
-2. Go to `Plugins` → `Manage and Install Plugins...`
-3. Search for "GeoAI"
-4. Click "Install Plugin"
+Before using the plugin, create a new conda environment dedicated to QGIS and the Python dependencies. Please do not try to reuse an existing QGIS install—mismatched Python packages almost always break the plugin.
 
-### Option 2: Install Using Script (Recommended for Developers)
-
-1. Clone or download this repository
-2. Run the installation script:
-
-    **Linux/macOS:**
-
-    ```bash
-    python install.py
-    ```
-
-    **Windows:**
-
-    ```cmd
-    python install.py
-    ```
-
-3. Restart QGIS
-4. Enable the plugin in `Plugins` → `Manage and Install Plugins...`
-
-To remove the plugin:
-
-```bash
-python install.py --remove
-```
-
-### Option 3: Manual Installation
-
-1. Copy the `geoai_plugin` folder to your QGIS plugins directory:
-    - **Linux**: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
-    - **Windows**: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
-    - **macOS**: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
-2. Restart QGIS
-3. Enable the plugin in `Plugins` → `Manage and Install Plugins...`
-
-### Install Dependencies
-
-Before using the plugin, install the required Python packages in your QGIS Python environment:
+It is recommended to use [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) to manage conda environments. Once Miniconda is installed, open the Terminal or Anaconda Prompt and run the following commands to create a new conda environment and install QGIS and Python packages:
 
 ```bash
 conda create -n geo python=3.12
@@ -95,13 +61,13 @@ conda activate geo
 conda install -c conda-forge qgis segment-geospatial geoai
 ```
 
-Some SamGeo dependencies are only available on PyPI. Run the following command to install all dependencies:
+Some SamGeo dependencies are only available on PyPI. Run the following command to install the remaining dependencies:
 
 ```bash
 pip install -U "segment-geospatial[samgeo3]"
 ```
 
-It is a bit tricky to install SAM 3 on Windows. Run the following commands on Windows to install SamGeo:
+It is a bit trickier to install SAM 3 on Windows. Use the following commands to prepare the environment:
 
 ```bash
 conda create -n geo python=3.12
@@ -111,9 +77,53 @@ conda install -c conda-forge qgis segment-geospatial geoai
 pip install "segment-geospatial[samgeo3]" triton-windows
 ```
 
+### Install QGIS Plugin
+
+### Option 1: Install from Plugin Manager (Coming soon)
+
+1. Open QGIS
+2. Go to `Plugins` → `Manage and Install Plugins...`
+3. Search for "GeoAI"
+4. Click "Install Plugin"
+
+### Option 2: Install Using Script
+
+1. Clone or download this repository
+
+    ```bash
+    git clone https://github.com/opengeos/geoai.git
+    ```
+
+2. Run the installation script (from the repo root it will link/copy files to your QGIS profile):
+
+    ```bash
+    cd qgis_plugin
+    python install.py
+    ```
+
+3. Restart QGIS so it picks up the new plugin files.
+4. Enable the plugin in `Plugins` → `Manage and Install Plugins...` → Toggle on the `GeoAI` plugin.
+
+To remove the plugin:
+
+```bash
+python install.py --remove
+```
+
+### Option 3: Manual Installation
+
+1. Copy the `qgis_plugin` folder to your QGIS plugins directory:
+    - **Linux**: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
+    - **Windows**: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
+    - **macOS**: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
+2. Restart QGIS
+3. Enable the plugin in `Plugins` → `Manage and Install Plugins...` → Toggle on the `GeoAI` plugin. Revisit this dialog any time you update the plugin files.
+
 ## Usage
 
 ### Moondream Vision-Language Model
+
+Sample dataset: [parking_lot.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif)
 
 1. Click the **Moondream** button in the GeoAI toolbar (or `GeoAI` menu → `Moondream VLM`)
 2. Load a Moondream model (default: vikhyatk/moondream2)
@@ -123,15 +133,22 @@ pip install "segment-geospatial[samgeo3]" triton-windows
     - **Query**: Ask a question about the image
     - **Detect**: Detect objects by type (e.g., "building", "car")
     - **Point**: Locate specific objects
-5. Click "Run Analysis"
-6. Results are displayed and optionally added to the map
+5. Click "Run"
+6. Results are displayed and optionally added to the map. You can drag the panel to any side of QGIS to keep it out of the way while browsing results. Save the output table or vector layer if you want to reuse detections later.
 
     ![moondream](https://github.com/user-attachments/assets/bb800a04-b7c4-4fdd-a628-a48842d7eac5)
 
 ### Segmentation Panel (Create Data, Train, Inference)
 
-1. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
-2. Use the tabs at the top of the panel to switch between:
+Sample datasets:
+
+-   [naip_train_buildings.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.tif)
+-   [naip_test_buildings.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.tif)
+-   [naip_test_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.geojson)
+
+1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to the conda environment.
+2. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
+3. Use the tabs at the top of the panel to switch between:
 
     - **Create Training Data**: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.
     - **Train Model**: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.
@@ -144,6 +161,8 @@ pip install "segment-geospatial[samgeo3]" triton-windows
     ![inference](https://github.com/user-attachments/assets/f0945c01-0fcb-4607-9226-4a3b2bcb05e1)
 
 ### SamGeo Panel (Segment Anything Model)
+
+Sample dataset: [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
 
 1. Click the **SamGeo** button in the GeoAI toolbar (or `GeoAI` menu → `SamGeo`)
 2. In the **Model** tab:
@@ -185,11 +204,13 @@ pip install "segment-geospatial[samgeo3]" triton-windows
 
 ### Clear GPU Memory
 
-Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache.
+Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.
 
 ![](https://github.com/user-attachments/assets/76c9dd8a-581c-4975-9ecb-4bfe301447bd)
 
 ## Supported Model Architectures (Segmentation)
+
+The QGIS plugin supports any models supported by [Pytorch Segmentation Models](https://smp.readthedocs.io/en/latest/models.html), including:
 
 -   U-Net
 -   U-Net++
@@ -199,7 +220,10 @@ Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loa
 -   PSPNet
 -   LinkNet
 -   MANet
+-   PAN
+-   UperNet
 -   SegFormer
+-   DPT
 
 ## Supported Encoders (Segmentation)
 
