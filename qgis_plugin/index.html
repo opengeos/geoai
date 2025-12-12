@@ -12,9 +12,13 @@
         <meta name="author" content="opengeos">
       
       
-        <link rel="canonical" href="https://opengeoai.org/changelog/">
+        <link rel="canonical" href="https://opengeoai.org/qgis_plugin/">
       
       
+        <link rel="prev" href="../installation/">
+      
+      
+        <link rel="next" href="../contributing/">
       
       
         
@@ -25,7 +29,7 @@
     
     
       
-        <title>Changelog - GeoAI</title>
+        <title>QGIS Plugin - GeoAI</title>
       
     
     
@@ -80,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#changelog" class="md-skip">
+        <a href="#qgis-plugin-for-geoai" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Changelog
+              QGIS Plugin
             
           </span>
         </div>
@@ -316,10 +320,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../qgis_plugin/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QGIS Plugin
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -335,6 +366,297 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moondream Vision-Language Model Panel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segmentation-panel-combined-training-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segmentation Panel (Combined Training &amp; Inference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#samgeo-panel-segment-anything-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SamGeo Panel (Segment Anything Model)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-memory-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU Memory Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-qgis-and-python-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install QGIS and Python Packages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-qgis-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install QGIS Plugin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-1-install-from-plugin-manager-coming-soon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1: Install from Plugin Manager (Coming soon)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-install-using-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2: Install Using Script
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-3-manual-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 3: Manual Installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moondream Vision-Language Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segmentation-panel-create-data-train-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segmentation Panel (Create Data, Train, Inference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#samgeo-panel-segment-anything-model_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SamGeo Panel (Segment Anything Model)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-gpu-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clear GPU Memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-model-architectures-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Model Architectures (Segmentation)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-encoders-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Encoders (Segmentation)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-sam-models-samgeo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported SAM Models (SamGeo)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        License
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3017,10 +3339,270 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#v001-aug-11-2023" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v0.0.1 - Aug 11, 2023
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moondream Vision-Language Model Panel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segmentation-panel-combined-training-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segmentation Panel (Combined Training &amp; Inference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#samgeo-panel-segment-anything-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SamGeo Panel (Segment Anything Model)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-memory-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU Memory Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-qgis-and-python-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install QGIS and Python Packages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-qgis-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install QGIS Plugin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-1-install-from-plugin-manager-coming-soon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1: Install from Plugin Manager (Coming soon)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-install-using-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2: Install Using Script
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-3-manual-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 3: Manual Installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moondream Vision-Language Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segmentation-panel-create-data-train-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segmentation Panel (Create Data, Train, Inference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#samgeo-panel-segment-anything-model_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SamGeo Panel (Segment Anything Model)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-gpu-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clear GPU Memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-model-architectures-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Model Architectures (Segmentation)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-encoders-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Encoders (Segmentation)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-sam-models-samgeo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported SAM Models (SamGeo)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        License
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links
       
     </span>
   </a>
@@ -3050,9 +3632,251 @@
   
 
 
-<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="v001-aug-11-2023">v0.0.1 - Aug 11, 2023<a class="headerlink" href="#v001-aug-11-2023" title="Permanent link">&para;</a></h2>
-<p>Initial release</p>
+<h1 id="qgis-plugin-for-geoai">QGIS Plugin for GeoAI<a class="headerlink" href="#qgis-plugin-for-geoai" title="Permanent link">&para;</a></h1>
+<p>A QGIS plugin providing AI-powered geospatial analysis tools from the <a href="https://github.com/opengeos/geoai">geoai</a> package. The plugin bundles several model-driven workflows (Moondream VLM, segmentation training/inference, SamGeo) into dockable panels so you can keep QGIS as the main workspace while experimenting with GeoAI.</p>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Create a fresh conda environment (<code>conda create -n geo python=3.12</code>) and install QGIS plus GeoAI dependencies as described below.</li>
+<li>Install the GeoAI QGIS plugin either from the script (<code>python install.py</code>) or by copying the <code>qgis_plugin</code> folder into your QGIS profile.</li>
+<li>Restart QGIS, enable the plugin under <code>Plugins</code> → <code>Manage and Install Plugins...</code>, and open one of the panels from the GeoAI toolbar to begin experimenting with sample datasets.</li>
+</ol>
+<p><a href="https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362"><img alt="demo" src="https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362" /></a></p>
+<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
+<p>Each tool lives inside a dockable panel that can be attached to either side of the QGIS interface, so you can keep layers, maps, and models visible simultaneously.</p>
+<h3 id="moondream-vision-language-model-panel">Moondream Vision-Language Model Panel<a class="headerlink" href="#moondream-vision-language-model-panel" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Caption</strong>: Generate descriptions of geospatial imagery (short, normal, or long)</li>
+<li><strong>Query</strong>: Ask questions about images using natural language</li>
+<li><strong>Detect</strong>: Detect and locate objects with bounding boxes</li>
+<li><strong>Point</strong>: Locate specific objects with point markers</li>
+</ul>
+<h3 id="segmentation-panel-combined-training-inference">Segmentation Panel (Combined Training &amp; Inference)<a class="headerlink" href="#segmentation-panel-combined-training-inference" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Tab 1 - Create Training Data</strong>: Export GeoTIFF tiles from raster and vector data</li>
+<li><strong>Tab 2 - Train Models</strong>: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)</li>
+<li><strong>Tab 3 - Run Inference</strong>: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.</li>
+</ul>
+<h3 id="samgeo-panel-segment-anything-model">SamGeo Panel (Segment Anything Model)<a class="headerlink" href="#samgeo-panel-segment-anything-model" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model Tab</strong>: Load SAM models (SAM1, SAM2, or SAM3) with configurable backend and device settings</li>
+<li><strong>Text Tab</strong>: Segment objects using text prompts (e.g., "tree", "building", "road")</li>
+<li><strong>Interactive Tab</strong>: Segment using point prompts (foreground/background) or box prompts drawn on the map</li>
+<li><strong>Batch Tab</strong>: Process multiple points interactively or from vector files/layers</li>
+<li><strong>Output Tab</strong>: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)</li>
+</ul>
+<h3 id="gpu-memory-management">GPU Memory Management<a class="headerlink" href="#gpu-memory-management" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Clear GPU Memory</strong>: Release GPU memory and clear CUDA cache for all loaded models</li>
+</ul>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>QGIS 3.28 or later</li>
+<li>Python 3.10+</li>
+<li>PyTorch (with CUDA support for GPU acceleration)</li>
+<li>geoai-py package</li>
+<li>samgeo package (for SamGeo panel)</li>
+</ul>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
+<h3 id="install-qgis-and-python-packages">Install QGIS and Python Packages<a class="headerlink" href="#install-qgis-and-python-packages" title="Permanent link">&para;</a></h3>
+<p>Before using the plugin, create a new conda environment dedicated to QGIS and the Python dependencies. Please do not try to reuse an existing QGIS install—mismatched Python packages almost always break the plugin.</p>
+<p>It is recommended to use <a href="https://www.anaconda.com/docs/getting-started/miniconda/install">Miniconda</a> to manage conda environments. Once Miniconda is installed, open the Terminal or Anaconda Prompt and run the following commands to create a new conda environment and install QGIS and Python packages:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12
+conda<span class="w"> </span>activate<span class="w"> </span>geo
+conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>qgis<span class="w"> </span>segment-geospatial<span class="w"> </span>geoai
+</code></pre></div></td></tr></table></div>
+<p>Some SamGeo dependencies are only available on PyPI. Run the following command to install the remaining dependencies:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span><span class="s2">&quot;segment-geospatial[samgeo3]&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p>It is a bit trickier to install SAM 3 on Windows. Use the following commands to prepare the environment:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12
+conda<span class="w"> </span>activate<span class="w"> </span>geo
+conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">12</span>.1<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia
+conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>qgis<span class="w"> </span>segment-geospatial<span class="w"> </span>geoai
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;segment-geospatial[samgeo3]&quot;</span><span class="w"> </span>triton-windows
+</code></pre></div></td></tr></table></div>
+<h3 id="install-qgis-plugin">Install QGIS Plugin<a class="headerlink" href="#install-qgis-plugin" title="Permanent link">&para;</a></h3>
+<h3 id="option-1-install-from-plugin-manager-coming-soon">Option 1: Install from Plugin Manager (Coming soon)<a class="headerlink" href="#option-1-install-from-plugin-manager-coming-soon" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open QGIS</li>
+<li>Go to <code>Plugins</code> → <code>Manage and Install Plugins...</code></li>
+<li>Search for "GeoAI"</li>
+<li>Click "Install Plugin"</li>
+</ol>
+<h3 id="option-2-install-using-script">Option 2: Install Using Script<a class="headerlink" href="#option-2-install-using-script" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p>Clone or download this repository</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/opengeos/geoai.git
+</code></pre></div></td></tr></table></div>
+</li>
+<li>
+<p>Run the installation script (from the repo root it will link/copy files to your QGIS profile):</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>qgis_plugin
+python<span class="w"> </span>install.py
+</code></pre></div></td></tr></table></div>
+</li>
+<li>
+<p>Restart QGIS so it picks up the new plugin files.</p>
+</li>
+<li>Enable the plugin in <code>Plugins</code> → <code>Manage and Install Plugins...</code> → Toggle on the <code>GeoAI</code> plugin.</li>
+</ol>
+<p>To remove the plugin:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>python<span class="w"> </span>install.py<span class="w"> </span>--remove
+</code></pre></div></td></tr></table></div>
+<h3 id="option-3-manual-installation">Option 3: Manual Installation<a class="headerlink" href="#option-3-manual-installation" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Copy the <code>qgis_plugin</code> folder to your QGIS plugins directory:<ul>
+<li><strong>Linux</strong>: <code>~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+<li><strong>Windows</strong>: <code>C:\Users\&lt;username&gt;\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\</code></li>
+<li><strong>macOS</strong>: <code>~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+</ul>
+</li>
+<li>Restart QGIS</li>
+<li>Enable the plugin in <code>Plugins</code> → <code>Manage and Install Plugins...</code> → Toggle on the <code>GeoAI</code> plugin. Revisit this dialog any time you update the plugin files.</li>
+</ol>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="moondream-vision-language-model">Moondream Vision-Language Model<a class="headerlink" href="#moondream-vision-language-model" title="Permanent link">&para;</a></h3>
+<p>Sample dataset: <a href="https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif">parking_lot.tif</a></p>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>Moondream</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Moondream VLM</code>)</li>
+<li>Load a Moondream model (default: vikhyatk/moondream2)</li>
+<li>Select a raster layer or browse for an image file</li>
+<li>Choose a mode:<ul>
+<li><strong>Caption</strong>: Generate a description of the image</li>
+<li><strong>Query</strong>: Ask a question about the image</li>
+<li><strong>Detect</strong>: Detect objects by type (e.g., "building", "car")</li>
+<li><strong>Point</strong>: Locate specific objects</li>
+</ul>
+</li>
+<li>Click "Run"</li>
+<li>
+<p>Results are displayed and optionally added to the map. You can drag the panel to any side of QGIS to keep it out of the way while browsing results. Save the output table or vector layer if you want to reuse detections later.</p>
+<p><img alt="moondream" src="https://github.com/user-attachments/assets/bb800a04-b7c4-4fdd-a628-a48842d7eac5" /></p>
+</li>
+</ol>
+<h3 id="segmentation-panel-create-data-train-inference">Segmentation Panel (Create Data, Train, Inference)<a class="headerlink" href="#segmentation-panel-create-data-train-inference" title="Permanent link">&para;</a></h3>
+<p>Sample datasets:</p>
+<ul>
+<li><a href="https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.tif">naip_train_buildings.tif</a></li>
+<li><a href="https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.tif">naip_test_buildings.tif</a></li>
+<li><a href="https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.geojson">naip_test_buildings.geojson</a></li>
+</ul>
+<p>Steps:</p>
+<ol>
+<li>Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to the conda environment.</li>
+<li>Click the <strong>Segmentation</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Segmentation</code>)</li>
+<li>
+<p>Use the tabs at the top of the panel to switch between:</p>
+<ul>
+<li><strong>Create Training Data</strong>: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.</li>
+<li><strong>Train Model</strong>: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.</li>
+<li><strong>Run Inference</strong>: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.</li>
+</ul>
+<p><img alt="data" src="https://github.com/user-attachments/assets/121fcfa8-6f9b-4413-9419-af666698c053" /></p>
+<p><img alt="train" src="https://github.com/user-attachments/assets/dfeefb86-ebf7-467c-a5ff-794cde80a7cb" /></p>
+<p><img alt="inference" src="https://github.com/user-attachments/assets/f0945c01-0fcb-4607-9226-4a3b2bcb05e1" /></p>
+</li>
+</ol>
+<h3 id="samgeo-panel-segment-anything-model_1">SamGeo Panel (Segment Anything Model)<a class="headerlink" href="#samgeo-panel-segment-anything-model_1" title="Permanent link">&para;</a></h3>
+<p>Sample dataset: <a href="https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif">uc_berkeley.tif</a></p>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>SamGeo</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>SamGeo</code>)</li>
+<li>
+<p>In the <strong>Model</strong> tab:</p>
+<ul>
+<li>Select the SAM model version (SamGeo3/SAM3, SamGeo2/SAM2, or SamGeo/SAM1)</li>
+<li>Configure backend (meta or transformers) and device (auto, cuda, cpu)</li>
+<li>Click "Load Model" to initialize the model</li>
+<li>Select a raster layer or browse for an image file and click "Set Image"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/600b0879-f851-4423-b668-cb9e8df28425" /></p>
+</li>
+<li>
+<p>Choose a segmentation method:</p>
+<ul>
+<li>
+<p><strong>Text Tab</strong>: Enter text prompts describing objects to segment (e.g., "tree, building")</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/da2c17fc-4633-488d-ba44-00f1cd97555c" /></p>
+</li>
+<li>
+<p><strong>Interactive Tab</strong>:</p>
+<ul>
+<li>Click "Add Foreground Points" or "Add Background Points" and click on the map</li>
+<li>Or click "Draw Box" and drag a rectangle on the map</li>
+<li>Click "Segment by Points" or "Segment by Box"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/6730737d-62fc-438a-bff5-cffb685d391e" /></p>
+</li>
+<li>
+<p><strong>Batch Tab</strong>: Add multiple points interactively or load from a vector file/layer</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/104ec741-44cc-404a-9213-36cf78456171" /></p>
+</li>
+</ul>
+</li>
+<li>
+<p>In the <strong>Output</strong> tab:</p>
+<ul>
+<li>Select output format (Raster GeoTIFF, Vector GeoPackage, or Vector Shapefile)</li>
+<li>For vector output, optionally enable regularization:<ul>
+<li>Check "Regularize polygons (orthogonalize)"</li>
+<li>Set Epsilon (simplification tolerance) and Min Area (filter small polygons)</li>
+</ul>
+</li>
+<li>Click "Save Masks" to export results</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/5c80cc57-3870-4a20-bb74-73e394ef22a6" /></p>
+</li>
+</ol>
+<h3 id="clear-gpu-memory">Clear GPU Memory<a class="headerlink" href="#clear-gpu-memory" title="Permanent link">&para;</a></h3>
+<p>Click the <strong>GPU</strong> button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/76c9dd8a-581c-4975-9ecb-4bfe301447bd" /></p>
+<h2 id="supported-model-architectures-segmentation">Supported Model Architectures (Segmentation)<a class="headerlink" href="#supported-model-architectures-segmentation" title="Permanent link">&para;</a></h2>
+<p>The QGIS plugin supports any models supported by <a href="https://smp.readthedocs.io/en/latest/models.html">Pytorch Segmentation Models</a>, including:</p>
+<ul>
+<li>U-Net</li>
+<li>U-Net++</li>
+<li>DeepLabV3</li>
+<li>DeepLabV3+</li>
+<li>FPN (Feature Pyramid Network)</li>
+<li>PSPNet</li>
+<li>LinkNet</li>
+<li>MANet</li>
+<li>PAN</li>
+<li>UperNet</li>
+<li>SegFormer</li>
+<li>DPT</li>
+</ul>
+<h2 id="supported-encoders-segmentation">Supported Encoders (Segmentation)<a class="headerlink" href="#supported-encoders-segmentation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>ResNet (34, 50, 101, 152)</li>
+<li>EfficientNet (b0-b4)</li>
+<li>MobileNetV2</li>
+<li>VGG (16, 19)</li>
+</ul>
+<h2 id="supported-sam-models-samgeo">Supported SAM Models (SamGeo)<a class="headerlink" href="#supported-sam-models-samgeo" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>SamGeo3 (SAM3)</strong>: Latest version with text prompts, point prompts, and box prompts</li>
+<li><strong>SamGeo2 (SAM2)</strong>: Improved version with better performance</li>
+<li><strong>SamGeo (SAM1)</strong>: Original Segment Anything Model</li>
+</ul>
+<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
+<p>MIT License - see <a href="../LICENSE">LICENSE</a> for details.</p>
+<h2 id="links">Links<a class="headerlink" href="#links" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://opengeoai.org">GeoAI Documentation</a></li>
+<li><a href="https://samgeo.gishub.org">SamGeo Documentation</a></li>
+<li><a href="https://github.com/opengeos/geoai">GitHub Repository</a></li>
+<li><a href="https://github.com/opengeos/geoai/issues">Report Issues</a></li>
+</ul>
 
 
 
@@ -3075,7 +3899,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 12, 2023 00:19:37 UTC"><span class="timeago" datetime="2023-08-12T00:19:37+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 12, 2023 00:19:37 UTC">2023-08-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 12, 2025 05:38:04 UTC"><span class="timeago" datetime="2025-12-12T05:38:04+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 12, 2025 05:38:04 UTC">2025-12-12</span>
   </span>
 
     
@@ -3085,7 +3909,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 11, 2023 20:22:47 UTC"><span class="timeago" datetime="2023-08-11T20:22:47+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 11, 2023 20:22:47 UTC">2023-08-11</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 12, 2025 05:38:04 UTC"><span class="timeago" datetime="2025-12-12T05:38:04+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 12, 2025 05:38:04 UTC">2025-12-12</span>
   </span>
 
     
