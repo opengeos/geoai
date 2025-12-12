@@ -179,7 +179,7 @@ class AutoGeoImageProcessor:
             Tuple of (image array in CHW format, metadata dict).
 
         Example:
-            >>> processor = AutoGeoImageProcessor("facebook/sam-vit-base")
+            >>> processor = AutoGeoImageProcessor.from_pretrained("facebook/sam-vit-base")
             >>> data, metadata = processor.load_geotiff("input.tif")
             >>> print(data.shape)  # (C, H, W)
             >>> print(metadata['crs'])  # CRS info
