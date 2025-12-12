@@ -1,14 +1,22 @@
 # QGIS Plugin for GeoAI
 
-A QGIS plugin providing AI-powered geospatial analysis tools from the [geoai](https://github.com/opengeos/geoai) package. The plugin bundles several model-driven workflows (Moondream VLM, segmentation training/inference, SamGeo) into dockable panels so you can keep QGIS as the main workspace while experimenting with GeoAI.
+A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, segmentation training/inference, SamGeo) so you can keep QGIS as your main workspace while experimenting with GeoAI.
 
 ## Quick Start
 
-1. Create a fresh conda environment (`conda create -n geo python=3.12`) and install QGIS plus GeoAI dependencies as described below.
-2. Install the GeoAI QGIS plugin either from the script (`python install.py`) or by copying the `qgis_plugin` folder into your QGIS profile.
-3. Restart QGIS, enable the plugin under `Plugins` → `Manage and Install Plugins...`, and open one of the panels from the GeoAI toolbar to begin experimenting with sample datasets.
+-   Create a fresh conda env (`conda create -n geo python=3.12`) and install QGIS + deps (see below).
+-   Install the plugin (`python install.py`) from this repo.
+-   Restart QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`.
+-   Open a GeoAI toolbar panel and try the sample datasets below.
 
 [![demo](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)
+
+## Requirements
+
+-   QGIS 3.28 or later
+-   Python 3.10+ (conda recommended)
+-   PyTorch (CUDA if you want GPU acceleration)
+-   `geoai` and `samgeo` packages
 
 ## Features
 
@@ -39,35 +47,45 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 -   **Clear GPU Memory**: Release GPU memory and clear CUDA cache for all loaded models
 
-## Requirements
-
--   QGIS 3.28 or later
--   Python 3.10+
--   PyTorch (with CUDA support for GPU acceleration)
--   geoai-py package
--   samgeo package (for SamGeo panel)
-
 ## Installation
 
-### Install QGIS and Python Packages
+### 1) Set up the environment
 
-Before using the plugin, create a new conda environment dedicated to QGIS and the Python dependencies. Please do not try to reuse an existing QGIS install—mismatched Python packages almost always break the plugin.
-
-It is recommended to use [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) to manage conda environments. Once Miniconda is installed, open the Terminal or Anaconda Prompt and run the following commands to create a new conda environment and install QGIS and Python packages:
+Use a clean conda env dedicated to QGIS—mixing with an existing QGIS install often breaks dependencies.
 
 ```bash
 conda create -n geo python=3.12
 conda activate geo
-conda install -c conda-forge qgis segment-geospatial geoai
 ```
 
-Some SamGeo dependencies are only available on PyPI. Run the following command to install the remaining dependencies:
+Install core geospatial deps first:
 
 ```bash
-pip install -U "segment-geospatial[samgeo3]"
+conda install -c conda-forge --strict-channel-priority gdal rasterio libnetcdf netcdf4
+python -c "import rasterio; print('raster import successful')"
 ```
 
-It is a bit trickier to install SAM 3 on Windows. Use the following commands to prepare the environment:
+Install GeoAI:
+
+```bash
+conda install -c conda-forge geoai
+python -c "import geoai; print('geoai import successful')"
+```
+
+Install QGIS:
+
+```bash
+conda install -c conda-forge qgis
+```
+
+Install SamGeo extras (PyPI is required for some parts):
+
+```bash
+pip install -U "segment-geospatial[samgeo3]" sam3
+python -c "import samgeo; print('samgeo import successful')"
+```
+
+Windows + SAM3 often needs the PyTorch wheels from NVIDIA and PyPI:
 
 ```bash
 conda create -n geo python=3.12
@@ -77,47 +95,34 @@ conda install -c conda-forge qgis segment-geospatial geoai
 pip install "segment-geospatial[samgeo3]" triton-windows
 ```
 
-### Install QGIS Plugin
+### 2) Install the QGIS plugin
 
-### Option 1: Install from Plugin Manager (Coming soon)
+Option A — use the helper script (recommended):
 
-1. Open QGIS
-2. Go to `Plugins` → `Manage and Install Plugins...`
-3. Search for "GeoAI"
-4. Click "Install Plugin"
+```bash
+git clone https://github.com/opengeos/geoai.git
+cd geoai/qgis_plugin
+python install.py
+```
 
-### Option 2: Install Using Script
-
-1. Clone or download this repository
-
-    ```bash
-    git clone https://github.com/opengeos/geoai.git
-    ```
-
-2. Run the installation script (from the repo root it will link/copy files to your QGIS profile):
-
-    ```bash
-    cd qgis_plugin
-    python install.py
-    ```
-
-3. Restart QGIS so it picks up the new plugin files.
-4. Enable the plugin in `Plugins` → `Manage and Install Plugins...` → Toggle on the `GeoAI` plugin.
-
-To remove the plugin:
+This links/copies the plugin into your active QGIS profile. Re-run after pulling updates. Remove with:
 
 ```bash
 python install.py --remove
 ```
 
-### Option 3: Manual Installation
+Option B — manual copy:
 
-1. Copy the `qgis_plugin` folder to your QGIS plugins directory:
-    - **Linux**: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
-    - **Windows**: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
-    - **macOS**: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
-2. Restart QGIS
-3. Enable the plugin in `Plugins` → `Manage and Install Plugins...` → Toggle on the `GeoAI` plugin. Revisit this dialog any time you update the plugin files.
+-   Copy the `qgis_plugin` folder to your QGIS plugins directory:
+    -   Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
+    -   Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
+    -   macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
+
+### 3) Enable in QGIS
+
+Launch QGIS: `conda run qgis`
+
+QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`. After updates, toggle the plugin off/on or restart QGIS to reload.
 
 ## Usage
 
@@ -243,6 +248,13 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 -   **SamGeo3 (SAM3)**: Latest version with text prompts, point prompts, and box prompts
 -   **SamGeo2 (SAM2)**: Improved version with better performance
 -   **SamGeo (SAM1)**: Original Segment Anything Model
+
+## Troubleshooting
+
+-   Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
+-   GDAL/rasterio errors: verify you launched QGIS from the conda env (`conda activate geo` then `qgis`) so it picks up the same Python libs.
+-   CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
+-   Model download failures: check network/firewall, then retry loading models from the panel.
 
 ## License
 
