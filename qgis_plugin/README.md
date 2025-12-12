@@ -149,9 +149,9 @@ Steps:
 
 Sample datasets:
 
--   [naip_train_buildings.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.tif)
--   [naip_test_buildings.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.tif)
--   [naip_test_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.geojson)
+-   [naip_rgb_train.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_rgb_train.tif)
+-   [naip_test.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test.tif)
+-   [naip_train_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.geojson)
 
 Steps:
 
@@ -171,7 +171,12 @@ Steps:
 
 ### SamGeo Panel (Segment Anything Model)
 
-Sample dataset: [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
+Sample dataset:
+
+-   [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
+-   [wa_building_image.tif](https://github.com/opengeos/datasets/releases/download/places/wa_building_image.tif)
+-   [wa_building_centroids.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_centroids.geojson)
+-   [wa_building_bboxes.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_bboxes.geojson)
 
 Steps:
 
