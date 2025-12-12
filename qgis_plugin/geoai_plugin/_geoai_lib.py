@@ -161,5 +161,6 @@ def get_geoai() -> ModuleType:
         "Fix: install the GeoAI Python package into *this same Python environment*.\n"
         "In QGIS, open Python Console and run:\n"
         "  import sys, subprocess\n"
-        "  subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--user', 'geoai-py'])\n"
+        "  subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'geoai-py'])\n"
+        "If you encounter issues, please consult the QGIS documentation for your platform regarding installing Python packages for use in QGIS.\n"
     )
