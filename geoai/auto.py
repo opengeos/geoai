@@ -75,7 +75,7 @@ class AutoGeoImageProcessor:
     Example:
         >>> processor = AutoGeoImageProcessor.from_pretrained("facebook/sam-vit-base")
         >>> data, metadata = processor.load_geotiff("input.tif")
-        >>> inputs = processor.preprocess(data)
+        >>> inputs = processor(data)
     """
 
     def __init__(
