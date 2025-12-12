@@ -9,7 +9,11 @@ A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models 
 -   Restart QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`.
 -   Open a GeoAI toolbar panel and try the sample datasets below.
 
-[![demo](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)
+## Video Tutorials
+
+Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video tutorial](https://youtu.be/8-OhlqeoyiY) on how to use the GeoAI plugin in QGIS.
+
+[![demo](https://github.com/user-attachments/assets/5aabc3d3-efd1-4011-ab31-2b3f11aab3ed)](https://youtu.be/8-OhlqeoyiY)
 
 ## Requirements
 

@@ -103,7 +103,7 @@ mamba install -c conda-forge geoai
 
 Check out the [QGIS Plugin](https://opengeoai.org/qgis_plugin/) page if you are interested in using GeoAI with QGIS.
 
-[![demo](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)](https://github.com/user-attachments/assets/557feb58-ca58-4e27-800f-f3e8a8d3d362)
+[![demo](https://github.com/user-attachments/assets/5aabc3d3-efd1-4011-ab31-2b3f11aab3ed)](https://youtu.be/8-OhlqeoyiY)
 
 ## 📋 Documentation
 
