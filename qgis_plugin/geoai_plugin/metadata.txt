@@ -44,7 +44,7 @@ deprecated=False
 changelog=
     0.2.0
         - Fix geoai import name conflict issue
-        - Add support SamGeo segmentation
+        - Add support for SamGeo segmentation
 
     0.1.0 - Initial release
         - Moondream integration for image captioning, querying, detection, and pointing
