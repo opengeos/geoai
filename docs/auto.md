@@ -1,0 +1,3 @@
+# auto module
+
+::: geoai.auto
