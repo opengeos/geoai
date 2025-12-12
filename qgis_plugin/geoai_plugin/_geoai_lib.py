@@ -27,12 +27,19 @@ _CACHED: Optional[ModuleType] = None
 
 
 def _is_module_from_dir(mod: ModuleType, directory: Path) -> bool:
+    """
+    Returns True if the given module's __file__ is located within the specified directory.
+
+    Returns False if the module has no __file__, or if path resolution fails (e.g., due to
+    being on different filesystems or invalid paths). Only ValueError and OSError from
+    path resolution/comparison are caught and treated as a negative result.
+    """
     try:
         mod_file = getattr(mod, "__file__", None)
         if not mod_file:
             return False
         return Path(mod_file).resolve().is_relative_to(directory.resolve())
-    except Exception:
+    except (ValueError, OSError):
         return False
 
 
