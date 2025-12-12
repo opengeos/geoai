@@ -136,7 +136,7 @@ def get_geoai() -> ModuleType:
         if not _is_module_from_dir(imported, plugin_dir):
             _CACHED = imported
             return imported
-    except Exception:
+    except (ImportError, ModuleNotFoundError, AttributeError):
         pass
 
     # Shadowed: try to import by temporarily removing the plugin from sys.path.
