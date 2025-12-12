@@ -62,7 +62,7 @@ Install core geospatial deps first:
 
 ```bash
 conda install -c conda-forge --strict-channel-priority gdal rasterio libnetcdf netcdf4
-python -c "import rasterio; print('raster import successful')"
+python -c "import rasterio; print('rasterio import successful')"
 ```
 
 Install GeoAI:
