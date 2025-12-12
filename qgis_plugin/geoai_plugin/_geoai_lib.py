@@ -70,7 +70,7 @@ def _import_geoai_without_plugin_shadow(plugin_pkg_dir: Path) -> Optional[Module
                 sys.modules["geoai"] = orig_geoai_mod
             return None
         return imported
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         return None
     finally:
         # Restore sys.path and the original shadow module (if any)
