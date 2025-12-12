@@ -59,6 +59,8 @@ def _import_geoai_without_plugin_shadow(plugin_pkg_dir: Path) -> Optional[Module
 
         # If we somehow still got the plugin, treat as failure.
         if _is_module_from_dir(imported, plugin_pkg_dir):
+            if orig_geoai_mod is not None:
+                sys.modules["geoai"] = orig_geoai_mod
             return None
         return imported
     except Exception:
