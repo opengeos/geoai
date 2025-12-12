@@ -1350,7 +1350,9 @@ class SamGeoDockWidget(QDockWidget):
                     # Check if regularization is enabled
                     if self.regularize_check.isChecked():
                         # Use geoai.orthogonalize for regularization
-                        import geoai
+                        from .._geoai_lib import get_geoai
+
+                        geoai = get_geoai()
 
                         epsilon = self.epsilon_spin.value()
                         min_area = (

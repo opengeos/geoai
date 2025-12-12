@@ -129,7 +129,9 @@ class TrainingWorker(QThread):
         import sys
 
         try:
-            import geoai
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
 
             self.progress.emit("Starting training...")
 
@@ -196,7 +198,9 @@ class TileExportWorker(QThread):
     def run(self):
         """Execute tile export."""
         try:
-            import geoai
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
 
             self.progress.emit("Exporting tiles...")
 
@@ -256,7 +260,9 @@ class InferenceWorker(QThread):
     def run(self):
         """Execute the inference."""
         try:
-            import geoai
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
 
             self.progress.emit("Running inference...")
 
@@ -311,7 +317,9 @@ class VectorizeWorker(QThread):
     def run(self):
         """Execute vectorization."""
         try:
-            import geoai
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
 
             self.progress.emit("Vectorizing mask...")
 

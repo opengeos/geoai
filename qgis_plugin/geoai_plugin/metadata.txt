@@ -2,22 +2,28 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model for image captioning, querying, object detection, and semantic segmentation model training and inference.
-version=0.1.0
+version=0.2.0
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
 about=This plugin provides AI-powered geospatial analysis tools:
 
-    <b>Moondream Vision-Language Model:</b>
+    Moondream Vision-Language Model:
     - Caption: Generate descriptions of geospatial imagery
     - Query: Ask questions about images using natural language
     - Detect: Detect and locate objects with bounding boxes
     - Point: Locate specific objects with point markers
 
-    <b>Semantic Segmentation:</b>
+    Semantic Segmentation:
     - Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
     - Run inference on raster imagery
     - Export results as vector or raster data
+
+    SamGeo segmentation:
+    - Segment objects using text prompts (e.g., "tree", "building", "road")
+    - Segment using point prompts (foreground/background) or box prompts drawn on the map
+    - Process multiple points interactively or from vector files/layers
+    - Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization
 
     Requires the geoai-py Python package and PyTorch with CUDA support for optimal performance.
 
@@ -36,6 +42,10 @@ experimental=True
 deprecated=False
 
 changelog=
+    0.2.0
+        - Fix geoai import name conflict issue
+        - Add support SamGeo segmentation
+
     0.1.0 - Initial release
         - Moondream integration for image captioning, querying, detection, and pointing
         - Semantic segmentation model training
