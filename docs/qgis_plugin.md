@@ -146,6 +146,8 @@ Sample datasets:
 -   [naip_test_buildings.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.tif)
 -   [naip_test_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test_buildings.geojson)
 
+Steps:
+
 1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to the conda environment.
 2. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
 3. Use the tabs at the top of the panel to switch between:
