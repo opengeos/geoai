@@ -1774,7 +1774,7 @@ def show_detections(
         Matplotlib figure object.
 
     Example:
-        >>> result = geoai.object_detection("aerial.tif", labels=["building", "tree"])
+        >>> result = geoai.auto.object_detection("aerial.tif", labels=["building", "tree"])
         >>> fig = show_detections("aerial.tif", result)
     """
     import matplotlib.pyplot as plt
