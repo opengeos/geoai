@@ -27,7 +27,6 @@ from qgis.PyQt.QtWidgets import (
     QTextEdit,
 )
 from qgis.PyQt.QtGui import QFont
-from qgis.core import QgsApplication
 
 
 # GitHub URLs for the plugin
