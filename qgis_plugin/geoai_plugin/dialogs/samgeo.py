@@ -228,7 +228,7 @@ class SamGeoDockWidget(QDockWidget):
         self.custom_bands_check.setChecked(False)
         self.custom_bands_check.setToolTip(
             "Enable to specify custom bands for RGB display.\n"
-            "Useful for GeoTIFFs with more than 3 bands.\n"
+            "Useful for multi-band GeoTIFF files (with more than 3 bands).\n"
             "Example: [4, 3, 2] for NIR-R-G false color composite."
         )
         self.custom_bands_check.stateChanged.connect(self._on_custom_bands_changed)
