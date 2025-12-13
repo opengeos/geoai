@@ -223,6 +223,44 @@ class SamGeoDockWidget(QDockWidget):
         self.set_file_btn.clicked.connect(self.set_image_from_file)
         layer_layout.addWidget(self.set_file_btn)
 
+        # Band selection for multi-band GeoTIFFs
+        self.custom_bands_check = QCheckBox("Use custom RGB bands")
+        self.custom_bands_check.setChecked(False)
+        self.custom_bands_check.setToolTip(
+            "Enable to specify custom bands for RGB display.\n"
+            "Useful for GeoTIFFs with more than 3 bands.\n"
+            "Example: [4, 3, 2] for NIR-R-G false color composite."
+        )
+        self.custom_bands_check.stateChanged.connect(self._on_custom_bands_changed)
+        layer_layout.addWidget(self.custom_bands_check)
+
+        # RGB band spinboxes
+        bands_row = QHBoxLayout()
+        bands_row.addWidget(QLabel("R:"))
+        self.red_band_spin = QSpinBox()
+        self.red_band_spin.setRange(1, 100)
+        self.red_band_spin.setValue(1)
+        self.red_band_spin.setToolTip("Red band index (1-based)")
+        self.red_band_spin.setEnabled(False)
+        bands_row.addWidget(self.red_band_spin)
+
+        bands_row.addWidget(QLabel("G:"))
+        self.green_band_spin = QSpinBox()
+        self.green_band_spin.setRange(1, 100)
+        self.green_band_spin.setValue(2)
+        self.green_band_spin.setToolTip("Green band index (1-based)")
+        self.green_band_spin.setEnabled(False)
+        bands_row.addWidget(self.green_band_spin)
+
+        bands_row.addWidget(QLabel("B:"))
+        self.blue_band_spin = QSpinBox()
+        self.blue_band_spin.setRange(1, 100)
+        self.blue_band_spin.setValue(3)
+        self.blue_band_spin.setToolTip("Blue band index (1-based)")
+        self.blue_band_spin.setEnabled(False)
+        bands_row.addWidget(self.blue_band_spin)
+        layer_layout.addLayout(bands_row)
+
         self.image_status = QLabel("Image: Not set")
         self.image_status.setStyleSheet("color: gray;")
         layer_layout.addWidget(self.image_status)
@@ -620,6 +658,28 @@ class SamGeoDockWidget(QDockWidget):
         self.epsilon_spin.setEnabled(enabled)
         self.min_area_spin.setEnabled(enabled)
 
+    def _on_custom_bands_changed(self, state):
+        """Handle custom bands checkbox state change."""
+        enabled = state == Qt.Checked
+        self.red_band_spin.setEnabled(enabled)
+        self.green_band_spin.setEnabled(enabled)
+        self.blue_band_spin.setEnabled(enabled)
+
+    def _get_bands(self):
+        """Get the bands list for set_image if custom bands are enabled.
+
+        Returns:
+            List[int] or None: List of band indices [R, G, B] if custom bands
+                are enabled, None otherwise.
+        """
+        if self.custom_bands_check.isChecked():
+            return [
+                self.red_band_spin.value(),
+                self.green_band_spin.value(),
+                self.blue_band_spin.value(),
+            ]
+        return None
+
     def refresh_layers(self):
         """Refresh the list of raster layers."""
         self.layer_combo.clear()
@@ -767,13 +827,23 @@ class SamGeoDockWidget(QDockWidget):
             self.image_status.setText("Setting image...")
             QCoreApplication.processEvents()
 
-            self.sam.set_image(source)
+            # Get bands if custom bands are enabled
+            bands = self._get_bands()
+            self.sam.set_image(source, bands=bands)
             self.current_layer = layer
             self.current_image_path = source
 
-            self.image_status.setText(f"Image: {layer.name()}")
+            # Build status message
+            status_msg = f"Image: {layer.name()}"
+            if bands:
+                status_msg += f" (Bands: {bands})"
+            self.image_status.setText(status_msg)
             self.image_status.setStyleSheet("color: green;")
-            self.log_message(f"Image set from layer: {layer.name()}")
+
+            log_msg = f"Image set from layer: {layer.name()}"
+            if bands:
+                log_msg += f" with bands {bands}"
+            self.log_message(log_msg)
 
         except Exception as e:
             self.image_status.setText("Image: Failed to set")
@@ -800,7 +870,9 @@ class SamGeoDockWidget(QDockWidget):
             self.image_status.setText("Setting image...")
             QCoreApplication.processEvents()
 
-            self.sam.set_image(file_path)
+            # Get bands if custom bands are enabled
+            bands = self._get_bands()
+            self.sam.set_image(file_path, bands=bands)
 
             # Optionally add the layer to the map
             layer = QgsRasterLayer(file_path, os.path.basename(file_path))
@@ -808,9 +880,18 @@ class SamGeoDockWidget(QDockWidget):
                 QgsProject.instance().addMapLayer(layer)
                 self.current_layer = layer
                 self.current_image_path = file_path
-                self.image_status.setText(f"Image: {os.path.basename(file_path)}")
+
+                # Build status message
+                status_msg = f"Image: {os.path.basename(file_path)}"
+                if bands:
+                    status_msg += f" (Bands: {bands})"
+                self.image_status.setText(status_msg)
                 self.image_status.setStyleSheet("color: green;")
-                self.log_message(f"Image set from file: {file_path}")
+
+                log_msg = f"Image set from file: {file_path}"
+                if bands:
+                    log_msg += f" with bands {bands}"
+                self.log_message(log_msg)
                 self.refresh_layers()
             else:
                 self.current_layer = None
