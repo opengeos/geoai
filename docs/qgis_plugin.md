@@ -53,7 +53,9 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 ## Installation
 
-### 1) Set up the environment
+### 1) Set up the environment on
+
+#### Installation on Linux/macOS
 
 Use a clean conda env dedicated to QGIS—mixing with an existing QGIS install often breaks dependencies.
 
@@ -89,14 +91,18 @@ pip install -U "segment-geospatial[samgeo3]" sam3
 python -c "import samgeo; print('samgeo import successful')"
 ```
 
+#### Installation on Windows
+
 Windows + SAM3 often needs the PyTorch wheels from NVIDIA and PyPI:
 
 ```bash
 conda create -n geo python=3.12
 conda activate geo
 conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia
-conda install -c conda-forge qgis segment-geospatial geoai
-pip install "segment-geospatial[samgeo3]" triton-windows
+conda install -c conda-forge geoai
+python -c "import geoai; print('geoai import successful')"
+conda install -c conda-forge qgis
+pip install -U "segment-geospatial[samgeo3]" sam3 triton-windows
 ```
 
 ### 2) Install the QGIS plugin
