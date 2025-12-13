@@ -102,7 +102,8 @@ conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia
 conda install -c conda-forge geoai
 python -c "import geoai; print('geoai import successful')"
 conda install -c conda-forge qgis
-pip install -U "segment-geospatial[samgeo3]" sam3 triton-windows
+pip install -U "segment-geospatial[samgeo3]" triton-windows
+pip install -U sam3 geoai
 ```
 
 #### Request access to SAM 3
