@@ -186,7 +186,7 @@ class DownloadWorker(QThread):
             if temp_dir and os.path.exists(temp_dir):
                 try:
                     shutil.rmtree(temp_dir)
-                except Exception:
+                except OSError:
                     pass
 
 
