@@ -281,7 +281,7 @@ class UpdateCheckerDialog(QDialog):
 
         # Info label
         info_label = QLabel(
-            '<small>Updates are downloaded from '
+            "<small>Updates are downloaded from "
             f'<a href="https://github.com/{GITHUB_REPO}">GitHub</a>. '
             "QGIS must be restarted after installing an update.</small>"
         )
