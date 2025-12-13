@@ -506,8 +506,12 @@ class GeoAIPlugin:
                 version_match = re.search(r"^version=(.+)$", content, re.MULTILINE)
                 if version_match:
                     version = version_match.group(1).strip()
-        except Exception:
-            pass
+        except Exception as e:
+            QMessageBox.warning(
+                self.iface.mainWindow(),
+                "GeoAI Plugin",
+                f"Could not read version from metadata.txt:\n{str(e)}",
+            )
 
         about_text = f"""
 <h2>GeoAI Plugin for QGIS</h2>
