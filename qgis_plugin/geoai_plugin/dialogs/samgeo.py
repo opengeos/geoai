@@ -1317,8 +1317,8 @@ class SamGeoDockWidget(QDockWidget):
                     QgsProject.instance().addMapLayer(layer)
                     self.results_text.append("Added result layer to map.")
 
-            # Auto-show results if enabled and no batch-specific output was provided
-            if num_masks > 0 and not output_path:
+            # Auto-show results if enabled
+            if num_masks > 0:
                 self._auto_show_results()
 
         except Exception as e:
