@@ -103,7 +103,7 @@ conda install -c conda-forge geoai
 python -c "import geoai; print('geoai import successful')"
 conda install -c conda-forge qgis
 pip install -U "segment-geospatial[samgeo3]" triton-windows
-pip install -U sam3 geoai
+pip install -U sam3 geoai-py segment-geospatial
 ```
 
 #### Request access to SAM 3
