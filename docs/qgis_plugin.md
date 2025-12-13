@@ -53,7 +53,7 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 ## Installation
 
-### 1) Set up the environment on
+### 1) Set up the environment
 
 #### Installation on Linux/macOS
 
