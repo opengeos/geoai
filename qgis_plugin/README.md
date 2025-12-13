@@ -105,6 +105,14 @@ conda install -c conda-forge qgis
 pip install -U "segment-geospatial[samgeo3]" sam3 triton-windows
 ```
 
+#### Request access to SAM 3
+
+To use SAM 3, you will need to request access by filling out this form on Hugging Face at <https://huggingface.co/facebook/sam3>. Once your request has been approved, run the following command in the terminal to authenticate:
+
+```bash
+hf auth login
+```
+
 ### 2) Install the QGIS plugin
 
 Option A — use the helper script (recommended):
