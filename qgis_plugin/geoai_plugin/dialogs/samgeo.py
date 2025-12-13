@@ -92,30 +92,30 @@ class SamGeoDockWidget(QDockWidget):
         main_widget.setLayout(main_layout)
 
         # Tab widget for different modes
-        tab_widget = QTabWidget()
+        self.tab_widget = QTabWidget()
 
         # === Model Settings Tab ===
         model_tab = self._create_model_tab()
-        tab_widget.addTab(model_tab, "Model")
+        self.tab_widget.addTab(model_tab, "Model")
 
         # === Text Prompts Tab ===
         text_tab = self._create_text_tab()
-        tab_widget.addTab(text_tab, "Text")
+        self.tab_widget.addTab(text_tab, "Text")
 
         # === Interactive Tab ===
         interactive_tab = self._create_interactive_tab()
-        tab_widget.addTab(interactive_tab, "Interactive")
+        self.tab_widget.addTab(interactive_tab, "Interactive")
 
         # === Batch Tab ===
         batch_tab = self._create_batch_tab()
-        tab_widget.addTab(batch_tab, "Batch")
+        self.tab_widget.addTab(batch_tab, "Batch")
 
         # === Output Tab ===
         output_tab = self._create_output_tab()
-        tab_widget.addTab(output_tab, "Output")
+        self.tab_widget.addTab(output_tab, "Output")
 
         # Add tab widget to main layout
-        main_layout.addWidget(tab_widget)
+        main_layout.addWidget(self.tab_widget)
 
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -520,6 +520,15 @@ class SamGeoDockWidget(QDockWidget):
         self.add_to_map_check.setChecked(True)
         output_group_layout.addWidget(self.add_to_map_check)
 
+        # Auto-show results after segmentation
+        self.auto_show_check = QCheckBox("Auto-show results after segmentation")
+        self.auto_show_check.setChecked(True)
+        self.auto_show_check.setToolTip(
+            "Automatically save and display results after running segmentation\n"
+            "in the Text, Interactive, or Batch tabs"
+        )
+        output_group_layout.addWidget(self.auto_show_check)
+
         # Output path
         output_path_row = QHBoxLayout()
         self.output_path_edit = QLineEdit()
@@ -858,9 +867,12 @@ class SamGeoDockWidget(QDockWidget):
 
             # Update status label
             if num_masks > 0:
-                self.text_status_label.setText(
-                    f"Found {num_masks} object(s). Go to Output tab to save."
-                )
+                if self.auto_show_check.isChecked():
+                    self.text_status_label.setText(f"Found {num_masks} object(s).")
+                else:
+                    self.text_status_label.setText(
+                        f"Found {num_masks} object(s). Go to Output tab to save."
+                    )
                 self.text_status_label.setStyleSheet("color: green;")
             else:
                 self.text_status_label.setText(
@@ -869,6 +881,10 @@ class SamGeoDockWidget(QDockWidget):
                 self.text_status_label.setStyleSheet("color: orange;")
 
             self.log_message(f"Text segmentation complete. Found {num_masks} objects.")
+
+            # Auto-show results if enabled
+            if num_masks > 0:
+                self._auto_show_results()
 
         except Exception as e:
             self.text_status_label.setText("Segmentation failed!")
@@ -1029,9 +1045,12 @@ class SamGeoDockWidget(QDockWidget):
 
             # Update status label
             if num_masks > 0:
-                self.point_status_label.setText(
-                    f"Found {num_masks} object(s). Go to Output tab to save."
-                )
+                if self.auto_show_check.isChecked():
+                    self.point_status_label.setText(f"Found {num_masks} object(s).")
+                else:
+                    self.point_status_label.setText(
+                        f"Found {num_masks} object(s). Go to Output tab to save."
+                    )
                 self.point_status_label.setStyleSheet("color: green;")
             else:
                 self.point_status_label.setText(
@@ -1046,6 +1065,10 @@ class SamGeoDockWidget(QDockWidget):
             self.add_bg_point_btn.setChecked(False)
             if self.previous_tool:
                 self.canvas.setMapTool(self.previous_tool)
+
+            # Auto-show results if enabled
+            if num_masks > 0:
+                self._auto_show_results()
 
         except Exception as e:
             self.point_status_label.setText("Segmentation failed!")
@@ -1131,9 +1154,12 @@ class SamGeoDockWidget(QDockWidget):
 
             # Update status label
             if num_masks > 0:
-                self.box_status_label.setText(
-                    f"Found {num_masks} object(s). Go to Output tab to save."
-                )
+                if self.auto_show_check.isChecked():
+                    self.box_status_label.setText(f"Found {num_masks} object(s).")
+                else:
+                    self.box_status_label.setText(
+                        f"Found {num_masks} object(s). Go to Output tab to save."
+                    )
                 self.box_status_label.setStyleSheet("color: green;")
             else:
                 self.box_status_label.setText("No objects found. Try a different box.")
@@ -1145,6 +1171,10 @@ class SamGeoDockWidget(QDockWidget):
             self.draw_box_btn.setChecked(False)
             if self.previous_tool:
                 self.canvas.setMapTool(self.previous_tool)
+
+            # Auto-show results if enabled
+            if num_masks > 0:
+                self._auto_show_results()
 
         except Exception as e:
             self.box_status_label.setText("Segmentation failed!")
@@ -1260,9 +1290,12 @@ class SamGeoDockWidget(QDockWidget):
 
             # Update status label
             if num_masks > 0:
-                self.batch_status_label.setText(
-                    f"Found {num_masks} object(s). Go to Output tab to save."
-                )
+                if self.auto_show_check.isChecked():
+                    self.batch_status_label.setText(f"Found {num_masks} object(s).")
+                else:
+                    self.batch_status_label.setText(
+                        f"Found {num_masks} object(s). Go to Output tab to save."
+                    )
                 self.batch_status_label.setStyleSheet("color: green;")
             else:
                 self.batch_status_label.setText(
@@ -1277,12 +1310,16 @@ class SamGeoDockWidget(QDockWidget):
             # Deactivate batch point tool if active
             self.batch_add_point_btn.setChecked(False)
 
-            # Add output to map if saved and option is checked
+            # Add output to map if saved and option is checked (for batch-specific output)
             if output_path and self.add_to_map_check.isChecked():
                 layer = QgsRasterLayer(output_path, os.path.basename(output_path))
                 if layer.isValid():
                     QgsProject.instance().addMapLayer(layer)
                     self.results_text.append("Added result layer to map.")
+
+            # Auto-show results if enabled and no batch-specific output was provided
+            if num_masks > 0 and not output_path:
+                self._auto_show_results()
 
         except Exception as e:
             self.batch_status_label.setText("Failed!")
@@ -1291,6 +1328,123 @@ class SamGeoDockWidget(QDockWidget):
 
         finally:
             self.progress_bar.setVisible(False)
+
+    def _auto_show_results(self):
+        """Automatically save and show results based on Output tab settings.
+
+        This method is called after successful segmentation to automatically
+        display results without requiring the user to manually click on the
+        Output tab and Save Masks button.
+        """
+        if not self.auto_show_check.isChecked():
+            return
+
+        if self.sam is None or self.sam.masks is None or len(self.sam.masks) == 0:
+            return
+
+        import tempfile
+
+        format_text = self.output_format_combo.currentText()
+        output_path = self.output_path_edit.text().strip()
+
+        # Generate temp file path if not specified
+        use_temp_file = False
+        if not output_path:
+            use_temp_file = True
+            if "Raster" in format_text:
+                temp_file = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
+                output_path = temp_file.name
+                temp_file.close()
+            elif "GeoPackage" in format_text:
+                temp_file = tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False)
+                output_path = temp_file.name
+                temp_file.close()
+            else:  # Shapefile
+                temp_dir = tempfile.mkdtemp()
+                output_path = os.path.join(temp_dir, "masks.shp")
+
+        try:
+            unique = self.unique_check.isChecked()
+
+            if "Raster" in format_text:
+                # Save as raster
+                self.sam.save_masks(output=output_path, unique=unique)
+
+                if self.add_to_map_check.isChecked():
+                    layer_name = (
+                        "samgeo_masks"
+                        if use_temp_file
+                        else os.path.basename(output_path)
+                    )
+                    layer = QgsRasterLayer(output_path, layer_name)
+                    if layer.isValid():
+                        QgsProject.instance().addMapLayer(layer)
+            else:
+                # Save as vector - first save as raster, then convert
+                temp_raster = tempfile.NamedTemporaryFile(
+                    suffix=".tif", delete=False
+                ).name
+                try:
+                    self.sam.save_masks(output=temp_raster, unique=unique)
+
+                    # Check if regularization is enabled
+                    if self.regularize_check.isChecked():
+                        # Use geoai.orthogonalize for regularization
+                        from .._geoai_lib import get_geoai
+
+                        geoai = get_geoai()
+
+                        epsilon = self.epsilon_spin.value()
+                        min_area = (
+                            self.min_area_spin.value()
+                            if self.min_area_spin.value() > 0
+                            else None
+                        )
+
+                        gdf = geoai.orthogonalize(
+                            temp_raster,
+                            output_path,
+                            epsilon=epsilon,
+                        )
+
+                        # Apply min area filter if specified
+                        if min_area is not None and min_area > 0:
+                            gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
+                            gdf = gdf[gdf["area_m2"] >= min_area]
+                            # Determine driver based on output format
+                            if output_path.endswith(".geojson"):
+                                driver = "GeoJSON"
+                            elif output_path.endswith(".gpkg"):
+                                driver = "GPKG"
+                            elif output_path.endswith(".shp"):
+                                driver = "ESRI Shapefile"
+                            else:
+                                driver = None
+                            gdf.to_file(output_path, driver=driver)
+                    else:
+                        # Convert raster to vector without regularization
+                        from samgeo import common
+
+                        common.raster_to_vector(temp_raster, output_path)
+
+                    if self.add_to_map_check.isChecked():
+                        layer_name = (
+                            "samgeo_masks"
+                            if use_temp_file
+                            else os.path.basename(output_path)
+                        )
+                        layer = QgsVectorLayer(output_path, layer_name, "ogr")
+                        if layer.isValid():
+                            QgsProject.instance().addMapLayer(layer)
+                finally:
+                    if os.path.exists(temp_raster):
+                        os.remove(temp_raster)
+
+            self.results_text.append(f"\nAuto-saved to: {output_path}")
+            self.log_message(f"Auto-saved masks to: {output_path}")
+
+        except Exception as e:
+            self.log_message(f"Auto-show failed: {str(e)}", level=Qgis.Warning)
 
     def save_masks(self):
         """Save the segmentation masks."""
