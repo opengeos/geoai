@@ -115,6 +115,12 @@ class DownloadWorker(QThread):
             # Extract the zip file
             extract_dir = os.path.join(temp_dir, "extracted")
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                # Secure extraction to prevent zip slip
+                for member in zip_ref.namelist():
+                    member_path = os.path.realpath(os.path.join(extract_dir, member))
+                    extract_dir_real = os.path.realpath(extract_dir)
+                    if not member_path.startswith(extract_dir_real + os.sep):
+                        raise Exception(f"Attempted Path Traversal in Zip File: {member}")
                 zip_ref.extractall(extract_dir)
 
             self.progress.emit(70, "Locating plugin files...")
