@@ -1445,6 +1445,7 @@ class SamGeoDockWidget(QDockWidget):
 
         except Exception as e:
             self.log_message(f"Auto-show failed: {str(e)}", level=Qgis.Warning)
+            self.show_error(f"Auto-show failed: {str(e)}")
 
     def save_masks(self):
         """Save the segmentation masks."""
