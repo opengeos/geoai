@@ -497,6 +497,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="1) Set up the environment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-on-linuxmacos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation on Linux/macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-on-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation on Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#request-access-to-sam-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request access to SAM 3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3453,6 +3492,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="1) Set up the environment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-on-linuxmacos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation on Linux/macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installation-on-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation on Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#request-access-to-sam-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request access to SAM 3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3680,6 +3758,7 @@
 </ul>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <h3 id="1-set-up-the-environment">1) Set up the environment<a class="headerlink" href="#1-set-up-the-environment" title="Permanent link">&para;</a></h3>
+<h4 id="installation-on-linuxmacos">Installation on Linux/macOS<a class="headerlink" href="#installation-on-linuxmacos" title="Permanent link">&para;</a></h4>
 <p>Use a clean conda env dedicated to QGIS—mixing with an existing QGIS install often breaks dependencies.</p>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
 <span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12
@@ -3703,16 +3782,25 @@ python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;i
 <span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span><span class="s2">&quot;segment-geospatial[samgeo3]&quot;</span><span class="w"> </span>sam3
 python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import samgeo; print(&#39;samgeo import successful&#39;)&quot;</span>
 </code></pre></div></td></tr></table></div>
+<h4 id="installation-on-windows">Installation on Windows<a class="headerlink" href="#installation-on-windows" title="Permanent link">&para;</a></h4>
 <p>Windows + SAM3 often needs the PyTorch wheels from NVIDIA and PyPI:</p>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
 <span class="normal">2</span>
 <span class="normal">3</span>
 <span class="normal">4</span>
-<span class="normal">5</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12
+<span class="normal">5</span>
+<span class="normal">6</span>
+<span class="normal">7</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12
 conda<span class="w"> </span>activate<span class="w"> </span>geo
 conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">12</span>.1<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia
-conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>qgis<span class="w"> </span>segment-geospatial<span class="w"> </span>geoai
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;segment-geospatial[samgeo3]&quot;</span><span class="w"> </span>triton-windows
+conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>geoai
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import geoai; print(&#39;geoai import successful&#39;)&quot;</span>
+conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>qgis
+pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span><span class="s2">&quot;segment-geospatial[samgeo3]&quot;</span><span class="w"> </span>sam3<span class="w"> </span>triton-windows
+</code></pre></div></td></tr></table></div>
+<h4 id="request-access-to-sam-3">Request access to SAM 3<a class="headerlink" href="#request-access-to-sam-3" title="Permanent link">&para;</a></h4>
+<p>To use SAM 3, you will need to request access by filling out this form on Hugging Face at <a href="https://huggingface.co/facebook/sam3">https://huggingface.co/facebook/sam3</a>. Once your request has been approved, run the following command in the terminal to authenticate:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>hf<span class="w"> </span>auth<span class="w"> </span>login
 </code></pre></div></td></tr></table></div>
 <h3 id="2-install-the-qgis-plugin">2) Install the QGIS plugin<a class="headerlink" href="#2-install-the-qgis-plugin" title="Permanent link">&para;</a></h3>
 <p>Option A — use the helper script (recommended):</p>
@@ -3908,7 +3996,7 @@ python<span class="w"> </span>install.py
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 12, 2025 21:47:28 UTC"><span class="timeago" datetime="2025-12-12T21:47:28+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 12, 2025 21:47:28 UTC">2025-12-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 13, 2025 15:56:34 UTC"><span class="timeago" datetime="2025-12-13T15:56:34+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 13, 2025 15:56:34 UTC">2025-12-13</span>
   </span>
 
     
