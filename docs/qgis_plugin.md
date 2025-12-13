@@ -99,10 +99,10 @@ Windows + SAM3 often needs the PyTorch wheels from NVIDIA and PyPI:
 conda create -n geo python=3.12
 conda activate geo
 conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia
-conda install -c conda-forge geoai
+conda install -c conda-forge geoai qgis
 python -c "import geoai; print('geoai import successful')"
-conda install -c conda-forge qgis
 pip install -U "segment-geospatial[samgeo3]" triton-windows
+python -c "import samgeo; print('samgeo import successful')"
 pip install -U sam3 geoai-py segment-geospatial
 ```
 
