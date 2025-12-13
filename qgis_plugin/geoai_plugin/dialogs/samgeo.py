@@ -674,11 +674,19 @@ class SamGeoDockWidget(QDockWidget):
                 are enabled. Returns None if custom bands are disabled.
         """
         if self.custom_bands_check.isChecked():
-            return [
+            bands = [
                 self.red_band_spin.value(),
                 self.green_band_spin.value(),
                 self.blue_band_spin.value(),
             ]
+            if len(set(bands)) < 3:
+                QMessageBox.warning(
+                    self,
+                    "Invalid Band Selection",
+                    "Please select three different bands for R, G, and B channels."
+                )
+                return None
+            return bands
         return None
 
     def refresh_layers(self):
