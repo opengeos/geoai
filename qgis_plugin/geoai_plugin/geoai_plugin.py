@@ -160,6 +160,19 @@ class GeoAIPlugin:
         # Add separator
         self.menu.addSeparator()
 
+        # Update icon - use QGIS default download/update icon
+        update_icon = ":/images/themes/default/mActionRefresh.svg"
+
+        # Add Check for Updates action (menu only)
+        self.add_action(
+            update_icon,
+            "Check for Updates...",
+            self.show_update_checker,
+            add_to_toolbar=False,
+            status_tip="Check for plugin updates from GitHub",
+            parent=self.iface.mainWindow(),
+        )
+
         # Add About action (menu only)
         self.add_action(
             about_icon,
@@ -482,9 +495,27 @@ class GeoAIPlugin:
 
     def show_about(self):
         """Display the about dialog."""
-        about_text = """
+        # Read version from metadata.txt
+        version = "Unknown"
+        try:
+            metadata_path = os.path.join(self.plugin_dir, "metadata.txt")
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                import re
+
+                content = f.read()
+                version_match = re.search(r"^version=(.+)$", content, re.MULTILINE)
+                if version_match:
+                    version = version_match.group(1).strip()
+        except Exception as e:
+            QMessageBox.warning(
+                self.iface.mainWindow(),
+                "GeoAI Plugin",
+                f"Could not read version from metadata.txt:\n{str(e)}",
+            )
+
+        about_text = f"""
 <h2>GeoAI Plugin for QGIS</h2>
-<p>Version: 0.1.0</p>
+<p>Version: {version}</p>
 <p>Author: Qiusheng Wu</p>
 
 <h3>Features:</h3>
@@ -508,3 +539,25 @@ class GeoAIPlugin:
             "About GeoAI Plugin",
             about_text,
         )
+
+    def show_update_checker(self):
+        """Display the update checker dialog."""
+        try:
+            from .dialogs.update_checker import UpdateCheckerDialog
+        except ImportError as e:
+            QMessageBox.critical(
+                self.iface.mainWindow(),
+                "Error",
+                f"Failed to import update checker dialog:\n{str(e)}",
+            )
+            return
+
+        try:
+            dialog = UpdateCheckerDialog(self.plugin_dir, self.iface.mainWindow())
+            dialog.exec_()
+        except Exception as e:
+            QMessageBox.critical(
+                self.iface.mainWindow(),
+                "Error",
+                f"Failed to open update checker:\n{str(e)}",
+            )
