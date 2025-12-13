@@ -60,7 +60,9 @@ class VersionCheckWorker(QThread):
 
             # Parse changelog
             changelog_match = re.search(
-                r"^changelog=(.+?)(?=^[a-zA-Z0-9_]+=|\Z)", content, re.MULTILINE | re.DOTALL
+                r"^changelog=(.+?)(?=^[a-zA-Z0-9_]+=|\Z)",
+                content,
+                re.MULTILINE | re.DOTALL,
             )
             changelog = ""
             if changelog_match:
