@@ -217,7 +217,7 @@ class UpdateCheckerDialog(QDialog):
             version_match = re.search(r"^version=(.+)$", content, re.MULTILINE)
             if version_match:
                 return version_match.group(1).strip()
-        except Exception:
+        except (FileNotFoundError, OSError, IOError):
             pass
         return "Unknown"
 
