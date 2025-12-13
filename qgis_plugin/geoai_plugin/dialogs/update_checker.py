@@ -120,7 +120,9 @@ class DownloadWorker(QThread):
                     member_path = os.path.realpath(os.path.join(extract_dir, member))
                     extract_dir_real = os.path.realpath(extract_dir)
                     if not member_path.startswith(extract_dir_real + os.sep):
-                        raise Exception(f"Attempted Path Traversal in Zip File: {member}")
+                        raise Exception(
+                            f"Attempted Path Traversal in Zip File: {member}"
+                        )
                 zip_ref.extractall(extract_dir)
 
             self.progress.emit(70, "Locating plugin files...")
