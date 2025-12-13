@@ -669,8 +669,9 @@ class SamGeoDockWidget(QDockWidget):
         """Get the bands list for set_image if custom bands are enabled.
 
         Returns:
-            List[int] or None: List of band indices [R, G, B] if custom bands
-                are enabled, None otherwise.
+            list[int] or None: A list of exactly three integers [R, G, B], representing
+                the band indices for red, green, and blue channels in that order, if custom bands
+                are enabled. Returns None if custom bands are disabled.
         """
         if self.custom_bands_check.isChecked():
             return [
