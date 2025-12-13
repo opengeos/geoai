@@ -544,7 +544,15 @@ class GeoAIPlugin:
         """Display the update checker dialog."""
         try:
             from .dialogs.update_checker import UpdateCheckerDialog
+        except ImportError as e:
+            QMessageBox.critical(
+                self.iface.mainWindow(),
+                "Error",
+                f"Failed to import update checker dialog:\n{str(e)}",
+            )
+            return
 
+        try:
             dialog = UpdateCheckerDialog(self.plugin_dir, self.iface.mainWindow())
             dialog.exec_()
         except Exception as e:
