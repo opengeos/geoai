@@ -150,10 +150,18 @@ class DownloadWorker(QThread):
 
             except Exception as e:
                 # Restore backup if copy fails
-                if os.path.exists(backup_dir):
+                def is_valid_plugin_dir(path):
+                    return (
+                        os.path.exists(os.path.join(path, "metadata.txt")) and
+                        os.path.exists(os.path.join(path, "geoai_plugin.py"))
+                    )
+                if os.path.exists(backup_dir) and is_valid_plugin_dir(backup_dir):
                     if os.path.exists(target_dir):
                         shutil.rmtree(target_dir)
                     shutil.move(backup_dir, target_dir)
+                else:
+                    # Backup is missing or invalid, cannot restore
+                    self.error.emit("Backup missing or invalid, cannot restore previous plugin version.")
                 raise e
 
         except HTTPError as e:
