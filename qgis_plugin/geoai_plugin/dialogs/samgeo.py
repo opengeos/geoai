@@ -683,7 +683,7 @@ class SamGeoDockWidget(QDockWidget):
                 QMessageBox.warning(
                     self,
                     "Invalid Band Selection",
-                    "Please select three different bands for R, G, and B channels."
+                    "Please select three different bands for R, G, and B channels.",
                 )
                 return None
             return bands
