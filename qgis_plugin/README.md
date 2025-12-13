@@ -106,6 +106,10 @@ python -c "import samgeo; print('samgeo import successful')"
 pip install -U sam3 geoai-py segment-geospatial
 ```
 
+You can follow this [video tutorial](https://youtu.be/a-Ns9peiuu8) to install the GeoAI QGIS Plugin on Windows:
+
+[![windows](https://github.com/user-attachments/assets/8d89d535-1d66-45d2-a6c0-171416c259c9)](https://youtu.be/a-Ns9peiuu8)
+
 #### Request access to SAM 3
 
 To use SAM 3, you will need to request access by filling out this form on Hugging Face at <https://huggingface.co/facebook/sam3>. Once your request has been approved, run the following command in the terminal to authenticate:
