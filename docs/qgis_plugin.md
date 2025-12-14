@@ -122,6 +122,8 @@ hf auth login
 
 Option A — use QGIS Plugin Manager (recommended):
 
+GeoAI is available as an experimental plugin in the official [QGIS plugin repository](https://plugins.qgis.org/plugins/geoai). To install:
+
 1. Launch QGIS: `conda run qgis`
 2. Go to `Plugins` → `Manage and Install Plugins...` → `Settings` tab → check `Show also Experimental Plugins` → Click on `Reload all Repositories` button.
 3. Switch to the `All` tab, search for `GeoAI`, select it, and click `Install Experimental Plugin`.
@@ -130,7 +132,7 @@ Option A — use QGIS Plugin Manager (recommended):
 
 ![](https://github.com/user-attachments/assets/ea101a82-5df7-4947-99b8-d4a83a1598ed)
 
-Option B — use the helper script
+Option B — use the helper script:
 
 ```bash
 git clone https://github.com/opengeos/geoai.git
