@@ -627,7 +627,9 @@ class SamGeoDockWidget(QDockWidget):
         regularize_options_layout.addLayout(epsilon_row)
 
         self.regularize_options_widget.setLayout(regularize_options_layout)
-        self.regularize_options_widget.setVisible(False)  # Hidden by default (Simple mode)
+        self.regularize_options_widget.setVisible(
+            False
+        )  # Hidden by default (Simple mode)
         vector_options_layout.addWidget(self.regularize_options_widget)
 
         # Smooth options
