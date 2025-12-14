@@ -34,4 +34,4 @@ jobs:
 
             - name: Test import
               run: |
-                  uv run python -c "import geoai; print('geoai import successful')"  # not working due to bitsandbytes
+                  uv run python -c "import geoai; print('geoai import successful')"
