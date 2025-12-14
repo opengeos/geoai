@@ -2207,6 +2207,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/smooth_vector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Smooth vector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3576,6 +3604,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#geoai.sam.smooth_vector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        smooth_vector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#geoai.sam.stack_bands" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4560,6 +4599,17 @@
     <span class="md-ellipsis">
       
         rowcol_to_xy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geoai.sam.smooth_vector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        smooth_vector
       
     </span>
   </a>
@@ -30072,6 +30122,372 @@ not saved. Defaults to None.</p>
             <span class="n">boxes_to_vector</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">src_crs</span><span class="p">,</span> <span class="n">dst_crs</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">result</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="geoai.sam.smooth_vector" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">smooth_vector</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">segment_length</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">smooth_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">num_cores</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">merge_collection</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">merge_field</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">merge_multipolygons</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">preserve_area</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">area_tolerance</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+<a href="#geoai.sam.smooth_vector" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Smooth a vector data using the smoothify library.
+    See https://github.com/DPIRD-DMA/Smoothify for more details.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>vector_data</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="geopandas.GeoDataFrame">GeoDataFrame</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The vector data to smooth.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>output_path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The path to save the smoothed vector data. If None, returns the smoothed vector data.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>segment_length</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resolution of the original raster data in map units. If None (default), automatically
+detects by finding the minimum segment length (from a data sample). Recommended to specify explicitly when known.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>smooth_iterations</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The number of iterations to smooth the vector data.</p>
+              </div>
+            </td>
+            <td>
+                  <code>3</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_cores</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of cores to use for parallel processing. If 0 (default), uses all available cores.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>merge_collection</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to merge/dissolve adjacent geometries in collections before smoothing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>merge_field</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column name to use for dissolving geometries. Only valid when merge_collection=True.
+If None, dissolves all geometries together. If specified, dissolves geometries grouped by the column values.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>merge_multipolygons</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to merge adjacent polygons within MultiPolygons before smoothing</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>preserve_area</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to restore original area after smoothing via buffering (applies to Polygons only)</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>area_tolerance</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Percentage of original area allowed as error (e.g., 0.01 = 0.01% error = 99.99% preservation).
+Only affects Polygons when preserve_area=True</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.01</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="geopandas.GeoDataFrame">GeoDataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>gpd.GeoDataFrame: The smoothed vector data.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">geoai</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">gdf</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">read_vector</span><span class="p">(</span><span class="s2">&quot;path/to/vector.geojson&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smoothed_gdf</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">smooth_vector</span><span class="p">(</span><span class="n">gdf</span><span class="p">,</span> <span class="n">smooth_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="s2">&quot;path/to/smoothed_vector.geojson&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smoothed_gdf</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">smoothed_gdf</span><span class="o">.</span><span class="n">explore</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>geoai/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">7853</span>
+<span class="normal">7854</span>
+<span class="normal">7855</span>
+<span class="normal">7856</span>
+<span class="normal">7857</span>
+<span class="normal">7858</span>
+<span class="normal">7859</span>
+<span class="normal">7860</span>
+<span class="normal">7861</span>
+<span class="normal">7862</span>
+<span class="normal">7863</span>
+<span class="normal">7864</span>
+<span class="normal">7865</span>
+<span class="normal">7866</span>
+<span class="normal">7867</span>
+<span class="normal">7868</span>
+<span class="normal">7869</span>
+<span class="normal">7870</span>
+<span class="normal">7871</span>
+<span class="normal">7872</span>
+<span class="normal">7873</span>
+<span class="normal">7874</span>
+<span class="normal">7875</span>
+<span class="normal">7876</span>
+<span class="normal">7877</span>
+<span class="normal">7878</span>
+<span class="normal">7879</span>
+<span class="normal">7880</span>
+<span class="normal">7881</span>
+<span class="normal">7882</span>
+<span class="normal">7883</span>
+<span class="normal">7884</span>
+<span class="normal">7885</span>
+<span class="normal">7886</span>
+<span class="normal">7887</span>
+<span class="normal">7888</span>
+<span class="normal">7889</span>
+<span class="normal">7890</span>
+<span class="normal">7891</span>
+<span class="normal">7892</span>
+<span class="normal">7893</span>
+<span class="normal">7894</span>
+<span class="normal">7895</span>
+<span class="normal">7896</span>
+<span class="normal">7897</span>
+<span class="normal">7898</span>
+<span class="normal">7899</span>
+<span class="normal">7900</span>
+<span class="normal">7901</span>
+<span class="normal">7902</span>
+<span class="normal">7903</span>
+<span class="normal">7904</span>
+<span class="normal">7905</span>
+<span class="normal">7906</span>
+<span class="normal">7907</span>
+<span class="normal">7908</span>
+<span class="normal">7909</span>
+<span class="normal">7910</span>
+<span class="normal">7911</span>
+<span class="normal">7912</span>
+<span class="normal">7913</span>
+<span class="normal">7914</span>
+<span class="normal">7915</span>
+<span class="normal">7916</span>
+<span class="normal">7917</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">smooth_vector</span><span class="p">(</span>
+    <span class="n">vector_data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">],</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">segment_length</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">smooth_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">num_cores</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">merge_collection</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">merge_field</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">merge_multipolygons</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">preserve_area</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">area_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Smooth a vector data using the smoothify library.</span>
+<span class="sd">        See https://github.com/DPIRD-DMA/Smoothify for more details.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vector_data: The vector data to smooth.</span>
+<span class="sd">        output_path: The path to save the smoothed vector data. If None, returns the smoothed vector data.</span>
+<span class="sd">        segment_length: Resolution of the original raster data in map units. If None (default), automatically</span>
+<span class="sd">            detects by finding the minimum segment length (from a data sample). Recommended to specify explicitly when known.</span>
+<span class="sd">        smooth_iterations: The number of iterations to smooth the vector data.</span>
+<span class="sd">        num_cores: Number of cores to use for parallel processing. If 0 (default), uses all available cores.</span>
+<span class="sd">        merge_collection: Whether to merge/dissolve adjacent geometries in collections before smoothing.</span>
+<span class="sd">        merge_field: Column name to use for dissolving geometries. Only valid when merge_collection=True.</span>
+<span class="sd">            If None, dissolves all geometries together. If specified, dissolves geometries grouped by the column values.</span>
+<span class="sd">        merge_multipolygons: Whether to merge adjacent polygons within MultiPolygons before smoothing</span>
+<span class="sd">        preserve_area: Whether to restore original area after smoothing via buffering (applies to Polygons only)</span>
+<span class="sd">        area_tolerance: Percentage of original area allowed as error (e.g., 0.01 = 0.01% error = 99.99% preservation).</span>
+<span class="sd">            Only affects Polygons when preserve_area=True</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        gpd.GeoDataFrame: The smoothed vector data.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; import geoai</span>
+<span class="sd">        &gt;&gt;&gt; gdf = geoai.read_vector(&quot;path/to/vector.geojson&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; smoothed_gdf = geoai.smooth_vector(gdf, smooth_iterations=3, output_path=&quot;path/to/smoothed_vector.geojson&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; smoothed_gdf.head()</span>
+<span class="sd">        &gt;&gt;&gt; smoothed_gdf.explore()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">smoothify</span><span class="w"> </span><span class="kn">import</span> <span class="n">smoothify</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="n">install_package</span><span class="p">(</span><span class="s2">&quot;smoothify&quot;</span><span class="p">)</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">smoothify</span><span class="w"> </span><span class="kn">import</span> <span class="n">smoothify</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vector_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">vector_data</span> <span class="o">=</span> <span class="n">leafmap</span><span class="o">.</span><span class="n">read_vector</span><span class="p">(</span><span class="n">vector_data</span><span class="p">)</span>
+
+    <span class="n">smoothed_vector_data</span> <span class="o">=</span> <span class="n">smoothify</span><span class="p">(</span>
+        <span class="n">geom</span><span class="o">=</span><span class="n">vector_data</span><span class="p">,</span>
+        <span class="n">segment_length</span><span class="o">=</span><span class="n">segment_length</span><span class="p">,</span>
+        <span class="n">smooth_iterations</span><span class="o">=</span><span class="n">smooth_iterations</span><span class="p">,</span>
+        <span class="n">num_cores</span><span class="o">=</span><span class="n">num_cores</span><span class="p">,</span>
+        <span class="n">merge_collection</span><span class="o">=</span><span class="n">merge_collection</span><span class="p">,</span>
+        <span class="n">merge_field</span><span class="o">=</span><span class="n">merge_field</span><span class="p">,</span>
+        <span class="n">merge_multipolygons</span><span class="o">=</span><span class="n">merge_multipolygons</span><span class="p">,</span>
+        <span class="n">preserve_area</span><span class="o">=</span><span class="n">preserve_area</span><span class="p">,</span>
+        <span class="n">area_tolerance</span><span class="o">=</span><span class="n">area_tolerance</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">output_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">smoothed_vector_data</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">smoothed_vector_data</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
