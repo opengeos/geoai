@@ -7880,6 +7880,16 @@ def smooth_vector(
         preserve_area: Whether to restore original area after smoothing via buffering (applies to Polygons only)
         area_tolerance: Percentage of original area allowed as error (e.g., 0.01 = 0.01% error = 99.99% preservation).
             Only affects Polygons when preserve_area=True
+
+    Returns:
+        gpd.GeoDataFrame: The smoothed vector data.
+
+    Examples:
+        >>> import geoai
+        >>> gdf = geoai.read_vector("path/to/vector.geojson")
+        >>> smoothed_gdf = geoai.smooth_vector(gdf, smooth_iterations=3, output_path="path/to/smoothed_vector.geojson")
+        >>> smoothed_gdf.head()
+        >>> smoothed_gdf.explore()
     """
     try:
         from smoothify import smoothify
