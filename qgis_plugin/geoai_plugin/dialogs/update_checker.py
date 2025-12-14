@@ -288,7 +288,7 @@ class UpdateCheckerDialog(QDialog):
         self.check_btn.clicked.connect(self.check_for_updates)
         button_layout.addWidget(self.check_btn)
 
-        self.install_btn = QPushButton("Download & Install Update")
+        self.install_btn = QPushButton("Download and Install Update")
         self.install_btn.setEnabled(False)
         self.install_btn.clicked.connect(self.download_and_install)
         button_layout.addWidget(self.install_btn)
@@ -346,7 +346,7 @@ class UpdateCheckerDialog(QDialog):
             self.latest_version_label.setStyleSheet("color: green; font-weight: bold;")
             self.status_label.setText(
                 f"A new version ({self.latest_version}) is available! "
-                "Click 'Download & Install Update' to update."
+                "Click 'Download and Install Update' to update."
             )
             self.status_label.setStyleSheet("color: green;")
             self.install_btn.setEnabled(True)

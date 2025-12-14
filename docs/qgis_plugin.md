@@ -120,7 +120,19 @@ hf auth login
 
 ### 2) Install the QGIS plugin
 
-Option A — use the helper script (recommended):
+Option A — use QGIS Plugin Manager (recommended):
+
+GeoAI is available as an experimental plugin in the official [QGIS plugin repository](https://plugins.qgis.org/plugins/geoai). To install:
+
+1. Launch QGIS: `conda run qgis`
+2. Go to `Plugins` → `Manage and Install Plugins...` → `Settings` tab → check `Show also Experimental Plugins` → Click on `Reload all Repositories` button.
+3. Switch to the `All` tab, search for `GeoAI`, select it, and click `Install Experimental Plugin`.
+
+![](https://github.com/user-attachments/assets/c15c4b7e-1e8c-45de-9127-671c7c2c85a9)
+
+![](https://github.com/user-attachments/assets/ea101a82-5df7-4947-99b8-d4a83a1598ed)
+
+Option B — use the helper script:
 
 ```bash
 git clone https://github.com/opengeos/geoai.git
@@ -134,7 +146,7 @@ This links/copies the plugin into your active QGIS profile. Re-run after pulling
 python install.py --remove
 ```
 
-Option B — manual copy:
+Option C — manual copy:
 
 -   Copy the `qgis_plugin` folder to your QGIS plugins directory:
     -   Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
@@ -146,6 +158,8 @@ Option B — manual copy:
 Launch QGIS: `conda run qgis`
 
 QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`. After updates, toggle the plugin off/on or restart QGIS to reload.
+
+![](https://github.com/user-attachments/assets/1b6dab14-311d-4f62-85aa-1faed73ead5b)
 
 ## Usage
 
@@ -246,6 +260,12 @@ Steps:
 Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.
 
 ![](https://github.com/user-attachments/assets/76c9dd8a-581c-4975-9ecb-4bfe301447bd)
+
+### Plugin Update Checker
+
+Go to `GeoAI` menu → `Check for Updates...` to see if a newer version of the GeoAI plugin is available. Click on the `Check for Updates` button to fetch the latest version info from GitHub. If an update is found, click the `Download and Install Update` button to download and install the latest version automatically. Restart QGIS to apply the update.
+
+![](https://github.com/user-attachments/assets/cc0dfd38-9b41-4735-9af0-c49b7aa71b72)
 
 ## Supported Model Architectures (Segmentation)
 
