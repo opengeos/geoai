@@ -142,7 +142,8 @@ class DownloadWorker(QThread):
 
             # Get the parent directory of the current plugin (QGIS plugins folder)
             plugins_folder = os.path.dirname(self.plugin_dir)
-            target_dir = os.path.join(plugins_folder, "geoai_plugin")
+            current_plugin_name = os.path.basename(self.plugin_dir)
+            target_dir = os.path.join(plugins_folder, current_plugin_name)
 
             # Backup current plugin (optional - we'll just replace)
             backup_dir = os.path.join(temp_dir, "backup")
