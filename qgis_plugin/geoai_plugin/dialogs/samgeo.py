@@ -1200,11 +1200,21 @@ class SamGeoDockWidget(QDockWidget):
                 )
             else:
                 # Fallback for older SamGeo versions
-                self.sam.predict(
-                    point_coords=point_coords,
-                    point_labels=point_labels,
-                    point_crs=None,
-                )
+                # Try to pass multimask_output for consistency; if not supported, fall back without it.
+                try:
+                    self.sam.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        point_crs=None,
+                        multimask_output=use_multimask,
+                    )
+                except TypeError:
+                    # Older SamGeo versions do not support multimask_output; behavior may differ.
+                    self.sam.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        point_crs=None,
+                    )
 
             num_masks = len(self.sam.masks) if self.sam.masks else 0
             self.results_text.setText(
