@@ -344,6 +344,64 @@ class VectorizeWorker(QThread):
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
+class SmoothVectorWorker(QThread):
+    """Worker thread for smoothing vector data."""
+
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
+
+    def __init__(
+        self,
+        mask_path: str,
+        output_path: str,
+        smooth_iterations: int = 3,
+        min_area: Optional[float] = None,
+        simplify_tolerance: Optional[float] = None,
+    ):
+        super().__init__()
+        self.mask_path = mask_path
+        self.output_path = output_path
+        self.smooth_iterations = smooth_iterations
+        self.min_area = min_area
+        self.simplify_tolerance = simplify_tolerance
+
+    def run(self):
+        """Execute smoothing."""
+        try:
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
+
+            self.progress.emit("Converting raster to vector...")
+
+            # First convert raster to vector (use 0 for min_area if None)
+            min_area_value = self.min_area if self.min_area is not None else 0
+            gdf = geoai.raster_to_vector(
+                self.mask_path,
+                min_area=min_area_value,
+                simplify_tolerance=self.simplify_tolerance,
+            )
+
+            self.progress.emit(
+                f"Smoothing vector (iterations: {self.smooth_iterations})..."
+            )
+
+            # Apply smoothing
+            smoothed_gdf = geoai.smooth_vector(
+                gdf,
+                smooth_iterations=self.smooth_iterations,
+                output_path=self.output_path,
+            )
+
+            self.finished.emit(self.output_path)
+
+        except Exception as e:
+            import traceback
+
+            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+
+
 class SegmentationDockWidget(QDockWidget):
     """Dockable widget for segmentation training and inference."""
 
@@ -360,6 +418,7 @@ class SegmentationDockWidget(QDockWidget):
         self.tile_worker = None
         self.inference_worker = None
         self.vectorize_worker = None
+        self.smooth_worker = None
         self.last_output_path = None
 
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -914,11 +973,45 @@ class SegmentationDockWidget(QDockWidget):
         vectorize_layout = QFormLayout()
         vectorize_layout.setSpacing(5)
 
+        # Mode selection: Regularize vs Smooth
+        self.vectorize_mode_combo = QComboBox()
+        self.vectorize_mode_combo.setStyleSheet(self.combo_style)
+        self.vectorize_mode_combo.addItems(
+            ["Regularize (buildings)", "Smooth (natural features)"]
+        )
+        self.vectorize_mode_combo.currentIndexChanged.connect(
+            self.on_vectorize_mode_changed
+        )
+        vectorize_layout.addRow("Mode:", self.vectorize_mode_combo)
+
+        # Regularize options (visible by default)
         self.epsilon_spin = QDoubleSpinBox()
         self.epsilon_spin.setRange(0.0, 100.0)
         self.epsilon_spin.setValue(2.0)
         self.epsilon_spin.setStyleSheet(self.spin_style)
+        self.epsilon_spin.setToolTip(
+            "Douglas-Peucker tolerance for orthogonalization (suitable for buildings)"
+        )
         vectorize_layout.addRow("Epsilon:", self.epsilon_spin)
+
+        # Smooth options (hidden by default)
+        self.smooth_iterations_spin = QSpinBox()
+        self.smooth_iterations_spin.setRange(1, 20)
+        self.smooth_iterations_spin.setValue(3)
+        self.smooth_iterations_spin.setStyleSheet(self.spin_style)
+        self.smooth_iterations_spin.setToolTip(
+            "Number of smoothing iterations (suitable for natural features like water)"
+        )
+        self.smooth_iterations_spin.setVisible(False)
+        vectorize_layout.addRow("Iterations:", self.smooth_iterations_spin)
+        # Store reference to the label for visibility toggle
+        self._smooth_iterations_label = vectorize_layout.labelForField(
+            self.smooth_iterations_spin
+        )
+        self._smooth_iterations_label.setVisible(False)
+
+        # Store reference to epsilon label for visibility toggle
+        self._epsilon_label = vectorize_layout.labelForField(self.epsilon_spin)
 
         self.min_area_spin = QDoubleSpinBox()
         self.min_area_spin.setRange(0.0, 10000.0)
@@ -1105,6 +1198,18 @@ class SegmentationDockWidget(QDockWidget):
         )
         if file_path:
             self.vector_output_edit.setText(file_path)
+
+    def on_vectorize_mode_changed(self, index):
+        """Handle vectorize mode change between Regularize and Smooth."""
+        is_smooth = index == 1  # 1 = Smooth mode
+
+        # Toggle visibility of Regularize options
+        self.epsilon_spin.setVisible(not is_smooth)
+        self._epsilon_label.setVisible(not is_smooth)
+
+        # Toggle visibility of Smooth options
+        self.smooth_iterations_spin.setVisible(is_smooth)
+        self._smooth_iterations_label.setVisible(is_smooth)
 
     def on_probability_check_toggled(self, checked):
         """Enable/disable probability path input based on checkbox."""
@@ -1405,22 +1510,38 @@ class SegmentationDockWidget(QDockWidget):
 
         self.vectorize_btn.setEnabled(False)
         self.inference_progress.setRange(0, 0)
-        self.log("Vectorizing...")
 
         min_area = (
             self.min_area_spin.value() if self.min_area_spin.value() > 0 else None
         )
 
-        self.vectorize_worker = VectorizeWorker(
-            mask_path,
-            vector_output,
-            self.epsilon_spin.value(),
-            min_area,
-        )
-        self.vectorize_worker.finished.connect(self.on_vectorize_finished)
-        self.vectorize_worker.error.connect(self.on_vectorize_error)
-        self.vectorize_worker.progress.connect(self.log)
-        self.vectorize_worker.start()
+        # Check vectorize mode: 0 = Regularize, 1 = Smooth
+        is_smooth_mode = self.vectorize_mode_combo.currentIndex() == 1
+
+        if is_smooth_mode:
+            self.log("Smoothing vector (for natural features)...")
+            self.smooth_worker = SmoothVectorWorker(
+                mask_path,
+                vector_output,
+                smooth_iterations=self.smooth_iterations_spin.value(),
+                min_area=min_area,
+            )
+            self.smooth_worker.finished.connect(self.on_vectorize_finished)
+            self.smooth_worker.error.connect(self.on_vectorize_error)
+            self.smooth_worker.progress.connect(self.log)
+            self.smooth_worker.start()
+        else:
+            self.log("Regularizing vector (for buildings)...")
+            self.vectorize_worker = VectorizeWorker(
+                mask_path,
+                vector_output,
+                self.epsilon_spin.value(),
+                min_area,
+            )
+            self.vectorize_worker.finished.connect(self.on_vectorize_finished)
+            self.vectorize_worker.error.connect(self.on_vectorize_error)
+            self.vectorize_worker.progress.connect(self.log)
+            self.vectorize_worker.start()
 
     def on_vectorize_finished(self, output_path: str):
         self.inference_progress.setRange(0, 100)
@@ -1451,6 +1572,7 @@ class SegmentationDockWidget(QDockWidget):
             self.tile_worker,
             self.inference_worker,
             self.vectorize_worker,
+            self.smooth_worker,
         ]:
             if worker and worker.isRunning():
                 worker.terminate()
