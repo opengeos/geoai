@@ -540,7 +540,12 @@ class SamGeoDockWidget(QDockWidget):
         format_row.addWidget(QLabel("Format:"))
         self.output_format_combo = QComboBox()
         self.output_format_combo.addItems(
-            ["Raster (GeoTIFF)", "Vector (GeoPackage)", "Vector (Shapefile)"]
+            [
+                "Raster (GeoTIFF)",
+                "Vector (GeoPackage)",
+                "Vector (Shapefile)",
+                "Vector (GeoJSON)",
+            ]
         )
         self.output_format_combo.currentIndexChanged.connect(
             self._on_output_format_changed
@@ -584,15 +589,25 @@ class SamGeoDockWidget(QDockWidget):
         output_group.setLayout(output_group_layout)
         output_layout.addWidget(output_group)
 
-        # Regularize options (for vector output)
-        self.regularize_group = QGroupBox("Regularize Options (Vector Only)")
-        regularize_layout = QVBoxLayout()
+        # Vector processing options (for vector output)
+        self.vector_options_group = QGroupBox("Vector Processing Options (Vector Only)")
+        vector_options_layout = QVBoxLayout()
 
-        # Regularize checkbox
-        self.regularize_check = QCheckBox("Regularize polygons (orthogonalize)")
-        self.regularize_check.setChecked(False)
-        self.regularize_check.stateChanged.connect(self._on_regularize_changed)
-        regularize_layout.addWidget(self.regularize_check)
+        # Mode selection: Regularize vs Smooth
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Mode:"))
+        self.vector_mode_combo = QComboBox()
+        self.vector_mode_combo.addItems(
+            ["Regularize (buildings)", "Smooth (natural features)"]
+        )
+        self.vector_mode_combo.currentIndexChanged.connect(self._on_vector_mode_changed)
+        mode_row.addWidget(self.vector_mode_combo)
+        vector_options_layout.addLayout(mode_row)
+
+        # Regularize options
+        self.regularize_options_widget = QWidget()
+        regularize_options_layout = QVBoxLayout()
+        regularize_options_layout.setContentsMargins(0, 0, 0, 0)
 
         # Epsilon (Douglas-Peucker tolerance)
         epsilon_row = QHBoxLayout()
@@ -602,13 +617,36 @@ class SamGeoDockWidget(QDockWidget):
         self.epsilon_spin.setValue(2.0)
         self.epsilon_spin.setSingleStep(0.5)
         self.epsilon_spin.setToolTip(
-            "Douglas-Peucker simplification tolerance for orthogonalization"
+            "Douglas-Peucker simplification tolerance for orthogonalization (suitable for buildings)"
         )
-        self.epsilon_spin.setEnabled(False)
         epsilon_row.addWidget(self.epsilon_spin)
-        regularize_layout.addLayout(epsilon_row)
+        regularize_options_layout.addLayout(epsilon_row)
 
-        # Min Area filter
+        self.regularize_options_widget.setLayout(regularize_options_layout)
+        vector_options_layout.addWidget(self.regularize_options_widget)
+
+        # Smooth options
+        self.smooth_options_widget = QWidget()
+        smooth_options_layout = QVBoxLayout()
+        smooth_options_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Smooth iterations
+        smooth_iterations_row = QHBoxLayout()
+        smooth_iterations_row.addWidget(QLabel("Iterations:"))
+        self.smooth_iterations_spin = QSpinBox()
+        self.smooth_iterations_spin.setRange(1, 20)
+        self.smooth_iterations_spin.setValue(3)
+        self.smooth_iterations_spin.setToolTip(
+            "Number of smoothing iterations (suitable for natural features like water, vegetation)"
+        )
+        smooth_iterations_row.addWidget(self.smooth_iterations_spin)
+        smooth_options_layout.addLayout(smooth_iterations_row)
+
+        self.smooth_options_widget.setLayout(smooth_options_layout)
+        self.smooth_options_widget.setVisible(False)  # Hidden by default
+        vector_options_layout.addWidget(self.smooth_options_widget)
+
+        # Min Area filter (common to both modes)
         min_area_row = QHBoxLayout()
         min_area_row.addWidget(QLabel("Min Area:"))
         self.min_area_spin = QDoubleSpinBox()
@@ -618,13 +656,14 @@ class SamGeoDockWidget(QDockWidget):
         self.min_area_spin.setToolTip(
             "Minimum area filter - polygons smaller than this will be removed"
         )
-        self.min_area_spin.setEnabled(False)
         min_area_row.addWidget(self.min_area_spin)
-        regularize_layout.addLayout(min_area_row)
+        vector_options_layout.addLayout(min_area_row)
 
-        self.regularize_group.setLayout(regularize_layout)
-        self.regularize_group.setVisible(False)  # Hidden by default (raster selected)
-        output_layout.addWidget(self.regularize_group)
+        self.vector_options_group.setLayout(vector_options_layout)
+        self.vector_options_group.setVisible(
+            False
+        )  # Hidden by default (raster selected)
+        output_layout.addWidget(self.vector_options_group)
 
         # Save button
         self.save_btn = QPushButton("Save Masks")
@@ -650,13 +689,13 @@ class SamGeoDockWidget(QDockWidget):
         """Handle output format combo box change."""
         format_text = self.output_format_combo.currentText()
         is_vector = "Vector" in format_text
-        self.regularize_group.setVisible(is_vector)
+        self.vector_options_group.setVisible(is_vector)
 
-    def _on_regularize_changed(self, state):
-        """Handle regularize checkbox state change."""
-        enabled = state == Qt.Checked
-        self.epsilon_spin.setEnabled(enabled)
-        self.min_area_spin.setEnabled(enabled)
+    def _on_vector_mode_changed(self, index):
+        """Handle vector processing mode change between Regularize and Smooth."""
+        is_smooth = index == 1  # 1 = Smooth mode
+        self.regularize_options_widget.setVisible(not is_smooth)
+        self.smooth_options_widget.setVisible(is_smooth)
 
     def _on_custom_bands_changed(self, state):
         """Handle custom bands checkbox state change."""
@@ -741,7 +780,9 @@ class SamGeoDockWidget(QDockWidget):
     def browse_output(self):
         """Browse for output file location."""
         format_text = self.output_format_combo.currentText()
-        if "GeoPackage" in format_text:
+        if "GeoJSON" in format_text:
+            filter_str = "GeoJSON (*.geojson)"
+        elif "GeoPackage" in format_text:
             filter_str = "GeoPackage (*.gpkg)"
         elif "Shapefile" in format_text:
             filter_str = "Shapefile (*.shp)"
@@ -1445,6 +1486,10 @@ class SamGeoDockWidget(QDockWidget):
                 temp_file = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
                 output_path = temp_file.name
                 temp_file.close()
+            elif "GeoJSON" in format_text:
+                temp_file = tempfile.NamedTemporaryFile(suffix=".geojson", delete=False)
+                output_path = temp_file.name
+                temp_file.close()
             elif "GeoPackage" in format_text:
                 temp_file = tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False)
                 output_path = temp_file.name
@@ -1477,19 +1522,35 @@ class SamGeoDockWidget(QDockWidget):
                 try:
                     self.sam.save_masks(output=temp_raster, unique=unique)
 
-                    # Check if regularization is enabled
-                    if self.regularize_check.isChecked():
-                        # Use geoai.orthogonalize for regularization
-                        from .._geoai_lib import get_geoai
+                    from .._geoai_lib import get_geoai
 
-                        geoai = get_geoai()
+                    geoai = get_geoai()
 
-                        epsilon = self.epsilon_spin.value()
-                        min_area = (
-                            self.min_area_spin.value()
-                            if self.min_area_spin.value() > 0
-                            else None
+                    min_area = self.min_area_spin.value()
+
+                    # Check vector processing mode: 0 = Regularize, 1 = Smooth
+                    is_smooth_mode = self.vector_mode_combo.currentIndex() == 1
+
+                    if is_smooth_mode:
+                        # Use smooth_vector for natural features
+                        smooth_iterations = self.smooth_iterations_spin.value()
+
+                        # First convert raster to vector (min_area=0 means no filtering)
+                        gdf = geoai.raster_to_vector(
+                            temp_raster,
+                            min_area=min_area if min_area > 0 else 0,
+                            simplify_tolerance=None,
                         )
+
+                        # Apply smoothing
+                        gdf = geoai.smooth_vector(
+                            gdf,
+                            smooth_iterations=smooth_iterations,
+                            output_path=output_path,
+                        )
+                    else:
+                        # Use orthogonalize for regularization (buildings)
+                        epsilon = self.epsilon_spin.value()
 
                         gdf = geoai.orthogonalize(
                             temp_raster,
@@ -1498,7 +1559,7 @@ class SamGeoDockWidget(QDockWidget):
                         )
 
                         # Apply min area filter if specified
-                        if min_area is not None and min_area > 0:
+                        if min_area > 0:
                             gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
                             gdf = gdf[gdf["area_m2"] >= min_area]
                             # Determine driver based on output format
@@ -1511,11 +1572,6 @@ class SamGeoDockWidget(QDockWidget):
                             else:
                                 driver = None
                             gdf.to_file(output_path, driver=driver)
-                    else:
-                        # Convert raster to vector without regularization
-                        from samgeo import common
-
-                        common.raster_to_vector(temp_raster, output_path)
 
                     if self.add_to_map_check.isChecked():
                         layer_name = (
@@ -1556,6 +1612,10 @@ class SamGeoDockWidget(QDockWidget):
                 temp_file = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
                 output_path = temp_file.name
                 temp_file.close()
+            elif "GeoJSON" in format_text:
+                temp_file = tempfile.NamedTemporaryFile(suffix=".geojson", delete=False)
+                output_path = temp_file.name
+                temp_file.close()
             elif "GeoPackage" in format_text:
                 temp_file = tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False)
                 output_path = temp_file.name
@@ -1592,19 +1652,35 @@ class SamGeoDockWidget(QDockWidget):
                 try:
                     self.sam.save_masks(output=temp_raster, unique=unique)
 
-                    # Check if regularization is enabled
-                    if self.regularize_check.isChecked():
-                        # Use geoai.orthogonalize for regularization
-                        from .._geoai_lib import get_geoai
+                    from .._geoai_lib import get_geoai
 
-                        geoai = get_geoai()
+                    geoai = get_geoai()
 
-                        epsilon = self.epsilon_spin.value()
-                        min_area = (
-                            self.min_area_spin.value()
-                            if self.min_area_spin.value() > 0
-                            else None
+                    min_area = self.min_area_spin.value()
+
+                    # Check vector processing mode: 0 = Regularize, 1 = Smooth
+                    is_smooth_mode = self.vector_mode_combo.currentIndex() == 1
+
+                    if is_smooth_mode:
+                        # Use smooth_vector for natural features
+                        smooth_iterations = self.smooth_iterations_spin.value()
+
+                        # First convert raster to vector (min_area=0 means no filtering)
+                        gdf = geoai.raster_to_vector(
+                            temp_raster,
+                            min_area=min_area if min_area > 0 else 0,
+                            simplify_tolerance=None,
                         )
+
+                        # Apply smoothing
+                        gdf = geoai.smooth_vector(
+                            gdf,
+                            smooth_iterations=smooth_iterations,
+                            output_path=output_path,
+                        )
+                    else:
+                        # Use orthogonalize for regularization (buildings)
+                        epsilon = self.epsilon_spin.value()
 
                         gdf = geoai.orthogonalize(
                             temp_raster,
@@ -1613,7 +1689,7 @@ class SamGeoDockWidget(QDockWidget):
                         )
 
                         # Apply min area filter if specified
-                        if min_area is not None and min_area > 0:
+                        if min_area > 0:
                             gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
                             gdf = gdf[gdf["area_m2"] >= min_area]
                             # Determine driver based on output format
@@ -1626,11 +1702,6 @@ class SamGeoDockWidget(QDockWidget):
                             else:
                                 driver = None
                             gdf.to_file(output_path, driver=driver)
-                    else:
-                        # Convert raster to vector without regularization
-                        from samgeo import common
-
-                        common.raster_to_vector(temp_raster, output_path)
 
                     if self.add_to_map_check.isChecked():
                         layer_name = (
