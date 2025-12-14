@@ -7848,3 +7848,60 @@ def empty_cache() -> None:
         torch.cuda.empty_cache()
     elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
         torch.mps.empty_cache()
+
+
+def smooth_vector(
+    vector_data: Union[str, gpd.GeoDataFrame],
+    output_path: str = None,
+    segment_length: float = None,
+    smooth_iterations: int = 3,
+    num_cores: int = 0,
+    merge_collection: bool = True,
+    merge_field: str = None,
+    merge_multipolygons: bool = True,
+    preserve_area: bool = True,
+    area_tolerance: float = 0.01,
+    **kwargs: Any,
+) -> gpd.GeoDataFrame:
+    """Smooth a vector data using the smoothify library.
+        See https://github.com/DPIRD-DMA/Smoothify for more details.
+
+    Args:
+        vector_data: The vector data to smooth.
+        output_path: The path to save the smoothed vector data. If None, returns the smoothed vector data.
+        segment_length: Resolution of the original raster data in map units. If None (default), automatically
+            detects by finding the minimum segment length (from a data sample). Recommended to specify explicitly when known.
+        smooth_iterations: The number of iterations to smooth the vector data.
+        num_cores: Number of cores to use for parallel processing. If 0 (default), uses all available cores.
+        merge_collection: Whether to merge/dissolve adjacent geometries in collections before smoothing.
+        merge_field: Column name to use for dissolving geometries. Only valid when merge_collection=True.
+            If None, dissolves all geometries together. If specified, dissolves geometries grouped by the column values.
+        merge_multipolygons: Whether to merge adjacent polygons within MultiPolygons before smoothing
+        preserve_area: Whether to restore original area after smoothing via buffering (applies to Polygons only)
+        area_tolerance: Percentage of original area allowed as error (e.g., 0.01 = 0.01% error = 99.99% preservation).
+            Only affects Polygons when preserve_area=True
+    """
+    try:
+        from smoothify import smoothify
+    except ImportError:
+        install_package("smoothify")
+        from smoothify import smoothify
+
+    if isinstance(vector_data, str):
+        vector_data = leafmap.read_vector(vector_data)
+
+    smoothed_vector_data = smoothify(
+        geom=vector_data,
+        segment_length=segment_length,
+        smooth_iterations=smooth_iterations,
+        num_cores=num_cores,
+        merge_collection=merge_collection,
+        merge_field=merge_field,
+        merge_multipolygons=merge_multipolygons,
+        preserve_area=preserve_area,
+        area_tolerance=area_tolerance,
+        **kwargs,
+    )
+    if output_path is not None:
+        smoothed_vector_data.to_file(output_path)
+    return smoothed_vector_data
