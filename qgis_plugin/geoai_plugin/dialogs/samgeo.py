@@ -139,7 +139,7 @@ class SamGeoDockWidget(QDockWidget):
         version_row = QHBoxLayout()
         version_row.addWidget(QLabel("Model:"))
         self.model_combo = QComboBox()
-        self.model_combo.addItems(["SamGeo3 (SAM3)", "SamGeo2 (SAM2)", "SamGeo (SAM1)"])
+        self.model_combo.addItems(["SamGeo3 (SAM3)"])
         version_row.addWidget(self.model_combo)
         backend_layout.addLayout(version_row)
 
