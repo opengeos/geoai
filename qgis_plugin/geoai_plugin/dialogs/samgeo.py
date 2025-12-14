@@ -32,6 +32,7 @@ from qgis.PyQt.QtWidgets import (
     QScrollArea,
 )
 from qgis.core import (
+    QgsCoordinateTransform,
     QgsProject,
     QgsRasterLayer,
     QgsVectorLayer,
@@ -1064,6 +1065,15 @@ class SamGeoDockWidget(QDockWidget):
             width = self.current_layer.width()
             height = self.current_layer.height()
 
+            # Transform point from canvas CRS to layer CRS if they differ
+            canvas_crs = self.canvas.mapSettings().destinationCrs()
+            layer_crs = self.current_layer.crs()
+            if canvas_crs != layer_crs:
+                transform = QgsCoordinateTransform(
+                    canvas_crs, layer_crs, QgsProject.instance()
+                )
+                point = transform.transform(point)
+
             # Calculate pixel coordinates
             px = (point.x() - extent.xMinimum()) / extent.width() * width
             py = (extent.yMaximum() - point.y()) / extent.height() * height
@@ -1107,6 +1117,15 @@ class SamGeoDockWidget(QDockWidget):
             extent = self.current_layer.extent()
             width = self.current_layer.width()
             height = self.current_layer.height()
+
+            # Transform point from canvas CRS to layer CRS if they differ
+            canvas_crs = self.canvas.mapSettings().destinationCrs()
+            layer_crs = self.current_layer.crs()
+            if canvas_crs != layer_crs:
+                transform = QgsCoordinateTransform(
+                    canvas_crs, layer_crs, QgsProject.instance()
+                )
+                point = transform.transform(point)
 
             # Calculate pixel coordinates
             px = (point.x() - extent.xMinimum()) / extent.width() * width
@@ -1164,18 +1183,38 @@ class SamGeoDockWidget(QDockWidget):
             point_coords = np.array(self.point_coords)
             point_labels = np.array(self.point_labels)
 
+            # Use multimask_output=False when there are multiple points or
+            # background points, as it gives better results for non-ambiguous prompts
+            has_background = 0 in point_labels
+            use_multimask = len(point_coords) == 1 and not has_background
+
             # Use appropriate method based on model type
+            # point_crs=None because coordinates are already in pixel space
+            # (transformed from canvas CRS to layer CRS in add_point())
             if hasattr(self.sam, "generate_masks_by_points"):
                 self.sam.generate_masks_by_points(
                     point_coords=point_coords.tolist(),
                     point_labels=point_labels.tolist(),
+                    point_crs=None,
+                    multimask_output=use_multimask,
                 )
             else:
                 # Fallback for older SamGeo versions
-                self.sam.predict(
-                    point_coords=point_coords,
-                    point_labels=point_labels,
-                )
+                # Try to pass multimask_output for consistency; if not supported, fall back without it.
+                try:
+                    self.sam.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        point_crs=None,
+                        multimask_output=use_multimask,
+                    )
+                except TypeError:
+                    # Older SamGeo versions do not support multimask_output; behavior may differ.
+                    self.sam.predict(
+                        point_coords=point_coords,
+                        point_labels=point_labels,
+                        point_crs=None,
+                    )
 
             num_masks = len(self.sam.masks) if self.sam.masks else 0
             self.results_text.setText(
@@ -1238,6 +1277,15 @@ class SamGeoDockWidget(QDockWidget):
             extent = self.current_layer.extent()
             width = self.current_layer.width()
             height = self.current_layer.height()
+
+            # Transform rectangle from canvas CRS to layer CRS if they differ
+            canvas_crs = self.canvas.mapSettings().destinationCrs()
+            layer_crs = self.current_layer.crs()
+            if canvas_crs != layer_crs:
+                transform = QgsCoordinateTransform(
+                    canvas_crs, layer_crs, QgsProject.instance()
+                )
+                rect = transform.transformBoundingBox(rect)
 
             # Convert to pixel coordinates
             x1 = (rect.xMinimum() - extent.xMinimum()) / extent.width() * width
