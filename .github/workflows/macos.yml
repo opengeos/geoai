@@ -32,6 +32,6 @@ jobs:
                   uv venv --python ${{ matrix.config.py }}
                   uv pip install .
 
-            # - name: Test import
-            #   run: |
-            #       uv run python -c "import geoai; print('geoai import successful')"  # not working due to bitsandbytes
+            - name: Test import
+              run: |
+                  uv run python -c "import geoai; print('geoai import successful')"
