@@ -593,12 +593,16 @@ class SamGeoDockWidget(QDockWidget):
         self.vector_options_group = QGroupBox("Vector Processing Options (Vector Only)")
         vector_options_layout = QVBoxLayout()
 
-        # Mode selection: Regularize vs Smooth
+        # Mode selection: Simple, Regularize, or Smooth
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Mode:"))
         self.vector_mode_combo = QComboBox()
         self.vector_mode_combo.addItems(
-            ["Regularize (buildings)", "Smooth (natural features)"]
+            [
+                "Simple (no processing)",
+                "Regularize (buildings)",
+                "Smooth (natural features)",
+            ]
         )
         self.vector_mode_combo.currentIndexChanged.connect(self._on_vector_mode_changed)
         mode_row.addWidget(self.vector_mode_combo)
@@ -623,6 +627,7 @@ class SamGeoDockWidget(QDockWidget):
         regularize_options_layout.addLayout(epsilon_row)
 
         self.regularize_options_widget.setLayout(regularize_options_layout)
+        self.regularize_options_widget.setVisible(False)  # Hidden by default (Simple mode)
         vector_options_layout.addWidget(self.regularize_options_widget)
 
         # Smooth options
@@ -692,9 +697,12 @@ class SamGeoDockWidget(QDockWidget):
         self.vector_options_group.setVisible(is_vector)
 
     def _on_vector_mode_changed(self, index):
-        """Handle vector processing mode change between Regularize and Smooth."""
-        is_smooth = index == 1  # 1 = Smooth mode
-        self.regularize_options_widget.setVisible(not is_smooth)
+        """Handle vector processing mode change: Simple, Regularize, or Smooth."""
+        # 0 = Simple (no processing), 1 = Regularize, 2 = Smooth
+        is_simple = index == 0
+        is_regularize = index == 1
+        is_smooth = index == 2
+        self.regularize_options_widget.setVisible(is_regularize)
         self.smooth_options_widget.setVisible(is_smooth)
 
     def _on_custom_bands_changed(self, state):
@@ -1528,10 +1536,18 @@ class SamGeoDockWidget(QDockWidget):
 
                     min_area = self.min_area_spin.value()
 
-                    # Check vector processing mode: 0 = Regularize, 1 = Smooth
-                    is_smooth_mode = self.vector_mode_combo.currentIndex() == 1
+                    # Check vector processing mode: 0 = Simple, 1 = Regularize, 2 = Smooth
+                    vector_mode = self.vector_mode_combo.currentIndex()
 
-                    if is_smooth_mode:
+                    if vector_mode == 0:
+                        # Simple mode - just convert raster to vector
+                        gdf = geoai.raster_to_vector(
+                            temp_raster,
+                            output_path=output_path,
+                            min_area=min_area if min_area > 0 else 0,
+                            simplify_tolerance=None,
+                        )
+                    elif vector_mode == 2:
                         # Use smooth_vector for natural features
                         smooth_iterations = self.smooth_iterations_spin.value()
 
@@ -1658,10 +1674,18 @@ class SamGeoDockWidget(QDockWidget):
 
                     min_area = self.min_area_spin.value()
 
-                    # Check vector processing mode: 0 = Regularize, 1 = Smooth
-                    is_smooth_mode = self.vector_mode_combo.currentIndex() == 1
+                    # Check vector processing mode: 0 = Simple, 1 = Regularize, 2 = Smooth
+                    vector_mode = self.vector_mode_combo.currentIndex()
 
-                    if is_smooth_mode:
+                    if vector_mode == 0:
+                        # Simple mode - just convert raster to vector
+                        gdf = geoai.raster_to_vector(
+                            temp_raster,
+                            output_path=output_path,
+                            min_area=min_area if min_area > 0 else 0,
+                            simplify_tolerance=None,
+                        )
+                    elif vector_mode == 2:
                         # Use smooth_vector for natural features
                         smooth_iterations = self.smooth_iterations_spin.value()
 
