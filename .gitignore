@@ -21,6 +21,8 @@ docs/workshops/**/*.txt
 *.geojson
 *.gpkg
 *.csv
+*.mp4
+*.gif
 docs/examples/*.md
 *.xml
 docs/examples/output/
