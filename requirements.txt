@@ -21,6 +21,7 @@ rioxarray
 scikit-image
 scikit-learn
 # segment-geospatial
+smoothify
 timm
 tokenizers>=0.22.1
 torch
