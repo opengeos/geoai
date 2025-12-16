@@ -2,7 +2,7 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model for image captioning, querying, object detection, and semantic segmentation model training and inference.
-version=0.2.1
+version=0.3.0
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -38,10 +38,13 @@ homepage=https://opengeoai.org
 category=Analysis
 icon=icons/icon.png
 
-experimental=True
+experimental=False
 deprecated=False
 
 changelog=
+    0.3.0
+        - Add smooth vector option to QGIS plugin
+        - Fix point segmentation bug
     0.2.1
         - Disable SamGeo 1 and 2 due to compatibility issues
 
