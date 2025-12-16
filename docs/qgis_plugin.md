@@ -93,18 +93,185 @@ python -c "import samgeo; print('samgeo import successful')"
 
 #### Installation on Windows
 
-Windows + SAM3 often needs the PyTorch wheels from NVIDIA and PyPI:
+Windows installation requires some additional steps compared to Linux/macOS. Choose the appropriate section based on whether you have an NVIDIA GPU or want CPU-only installation.
+
+**Prerequisites (Required for all Windows users):**
+
+1. Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Anaconda](https://www.anaconda.com/download) if you haven't already.
+2. Open **Anaconda Prompt** (not PowerShell or CMD) for all installation commands.
+3. For GPU users: Ensure you have the latest [NVIDIA GPU drivers](https://www.nvidia.com/Download/index.aspx) installed.
+
+##### Option A: Windows with NVIDIA GPU (CUDA)
+
+This option provides the best performance using your NVIDIA GPU for model inference and training.
+
+**Step 1: Create and activate the conda environment**
 
 ```bash
-conda create -n geo python=3.12
+conda create -n geo python=3.12 -y
 conda activate geo
-conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia
-conda install -c conda-forge geoai qgis
-python -c "import geoai; print('geoai import successful')"
-pip install -U "segment-geospatial[samgeo3]" triton-windows
-python -c "import samgeo; print('samgeo import successful')"
-pip install -U sam3 geoai-py segment-geospatial
 ```
+
+**Step 2: Install PyTorch with CUDA support**
+
+First, check your NVIDIA driver version to determine the compatible CUDA version:
+
+```bash
+nvidia-smi
+```
+
+Look for the "CUDA Version" in the output. Then install the appropriate PyTorch version:
+
+For CUDA 12.4 (recommended for newer drivers):
+
+```bash
+conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia -y
+```
+
+For CUDA 12.1 (for older drivers):
+
+```bash
+conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia -y
+```
+
+**Step 3: Verify PyTorch GPU installation**
+
+```bash
+python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+```
+
+You should see `CUDA available: True` and your GPU name. If not, see the troubleshooting section below.
+
+**Step 4: Install QGIS and core dependencies**
+
+```bash
+conda install -c conda-forge qgis -y
+```
+
+**Step 5: Install GeoAI**
+
+```bash
+conda install -c conda-forge geoai -y
+python -c "import geoai; print('geoai import successful')"
+```
+
+**Step 6: Install SamGeo with SAM3 support**
+
+```bash
+pip install -U triton-windows
+pip install -U "segment-geospatial[samgeo3]"
+pip install -U sam3
+python -c "import samgeo; print('samgeo import successful')"
+```
+
+##### Option B: Windows CPU-Only (No GPU)
+
+Use this option if you don't have an NVIDIA GPU or want a simpler installation.
+
+**Step 1: Create and activate the conda environment**
+
+```bash
+conda create -n geo python=3.12 -y
+conda activate geo
+```
+
+**Step 2: Install PyTorch (CPU version)**
+
+```bash
+conda install pytorch torchvision cpuonly -c pytorch -y
+```
+
+**Step 3: Verify PyTorch installation**
+
+```bash
+python -c "import torch; print(f'PyTorch: {torch.__version__}'); print('PyTorch CPU installation successful')"
+```
+
+**Step 4: Install QGIS and core dependencies**
+
+```bash
+conda install -c conda-forge qgis -y
+```
+
+**Step 5: Install GeoAI**
+
+```bash
+conda install -c conda-forge geoai -y
+python -c "import geoai; print('geoai import successful')"
+```
+
+**Step 6: Install SamGeo (without SAM3)**
+
+```bash
+pip install segment-geospatial
+python -c "import samgeo; print('samgeo import successful')"
+```
+
+##### Windows Troubleshooting
+
+**Common Issue 1: CUDA not detected after PyTorch installation**
+
+If `torch.cuda.is_available()` returns `False`:
+
+1. Verify NVIDIA drivers are installed: Run `nvidia-smi` in command prompt
+2. Ensure you installed the CUDA-enabled PyTorch (not CPU version)
+3. Try reinstalling PyTorch:
+
+```bash
+conda uninstall pytorch torchvision -y
+conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia -y
+```
+
+**Common Issue 2: DLL load failed or missing dependencies**
+
+If you see errors like `DLL load failed` or `ImportError`:
+
+1. Install Microsoft Visual C++ Redistributable:
+    - Download and install [VC++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+2. Restart your computer after installation
+
+**Common Issue 3: Triton installation fails**
+
+Triton is required for SAM3 on Windows. If `pip install triton-windows` fails:
+
+1. Ensure you're using Python 3.12 (not 3.13+)
+2. Try installing from conda-forge:
+
+```bash
+pip install triton-windows --no-cache-dir
+```
+
+If Triton still doesn't work, you can skip SAM3 and use SAM1/SAM2 instead.
+
+**Common Issue 4: Permission errors during installation**
+
+Run Anaconda Prompt as Administrator, or try:
+
+```bash
+pip install --user <package-name>
+```
+
+**Common Issue 5: QGIS fails to start or shows import errors**
+
+Make sure you launch QGIS from the activated conda environment:
+
+```bash
+conda activate geo
+qgis
+```
+
+Do NOT use the QGIS shortcut from the Start Menu—it won't have access to the conda packages.
+
+**Common Issue 6: Out of memory errors**
+
+If you run out of GPU memory:
+
+1. Use the **GPU** button in the GeoAI toolbar to clear memory
+2. Close other GPU-intensive applications
+3. Use smaller batch sizes in training/inference settings
+4. Switch to CPU mode in the plugin settings for smaller tasks
+
+##### Video Tutorial
 
 You can follow this [video tutorial](https://youtu.be/a-Ns9peiuu8) to install the GeoAI QGIS Plugin on Windows:
 
