@@ -45,8 +45,6 @@ changelog=
     0.3.0
         - Add smooth vector option to QGIS plugin
         - Fix point segmentation bug
-        - Disable SamGeo 1 and 2 due to compatibility issues
-
     0.2.1
         - Disable SamGeo 1 and 2 due to compatibility issues
 
