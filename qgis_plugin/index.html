@@ -520,6 +520,56 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Installation on Windows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-windows-with-nvidia-gpu-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: Windows with NVIDIA GPU (CUDA)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-windows-cpu-only-no-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Windows CPU-Only (No GPU)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows-troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#video-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video Tutorial
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3582,6 +3632,56 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Installation on Windows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-windows-with-nvidia-gpu-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: Windows with NVIDIA GPU (CUDA)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-windows-cpu-only-no-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Windows CPU-Only (No GPU)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows-troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#video-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video Tutorial
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3861,23 +3961,128 @@ python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;i
 python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import samgeo; print(&#39;samgeo import successful&#39;)&quot;</span>
 </code></pre></div></td></tr></table></div>
 <h4 id="installation-on-windows">Installation on Windows<a class="headerlink" href="#installation-on-windows" title="Permanent link">&para;</a></h4>
-<p>Windows + SAM3 often needs the PyTorch wheels from NVIDIA and PyPI:</p>
+<p>Windows installation requires some additional steps compared to Linux/macOS. Choose the appropriate section based on whether you have an NVIDIA GPU or want CPU-only installation.</p>
+<p><strong>Prerequisites (Required for all Windows users):</strong></p>
+<ol>
+<li>Install <a href="https://docs.conda.io/en/latest/miniconda.html">Miniconda</a> or <a href="https://www.anaconda.com/download">Anaconda</a> if you haven't already.</li>
+<li>Open <strong>Anaconda Prompt</strong> (not PowerShell or CMD) for all installation commands.</li>
+<li>For GPU users: Ensure you have the latest <a href="https://www.nvidia.com/Download/index.aspx">NVIDIA GPU drivers</a> installed.</li>
+</ol>
+<h5 id="option-a-windows-with-nvidia-gpu-cuda">Option A: Windows with NVIDIA GPU (CUDA)<a class="headerlink" href="#option-a-windows-with-nvidia-gpu-cuda" title="Permanent link">&para;</a></h5>
+<p>This option provides the best performance using your NVIDIA GPU for model inference and training.</p>
+<p><strong>Step 1: Create and activate the conda environment</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span>-y
+conda<span class="w"> </span>activate<span class="w"> </span>geo
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 2: Install PyTorch with CUDA support</strong></p>
+<p>First, check your NVIDIA driver version to determine the compatible CUDA version:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>nvidia-smi
+</code></pre></div></td></tr></table></div>
+<p>Look for the "CUDA Version" in the output. Then install the appropriate PyTorch version:</p>
+<p>For CUDA 12.4 (recommended for newer drivers):</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">12</span>.4<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia<span class="w"> </span>-y
+</code></pre></div></td></tr></table></div>
+<p>For CUDA 12.1 (for older drivers):</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">12</span>.1<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia<span class="w"> </span>-y
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 3: Verify PyTorch GPU installation</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(f&#39;PyTorch: {torch.__version__}&#39;); print(f&#39;CUDA available: {torch.cuda.is_available()}&#39;); print(f&#39;GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \&quot;None\&quot;}&#39;)&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p>You should see <code>CUDA available: True</code> and your GPU name. If not, see the troubleshooting section below.</p>
+<p><strong>Step 4: Install QGIS and core dependencies</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>qgis<span class="w"> </span>-y
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 5: Install GeoAI</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>geoai<span class="w"> </span>-y
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import geoai; print(&#39;geoai import successful&#39;)&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 6: Install SamGeo with SAM3 support</strong></p>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
 <span class="normal">2</span>
 <span class="normal">3</span>
-<span class="normal">4</span>
-<span class="normal">5</span>
-<span class="normal">6</span>
-<span class="normal">7</span>
-<span class="normal">8</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12
-conda<span class="w"> </span>activate<span class="w"> </span>geo
-conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">12</span>.1<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia
-conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>geoai<span class="w"> </span>qgis
-python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import geoai; print(&#39;geoai import successful&#39;)&quot;</span>
-pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span><span class="s2">&quot;segment-geospatial[samgeo3]&quot;</span><span class="w"> </span>triton-windows
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>triton-windows
+pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span><span class="s2">&quot;segment-geospatial[samgeo3]&quot;</span>
+pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>sam3
 python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import samgeo; print(&#39;samgeo import successful&#39;)&quot;</span>
-pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>sam3<span class="w"> </span>geoai-py<span class="w"> </span>segment-geospatial
 </code></pre></div></td></tr></table></div>
+<h5 id="option-b-windows-cpu-only-no-gpu">Option B: Windows CPU-Only (No GPU)<a class="headerlink" href="#option-b-windows-cpu-only-no-gpu" title="Permanent link">&para;</a></h5>
+<p>Use this option if you don't have an NVIDIA GPU or want a simpler installation.</p>
+<p><strong>Step 1: Create and activate the conda environment</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>geo<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span>-y
+conda<span class="w"> </span>activate<span class="w"> </span>geo
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 2: Install PyTorch (CPU version)</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>cpuonly<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-y
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 3: Verify PyTorch installation</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch; print(f&#39;PyTorch: {torch.__version__}&#39;); print(&#39;PyTorch CPU installation successful&#39;)&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 4: Install QGIS and core dependencies</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>qgis<span class="w"> </span>-y
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 5: Install GeoAI</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>geoai<span class="w"> </span>-y
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import geoai; print(&#39;geoai import successful&#39;)&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p><strong>Step 6: Install SamGeo (without SAM3)</strong></p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>segment-geospatial
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import samgeo; print(&#39;samgeo import successful&#39;)&quot;</span>
+</code></pre></div></td></tr></table></div>
+<h5 id="windows-troubleshooting">Windows Troubleshooting<a class="headerlink" href="#windows-troubleshooting" title="Permanent link">&para;</a></h5>
+<p><strong>Common Issue 1: CUDA not detected after PyTorch installation</strong></p>
+<p>If <code>torch.cuda.is_available()</code> returns <code>False</code>:</p>
+<ol>
+<li>Verify NVIDIA drivers are installed: Run <code>nvidia-smi</code> in command prompt</li>
+<li>Ensure you installed the CUDA-enabled PyTorch (not CPU version)</li>
+<li>Try reinstalling PyTorch:</li>
+</ol>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>uninstall<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>-y
+conda<span class="w"> </span>install<span class="w"> </span>pytorch<span class="w"> </span>torchvision<span class="w"> </span>pytorch-cuda<span class="o">=</span><span class="m">12</span>.4<span class="w"> </span>-c<span class="w"> </span>pytorch<span class="w"> </span>-c<span class="w"> </span>nvidia<span class="w"> </span>-y
+</code></pre></div></td></tr></table></div>
+<p><strong>Common Issue 2: DLL load failed or missing dependencies</strong></p>
+<p>If you see errors like <code>DLL load failed</code> or <code>ImportError</code>:</p>
+<ol>
+<li>Install Microsoft Visual C++ Redistributable:<ul>
+<li>Download and install <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe">VC++ Redistributable</a></li>
+</ul>
+</li>
+<li>Restart your computer after installation</li>
+</ol>
+<p><strong>Common Issue 3: Triton installation fails</strong></p>
+<p>Triton is required for SAM3 on Windows. If <code>pip install triton-windows</code> fails:</p>
+<ol>
+<li>Ensure you're using Python 3.12 (not 3.13+)</li>
+<li>Try installing from conda-forge:</li>
+</ol>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>triton-windows<span class="w"> </span>--no-cache-dir
+</code></pre></div></td></tr></table></div>
+<p>If Triton still doesn't work, you can skip SAM3 and use SAM1/SAM2 instead.</p>
+<p><strong>Common Issue 4: Permission errors during installation</strong></p>
+<p>Run Anaconda Prompt as Administrator, or try:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>--user<span class="w"> </span>&lt;package-name&gt;
+</code></pre></div></td></tr></table></div>
+<p><strong>Common Issue 5: QGIS fails to start or shows import errors</strong></p>
+<p>Make sure you launch QGIS from the activated conda environment:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>conda<span class="w"> </span>activate<span class="w"> </span>geo
+qgis
+</code></pre></div></td></tr></table></div>
+<p>Do NOT use the QGIS shortcut from the Start Menu—it won't have access to the conda packages.</p>
+<p><strong>Common Issue 6: Out of memory errors</strong></p>
+<p>If you run out of GPU memory:</p>
+<ol>
+<li>Use the <strong>GPU</strong> button in the GeoAI toolbar to clear memory</li>
+<li>Close other GPU-intensive applications</li>
+<li>Use smaller batch sizes in training/inference settings</li>
+<li>Switch to CPU mode in the plugin settings for smaller tasks</li>
+</ol>
+<h5 id="video-tutorial">Video Tutorial<a class="headerlink" href="#video-tutorial" title="Permanent link">&para;</a></h5>
 <p>You can follow this <a href="https://youtu.be/a-Ns9peiuu8">video tutorial</a> to install the GeoAI QGIS Plugin on Windows:</p>
 <p><a href="https://youtu.be/a-Ns9peiuu8"><img alt="windows" src="https://github.com/user-attachments/assets/8d89d535-1d66-45d2-a6c0-171416c259c9" /></a></p>
 <h4 id="request-access-to-sam-3">Request access to SAM 3<a class="headerlink" href="#request-access-to-sam-3" title="Permanent link">&para;</a></h4>
@@ -4091,7 +4296,7 @@ python<span class="w"> </span>install.py
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 14, 2025 14:35:24 UTC"><span class="timeago" datetime="2025-12-14T14:35:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 14, 2025 14:35:24 UTC">2025-12-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 16, 2025 15:18:57 UTC"><span class="timeago" datetime="2025-12-16T15:18:57+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 16, 2025 15:18:57 UTC">2025-12-16</span>
   </span>
 
     
