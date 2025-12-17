@@ -136,6 +136,7 @@ nav:
           - examples/water_dynamics.ipynb
           - examples/wetland_mapping.ipynb
           - examples/wetland_dynamics.ipynb
+          - examples/wetland_sam3.ipynb
           - examples/regularization.ipynb
           - examples/globe_projection.ipynb
           - examples/samgeo.ipynb
