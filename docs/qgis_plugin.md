@@ -292,12 +292,10 @@ Option A — use QGIS Plugin Manager (recommended):
 GeoAI is available as an experimental plugin in the official [QGIS plugin repository](https://plugins.qgis.org/plugins/geoai). To install:
 
 1. Launch QGIS: `conda run qgis`
-2. Go to `Plugins` → `Manage and Install Plugins...` → `Settings` tab → check `Show also Experimental Plugins` → Click on `Reload all Repositories` button.
-3. Switch to the `All` tab, search for `GeoAI`, select it, and click `Install Experimental Plugin`.
+2. Go to `Plugins` → `Manage and Install Plugins...`
+3. Switch to the `All` tab, search for `GeoAI`, select it, and click `Install Plugin`
 
-![](https://github.com/user-attachments/assets/c15c4b7e-1e8c-45de-9127-671c7c2c85a9)
-
-![](https://github.com/user-attachments/assets/ea101a82-5df7-4947-99b8-d4a83a1598ed)
+![](https://github.com/user-attachments/assets/b31d1d13-27ff-420a-84ab-9cc82ade9a8e)
 
 Option B — use the helper script:
 
