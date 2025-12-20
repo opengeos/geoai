@@ -4,9 +4,10 @@ A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models 
 
 ## Quick Start
 
--   Create a fresh conda env (`conda create -n geo python=3.12`) and install QGIS + deps (see below).
--   Install the plugin (`python install.py`) from this repo.
--   Restart QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`.
+-   Create a Pixi project and install the dependencies.
+-   Install the QGIS plugin from the QGIS Plugin Manager.
+-   Enable the GeoAI plugin in QGIS.
+-   Restart QGIS.
 -   Open a GeoAI toolbar panel and try the sample datasets below.
 
 ## Video Tutorials
@@ -18,7 +19,7 @@ Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video 
 ## Requirements
 
 -   QGIS 3.28 or later
--   Python 3.10+ (conda recommended)
+-   Python 3.10+ (Pixi recommended)
 -   PyTorch (CUDA if you want GPU acceleration)
 -   `geoai` and `samgeo` packages
 
@@ -53,57 +54,33 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 ## Installation
 
-### 1) Set up the environment
+### 1. Set up the environment
 
-#### Installation on Linux/macOS
+Installing the GeoAI QGIS plugin on can be challenging due to the complicated pytorch/cuda dependencies. Conda or mamba might take a while to resolve the dependencies, while pip might fail to install the dependencies properly. It is recommended to use [pixi](https://pixi.prefix.dev/latest) to install the dependencies to avoid these issues.
 
-Use a clean conda env dedicated to QGIS—mixing with an existing QGIS install often breaks dependencies.
+#### 1) Install Pixi
 
-```bash
-conda create -n geo python=3.12
-conda activate geo
-```
-
-Install core geospatial deps first:
+#### Linux/macOS (bash/zsh)
 
 ```bash
-conda install -c conda-forge --strict-channel-priority gdal rasterio libnetcdf netcdf4
-python -c "import rasterio; print('rasterio import successful')"
+curl -fsSL https://pixi.sh/install.sh | sh
 ```
 
-Install GeoAI:
+Close and re-open your terminal (or reload your shell) so `pixi` is on your `PATH`. Then confirm:
 
 ```bash
-conda install -c conda-forge geoai
-python -c "import geoai; print('geoai import successful')"
+pixi --version
 ```
 
-Install QGIS:
+#### Windows (PowerShell)
 
-```bash
-conda install -c conda-forge qgis
-```
-
-Install SamGeo extras (PyPI is required for some parts):
-
-```bash
-pip install -U "segment-geospatial[samgeo3]" sam3
-python -c "import samgeo; print('samgeo import successful')"
-```
-
-#### Installation on Windows
-
-Installing the QGIS plugin on Windows can be challenging due to the complicated dependencies. Conda or mamba might take a while to resolve the dependencies, and it might fail to install the plugin. It is recommended to use [pixi](https://pixi.prefix.dev/latest) to install the dependencies.
-
-##### 1) Install Pixi (PowerShell)
-
-Open **PowerShell** (regular user is fine) and run:
+Open **PowerShell** (preferably as a normal user, Admin not required), then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -c "irm -useb https://pixi.sh/install.ps1 | iex"
 ```
 
-Close and reopen PowerShell, then verify:
+Close and re-open PowerShell, then confirm:
 
 ```powershell
 pixi --version
@@ -111,7 +88,7 @@ pixi --version
 
 ---
 
-##### 2) Create a Pixi project
+#### 2) Create a Pixi project
 
 Navigate to a directory where you want to create the project and run:
 
@@ -122,7 +99,7 @@ cd geo
 
 ---
 
-##### 3) Configure `pixi.toml`
+#### 3) Configure `pixi.toml`
 
 Open `pixi.toml` in the `geo` directory and replace its contents with:
 
@@ -147,7 +124,7 @@ libopenblas = ">=0.3.30"
 
 ---
 
-##### 4) Install the environment
+#### 4) Install the environment
 
 From the `geo` folder:
 
@@ -159,7 +136,7 @@ This step may take several minutes on first install.
 
 ---
 
-##### 5) Upgrade `segment-geospatial` via pip
+#### 5) Upgrade `segment-geospatial` via pip
 
 Install the latest `segment-geospatial` release on top of the resolved environment:
 
@@ -169,7 +146,7 @@ pixi run pip install -U segment-geospatial
 
 ---
 
-##### 6) Verify PyTorch + CUDA
+#### 6) Verify PyTorch + CUDA
 
 Run the following command to verify the PyTorch + CUDA installation:
 
@@ -190,40 +167,35 @@ If CUDA is `False`, check:
 
 ---
 
-##### 7) Launch QGIS from the Pixi environment
-
-```powershell
-pixi run qgis
-```
-
-Always launch QGIS this way to ensure PyTorch, GeoAI, and SAM 3 dependencies are correctly available.
-
-##### Video Tutorial
-
-You can follow this [video tutorial](https://youtu.be/a-Ns9peiuu8) to install the GeoAI QGIS Plugin on Windows:
-
-[![windows](https://github.com/user-attachments/assets/8d89d535-1d66-45d2-a6c0-171416c259c9)](https://youtu.be/a-Ns9peiuu8)
 
 #### Request access to SAM 3
 
 To use SAM 3, you will need to request access by filling out this form on Hugging Face at <https://huggingface.co/facebook/sam3>. Once your request has been approved, run the following command in the terminal to authenticate:
 
 ```bash
-hf auth login
+pixi run hf auth login
 ```
 
 After authentication, you can download the SAM 3 model from Hugging Face:
+
 ```bash
-hf download facebook/sam3
+pixi run hf download facebook/sam3
 ```
 
-### 2) Install the QGIS plugin
+#### Video Tutorial
+
+You can follow this [video tutorial](https://youtu.be/a-Ns9peiuu8) to install the GeoAI QGIS Plugin on Linux/Windows:
+
+[![installation](https://github.com/user-attachments/assets/8d89d535-1d66-45d2-a6c0-171416c259c9)](https://youtu.be/a-Ns9peiuu8)
+
+
+### 2. Install the QGIS plugin
 
 Option A — use QGIS Plugin Manager (recommended):
 
-GeoAI is available as an experimental plugin in the official [QGIS plugin repository](https://plugins.qgis.org/plugins/geoai). To install:
+GeoAI is available as a QGIS plugin in the official [QGIS plugin repository](https://plugins.qgis.org/plugins/geoai). To install:
 
-1. Launch QGIS: `conda run qgis`
+1. Launch QGIS: `pixi run qgis`
 2. Go to `Plugins` → `Manage and Install Plugins...`
 3. Switch to the `All` tab, search for `GeoAI`, select it, and click `Install Plugin`
 
@@ -250,9 +222,9 @@ Option C — manual copy:
     -   Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
     -   macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
 
-### 3) Enable in QGIS
+### 3. Enable in QGIS
 
-Launch QGIS: `conda run qgis`
+Launch QGIS: `pixi run qgis`
 
 QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`. After updates, toggle the plugin off/on or restart QGIS to reload.
 
@@ -289,7 +261,7 @@ Sample datasets:
 
 Steps:
 
-1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to the conda environment.
+1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to pixi project.
 2. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
 3. Use the tabs at the top of the panel to switch between:
 
@@ -397,7 +369,6 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 ## Troubleshooting
 
 -   Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
--   GDAL/rasterio errors: verify you launched QGIS from the conda env (`conda activate geo` then `qgis`) so it picks up the same Python libs.
 -   CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
 -   Model download failures: check network/firewall, then retry loading models from the panel.
 
