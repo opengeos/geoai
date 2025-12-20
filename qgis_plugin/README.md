@@ -130,7 +130,7 @@ Open `pixi.toml` in the `geo` directory and replace its contents with:
 [workspace]
 channels = ["https://prefix.dev/conda-forge"]
 name = "pytorch-conda-forge"
-platforms = ["win-64"]
+platforms = ["linux-64", "win-64"]
 
 [system-requirements]
 cuda = "12.0"
