@@ -12,9 +12,19 @@ A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models 
 
 ## Video Tutorials
 
+### Installation Tutorial
+
+You can follow this [video tutorial](https://youtu.be/TJmZQXJK-IU) to install the GeoAI QGIS Plugin on Linux/Windows:
+
+[![installation](https://github.com/user-attachments/assets/6fa17c97-2ff5-40d6-be16-c6dcfe03f806)](https://youtu.be/TJmZQXJK-IU)
+
+### Usage Tutorial
+
 Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video tutorial](https://youtu.be/8-OhlqeoyiY) on how to use the GeoAI plugin in QGIS.
 
 [![demo](https://github.com/user-attachments/assets/5aabc3d3-efd1-4011-ab31-2b3f11aab3ed)](https://youtu.be/8-OhlqeoyiY)
+
+
 
 ## Requirements
 
@@ -181,13 +191,6 @@ After authentication, you can download the SAM 3 model from Hugging Face:
 ```bash
 pixi run hf download facebook/sam3
 ```
-
-#### Video Tutorial
-
-You can follow this [video tutorial](https://youtu.be/a-Ns9peiuu8) to install the GeoAI QGIS Plugin on Linux/Windows:
-
-[![installation](https://github.com/user-attachments/assets/8d89d535-1d66-45d2-a6c0-171416c259c9)](https://youtu.be/a-Ns9peiuu8)
-
 
 ### 2. Install the QGIS plugin
 
