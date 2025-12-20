@@ -106,7 +106,7 @@ Open `pixi.toml` in the `geo` directory and replace its contents with:
 ```toml
 [workspace]
 channels = ["https://prefix.dev/conda-forge"]
-name = "pytorch-conda-forge"
+name = "geo"
 platforms = ["linux-64", "win-64"]
 
 [system-requirements]
