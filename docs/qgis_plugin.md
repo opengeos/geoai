@@ -212,6 +212,11 @@ To use SAM 3, you will need to request access by filling out this form on Huggin
 hf auth login
 ```
 
+After authentication, you can download the SAM 3 model from Hugging Face:
+```bash
+hf download facebook/sam3
+```
+
 ### 2) Install the QGIS plugin
 
 Option A — use QGIS Plugin Manager (recommended):
