@@ -1042,8 +1042,19 @@ class SamGeoDockWidget(QDockWidget):
             if temp_export_path and os.path.exists(temp_export_path):
                 try:
                     os.remove(temp_export_path)
-                except Exception:
-                    pass
+                    # Keep internal temp file tracking consistent, if present
+                    if hasattr(self, "_temp_files"):
+                        try:
+                            self._temp_files.remove(temp_export_path)
+                        except ValueError:
+                            # It was not tracked; ignore
+                            pass
+                except Exception as cleanup_error:
+                    # Log cleanup failure but do not mask the original error
+                    self.log_message(
+                        f"Failed to clean up temporary export file '{temp_export_path}': {cleanup_error}",
+                        level=Qgis.Warning,
+                    )
             self.show_error(f"Failed to set image: {str(e)}")
 
         finally:
