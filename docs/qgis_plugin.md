@@ -130,8 +130,8 @@ cuda = "12.0"
 python = "3.12.*"
 pytorch-gpu = ">=2.9.1,<3"
 qgis = ">=3.44.5"
-geoai = ">=0.23.0"
-segment-geospatial = ">=0.10.8"
+geoai = ">=0.24.0"
+segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
 libopenblas = ">=0.3.30"
 ```
@@ -151,8 +151,8 @@ cuda = "13.0"
 python = "3.12.*"
 pytorch-gpu = ">=2.9.1,<3"
 qgis = ">=3.44.5"
-geoai = ">=0.23.0"
-segment-geospatial = ">=0.10.8"
+geoai = ">=0.24.0"
+segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
 libopenblas = ">=0.3.30"
 ```
@@ -169,8 +169,8 @@ platforms = ["linux-64", "win-64"]
 python = "3.12.*"
 pytorch-cpu = ">=2.9.1,<3"
 qgis = ">=3.44.5"
-geoai = ">=0.23.0"
-segment-geospatial = ">=0.10.8"
+geoai = ">=0.24.0"
+segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
 libopenblas = ">=0.3.30"
 ```
@@ -189,17 +189,7 @@ This step may take several minutes on first install depending on your internet c
 
 ---
 
-#### 5) Upgrade `segment-geospatial` via pip
-
-Install the latest `segment-geospatial` release on top of the resolved environment:
-
-```powershell
-pixi run pip install -U segment-geospatial
-```
-
----
-
-#### 6) Verify PyTorch + CUDA
+#### 5) Verify PyTorch + CUDA
 
 If you have a NVIDIA GPU with CUDA, run the following command to verify the PyTorch + CUDA installation:
 
