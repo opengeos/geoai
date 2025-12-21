@@ -760,12 +760,17 @@ class SamGeoDockWidget(QDockWidget):
         # - /path/to/file.gpkg (with sublayer info)
         if source.upper().startswith("GPKG:"):
             return True
-        if ".gpkg" in source.lower() and ("|" in source or ":" in source):
-            return True
-        # Check if it's a .gpkg file that exists but the source has sublayer info
+        # For non-prefixed sources, be stricter about GDAL-style layer syntax.
+        # Only treat `.gpkg|...` as GeoPackage when the part after `|` contains
+        # a `layername=` token commonly used in GDAL connection strings.
+        if ".gpkg" in source.lower() and "|" in source:
+            after_pipe = source.split("|", 1)[1]
+            if after_pipe.startswith("layername=") or "layername=" in after_pipe:
+                return True
+        # Check if it's a .gpkg file that exists (plain GeoPackage path)
         if ".gpkg" in source.lower():
-            # Extract potential gpkg path
-            gpkg_path = source.split("|")[0].split(":")[0]
+            # Extract potential gpkg path (ignore any GDAL-style pipe options)
+            gpkg_path = source.split("|", 1)[0]
             if gpkg_path.lower().endswith(".gpkg") and os.path.exists(gpkg_path):
                 return True
         return False
