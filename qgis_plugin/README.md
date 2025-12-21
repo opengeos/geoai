@@ -111,7 +111,7 @@ cd geo
 
 #### 3) Configure `pixi.toml`
 
-Open `pixi.toml` in the `geo` directory and replace its contents with the following depending on your system. 
+Open `pixi.toml` in the `geo` directory and replace its contents with the following depending on your system.
 
 If you have a NVIDIA GPU with CUDA, run `nvidia-smi` to check the CUDA version.
 
