@@ -111,7 +111,11 @@ cd geo
 
 #### 3) Configure `pixi.toml`
 
-Open `pixi.toml` in the `geo` directory and replace its contents with:
+Open `pixi.toml` in the `geo` directory and replace its contents with the following depending on your system. 
+
+If you have a NVIDIA GPU with CUDA, run `nvidia-smi` to check the CUDA version.
+
+- For GPU with CUDA 12.x:
 
 ```toml
 [workspace]
@@ -132,6 +136,45 @@ sam3 = ">=0.1.0.20251211"
 libopenblas = ">=0.3.30"
 ```
 
+- For GPU with CUDA 13.x:
+
+```toml
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+name = "geo"
+platforms = ["linux-64", "win-64"]
+
+[system-requirements]
+cuda = "13.0"
+
+[dependencies]
+python = "3.12.*"
+pytorch-gpu = ">=2.9.1,<3"
+qgis = ">=3.44.5"
+geoai = ">=0.23.0"
+segment-geospatial = ">=0.10.8"
+sam3 = ">=0.1.0.20251211"
+libopenblas = ">=0.3.30"
+```
+
+- For CPU:
+
+```toml
+[workspace]
+channels = ["https://prefix.dev/conda-forge"]
+name = "geo"
+platforms = ["linux-64", "win-64"]
+
+[dependencies]
+python = "3.12.*"
+pytorch-cpu = ">=2.9.1,<3"
+qgis = ">=3.44.5"
+geoai = ">=0.23.0"
+segment-geospatial = ">=0.10.8"
+sam3 = ">=0.1.0.20251211"
+libopenblas = ">=0.3.30"
+```
+
 ---
 
 #### 4) Install the environment
@@ -142,7 +185,7 @@ From the `geo` folder:
 pixi install
 ```
 
-This step may take several minutes on first install.
+This step may take several minutes on first install depending on your internet connection and system.
 
 ---
 
@@ -158,7 +201,7 @@ pixi run pip install -U segment-geospatial
 
 #### 6) Verify PyTorch + CUDA
 
-Run the following command to verify the PyTorch + CUDA installation:
+If you have a NVIDIA GPU with CUDA, run the following command to verify the PyTorch + CUDA installation:
 
 ```powershell
 pixi run python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('GPU:', (torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'))"
@@ -191,6 +234,8 @@ After authentication, you can download the SAM 3 model from Hugging Face:
 ```bash
 pixi run hf download facebook/sam3
 ```
+
+**Important Note**: SAM 3 currently requires a NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
 
 ### 2. Install the QGIS plugin
 
