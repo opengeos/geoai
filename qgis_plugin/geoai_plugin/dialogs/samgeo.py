@@ -6,6 +6,7 @@ using the SamGeo library (SAM, SAM2, and SAM3 models).
 """
 
 import os
+import tempfile
 
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtGui import QColor
@@ -34,7 +35,9 @@ from qgis.PyQt.QtWidgets import (
 from qgis.core import (
     QgsCoordinateTransform,
     QgsProject,
+    QgsRasterFileWriter,
     QgsRasterLayer,
+    QgsRasterPipe,
     QgsVectorLayer,
     QgsWkbTypes,
     Qgis,
@@ -78,6 +81,9 @@ class SamGeoDockWidget(QDockWidget):
         self.batch_point_tool = None
         self.box_tool = None
         self.previous_tool = None
+
+        # Track temporary files for cleanup
+        self._temp_files = []
 
         self._setup_ui()
 
@@ -739,6 +745,92 @@ class SamGeoDockWidget(QDockWidget):
             return bands
         return None
 
+    def _is_geopackage_raster(self, source):
+        """Check if the layer source is a raster inside a GeoPackage.
+
+        Args:
+            source: The layer source string from QGIS.
+
+        Returns:
+            bool: True if the source is a GeoPackage raster, False otherwise.
+        """
+        # GeoPackage raster sources can have various formats:
+        # - GPKG:/path/to/file.gpkg:layername
+        # - /path/to/file.gpkg|layername=...
+        # - /path/to/file.gpkg (with sublayer info)
+        if source.upper().startswith("GPKG:"):
+            return True
+        if ".gpkg" in source.lower() and ("|" in source or ":" in source):
+            return True
+        # Check if it's a .gpkg file that exists but the source has sublayer info
+        if ".gpkg" in source.lower():
+            # Extract potential gpkg path
+            gpkg_path = source.split("|")[0].split(":")[0]
+            if gpkg_path.lower().endswith(".gpkg") and os.path.exists(gpkg_path):
+                return True
+        return False
+
+    def _export_geopackage_raster(self, layer):
+        """Export a GeoPackage raster layer to a temporary GeoTIFF file.
+
+        Args:
+            layer: The QgsRasterLayer to export.
+
+        Returns:
+            str: Path to the temporary GeoTIFF file, or None if export failed.
+        """
+        try:
+            # Create a temporary file
+            temp_file = tempfile.NamedTemporaryFile(
+                suffix=".tif", delete=False, prefix="samgeo_gpkg_"
+            )
+            temp_path = temp_file.name
+            temp_file.close()
+
+            # Set up the raster pipe
+            pipe = QgsRasterPipe()
+            provider = layer.dataProvider()
+
+            if not pipe.set(provider.clone()):
+                self.log_message(
+                    "Failed to set up raster pipe for GeoPackage export",
+                    level=Qgis.Warning,
+                )
+                return None
+
+            # Create the file writer
+            file_writer = QgsRasterFileWriter(temp_path)
+            file_writer.setOutputFormat("GTiff")
+
+            # Write the raster
+            error = file_writer.writeRaster(
+                pipe,
+                provider.xSize(),
+                provider.ySize(),
+                provider.extent(),
+                provider.crs(),
+            )
+
+            if error == QgsRasterFileWriter.NoError:
+                self.log_message(f"Exported GeoPackage raster to: {temp_path}")
+                # Track temp file for cleanup
+                self._temp_files.append(temp_path)
+                return temp_path
+            else:
+                self.log_message(
+                    f"Failed to export GeoPackage raster: error code {error}",
+                    level=Qgis.Warning,
+                )
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                return None
+
+        except Exception as e:
+            self.log_message(
+                f"Exception exporting GeoPackage raster: {str(e)}", level=Qgis.Warning
+            )
+            return None
+
     def refresh_layers(self):
         """Refresh the list of raster layers."""
         self.layer_combo.clear()
@@ -878,9 +970,35 @@ class SamGeoDockWidget(QDockWidget):
 
         # Get the layer's file path
         source = layer.source()
-        if not os.path.exists(source):
-            self.show_error(f"Layer source file not found: {source}")
-            return
+
+        # Check if this is a GeoPackage raster
+        is_gpkg = self._is_geopackage_raster(source)
+        temp_export_path = None
+
+        if is_gpkg:
+            # Export GeoPackage raster to a temporary file
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setRange(0, 0)
+            self.image_status.setText("Exporting GeoPackage raster...")
+            QCoreApplication.processEvents()
+
+            temp_export_path = self._export_geopackage_raster(layer)
+            if temp_export_path is None:
+                self.progress_bar.setVisible(False)
+                self.image_status.setText("Image: Failed to export")
+                self.image_status.setStyleSheet("color: red;")
+                self.show_error(
+                    "Failed to export GeoPackage raster. "
+                    "Try exporting the layer to a GeoTIFF file manually."
+                )
+                return
+            image_path = temp_export_path
+        else:
+            # Regular file path
+            if not os.path.exists(source):
+                self.show_error(f"Layer source file not found: {source}")
+                return
+            image_path = source
 
         try:
             self.progress_bar.setVisible(True)
@@ -890,18 +1008,22 @@ class SamGeoDockWidget(QDockWidget):
 
             # Get bands if custom bands are enabled
             bands = self._get_bands()
-            self.sam.set_image(source, bands=bands)
+            self.sam.set_image(image_path, bands=bands)
             self.current_layer = layer
-            self.current_image_path = source
+            self.current_image_path = image_path
 
             # Build status message
             status_msg = f"Image: {layer.name()}"
+            if is_gpkg:
+                status_msg += " (from GeoPackage)"
             if bands:
                 status_msg += f" (Bands: {bands})"
             self.image_status.setText(status_msg)
             self.image_status.setStyleSheet("color: green;")
 
             log_msg = f"Image set from layer: {layer.name()}"
+            if is_gpkg:
+                log_msg += f" (exported from GeoPackage to {image_path})"
             if bands:
                 log_msg += f" with bands {bands}"
             self.log_message(log_msg)
@@ -909,6 +1031,12 @@ class SamGeoDockWidget(QDockWidget):
         except Exception as e:
             self.image_status.setText("Image: Failed to set")
             self.image_status.setStyleSheet("color: red;")
+            # Clean up temp file if export succeeded but set_image failed
+            if temp_export_path and os.path.exists(temp_export_path):
+                try:
+                    os.remove(temp_export_path)
+                except Exception:
+                    pass
             self.show_error(f"Failed to set image: {str(e)}")
 
         finally:
@@ -1818,6 +1946,18 @@ class SamGeoDockWidget(QDockWidget):
 
         if self.box_tool is not None:
             self.box_tool.clear_rubber_band()
+
+        # Clean up temporary files (e.g., exported GeoPackage rasters)
+        for temp_file in self._temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                    self.log_message(f"Cleaned up temporary file: {temp_file}")
+            except Exception as e:
+                self.log_message(
+                    f"Failed to clean up temp file {temp_file}: {e}", level=Qgis.Warning
+                )
+        self._temp_files.clear()
 
         # Clean up model
         if self.sam is not None:
