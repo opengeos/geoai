@@ -796,6 +796,8 @@ class SamGeoDockWidget(QDockWidget):
                     "Failed to set up raster pipe for GeoPackage export",
                     level=Qgis.Warning,
                 )
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
                 return None
 
             # Create the file writer
