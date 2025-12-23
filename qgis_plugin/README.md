@@ -128,8 +128,8 @@ cuda = "12.0"
 
 [dependencies]
 python = "3.12.*"
-pytorch-gpu = ">=2.9.1,<3"
-qgis = ">=3.44.5"
+pytorch-gpu = ">=2.7.1,<3"
+qgis = "3.42.*"
 geoai = ">=0.24.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
@@ -166,8 +166,8 @@ platforms = ["linux-64", "win-64"]
 
 [dependencies]
 python = "3.12.*"
-pytorch-cpu = ">=2.9.1,<3"
-qgis = ">=3.44.5"
+pytorch-cpu = ">=2.7.1,<3"
+qgis = "3.42.*"
 geoai = ">=0.24.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
