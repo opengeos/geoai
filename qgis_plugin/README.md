@@ -145,7 +145,7 @@ name = "geo"
 platforms = ["linux-64", "win-64"]
 
 [system-requirements]
-cuda = "12.0"
+cuda = "13.0"
 
 [dependencies]
 python = "3.12.*"
