@@ -238,6 +238,10 @@ GeoAI is available as a QGIS plugin in the official [QGIS plugin repository](htt
 
 ![](https://github.com/user-attachments/assets/b31d1d13-27ff-420a-84ab-9cc82ade9a8e)
 
+If you encounter an error message like this after installing the plugin, click **Close** to dismiss the dialog. Next, in the QGIS Plugin Manager on the **Installed** tab, toggle the checkbox next to the **GeoAI** plugin to enable it. If the error dialog appears again, close it once more, then restart QGIS to reload the plugin. After restarting, the GeoAI plugin should appear in the QGIS toolbar.
+
+![](https://github.com/user-attachments/assets/cb1be4f9-eaba-4c0c-9c48-f209d39b2d71)
+
 Option B — use the helper script:
 
 ```bash
