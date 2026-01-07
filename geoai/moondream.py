@@ -18,6 +18,7 @@ import rasterio
 import torch
 from PIL import Image
 from shapely.geometry import Point, box
+from tqdm import tqdm
 from transformers.utils import logging as hf_logging
 
 from .utils import get_device
@@ -867,6 +868,533 @@ class MoondreamGeo:
         else:
             return None
 
+    def _create_sliding_windows(
+        self,
+        image_width: int,
+        image_height: int,
+        window_size: int = 512,
+        overlap: int = 64,
+    ) -> List[Tuple[int, int, int, int]]:
+        """Create sliding window coordinates for tiled processing.
+
+        Args:
+            image_width: Width of the full image.
+            image_height: Height of the full image.
+            window_size: Size of each window/tile.
+            overlap: Overlap between adjacent windows.
+
+        Returns:
+            List of tuples (x_start, y_start, x_end, y_end) for each window.
+        """
+        windows = []
+        stride = window_size - overlap
+
+        for y in range(0, image_height, stride):
+            for x in range(0, image_width, stride):
+                x_start = x
+                y_start = y
+                x_end = min(x + window_size, image_width)
+                y_end = min(y + window_size, image_height)
+
+                # Only add windows that have sufficient size
+                if (x_end - x_start) >= window_size // 2 and (
+                    y_end - y_start
+                ) >= window_size // 2:
+                    windows.append((x_start, y_start, x_end, y_end))
+
+        return windows
+
+    def _apply_nms(
+        self,
+        detections: List[Dict[str, Any]],
+        iou_threshold: float = 0.5,
+    ) -> List[Dict[str, Any]]:
+        """Apply Non-Maximum Suppression to remove overlapping detections.
+
+        Args:
+            detections: List of detection dictionaries with bounding boxes.
+            iou_threshold: IoU threshold for considering boxes as overlapping.
+
+        Returns:
+            Filtered list of detections after NMS.
+        """
+        if not detections:
+            return []
+
+        # Sort by confidence/score if available
+        if "score" in detections[0]:
+            detections = sorted(detections, key=lambda x: x.get("score", 1.0), reverse=True)
+
+        # Convert to arrays for efficient computation
+        boxes = np.array(
+            [
+                [d["x_min"], d["y_min"], d["x_max"], d["y_max"]]
+                for d in detections
+            ]
+        )
+
+        # Calculate areas
+        x1 = boxes[:, 0]
+        y1 = boxes[:, 1]
+        x2 = boxes[:, 2]
+        y2 = boxes[:, 3]
+        areas = (x2 - x1) * (y2 - y1)
+
+        # Sort by y2 coordinate (bottom of box)
+        order = y2.argsort()
+
+        keep = []
+        while order.size > 0:
+            i = order[-1]
+            keep.append(i)
+
+            # Calculate IoU with remaining boxes
+            xx1 = np.maximum(x1[i], x1[order[:-1]])
+            yy1 = np.maximum(y1[i], y1[order[:-1]])
+            xx2 = np.minimum(x2[i], x2[order[:-1]])
+            yy2 = np.minimum(y2[i], y2[order[:-1]])
+
+            w = np.maximum(0, xx2 - xx1)
+            h = np.maximum(0, yy2 - yy1)
+            intersection = w * h
+
+            iou = intersection / (areas[i] + areas[order[:-1]] - intersection)
+
+            # Keep only boxes with IoU less than threshold
+            inds = np.where(iou <= iou_threshold)[0]
+            order = order[inds]
+
+        return [detections[i] for i in keep]
+
+    def detect_sliding_window(
+        self,
+        source: Union[str, Image.Image, np.ndarray],
+        object_type: str,
+        window_size: int = 512,
+        overlap: int = 64,
+        iou_threshold: float = 0.5,
+        bands: Optional[List[int]] = None,
+        output_path: Optional[str] = None,
+        settings: Optional[Dict] = None,
+        show_progress: bool = True,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Detect objects using sliding window for large images.
+
+        This method processes large images by dividing them into overlapping
+        windows/tiles, running detection on each tile, and merging results
+        using Non-Maximum Suppression (NMS) to handle overlapping detections.
+
+        Args:
+            source: Image source or pre-encoded image.
+            object_type: Type of object to detect (e.g., "car", "building").
+            window_size: Size of each processing window/tile. Default 512.
+            overlap: Overlap between adjacent windows. Default 64.
+            iou_threshold: IoU threshold for NMS to merge overlapping detections.
+            bands: Band indices for GeoTIFF.
+            output_path: Path to save results as GeoJSON/Shapefile/GeoPackage.
+            settings: Additional settings for the model.
+            show_progress: Whether to show progress bar.
+            **kwargs: Additional arguments for the model.
+
+        Returns:
+            Dictionary with "objects" key containing list of bounding boxes
+            with normalized coordinates. If georeferenced, also includes
+            "gdf" (GeoDataFrame).
+        """
+        # Load image
+        if isinstance(source, (str, Image.Image, np.ndarray)):
+            image, metadata = self.load_image(source, bands)
+        else:
+            image = source
+            metadata = self._metadata
+
+        width, height = image.size
+
+        # If image is smaller than window size, use regular detection
+        if width <= window_size and height <= window_size:
+            return self.detect(
+                image, object_type, bands=bands, output_path=output_path,
+                settings=settings, **kwargs
+            )
+
+        # Create sliding windows
+        windows = self._create_sliding_windows(width, height, window_size, overlap)
+
+        all_detections = []
+
+        # Progress bar setup
+        iterator = tqdm(windows, desc=f"Detecting {object_type}") if show_progress else windows
+
+        # Process each window
+        for x_start, y_start, x_end, y_end in iterator:
+            # Crop window from image
+            window_img = image.crop((x_start, y_start, x_end, y_end))
+
+            # Detect in window
+            call_kwargs = {}
+            if settings:
+                call_kwargs["settings"] = settings
+            call_kwargs.update(kwargs)
+
+            try:
+                result = self.model.detect(window_img, object_type, **call_kwargs)
+
+                # Adjust coordinates to full image space
+                window_width = x_end - x_start
+                window_height = y_end - y_start
+
+                for obj in result.get("objects", []):
+                    # Convert from window-relative normalized coords to full image normalized coords
+                    full_x_min = (x_start + obj["x_min"] * window_width) / width
+                    full_y_min = (y_start + obj["y_min"] * window_height) / height
+                    full_x_max = (x_start + obj["x_max"] * window_width) / width
+                    full_y_max = (y_start + obj["y_max"] * window_height) / height
+
+                    detection = {
+                        "x_min": full_x_min,
+                        "y_min": full_y_min,
+                        "x_max": full_x_max,
+                        "y_max": full_y_max,
+                    }
+
+                    # Preserve additional fields if present
+                    for key in obj:
+                        if key not in ["x_min", "y_min", "x_max", "y_max"]:
+                            detection[key] = obj[key]
+
+                    all_detections.append(detection)
+
+            except Exception as e:
+                if show_progress:
+                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+
+        # Apply NMS to merge overlapping detections
+        merged_detections = self._apply_nms(all_detections, iou_threshold)
+
+        result = {"objects": merged_detections}
+
+        # Convert to georeferenced if possible
+        if metadata and metadata.get("crs") and metadata.get("transform"):
+            result = self._georef_detections(result, metadata)
+
+            if output_path:
+                self._save_vector(result["gdf"], output_path)
+
+        return result
+
+    def point_sliding_window(
+        self,
+        source: Union[str, Image.Image, np.ndarray],
+        object_description: str,
+        window_size: int = 512,
+        overlap: int = 64,
+        bands: Optional[List[int]] = None,
+        output_path: Optional[str] = None,
+        show_progress: bool = True,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Find points using sliding window for large images.
+
+        This method processes large images by dividing them into overlapping
+        windows/tiles and finding points in each tile.
+
+        Args:
+            source: Image source or pre-encoded image.
+            object_description: Description of objects to find.
+            window_size: Size of each processing window/tile. Default 512.
+            overlap: Overlap between adjacent windows. Default 64.
+            bands: Band indices for GeoTIFF.
+            output_path: Path to save results as GeoJSON/Shapefile/GeoPackage.
+            show_progress: Whether to show progress bar.
+            **kwargs: Additional arguments for the model.
+
+        Returns:
+            Dictionary with "points" key containing list of points
+            with normalized coordinates. If georeferenced, also includes
+            "gdf" (GeoDataFrame).
+        """
+        # Load image
+        if isinstance(source, (str, Image.Image, np.ndarray)):
+            image, metadata = self.load_image(source, bands)
+        else:
+            image = source
+            metadata = self._metadata
+
+        width, height = image.size
+
+        # If image is smaller than window size, use regular point detection
+        if width <= window_size and height <= window_size:
+            return self.point(
+                image, object_description, bands=bands,
+                output_path=output_path, **kwargs
+            )
+
+        # Create sliding windows
+        windows = self._create_sliding_windows(width, height, window_size, overlap)
+
+        all_points = []
+
+        # Progress bar setup
+        iterator = tqdm(windows, desc=f"Finding {object_description}") if show_progress else windows
+
+        # Process each window
+        for x_start, y_start, x_end, y_end in iterator:
+            # Crop window from image
+            window_img = image.crop((x_start, y_start, x_end, y_end))
+
+            # Find points in window
+            try:
+                result = self.model.point(window_img, object_description, **kwargs)
+
+                # Adjust coordinates to full image space
+                window_width = x_end - x_start
+                window_height = y_end - y_start
+
+                for pt in result.get("points", []):
+                    # Convert from window-relative normalized coords to full image normalized coords
+                    full_x = (x_start + pt["x"] * window_width) / width
+                    full_y = (y_start + pt["y"] * window_height) / height
+
+                    point = {"x": full_x, "y": full_y}
+
+                    # Preserve additional fields if present
+                    for key in pt:
+                        if key not in ["x", "y"]:
+                            point[key] = pt[key]
+
+                    all_points.append(point)
+
+            except Exception as e:
+                if show_progress:
+                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+
+        result = {"points": all_points}
+
+        # Convert to georeferenced if possible
+        if metadata and metadata.get("crs") and metadata.get("transform"):
+            result = self._georef_points(result, metadata)
+
+            if output_path:
+                self._save_vector(result["gdf"], output_path)
+
+        return result
+
+    def query_sliding_window(
+        self,
+        question: str,
+        source: Union[str, Image.Image, np.ndarray],
+        window_size: int = 512,
+        overlap: int = 64,
+        reasoning: Optional[bool] = None,
+        bands: Optional[List[int]] = None,
+        settings: Optional[Dict] = None,
+        show_progress: bool = True,
+        combine_strategy: str = "concatenate",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Query image using sliding window for large images.
+
+        This method processes large images by dividing them into overlapping
+        windows/tiles, querying each tile, and combining the responses.
+
+        Args:
+            question: The question to ask about each window.
+            source: Image source or pre-encoded image.
+            window_size: Size of each processing window/tile. Default 512.
+            overlap: Overlap between adjacent windows. Default 64.
+            reasoning: Enable reasoning mode (moondream3 only).
+            bands: Band indices for GeoTIFF.
+            settings: Additional settings for the model.
+            show_progress: Whether to show progress bar.
+            combine_strategy: How to combine answers from different windows.
+                Options: "concatenate", "summarize". Default "concatenate".
+            **kwargs: Additional arguments for the model.
+
+        Returns:
+            Dictionary with "answer" key containing the combined response,
+            and "tile_answers" with individual tile responses.
+        """
+        # Load image
+        if isinstance(source, (str, Image.Image, np.ndarray)):
+            image, _ = self.load_image(source, bands)
+        else:
+            image = source
+
+        width, height = image.size
+
+        # If image is smaller than window size, use regular query
+        if width <= window_size and height <= window_size:
+            return self.query(
+                question, image, reasoning=reasoning,
+                bands=bands, settings=settings, **kwargs
+            )
+
+        # Create sliding windows
+        windows = self._create_sliding_windows(width, height, window_size, overlap)
+
+        tile_answers = []
+
+        # Progress bar setup
+        iterator = tqdm(windows, desc="Querying tiles") if show_progress else windows
+
+        # Process each window
+        for idx, (x_start, y_start, x_end, y_end) in enumerate(iterator):
+            # Crop window from image
+            window_img = image.crop((x_start, y_start, x_end, y_end))
+
+            # Query window
+            call_kwargs = {"question": question, "image": window_img}
+            if reasoning is not None and self.model_version == "moondream3":
+                call_kwargs["reasoning"] = reasoning
+            if settings:
+                call_kwargs["settings"] = settings
+            call_kwargs.update(kwargs)
+
+            try:
+                result = self.model.query(**call_kwargs)
+                tile_answers.append({
+                    "tile_id": idx,
+                    "bounds": (x_start, y_start, x_end, y_end),
+                    "answer": result.get("answer", "")
+                })
+            except Exception as e:
+                if show_progress:
+                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+
+        # Combine answers
+        if combine_strategy == "concatenate":
+            combined_answer = "\n\n".join([
+                f"Tile {ta['tile_id']} (region {ta['bounds']}): {ta['answer']}"
+                for ta in tile_answers
+            ])
+        elif combine_strategy == "summarize":
+            # Use the model to summarize the tile answers
+            summary_prompt = (
+                f"Based on these regional observations about '{question}', "
+                f"provide a comprehensive summary:\n\n"
+            )
+            for ta in tile_answers:
+                summary_prompt += f"Region {ta['tile_id']}: {ta['answer']}\n"
+
+            try:
+                summary_result = self.model.query(question=summary_prompt)
+                combined_answer = summary_result.get("answer", "")
+            except:
+                # Fall back to concatenation if summarization fails
+                combined_answer = " ".join([ta["answer"] for ta in tile_answers])
+        else:
+            combined_answer = " ".join([ta["answer"] for ta in tile_answers])
+
+        return {
+            "answer": combined_answer,
+            "tile_answers": tile_answers
+        }
+
+    def caption_sliding_window(
+        self,
+        source: Union[str, Image.Image, np.ndarray],
+        window_size: int = 512,
+        overlap: int = 64,
+        length: str = "normal",
+        bands: Optional[List[int]] = None,
+        settings: Optional[Dict] = None,
+        show_progress: bool = True,
+        combine_strategy: str = "concatenate",
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Generate caption using sliding window for large images.
+
+        This method processes large images by dividing them into overlapping
+        windows/tiles, generating captions for each tile, and combining them.
+
+        Args:
+            source: Image source or pre-encoded image.
+            window_size: Size of each processing window/tile. Default 512.
+            overlap: Overlap between adjacent windows. Default 64.
+            length: Caption length - "short", "normal", or "long".
+            bands: Band indices for GeoTIFF.
+            settings: Additional settings for the model.
+            show_progress: Whether to show progress bar.
+            combine_strategy: How to combine captions from different windows.
+                Options: "concatenate", "summarize". Default "concatenate".
+            **kwargs: Additional arguments for the model.
+
+        Returns:
+            Dictionary with "caption" key containing the combined caption,
+            and "tile_captions" with individual tile captions.
+        """
+        # Load image
+        if isinstance(source, (str, Image.Image, np.ndarray)):
+            image, _ = self.load_image(source, bands)
+        else:
+            image = source
+
+        width, height = image.size
+
+        # If image is smaller than window size, use regular caption
+        if width <= window_size and height <= window_size:
+            return self.caption(
+                image, length=length, bands=bands,
+                settings=settings, **kwargs
+            )
+
+        # Create sliding windows
+        windows = self._create_sliding_windows(width, height, window_size, overlap)
+
+        tile_captions = []
+
+        # Progress bar setup
+        iterator = tqdm(windows, desc="Generating captions") if show_progress else windows
+
+        # Process each window
+        for idx, (x_start, y_start, x_end, y_end) in enumerate(iterator):
+            # Crop window from image
+            window_img = image.crop((x_start, y_start, x_end, y_end))
+
+            # Caption window
+            call_kwargs = {"length": length}
+            if settings:
+                call_kwargs["settings"] = settings
+            call_kwargs.update(kwargs)
+
+            try:
+                result = self.model.caption(window_img, **call_kwargs)
+                tile_captions.append({
+                    "tile_id": idx,
+                    "bounds": (x_start, y_start, x_end, y_end),
+                    "caption": result.get("caption", "")
+                })
+            except Exception as e:
+                if show_progress:
+                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+
+        # Combine captions
+        if combine_strategy == "concatenate":
+            combined_caption = " ".join([tc["caption"] for tc in tile_captions])
+        elif combine_strategy == "summarize":
+            # Use the model to create a cohesive summary caption
+            summary_prompt = (
+                "Based on these descriptions of different regions of an image, "
+                "create a single comprehensive caption for the entire image:\n\n"
+            )
+            for tc in tile_captions:
+                summary_prompt += f"Region {tc['tile_id']}: {tc['caption']}\n"
+
+            try:
+                summary_result = self.model.query(question=summary_prompt)
+                combined_caption = summary_result.get("answer", "")
+            except:
+                # Fall back to concatenation if summarization fails
+                combined_caption = " ".join([tc["caption"] for tc in tile_captions])
+        else:
+            combined_caption = " ".join([tc["caption"] for tc in tile_captions])
+
+        return {
+            "caption": combined_caption,
+            "tile_captions": tile_captions
+        }
+
 
 def moondream_caption(
     source: Union[str, Image.Image, np.ndarray],
@@ -987,4 +1515,199 @@ def moondream_point(
     processor = MoondreamGeo(model_name=model_name, revision=revision, device=device)
     return processor.point(
         source, object_description, output_path=output_path, bands=bands, **kwargs
+    )
+
+
+def moondream_detect_sliding_window(
+    source: Union[str, Image.Image, np.ndarray],
+    object_type: str,
+    window_size: int = 512,
+    overlap: int = 64,
+    iou_threshold: float = 0.5,
+    model_name: str = "vikhyatk/moondream2",
+    revision: Optional[str] = None,
+    output_path: Optional[str] = None,
+    bands: Optional[List[int]] = None,
+    device: Optional[str] = None,
+    show_progress: bool = True,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Convenience function to detect objects using sliding window.
+
+    This function is designed for large images where the standard detection
+    may not work well. It divides the image into overlapping windows and
+    merges detections using NMS.
+
+    Args:
+        source: Image source.
+        object_type: Type of object to detect.
+        window_size: Size of each processing window. Default 512.
+        overlap: Overlap between windows. Default 64.
+        iou_threshold: IoU threshold for NMS. Default 0.5.
+        model_name: Moondream model name.
+        revision: Model revision.
+        output_path: Path to save results as vector file.
+        bands: Band indices for GeoTIFF.
+        device: Device for inference.
+        show_progress: Whether to show progress bar.
+        **kwargs: Additional arguments.
+
+    Returns:
+        Detection results dictionary with "objects" and optionally "gdf".
+    """
+    processor = MoondreamGeo(model_name=model_name, revision=revision, device=device)
+    return processor.detect_sliding_window(
+        source,
+        object_type,
+        window_size=window_size,
+        overlap=overlap,
+        iou_threshold=iou_threshold,
+        output_path=output_path,
+        bands=bands,
+        show_progress=show_progress,
+        **kwargs,
+    )
+
+
+def moondream_point_sliding_window(
+    source: Union[str, Image.Image, np.ndarray],
+    object_description: str,
+    window_size: int = 512,
+    overlap: int = 64,
+    model_name: str = "vikhyatk/moondream2",
+    revision: Optional[str] = None,
+    output_path: Optional[str] = None,
+    bands: Optional[List[int]] = None,
+    device: Optional[str] = None,
+    show_progress: bool = True,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Convenience function to find points using sliding window.
+
+    This function is designed for large images. It divides the image
+    into overlapping windows and aggregates all detected points.
+
+    Args:
+        source: Image source.
+        object_description: Description of objects to find.
+        window_size: Size of each processing window. Default 512.
+        overlap: Overlap between windows. Default 64.
+        model_name: Moondream model name.
+        revision: Model revision.
+        output_path: Path to save results as vector file.
+        bands: Band indices for GeoTIFF.
+        device: Device for inference.
+        show_progress: Whether to show progress bar.
+        **kwargs: Additional arguments.
+
+    Returns:
+        Point results dictionary with "points" and optionally "gdf".
+    """
+    processor = MoondreamGeo(model_name=model_name, revision=revision, device=device)
+    return processor.point_sliding_window(
+        source,
+        object_description,
+        window_size=window_size,
+        overlap=overlap,
+        output_path=output_path,
+        bands=bands,
+        show_progress=show_progress,
+        **kwargs,
+    )
+
+
+def moondream_query_sliding_window(
+    question: str,
+    source: Union[str, Image.Image, np.ndarray],
+    window_size: int = 512,
+    overlap: int = 64,
+    model_name: str = "vikhyatk/moondream2",
+    revision: Optional[str] = None,
+    reasoning: Optional[bool] = None,
+    bands: Optional[List[int]] = None,
+    device: Optional[str] = None,
+    show_progress: bool = True,
+    combine_strategy: str = "concatenate",
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Convenience function to query large images using sliding window.
+
+    This function divides the image into overlapping windows, queries each,
+    and combines the answers.
+
+    Args:
+        question: Question to ask about the image.
+        source: Image source.
+        window_size: Size of each processing window. Default 512.
+        overlap: Overlap between windows. Default 64.
+        model_name: Moondream model name.
+        revision: Model revision.
+        reasoning: Enable reasoning mode (moondream3 only).
+        bands: Band indices for GeoTIFF.
+        device: Device for inference.
+        show_progress: Whether to show progress bar.
+        combine_strategy: How to combine answers ("concatenate" or "summarize").
+        **kwargs: Additional arguments.
+
+    Returns:
+        Dictionary with "answer" and "tile_answers" keys.
+    """
+    processor = MoondreamGeo(model_name=model_name, revision=revision, device=device)
+    return processor.query_sliding_window(
+        question,
+        source,
+        window_size=window_size,
+        overlap=overlap,
+        reasoning=reasoning,
+        bands=bands,
+        show_progress=show_progress,
+        combine_strategy=combine_strategy,
+        **kwargs,
+    )
+
+
+def moondream_caption_sliding_window(
+    source: Union[str, Image.Image, np.ndarray],
+    window_size: int = 512,
+    overlap: int = 64,
+    length: str = "normal",
+    model_name: str = "vikhyatk/moondream2",
+    revision: Optional[str] = None,
+    bands: Optional[List[int]] = None,
+    device: Optional[str] = None,
+    show_progress: bool = True,
+    combine_strategy: str = "concatenate",
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Convenience function to caption large images using sliding window.
+
+    This function divides the image into overlapping windows, captions each,
+    and combines the results.
+
+    Args:
+        source: Image source.
+        window_size: Size of each processing window. Default 512.
+        overlap: Overlap between windows. Default 64.
+        length: Caption length ("short", "normal", "long").
+        model_name: Moondream model name.
+        revision: Model revision.
+        bands: Band indices for GeoTIFF.
+        device: Device for inference.
+        show_progress: Whether to show progress bar.
+        combine_strategy: How to combine captions ("concatenate" or "summarize").
+        **kwargs: Additional arguments.
+
+    Returns:
+        Dictionary with "caption" and "tile_captions" keys.
+    """
+    processor = MoondreamGeo(model_name=model_name, revision=revision, device=device)
+    return processor.caption_sliding_window(
+        source,
+        window_size=window_size,
+        overlap=overlap,
+        length=length,
+        bands=bands,
+        show_progress=show_progress,
+        combine_strategy=combine_strategy,
+        **kwargs,
     )
