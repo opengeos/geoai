@@ -923,14 +923,13 @@ class MoondreamGeo:
 
         # Sort by confidence/score if available
         if "score" in detections[0]:
-            detections = sorted(detections, key=lambda x: x.get("score", 1.0), reverse=True)
+            detections = sorted(
+                detections, key=lambda x: x.get("score", 1.0), reverse=True
+            )
 
         # Convert to arrays for efficient computation
         boxes = np.array(
-            [
-                [d["x_min"], d["y_min"], d["x_max"], d["y_max"]]
-                for d in detections
-            ]
+            [[d["x_min"], d["y_min"], d["x_max"], d["y_max"]] for d in detections]
         )
 
         # Calculate areas
@@ -1014,8 +1013,12 @@ class MoondreamGeo:
         # If image is smaller than window size, use regular detection
         if width <= window_size and height <= window_size:
             return self.detect(
-                image, object_type, bands=bands, output_path=output_path,
-                settings=settings, **kwargs
+                image,
+                object_type,
+                bands=bands,
+                output_path=output_path,
+                settings=settings,
+                **kwargs,
             )
 
         # Create sliding windows
@@ -1024,7 +1027,9 @@ class MoondreamGeo:
         all_detections = []
 
         # Progress bar setup
-        iterator = tqdm(windows, desc=f"Detecting {object_type}") if show_progress else windows
+        iterator = (
+            tqdm(windows, desc=f"Detecting {object_type}") if show_progress else windows
+        )
 
         # Process each window
         for x_start, y_start, x_end, y_end in iterator:
@@ -1067,7 +1072,9 @@ class MoondreamGeo:
 
             except Exception as e:
                 if show_progress:
-                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+                    print(
+                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    )
 
         # Apply NMS to merge overlapping detections
         merged_detections = self._apply_nms(all_detections, iou_threshold)
@@ -1126,8 +1133,11 @@ class MoondreamGeo:
         # If image is smaller than window size, use regular point detection
         if width <= window_size and height <= window_size:
             return self.point(
-                image, object_description, bands=bands,
-                output_path=output_path, **kwargs
+                image,
+                object_description,
+                bands=bands,
+                output_path=output_path,
+                **kwargs,
             )
 
         # Create sliding windows
@@ -1136,7 +1146,11 @@ class MoondreamGeo:
         all_points = []
 
         # Progress bar setup
-        iterator = tqdm(windows, desc=f"Finding {object_description}") if show_progress else windows
+        iterator = (
+            tqdm(windows, desc=f"Finding {object_description}")
+            if show_progress
+            else windows
+        )
 
         # Process each window
         for x_start, y_start, x_end, y_end in iterator:
@@ -1167,7 +1181,9 @@ class MoondreamGeo:
 
             except Exception as e:
                 if show_progress:
-                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+                    print(
+                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    )
 
         result = {"points": all_points}
 
@@ -1226,8 +1242,12 @@ class MoondreamGeo:
         # If image is smaller than window size, use regular query
         if width <= window_size and height <= window_size:
             return self.query(
-                question, image, reasoning=reasoning,
-                bands=bands, settings=settings, **kwargs
+                question,
+                image,
+                reasoning=reasoning,
+                bands=bands,
+                settings=settings,
+                **kwargs,
             )
 
         # Create sliding windows
@@ -1253,21 +1273,27 @@ class MoondreamGeo:
 
             try:
                 result = self.model.query(**call_kwargs)
-                tile_answers.append({
-                    "tile_id": idx,
-                    "bounds": (x_start, y_start, x_end, y_end),
-                    "answer": result.get("answer", "")
-                })
+                tile_answers.append(
+                    {
+                        "tile_id": idx,
+                        "bounds": (x_start, y_start, x_end, y_end),
+                        "answer": result.get("answer", ""),
+                    }
+                )
             except Exception as e:
                 if show_progress:
-                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+                    print(
+                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    )
 
         # Combine answers
         if combine_strategy == "concatenate":
-            combined_answer = "\n\n".join([
-                f"Tile {ta['tile_id']} (region {ta['bounds']}): {ta['answer']}"
-                for ta in tile_answers
-            ])
+            combined_answer = "\n\n".join(
+                [
+                    f"Tile {ta['tile_id']} (region {ta['bounds']}): {ta['answer']}"
+                    for ta in tile_answers
+                ]
+            )
         elif combine_strategy == "summarize":
             # Use the model to summarize the tile answers
             summary_prompt = (
@@ -1286,10 +1312,7 @@ class MoondreamGeo:
         else:
             combined_answer = " ".join([ta["answer"] for ta in tile_answers])
 
-        return {
-            "answer": combined_answer,
-            "tile_answers": tile_answers
-        }
+        return {"answer": combined_answer, "tile_answers": tile_answers}
 
     def caption_sliding_window(
         self,
@@ -1335,8 +1358,7 @@ class MoondreamGeo:
         # If image is smaller than window size, use regular caption
         if width <= window_size and height <= window_size:
             return self.caption(
-                image, length=length, bands=bands,
-                settings=settings, **kwargs
+                image, length=length, bands=bands, settings=settings, **kwargs
             )
 
         # Create sliding windows
@@ -1345,7 +1367,9 @@ class MoondreamGeo:
         tile_captions = []
 
         # Progress bar setup
-        iterator = tqdm(windows, desc="Generating captions") if show_progress else windows
+        iterator = (
+            tqdm(windows, desc="Generating captions") if show_progress else windows
+        )
 
         # Process each window
         for idx, (x_start, y_start, x_end, y_end) in enumerate(iterator):
@@ -1360,14 +1384,18 @@ class MoondreamGeo:
 
             try:
                 result = self.model.caption(window_img, **call_kwargs)
-                tile_captions.append({
-                    "tile_id": idx,
-                    "bounds": (x_start, y_start, x_end, y_end),
-                    "caption": result.get("caption", "")
-                })
+                tile_captions.append(
+                    {
+                        "tile_id": idx,
+                        "bounds": (x_start, y_start, x_end, y_end),
+                        "caption": result.get("caption", ""),
+                    }
+                )
             except Exception as e:
                 if show_progress:
-                    print(f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}")
+                    print(
+                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    )
 
         # Combine captions
         if combine_strategy == "concatenate":
@@ -1390,10 +1418,7 @@ class MoondreamGeo:
         else:
             combined_caption = " ".join([tc["caption"] for tc in tile_captions])
 
-        return {
-            "caption": combined_caption,
-            "tile_captions": tile_captions
-        }
+        return {"caption": combined_caption, "tile_captions": tile_captions}
 
 
 def moondream_caption(
