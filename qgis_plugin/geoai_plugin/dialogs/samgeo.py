@@ -915,7 +915,10 @@ class SamGeoDockWidget(QDockWidget):
             tuple: (is_cuda_available: bool, warning_message: str or None)
         """
         if torch is None:
-            return False, "PyTorch is not installed. Please install PyTorch to use CUDA acceleration."
+            return (
+                False,
+                "PyTorch is not installed. Please install PyTorch to use CUDA acceleration.",
+            )
 
         # Check if CUDA is available
         try:
@@ -934,18 +937,24 @@ class SamGeoDockWidget(QDockWidget):
                     # Try to fix by resetting to device 0
                     try:
                         os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-                        self.log_message("Reset CUDA_VISIBLE_DEVICES to '0', checking again...")
+                        self.log_message(
+                            "Reset CUDA_VISIBLE_DEVICES to '0', checking again..."
+                        )
 
                         # Force PyTorch to reinitialize CUDA
                         # Note: This may not work in all cases as CUDA is initialized once per process
-                        if hasattr(torch.cuda, '_lazy_init'):
+                        if hasattr(torch.cuda, "_lazy_init"):
                             torch.cuda._lazy_init()
 
                         cuda_available = torch.cuda.is_available()
 
                         if cuda_available:
                             device_count = torch.cuda.device_count()
-                            device_name = torch.cuda.get_device_name(0) if device_count > 0 else "Unknown"
+                            device_name = (
+                                torch.cuda.get_device_name(0)
+                                if device_count > 0
+                                else "Unknown"
+                            )
                             warning_msg = (
                                 f"Fixed CUDA issue: Reset CUDA_VISIBLE_DEVICES from '{cuda_visible}' to '0'. "
                                 f"Detected {device_count} GPU(s): {device_name}"
@@ -977,8 +986,12 @@ class SamGeoDockWidget(QDockWidget):
             else:
                 # CUDA is available
                 device_count = torch.cuda.device_count()
-                device_name = torch.cuda.get_device_name(0) if device_count > 0 else "Unknown"
-                self.log_message(f"CUDA available: {device_count} GPU(s) detected - {device_name}")
+                device_name = (
+                    torch.cuda.get_device_name(0) if device_count > 0 else "Unknown"
+                )
+                self.log_message(
+                    f"CUDA available: {device_count} GPU(s) detected - {device_name}"
+                )
                 return True, None
 
         except Exception as e:
@@ -1022,19 +1035,17 @@ class SamGeoDockWidget(QDockWidget):
                     else:
                         # Auto mode - fall back to CPU
                         device = "cpu"
-                        self.log_message(f"Auto mode: CUDA not available, using CPU. Reason: {warning_message}")
+                        self.log_message(
+                            f"Auto mode: CUDA not available, using CPU. Reason: {warning_message}"
+                        )
                         QMessageBox.information(
                             self,
                             "Using CPU Mode",
-                            f"CUDA is not available. Automatically using CPU mode.\n\n{warning_message}"
+                            f"CUDA is not available. Automatically using CPU mode.\n\n{warning_message}",
                         )
                 elif warning_message:
                     # CUDA is now available but there was a warning (e.g., fixed CUDA_VISIBLE_DEVICES)
-                    QMessageBox.information(
-                        self,
-                        "CUDA Issue Fixed",
-                        warning_message
-                    )
+                    QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
 
             confidence = self.conf_spin.value()
             enable_interactive = self.interactive_check.isChecked()
