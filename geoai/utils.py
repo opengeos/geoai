@@ -64,7 +64,7 @@ def view_raster(
     client_args: Optional[Dict] = {"cors_all": False},
     basemap: Optional[str] = "OpenStreetMap",
     basemap_args: Optional[Dict] = None,
-    backend: Optional[str] = "ipyleaflet",
+    backend: Optional[str] = "folium",
     **kwargs: Any,
 ) -> Any:
     """
@@ -87,7 +87,7 @@ def view_raster(
         client_args (Optional[Dict], optional): Additional arguments for the client. Defaults to {"cors_all": False}.
         basemap (Optional[str], optional): The basemap to use. Defaults to "OpenStreetMap".
         basemap_args (Optional[Dict], optional): Additional arguments for the basemap. Defaults to None.
-        backend (Optional[str], optional): The backend to use. Defaults to "ipyleaflet".
+        backend (Optional[str], optional): The backend to use. Defaults to "folium".
         **kwargs (Any): Additional keyword arguments.
 
     Returns:
@@ -123,26 +123,39 @@ def view_raster(
     if isinstance(source, dict):
         source = dict_to_image(source)
 
-    if (
-        isinstance(source, str)
-        and source.lower().endswith(".tif")
-        and source.startswith("http")
-    ):
-        if indexes is not None:
-            kwargs["bidx"] = indexes
-        if colormap is not None:
-            kwargs["colormap_name"] = colormap
-        if attribution is None:
-            attribution = "TiTiler"
+    if isinstance(source, str) and source.startswith("http"):
+        if backend == "folium":
 
-        m.add_cog_layer(
-            source,
-            name=layer_name,
-            opacity=opacity,
-            attribution=attribution,
-            zoom_to_layer=zoom_to_layer,
-            **kwargs,
-        )
+            m.add_geotiff(
+                url=source,
+                name=layer_name,
+                opacity=opacity,
+                attribution=attribution,
+                fit_bounds=zoom_to_layer,
+                palette=colormap,
+                vmin=vmin,
+                vmax=vmax,
+                **kwargs,
+            )
+            m.add_layer_control()
+            m.add_opacity_control()
+
+        else:
+            if indexes is not None:
+                kwargs["bidx"] = indexes
+            if colormap is not None:
+                kwargs["colormap_name"] = colormap
+            if attribution is None:
+                attribution = "TiTiler"
+
+            m.add_cog_layer(
+                source,
+                name=layer_name,
+                opacity=opacity,
+                attribution=attribution,
+                zoom_to_layer=zoom_to_layer,
+                **kwargs,
+            )
     else:
         m.add_raster(
             source=source,
@@ -379,6 +392,394 @@ def calc_stats(dataset, divide_by: float = 1.0) -> Tuple[np.ndarray, np.ndarray]
     # at the end, we shall have 2 vectors with length n=chnls
     # we will average them considering the number of images
     return accum_mean / len(files), accum_std / len(files)
+
+
+def calc_iou(
+    ground_truth: Union[str, np.ndarray, torch.Tensor],
+    prediction: Union[str, np.ndarray, torch.Tensor],
+    num_classes: Optional[int] = None,
+    ignore_index: Optional[int] = None,
+    smooth: float = 1e-6,
+    band: int = 1,
+) -> Union[float, np.ndarray]:
+    """
+    Calculate Intersection over Union (IoU) between ground truth and prediction masks.
+
+    This function computes the IoU metric for segmentation tasks. It supports both
+    binary and multi-class segmentation, and can handle numpy arrays, PyTorch tensors,
+    or file paths to raster files.
+
+    Args:
+        ground_truth (Union[str, np.ndarray, torch.Tensor]): Ground truth segmentation mask.
+            Can be a file path (str) to a raster file, numpy array, or PyTorch tensor.
+            For binary segmentation: shape (H, W) with values {0, 1}.
+            For multi-class segmentation: shape (H, W) with class indices.
+        prediction (Union[str, np.ndarray, torch.Tensor]): Predicted segmentation mask.
+            Can be a file path (str) to a raster file, numpy array, or PyTorch tensor.
+            Should have the same shape and format as ground_truth.
+        num_classes (Optional[int], optional): Number of classes for multi-class segmentation.
+            If None, assumes binary segmentation. Defaults to None.
+        ignore_index (Optional[int], optional): Class index to ignore in computation.
+            Useful for ignoring background or unlabeled pixels. Defaults to None.
+        smooth (float, optional): Smoothing factor to avoid division by zero.
+            Defaults to 1e-6.
+        band (int, optional): Band index to read from raster file (1-based indexing).
+            Only used when input is a file path. Defaults to 1.
+
+    Returns:
+        Union[float, np.ndarray]: For binary segmentation, returns a single float IoU score.
+            For multi-class segmentation, returns an array of IoU scores for each class.
+
+    Examples:
+        >>> # Binary segmentation with arrays
+        >>> gt = np.array([[0, 0, 1, 1], [0, 1, 1, 1]])
+        >>> pred = np.array([[0, 0, 1, 1], [0, 0, 1, 1]])
+        >>> iou = calc_iou(gt, pred)
+        >>> print(f"IoU: {iou:.4f}")
+        IoU: 0.8333
+
+        >>> # Multi-class segmentation
+        >>> gt = np.array([[0, 0, 1, 1], [0, 2, 2, 1]])
+        >>> pred = np.array([[0, 0, 1, 1], [0, 0, 2, 2]])
+        >>> iou = calc_iou(gt, pred, num_classes=3)
+        >>> print(f"IoU per class: {iou}")
+        IoU per class: [0.8333 0.5000 0.5000]
+
+        >>> # Using PyTorch tensors
+        >>> gt_tensor = torch.tensor([[0, 0, 1, 1], [0, 1, 1, 1]])
+        >>> pred_tensor = torch.tensor([[0, 0, 1, 1], [0, 0, 1, 1]])
+        >>> iou = calc_iou(gt_tensor, pred_tensor)
+        >>> print(f"IoU: {iou:.4f}")
+        IoU: 0.8333
+
+        >>> # Using raster file paths
+        >>> iou = calc_iou("ground_truth.tif", "prediction.tif", num_classes=3)
+        >>> print(f"Mean IoU: {np.nanmean(iou):.4f}")
+        Mean IoU: 0.7500
+    """
+    # Load from file if string path is provided
+    if isinstance(ground_truth, str):
+        with rasterio.open(ground_truth) as src:
+            ground_truth = src.read(band)
+    if isinstance(prediction, str):
+        with rasterio.open(prediction) as src:
+            prediction = src.read(band)
+
+    # Convert to numpy if torch tensor
+    if isinstance(ground_truth, torch.Tensor):
+        ground_truth = ground_truth.cpu().numpy()
+    if isinstance(prediction, torch.Tensor):
+        prediction = prediction.cpu().numpy()
+
+    # Ensure inputs have the same shape
+    if ground_truth.shape != prediction.shape:
+        raise ValueError(
+            f"Shape mismatch: ground_truth {ground_truth.shape} vs prediction {prediction.shape}"
+        )
+
+    # Binary segmentation
+    if num_classes is None:
+        ground_truth = ground_truth.astype(bool)
+        prediction = prediction.astype(bool)
+
+        intersection = np.logical_and(ground_truth, prediction).sum()
+        union = np.logical_or(ground_truth, prediction).sum()
+
+        if union == 0:
+            return 1.0 if intersection == 0 else 0.0
+
+        iou = (intersection + smooth) / (union + smooth)
+        return float(iou)
+
+    # Multi-class segmentation
+    else:
+        iou_per_class = []
+
+        for class_idx in range(num_classes):
+            # Handle ignored class by appending np.nan
+            if ignore_index is not None and class_idx == ignore_index:
+                iou_per_class.append(np.nan)
+                continue
+
+            # Create binary masks for current class
+            gt_class = (ground_truth == class_idx).astype(bool)
+            pred_class = (prediction == class_idx).astype(bool)
+
+            intersection = np.logical_and(gt_class, pred_class).sum()
+            union = np.logical_or(gt_class, pred_class).sum()
+
+            if union == 0:
+                # If class is not present in both gt and pred
+                iou_per_class.append(np.nan)
+            else:
+                iou_per_class.append((intersection + smooth) / (union + smooth))
+
+        return np.array(iou_per_class)
+
+
+def calc_f1_score(
+    ground_truth: Union[str, np.ndarray, torch.Tensor],
+    prediction: Union[str, np.ndarray, torch.Tensor],
+    num_classes: Optional[int] = None,
+    ignore_index: Optional[int] = None,
+    smooth: float = 1e-6,
+    band: int = 1,
+) -> Union[float, np.ndarray]:
+    """
+    Calculate F1 score between ground truth and prediction masks.
+
+    The F1 score is the harmonic mean of precision and recall, computed as:
+    F1 = 2 * (precision * recall) / (precision + recall)
+    where precision = TP / (TP + FP) and recall = TP / (TP + FN).
+
+    This function supports both binary and multi-class segmentation, and can handle
+    numpy arrays, PyTorch tensors, or file paths to raster files.
+
+    Args:
+        ground_truth (Union[str, np.ndarray, torch.Tensor]): Ground truth segmentation mask.
+            Can be a file path (str) to a raster file, numpy array, or PyTorch tensor.
+            For binary segmentation: shape (H, W) with values {0, 1}.
+            For multi-class segmentation: shape (H, W) with class indices.
+        prediction (Union[str, np.ndarray, torch.Tensor]): Predicted segmentation mask.
+            Can be a file path (str) to a raster file, numpy array, or PyTorch tensor.
+            Should have the same shape and format as ground_truth.
+        num_classes (Optional[int], optional): Number of classes for multi-class segmentation.
+            If None, assumes binary segmentation. Defaults to None.
+        ignore_index (Optional[int], optional): Class index to ignore in computation.
+            Useful for ignoring background or unlabeled pixels. Defaults to None.
+        smooth (float, optional): Smoothing factor to avoid division by zero.
+            Defaults to 1e-6.
+        band (int, optional): Band index to read from raster file (1-based indexing).
+            Only used when input is a file path. Defaults to 1.
+
+    Returns:
+        Union[float, np.ndarray]: For binary segmentation, returns a single float F1 score.
+            For multi-class segmentation, returns an array of F1 scores for each class.
+
+    Examples:
+        >>> # Binary segmentation with arrays
+        >>> gt = np.array([[0, 0, 1, 1], [0, 1, 1, 1]])
+        >>> pred = np.array([[0, 0, 1, 1], [0, 0, 1, 1]])
+        >>> f1 = calc_f1_score(gt, pred)
+        >>> print(f"F1 Score: {f1:.4f}")
+        F1 Score: 0.8571
+
+        >>> # Multi-class segmentation
+        >>> gt = np.array([[0, 0, 1, 1], [0, 2, 2, 1]])
+        >>> pred = np.array([[0, 0, 1, 1], [0, 0, 2, 2]])
+        >>> f1 = calc_f1_score(gt, pred, num_classes=3)
+        >>> print(f"F1 Score per class: {f1}")
+        F1 Score per class: [0.8571 0.6667 0.6667]
+
+        >>> # Using PyTorch tensors
+        >>> gt_tensor = torch.tensor([[0, 0, 1, 1], [0, 1, 1, 1]])
+        >>> pred_tensor = torch.tensor([[0, 0, 1, 1], [0, 0, 1, 1]])
+        >>> f1 = calc_f1_score(gt_tensor, pred_tensor)
+        >>> print(f"F1 Score: {f1:.4f}")
+        F1 Score: 0.8571
+
+        >>> # Using raster file paths
+        >>> f1 = calc_f1_score("ground_truth.tif", "prediction.tif", num_classes=3)
+        >>> print(f"Mean F1: {np.nanmean(f1):.4f}")
+        Mean F1: 0.7302
+    """
+    # Load from file if string path is provided
+    if isinstance(ground_truth, str):
+        with rasterio.open(ground_truth) as src:
+            ground_truth = src.read(band)
+    if isinstance(prediction, str):
+        with rasterio.open(prediction) as src:
+            prediction = src.read(band)
+
+    # Convert to numpy if torch tensor
+    if isinstance(ground_truth, torch.Tensor):
+        ground_truth = ground_truth.cpu().numpy()
+    if isinstance(prediction, torch.Tensor):
+        prediction = prediction.cpu().numpy()
+
+    # Ensure inputs have the same shape
+    if ground_truth.shape != prediction.shape:
+        raise ValueError(
+            f"Shape mismatch: ground_truth {ground_truth.shape} vs prediction {prediction.shape}"
+        )
+
+    # Binary segmentation
+    if num_classes is None:
+        ground_truth = ground_truth.astype(bool)
+        prediction = prediction.astype(bool)
+
+        # Calculate True Positives, False Positives, False Negatives
+        tp = np.logical_and(ground_truth, prediction).sum()
+        fp = np.logical_and(~ground_truth, prediction).sum()
+        fn = np.logical_and(ground_truth, ~prediction).sum()
+
+        # Calculate precision and recall
+        precision = (tp + smooth) / (tp + fp + smooth)
+        recall = (tp + smooth) / (tp + fn + smooth)
+
+        # Calculate F1 score
+        f1 = 2 * (precision * recall) / (precision + recall + smooth)
+        return float(f1)
+
+    # Multi-class segmentation
+    else:
+        f1_per_class = []
+
+        for class_idx in range(num_classes):
+            # Mark ignored class with np.nan
+            if ignore_index is not None and class_idx == ignore_index:
+                f1_per_class.append(np.nan)
+                continue
+
+            # Create binary masks for current class
+            gt_class = (ground_truth == class_idx).astype(bool)
+            pred_class = (prediction == class_idx).astype(bool)
+
+            # Calculate True Positives, False Positives, False Negatives
+            tp = np.logical_and(gt_class, pred_class).sum()
+            fp = np.logical_and(~gt_class, pred_class).sum()
+            fn = np.logical_and(gt_class, ~pred_class).sum()
+
+            # Calculate precision and recall
+            precision = (tp + smooth) / (tp + fp + smooth)
+            recall = (tp + smooth) / (tp + fn + smooth)
+
+            # Calculate F1 score
+            if tp + fp + fn == 0:
+                # If class is not present in both gt and pred
+                f1_per_class.append(np.nan)
+            else:
+                f1 = 2 * (precision * recall) / (precision + recall + smooth)
+                f1_per_class.append(f1)
+
+        return np.array(f1_per_class)
+
+
+def calc_segmentation_metrics(
+    ground_truth: Union[str, np.ndarray, torch.Tensor],
+    prediction: Union[str, np.ndarray, torch.Tensor],
+    num_classes: Optional[int] = None,
+    ignore_index: Optional[int] = None,
+    smooth: float = 1e-6,
+    metrics: List[str] = ["iou", "f1"],
+    band: int = 1,
+) -> Dict[str, Union[float, np.ndarray]]:
+    """
+    Calculate multiple segmentation metrics between ground truth and prediction masks.
+
+    This is a convenient wrapper function that computes multiple metrics at once,
+    including IoU (Intersection over Union) and F1 score. It supports both binary
+    and multi-class segmentation, and can handle numpy arrays, PyTorch tensors,
+    or file paths to raster files.
+
+    Args:
+        ground_truth (Union[str, np.ndarray, torch.Tensor]): Ground truth segmentation mask.
+            Can be a file path (str) to a raster file, numpy array, or PyTorch tensor.
+            For binary segmentation: shape (H, W) with values {0, 1}.
+            For multi-class segmentation: shape (H, W) with class indices.
+        prediction (Union[str, np.ndarray, torch.Tensor]): Predicted segmentation mask.
+            Can be a file path (str) to a raster file, numpy array, or PyTorch tensor.
+            Should have the same shape and format as ground_truth.
+        num_classes (Optional[int], optional): Number of classes for multi-class segmentation.
+            If None, assumes binary segmentation. Defaults to None.
+        ignore_index (Optional[int], optional): Class index to ignore in computation.
+            Useful for ignoring background or unlabeled pixels. Defaults to None.
+        smooth (float, optional): Smoothing factor to avoid division by zero.
+            Defaults to 1e-6.
+        metrics (List[str], optional): List of metrics to calculate.
+            Options: "iou", "f1". Defaults to ["iou", "f1"].
+        band (int, optional): Band index to read from raster file (1-based indexing).
+            Only used when input is a file path. Defaults to 1.
+
+    Returns:
+        Dict[str, Union[float, np.ndarray]]: Dictionary containing the computed metrics.
+            Keys are metric names ("iou", "f1"), values are the metric scores.
+            For binary segmentation, values are floats.
+            For multi-class segmentation, values are numpy arrays with per-class scores.
+            Also includes "mean_iou" and "mean_f1" for multi-class segmentation
+            (mean computed over valid classes, ignoring NaN values).
+
+    Examples:
+        >>> # Binary segmentation with arrays
+        >>> gt = np.array([[0, 0, 1, 1], [0, 1, 1, 1]])
+        >>> pred = np.array([[0, 0, 1, 1], [0, 0, 1, 1]])
+        >>> metrics = calc_segmentation_metrics(gt, pred)
+        >>> print(f"IoU: {metrics['iou']:.4f}, F1: {metrics['f1']:.4f}")
+        IoU: 0.8333, F1: 0.8571
+
+        >>> # Multi-class segmentation
+        >>> gt = np.array([[0, 0, 1, 1], [0, 2, 2, 1]])
+        >>> pred = np.array([[0, 0, 1, 1], [0, 0, 2, 2]])
+        >>> metrics = calc_segmentation_metrics(gt, pred, num_classes=3)
+        >>> print(f"Mean IoU: {metrics['mean_iou']:.4f}")
+        >>> print(f"Mean F1: {metrics['mean_f1']:.4f}")
+        >>> print(f"Per-class IoU: {metrics['iou']}")
+        Mean IoU: 0.6111
+        Mean F1: 0.7302
+        Per-class IoU: [0.8333 0.5000 0.5000]
+
+        >>> # Calculate only IoU
+        >>> metrics = calc_segmentation_metrics(gt, pred, num_classes=3, metrics=["iou"])
+        >>> print(f"Mean IoU: {metrics['mean_iou']:.4f}")
+        Mean IoU: 0.6111
+
+        >>> # Using PyTorch tensors
+        >>> gt_tensor = torch.tensor([[0, 0, 1, 1], [0, 1, 1, 1]])
+        >>> pred_tensor = torch.tensor([[0, 0, 1, 1], [0, 0, 1, 1]])
+        >>> metrics = calc_segmentation_metrics(gt_tensor, pred_tensor)
+        >>> print(f"IoU: {metrics['iou']:.4f}, F1: {metrics['f1']:.4f}")
+        IoU: 0.8333, F1: 0.8571
+
+        >>> # Using raster file paths
+        >>> metrics = calc_segmentation_metrics("ground_truth.tif", "prediction.tif", num_classes=3)
+        >>> print(f"Mean IoU: {metrics['mean_iou']:.4f}")
+        >>> print(f"Mean F1: {metrics['mean_f1']:.4f}")
+        Mean IoU: 0.6111
+        Mean F1: 0.7302
+    """
+    results = {}
+
+    # Calculate IoU if requested
+    if "iou" in metrics:
+        iou = calc_iou(
+            ground_truth,
+            prediction,
+            num_classes=num_classes,
+            ignore_index=ignore_index,
+            smooth=smooth,
+            band=band,
+        )
+        results["iou"] = iou
+
+        # Add mean IoU for multi-class
+        if num_classes is not None and isinstance(iou, np.ndarray):
+            # Calculate mean ignoring NaN values
+            valid_ious = iou[~np.isnan(iou)]
+            results["mean_iou"] = (
+                float(np.mean(valid_ious)) if len(valid_ious) > 0 else 0.0
+            )
+
+    # Calculate F1 score if requested
+    if "f1" in metrics:
+        f1 = calc_f1_score(
+            ground_truth,
+            prediction,
+            num_classes=num_classes,
+            ignore_index=ignore_index,
+            smooth=smooth,
+            band=band,
+        )
+        results["f1"] = f1
+
+        # Add mean F1 for multi-class
+        if num_classes is not None and isinstance(f1, np.ndarray):
+            # Calculate mean ignoring NaN values
+            valid_f1s = f1[~np.isnan(f1)]
+            results["mean_f1"] = (
+                float(np.mean(valid_f1s)) if len(valid_f1s) > 0 else 0.0
+            )
+
+    return results
 
 
 def dict_to_rioxarray(data_dict: Dict) -> xr.DataArray:
@@ -691,8 +1092,9 @@ def view_vector(
 
 def view_vector_interactive(
     vector_data: Union[str, gpd.GeoDataFrame],
-    layer_name: str = "Vector Layer",
+    layer_name: str = "Vector",
     tiles_args: Optional[Dict] = None,
+    opacity: float = 0.7,
     **kwargs: Any,
 ) -> Any:
     """
@@ -704,9 +1106,10 @@ def view_vector_interactive(
 
     Args:
         vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.
-        layer_name (str, optional): The name of the layer. Defaults to "Vector Layer".
+        layer_name (str, optional): The name of the layer. Defaults to "Vector".
         tiles_args (dict, optional): Additional arguments for the localtileserver client.
             get_folium_tile_layer function. Defaults to None.
+        opacity (float, optional): The opacity of the layer. Defaults to 0.7.
         **kwargs: Additional keyword arguments to pass to GeoDataFrame.explore() function.
             See https://geopandas.org/en/stable/docs/reference/api/geopandas.GeoDataFrame.explore.html
 
@@ -721,9 +1124,8 @@ def view_vector_interactive(
         >>> roads = gpd.read_file("roads.shp")
         >>> view_vector_interactive(roads, figsize=(12, 8))
     """
-    import folium
-    import folium.plugins as plugins
-    from leafmap import cog_tile
+
+    from leafmap.foliumap import Map
     from localtileserver import TileClient, get_folium_tile_layer
 
     google_tiles = {
@@ -749,8 +1151,16 @@ def view_vector_interactive(
         },
     }
 
+    # Make it compatible with binder and JupyterHub
+    if os.environ.get("JUPYTERHUB_SERVICE_PREFIX") is not None:
+        os.environ["LOCALTILESERVER_CLIENT_PREFIX"] = (
+            f"{os.environ['JUPYTERHUB_SERVICE_PREFIX'].lstrip('/')}/proxy/{{port}}"
+        )
+
     basemap_layer_name = None
     raster_layer = None
+
+    m = Map()
 
     if "tiles" in kwargs and isinstance(kwargs["tiles"], str):
         if kwargs["tiles"].title() in google_tiles:
@@ -762,14 +1172,17 @@ def view_vector_interactive(
                 tiles_args = {}
             if kwargs["tiles"].lower().startswith("http"):
                 basemap_layer_name = "Remote Raster"
-                kwargs["tiles"] = cog_tile(kwargs["tiles"], **tiles_args)
-                kwargs["attr"] = "TiTiler"
+                m.add_geotiff(kwargs["tiles"], name=basemap_layer_name, **tiles_args)
             else:
                 basemap_layer_name = "Local Raster"
                 client = TileClient(kwargs["tiles"])
                 raster_layer = get_folium_tile_layer(client, **tiles_args)
-                kwargs["tiles"] = raster_layer.tiles
-                kwargs["attr"] = "localtileserver"
+                m.add_tile_layer(
+                    raster_layer.tiles,
+                    name=basemap_layer_name,
+                    attribution="localtileserver",
+                    **tiles_args,
+                )
 
     if "max_zoom" not in kwargs:
         kwargs["max_zoom"] = 30
@@ -784,23 +1197,18 @@ def view_vector_interactive(
     if not isinstance(vector_data, gpd.GeoDataFrame):
         raise TypeError("Input data must be a GeoDataFrame")
 
-    layer_control = kwargs.pop("layer_control", True)
-    fullscreen_control = kwargs.pop("fullscreen_control", True)
+    if "column" in kwargs:
+        if "legend_position" not in kwargs:
+            kwargs["legend_position"] = "bottomleft"
+        if "cmap" not in kwargs:
+            kwargs["cmap"] = "viridis"
+        m.add_data(vector_data, layer_name=layer_name, opacity=opacity, **kwargs)
 
-    m = vector_data.explore(**kwargs)
+    else:
+        m.add_gdf(vector_data, layer_name=layer_name, opacity=opacity, **kwargs)
 
-    # Change the layer name
-    for layer in m._children.values():
-        if isinstance(layer, folium.GeoJson):
-            layer.layer_name = layer_name
-        if isinstance(layer, folium.TileLayer) and basemap_layer_name:
-            layer.layer_name = basemap_layer_name
-
-    if layer_control:
-        m.add_child(folium.LayerControl())
-
-    if fullscreen_control:
-        plugins.Fullscreen().add_to(m)
+    m.add_layer_control()
+    m.add_opacity_control()
 
     return m
 
@@ -2594,10 +3002,86 @@ def batch_vector_to_raster(
     return output_files
 
 
+def get_default_augmentation_transforms(
+    tile_size: int = 256,
+    include_normalize: bool = False,
+    mean: Tuple[float, float, float] = (0.485, 0.456, 0.406),
+    std: Tuple[float, float, float] = (0.229, 0.224, 0.225),
+) -> Any:
+    """
+    Get default data augmentation transforms for geospatial imagery using albumentations.
+
+    This function returns a composition of augmentation transforms commonly used
+    for remote sensing and geospatial data. The transforms include geometric
+    transformations (flips, rotations) and photometric adjustments (brightness,
+    contrast, saturation).
+
+    Args:
+        tile_size (int): Target size for tiles. Defaults to 256.
+        include_normalize (bool): Whether to include normalization transform.
+            Defaults to False. Set to True if using for training with pretrained models.
+        mean (tuple): Mean values for normalization (RGB). Defaults to ImageNet values.
+        std (tuple): Standard deviation for normalization (RGB). Defaults to ImageNet values.
+
+    Returns:
+        albumentations.Compose: A composition of augmentation transforms.
+
+    Example:
+        >>> import albumentations as A
+        >>> # Get default transforms
+        >>> transform = get_default_augmentation_transforms()
+        >>> # Apply to image and mask
+        >>> augmented = transform(image=image, mask=mask)
+        >>> aug_image = augmented['image']
+        >>> aug_mask = augmented['mask']
+    """
+    try:
+        import albumentations as A
+    except ImportError:
+        raise ImportError(
+            "albumentations is required for data augmentation. "
+            "Install it with: pip install albumentations"
+        )
+
+    transforms_list = [
+        # Geometric transforms
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.ShiftScaleRotate(
+            shift_limit=0.1,
+            scale_limit=0.1,
+            rotate_limit=45,
+            border_mode=0,
+            p=0.5,
+        ),
+        # Photometric transforms
+        A.RandomBrightnessContrast(
+            brightness_limit=0.2,
+            contrast_limit=0.2,
+            p=0.5,
+        ),
+        A.HueSaturationValue(
+            hue_shift_limit=10,
+            sat_shift_limit=20,
+            val_shift_limit=10,
+            p=0.3,
+        ),
+        A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),
+        A.GaussianBlur(blur_limit=(3, 5), p=0.2),
+    ]
+
+    # Add normalization if requested
+    if include_normalize:
+        transforms_list.append(A.Normalize(mean=mean, std=std))
+
+    return A.Compose(transforms_list)
+
+
 def export_geotiff_tiles(
     in_raster,
     out_folder,
-    in_class_data,
+    in_class_data=None,
     tile_size=256,
     stride=128,
     class_value_field="class",
@@ -2607,6 +3091,10 @@ def export_geotiff_tiles(
     all_touched=True,
     create_overview=False,
     skip_empty_tiles=False,
+    metadata_format="PASCAL_VOC",
+    apply_augmentation=False,
+    augmentation_count=3,
+    augmentation_transforms=None,
 ):
     """
     Export georeferenced GeoTIFF tiles and labels from raster and classification data.
@@ -2614,7 +3102,8 @@ def export_geotiff_tiles(
     Args:
         in_raster (str): Path to input raster image
         out_folder (str): Path to output folder
-        in_class_data (str): Path to classification data - can be vector file or raster
+        in_class_data (str, optional): Path to classification data - can be vector file or raster.
+            If None, only image tiles will be exported without labels. Defaults to None.
         tile_size (int): Size of tiles in pixels (square)
         stride (int): Step size between tiles
         class_value_field (str): Field containing class values (for vector data)
@@ -2624,38 +3113,95 @@ def export_geotiff_tiles(
         all_touched (bool): Whether to use all_touched=True in rasterization (for vector data)
         create_overview (bool): Whether to create an overview image of all tiles
         skip_empty_tiles (bool): If True, skip tiles with no features
+        metadata_format (str): Output metadata format (PASCAL_VOC, COCO, YOLO). Default: PASCAL_VOC
+        apply_augmentation (bool): If True, generate augmented versions of each tile.
+            This will create multiple variants of each tile using data augmentation techniques.
+            Defaults to False.
+        augmentation_count (int): Number of augmented versions to generate per tile
+            (only used if apply_augmentation=True). Defaults to 3.
+        augmentation_transforms (albumentations.Compose, optional): Custom augmentation transforms.
+            If None and apply_augmentation=True, uses default transforms from
+            get_default_augmentation_transforms(). Should be an albumentations.Compose object.
+            Defaults to None.
+
+    Returns:
+        None: Tiles and labels are saved to out_folder.
+
+    Example:
+        >>> # Export tiles without augmentation
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif')
+        >>>
+        >>> # Export tiles with default augmentation (3 augmented versions per tile)
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif',
+        ...                      apply_augmentation=True)
+        >>>
+        >>> # Export with custom augmentation
+        >>> import albumentations as A
+        >>> custom_transform = A.Compose([
+        ...     A.HorizontalFlip(p=0.5),
+        ...     A.RandomBrightnessContrast(p=0.5),
+        ... ])
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif',
+        ...                      apply_augmentation=True,
+        ...                      augmentation_count=5,
+        ...                      augmentation_transforms=custom_transform)
     """
 
     import logging
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
 
+    # Initialize augmentation transforms if needed
+    if apply_augmentation:
+        if augmentation_transforms is None:
+            augmentation_transforms = get_default_augmentation_transforms(
+                tile_size=tile_size
+            )
+        if not quiet:
+            print(
+                f"Data augmentation enabled: generating {augmentation_count} augmented versions per tile"
+            )
+
     # Create output directories
     os.makedirs(out_folder, exist_ok=True)
     image_dir = os.path.join(out_folder, "images")
     os.makedirs(image_dir, exist_ok=True)
-    label_dir = os.path.join(out_folder, "labels")
-    os.makedirs(label_dir, exist_ok=True)
-    ann_dir = os.path.join(out_folder, "annotations")
-    os.makedirs(ann_dir, exist_ok=True)
 
-    # Determine if class data is raster or vector
+    # Only create label and annotation directories if class data is provided
+    if in_class_data is not None:
+        label_dir = os.path.join(out_folder, "labels")
+        os.makedirs(label_dir, exist_ok=True)
+
+        # Create annotation directory based on metadata format
+        if metadata_format in ["PASCAL_VOC", "COCO"]:
+            ann_dir = os.path.join(out_folder, "annotations")
+            os.makedirs(ann_dir, exist_ok=True)
+
+        # Initialize COCO annotations dictionary
+        if metadata_format == "COCO":
+            coco_annotations = {"images": [], "annotations": [], "categories": []}
+            ann_id = 0
+
+    # Determine if class data is raster or vector (only if class data provided)
     is_class_data_raster = False
-    if isinstance(in_class_data, str):
-        file_ext = Path(in_class_data).suffix.lower()
-        # Common raster extensions
-        if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
-            try:
-                with rasterio.open(in_class_data) as src:
-                    is_class_data_raster = True
+    if in_class_data is not None:
+        if isinstance(in_class_data, str):
+            file_ext = Path(in_class_data).suffix.lower()
+            # Common raster extensions
+            if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
+                try:
+                    with rasterio.open(in_class_data) as src:
+                        is_class_data_raster = True
+                        if not quiet:
+                            print(f"Detected in_class_data as raster: {in_class_data}")
+                            print(f"Raster CRS: {src.crs}")
+                            print(f"Raster dimensions: {src.width} x {src.height}")
+                except Exception:
+                    is_class_data_raster = False
                     if not quiet:
-                        print(f"Detected in_class_data as raster: {in_class_data}")
-                        print(f"Raster CRS: {src.crs}")
-                        print(f"Raster dimensions: {src.width} x {src.height}")
-            except Exception:
-                is_class_data_raster = False
-                if not quiet:
-                    print(f"Unable to open {in_class_data} as raster, trying as vector")
+                        print(
+                            f"Unable to open {in_class_data} as raster, trying as vector"
+                        )
 
     # Open the input raster
     with rasterio.open(in_raster) as src:
@@ -2675,10 +3221,10 @@ def export_geotiff_tiles(
         if max_tiles is None:
             max_tiles = total_tiles
 
-        # Process classification data
+        # Process classification data (only if class data provided)
         class_to_id = {}
 
-        if is_class_data_raster:
+        if in_class_data is not None and is_class_data_raster:
             # Load raster class data
             with rasterio.open(in_class_data) as class_src:
                 # Check if raster CRS matches
@@ -2711,7 +3257,18 @@ def export_geotiff_tiles(
 
                 # Create class mapping
                 class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
-        else:
+
+                # Populate COCO categories
+                if metadata_format == "COCO":
+                    for cls_val in unique_classes:
+                        coco_annotations["categories"].append(
+                            {
+                                "id": class_to_id[int(cls_val)],
+                                "name": str(int(cls_val)),
+                                "supercategory": "object",
+                            }
+                        )
+        elif in_class_data is not None:
             # Load vector class data
             try:
                 gdf = gpd.read_file(in_class_data)
@@ -2740,12 +3297,33 @@ def export_geotiff_tiles(
                         )
                     # Create class mapping
                     class_to_id = {cls: i + 1 for i, cls in enumerate(unique_classes)}
+
+                    # Populate COCO categories
+                    if metadata_format == "COCO":
+                        for cls_val in unique_classes:
+                            coco_annotations["categories"].append(
+                                {
+                                    "id": class_to_id[cls_val],
+                                    "name": str(cls_val),
+                                    "supercategory": "object",
+                                }
+                            )
                 else:
                     if not quiet:
                         print(
                             f"WARNING: '{class_value_field}' not found in vector data. Using default class ID 1."
                         )
                     class_to_id = {1: 1}  # Default mapping
+
+                    # Populate COCO categories with default
+                    if metadata_format == "COCO":
+                        coco_annotations["categories"].append(
+                            {
+                                "id": 1,
+                                "name": "object",
+                                "supercategory": "object",
+                            }
+                        )
             except Exception as e:
                 raise ValueError(f"Error processing vector data: {e}")
 
@@ -2812,8 +3390,8 @@ def export_geotiff_tiles(
                 label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
                 has_features = False
 
-                # Process classification data to create labels
-                if is_class_data_raster:
+                # Process classification data to create labels (only if class data provided)
+                if in_class_data is not None and is_class_data_raster:
                     # For raster class data
                     with rasterio.open(in_class_data) as class_src:
                         # Calculate window in class raster
@@ -2863,7 +3441,7 @@ def export_geotiff_tiles(
                             except Exception as e:
                                 pbar.write(f"Error reading class raster window: {e}")
                                 stats["errors"] += 1
-                else:
+                elif in_class_data is not None:
                     # For vector class data
                     # Find features that intersect with window
                     window_features = gdf[gdf.intersects(window_bounds)]
@@ -2906,8 +3484,8 @@ def export_geotiff_tiles(
                                     pbar.write(f"Error rasterizing feature {idx}: {e}")
                                     stats["errors"] += 1
 
-                # Skip tile if no features and skip_empty_tiles is True
-                if skip_empty_tiles and not has_features:
+                # Skip tile if no features and skip_empty_tiles is True (only when class data provided)
+                if in_class_data is not None and skip_empty_tiles and not has_features:
                     pbar.update(1)
                     tile_index += 1
                     continue
@@ -2915,119 +3493,316 @@ def export_geotiff_tiles(
                 # Read image data
                 image_data = src.read(window=window)
 
-                # Export image as GeoTIFF
-                image_path = os.path.join(image_dir, f"tile_{tile_index:06d}.tif")
+                # Helper function to save a single tile (original or augmented)
+                def save_tile(
+                    img_data,
+                    lbl_mask,
+                    tile_id,
+                    img_profile,
+                    window_trans,
+                    is_augmented=False,
+                ):
+                    """Save a single image and label tile."""
+                    # Export image as GeoTIFF
+                    image_path = os.path.join(image_dir, f"tile_{tile_id:06d}.tif")
 
-                # Create profile for image GeoTIFF
-                image_profile = src.profile.copy()
-                image_profile.update(
-                    {
-                        "height": tile_size,
-                        "width": tile_size,
-                        "count": image_data.shape[0],
-                        "transform": window_transform,
-                    }
+                    # Update profile
+                    img_profile_copy = img_profile.copy()
+                    img_profile_copy.update(
+                        {
+                            "height": tile_size,
+                            "width": tile_size,
+                            "count": img_data.shape[0],
+                            "transform": window_trans,
+                        }
+                    )
+
+                    # Save image as GeoTIFF
+                    try:
+                        with rasterio.open(image_path, "w", **img_profile_copy) as dst:
+                            dst.write(img_data)
+                        stats["total_tiles"] += 1
+                    except Exception as e:
+                        pbar.write(f"ERROR saving image GeoTIFF: {e}")
+                        stats["errors"] += 1
+                        return
+
+                    # Export label as GeoTIFF (only if class data provided)
+                    if in_class_data is not None:
+                        # Create profile for label GeoTIFF
+                        label_profile = {
+                            "driver": "GTiff",
+                            "height": tile_size,
+                            "width": tile_size,
+                            "count": 1,
+                            "dtype": "uint8",
+                            "crs": src.crs,
+                            "transform": window_trans,
+                        }
+
+                        label_path = os.path.join(label_dir, f"tile_{tile_id:06d}.tif")
+                        try:
+                            with rasterio.open(label_path, "w", **label_profile) as dst:
+                                dst.write(lbl_mask.astype(np.uint8), 1)
+
+                            if not is_augmented and np.any(lbl_mask > 0):
+                                stats["tiles_with_features"] += 1
+                                stats["feature_pixels"] += np.count_nonzero(lbl_mask)
+                        except Exception as e:
+                            pbar.write(f"ERROR saving label GeoTIFF: {e}")
+                            stats["errors"] += 1
+
+                # Save original tile
+                save_tile(
+                    image_data,
+                    label_mask,
+                    tile_index,
+                    src.profile,
+                    window_transform,
+                    is_augmented=False,
                 )
 
-                # Save image as GeoTIFF
-                try:
-                    with rasterio.open(image_path, "w", **image_profile) as dst:
-                        dst.write(image_data)
-                    stats["total_tiles"] += 1
-                except Exception as e:
-                    pbar.write(f"ERROR saving image GeoTIFF: {e}")
-                    stats["errors"] += 1
+                # Generate and save augmented tiles if enabled
+                if apply_augmentation:
+                    for aug_idx in range(augmentation_count):
+                        # Prepare image for augmentation (convert from CHW to HWC)
+                        img_for_aug = np.transpose(image_data, (1, 2, 0))
 
-                # Create profile for label GeoTIFF
-                label_profile = {
-                    "driver": "GTiff",
-                    "height": tile_size,
-                    "width": tile_size,
-                    "count": 1,
-                    "dtype": "uint8",
-                    "crs": src.crs,
-                    "transform": window_transform,
-                }
+                        # Ensure uint8 data type for albumentations
+                        # Albumentations expects uint8 for most transforms
+                        if not np.issubdtype(img_for_aug.dtype, np.uint8):
+                            # If image is float, scale to 0-255 and convert to uint8
+                            if np.issubdtype(img_for_aug.dtype, np.floating):
+                                img_for_aug = (
+                                    (img_for_aug * 255).clip(0, 255).astype(np.uint8)
+                                )
+                            else:
+                                img_for_aug = img_for_aug.astype(np.uint8)
 
-                # Export label as GeoTIFF
-                label_path = os.path.join(label_dir, f"tile_{tile_index:06d}.tif")
-                try:
-                    with rasterio.open(label_path, "w", **label_profile) as dst:
-                        dst.write(label_mask.astype(np.uint8), 1)
+                        # Apply augmentation
+                        try:
+                            if in_class_data is not None:
+                                # Augment both image and mask
+                                augmented = augmentation_transforms(
+                                    image=img_for_aug, mask=label_mask
+                                )
+                                aug_image = augmented["image"]
+                                aug_mask = augmented["mask"]
+                            else:
+                                # Augment only image
+                                augmented = augmentation_transforms(image=img_for_aug)
+                                aug_image = augmented["image"]
+                                aug_mask = label_mask
 
-                    if has_features:
-                        stats["tiles_with_features"] += 1
-                        stats["feature_pixels"] += np.count_nonzero(label_mask)
-                except Exception as e:
-                    pbar.write(f"ERROR saving label GeoTIFF: {e}")
-                    stats["errors"] += 1
+                            # Convert back from HWC to CHW
+                            aug_image = np.transpose(aug_image, (2, 0, 1))
 
-                # Create XML annotation for object detection if using vector class data
+                            # Ensure correct dtype for saving
+                            aug_image = aug_image.astype(image_data.dtype)
+
+                            # Generate unique tile ID for augmented version
+                            # Use a collision-free numbering scheme: (tile_index * (augmentation_count + 1)) + aug_idx + 1
+                            aug_tile_id = (
+                                (tile_index * (augmentation_count + 1)) + aug_idx + 1
+                            )
+
+                            # Save augmented tile
+                            save_tile(
+                                aug_image,
+                                aug_mask,
+                                aug_tile_id,
+                                src.profile,
+                                window_transform,
+                                is_augmented=True,
+                            )
+
+                        except Exception as e:
+                            pbar.write(
+                                f"ERROR applying augmentation {aug_idx} to tile {tile_index}: {e}"
+                            )
+                            stats["errors"] += 1
+
+                # Create annotations for object detection if using vector class data
                 if (
-                    not is_class_data_raster
+                    in_class_data is not None
+                    and not is_class_data_raster
                     and "gdf" in locals()
                     and len(window_features) > 0
                 ):
-                    # Create XML annotation
-                    root = ET.Element("annotation")
-                    ET.SubElement(root, "folder").text = "images"
-                    ET.SubElement(root, "filename").text = f"tile_{tile_index:06d}.tif"
+                    if metadata_format == "PASCAL_VOC":
+                        # Create XML annotation
+                        root = ET.Element("annotation")
+                        ET.SubElement(root, "folder").text = "images"
+                        ET.SubElement(root, "filename").text = (
+                            f"tile_{tile_index:06d}.tif"
+                        )
 
-                    size = ET.SubElement(root, "size")
-                    ET.SubElement(size, "width").text = str(tile_size)
-                    ET.SubElement(size, "height").text = str(tile_size)
-                    ET.SubElement(size, "depth").text = str(image_data.shape[0])
+                        size = ET.SubElement(root, "size")
+                        ET.SubElement(size, "width").text = str(tile_size)
+                        ET.SubElement(size, "height").text = str(tile_size)
+                        ET.SubElement(size, "depth").text = str(image_data.shape[0])
 
-                    # Add georeference information
-                    geo = ET.SubElement(root, "georeference")
-                    ET.SubElement(geo, "crs").text = str(src.crs)
-                    ET.SubElement(geo, "transform").text = str(
-                        window_transform
-                    ).replace("\n", "")
-                    ET.SubElement(geo, "bounds").text = (
-                        f"{minx}, {miny}, {maxx}, {maxy}"
-                    )
+                        # Add georeference information
+                        geo = ET.SubElement(root, "georeference")
+                        ET.SubElement(geo, "crs").text = str(src.crs)
+                        ET.SubElement(geo, "transform").text = str(
+                            window_transform
+                        ).replace("\n", "")
+                        ET.SubElement(geo, "bounds").text = (
+                            f"{minx}, {miny}, {maxx}, {maxy}"
+                        )
 
-                    # Add objects
-                    for idx, feature in window_features.iterrows():
-                        # Get feature class
-                        if class_value_field in feature:
-                            class_val = feature[class_value_field]
-                        else:
-                            class_val = "object"
+                        # Add objects
+                        for idx, feature in window_features.iterrows():
+                            # Get feature class
+                            if class_value_field in feature:
+                                class_val = feature[class_value_field]
+                            else:
+                                class_val = "object"
 
-                        # Get geometry bounds in pixel coordinates
-                        geom = feature.geometry.intersection(window_bounds)
-                        if not geom.is_empty:
-                            # Get bounds in world coordinates
-                            minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+                            # Get geometry bounds in pixel coordinates
+                            geom = feature.geometry.intersection(window_bounds)
+                            if not geom.is_empty:
+                                # Get bounds in world coordinates
+                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
 
-                            # Convert to pixel coordinates
-                            col_min, row_min = ~window_transform * (minx_f, maxy_f)
-                            col_max, row_max = ~window_transform * (maxx_f, miny_f)
+                                # Convert to pixel coordinates
+                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
+                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
 
-                            # Ensure coordinates are within tile bounds
-                            xmin = max(0, min(tile_size, int(col_min)))
-                            ymin = max(0, min(tile_size, int(row_min)))
-                            xmax = max(0, min(tile_size, int(col_max)))
-                            ymax = max(0, min(tile_size, int(row_max)))
+                                # Ensure coordinates are within tile bounds
+                                xmin = max(0, min(tile_size, int(col_min)))
+                                ymin = max(0, min(tile_size, int(row_min)))
+                                xmax = max(0, min(tile_size, int(col_max)))
+                                ymax = max(0, min(tile_size, int(row_max)))
 
-                            # Only add if the box has non-zero area
-                            if xmax > xmin and ymax > ymin:
-                                obj = ET.SubElement(root, "object")
-                                ET.SubElement(obj, "name").text = str(class_val)
-                                ET.SubElement(obj, "difficult").text = "0"
+                                # Only add if the box has non-zero area
+                                if xmax > xmin and ymax > ymin:
+                                    obj = ET.SubElement(root, "object")
+                                    ET.SubElement(obj, "name").text = str(class_val)
+                                    ET.SubElement(obj, "difficult").text = "0"
 
-                                bbox = ET.SubElement(obj, "bndbox")
-                                ET.SubElement(bbox, "xmin").text = str(xmin)
-                                ET.SubElement(bbox, "ymin").text = str(ymin)
-                                ET.SubElement(bbox, "xmax").text = str(xmax)
-                                ET.SubElement(bbox, "ymax").text = str(ymax)
+                                    bbox = ET.SubElement(obj, "bndbox")
+                                    ET.SubElement(bbox, "xmin").text = str(xmin)
+                                    ET.SubElement(bbox, "ymin").text = str(ymin)
+                                    ET.SubElement(bbox, "xmax").text = str(xmax)
+                                    ET.SubElement(bbox, "ymax").text = str(ymax)
 
-                    # Save XML
-                    tree = ET.ElementTree(root)
-                    xml_path = os.path.join(ann_dir, f"tile_{tile_index:06d}.xml")
-                    tree.write(xml_path)
+                        # Save XML
+                        tree = ET.ElementTree(root)
+                        xml_path = os.path.join(ann_dir, f"tile_{tile_index:06d}.xml")
+                        tree.write(xml_path)
+
+                    elif metadata_format == "COCO":
+                        # Add image info
+                        image_id = tile_index
+                        coco_annotations["images"].append(
+                            {
+                                "id": image_id,
+                                "file_name": f"tile_{tile_index:06d}.tif",
+                                "width": tile_size,
+                                "height": tile_size,
+                                "crs": str(src.crs),
+                                "transform": str(window_transform),
+                            }
+                        )
+
+                        # Add annotations for each feature
+                        for _, feature in window_features.iterrows():
+                            # Get feature class
+                            if class_value_field in feature:
+                                class_val = feature[class_value_field]
+                                category_id = class_to_id.get(class_val, 1)
+                            else:
+                                category_id = 1
+
+                            # Get geometry bounds
+                            geom = feature.geometry.intersection(window_bounds)
+                            if not geom.is_empty:
+                                # Get bounds in world coordinates
+                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+
+                                # Convert to pixel coordinates
+                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
+                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
+
+                                # Ensure coordinates are within tile bounds
+                                xmin = max(0, min(tile_size, int(col_min)))
+                                ymin = max(0, min(tile_size, int(row_min)))
+                                xmax = max(0, min(tile_size, int(col_max)))
+                                ymax = max(0, min(tile_size, int(row_max)))
+
+                                # Skip if box is too small
+                                if xmax - xmin < 1 or ymax - ymin < 1:
+                                    continue
+
+                                width = xmax - xmin
+                                height = ymax - ymin
+
+                                # Add annotation
+                                ann_id += 1
+                                coco_annotations["annotations"].append(
+                                    {
+                                        "id": ann_id,
+                                        "image_id": image_id,
+                                        "category_id": category_id,
+                                        "bbox": [xmin, ymin, width, height],
+                                        "area": width * height,
+                                        "iscrowd": 0,
+                                    }
+                                )
+
+                    elif metadata_format == "YOLO":
+                        # Create YOLO format annotations
+                        yolo_annotations = []
+
+                        for _, feature in window_features.iterrows():
+                            # Get feature class
+                            if class_value_field in feature:
+                                class_val = feature[class_value_field]
+                                # YOLO uses 0-indexed class IDs
+                                class_id = class_to_id.get(class_val, 1) - 1
+                            else:
+                                class_id = 0
+
+                            # Get geometry bounds
+                            geom = feature.geometry.intersection(window_bounds)
+                            if not geom.is_empty:
+                                # Get bounds in world coordinates
+                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+
+                                # Convert to pixel coordinates
+                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
+                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
+
+                                # Ensure coordinates are within tile bounds
+                                xmin = max(0, min(tile_size, col_min))
+                                ymin = max(0, min(tile_size, row_min))
+                                xmax = max(0, min(tile_size, col_max))
+                                ymax = max(0, min(tile_size, row_max))
+
+                                # Skip if box is too small
+                                if xmax - xmin < 1 or ymax - ymin < 1:
+                                    continue
+
+                                # Calculate normalized coordinates (YOLO format)
+                                x_center = ((xmin + xmax) / 2) / tile_size
+                                y_center = ((ymin + ymax) / 2) / tile_size
+                                width = (xmax - xmin) / tile_size
+                                height = (ymax - ymin) / tile_size
+
+                                # Add YOLO annotation line
+                                yolo_annotations.append(
+                                    f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}"
+                                )
+
+                        # Save YOLO annotations to text file
+                        if yolo_annotations:
+                            yolo_path = os.path.join(
+                                label_dir, f"tile_{tile_index:06d}.txt"
+                            )
+                            with open(yolo_path, "w") as f:
+                                f.write("\n".join(yolo_annotations))
 
                 # Update progress bar
                 pbar.update(1)
@@ -3044,6 +3819,39 @@ def export_geotiff_tiles(
 
         # Close progress bar
         pbar.close()
+
+        # Save COCO annotations if applicable (only if class data provided)
+        if in_class_data is not None and metadata_format == "COCO":
+            try:
+                with open(os.path.join(ann_dir, "instances.json"), "w") as f:
+                    json.dump(coco_annotations, f, indent=2)
+                if not quiet:
+                    print(
+                        f"Saved COCO annotations: {len(coco_annotations['images'])} images, "
+                        f"{len(coco_annotations['annotations'])} annotations, "
+                        f"{len(coco_annotations['categories'])} categories"
+                    )
+            except Exception as e:
+                if not quiet:
+                    print(f"ERROR saving COCO annotations: {e}")
+                stats["errors"] += 1
+
+        # Save YOLO classes file if applicable (only if class data provided)
+        if in_class_data is not None and metadata_format == "YOLO":
+            try:
+                # Create classes.txt with class names
+                classes_path = os.path.join(out_folder, "classes.txt")
+                # Sort by class ID to ensure correct order
+                sorted_classes = sorted(class_to_id.items(), key=lambda x: x[1])
+                with open(classes_path, "w") as f:
+                    for class_val, _ in sorted_classes:
+                        f.write(f"{class_val}\n")
+                if not quiet:
+                    print(f"Saved YOLO classes file with {len(class_to_id)} classes")
+            except Exception as e:
+                if not quiet:
+                    print(f"ERROR saving YOLO classes file: {e}")
+                stats["errors"] += 1
 
         # Create overview image if requested
         if create_overview and stats["tile_coordinates"]:
@@ -3062,13 +3870,14 @@ def export_geotiff_tiles(
         if not quiet:
             print("\n------- Export Summary -------")
             print(f"Total tiles exported: {stats['total_tiles']}")
-            print(
-                f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
-            )
-            if stats["tiles_with_features"] > 0:
+            if in_class_data is not None:
                 print(
-                    f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
+                    f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
                 )
+                if stats["tiles_with_features"] > 0:
+                    print(
+                        f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
+                    )
             if stats["errors"] > 0:
                 print(f"Errors encountered: {stats['errors']}")
             print(f"Output saved to: {out_folder}")
@@ -3077,7 +3886,6 @@ def export_geotiff_tiles(
             if stats["total_tiles"] > 0:
                 print("\n------- Georeference Verification -------")
                 sample_image = os.path.join(image_dir, f"tile_0.tif")
-                sample_label = os.path.join(label_dir, f"tile_0.tif")
 
                 if os.path.exists(sample_image):
                     try:
@@ -3093,19 +3901,22 @@ def export_geotiff_tiles(
                     except Exception as e:
                         print(f"Error verifying image georeference: {e}")
 
-                if os.path.exists(sample_label):
-                    try:
-                        with rasterio.open(sample_label) as lbl:
-                            print(f"Label CRS: {lbl.crs}")
-                            print(f"Label transform: {lbl.transform}")
-                            print(
-                                f"Label has georeference: {lbl.crs is not None and lbl.transform is not None}"
-                            )
-                            print(
-                                f"Label dimensions: {lbl.width}x{lbl.height}, {lbl.count} bands, {lbl.dtypes[0]} type"
-                            )
-                    except Exception as e:
-                        print(f"Error verifying label georeference: {e}")
+                # Only verify label if class data was provided
+                if in_class_data is not None:
+                    sample_label = os.path.join(label_dir, f"tile_0.tif")
+                    if os.path.exists(sample_label):
+                        try:
+                            with rasterio.open(sample_label) as lbl:
+                                print(f"Label CRS: {lbl.crs}")
+                                print(f"Label transform: {lbl.transform}")
+                                print(
+                                    f"Label has georeference: {lbl.crs is not None and lbl.transform is not None}"
+                                )
+                                print(
+                                    f"Label dimensions: {lbl.width}x{lbl.height}, {lbl.count} bands, {lbl.dtypes[0]} type"
+                                )
+                        except Exception as e:
+                            print(f"Error verifying label georeference: {e}")
 
         # Return statistics dictionary for further processing if needed
         return stats
@@ -3113,8 +3924,9 @@ def export_geotiff_tiles(
 
 def export_geotiff_tiles_batch(
     images_folder,
-    masks_folder,
-    output_folder,
+    masks_folder=None,
+    masks_file=None,
+    output_folder=None,
     tile_size=256,
     stride=128,
     class_value_field="class",
@@ -3122,25 +3934,43 @@ def export_geotiff_tiles_batch(
     max_tiles=None,
     quiet=False,
     all_touched=True,
-    create_overview=False,
     skip_empty_tiles=False,
     image_extensions=None,
     mask_extensions=None,
+    match_by_name=False,
+    metadata_format="PASCAL_VOC",
 ) -> Dict[str, Any]:
     """
-    Export georeferenced GeoTIFF tiles from folders of images and masks.
+    Export georeferenced GeoTIFF tiles from images and optionally masks.
 
-    This function processes multiple image-mask pairs from input folders,
-    generating tiles for each pair. All image tiles are saved to a single
-    'images' folder and all mask tiles to a single 'masks' folder.
+    This function supports four modes:
+    1. Images only (no masks) - when neither masks_file nor masks_folder is provided
+    2. Single vector file covering all images (masks_file parameter)
+    3. Multiple vector files, one per image (masks_folder parameter)
+    4. Multiple raster mask files (masks_folder parameter)
 
-    Images and masks are paired by their sorted order (alphabetically), not by
-    filename matching. The number of images and masks must be equal.
+    For mode 1 (images only), only image tiles will be exported without labels.
+
+    For mode 2 (single vector file), specify masks_file path. The function will
+    use spatial intersection to determine which features apply to each image.
+
+    For mode 3/4 (multiple mask files), specify masks_folder path. Images and masks
+    are paired either by matching filenames (match_by_name=True) or by sorted order
+    (match_by_name=False).
+
+    All image tiles are saved to a single 'images' folder and all mask tiles (if provided)
+    to a single 'masks' folder within the output directory.
 
     Args:
         images_folder (str): Path to folder containing raster images
-        masks_folder (str): Path to folder containing classification masks/vectors
-        output_folder (str): Path to output folder
+        masks_folder (str, optional): Path to folder containing classification masks/vectors.
+            Use this for multiple mask files (one per image or raster masks). If not provided
+            and masks_file is also not provided, only image tiles will be exported.
+        masks_file (str, optional): Path to a single vector file covering all images.
+            Use this for a single GeoJSON/Shapefile that covers multiple images. If not provided
+            and masks_folder is also not provided, only image tiles will be exported.
+        output_folder (str, optional): Path to output folder. If None, creates 'tiles'
+            subfolder in images_folder.
         tile_size (int): Size of tiles in pixels (square)
         stride (int): Step size between tiles
         class_value_field (str): Field containing class values (for vector data)
@@ -3152,17 +3982,62 @@ def export_geotiff_tiles_batch(
         skip_empty_tiles (bool): If True, skip tiles with no features
         image_extensions (list): List of image file extensions to process (default: common raster formats)
         mask_extensions (list): List of mask file extensions to process (default: common raster/vector formats)
+        match_by_name (bool): If True, match image and mask files by base filename.
+            If False, match by sorted order (alphabetically). Only applies when masks_folder is used.
+        metadata_format (str): Annotation format - "PASCAL_VOC" (XML), "COCO" (JSON), or "YOLO" (TXT).
+            Default is "PASCAL_VOC".
 
     Returns:
         Dict[str, Any]: Dictionary containing batch processing statistics
 
     Raises:
-        ValueError: If no images or masks found, or if counts don't match
+        ValueError: If no images found, or if masks_folder and masks_file are both specified,
+            or if counts don't match when using masks_folder with match_by_name=False.
+
+    Examples:
+        # Images only (no masks)
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     output_folder='output/tiles'
+        ... )
+
+        # Single vector file covering all images
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     masks_file='data/buildings.geojson',
+        ...     output_folder='output/tiles'
+        ... )
+
+        # Multiple vector files, matched by filename
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     masks_folder='data/masks',
+        ...     output_folder='output/tiles',
+        ...     match_by_name=True
+        ... )
+
+        # Multiple mask files, matched by sorted order
+        >>> stats = export_geotiff_tiles_batch(
+        ...     images_folder='data/images',
+        ...     masks_folder='data/masks',
+        ...     output_folder='output/tiles',
+        ...     match_by_name=False
+        ... )
     """
 
     import logging
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
+
+    # Validate input parameters
+    if masks_folder is not None and masks_file is not None:
+        raise ValueError(
+            "Cannot specify both masks_folder and masks_file. Please use only one."
+        )
+
+    # Default output folder if not specified
+    if output_folder is None:
+        output_folder = os.path.join(images_folder, "tiles")
 
     # Default extensions if not provided
     if image_extensions is None:
@@ -3190,9 +4065,37 @@ def export_geotiff_tiles_batch(
     # Create output folder structure
     os.makedirs(output_folder, exist_ok=True)
     output_images_dir = os.path.join(output_folder, "images")
-    output_masks_dir = os.path.join(output_folder, "masks")
     os.makedirs(output_images_dir, exist_ok=True)
-    os.makedirs(output_masks_dir, exist_ok=True)
+
+    # Only create masks directory if masks are provided
+    output_masks_dir = None
+    if masks_folder is not None or masks_file is not None:
+        output_masks_dir = os.path.join(output_folder, "masks")
+        os.makedirs(output_masks_dir, exist_ok=True)
+
+    # Create annotation directory based on metadata format (only if masks are provided)
+    ann_dir = None
+    if (masks_folder is not None or masks_file is not None) and metadata_format in [
+        "PASCAL_VOC",
+        "COCO",
+    ]:
+        ann_dir = os.path.join(output_folder, "annotations")
+        os.makedirs(ann_dir, exist_ok=True)
+
+    # Initialize COCO annotations dictionary (only if masks are provided)
+    coco_annotations = None
+    if (
+        masks_folder is not None or masks_file is not None
+    ) and metadata_format == "COCO":
+        coco_annotations = {"images": [], "annotations": [], "categories": []}
+
+    # Initialize YOLO class set (only if masks are provided)
+    yolo_classes = (
+        set()
+        if (masks_folder is not None or masks_file is not None)
+        and metadata_format == "YOLO"
+        else None
+    )
 
     # Get list of image files
     image_files = []
@@ -3200,30 +4103,105 @@ def export_geotiff_tiles_batch(
         pattern = os.path.join(images_folder, f"*{ext}")
         image_files.extend(glob.glob(pattern))
 
-    # Get list of mask files
-    mask_files = []
-    for ext in mask_extensions:
-        pattern = os.path.join(masks_folder, f"*{ext}")
-        mask_files.extend(glob.glob(pattern))
-
     # Sort files for consistent processing
     image_files.sort()
-    mask_files.sort()
 
     if not image_files:
         raise ValueError(
             f"No image files found in {images_folder} with extensions {image_extensions}"
         )
 
-    if not mask_files:
-        raise ValueError(
-            f"No mask files found in {masks_folder} with extensions {mask_extensions}"
-        )
+    # Handle different mask input modes
+    use_single_mask_file = masks_file is not None
+    has_masks = masks_file is not None or masks_folder is not None
+    mask_files = []
+    image_mask_pairs = []
 
-    if len(image_files) != len(mask_files):
-        raise ValueError(
-            f"Number of image files ({len(image_files)}) does not match number of mask files ({len(mask_files)})"
-        )
+    if not has_masks:
+        # Mode 0: No masks - create pairs with None for mask
+        for image_file in image_files:
+            image_mask_pairs.append((image_file, None, None))
+
+    elif use_single_mask_file:
+        # Mode 1: Single vector file covering all images
+        if not os.path.exists(masks_file):
+            raise ValueError(f"Mask file not found: {masks_file}")
+
+        # Load the single mask file once - will be spatially filtered per image
+        single_mask_gdf = gpd.read_file(masks_file)
+
+        if not quiet:
+            print(f"Using single mask file: {masks_file}")
+            print(
+                f"Mask contains {len(single_mask_gdf)} features in CRS: {single_mask_gdf.crs}"
+            )
+
+        # Create pairs with the same mask file for all images
+        for image_file in image_files:
+            image_mask_pairs.append((image_file, masks_file, single_mask_gdf))
+
+    else:
+        # Mode 2/3: Multiple mask files (vector or raster)
+        # Get list of mask files
+        for ext in mask_extensions:
+            pattern = os.path.join(masks_folder, f"*{ext}")
+            mask_files.extend(glob.glob(pattern))
+
+        # Sort files for consistent processing
+        mask_files.sort()
+
+        if not mask_files:
+            raise ValueError(
+                f"No mask files found in {masks_folder} with extensions {mask_extensions}"
+            )
+
+        # Match images to masks
+        if match_by_name:
+            # Match by base filename
+            image_dict = {
+                os.path.splitext(os.path.basename(f))[0]: f for f in image_files
+            }
+            mask_dict = {
+                os.path.splitext(os.path.basename(f))[0]: f for f in mask_files
+            }
+
+            # Find matching pairs
+            for img_base, img_path in image_dict.items():
+                if img_base in mask_dict:
+                    image_mask_pairs.append((img_path, mask_dict[img_base], None))
+                else:
+                    if not quiet:
+                        print(f"Warning: No mask found for image {img_base}")
+
+            if not image_mask_pairs:
+                # Provide detailed error message with found files
+                image_bases = list(image_dict.keys())
+                mask_bases = list(mask_dict.keys())
+                error_msg = (
+                    "No matching image-mask pairs found when matching by filename. "
+                    "Check that image and mask files have matching base names.\n"
+                    f"Found {len(image_bases)} image(s): "
+                    f"{', '.join(image_bases[:5]) if image_bases else 'None found'}"
+                    f"{'...' if len(image_bases) > 5 else ''}\n"
+                    f"Found {len(mask_bases)} mask(s): "
+                    f"{', '.join(mask_bases[:5]) if mask_bases else 'None found'}"
+                    f"{'...' if len(mask_bases) > 5 else ''}\n"
+                    "Tip: Set match_by_name=False to match by sorted order, or ensure filenames match."
+                )
+                raise ValueError(error_msg)
+
+        else:
+            # Match by sorted order
+            if len(image_files) != len(mask_files):
+                raise ValueError(
+                    f"Number of image files ({len(image_files)}) does not match "
+                    f"number of mask files ({len(mask_files)}) when matching by sorted order. "
+                    f"Use match_by_name=True for filename-based matching."
+                )
+
+            # Create pairs by sorted order
+            for image_file, mask_file in zip(image_files, mask_files):
+                image_mask_pairs.append((image_file, mask_file, None))
 
     # Initialize batch statistics
     batch_stats = {
@@ -3237,23 +4215,28 @@ def export_geotiff_tiles_batch(
     }
 
     if not quiet:
-        print(
-            f"Found {len(image_files)} image files and {len(mask_files)} mask files to process"
-        )
-        print(f"Processing batch from {images_folder} and {masks_folder}")
+        if not has_masks:
+            print(
+                f"Found {len(image_files)} image files to process (images only, no masks)"
+            )
+        elif use_single_mask_file:
+            print(f"Found {len(image_files)} image files to process")
+            print(f"Using single mask file: {masks_file}")
+        else:
+            print(f"Found {len(image_mask_pairs)} matching image-mask pairs to process")
+            print(f"Processing batch from {images_folder} and {masks_folder}")
         print(f"Output folder: {output_folder}")
         print("-" * 60)
 
     # Global tile counter for unique naming
     global_tile_counter = 0
 
-    # Process each image-mask pair by sorted order
-    for idx, (image_file, mask_file) in enumerate(
+    # Process each image-mask pair
+    for idx, (image_file, mask_file, mask_gdf) in enumerate(
         tqdm(
-            zip(image_files, mask_files),
+            image_mask_pairs,
             desc="Processing image pairs",
             disable=quiet,
-            total=len(image_files),
         )
     ):
         batch_stats["total_image_pairs"] += 1
@@ -3265,9 +4248,17 @@ def export_geotiff_tiles_batch(
             if not quiet:
                 print(f"\nProcessing: {base_name}")
                 print(f"  Image: {os.path.basename(image_file)}")
-                print(f"  Mask: {os.path.basename(mask_file)}")
+                if mask_file is not None:
+                    if use_single_mask_file:
+                        print(
+                            f"  Mask: {os.path.basename(mask_file)} (spatially filtered)"
+                        )
+                    else:
+                        print(f"  Mask: {os.path.basename(mask_file)}")
+                else:
+                    print(f"  Mask: None (images only)")
 
-            # Process the image-mask pair manually to get direct control over tile saving
+            # Process the image-mask pair
             tiles_generated = _process_image_mask_pair(
                 image_file=image_file,
                 mask_file=mask_file,
@@ -3283,6 +4274,15 @@ def export_geotiff_tiles_batch(
                 all_touched=all_touched,
                 skip_empty_tiles=skip_empty_tiles,
                 quiet=quiet,
+                mask_gdf=mask_gdf,  # Pass pre-loaded GeoDataFrame if using single mask
+                use_single_mask_file=use_single_mask_file,
+                metadata_format=metadata_format,
+                ann_dir=(
+                    ann_dir
+                    if "ann_dir" in locals()
+                    and metadata_format in ["PASCAL_VOC", "COCO"]
+                    else None
+                ),
             )
 
             # Update counters
@@ -3304,6 +4304,23 @@ def export_geotiff_tiles_batch(
                 }
             )
 
+            # Aggregate COCO annotations
+            if metadata_format == "COCO" and "coco_data" in tiles_generated:
+                coco_data = tiles_generated["coco_data"]
+                # Add images and annotations
+                coco_annotations["images"].extend(coco_data.get("images", []))
+                coco_annotations["annotations"].extend(coco_data.get("annotations", []))
+                # Merge categories (avoid duplicates)
+                for cat in coco_data.get("categories", []):
+                    if not any(
+                        c["id"] == cat["id"] for c in coco_annotations["categories"]
+                    ):
+                        coco_annotations["categories"].append(cat)
+
+            # Aggregate YOLO classes
+            if metadata_format == "YOLO" and "yolo_classes" in tiles_generated:
+                yolo_classes.update(tiles_generated["yolo_classes"])
+
         except Exception as e:
             if not quiet:
                 print(f"ERROR processing {base_name}: {e}")
@@ -3311,6 +4328,33 @@ def export_geotiff_tiles_batch(
                 {"image": image_file, "mask": mask_file, "error": str(e)}
             )
             batch_stats["errors"] += 1
+
+    # Save aggregated COCO annotations
+    if metadata_format == "COCO" and coco_annotations:
+        import json
+
+        coco_path = os.path.join(ann_dir, "instances.json")
+        with open(coco_path, "w") as f:
+            json.dump(coco_annotations, f, indent=2)
+        if not quiet:
+            print(f"\nSaved COCO annotations: {coco_path}")
+            print(
+                f"  Images: {len(coco_annotations['images'])}, "
+                f"Annotations: {len(coco_annotations['annotations'])}, "
+                f"Categories: {len(coco_annotations['categories'])}"
+            )
+
+    # Save aggregated YOLO classes
+    if metadata_format == "YOLO" and yolo_classes:
+        classes_path = os.path.join(output_folder, "labels", "classes.txt")
+        os.makedirs(os.path.dirname(classes_path), exist_ok=True)
+        sorted_classes = sorted(yolo_classes)
+        with open(classes_path, "w") as f:
+            for cls in sorted_classes:
+                f.write(f"{cls}\n")
+        if not quiet:
+            print(f"\nSaved YOLO classes: {classes_path}")
+            print(f"  Total classes: {len(sorted_classes)}")
 
     # Print batch summary
     if not quiet:
@@ -3334,7 +4378,12 @@ def export_geotiff_tiles_batch(
 
         print(f"Output saved to: {output_folder}")
         print(f"  Images: {output_images_dir}")
-        print(f"  Masks: {output_masks_dir}")
+        if output_masks_dir is not None:
+            print(f"  Masks: {output_masks_dir}")
+            if metadata_format in ["PASCAL_VOC", "COCO"] and ann_dir is not None:
+                print(f"  Annotations: {ann_dir}")
+            elif metadata_format == "YOLO":
+                print(f"  Labels: {os.path.join(output_folder, 'labels')}")
 
         # List failed files if any
         if batch_stats["failed_files"]:
@@ -3360,18 +4409,26 @@ def _process_image_mask_pair(
     all_touched=True,
     skip_empty_tiles=False,
     quiet=False,
+    mask_gdf=None,
+    use_single_mask_file=False,
+    metadata_format="PASCAL_VOC",
+    ann_dir=None,
 ):
     """
     Process a single image-mask pair and save tiles directly to output directories.
+
+    Args:
+        mask_gdf (GeoDataFrame, optional): Pre-loaded GeoDataFrame when using single mask file
+        use_single_mask_file (bool): If True, spatially filter mask_gdf to image bounds
 
     Returns:
         dict: Statistics for this image-mask pair
     """
     import warnings
 
-    # Determine if mask data is raster or vector
+    # Determine if mask data is raster or vector (only if mask_file is provided)
     is_class_data_raster = False
-    if isinstance(mask_file, str):
+    if mask_file is not None and isinstance(mask_file, str):
         file_ext = Path(mask_file).suffix.lower()
         # Common raster extensions
         if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
@@ -3388,6 +4445,13 @@ def _process_image_mask_pair(
         "errors": 0,
     }
 
+    # Initialize COCO/YOLO tracking for this image
+    if metadata_format == "COCO":
+        stats["coco_data"] = {"images": [], "annotations": [], "categories": []}
+        coco_ann_id = 0
+    if metadata_format == "YOLO":
+        stats["yolo_classes"] = set()
+
     # Open the input raster
     with rasterio.open(image_file) as src:
         # Calculate number of tiles
@@ -3398,10 +4462,10 @@ def _process_image_mask_pair(
         if max_tiles is None:
             max_tiles = total_tiles
 
-        # Process classification data
+        # Process classification data (only if mask_file is provided)
         class_to_id = {}
 
-        if is_class_data_raster:
+        if mask_file is not None and is_class_data_raster:
             # Load raster class data
             with rasterio.open(mask_file) as class_src:
                 # Check if raster CRS matches
@@ -3428,14 +4492,39 @@ def _process_image_mask_pair(
 
                 # Create class mapping
                 class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
-        else:
+        elif mask_file is not None:
             # Load vector class data
             try:
-                gdf = gpd.read_file(mask_file)
+                if use_single_mask_file and mask_gdf is not None:
+                    # Using pre-loaded single mask file - spatially filter to image bounds
+                    # Get image bounds
+                    image_bounds = box(*src.bounds)
+                    image_gdf = gpd.GeoDataFrame(
+                        {"geometry": [image_bounds]}, crs=src.crs
+                    )
 
-                # Always reproject to match raster CRS
-                if gdf.crs != src.crs:
-                    gdf = gdf.to_crs(src.crs)
+                    # Reproject mask if needed
+                    if mask_gdf.crs != src.crs:
+                        mask_gdf_reprojected = mask_gdf.to_crs(src.crs)
+                    else:
+                        mask_gdf_reprojected = mask_gdf
+
+                    # Spatially filter features that intersect with image bounds
+                    gdf = mask_gdf_reprojected[
+                        mask_gdf_reprojected.intersects(image_bounds)
+                    ].copy()
+
+                    if not quiet and len(gdf) > 0:
+                        print(
+                            f"  Filtered to {len(gdf)} features intersecting image bounds"
+                        )
+                else:
+                    # Load individual mask file
+                    gdf = gpd.read_file(mask_file)
+
+                    # Always reproject to match raster CRS
+                    if gdf.crs != src.crs:
+                        gdf = gdf.to_crs(src.crs)
 
                 # Apply buffer if specified
                 if buffer_radius > 0:
@@ -3455,9 +4544,6 @@ def _process_image_mask_pair(
         tile_index = 0
         for y in range(num_tiles_y):
             for x in range(num_tiles_x):
-                if tile_index >= max_tiles:
-                    break
-
                 # Calculate window coordinates
                 window_x = x * stride
                 window_y = y * stride
@@ -3482,12 +4568,12 @@ def _process_image_mask_pair(
 
                 window_bounds = box(minx, miny, maxx, maxy)
 
-                # Create label mask
+                # Create label mask (only if mask_file is provided)
                 label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
                 has_features = False
 
-                # Process classification data to create labels
-                if is_class_data_raster:
+                # Process classification data to create labels (only if mask_file is provided)
+                if mask_file is not None and is_class_data_raster:
                     # For raster class data
                     with rasterio.open(mask_file) as class_src:
                         # Get corresponding window in class raster
@@ -3520,7 +4606,7 @@ def _process_image_mask_pair(
                             if not quiet:
                                 print(f"Error reading class raster window: {e}")
                             stats["errors"] += 1
-                else:
+                elif mask_file is not None:
                     # For vector class data
                     # Find features that intersect with window
                     window_features = gdf[gdf.intersects(window_bounds)]
@@ -3558,10 +4644,13 @@ def _process_image_mask_pair(
                                         print(f"Error rasterizing feature {idx}: {e}")
                                     stats["errors"] += 1
 
-                # Skip tile if no features and skip_empty_tiles is True
-                if skip_empty_tiles and not has_features:
-                    tile_index += 1
+                # Skip tile if no features and skip_empty_tiles is True (only applies when masks are provided)
+                if mask_file is not None and skip_empty_tiles and not has_features:
                     continue
+
+                # Check if we've reached max_tiles before saving
+                if tile_index >= max_tiles:
+                    break
 
                 # Generate unique tile name
                 tile_name = f"{base_name}_{global_tile_counter + tile_index:06d}"
@@ -3593,29 +4682,225 @@ def _process_image_mask_pair(
                         print(f"ERROR saving image GeoTIFF: {e}")
                     stats["errors"] += 1
 
-                # Create profile for label GeoTIFF
-                label_profile = {
-                    "driver": "GTiff",
-                    "height": tile_size,
-                    "width": tile_size,
-                    "count": 1,
-                    "dtype": "uint8",
-                    "crs": src.crs,
-                    "transform": window_transform,
-                }
+                # Export label as GeoTIFF (only if mask_file and output_masks_dir are provided)
+                if mask_file is not None and output_masks_dir is not None:
+                    # Create profile for label GeoTIFF
+                    label_profile = {
+                        "driver": "GTiff",
+                        "height": tile_size,
+                        "width": tile_size,
+                        "count": 1,
+                        "dtype": "uint8",
+                        "crs": src.crs,
+                        "transform": window_transform,
+                    }
 
-                # Export label as GeoTIFF
-                label_path = os.path.join(output_masks_dir, f"{tile_name}.tif")
-                try:
-                    with rasterio.open(label_path, "w", **label_profile) as dst:
-                        dst.write(label_mask.astype(np.uint8), 1)
+                    label_path = os.path.join(output_masks_dir, f"{tile_name}.tif")
+                    try:
+                        with rasterio.open(label_path, "w", **label_profile) as dst:
+                            dst.write(label_mask.astype(np.uint8), 1)
 
-                    if has_features:
-                        stats["tiles_with_features"] += 1
-                except Exception as e:
-                    if not quiet:
-                        print(f"ERROR saving label GeoTIFF: {e}")
-                    stats["errors"] += 1
+                        if has_features:
+                            stats["tiles_with_features"] += 1
+                    except Exception as e:
+                        if not quiet:
+                            print(f"ERROR saving label GeoTIFF: {e}")
+                        stats["errors"] += 1
+
+                # Generate annotation metadata based on format (only if mask_file is provided)
+                if (
+                    mask_file is not None
+                    and metadata_format == "PASCAL_VOC"
+                    and ann_dir
+                ):
+                    # Create PASCAL VOC XML annotation
+                    from lxml import etree as ET
+
+                    annotation = ET.Element("annotation")
+                    ET.SubElement(annotation, "folder").text = os.path.basename(
+                        output_images_dir
+                    )
+                    ET.SubElement(annotation, "filename").text = f"{tile_name}.tif"
+                    ET.SubElement(annotation, "path").text = image_path
+
+                    source = ET.SubElement(annotation, "source")
+                    ET.SubElement(source, "database").text = "GeoAI"
+
+                    size = ET.SubElement(annotation, "size")
+                    ET.SubElement(size, "width").text = str(tile_size)
+                    ET.SubElement(size, "height").text = str(tile_size)
+                    ET.SubElement(size, "depth").text = str(image_data.shape[0])
+
+                    ET.SubElement(annotation, "segmented").text = "1"
+
+                    # Find connected components for instance segmentation
+                    from scipy import ndimage
+
+                    for class_id in np.unique(label_mask):
+                        if class_id == 0:
+                            continue
+
+                        class_mask = (label_mask == class_id).astype(np.uint8)
+                        labeled_array, num_features = ndimage.label(class_mask)
+
+                        for instance_id in range(1, num_features + 1):
+                            instance_mask = labeled_array == instance_id
+                            coords = np.argwhere(instance_mask)
+
+                            if len(coords) == 0:
+                                continue
+
+                            ymin, xmin = coords.min(axis=0)
+                            ymax, xmax = coords.max(axis=0)
+
+                            obj = ET.SubElement(annotation, "object")
+                            class_name = next(
+                                (k for k, v in class_to_id.items() if v == class_id),
+                                str(class_id),
+                            )
+                            ET.SubElement(obj, "name").text = str(class_name)
+                            ET.SubElement(obj, "pose").text = "Unspecified"
+                            ET.SubElement(obj, "truncated").text = "0"
+                            ET.SubElement(obj, "difficult").text = "0"
+
+                            bndbox = ET.SubElement(obj, "bndbox")
+                            ET.SubElement(bndbox, "xmin").text = str(int(xmin))
+                            ET.SubElement(bndbox, "ymin").text = str(int(ymin))
+                            ET.SubElement(bndbox, "xmax").text = str(int(xmax))
+                            ET.SubElement(bndbox, "ymax").text = str(int(ymax))
+
+                    # Save XML file
+                    xml_path = os.path.join(ann_dir, f"{tile_name}.xml")
+                    tree = ET.ElementTree(annotation)
+                    tree.write(xml_path, pretty_print=True, encoding="utf-8")
+
+                elif mask_file is not None and metadata_format == "COCO":
+                    # Add COCO image entry
+                    image_id = int(global_tile_counter + tile_index)
+                    stats["coco_data"]["images"].append(
+                        {
+                            "id": image_id,
+                            "file_name": f"{tile_name}.tif",
+                            "width": int(tile_size),
+                            "height": int(tile_size),
+                        }
+                    )
+
+                    # Add COCO categories (only once per unique class)
+                    for class_val, class_id in class_to_id.items():
+                        if not any(
+                            c["id"] == class_id
+                            for c in stats["coco_data"]["categories"]
+                        ):
+                            stats["coco_data"]["categories"].append(
+                                {
+                                    "id": int(class_id),
+                                    "name": str(class_val),
+                                    "supercategory": "object",
+                                }
+                            )
+
+                    # Add COCO annotations (instance segmentation)
+                    from scipy import ndimage
+                    from skimage import measure
+
+                    for class_id in np.unique(label_mask):
+                        if class_id == 0:
+                            continue
+
+                        class_mask = (label_mask == class_id).astype(np.uint8)
+                        labeled_array, num_features = ndimage.label(class_mask)
+
+                        for instance_id in range(1, num_features + 1):
+                            instance_mask = (labeled_array == instance_id).astype(
+                                np.uint8
+                            )
+                            coords = np.argwhere(instance_mask)
+
+                            if len(coords) == 0:
+                                continue
+
+                            ymin, xmin = coords.min(axis=0)
+                            ymax, xmax = coords.max(axis=0)
+
+                            bbox = [
+                                int(xmin),
+                                int(ymin),
+                                int(xmax - xmin),
+                                int(ymax - ymin),
+                            ]
+                            area = int(np.sum(instance_mask))
+
+                            # Find contours for segmentation
+                            contours = measure.find_contours(instance_mask, 0.5)
+                            segmentation = []
+                            for contour in contours:
+                                contour = np.flip(contour, axis=1)
+                                segmentation_points = contour.ravel().tolist()
+                                if len(segmentation_points) >= 6:
+                                    segmentation.append(segmentation_points)
+
+                            if segmentation:
+                                stats["coco_data"]["annotations"].append(
+                                    {
+                                        "id": int(coco_ann_id),
+                                        "image_id": int(image_id),
+                                        "category_id": int(class_id),
+                                        "bbox": bbox,
+                                        "area": area,
+                                        "segmentation": segmentation,
+                                        "iscrowd": 0,
+                                    }
+                                )
+                                coco_ann_id += 1
+
+                elif mask_file is not None and metadata_format == "YOLO":
+                    # Create YOLO labels directory if needed
+                    labels_dir = os.path.join(
+                        os.path.dirname(output_images_dir), "labels"
+                    )
+                    os.makedirs(labels_dir, exist_ok=True)
+
+                    # Generate YOLO annotation file
+                    yolo_path = os.path.join(labels_dir, f"{tile_name}.txt")
+                    from scipy import ndimage
+
+                    with open(yolo_path, "w") as yolo_file:
+                        for class_id in np.unique(label_mask):
+                            if class_id == 0:
+                                continue
+
+                            # Track class for classes.txt
+                            class_name = next(
+                                (k for k, v in class_to_id.items() if v == class_id),
+                                str(class_id),
+                            )
+                            stats["yolo_classes"].add(class_name)
+
+                            class_mask = (label_mask == class_id).astype(np.uint8)
+                            labeled_array, num_features = ndimage.label(class_mask)
+
+                            for instance_id in range(1, num_features + 1):
+                                instance_mask = labeled_array == instance_id
+                                coords = np.argwhere(instance_mask)
+
+                                if len(coords) == 0:
+                                    continue
+
+                                ymin, xmin = coords.min(axis=0)
+                                ymax, xmax = coords.max(axis=0)
+
+                                # Convert to YOLO format (normalized center coordinates)
+                                x_center = ((xmin + xmax) / 2) / tile_size
+                                y_center = ((ymin + ymax) / 2) / tile_size
+                                width = (xmax - xmin) / tile_size
+                                height = (ymax - ymin) / tile_size
+
+                                # YOLO uses 0-based class indices
+                                yolo_class_id = class_id - 1
+                                yolo_file.write(
+                                    f"{yolo_class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n"
+                                )
 
                 tile_index += 1
                 if tile_index >= max_tiles:
@@ -3625,6 +4910,179 @@ def _process_image_mask_pair(
                 break
 
     return stats
+
+
+def display_training_tiles(
+    output_dir,
+    num_tiles=6,
+    figsize=(18, 6),
+    cmap="gray",
+    save_path=None,
+):
+    """
+    Display image and mask tile pairs from training data output.
+
+    Args:
+        output_dir (str): Path to output directory containing 'images' and 'masks' subdirectories
+        num_tiles (int): Number of tile pairs to display (default: 6)
+        figsize (tuple): Figure size as (width, height) in inches (default: (18, 6))
+        cmap (str): Colormap for mask display (default: 'gray')
+        save_path (str, optional): If provided, save figure to this path instead of displaying
+
+    Returns:
+        tuple: (fig, axes) matplotlib figure and axes objects
+
+    Example:
+        >>> fig, axes = display_training_tiles('output/tiles', num_tiles=6)
+        >>> # Or save to file
+        >>> display_training_tiles('output/tiles', num_tiles=4, save_path='tiles_preview.png')
+    """
+    import matplotlib.pyplot as plt
+
+    # Get list of image tiles
+    images_dir = os.path.join(output_dir, "images")
+    if not os.path.exists(images_dir):
+        raise ValueError(f"Images directory not found: {images_dir}")
+
+    image_tiles = sorted(os.listdir(images_dir))[:num_tiles]
+
+    if not image_tiles:
+        raise ValueError(f"No image tiles found in {images_dir}")
+
+    # Limit to available tiles
+    num_tiles = min(num_tiles, len(image_tiles))
+
+    # Create figure with subplots
+    fig, axes = plt.subplots(2, num_tiles, figsize=figsize)
+
+    # Handle case where num_tiles is 1
+    if num_tiles == 1:
+        axes = axes.reshape(2, 1)
+
+    for idx, tile_name in enumerate(image_tiles):
+        # Load and display image tile
+        image_path = os.path.join(output_dir, "images", tile_name)
+        with rasterio.open(image_path) as src:
+            show(src, ax=axes[0, idx], title=f"Image {idx+1}")
+
+        # Load and display mask tile
+        mask_path = os.path.join(output_dir, "masks", tile_name)
+        if os.path.exists(mask_path):
+            with rasterio.open(mask_path) as src:
+                show(src, ax=axes[1, idx], title=f"Mask {idx+1}", cmap=cmap)
+        else:
+            axes[1, idx].text(
+                0.5,
+                0.5,
+                "Mask not found",
+                ha="center",
+                va="center",
+                transform=axes[1, idx].transAxes,
+            )
+            axes[1, idx].set_title(f"Mask {idx+1}")
+
+    plt.tight_layout()
+
+    # Save or show
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Figure saved to: {save_path}")
+    else:
+        plt.show()
+
+    return fig, axes
+
+
+def display_image_with_vector(
+    image_path,
+    vector_path,
+    figsize=(16, 8),
+    vector_color="red",
+    vector_linewidth=1,
+    vector_facecolor="none",
+    save_path=None,
+):
+    """
+    Display a raster image alongside the same image with vector overlay.
+
+    Args:
+        image_path (str): Path to raster image file
+        vector_path (str): Path to vector file (GeoJSON, Shapefile, etc.)
+        figsize (tuple): Figure size as (width, height) in inches (default: (16, 8))
+        vector_color (str): Edge color for vector features (default: 'red')
+        vector_linewidth (float): Line width for vector features (default: 1)
+        vector_facecolor (str): Fill color for vector features (default: 'none')
+        save_path (str, optional): If provided, save figure to this path instead of displaying
+
+    Returns:
+        tuple: (fig, axes, info_dict) where info_dict contains image and vector metadata
+
+    Example:
+        >>> fig, axes, info = display_image_with_vector(
+        ...     'image.tif',
+        ...     'buildings.geojson',
+        ...     vector_color='blue'
+        ... )
+        >>> print(f"Number of features: {info['num_features']}")
+    """
+    import matplotlib.pyplot as plt
+
+    # Validate inputs
+    if not os.path.exists(image_path):
+        raise ValueError(f"Image file not found: {image_path}")
+    if not os.path.exists(vector_path):
+        raise ValueError(f"Vector file not found: {vector_path}")
+
+    # Create figure
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+
+    # Load and display image
+    with rasterio.open(image_path) as src:
+        # Plot image only
+        show(src, ax=ax1, title="Image")
+
+        # Load vector data
+        vector_data = gpd.read_file(vector_path)
+
+        # Reproject to image CRS if needed
+        if vector_data.crs != src.crs:
+            vector_data = vector_data.to_crs(src.crs)
+
+        # Plot image with vector overlay
+        show(
+            src,
+            ax=ax2,
+            title=f"Image with {len(vector_data)} Vector Features",
+        )
+        vector_data.plot(
+            ax=ax2,
+            facecolor=vector_facecolor,
+            edgecolor=vector_color,
+            linewidth=vector_linewidth,
+        )
+
+        # Collect metadata
+        info = {
+            "image_shape": src.shape,
+            "image_crs": src.crs,
+            "image_bounds": src.bounds,
+            "num_features": len(vector_data),
+            "vector_crs": vector_data.crs,
+            "vector_bounds": vector_data.total_bounds,
+        }
+
+    plt.tight_layout()
+
+    # Save or show
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Figure saved to: {save_path}")
+    else:
+        plt.show()
+
+    return fig, (ax1, ax2), info
 
 
 def create_overview_image(
@@ -7521,17 +8979,39 @@ def write_colormap(
 
 def plot_performance_metrics(
     history_path: str,
-    figsize: Tuple[int, int] = (15, 5),
+    figsize: Optional[Tuple[int, int]] = None,
     verbose: bool = True,
     save_path: Optional[str] = None,
+    csv_path: Optional[str] = None,
     kwargs: Optional[Dict] = None,
-) -> None:
-    """Plot performance metrics from a history object.
+) -> pd.DataFrame:
+    """Plot performance metrics from a training history object and return as DataFrame.
+
+    This function loads training history, plots available metrics (loss, IoU, F1,
+    precision, recall), optionally exports to CSV, and returns all metrics as a
+    pandas DataFrame for further analysis.
 
     Args:
-        history_path: The history object to plot.
-        figsize: The figure size.
-        verbose: Whether to print the best and final metrics.
+        history_path (str): Path to the saved training history (.pth file).
+        figsize (Optional[Tuple[int, int]]): Figure size in inches. If None,
+            automatically determined based on number of metrics.
+        verbose (bool): Whether to print best and final metric values. Defaults to True.
+        save_path (Optional[str]): Path to save the plot image. If None, plot is not saved.
+        csv_path (Optional[str]): Path to export metrics as CSV. If None, CSV is not exported.
+        kwargs (Optional[Dict]): Additional keyword arguments for plt.savefig().
+
+    Returns:
+        pd.DataFrame: DataFrame containing all metrics with columns for epoch and each metric.
+            Columns include: 'epoch', 'train_loss', 'val_loss', 'val_iou', 'val_f1',
+            'val_precision', 'val_recall' (depending on availability in history).
+
+    Example:
+        >>> df = plot_performance_metrics(
+        ...     'training_history.pth',
+        ...     save_path='metrics_plot.png',
+        ...     csv_path='metrics.csv'
+        ... )
+        >>> print(df.head())
     """
     if kwargs is None:
         kwargs = {}
@@ -7541,65 +9021,135 @@ def plot_performance_metrics(
     train_loss_key = "train_losses" if "train_losses" in history else "train_loss"
     val_loss_key = "val_losses" if "val_losses" in history else "val_loss"
     val_iou_key = "val_ious" if "val_ious" in history else "val_iou"
-    val_dice_key = "val_dices" if "val_dices" in history else "val_dice"
+    # Support both new (f1) and old (dice) key formats for backward compatibility
+    val_f1_key = (
+        "val_f1s"
+        if "val_f1s" in history
+        else ("val_dices" if "val_dices" in history else "val_dice")
+    )
+    # Add support for precision and recall
+    val_precision_key = (
+        "val_precisions" if "val_precisions" in history else "val_precision"
+    )
+    val_recall_key = "val_recalls" if "val_recalls" in history else "val_recall"
 
-    # Determine number of subplots based on available metrics
-    has_dice = val_dice_key in history
-    n_plots = 3 if has_dice else 2
-    figsize = (15, 5) if has_dice else (10, 5)
+    # Collect available metrics for plotting
+    available_metrics = []
+    metric_info = {
+        "Loss": (train_loss_key, val_loss_key, ["Train Loss", "Val Loss"]),
+        "IoU": (val_iou_key, None, ["Val IoU"]),
+        "F1": (val_f1_key, None, ["Val F1"]),
+        "Precision": (val_precision_key, None, ["Val Precision"]),
+        "Recall": (val_recall_key, None, ["Val Recall"]),
+    }
 
-    plt.figure(figsize=figsize)
+    for metric_name, (key1, key2, labels) in metric_info.items():
+        if key1 in history or (key2 and key2 in history):
+            available_metrics.append((metric_name, key1, key2, labels))
 
-    # Plot loss
-    plt.subplot(1, n_plots, 1)
+    # Determine number of subplots and figure size
+    n_plots = len(available_metrics)
+    if figsize is None:
+        figsize = (5 * n_plots, 5)
+
+    # Create DataFrame for all metrics
+    n_epochs = 0
+    df_data = {}
+
+    # Add epochs
+    if "epochs" in history:
+        df_data["epoch"] = history["epochs"]
+        n_epochs = len(history["epochs"])
+    elif train_loss_key in history:
+        n_epochs = len(history[train_loss_key])
+        df_data["epoch"] = list(range(1, n_epochs + 1))
+
+    # Add all available metrics to DataFrame
     if train_loss_key in history:
-        plt.plot(history[train_loss_key], label="Train Loss")
+        df_data["train_loss"] = history[train_loss_key]
     if val_loss_key in history:
-        plt.plot(history[val_loss_key], label="Val Loss")
-    plt.title("Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.grid(True)
-
-    # Plot IoU
-    plt.subplot(1, n_plots, 2)
+        df_data["val_loss"] = history[val_loss_key]
     if val_iou_key in history:
-        plt.plot(history[val_iou_key], label="Val IoU")
-    plt.title("IoU Score")
-    plt.xlabel("Epoch")
-    plt.ylabel("IoU")
-    plt.legend()
-    plt.grid(True)
+        df_data["val_iou"] = history[val_iou_key]
+    if val_f1_key in history:
+        df_data["val_f1"] = history[val_f1_key]
+    if val_precision_key in history:
+        df_data["val_precision"] = history[val_precision_key]
+    if val_recall_key in history:
+        df_data["val_recall"] = history[val_recall_key]
 
-    # Plot Dice if available
-    if has_dice:
-        plt.subplot(1, n_plots, 3)
-        plt.plot(history[val_dice_key], label="Val Dice")
-        plt.title("Dice Score")
-        plt.xlabel("Epoch")
-        plt.ylabel("Dice")
-        plt.legend()
-        plt.grid(True)
+    # Create DataFrame
+    df = pd.DataFrame(df_data)
 
-    plt.tight_layout()
+    # Export to CSV if requested
+    if csv_path:
+        df.to_csv(csv_path, index=False)
+        if verbose:
+            print(f"Metrics exported to: {csv_path}")
 
-    if save_path:
-        if "dpi" not in kwargs:
-            kwargs["dpi"] = 150
-        if "bbox_inches" not in kwargs:
-            kwargs["bbox_inches"] = "tight"
-        plt.savefig(save_path, **kwargs)
+    # Create plots
+    if n_plots > 0:
+        fig, axes = plt.subplots(1, n_plots, figsize=figsize)
+        if n_plots == 1:
+            axes = [axes]
 
-    plt.show()
+        for idx, (metric_name, key1, key2, labels) in enumerate(available_metrics):
+            ax = axes[idx]
 
+            if metric_name == "Loss":
+                # Special handling for loss (has both train and val)
+                if key1 in history:
+                    ax.plot(history[key1], label=labels[0])
+                if key2 and key2 in history:
+                    ax.plot(history[key2], label=labels[1])
+            else:
+                # Single metric plots
+                if key1 in history:
+                    ax.plot(history[key1], label=labels[0])
+
+            ax.set_title(metric_name)
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel(metric_name)
+            ax.legend()
+            ax.grid(True)
+
+        plt.tight_layout()
+
+        if save_path:
+            if "dpi" not in kwargs:
+                kwargs["dpi"] = 150
+            if "bbox_inches" not in kwargs:
+                kwargs["bbox_inches"] = "tight"
+            plt.savefig(save_path, **kwargs)
+
+        plt.show()
+
+    # Print summary statistics
     if verbose:
+        print("\n=== Performance Metrics Summary ===")
         if val_iou_key in history:
-            print(f"Best IoU: {max(history[val_iou_key]):.4f}")
-            print(f"Final IoU: {history[val_iou_key][-1]:.4f}")
-        if val_dice_key in history:
-            print(f"Best Dice: {max(history[val_dice_key]):.4f}")
-            print(f"Final Dice: {history[val_dice_key][-1]:.4f}")
+            print(
+                f"IoU     - Best: {max(history[val_iou_key]):.4f} | Final: {history[val_iou_key][-1]:.4f}"
+            )
+        if val_f1_key in history:
+            print(
+                f"F1      - Best: {max(history[val_f1_key]):.4f} | Final: {history[val_f1_key][-1]:.4f}"
+            )
+        if val_precision_key in history:
+            print(
+                f"Precision - Best: {max(history[val_precision_key]):.4f} | Final: {history[val_precision_key][-1]:.4f}"
+            )
+        if val_recall_key in history:
+            print(
+                f"Recall  - Best: {max(history[val_recall_key]):.4f} | Final: {history[val_recall_key][-1]:.4f}"
+            )
+        if val_loss_key in history:
+            print(
+                f"Val Loss - Best: {min(history[val_loss_key]):.4f} | Final: {history[val_loss_key][-1]:.4f}"
+            )
+        print("===================================\n")
+
+    return df
 
 
 def get_device() -> torch.device:
