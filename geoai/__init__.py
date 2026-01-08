@@ -153,6 +153,10 @@ try:
         moondream_query,
         moondream_detect,
         moondream_point,
+        moondream_caption_sliding_window,
+        moondream_query_sliding_window,
+        moondream_detect_sliding_window,
+        moondream_point_sliding_window,
     )
     from .map_widgets import moondream_gui
 except ImportError:
