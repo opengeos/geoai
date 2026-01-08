@@ -1106,7 +1106,7 @@ def view_vector_interactive(
 
     Args:
         vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.
-        layer_name (str, optional): The name of the layer. Defaults to "Vector Layer".
+        layer_name (str, optional): The name of the layer. Defaults to "Vector".
         tiles_args (dict, optional): Additional arguments for the localtileserver client.
             get_folium_tile_layer function. Defaults to None.
         opacity (float, optional): The opacity of the layer. Defaults to 0.7.
