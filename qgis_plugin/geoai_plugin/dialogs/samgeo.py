@@ -8,6 +8,11 @@ using the SamGeo library (SAM, SAM2, and SAM3 models).
 import os
 import tempfile
 
+try:
+    import torch
+except ImportError:
+    torch = None
+
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import (
@@ -903,6 +908,97 @@ class SamGeoDockWidget(QDockWidget):
         if file_path:
             self.output_path_edit.setText(file_path)
 
+    def check_cuda_devices(self):
+        """Check CUDA device availability and fix CUDA_VISIBLE_DEVICES if needed.
+
+        Returns:
+            tuple: (is_cuda_available: bool, warning_message: str or None)
+        """
+        if torch is None:
+            return (
+                False,
+                "PyTorch is not installed. Please install PyTorch to use CUDA acceleration.",
+            )
+
+        # Check if CUDA is available
+        try:
+            cuda_available = torch.cuda.is_available()
+
+            if not cuda_available:
+                # Check if CUDA_VISIBLE_DEVICES is the issue
+                cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+
+                if cuda_visible is not None:
+                    # Log the issue
+                    self.log_message(
+                        f"CUDA not available. CUDA_VISIBLE_DEVICES is set to: {cuda_visible}"
+                    )
+
+                    # Try to fix by resetting to device 0
+                    try:
+                        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+                        self.log_message(
+                            "Reset CUDA_VISIBLE_DEVICES to '0', checking again..."
+                        )
+
+                        # Force PyTorch to reinitialize CUDA
+                        # Note: This may not work in all cases as CUDA is initialized once per process
+                        if hasattr(torch.cuda, "_lazy_init"):
+                            torch.cuda._lazy_init()
+
+                        cuda_available = torch.cuda.is_available()
+
+                        if cuda_available:
+                            device_count = torch.cuda.device_count()
+                            device_name = (
+                                torch.cuda.get_device_name(0)
+                                if device_count > 0
+                                else "Unknown"
+                            )
+                            warning_msg = (
+                                f"Fixed CUDA issue: Reset CUDA_VISIBLE_DEVICES from '{cuda_visible}' to '0'. "
+                                f"Detected {device_count} GPU(s): {device_name}"
+                            )
+                            self.log_message(warning_msg)
+                            return True, warning_msg
+                        else:
+                            # Still not available after fix attempt
+                            warning_msg = (
+                                f"CUDA_VISIBLE_DEVICES was set to '{cuda_visible}' but you may only have GPU 0. "
+                                f"Attempted to reset to '0' but CUDA still not available. "
+                                f"Try restarting QGIS or set CUDA_VISIBLE_DEVICES=0 before launching QGIS."
+                            )
+                            return False, warning_msg
+                    except Exception as e:
+                        warning_msg = f"Failed to reset CUDA_VISIBLE_DEVICES: {str(e)}"
+                        self.log_message(warning_msg)
+                        return False, warning_msg
+                else:
+                    # CUDA not available and CUDA_VISIBLE_DEVICES is not set
+                    warning_msg = (
+                        "CUDA is not available. Possible reasons:\n"
+                        "1. No NVIDIA GPU detected\n"
+                        "2. CUDA drivers not installed\n"
+                        "3. PyTorch not compiled with CUDA support\n"
+                        "Please check your CUDA installation or use CPU mode."
+                    )
+                    return False, warning_msg
+            else:
+                # CUDA is available
+                device_count = torch.cuda.device_count()
+                device_name = (
+                    torch.cuda.get_device_name(0) if device_count > 0 else "Unknown"
+                )
+                self.log_message(
+                    f"CUDA available: {device_count} GPU(s) detected - {device_name}"
+                )
+                return True, None
+
+        except Exception as e:
+            error_msg = f"Error checking CUDA availability: {str(e)}"
+            self.log_message(error_msg)
+            return False, error_msg
+
     def load_model(self):
         """Load the SamGeo model."""
         try:
@@ -915,8 +1011,41 @@ class SamGeoDockWidget(QDockWidget):
             model_version = self.model_combo.currentText()
             backend = self.backend_combo.currentText()
             device = self.device_combo.currentText()
+
             if device == "auto":
                 device = None
+
+            # Check CUDA availability if using CUDA or auto device selection
+            if device == "cuda" or device is None:
+                cuda_available, warning_message = self.check_cuda_devices()
+
+                if not cuda_available:
+                    # CUDA is not available
+                    if device == "cuda":
+                        # User explicitly requested CUDA but it's not available
+                        self.progress_bar.setVisible(False)
+                        error_msg = (
+                            f"CUDA device requested but not available.\n\n{warning_message}\n\n"
+                            "Please select 'cpu' from the Device dropdown or fix your CUDA installation."
+                        )
+                        self.show_error(error_msg)
+                        self.model_status.setText("Model: Failed to load")
+                        self.model_status.setStyleSheet("color: red;")
+                        return
+                    else:
+                        # Auto mode - fall back to CPU
+                        device = "cpu"
+                        self.log_message(
+                            f"Auto mode: CUDA not available, using CPU. Reason: {warning_message}"
+                        )
+                        QMessageBox.information(
+                            self,
+                            "Using CPU Mode",
+                            f"CUDA is not available. Automatically using CPU mode.\n\n{warning_message}",
+                        )
+                elif warning_message:
+                    # CUDA is now available but there was a warning (e.g., fixed CUDA_VISIBLE_DEVICES)
+                    QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
 
             confidence = self.conf_spin.value()
             enable_interactive = self.interactive_check.isChecked()
