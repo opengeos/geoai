@@ -28,14 +28,15 @@ NO_DATA_FLOAT = 0.0001
 OFFSET = 0
 PERCENTILE = 99.9
 
+
 def get_3d_sincos_pos_embed(embed_dim, grid_size, add_cls_token=False):
     """Create 3D sin/cos positional embeddings.
-    
+
     Args:
         embed_dim (int): Embedding dimension.
         grid_size (tuple[int, int, int] | list[int]): The grid depth, height and width.
         add_cls_token (bool, optional): Whether or not to add a classification (CLS) token.
-    
+
     Returns:
         Position embeddings (with or without cls token)
     """
@@ -110,9 +111,10 @@ def _init_weights(module):
         module.bias.data.zero_()
         module.weight.data.fill_(1.0)
 
+
 class PatchEmbed(nn.Module):
     """3D Patch Embedding."""
-    
+
     def __init__(
         self,
         input_size: tuple[int, int, int] = (1, 224, 224),
@@ -127,11 +129,15 @@ class PatchEmbed(nn.Module):
         self.input_size = input_size
         self.patch_size = patch_size
         self.grid_size = [s // p for s, p in zip(self.input_size, self.patch_size)]
-        assert all(g >= 1 for g in self.grid_size), "Patch size is bigger than input size."
+        assert all(
+            g >= 1 for g in self.grid_size
+        ), "Patch size is bigger than input size."
         self.num_patches = self.grid_size[0] * self.grid_size[1] * self.grid_size[2]
         self.flatten = flatten
 
-        self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size, bias=bias)
+        self.proj = nn.Conv3d(
+            in_chans, embed_dim, kernel_size=patch_size, stride=patch_size, bias=bias
+        )
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
     def forward(self, x):
@@ -145,7 +151,7 @@ class PatchEmbed(nn.Module):
 
 class TemporalEncoder(nn.Module):
     """Temporal coordinate encoder."""
-    
+
     def __init__(self, embed_dim: int, trainable_scale: bool = False):
         super().__init__()
         self.embed_dim = embed_dim
@@ -157,16 +163,20 @@ class TemporalEncoder(nn.Module):
         else:
             self.scale = 1.0
 
-    def forward(self, temporal_coords: torch.Tensor, tokens_per_frame: int | None = None):
+    def forward(
+        self, temporal_coords: torch.Tensor, tokens_per_frame: int | None = None
+    ):
         """
         temporal_coords: year and day-of-year info with shape (B, T, 2).
         """
         shape = temporal_coords.shape[:2] + (-1,)
 
         year = _get_1d_sincos_embed_from_grid_torch(
-            self.year_embed_dim, temporal_coords[:, :, 0].flatten()).reshape(shape)
+            self.year_embed_dim, temporal_coords[:, :, 0].flatten()
+        ).reshape(shape)
         julian_day = _get_1d_sincos_embed_from_grid_torch(
-            self.julian_day_embed_dim, temporal_coords[:, :, 1].flatten()).reshape(shape)
+            self.julian_day_embed_dim, temporal_coords[:, :, 1].flatten()
+        ).reshape(shape)
 
         embedding = self.scale * torch.cat([year, julian_day], dim=-1)
 
@@ -178,7 +188,7 @@ class TemporalEncoder(nn.Module):
 
 class LocationEncoder(nn.Module):
     """Location coordinate encoder."""
-    
+
     def __init__(self, embed_dim: int, trainable_scale: bool = False):
         super().__init__()
         self.embed_dim = embed_dim
@@ -197,9 +207,11 @@ class LocationEncoder(nn.Module):
         shape = location_coords.shape[:1] + (1, -1)
 
         lat = _get_1d_sincos_embed_from_grid_torch(
-            self.lat_embed_dim, location_coords[:, 0].flatten()).reshape(shape)
+            self.lat_embed_dim, location_coords[:, 0].flatten()
+        ).reshape(shape)
         lon = _get_1d_sincos_embed_from_grid_torch(
-            self.lon_embed_dim, location_coords[:, 1].flatten()).reshape(shape)
+            self.lon_embed_dim, location_coords[:, 1].flatten()
+        ).reshape(shape)
 
         embedding = self.scale * torch.cat([lat, lon], dim=-1)
 
@@ -208,7 +220,7 @@ class LocationEncoder(nn.Module):
 
 class PrithviViT(nn.Module):
     """Prithvi ViT Encoder."""
-    
+
     def __init__(
         self,
         img_size: int | tuple[int, int] = 224,
@@ -244,19 +256,29 @@ class PrithviViT(nn.Module):
         coords_encoding = coords_encoding or []
         self.temporal_encoding = "time" in coords_encoding
         self.location_encoding = "location" in coords_encoding
-        
+
         if self.temporal_encoding:
             self.temporal_encoder = TemporalEncoder(embed_dim, coords_scale_learn)
         if self.location_encoding:
             self.location_encoder = LocationEncoder(embed_dim, coords_scale_learn)
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        self.register_buffer("pos_embed", torch.zeros(1, self.patch_embed.num_patches + 1, embed_dim))
+        self.register_buffer(
+            "pos_embed", torch.zeros(1, self.patch_embed.num_patches + 1, embed_dim)
+        )
 
-        self.blocks = nn.ModuleList([
-            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
-            for _ in range(depth)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                Block(
+                    embed_dim,
+                    num_heads,
+                    mlp_ratio,
+                    qkv_bias=True,
+                    norm_layer=norm_layer,
+                )
+                for _ in range(depth)
+            ]
+        )
 
         self.norm = norm_layer(embed_dim)
         self.initialize_weights()
@@ -284,7 +306,9 @@ class PrithviViT(nn.Module):
         ids_restore = torch.argsort(ids_shuffle, dim=1)
 
         ids_keep = ids_shuffle[:, :len_keep]
-        sequence_masked = torch.gather(sequence, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D))
+        sequence_masked = torch.gather(
+            sequence, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D)
+        )
 
         mask = torch.ones([N, L], device=sequence.device)
         mask[:, :len_keep] = 0
@@ -297,13 +321,15 @@ class PrithviViT(nn.Module):
         x: torch.Tensor,
         temporal_coords: None | torch.Tensor = None,
         location_coords: None | torch.Tensor = None,
-        mask_ratio=0.75
+        mask_ratio=0.75,
     ):
         x = self.patch_embed(x)
         x = x + self.pos_embed[:, 1:, :]
 
         if self.temporal_encoding and temporal_coords is not None:
-            x = x + self.temporal_encoder(temporal_coords, x.shape[1] // self.num_frames)
+            x = x + self.temporal_encoder(
+                temporal_coords, x.shape[1] // self.num_frames
+            )
 
         if self.location_encoding and location_coords is not None:
             x = x + self.location_encoder(location_coords)
@@ -323,7 +349,7 @@ class PrithviViT(nn.Module):
 
 class MAEDecoder(nn.Module):
     """Transformer Decoder used in the Prithvi MAE."""
-    
+
     def __init__(
         self,
         patch_size: int | tuple[int, int, int] = (1, 16, 16),
@@ -349,28 +375,42 @@ class MAEDecoder(nn.Module):
 
         self.register_buffer(
             "decoder_pos_embed",
-            torch.zeros(1, grid_size[0] * grid_size[1] * grid_size[2] + 1, decoder_embed_dim)
+            torch.zeros(
+                1, grid_size[0] * grid_size[1] * grid_size[2] + 1, decoder_embed_dim
+            ),
         )
 
         coords_encoding = coords_encoding or []
         self.temporal_encoding = "time" in coords_encoding
         self.location_encoding = "location" in coords_encoding
-        
-        if self.temporal_encoding:
-            self.temporal_encoder = TemporalEncoder(decoder_embed_dim, coords_scale_learn)
-        if self.location_encoding:
-            self.location_encoder = LocationEncoder(decoder_embed_dim, coords_scale_learn)
 
-        self.decoder_blocks = nn.ModuleList([
-            Block(decoder_embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
-            for _ in range(depth)
-        ])
+        if self.temporal_encoding:
+            self.temporal_encoder = TemporalEncoder(
+                decoder_embed_dim, coords_scale_learn
+            )
+        if self.location_encoding:
+            self.location_encoder = LocationEncoder(
+                decoder_embed_dim, coords_scale_learn
+            )
+
+        self.decoder_blocks = nn.ModuleList(
+            [
+                Block(
+                    decoder_embed_dim,
+                    num_heads,
+                    mlp_ratio,
+                    qkv_bias=True,
+                    norm_layer=norm_layer,
+                )
+                for _ in range(depth)
+            ]
+        )
 
         self.decoder_norm = norm_layer(decoder_embed_dim)
         self.decoder_pred = nn.Linear(
             decoder_embed_dim,
             patch_size[0] * patch_size[1] * patch_size[2] * in_chans,
-            bias=True
+            bias=True,
         )
 
         self.initialize_weights()
@@ -379,7 +419,9 @@ class MAEDecoder(nn.Module):
         pos_embed = get_3d_sincos_pos_embed(
             self.decoder_pos_embed.shape[-1], self.grid_size, add_cls_token=True
         )
-        self.decoder_pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
+        self.decoder_pos_embed.data.copy_(
+            torch.from_numpy(pos_embed).float().unsqueeze(0)
+        )
 
         torch.nn.init.normal_(self.mask_token, std=0.02)
         self.apply(_init_weights)
@@ -394,9 +436,13 @@ class MAEDecoder(nn.Module):
     ):
         x = self.decoder_embed(hidden_states)
 
-        mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
+        mask_tokens = self.mask_token.repeat(
+            x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1
+        )
         x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)
-        x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))
+        x_ = torch.gather(
+            x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2])
+        )
         x = torch.cat([x[:, :1, :], x_], dim=1)
 
         x = x + self.decoder_pos_embed
@@ -422,7 +468,7 @@ class MAEDecoder(nn.Module):
 
 class PrithviMAE(nn.Module):
     """Prithvi Masked Autoencoder."""
-    
+
     def __init__(
         self,
         img_size: int | tuple[int, int] = 224,
@@ -447,7 +493,9 @@ class PrithviMAE(nn.Module):
         super().__init__()
 
         self.img_size = to_2tuple(img_size)
-        self.patch_size = patch_size if isinstance(patch_size, tuple) else (1, patch_size, patch_size)
+        self.patch_size = (
+            patch_size if isinstance(patch_size, tuple) else (1, patch_size, patch_size)
+        )
         self.num_frames = num_frames
         self.in_chans = in_chans
         self.norm_pix_loss = norm_pix_loss
@@ -487,16 +535,27 @@ class PrithviMAE(nn.Module):
         pW = W // self.patch_size[2]
 
         x = pixel_values.reshape(
-            B, C, T // self.patch_size[0], self.patch_size[0], pH, self.patch_size[1], pW, self.patch_size[2]
+            B,
+            C,
+            T // self.patch_size[0],
+            self.patch_size[0],
+            pH,
+            self.patch_size[1],
+            pW,
+            self.patch_size[2],
         )
         x = x.permute(0, 2, 4, 6, 3, 5, 7, 1)
         patchified_pixel_values = x.reshape(
-            B, T // self.patch_size[0] * pH * pW, self.patch_size[0] * self.patch_size[1] * self.patch_size[2] * C
+            B,
+            T // self.patch_size[0] * pH * pW,
+            self.patch_size[0] * self.patch_size[1] * self.patch_size[2] * C,
         )
 
         return patchified_pixel_values
 
-    def unpatchify(self, patchified_pixel_values, image_size: tuple[int, int] | None = None):
+    def unpatchify(
+        self, patchified_pixel_values, image_size: tuple[int, int] | None = None
+    ):
         if image_size is None:
             H, W = self.img_size
         else:
@@ -508,12 +567,22 @@ class PrithviMAE(nn.Module):
         T = self.num_frames
 
         x = patchified_pixel_values.reshape(
-            patchified_pixel_values.shape[0], T // self.patch_size[0], pH, pW,
-            self.patch_size[0], self.patch_size[1], self.patch_size[2], C
+            patchified_pixel_values.shape[0],
+            T // self.patch_size[0],
+            pH,
+            pW,
+            self.patch_size[0],
+            self.patch_size[1],
+            self.patch_size[2],
+            C,
         )
         x = x.permute(0, 7, 1, 4, 2, 5, 3, 6)
         pixel_values = x.reshape(
-            patchified_pixel_values.shape[0], C, T, pH * self.patch_size[1], pW * self.patch_size[2]
+            patchified_pixel_values.shape[0],
+            C,
+            T,
+            pH * self.patch_size[1],
+            pW * self.patch_size[2],
         )
 
         return pixel_values
@@ -541,15 +610,18 @@ class PrithviMAE(nn.Module):
     ):
         mask_ratio = mask_ratio if mask_ratio is not None else 0.75
 
-        latent, mask, ids_restore = self.encoder(pixel_values, temporal_coords, location_coords, mask_ratio)
+        latent, mask, ids_restore = self.encoder(
+            pixel_values, temporal_coords, location_coords, mask_ratio
+        )
         pred = self.decoder(latent, ids_restore, temporal_coords, location_coords)
         loss = self.forward_loss(pixel_values, pred, mask)
 
         return loss, pred, mask
 
+
 class PrithviProcessor:
     """Prithvi EO 2.0 processor with GeoTIFF input/output support.
-    
+
     https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL
     https://github.com/NASA-IMPACT/Prithvi-EO-2.0
     """
@@ -601,18 +673,20 @@ class PrithviProcessor:
         self.model = self._load_model()
 
     @staticmethod
-    def download_model(model_name: str = "Prithvi-EO-2.0-300M-TL", cache_dir: str = None) -> Tuple[str, str]:
+    def download_model(
+        model_name: str = "Prithvi-EO-2.0-300M-TL", cache_dir: str = None
+    ) -> Tuple[str, str]:
         """Download Prithvi model from HuggingFace Hub.
-        
+
         Args:
             model_name: Name of the model
             cache_dir: Directory to cache files
-            
+
         Returns:
             Tuple of (config_path, checkpoint_path)
         """
         repo_id = f"ibm-nasa-geospatial/{model_name}"
-        
+
         try:
             # Download config
             config_path = hf_hub_download(
@@ -620,18 +694,20 @@ class PrithviProcessor:
                 filename="config.json",
                 cache_dir=cache_dir,
             )
-            
+
             # Download checkpoint
             # Model name format: Prithvi-EO-2.0-300M-TL -> Prithvi_EO_V2_300M_TL.pt
-            checkpoint_filename = model_name.replace("-", "_").replace("_2.0_", "_V2_") + ".pt"
+            checkpoint_filename = (
+                model_name.replace("-", "_").replace("_2.0_", "_V2_") + ".pt"
+            )
             checkpoint_path = hf_hub_download(
                 repo_id=repo_id,
                 filename=checkpoint_filename,
                 cache_dir=cache_dir,
             )
-            
+
             return config_path, checkpoint_path
-            
+
         except Exception as e:
             raise RuntimeError(f"Failed to download model from HuggingFace Hub: {e}")
 
@@ -642,7 +718,7 @@ class PrithviProcessor:
             patch_size = self.config["patch_size"]
             if isinstance(patch_size, list):
                 patch_size = tuple(patch_size)
-            
+
             # Create model
             model = PrithviMAE(
                 img_size=self.config["img_size"],
@@ -663,13 +739,15 @@ class PrithviProcessor:
             )
 
             # Load checkpoint
-            state_dict = torch.load(self.checkpoint_path, map_location=self.device, weights_only=True)
-            
+            state_dict = torch.load(
+                self.checkpoint_path, map_location=self.device, weights_only=True
+            )
+
             # Remove fixed pos_embed weights
             for k in list(state_dict.keys()):
                 if "pos_embed" in k:
                     del state_dict[k]
-            
+
             model.load_state_dict(state_dict, strict=False)
             model = model.to(self.device)
             model.eval()
@@ -683,10 +761,10 @@ class PrithviProcessor:
 
     def read_geotiff(self, file_path: str) -> Tuple[np.ndarray, dict, Optional[Tuple]]:
         """Read GeoTIFF file.
-        
+
         Args:
             file_path: Path to GeoTIFF file
-            
+
         Returns:
             Tuple of (image array, metadata, coordinates)
         """
@@ -706,24 +784,24 @@ class PrithviProcessor:
         indices: Optional[List[int]] = None,
     ) -> np.ndarray:
         """Preprocess image for model input.
-        
+
         Args:
             img: Image array with shape (C, H, W)
             indices: Optional band indices to select
-            
+
         Returns:
             Preprocessed image
         """
         # Move channels to last dimension
         img = np.moveaxis(img, 0, -1)
-        
+
         # Select bands if specified
         if indices is not None:
             img = img[..., indices]
-        
+
         # Normalize (handle nodata)
         img = np.where(img == NO_DATA, NO_DATA_FLOAT, (img - self.mean) / self.std)
-        
+
         return img
 
     def load_images(
@@ -732,21 +810,23 @@ class PrithviProcessor:
         indices: Optional[List[int]] = None,
     ) -> Tuple[np.ndarray, List[dict], List, List]:
         """Load and preprocess multiple images.
-        
+
         Args:
             file_paths: List of GeoTIFF file paths
             indices: Optional band indices
-            
+
         Returns:
             Tuple of (images, metadata, temporal_coords, location_coords)
         """
         # Check if we need to pad to num_frames
         if len(file_paths) < self.num_frames:
             # Pad file_paths by repeating the last file
-            file_paths = list(file_paths) + [file_paths[-1]] * (self.num_frames - len(file_paths))
+            file_paths = list(file_paths) + [file_paths[-1]] * (
+                self.num_frames - len(file_paths)
+            )
         elif len(file_paths) > self.num_frames:
-            file_paths = file_paths[:self.num_frames]
-        
+            file_paths = file_paths[: self.num_frames]
+
         imgs = []
         metas = []
         temporal_coords = []
@@ -754,10 +834,10 @@ class PrithviProcessor:
 
         for file in file_paths:
             img, meta, coords = self.read_geotiff(file)
-            
+
             # Preprocess
             img = self.preprocess_image(img, indices)
-            
+
             imgs.append(img)
             metas.append(meta)
 
@@ -778,18 +858,18 @@ class PrithviProcessor:
         mask_ratio: Optional[float] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Run model inference.
-        
+
         Args:
             input_data: Input tensor with shape (B, C, T, H, W)
             temporal_coords: Optional temporal coordinates
             location_coords: Optional location coordinates
             mask_ratio: Mask ratio (default: from config)
-            
+
         Returns:
             Tuple of (reconstructed_image, mask_image)
         """
         mask_ratio = mask_ratio or self.mask_ratio
-        
+
         # Check if input dimensions match model expectations
         B, C, T, H, W = input_data.shape
         if H % self.img_size != 0 or W % self.img_size != 0:
@@ -826,15 +906,15 @@ class PrithviProcessor:
         indices: Optional[List[int]] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Process multiple GeoTIFF files and return tensors (without saving).
-        
+
         This method handles large images using sliding windows and returns tensors
         for visualization, unlike process_files() which saves to disk.
-        
+
         Args:
             file_paths: List of input file paths
             mask_ratio: Optional mask ratio
             indices: Optional band indices
-            
+
         Returns:
             Tuple of (input_tensor, reconstructed_tensor, mask_tensor)
         """
@@ -847,20 +927,27 @@ class PrithviProcessor:
         original_h, original_w = input_data.shape[-2:]
         pad_h = (self.img_size - (original_h % self.img_size)) % self.img_size
         pad_w = (self.img_size - (original_w % self.img_size)) % self.img_size
-        
+
         if pad_h > 0 or pad_w > 0:
             input_data = np.pad(
-                input_data, ((0, 0), (0, 0), (0, 0), (0, pad_h), (0, pad_w)), mode="reflect"
+                input_data,
+                ((0, 0), (0, 0), (0, 0), (0, pad_h), (0, pad_w)),
+                mode="reflect",
             )
 
         # Convert to tensor
         batch = torch.tensor(input_data, device="cpu")
 
         # Create sliding windows
-        windows = batch.unfold(3, self.img_size, self.img_size).unfold(4, self.img_size, self.img_size)
+        windows = batch.unfold(3, self.img_size, self.img_size).unfold(
+            4, self.img_size, self.img_size
+        )
         h1, w1 = windows.shape[3:5]
         windows = rearrange(
-            windows, "b c t h1 w1 h w -> (b h1 w1) c t h w", h=self.img_size, w=self.img_size
+            windows,
+            "b c t h1 w1 h w -> (b h1 w1) c t h w",
+            h=self.img_size,
+            w=self.img_size,
         )
 
         # Split into batches
@@ -870,7 +957,7 @@ class PrithviProcessor:
         # Process each window
         rec_imgs = []
         mask_imgs = []
-        
+
         for i, x in enumerate(windows_list):
             rec_img, mask_img = self.run_inference(x, None, None, mask_ratio)
             rec_imgs.append(rec_img)
@@ -919,12 +1006,12 @@ class PrithviProcessor:
         mask_tensor: torch.Tensor,
     ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
         """Extract RGB images from tensors for visualization.
-        
+
         Args:
             input_tensor: Input tensor (B, C, T, H, W)
             rec_tensor: Reconstructed tensor (B, C, T, H, W)
             mask_tensor: Mask tensor (B, C, T, H, W)
-            
+
         Returns:
             Tuple of (original_rgb, masked_rgb, reconstructed_rgb) lists
         """
@@ -932,9 +1019,9 @@ class PrithviProcessor:
         rgb_channels = [
             self.bands.index("B04"),
             self.bands.index("B03"),
-            self.bands.index("B02")
+            self.bands.index("B02"),
         ]
-        
+
         # Remove batch dimension
         if input_tensor.dim() == 5:
             input_tensor = input_tensor[0]
@@ -942,16 +1029,16 @@ class PrithviProcessor:
             rec_tensor = rec_tensor[0]
         if mask_tensor.dim() == 5:
             mask_tensor = mask_tensor[0]
-        
+
         mean = torch.tensor(self.mean)
         std = torch.tensor(self.std)
-        
+
         original_rgb = []
         masked_rgb = []
         reconstructed_rgb = []
-        
+
         num_frames = input_tensor.shape[1]
-        
+
         for t in range(num_frames):
             # Extract and denormalize original RGB
             rgb_orig = input_tensor[rgb_channels, t, :, :].clone()
@@ -962,7 +1049,7 @@ class PrithviProcessor:
             rgb_orig_np = (rgb_orig_np / 10000 * 255).astype(np.uint8)
             rgb_orig_np = np.transpose(rgb_orig_np, (1, 2, 0))
             original_rgb.append(rgb_orig_np)
-            
+
             # Extract and denormalize reconstructed RGB
             rgb_rec = rec_tensor[rgb_channels, t, :, :].clone()
             for i, c in enumerate(rgb_channels):
@@ -972,12 +1059,12 @@ class PrithviProcessor:
             rgb_rec_np = (rgb_rec_np / 10000 * 255).astype(np.uint8)
             rgb_rec_np = np.transpose(rgb_rec_np, (1, 2, 0))
             reconstructed_rgb.append(rgb_rec_np)
-            
+
             # Create masked RGB (visible patches only)
             mask_t = mask_tensor[rgb_channels, t, :, :].numpy()
             masked_np = rgb_orig_np.astype(np.float32) * np.transpose(mask_t, (1, 2, 0))
             masked_rgb.append(masked_np.astype(np.uint8))
-        
+
         return original_rgb, masked_rgb, reconstructed_rgb
 
     def process_files(
@@ -988,7 +1075,7 @@ class PrithviProcessor:
         indices: Optional[List[int]] = None,
     ):
         """Process multiple GeoTIFF files.
-        
+
         Args:
             file_paths: List of input file paths
             output_dir: Output directory for results
@@ -1014,10 +1101,15 @@ class PrithviProcessor:
         batch = torch.tensor(input_data, device="cpu")
 
         # Create sliding windows
-        windows = batch.unfold(3, self.img_size, self.img_size).unfold(4, self.img_size, self.img_size)
+        windows = batch.unfold(3, self.img_size, self.img_size).unfold(
+            4, self.img_size, self.img_size
+        )
         h1, w1 = windows.shape[3:5]
         windows = rearrange(
-            windows, "b c t h1 w1 h w -> (b h1 w1) c t h w", h=self.img_size, w=self.img_size
+            windows,
+            "b c t h1 w1 h w -> (b h1 w1) c t h w",
+            h=self.img_size,
+            w=self.img_size,
         )
 
         # Split into batches
@@ -1027,7 +1119,7 @@ class PrithviProcessor:
         # Process each window
         rec_imgs = []
         mask_imgs = []
-        
+
         for i, x in enumerate(windows_list):
             rec_img, mask_img = self.run_inference(x, None, None, mask_ratio)
             rec_imgs.append(rec_img)
@@ -1077,7 +1169,7 @@ class PrithviProcessor:
         output_dir: str,
     ):
         """Save reconstruction results.
-        
+
         Args:
             rec_img: Reconstructed image with shape (C, T, H, W)
             mask_img: Mask image with shape (C, T, H, W)
@@ -1115,24 +1207,25 @@ class PrithviProcessor:
             for i in range(image.shape[0]):
                 dest.write(image[i], i + 1)
 
+
 def load_prithvi_model(
     model_name: str = "Prithvi-EO-2.0-300M-TL",
     device: Optional[str] = None,
     cache_dir: Optional[str] = None,
 ) -> PrithviProcessor:
     """Load Prithvi model (convenience function).
-    
+
     Args:
         model_name: Name of the model
         device: Device to use ('cuda' or 'cpu')
         cache_dir: Cache directory
-        
+
     Returns:
         PrithviProcessor instance
     """
     if device is not None:
         device = torch.device(device)
-    
+
     return PrithviProcessor(
         model_name=model_name,
         device=device,
@@ -1148,7 +1241,7 @@ def prithvi_inference(
     device: Optional[str] = None,
 ):
     """Run Prithvi inference on GeoTIFF files (convenience function).
-    
+
     Args:
         file_paths: List of input GeoTIFF files
         output_dir: Output directory
