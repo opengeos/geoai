@@ -162,3 +162,14 @@ try:
 except ImportError:
     # Moondream not available (missing dependency)
     pass
+
+# Prithvi EO 2.0 Geospatial Foundation Model
+try:
+    from .prithvi import (
+        PrithviProcessor,
+        load_prithvi_model,
+        prithvi_inference,
+    )
+except ImportError:
+    # Prithvi not available (missing dependency)
+    pass
