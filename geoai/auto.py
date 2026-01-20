@@ -54,7 +54,6 @@ from transformers.utils import logging as hf_logging
 
 from .utils import get_device
 
-
 hf_logging.set_verbosity_error()  # silence HF load reports
 
 

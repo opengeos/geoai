@@ -249,7 +249,7 @@ class ChangeDetection:
             dict: Detailed results if return_detailed_results=True
         """
         # Read and align images
-        (img1, img2, transform, crs, original_shape) = self._read_and_align_images(
+        img1, img2, transform, crs, original_shape = self._read_and_align_images(
             image1_path, image2_path, target_size
         )
 
