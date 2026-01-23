@@ -15,6 +15,10 @@
         <link rel="canonical" href="https://opengeoai.org/examples/prithvi/">
       
       
+        <link rel="prev" href="../timelapse/">
+      
+      
+        <link rel="next" href="../../workshops/GeoAI_Workshop_2025/">
       
       
         
@@ -424,18 +428,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
@@ -456,7 +462,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2287,6 +2293,158 @@
 
               
             
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prithvi
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prithvi
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#import-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import Libraries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#download-sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Download Sample Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#define-input-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Define Input Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simple-one-line-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simple One-Line Inference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-processing-with-processor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Processing with Processor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visualize-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visualize Results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plot-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2906,6 +3064,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../prithvi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    prithvi module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../sam/" class="md-nav__link">
         
   
@@ -3105,6 +3291,17 @@
     <span class="md-ellipsis">
       
         Import Libraries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#download-sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Download Sample Data
       
     </span>
   </a>
@@ -3713,7 +3910,7 @@ import matplotlib.pyplot as plt</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="define-input-files">Define Input Files<a class="anchor-link" href="#define-input-files">¶</a></h2><p>Specify the paths to the satellite images for processing.</p>
+<h2 id="download-sample-data">Download Sample Data<a class="anchor-link" href="#download-sample-data">¶</a></h2>
 </div>
 </div>
 </div>
@@ -3736,19 +3933,11 @@ import matplotlib.pyplot as plt</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">file_paths</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">"asset/Mexico_HLS.S30.T13REM.2018026T173609.v2.0_cropped.tif"</span><span class="p">,</span>
-    <span class="s2">"asset/Mexico_HLS.S30.T13REM.2018106T172859.v2.0_cropped.tif"</span><span class="p">,</span>
-    <span class="s2">"asset/Mexico_HLS.S30.T13REM.2018201T172901.v2.0_cropped.tif"</span><span class="p">,</span>
-    <span class="s2">"asset/Mexico_HLS.S30.T13REM.2018266T173029.v2.0_cropped.tif"</span><span class="p">,</span>
-<span class="p">]</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">url</span> <span class="o">=</span> <span class="s2">"https://huggingface.co/datasets/giswqs/geospatial/resolve/main/Mexico_HLS_samples.zip"</span>
+<span class="n">geoai</span><span class="o">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-3">file_paths = [
-    "asset/Mexico_HLS.S30.T13REM.2018026T173609.v2.0_cropped.tif",
-    "asset/Mexico_HLS.S30.T13REM.2018106T172859.v2.0_cropped.tif",
-    "asset/Mexico_HLS.S30.T13REM.2018201T172901.v2.0_cropped.tif",
-    "asset/Mexico_HLS.S30.T13REM.2018266T173029.v2.0_cropped.tif",
-]</div>
+<div class="clipboard-copy-txt" id="cell-3">url = "https://huggingface.co/datasets/giswqs/geospatial/resolve/main/Mexico_HLS_samples.zip"
+geoai.download_file(url)</div>
 </div>
 </div>
 </div>
@@ -3761,7 +3950,7 @@ import matplotlib.pyplot as plt</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="simple-one-line-inference">Simple One-Line Inference<a class="anchor-link" href="#simple-one-line-inference">¶</a></h2><p>Run inference using the simplified API.</p>
+<h2 id="define-input-files">Define Input Files<a class="anchor-link" href="#define-input-files">¶</a></h2><p>Specify the paths to the satellite images for processing.</p>
 </div>
 </div>
 </div>
@@ -3784,9 +3973,19 @@ import matplotlib.pyplot as plt</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">geoai</span><span class="o">.</span><span class="n">prithvi_inference</span><span class="p">(</span><span class="n">file_paths</span><span class="o">=</span><span class="n">file_paths</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s2">"results"</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">file_paths</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018026T173609.v2.0_cropped.tif"</span><span class="p">,</span>
+    <span class="s2">"Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018106T172859.v2.0_cropped.tif"</span><span class="p">,</span>
+    <span class="s2">"Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018201T172901.v2.0_cropped.tif"</span><span class="p">,</span>
+    <span class="s2">"Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018266T173029.v2.0_cropped.tif"</span><span class="p">,</span>
+<span class="p">]</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-4">geoai.prithvi_inference(file_paths=file_paths, output_dir="results")</div>
+<div class="clipboard-copy-txt" id="cell-4">file_paths = [
+    "Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018026T173609.v2.0_cropped.tif",
+    "Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018106T172859.v2.0_cropped.tif",
+    "Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018201T172901.v2.0_cropped.tif",
+    "Mexico_HLS_samples/data/Mexico_HLS.S30.T13REM.2018266T173029.v2.0_cropped.tif",
+]</div>
 </div>
 </div>
 </div>
@@ -3799,7 +3998,7 @@ import matplotlib.pyplot as plt</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="advanced-processing-with-processor">Advanced Processing with Processor<a class="anchor-link" href="#advanced-processing-with-processor">¶</a></h2><p>Load the model and process files with custom parameters.</p>
+<h2 id="simple-one-line-inference">Simple One-Line Inference<a class="anchor-link" href="#simple-one-line-inference">¶</a></h2><p>Run inference using the simplified API.</p>
 </div>
 </div>
 </div>
@@ -3822,13 +4021,9 @@ import matplotlib.pyplot as plt</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">processor</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">load_prithvi_model</span><span class="p">()</span>
-<span class="n">output_dir</span> <span class="o">=</span> <span class="s2">"results"</span>
-<span class="n">processor</span><span class="o">.</span><span class="n">process_files</span><span class="p">(</span><span class="n">file_paths</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">mask_ratio</span><span class="o">=</span><span class="mf">0.75</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">geoai</span><span class="o">.</span><span class="n">prithvi_inference</span><span class="p">(</span><span class="n">file_paths</span><span class="o">=</span><span class="n">file_paths</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="s2">"results"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-5">processor = geoai.load_prithvi_model()
-output_dir = "results"
-processor.process_files(file_paths, output_dir, mask_ratio=0.75)</div>
+<div class="clipboard-copy-txt" id="cell-5">geoai.prithvi_inference(file_paths=file_paths, output_dir="results")</div>
 </div>
 </div>
 </div>
@@ -3841,7 +4036,7 @@ processor.process_files(file_paths, output_dir, mask_ratio=0.75)</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="visualize-results">Visualize Results<a class="anchor-link" href="#visualize-results">¶</a></h2><p>Process images and extract tensors for visualization.</p>
+<h2 id="advanced-processing-with-processor">Advanced Processing with Processor<a class="anchor-link" href="#advanced-processing-with-processor">¶</a></h2><p>Load the model and process files with custom parameters.</p>
 </div>
 </div>
 </div>
@@ -3864,22 +4059,31 @@ processor.process_files(file_paths, output_dir, mask_ratio=0.75)</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">rec_tensor</span><span class="p">,</span> <span class="n">mask_tensor</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">process_images</span><span class="p">(</span>
-    <span class="n">file_paths</span><span class="o">=</span><span class="n">file_paths</span><span class="p">,</span>
-    <span class="n">mask_ratio</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
-<span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">processor</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">load_prithvi_model</span><span class="p">()</span>
+<span class="n">output_dir</span> <span class="o">=</span> <span class="s2">"results"</span>
+<span class="n">processor</span><span class="o">.</span><span class="n">process_files</span><span class="p">(</span><span class="n">file_paths</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">mask_ratio</span><span class="o">=</span><span class="mf">0.75</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-6">input_tensor, rec_tensor, mask_tensor = processor.process_images(
-    file_paths=file_paths,
-    mask_ratio=0.75,
-)</div>
+<div class="clipboard-copy-txt" id="cell-6">processor = geoai.load_prithvi_model()
+output_dir = "results"
+processor.process_files(file_paths, output_dir, mask_ratio=0.75)</div>
 </div>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=12">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="visualize-results">Visualize Results<a class="anchor-link" href="#visualize-results">¶</a></h2><p>Process images and extract tensors for visualization.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=12">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=13">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3897,26 +4101,17 @@ processor.process_files(file_paths, output_dir, mask_ratio=0.75)</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">original_rgb</span><span class="p">,</span> <span class="n">masked_rgb</span><span class="p">,</span> <span class="n">reconstructed_rgb</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">visualize_rgb</span><span class="p">(</span>
-    <span class="n">input_tensor</span><span class="p">,</span> <span class="n">rec_tensor</span><span class="p">,</span> <span class="n">mask_tensor</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">rec_tensor</span><span class="p">,</span> <span class="n">mask_tensor</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">process_images</span><span class="p">(</span>
+    <span class="n">file_paths</span><span class="o">=</span><span class="n">file_paths</span><span class="p">,</span>
+    <span class="n">mask_ratio</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-7">original_rgb, masked_rgb, reconstructed_rgb = processor.visualize_rgb(
-    input_tensor, rec_tensor, mask_tensor
+<div class="clipboard-copy-txt" id="cell-7">input_tensor, rec_tensor, mask_tensor = processor.process_images(
+    file_paths=file_paths,
+    mask_ratio=0.75,
 )</div>
 </div>
 </div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=13">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="plot-comparison">Plot Comparison<a class="anchor-link" href="#plot-comparison">¶</a></h2><p>Display the original, masked, and reconstructed images side by side.</p>
 </div>
 </div>
 </div>
@@ -3930,6 +4125,48 @@ processor.process_files(file_paths, output_dir, mask_ratio=0.75)</div>
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
 <clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-8">
+<div>
+<span class="notice" hidden="">Copied!</span>
+<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
+<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+</clipboard-copy>
+</div>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">original_rgb</span><span class="p">,</span> <span class="n">masked_rgb</span><span class="p">,</span> <span class="n">reconstructed_rgb</span> <span class="o">=</span> <span class="n">processor</span><span class="o">.</span><span class="n">visualize_rgb</span><span class="p">(</span>
+    <span class="n">input_tensor</span><span class="p">,</span> <span class="n">rec_tensor</span><span class="p">,</span> <span class="n">mask_tensor</span>
+<span class="p">)</span>
+</pre></div>
+<div class="clipboard-copy-txt" id="cell-8">original_rgb, masked_rgb, reconstructed_rgb = processor.visualize_rgb(
+    input_tensor, rec_tensor, mask_tensor
+)</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=15">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="plot-comparison">Plot Comparison<a class="anchor-link" href="#plot-comparison">¶</a></h2><p>Display the original, masked, and reconstructed images side by side.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=16">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="CodeMirror cm-s-jupyter">
+<div class="zeroclipboard-container">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-9">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -3963,7 +4200,7 @@ processor.process_files(file_paths, output_dir, mask_ratio=0.75)</div>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-8">num_timestamps = len(original_rgb)
+<div class="clipboard-copy-txt" id="cell-9">num_timestamps = len(original_rgb)
 fig, axes = plt.subplots(num_timestamps, 3, figsize=(12, 4 * num_timestamps))
 
 if num_timestamps == 1:
@@ -3988,6 +4225,17 @@ plt.tight_layout()
 plt.show()</div>
 </div>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=17">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p><img alt="" src="https://github.com/user-attachments/assets/b5174766-43d2-43a8-ad84-6f7cbb286890"/></p>
 </div>
 </div>
 </div>
@@ -4021,7 +4269,7 @@ plt.show()</div>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 23, 2026 02:47:22 UTC"><span class="timeago" datetime="2026-01-23T02:47:22+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 23, 2026 02:47:22 UTC">2026-01-23</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 23, 2026 03:19:44 UTC"><span class="timeago" datetime="2026-01-23T03:19:44+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 23, 2026 03:19:44 UTC">2026-01-23</span>
   </span>
 
     
