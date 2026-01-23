@@ -1,0 +1,3 @@
+# Prithvi FM
+
+::: geoai.prithvi
