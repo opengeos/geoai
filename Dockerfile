@@ -5,7 +5,7 @@ FROM quay.io/jupyter/base-notebook:latest
 # -------------------------------------------------------
 USER root
 RUN apt-get update && \
-    apt-get install -y git && \
+    apt-get install -y git build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------------
