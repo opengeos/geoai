@@ -166,6 +166,7 @@ nav:
           - examples/AutoModel.ipynb
           - examples/smooth_vector.ipynb
           - examples/timelapse.ipynb
+          - examples/prithvi.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -186,6 +187,7 @@ nav:
           - map_tools module: map_tools.md
           - map_widgets module: map_widgets.md
           - moondream module: moondream.md
+          - prithvi module: prithvi.md
           - sam module: sam.md
           - segmentation module: segmentation.md
           - timm_train module: timm_train.md
