@@ -1,8 +1,8 @@
 # Testing Report: WMS/WMTS Segmentation Notebook
 
-**Date**: 2026-01-25  
-**Notebook**: `docs/examples/wms_wmts_segmentation.ipynb`  
-**Environment**: geo conda environment (Python 3.12.12)  
+**Date**: 2026-01-25
+**Notebook**: `docs/examples/wms_wmts_segmentation.ipynb`
+**Environment**: geo conda environment (Python 3.12.12)
 **Issue**: #420
 
 ## Testing Methodology
@@ -37,7 +37,7 @@ leafmap.map_tiles_to_geotiff(
     overwrite=True,
 )
 ```
-**Status**: PASS  
+**Status**: PASS
 **Result**: Downloaded 16 tiles, created 1.36 MB GeoTIFF
 
 ### ✅ Cell 3: Visualize downloaded imagery
@@ -49,11 +49,11 @@ with rasterio.open(output_path) as src:
     bounds = src.bounds
     m.fit_bounds([[bounds.bottom, bounds.left], [bounds.top, bounds.right]])
 ```
-**Status**: PASS  
+**Status**: PASS
 **Note**: Fixed from center_object() to fit_bounds()
 
 ### ⏭️ Cells 4-8: SAM3 operations
-**Status**: SKIPPED - Require HuggingFace authentication  
+**Status**: SKIPPED - Require HuggingFace authentication
 **Cells**:
 - Initialize SAM3
 - Set image
