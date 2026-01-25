@@ -881,7 +881,9 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
 
         return getattr(result, "final_text", str(result))
 
-    def search_and_get_first_item(self, prompt: str, visualize: bool = True) -> Optional[Dict[str, Any]]:
+    def search_and_get_first_item(
+        self, prompt: str, visualize: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """Search for imagery and return the first item as a structured dict.
 
         This method sends a search query to the agent, extracts the search results
@@ -952,7 +954,7 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             # Visualize on map if requested
             if visualize:
                 self._visualize_stac_item(item_data)
-                
+
             return item_data
 
         except json.JSONDecodeError:
