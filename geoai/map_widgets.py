@@ -483,7 +483,7 @@ def moondream_gui(
 
         if "gdf" in result and len(result["gdf"]) > 0:
             gdf = result["gdf"].copy().to_crs("EPSG:4326")
-            
+
             # Use add_gdf with point_style for more reliable display
             m.add_gdf(
                 gdf,
@@ -602,11 +602,15 @@ def moondream_gui(
                         text_prompt.value,
                     )
                     num_points = len(result.get("points", []))
-                    
+
                     # Show point detection info
-                    info_text = f"Locating: {text_prompt.value}\nFound {num_points} point(s)."
+                    info_text = (
+                        f"Locating: {text_prompt.value}\nFound {num_points} point(s)."
+                    )
                     if "gdf" in result and len(result["gdf"]) > 0:
-                        info_text += f"\nAdded {len(result['gdf'])} point marker(s) to map."
+                        info_text += (
+                            f"\nAdded {len(result['gdf'])} point marker(s) to map."
+                        )
                     update_output(info_text)
 
                     if num_points > 0:
