@@ -28,6 +28,16 @@ NO_DATA_FLOAT = 0.0001
 OFFSET = 0
 PERCENTILE = 99.9
 
+# Available Prithvi models
+AVAILABLE_MODELS = [
+    "Prithvi-EO-2.0-tiny-TL",  # tiny transfer learning, embed_dim=192, depth=12, with coords
+    "Prithvi-EO-2.0-100M-TL",  # 100M transfer learning, embed_dim=768, depth=12, with coords
+    "Prithvi-EO-2.0-300M",     # 300M base model, embed_dim=1024, depth=24, no coords
+    "Prithvi-EO-2.0-300M-TL",  # 300M transfer learning, embed_dim=768, depth=12, with coords
+    "Prithvi-EO-2.0-600M",     # 600M base model, embed_dim=1280, depth=32, no coords
+    "Prithvi-EO-2.0-600M-TL",  # 600M transfer learning, embed_dim=1280, depth=32, with coords
+]
+
 
 def get_3d_sincos_pos_embed(embed_dim, grid_size, add_cls_token=False):
     """Create 3D sin/cos positional embeddings.
@@ -622,8 +632,22 @@ class PrithviMAE(nn.Module):
 class PrithviProcessor:
     """Prithvi EO 2.0 processor with GeoTIFF input/output support.
 
-    https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL
-    https://github.com/NASA-IMPACT/Prithvi-EO-2.0
+    Supports multiple model variants:
+    - Prithvi-EO-2.0-tiny-TL (tiny transfer learning)
+    - Prithvi-EO-2.0-100M-TL (100M transfer learning)
+    - Prithvi-EO-2.0-300M (300M base model)
+    - Prithvi-EO-2.0-300M-TL (300M transfer learning)
+    - Prithvi-EO-2.0-600M (600M base model)
+    - Prithvi-EO-2.0-600M-TL (600M transfer learning)
+
+    References:
+        - tiny-TL: https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-tiny-TL
+        - 100M-TL: https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-100M-TL
+        - 300M: https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-300M
+        - 300M-TL: https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL
+        - 600M: https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-600M
+        - 600M-TL: https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-600M-TL
+        - GitHub: https://github.com/NASA-IMPACT/Prithvi-EO-2.0
     """
 
     def __init__(
@@ -637,7 +661,14 @@ class PrithviProcessor:
         """Initialize Prithvi processor.
 
         Args:
-            model_name: Name of the Prithvi model to download from HuggingFace Hub
+            model_name: Name of the Prithvi model to download from HuggingFace Hub.
+                Options:
+                - "Prithvi-EO-2.0-tiny-TL" (tiny, 192 dim, 12 layers)
+                - "Prithvi-EO-2.0-100M-TL" (100M, 768 dim, 12 layers)
+                - "Prithvi-EO-2.0-300M" (base, 1024 dim, 24 layers)
+                - "Prithvi-EO-2.0-300M-TL" (default, 768 dim, 12 layers)
+                - "Prithvi-EO-2.0-600M" (base, 1280 dim, 32 layers)
+                - "Prithvi-EO-2.0-600M-TL" (1280 dim, 32 layers)
             config_path: Path to config file (optional, downloads if not provided)
             checkpoint_path: Path to checkpoint file (optional, downloads if not provided)
             device: Torch device to use
@@ -679,7 +710,13 @@ class PrithviProcessor:
         """Download Prithvi model from HuggingFace Hub.
 
         Args:
-            model_name: Name of the model
+            model_name: Name of the model. Options:
+                - "Prithvi-EO-2.0-tiny-TL"
+                - "Prithvi-EO-2.0-100M-TL"
+                - "Prithvi-EO-2.0-300M" (base model)
+                - "Prithvi-EO-2.0-300M-TL" (default)
+                - "Prithvi-EO-2.0-600M" (base model)
+                - "Prithvi-EO-2.0-600M-TL"
             cache_dir: Directory to cache files
 
         Returns:
@@ -1208,6 +1245,20 @@ class PrithviProcessor:
                 dest.write(image[i], i + 1)
 
 
+def get_available_prithvi_models() -> List[str]:
+    """Get list of available Prithvi model names.
+
+    Returns:
+        List of available model names
+
+    Example:
+        >>> models = get_available_prithvi_models()
+        >>> print(models)
+        ['Prithvi-EO-2.0-300M-TL', 'Prithvi-EO-2.0-600M-TL']
+    """
+    return AVAILABLE_MODELS.copy()
+
+
 def load_prithvi_model(
     model_name: str = "Prithvi-EO-2.0-300M-TL",
     device: Optional[str] = None,
@@ -1216,12 +1267,32 @@ def load_prithvi_model(
     """Load Prithvi model (convenience function).
 
     Args:
-        model_name: Name of the model
+        model_name: Name of the model. Options:
+            - "Prithvi-EO-2.0-tiny-TL"
+            - "Prithvi-EO-2.0-100M-TL"
+            - "Prithvi-EO-2.0-300M" (base)
+            - "Prithvi-EO-2.0-300M-TL" (default)
+            - "Prithvi-EO-2.0-600M" (base)
+            - "Prithvi-EO-2.0-600M-TL"
         device: Device to use ('cuda' or 'cpu')
         cache_dir: Cache directory
 
     Returns:
         PrithviProcessor instance
+
+    Example:
+        >>> # Load tiny-TL model
+        >>> processor = load_prithvi_model("Prithvi-EO-2.0-tiny-TL")
+        >>> # Load 100M-TL model
+        >>> processor = load_prithvi_model("Prithvi-EO-2.0-100M-TL")
+        >>> # Load 300M base model
+        >>> processor = load_prithvi_model("Prithvi-EO-2.0-300M")
+        >>> # Load 300M-TL model
+        >>> processor = load_prithvi_model("Prithvi-EO-2.0-300M-TL")
+        >>> # Load 600M base model
+        >>> processor = load_prithvi_model("Prithvi-EO-2.0-600M")
+        >>> # Load 600M-TL model
+        >>> processor = load_prithvi_model("Prithvi-EO-2.0-600M-TL")
     """
     if device is not None:
         device = torch.device(device)
@@ -1245,9 +1316,23 @@ def prithvi_inference(
     Args:
         file_paths: List of input GeoTIFF files
         output_dir: Output directory
-        model_name: Name of the model
+        model_name: Name of the model. Options:
+            - "Prithvi-EO-2.0-tiny-TL"
+            - "Prithvi-EO-2.0-100M-TL"
+            - "Prithvi-EO-2.0-300M" (base)
+            - "Prithvi-EO-2.0-300M-TL" (default)
+            - "Prithvi-EO-2.0-600M" (base)
+            - "Prithvi-EO-2.0-600M-TL"
         mask_ratio: Optional mask ratio
         device: Device to use
+
+    Example:
+        >>> # Use tiny-TL model
+        >>> prithvi_inference(
+        ...     file_paths=["img1.tif", "img2.tif", "img3.tif", "img4.tif"],
+        ...     model_name="Prithvi-EO-2.0-tiny-TL",
+        ...     output_dir="output_tiny"
+        ... )
     """
     processor = load_prithvi_model(model_name, device)
     processor.process_files(file_paths, output_dir, mask_ratio)
