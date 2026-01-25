@@ -71,6 +71,8 @@ plugins:
                   "examples/water_detection.ipynb",
                   "examples/batch_segmentation.ipynb",
                   "examples/building_detection_lidar.ipynb",
+                  "examples/wms_wmts_segmentation.ipynb",
+                  "examples/wetland_sam3.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -137,6 +139,7 @@ nav:
           - examples/wetland_mapping.ipynb
           - examples/wetland_dynamics.ipynb
           - examples/wetland_sam3.ipynb
+          - examples/wms_wmts_segmentation.ipynb
           - examples/regularization.ipynb
           - examples/globe_projection.ipynb
           - examples/samgeo.ipynb
