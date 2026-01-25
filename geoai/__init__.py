@@ -167,6 +167,7 @@ except ImportError:
 try:
     from .prithvi import (
         PrithviProcessor,
+        get_available_prithvi_models,
         load_prithvi_model,
         prithvi_inference,
     )
