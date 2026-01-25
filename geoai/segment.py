@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import cv2
 import geopandas as gpd
 import numpy as np
 import rasterio
@@ -174,6 +173,8 @@ class GroundedSAM:
         Returns:
             List[DetectionResult]: Filtered detection results.
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
+
         if not detections:
             return detections
 
@@ -235,6 +236,8 @@ class GroundedSAM:
 
     def _mask_to_polygon(self, mask: np.ndarray) -> List[List[int]]:
         """Convert mask to polygon coordinates."""
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
+
         # Find contours in the binary mask
         contours, _ = cv2.findContours(
             mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -255,6 +258,8 @@ class GroundedSAM:
         self, polygon: List[Tuple[int, int]], image_shape: Tuple[int, int]
     ) -> np.ndarray:
         """Convert polygon to mask."""
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
+
         # Create an empty mask
         mask = np.zeros(image_shape, dtype=np.uint8)
 
@@ -279,6 +284,8 @@ class GroundedSAM:
         Returns:
             List[np.ndarray]: List of individual instance masks.
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
+
         # Find connected components
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
             mask.astype(np.uint8), connectivity=8
@@ -320,6 +327,8 @@ class GroundedSAM:
         Returns:
             List[Dict]: List of polygon dictionaries with geometry and properties.
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
+
         polygons = []
 
         # Get individual instances

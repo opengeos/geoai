@@ -6,7 +6,6 @@ import time
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 # Third-Party Libraries
-import cv2
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -440,6 +439,7 @@ class ObjectDetector:
         Returns:
             List of polygons as lists of (x, y) coordinates
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
 
         # Get parameters from kwargs or use instance defaults
         simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
@@ -637,6 +637,8 @@ class ObjectDetector:
         Returns:
             GeoDataFrame with objects
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
+
         # Use class defaults if parameters not provided
         simplify_tolerance = (
             simplify_tolerance
@@ -2165,6 +2167,7 @@ class ObjectDetector:
         Returns:
             GeoDataFrame with car detections and confidence values
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
 
         def _process_single_component(
             component_mask: np.ndarray,

@@ -3,7 +3,6 @@
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
@@ -736,6 +735,7 @@ class ChangeDetection:
         output_path="split_comparison.png",
     ):
         """Create a split comparison visualization showing before/after with change overlay."""
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
 
         # Load data
         with rasterio.open(image1_path) as src:

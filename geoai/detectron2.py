@@ -6,7 +6,6 @@ import os
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
-import cv2
 import numpy as np
 import rasterio
 import torch
@@ -135,6 +134,8 @@ def detectron2_segment(
     Returns:
         Dict containing segmentation results and output file paths
     """
+    import cv2  # Lazy import to avoid QGIS opencv conflicts
+
     check_detectron2()
 
     # Load the model
@@ -315,6 +316,8 @@ def visualize_detectron2_results(
     Returns:
         Visualization image as numpy array
     """
+    import cv2  # Lazy import to avoid QGIS opencv conflicts
+
     check_detectron2()
 
     # Load the image

@@ -24,7 +24,6 @@ Example:
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import cv2
 import geopandas as gpd
 import numpy as np
 import rasterio
@@ -877,6 +876,8 @@ class AutoGeoModel:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Run tiled inference for large images."""
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
+
         if data.ndim == 3:
             _, height, width = data.shape
         else:
@@ -1872,6 +1873,7 @@ def show_segmentation(
         >>> result = geoai.auto.semantic_segmentation("aerial.tif", output_path="seg.tif")
         >>> fig = show_segmentation("aerial.tif", result["mask"])
     """
+    import cv2  # Lazy import to avoid QGIS opencv conflicts
     import matplotlib.pyplot as plt
 
     img, _ = _load_image_for_display(source)
@@ -1941,6 +1943,7 @@ def show_depth(
         >>> result = geoai.auto.depth_estimation("aerial.tif", output_path="depth.tif")
         >>> fig = show_depth("aerial.tif", result["depth"])
     """
+    import cv2  # Lazy import to avoid QGIS opencv conflicts
     import matplotlib.pyplot as plt
 
     img, _ = _load_image_for_display(source)

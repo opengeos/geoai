@@ -5,7 +5,6 @@ The SamGeo class provides an interface for segmenting geospatial data using the 
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import cv2
 import numpy as np
 import torch
 from leafmap import array_to_image, blend_images
@@ -125,6 +124,7 @@ class SamGeo:
         Raises:
             ValueError: If the input source is not a valid path or numpy array.
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
 
         if isinstance(source, str):
             if source.startswith("http"):
@@ -399,6 +399,7 @@ class SamGeo:
         Raises:
             ValueError: If no masks are available and `save_masks()` cannot generate them.
         """
+        import cv2  # Lazy import to avoid QGIS opencv conflicts
         import matplotlib.pyplot as plt
 
         if self.batch:

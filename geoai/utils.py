@@ -24,7 +24,6 @@ from typing import (
 )
 
 # Third-Party Libraries
-import cv2
 import geopandas as gpd
 import leafmap
 import matplotlib.pyplot as plt
@@ -6109,6 +6108,8 @@ def masks_to_vector(
     Returns:
         Any: GeoDataFrame with building footprints
     """
+    import cv2  # Lazy import to avoid QGIS opencv conflicts
+
     # Set default output path if not provided
     # if output_path is None:
     #     output_path = os.path.splitext(mask_path)[0] + ".geojson"
@@ -7136,6 +7137,7 @@ def orthogonalize(
     Returns:
         Any: A GeoDataFrame containing the orthogonalized features.
     """
+    import cv2  # Lazy import to avoid QGIS opencv conflicts
 
     from functools import partial
 
