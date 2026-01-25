@@ -17,7 +17,7 @@ print("\n[1/3] Testing tile download from basemap...")
 try:
     bbox = [-122.2625, 37.8685, -122.2535, 37.8755]  # UC Berkeley area
     output_path = "/tmp/test_wms_imagery.tif"
-    
+
     leafmap.map_tiles_to_geotiff(
         output=output_path,
         bbox=bbox,
@@ -25,10 +25,10 @@ try:
         source="Esri.WorldImagery",
         overwrite=True,
     )
-    
+
     if Path(output_path).exists():
         print(f"✓ Successfully downloaded tiles to {output_path}")
-        
+
         # Check file size
         size_mb = Path(output_path).stat().st_size / (1024 * 1024)
         print(f"  File size: {size_mb:.2f} MB")
@@ -43,6 +43,7 @@ except Exception as e:
 print("\n[2/3] Testing raster reading...")
 try:
     import rasterio
+
     with rasterio.open(output_path) as src:
         print(f"✓ Raster opened successfully")
         print(f"  Dimensions: {src.width} x {src.height}")
@@ -57,6 +58,7 @@ except Exception as e:
 print("\n[3/3] Testing SAM3 import...")
 try:
     from samgeo import SamGeo3
+
     print("✓ SamGeo3 imported successfully")
     print("  Note: Full SAM3 functionality requires HuggingFace authentication")
 except Exception as e:
@@ -68,7 +70,7 @@ print("\n[BONUS] Testing sliding window components...")
 try:
     from rasterio.windows import Window
     import numpy as np
-    
+
     # Just verify we can create windows
     test_window = Window(0, 0, 512, 512)
     print(f"✓ Window creation successful: {test_window}")
