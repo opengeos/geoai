@@ -32,9 +32,9 @@ PERCENTILE = 99.9
 AVAILABLE_MODELS = [
     "Prithvi-EO-2.0-tiny-TL",  # tiny transfer learning, embed_dim=192, depth=12, with coords
     "Prithvi-EO-2.0-100M-TL",  # 100M transfer learning, embed_dim=768, depth=12, with coords
-    "Prithvi-EO-2.0-300M",     # 300M base model, embed_dim=1024, depth=24, no coords
+    "Prithvi-EO-2.0-300M",  # 300M base model, embed_dim=1024, depth=24, no coords
     "Prithvi-EO-2.0-300M-TL",  # 300M transfer learning, embed_dim=768, depth=12, with coords
-    "Prithvi-EO-2.0-600M",     # 600M base model, embed_dim=1280, depth=32, no coords
+    "Prithvi-EO-2.0-600M",  # 600M base model, embed_dim=1280, depth=32, no coords
     "Prithvi-EO-2.0-600M-TL",  # 600M transfer learning, embed_dim=1280, depth=32, with coords
 ]
 
