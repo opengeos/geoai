@@ -483,18 +483,19 @@ def moondream_gui(
 
         if "gdf" in result and len(result["gdf"]) > 0:
             gdf = result["gdf"].copy().to_crs("EPSG:4326")
-            gdf["x"] = gdf.geometry.centroid.x
-            gdf["y"] = gdf.geometry.centroid.y
-
-            m.add_circle_markers_from_xy(
+            
+            # Use add_gdf with point_style for more reliable display
+            m.add_gdf(
                 gdf,
-                "x",
-                "y",
-                radius=6,
-                color=color,
-                fill_color=color,
-                fill_opacity=opacity,
                 layer_name="Points",
+                point_style={
+                    "radius": 6,
+                    "color": color,
+                    "fillColor": color,
+                    "fillOpacity": opacity,
+                    "weight": 2,
+                },
+                info_mode=None,
             )
 
     def update_output(text, append=False):
@@ -601,9 +602,12 @@ def moondream_gui(
                         text_prompt.value,
                     )
                     num_points = len(result.get("points", []))
-                    update_output(
-                        f"Locating: {text_prompt.value}\nFound {num_points} point(s)."
-                    )
+                    
+                    # Show point detection info
+                    info_text = f"Locating: {text_prompt.value}\nFound {num_points} point(s)."
+                    if "gdf" in result and len(result["gdf"]) > 0:
+                        info_text += f"\nAdded {len(result['gdf'])} point marker(s) to map."
+                    update_output(info_text)
 
                     if num_points > 0:
                         add_point_markers(
