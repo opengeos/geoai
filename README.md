@@ -26,7 +26,7 @@ The package provides five core capabilities:
 5. Interactive visualization through integration with [Leafmap](https://github.com/opengeos/leafmap/) and [MapLibre](https://github.com/eoda-dev/py-maplibregl).
 6. Seamless QGIS integration via a dedicated GeoAI plugin, enabling users to run AI-powered geospatial workflows directly within the QGIS desktop environment, without writing code.
 
-GeoAI addresses the growing demand for accessible AI tools in geospatial research by providing high-level APIs that abstract complex machine learning workflows while maintaining flexibility for advanced users. The package supports multiple data formats (GeoTIFF, JPEG2000,GeoJSON, Shapefile, GeoPackage) and includes automatic device management for GPU acceleration when available. With over 10 modules and extensive notebook examples, GeoAI serves as both a research tool and educational resource for the geospatial AI community.
+GeoAI addresses the growing demand for accessible AI tools in geospatial research by providing high-level APIs that abstract complex machine learning workflows while maintaining flexibility for advanced users. The package supports multiple data formats (GeoTIFF, JPEG2000, GeoJSON, Shapefile, GeoPackage) and includes automatic device management for GPU acceleration when available. With over 10 modules and extensive notebook examples, GeoAI serves as both a research tool and educational resource for the geospatial AI community.
 
 ## 📝 Statement of Need
 
@@ -65,7 +65,7 @@ If you find GeoAI useful in your research, please consider citing the following 
 
 -   Integration with [PyTorch Segmentation Models](https://github.com/qubvel-org/segmentation_models.pytorch) for automatic feature extraction
 -   Specialized segmentation algorithms optimized for satellite and aerial imagery
--   Streamlined workflows for segmenting buildings, water bodies, wetlands,solar panels, etc.
+-   Streamlined workflows for segmenting buildings, water bodies, wetlands, solar panels, etc.
 -   Export capabilities to standard geospatial formats (GeoJSON, Shapefile, GeoPackage, GeoParquet)
 
 ### 🔍 Image Classification
