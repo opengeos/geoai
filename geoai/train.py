@@ -983,6 +983,26 @@ def train_MaskRCNN_model(
     # Save final model
     torch.save(model.state_dict(), os.path.join(output_dir, "final_model.pth"))
 
+    # Save model metadata for easier loading during inference
+    # Try to extract num_classes from model architecture
+    try:
+        detected_num_classes = model.roi_heads.box_predictor.cls_score.out_features
+    except AttributeError:
+        detected_num_classes = 2  # Default fallback
+
+    model_metadata = {
+        "num_channels": num_channels,
+        "num_classes": detected_num_classes,
+        "model_type": "MaskRCNN",
+        "backbone": "resnet50_fpn",
+    }
+
+    import json
+    metadata_path = os.path.join(output_dir, "model_metadata.json")
+    with open(metadata_path, "w") as f:
+        json.dump(model_metadata, f, indent=2)
+    print(f"Model metadata saved to: {metadata_path}")
+
     # Save training history
     torch.save(training_history, os.path.join(output_dir, "training_history.pth"))
 
@@ -4121,6 +4141,7 @@ def instance_segmentation(
     num_channels: int = 3,
     num_classes: int = 2,
     device: Optional[torch.device] = None,
+    strict: bool = True,
     **kwargs: Any,
 ) -> None:
     """
@@ -4137,13 +4158,64 @@ def instance_segmentation(
         confidence_threshold (float): Confidence threshold for predictions (0-1). Defaults to 0.5.
         batch_size (int): Batch size for inference. Defaults to 4.
         num_channels (int): Number of channels in the input image and model. Defaults to 3.
+            Must match the num_channels used during training.
         num_classes (int): Number of classes (including background). Defaults to 2.
+            Must match the num_classes used during training.
         device (torch.device): Device to run inference on. If None, uses CUDA if available.
+        strict (bool): Whether to strictly enforce that the keys in state_dict match
+            the keys in the model. If False, will load matching keys and warn about
+            mismatches. Defaults to True.
         **kwargs: Additional arguments passed to object_detection.
 
     Returns:
         None: Output mask is saved to output_path.
+
+    Raises:
+        RuntimeError: If there's a mismatch between the model architecture and saved
+            state_dict (when strict=True), with helpful debug information.
+        FileNotFoundError: If the model_path does not exist.
+
+    Note:
+        The num_channels and num_classes parameters must match the values used during
+        training. If a model_metadata.json file exists in the same directory as the
+        model weights, it will be used to auto-detect these values.
     """
+    import json
+    import warnings
+
+    # Check if model file exists
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+
+    # Try to load model metadata if available
+    model_dir = os.path.dirname(model_path)
+    metadata_path = os.path.join(model_dir, "model_metadata.json")
+    metadata_loaded = False
+
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, "r") as f:
+                metadata = json.load(f)
+
+            saved_num_channels = metadata.get("num_channels")
+            saved_num_classes = metadata.get("num_classes")
+
+            if saved_num_channels is not None and saved_num_channels != num_channels:
+                print(
+                    f"Note: Found model_metadata.json with num_channels={saved_num_channels}, "
+                    f"but you specified num_channels={num_channels}. Using your specified value."
+                )
+            if saved_num_classes is not None and saved_num_classes != num_classes:
+                print(
+                    f"Note: Found model_metadata.json with num_classes={saved_num_classes}, "
+                    f"but you specified num_classes={num_classes}. Using your specified value."
+                )
+
+            metadata_loaded = True
+            print(f"Model metadata loaded from: {metadata_path}")
+        except Exception as e:
+            print(f"Warning: Could not load model metadata: {e}")
+
     # Create model with the specified number of classes
     model = get_instance_segmentation_model(
         num_classes=num_classes, num_channels=num_channels, pretrained=True
@@ -4162,7 +4234,113 @@ def instance_segmentation(
             key.replace("module.", ""): value for key, value in state_dict.items()
         }
 
-    model.load_state_dict(state_dict)
+    # Load state dict with error handling
+    try:
+        incompatible_keys = model.load_state_dict(state_dict, strict=strict)
+
+        # Report any mismatches when using strict=False
+        if not strict and incompatible_keys:
+            if incompatible_keys.missing_keys:
+                warnings.warn(
+                    f"Missing keys when loading model (not in checkpoint): "
+                    f"{len(incompatible_keys.missing_keys)} keys. "
+                    f"First 5: {incompatible_keys.missing_keys[:5]}"
+                )
+            if incompatible_keys.unexpected_keys:
+                warnings.warn(
+                    f"Unexpected keys in checkpoint (not in model): "
+                    f"{len(incompatible_keys.unexpected_keys)} keys. "
+                    f"First 5: {incompatible_keys.unexpected_keys[:5]}"
+                )
+    except RuntimeError as e:
+        error_msg = str(e)
+
+        # Provide helpful debug information
+        model_keys = set(model.state_dict().keys())
+        checkpoint_keys = set(state_dict.keys())
+
+        missing_keys = model_keys - checkpoint_keys
+        unexpected_keys = checkpoint_keys - model_keys
+
+        # Check if this looks like a completely different model architecture
+        is_different_architecture = len(missing_keys) > 100 and len(unexpected_keys) > 100
+
+        debug_info = [
+            "\n" + "=" * 70,
+            "MODEL LOADING ERROR - Debug Information",
+            "=" * 70,
+            f"Model file: {model_path}",
+            f"Expected model keys: {len(model_keys)}",
+            f"Checkpoint keys: {len(checkpoint_keys)}",
+            f"Missing keys (in model but not in checkpoint): {len(missing_keys)}",
+            f"Unexpected keys (in checkpoint but not in model): {len(unexpected_keys)}",
+        ]
+
+        if missing_keys:
+            sample_missing = list(missing_keys)[:5]
+            debug_info.append(f"Sample missing keys: {sample_missing}")
+
+        if unexpected_keys:
+            sample_unexpected = list(unexpected_keys)[:5]
+            debug_info.append(f"Sample unexpected keys: {sample_unexpected}")
+
+        # Detect likely causes
+        debug_info.append("\nPossible causes:")
+
+        if is_different_architecture:
+            debug_info.append(
+                "  - LIKELY: The checkpoint appears to be from a DIFFERENT MODEL ARCHITECTURE."
+            )
+            debug_info.append(
+                "    The model you're trying to load may have been trained with a different"
+            )
+            debug_info.append(
+                "    function (e.g., semantic_segmentation instead of instance_segmentation)."
+            )
+
+            # Check for common architecture signatures
+            if any("encoder." in k for k in unexpected_keys):
+                debug_info.append(
+                    "    The checkpoint contains 'encoder.*' keys, suggesting it may be"
+                )
+                debug_info.append(
+                    "    a UNet or similar semantic segmentation model, not Mask R-CNN."
+                )
+            if any("backbone.body." in k for k in missing_keys):
+                debug_info.append(
+                    "    Mask R-CNN expects 'backbone.body.*' keys which are missing."
+                )
+
+        else:
+            debug_info.append(
+                f"  - num_channels mismatch: You specified {num_channels}, but the model "
+                "may have been trained with a different value."
+            )
+            debug_info.append(
+                f"  - num_classes mismatch: You specified {num_classes}, but the model "
+                "may have been trained with a different value."
+            )
+
+        if not metadata_loaded:
+            debug_info.append(
+                "\nTip: No model_metadata.json found. If you have access to the training "
+                "configuration, ensure num_channels and num_classes match exactly."
+            )
+
+        debug_info.append(
+            "\nTo attempt loading anyway with partial weight matching, set strict=False."
+        )
+        debug_info.append("=" * 70)
+
+        # Print debug info
+        print("\n".join(debug_info))
+
+        # Re-raise with enhanced error message
+        raise RuntimeError(
+            f"Failed to load model state_dict. {error_msg}\n\n"
+            f"See debug information above for possible causes and solutions."
+        ) from e
+
     model.to(device)
 
     # Use the proper instance segmentation inference function
@@ -4191,6 +4369,7 @@ def instance_segmentation_batch(
     num_channels: int = 3,
     num_classes: int = 2,
     device: Optional[torch.device] = None,
+    strict: bool = True,
     **kwargs: Any,
 ) -> None:
     """
@@ -4207,13 +4386,64 @@ def instance_segmentation_batch(
         confidence_threshold (float): Confidence threshold for predictions (0-1). Defaults to 0.5.
         batch_size (int): Batch size for inference. Defaults to 4.
         num_channels (int): Number of channels in the input image and model. Defaults to 3.
+            Must match the num_channels used during training.
         num_classes (int): Number of classes (including background). Defaults to 2.
+            Must match the num_classes used during training.
         device (torch.device): Device to run inference on. If None, uses CUDA if available.
+        strict (bool): Whether to strictly enforce that the keys in state_dict match
+            the keys in the model. If False, will load matching keys and warn about
+            mismatches. Defaults to True.
         **kwargs: Additional arguments passed to object_detection_batch.
 
     Returns:
         None: Output masks are saved to output_dir.
+
+    Raises:
+        RuntimeError: If there's a mismatch between the model architecture and saved
+            state_dict (when strict=True), with helpful debug information.
+        FileNotFoundError: If the model_path does not exist.
+
+    Note:
+        The num_channels and num_classes parameters must match the values used during
+        training. If a model_metadata.json file exists in the same directory as the
+        model weights, it will be used to auto-detect these values.
     """
+    import json
+    import warnings
+
+    # Check if model file exists
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+
+    # Try to load model metadata if available
+    model_dir = os.path.dirname(model_path)
+    metadata_path = os.path.join(model_dir, "model_metadata.json")
+    metadata_loaded = False
+
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, "r") as f:
+                metadata = json.load(f)
+
+            saved_num_channels = metadata.get("num_channels")
+            saved_num_classes = metadata.get("num_classes")
+
+            if saved_num_channels is not None and saved_num_channels != num_channels:
+                print(
+                    f"Note: Found model_metadata.json with num_channels={saved_num_channels}, "
+                    f"but you specified num_channels={num_channels}. Using your specified value."
+                )
+            if saved_num_classes is not None and saved_num_classes != num_classes:
+                print(
+                    f"Note: Found model_metadata.json with num_classes={saved_num_classes}, "
+                    f"but you specified num_classes={num_classes}. Using your specified value."
+                )
+
+            metadata_loaded = True
+            print(f"Model metadata loaded from: {metadata_path}")
+        except Exception as e:
+            print(f"Warning: Could not load model metadata: {e}")
+
     # Create model with the specified number of classes
     model = get_instance_segmentation_model(
         num_classes=num_classes, num_channels=num_channels, pretrained=True
@@ -4232,7 +4462,113 @@ def instance_segmentation_batch(
             key.replace("module.", ""): value for key, value in state_dict.items()
         }
 
-    model.load_state_dict(state_dict)
+    # Load state dict with error handling
+    try:
+        incompatible_keys = model.load_state_dict(state_dict, strict=strict)
+
+        # Report any mismatches when using strict=False
+        if not strict and incompatible_keys:
+            if incompatible_keys.missing_keys:
+                warnings.warn(
+                    f"Missing keys when loading model (not in checkpoint): "
+                    f"{len(incompatible_keys.missing_keys)} keys. "
+                    f"First 5: {incompatible_keys.missing_keys[:5]}"
+                )
+            if incompatible_keys.unexpected_keys:
+                warnings.warn(
+                    f"Unexpected keys in checkpoint (not in model): "
+                    f"{len(incompatible_keys.unexpected_keys)} keys. "
+                    f"First 5: {incompatible_keys.unexpected_keys[:5]}"
+                )
+    except RuntimeError as e:
+        error_msg = str(e)
+
+        # Provide helpful debug information
+        model_keys = set(model.state_dict().keys())
+        checkpoint_keys = set(state_dict.keys())
+
+        missing_keys = model_keys - checkpoint_keys
+        unexpected_keys = checkpoint_keys - model_keys
+
+        # Check if this looks like a completely different model architecture
+        is_different_architecture = len(missing_keys) > 100 and len(unexpected_keys) > 100
+
+        debug_info = [
+            "\n" + "=" * 70,
+            "MODEL LOADING ERROR - Debug Information",
+            "=" * 70,
+            f"Model file: {model_path}",
+            f"Expected model keys: {len(model_keys)}",
+            f"Checkpoint keys: {len(checkpoint_keys)}",
+            f"Missing keys (in model but not in checkpoint): {len(missing_keys)}",
+            f"Unexpected keys (in checkpoint but not in model): {len(unexpected_keys)}",
+        ]
+
+        if missing_keys:
+            sample_missing = list(missing_keys)[:5]
+            debug_info.append(f"Sample missing keys: {sample_missing}")
+
+        if unexpected_keys:
+            sample_unexpected = list(unexpected_keys)[:5]
+            debug_info.append(f"Sample unexpected keys: {sample_unexpected}")
+
+        # Detect likely causes
+        debug_info.append("\nPossible causes:")
+
+        if is_different_architecture:
+            debug_info.append(
+                "  - LIKELY: The checkpoint appears to be from a DIFFERENT MODEL ARCHITECTURE."
+            )
+            debug_info.append(
+                "    The model you're trying to load may have been trained with a different"
+            )
+            debug_info.append(
+                "    function (e.g., semantic_segmentation instead of instance_segmentation)."
+            )
+
+            # Check for common architecture signatures
+            if any("encoder." in k for k in unexpected_keys):
+                debug_info.append(
+                    "    The checkpoint contains 'encoder.*' keys, suggesting it may be"
+                )
+                debug_info.append(
+                    "    a UNet or similar semantic segmentation model, not Mask R-CNN."
+                )
+            if any("backbone.body." in k for k in missing_keys):
+                debug_info.append(
+                    "    Mask R-CNN expects 'backbone.body.*' keys which are missing."
+                )
+
+        else:
+            debug_info.append(
+                f"  - num_channels mismatch: You specified {num_channels}, but the model "
+                "may have been trained with a different value."
+            )
+            debug_info.append(
+                f"  - num_classes mismatch: You specified {num_classes}, but the model "
+                "may have been trained with a different value."
+            )
+
+        if not metadata_loaded:
+            debug_info.append(
+                "\nTip: No model_metadata.json found. If you have access to the training "
+                "configuration, ensure num_channels and num_classes match exactly."
+            )
+
+        debug_info.append(
+            "\nTo attempt loading anyway with partial weight matching, set strict=False."
+        )
+        debug_info.append("=" * 70)
+
+        # Print debug info
+        print("\n".join(debug_info))
+
+        # Re-raise with enhanced error message
+        raise RuntimeError(
+            f"Failed to load model state_dict. {error_msg}\n\n"
+            f"See debug information above for possible causes and solutions."
+        ) from e
+
     model.to(device)
 
     # Process all GeoTIFF files in the input directory
