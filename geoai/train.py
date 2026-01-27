@@ -998,6 +998,7 @@ def train_MaskRCNN_model(
     }
 
     import json
+
     metadata_path = os.path.join(output_dir, "model_metadata.json")
     with open(metadata_path, "w") as f:
         json.dump(model_metadata, f, indent=2)
@@ -4263,7 +4264,9 @@ def instance_segmentation(
         unexpected_keys = checkpoint_keys - model_keys
 
         # Check if this looks like a completely different model architecture
-        is_different_architecture = len(missing_keys) > 100 and len(unexpected_keys) > 100
+        is_different_architecture = (
+            len(missing_keys) > 100 and len(unexpected_keys) > 100
+        )
 
         debug_info = [
             "\n" + "=" * 70,
@@ -4491,7 +4494,9 @@ def instance_segmentation_batch(
         unexpected_keys = checkpoint_keys - model_keys
 
         # Check if this looks like a completely different model architecture
-        is_different_architecture = len(missing_keys) > 100 and len(unexpected_keys) > 100
+        is_different_architecture = (
+            len(missing_keys) > 100 and len(unexpected_keys) > 100
+        )
 
         debug_info = [
             "\n" + "=" * 70,
