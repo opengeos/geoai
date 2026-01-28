@@ -49,7 +49,66 @@ from qgis.core import (
     QgsMessageLog,
 )
 
+from qgis.PyQt.QtCore import QThread, pyqtSignal
+
 from .map_tools import PointPromptTool, BoxPromptTool
+
+
+class SamGeoModelLoadWorker(QThread):
+    """Worker thread for loading SamGeo model."""
+
+    finished = pyqtSignal(object, str)  # Emits (model, model_name)
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
+
+    def __init__(
+        self,
+        model_version: str,
+        backend: str,
+        device: str,
+        confidence: float,
+        enable_interactive: bool,
+    ):
+        super().__init__()
+        self.model_version = model_version
+        self.backend = backend
+        self.device = device
+        self.confidence = confidence
+        self.enable_interactive = enable_interactive
+
+    def run(self):
+        """Load the SamGeo model in background."""
+        try:
+            self.progress.emit("Initializing SamGeo...")
+
+            if "SamGeo3" in self.model_version:
+                from samgeo import SamGeo3
+
+                self.progress.emit("Loading SamGeo3 model...")
+                model = SamGeo3(
+                    backend=self.backend,
+                    device=self.device,
+                    confidence_threshold=self.confidence,
+                    enable_inst_interactivity=self.enable_interactive,
+                )
+                model_name = "SamGeo3"
+            elif "SamGeo2" in self.model_version:
+                from samgeo import SamGeo2
+
+                self.progress.emit("Loading SamGeo2 model...")
+                model = SamGeo2(device=self.device)
+                model_name = "SamGeo2"
+            else:
+                from samgeo import SamGeo
+
+                self.progress.emit("Loading SamGeo model...")
+                model = SamGeo(device=self.device)
+                model_name = "SamGeo"
+
+            self.finished.emit(model, model_name)
+
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class SamGeoDockWidget(QDockWidget):
@@ -89,6 +148,9 @@ class SamGeoDockWidget(QDockWidget):
 
         # Track temporary files for cleanup
         self._temp_files = []
+
+        # Model loading worker
+        self.model_load_worker = None
 
         self._setup_ui()
 
@@ -689,6 +751,67 @@ class SamGeoDockWidget(QDockWidget):
         self.save_btn.clicked.connect(self.save_masks)
         output_layout.addWidget(self.save_btn)
 
+        # Export Training Data Group
+        export_group = QGroupBox("Export Training Data")
+        export_group_layout = QVBoxLayout()
+
+        # Export format
+        export_format_row = QHBoxLayout()
+        export_format_row.addWidget(QLabel("Format:"))
+        self.export_format_combo = QComboBox()
+        self.export_format_combo.addItems(["PASCAL_VOC", "COCO", "YOLO"])
+        self.export_format_combo.setToolTip(
+            "Export format for training data:\n"
+            "- PASCAL_VOC: XML annotation files (semantic segmentation)\n"
+            "- COCO: JSON annotation file (instance segmentation)\n"
+            "- YOLO: Text files with normalized coordinates"
+        )
+        export_format_row.addWidget(self.export_format_combo)
+        export_group_layout.addLayout(export_format_row)
+
+        # Tile size
+        tile_size_row = QHBoxLayout()
+        tile_size_row.addWidget(QLabel("Tile Size:"))
+        self.export_tile_size_spin = QSpinBox()
+        self.export_tile_size_spin.setRange(64, 2048)
+        self.export_tile_size_spin.setValue(512)
+        self.export_tile_size_spin.setSingleStep(64)
+        tile_size_row.addWidget(self.export_tile_size_spin)
+        export_group_layout.addLayout(tile_size_row)
+
+        # Stride
+        stride_row = QHBoxLayout()
+        stride_row.addWidget(QLabel("Stride:"))
+        self.export_stride_spin = QSpinBox()
+        self.export_stride_spin.setRange(32, 1024)
+        self.export_stride_spin.setValue(256)
+        self.export_stride_spin.setSingleStep(32)
+        stride_row.addWidget(self.export_stride_spin)
+        export_group_layout.addLayout(stride_row)
+
+        # Output directory
+        export_dir_row = QHBoxLayout()
+        self.export_dir_edit = QLineEdit()
+        self.export_dir_edit.setPlaceholderText("Export output directory...")
+        export_dir_row.addWidget(self.export_dir_edit)
+        export_dir_browse_btn = QPushButton("...")
+        export_dir_browse_btn.setMaximumWidth(30)
+        export_dir_browse_btn.clicked.connect(self.browse_export_dir)
+        export_dir_row.addWidget(export_dir_browse_btn)
+        export_group_layout.addLayout(export_dir_row)
+
+        # Export button
+        self.export_btn = QPushButton("Export Training Tiles")
+        self.export_btn.clicked.connect(self.export_training_data)
+        self.export_btn.setToolTip(
+            "Export image tiles with segmentation masks.\n"
+            "Requires: image set and segmentation results."
+        )
+        export_group_layout.addWidget(self.export_btn)
+
+        export_group.setLayout(export_group_layout)
+        output_layout.addWidget(export_group)
+
         # Results info
         results_group = QGroupBox("Results")
         results_layout = QVBoxLayout()
@@ -1000,93 +1123,85 @@ class SamGeoDockWidget(QDockWidget):
             return False, error_msg
 
     def load_model(self):
-        """Load the SamGeo model."""
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)  # Indeterminate
-            self.model_status.setText("Loading model...")
-            self.model_status.setStyleSheet("color: orange;")
-            QCoreApplication.processEvents()
+        """Load the SamGeo model asynchronously."""
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)  # Indeterminate (spinning)
+        self.model_status.setText("Loading model...")
+        self.model_status.setStyleSheet("color: orange;")
+        self.load_model_btn.setEnabled(False)
 
-            model_version = self.model_combo.currentText()
-            backend = self.backend_combo.currentText()
-            device = self.device_combo.currentText()
+        model_version = self.model_combo.currentText()
+        backend = self.backend_combo.currentText()
+        device = self.device_combo.currentText()
 
-            if device == "auto":
-                device = None
+        if device == "auto":
+            device = None
 
-            # Check CUDA availability if using CUDA or auto device selection
-            if device == "cuda" or device is None:
-                cuda_available, warning_message = self.check_cuda_devices()
+        # Check CUDA availability if using CUDA or auto device selection
+        if device == "cuda" or device is None:
+            cuda_available, warning_message = self.check_cuda_devices()
 
-                if not cuda_available:
-                    # CUDA is not available
-                    if device == "cuda":
-                        # User explicitly requested CUDA but it's not available
-                        self.progress_bar.setVisible(False)
-                        error_msg = (
-                            f"CUDA device requested but not available.\n\n{warning_message}\n\n"
-                            "Please select 'cpu' from the Device dropdown or fix your CUDA installation."
-                        )
-                        self.show_error(error_msg)
-                        self.model_status.setText("Model: Failed to load")
-                        self.model_status.setStyleSheet("color: red;")
-                        return
-                    else:
-                        # Auto mode - fall back to CPU
-                        device = "cpu"
-                        self.log_message(
-                            f"Auto mode: CUDA not available, using CPU. Reason: {warning_message}"
-                        )
-                        QMessageBox.information(
-                            self,
-                            "Using CPU Mode",
-                            f"CUDA is not available. Automatically using CPU mode.\n\n{warning_message}",
-                        )
-                elif warning_message:
-                    # CUDA is now available but there was a warning (e.g., fixed CUDA_VISIBLE_DEVICES)
-                    QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
+            if not cuda_available:
+                # CUDA is not available
+                if device == "cuda":
+                    # User explicitly requested CUDA but it's not available
+                    self.progress_bar.setVisible(False)
+                    self.load_model_btn.setEnabled(True)
+                    error_msg = (
+                        f"CUDA device requested but not available.\n\n{warning_message}\n\n"
+                        "Please select 'cpu' from the Device dropdown or fix your CUDA installation."
+                    )
+                    self.show_error(error_msg)
+                    self.model_status.setText("Model: Failed to load")
+                    self.model_status.setStyleSheet("color: red;")
+                    return
+                else:
+                    # Auto mode - fall back to CPU
+                    device = "cpu"
+                    self.log_message(
+                        f"Auto mode: CUDA not available, using CPU. Reason: {warning_message}"
+                    )
+                    QMessageBox.information(
+                        self,
+                        "Using CPU Mode",
+                        f"CUDA is not available. Automatically using CPU mode.\n\n{warning_message}",
+                    )
+            elif warning_message:
+                # CUDA is now available but there was a warning (e.g., fixed CUDA_VISIBLE_DEVICES)
+                QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
 
-            confidence = self.conf_spin.value()
-            enable_interactive = self.interactive_check.isChecked()
+        confidence = self.conf_spin.value()
+        enable_interactive = self.interactive_check.isChecked()
 
-            # Import and initialize the appropriate model
-            if "SamGeo3" in model_version:
-                from samgeo import SamGeo3
+        # Create and start the model loading worker thread
+        self.model_load_worker = SamGeoModelLoadWorker(
+            model_version, backend, device, confidence, enable_interactive
+        )
+        self.model_load_worker.finished.connect(self.on_model_loaded)
+        self.model_load_worker.error.connect(self.on_model_load_error)
+        self.model_load_worker.progress.connect(self.on_model_load_progress)
+        self.model_load_worker.start()
 
-                self.sam = SamGeo3(
-                    backend=backend,
-                    device=device,
-                    confidence_threshold=confidence,
-                    enable_inst_interactivity=enable_interactive,
-                )
-                model_name = "SamGeo3"
-            elif "SamGeo2" in model_version:
-                from samgeo import SamGeo2
+    def on_model_load_progress(self, message: str):
+        """Handle model loading progress updates."""
+        self.model_status.setText(message)
 
-                self.sam = SamGeo2(
-                    device=device,
-                )
-                model_name = "SamGeo2"
-            else:
-                from samgeo import SamGeo
+    def on_model_loaded(self, model, model_name: str):
+        """Handle successful model loading."""
+        self.sam = model
+        self.model_status.setText(f"Model: {model_name} loaded")
+        self.model_status.setStyleSheet("color: green;")
+        self.progress_bar.setVisible(False)
+        self.load_model_btn.setEnabled(True)
+        self.log_message(f"{model_name} model loaded successfully")
 
-                self.sam = SamGeo(
-                    device=device,
-                )
-                model_name = "SamGeo"
-
-            self.model_status.setText(f"Model: {model_name} loaded")
-            self.model_status.setStyleSheet("color: green;")
-            self.log_message(f"{model_name} model loaded successfully")
-
-        except Exception as e:
-            self.model_status.setText("Model: Failed to load")
-            self.model_status.setStyleSheet("color: red;")
-            self.show_error(f"Failed to load model: {str(e)}")
-
-        finally:
-            self.progress_bar.setVisible(False)
+    def on_model_load_error(self, error_message: str):
+        """Handle model loading error."""
+        self.model_status.setText("Model: Failed to load")
+        self.model_status.setStyleSheet("color: red;")
+        self.progress_bar.setVisible(False)
+        self.load_model_btn.setEnabled(True)
+        self.show_error(f"Failed to load model: {error_message}")
 
     def set_image_from_layer(self):
         """Set the image from the selected QGIS layer."""
@@ -2073,6 +2188,94 @@ class SamGeoDockWidget(QDockWidget):
         finally:
             self.progress_bar.setVisible(False)
 
+    def browse_export_dir(self):
+        """Open directory dialog for export output."""
+        dir_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Export Directory",
+            "",
+        )
+        if dir_path:
+            self.export_dir_edit.setText(dir_path)
+
+    def export_training_data(self):
+        """Export image tiles with segmentation masks for training."""
+        if self.current_image_path is None:
+            self.show_error("Please set an image first.")
+            return
+
+        if self.sam is None or self.sam.masks is None or len(self.sam.masks) == 0:
+            self.show_error(
+                "No segmentation masks to export. Please run segmentation first."
+            )
+            return
+
+        output_dir = self.export_dir_edit.text().strip()
+        if not output_dir:
+            self.show_error("Please specify an export output directory.")
+            return
+
+        try:
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setRange(0, 0)
+            QCoreApplication.processEvents()
+
+            # First save the masks to a temporary raster file
+            temp_mask = tempfile.NamedTemporaryFile(
+                suffix=".tif", delete=False, prefix="samgeo_export_"
+            ).name
+
+            unique = self.unique_check.isChecked()
+            self.sam.save_masks(output=temp_mask, unique=unique)
+
+            # Get export parameters
+            export_format = self.export_format_combo.currentText()
+            tile_size = self.export_tile_size_spin.value()
+            stride = self.export_stride_spin.value()
+
+            # Import and call export function
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
+
+            self.results_text.append(f"\nExporting tiles in {export_format} format...")
+            QCoreApplication.processEvents()
+
+            geoai.export_geotiff_tiles(
+                in_raster=self.current_image_path,
+                out_folder=output_dir,
+                in_class_data=temp_mask,
+                tile_size=tile_size,
+                stride=stride,
+                metadata_format=export_format,
+                skip_empty_tiles=True,
+            )
+
+            # Clean up temp file
+            if os.path.exists(temp_mask):
+                os.remove(temp_mask)
+
+            self.results_text.append(f"Training data exported to: {output_dir}")
+            self.results_text.append(
+                f"Format: {export_format}, Tile size: {tile_size}x{tile_size}"
+            )
+            self.log_message(f"Training data exported to: {output_dir}")
+
+            QMessageBox.information(
+                self,
+                "Export Complete",
+                f"Training data exported to:\n{output_dir}\n\n"
+                f"Format: {export_format}\n"
+                f"Tile size: {tile_size}x{tile_size}\n"
+                f"Stride: {stride}",
+            )
+
+        except Exception as e:
+            self.show_error(f"Failed to export training data: {str(e)}")
+
+        finally:
+            self.progress_bar.setVisible(False)
+
     def show_error(self, message):
         """Show an error message."""
         QMessageBox.critical(self, "SamGeo Error", message)
@@ -2093,6 +2296,11 @@ class SamGeoDockWidget(QDockWidget):
 
         if self.box_tool is not None:
             self.box_tool.clear_rubber_band()
+
+        # Stop model loading worker if running
+        if self.model_load_worker is not None and self.model_load_worker.isRunning():
+            self.model_load_worker.terminate()
+            self.model_load_worker.wait()
 
         # Clean up temporary files (e.g., exported GeoPackage rasters)
         for temp_file in self._temp_files:
