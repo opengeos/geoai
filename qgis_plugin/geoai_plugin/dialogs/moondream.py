@@ -38,6 +38,37 @@ from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
 
 
+class ModelLoadWorker(QThread):
+    """Worker thread for loading Moondream model."""
+
+    finished = pyqtSignal(object)  # Emits the loaded model
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
+
+    def __init__(self, model_name: str, device: str = None):
+        super().__init__()
+        self.model_name = model_name
+        self.device = device
+
+    def run(self):
+        """Load the Moondream model in background."""
+        try:
+            self.progress.emit("Initializing model...")
+
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
+            MoondreamGeo = geoai.MoondreamGeo
+
+            self.progress.emit(f"Loading {self.model_name.split('/')[-1]}...")
+            moondream = MoondreamGeo(model_name=self.model_name, device=self.device)
+
+            self.finished.emit(moondream)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class MoondreamWorker(QThread):
     """Worker thread for running Moondream operations."""
 
@@ -123,6 +154,7 @@ class MoondreamDockWidget(QDockWidget):
         self.current_image_path = None
         self.last_result = None
         self.worker = None
+        self.model_load_worker = None
 
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.setup_ui()
@@ -266,6 +298,56 @@ class MoondreamDockWidget(QDockWidget):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
+        # Export Training Data Group
+        export_group = QGroupBox("Export Training Data")
+        export_layout = QFormLayout()
+        export_layout.setSpacing(5)
+
+        # Export format
+        self.export_format_combo = QComboBox()
+        self.export_format_combo.setStyleSheet(combo_style)
+        self.export_format_combo.addItems(["PASCAL_VOC", "COCO", "YOLO"])
+        self.export_format_combo.setToolTip(
+            "Export format for training data:\n"
+            "- PASCAL_VOC: XML annotation files\n"
+            "- COCO: JSON annotation file\n"
+            "- YOLO: Text files with normalized coordinates"
+        )
+        export_layout.addRow("Format:", self.export_format_combo)
+
+        # Tile size
+        from qgis.PyQt.QtWidgets import QSpinBox
+
+        self.export_tile_size_spin = QSpinBox()
+        self.export_tile_size_spin.setRange(64, 2048)
+        self.export_tile_size_spin.setValue(512)
+        self.export_tile_size_spin.setSingleStep(64)
+        export_layout.addRow("Tile Size:", self.export_tile_size_spin)
+
+        # Output directory
+        export_dir_layout = QHBoxLayout()
+        self.export_dir_edit = QLineEdit()
+        self.export_dir_edit.setPlaceholderText("Output directory...")
+        self.export_dir_edit.setStyleSheet(line_style)
+        export_dir_layout.addWidget(self.export_dir_edit)
+        self.export_dir_browse_btn = QPushButton("...")
+        self.export_dir_browse_btn.setFixedSize(30, self.input_height)
+        export_dir_layout.addWidget(self.export_dir_browse_btn)
+        export_layout.addRow("Output:", export_dir_layout)
+
+        # Export button
+        self.export_btn = QPushButton("Export Tiles")
+        self.export_btn.setEnabled(False)
+        self.export_btn.setStyleSheet(btn_style)
+        self.export_btn.setToolTip(
+            "Export image tiles with detection annotations.\n"
+            "Requires: loaded image and detection results."
+        )
+        export_layout.addRow("", self.export_btn)
+
+        export_group.setLayout(export_layout)
+        layout.addWidget(export_group)
+
         # Buttons
         btn_layout = QHBoxLayout()
         self.run_btn = QPushButton("Run")
@@ -324,6 +406,8 @@ class MoondreamDockWidget(QDockWidget):
         self.save_btn.clicked.connect(self.save_results)
         self.reset_btn.clicked.connect(self.reset)
         self.layer_combo.layerChanged.connect(self.on_layer_changed)
+        self.export_dir_browse_btn.clicked.connect(self.browse_export_dir)
+        self.export_btn.clicked.connect(self.export_training_data)
 
     def update_ui_for_mode(self):
         """Update UI elements based on selected mode."""
@@ -347,47 +431,52 @@ class MoondreamDockWidget(QDockWidget):
             self.caption_length_combo.setEnabled(False)
 
     def load_model(self):
-        """Load the Moondream model."""
-        try:
-            self.model_status.setText("Loading model...")
-            self.model_status.setStyleSheet("color: orange;")
-            self.progress_bar.setRange(0, 0)
-            self.load_model_btn.setEnabled(False)
+        """Load the Moondream model asynchronously."""
+        self.model_status.setText("Loading model...")
+        self.model_status.setStyleSheet("color: orange;")
+        self.progress_bar.setRange(0, 0)  # Indeterminate mode (spinning)
+        self.load_model_btn.setEnabled(False)
 
-            from qgis.PyQt.QtWidgets import QApplication
+        model_name = self.model_combo.currentText()
+        device = self.device_combo.currentText()
+        if device == "Auto":
+            device = None
 
-            QApplication.processEvents()
+        # Create and start the model loading worker thread
+        self.model_load_worker = ModelLoadWorker(model_name, device)
+        self.model_load_worker.finished.connect(self.on_model_loaded)
+        self.model_load_worker.error.connect(self.on_model_load_error)
+        self.model_load_worker.progress.connect(self.on_model_load_progress)
+        self.model_load_worker.start()
 
-            # Lazy import
-            from .._geoai_lib import get_geoai
+    def on_model_load_progress(self, message: str):
+        """Handle model loading progress updates."""
+        self.progress_bar.setFormat(message)
 
-            geoai = get_geoai()
-            MoondreamGeo = geoai.MoondreamGeo
+    def on_model_loaded(self, moondream):
+        """Handle successful model loading."""
+        self.moondream = moondream
+        model_name = self.model_combo.currentText()
 
-            model_name = self.model_combo.currentText()
-            device = self.device_combo.currentText()
-            if device == "Auto":
-                device = None
+        self.model_status.setText(f"Loaded: {model_name.split('/')[-1]}")
+        self.model_status.setStyleSheet("color: green;")
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+        self.progress_bar.setFormat("Model loaded")
+        self.load_model_btn.setEnabled(True)
 
-            self.moondream = MoondreamGeo(model_name=model_name, device=device)
+        if self.current_image_path:
+            self.run_btn.setEnabled(True)
 
-            self.model_status.setText(f"Loaded: {model_name.split('/')[-1]}")
-            self.model_status.setStyleSheet("color: green;")
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(0)
-
-            if self.current_image_path:
-                self.run_btn.setEnabled(True)
-
-        except Exception as e:
-            self.model_status.setText(f"Error: {str(e)[:40]}...")
-            self.model_status.setStyleSheet("color: red;")
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(0)
-            QMessageBox.critical(self, "Error", f"Failed to load model:\n{str(e)}")
-
-        finally:
-            self.load_model_btn.setEnabled(True)
+    def on_model_load_error(self, error_message: str):
+        """Handle model loading error."""
+        self.model_status.setText(f"Error: {error_message[:40]}...")
+        self.model_status.setStyleSheet("color: red;")
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Error")
+        self.load_model_btn.setEnabled(True)
+        QMessageBox.critical(self, "Error", f"Failed to load model:\n{error_message}")
 
     def browse_image(self):
         """Open file dialog to browse for an image."""
@@ -515,7 +604,9 @@ class MoondreamDockWidget(QDockWidget):
                 self.add_detection_layer(gdf, object_type)
 
             self.results_text.setPlainText(text)
-            self.save_btn.setEnabled(gdf is not None and len(gdf) > 0)
+            has_results = gdf is not None and len(gdf) > 0
+            self.save_btn.setEnabled(has_results)
+            self.export_btn.setEnabled(has_results)
 
         elif result_type == "point":
             description = data.get("description", "")
@@ -528,7 +619,9 @@ class MoondreamDockWidget(QDockWidget):
                 self.add_point_layer(gdf, description)
 
             self.results_text.setPlainText(text)
-            self.save_btn.setEnabled(gdf is not None and len(gdf) > 0)
+            has_results = gdf is not None and len(gdf) > 0
+            self.save_btn.setEnabled(has_results)
+            self.export_btn.setEnabled(has_results)
 
     def on_analysis_error(self, error_message: str):
         """Handle analysis error."""
@@ -589,6 +682,110 @@ class MoondreamDockWidget(QDockWidget):
         except Exception as e:
             QMessageBox.warning(self, "Warning", f"Failed to add layer:\n{str(e)}")
 
+    def browse_export_dir(self):
+        """Open directory dialog for export output."""
+        dir_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Export Directory",
+            "",
+        )
+        if dir_path:
+            self.export_dir_edit.setText(dir_path)
+
+    def export_training_data(self):
+        """Export image tiles with detection/point annotations for training."""
+        if not self.current_image_path:
+            QMessageBox.warning(self, "Warning", "Please load an image first.")
+            return
+
+        if not self.last_result:
+            QMessageBox.warning(
+                self, "Warning", "Please run detection or point analysis first."
+            )
+            return
+
+        result_type = self.last_result.get("type")
+        if result_type not in ["detect", "point"]:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "Export is only available for Detect and Point results.\n"
+                "Caption and Query results don't produce spatial data.",
+            )
+            return
+
+        result = self.last_result.get("result", {})
+        gdf = result.get("gdf")
+        if gdf is None or len(gdf) == 0:
+            QMessageBox.warning(self, "Warning", "No spatial results to export.")
+            return
+
+        output_dir = self.export_dir_edit.text()
+        if not output_dir:
+            QMessageBox.warning(self, "Warning", "Please specify an output directory.")
+            return
+
+        try:
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setFormat("Exporting...")
+            self.export_btn.setEnabled(False)
+
+            from qgis.PyQt.QtWidgets import QApplication
+
+            QApplication.processEvents()
+
+            # Save the GeoDataFrame to a temp file for export_geotiff_tiles
+            temp_vector = os.path.join(
+                tempfile.gettempdir(), "moondream_export_temp.geojson"
+            )
+            gdf.to_file(temp_vector, driver="GeoJSON")
+
+            # Get export parameters
+            export_format = self.export_format_combo.currentText()
+            tile_size = self.export_tile_size_spin.value()
+
+            # Import and call export function
+            from .._geoai_lib import get_geoai
+
+            geoai = get_geoai()
+
+            geoai.export_geotiff_tiles(
+                in_raster=self.current_image_path,
+                out_folder=output_dir,
+                in_class_data=temp_vector,
+                tile_size=tile_size,
+                stride=tile_size,  # No overlap for detection training
+                metadata_format=export_format,
+                skip_empty_tiles=True,
+            )
+
+            # Clean up temp file
+            if os.path.exists(temp_vector):
+                os.remove(temp_vector)
+
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(100)
+            self.progress_bar.setFormat("Export complete")
+
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Training data exported to:\n{output_dir}\n\n"
+                f"Format: {export_format}\n"
+                f"Tile size: {tile_size}x{tile_size}",
+            )
+
+        except Exception as e:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat("Export failed")
+            QMessageBox.critical(
+                self, "Error", f"Failed to export training data:\n{str(e)}"
+            )
+
+        finally:
+            self.export_btn.setEnabled(True)
+
     def save_results(self):
         """Save the current results to a file."""
         if not self.last_result:
@@ -645,10 +842,12 @@ class MoondreamDockWidget(QDockWidget):
         self.progress_bar.setFormat("")
         self.last_result = None
         self.save_btn.setEnabled(False)
+        self.export_btn.setEnabled(False)
 
     def closeEvent(self, event):
         """Handle widget close event."""
-        if self.worker and self.worker.isRunning():
-            self.worker.terminate()
-            self.worker.wait()
+        for worker in [self.worker, self.model_load_worker]:
+            if worker and worker.isRunning():
+                worker.terminate()
+                worker.wait()
         event.accept()
