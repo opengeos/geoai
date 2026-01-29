@@ -32,6 +32,9 @@ docs/workshops/**/*.jpg
 docs/workshops/**/*.png
 docs/examples/data/
 docs/workshops/data/
+docs/examples/ndvi_regression_output/
+docs/examples/timm_regression_output/
+docs/examples/ndvi_model/
 *.pth
 
 # Distribution / packaging
