@@ -29,12 +29,50 @@ except ImportError:
 
 try:
     import lightning.pytorch as pl
-    from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+    from lightning.pytorch.callbacks import (
+        ModelCheckpoint,
+        EarlyStopping,
+        TQDMProgressBar,
+    )
     from lightning.pytorch.loggers import CSVLogger
 
     LIGHTNING_AVAILABLE = True
 except ImportError:
     LIGHTNING_AVAILABLE = False
+
+
+class _CompactProgressBar(TQDMProgressBar):
+    """Progress bar that shows key metrics in the postfix, updated in place."""
+
+    def get_metrics(self, trainer, pl_module):
+        # Don't let Lightning set the postfix — we control it
+        return {}
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        super().on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+        if self.train_progress_bar is not None:
+            self.train_progress_bar.set_postfix_str("")
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        super().on_validation_epoch_end(trainer, pl_module)
+        metrics = trainer.callback_metrics
+        if metrics and self.train_progress_bar is not None:
+            keys = [
+                "train_loss_epoch",
+                "train_r2",
+                "val_loss",
+                "val_r2",
+                "val_rmse",
+            ]
+            parts = []
+            for k in keys:
+                v = metrics.get(k)
+                if v is not None:
+                    val = v.item() if hasattr(v, "item") else v
+                    if isinstance(val, float):
+                        parts.append(f"{k}={val:.4g}")
+            if parts:
+                self.train_progress_bar.set_postfix_str(", ".join(parts))
 
 
 def _prepare_normalization_stats(
@@ -215,9 +253,10 @@ class PixelRegressionModel(pl.LightningModule):
 
         metrics = self._compute_metrics(preds, y)
 
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        pb = getattr(self, "_prog_bar_metrics", True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=pb)
         self.log("train_rmse", metrics["rmse"], on_step=False, on_epoch=True)
-        self.log("train_r2", metrics["r2"], on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train_r2", metrics["r2"], on_step=False, on_epoch=True, prog_bar=pb)
 
         return loss
 
@@ -228,10 +267,11 @@ class PixelRegressionModel(pl.LightningModule):
 
         metrics = self._compute_metrics(preds, y)
 
-        self.log("val_loss", loss, on_epoch=True, prog_bar=True)
-        self.log("val_rmse", metrics["rmse"], on_epoch=True, prog_bar=True)
+        pb = getattr(self, "_prog_bar_metrics", True)
+        self.log("val_loss", loss, on_epoch=True, prog_bar=pb)
+        self.log("val_rmse", metrics["rmse"], on_epoch=True, prog_bar=pb)
         self.log("val_mae", metrics["mae"], on_epoch=True)
-        self.log("val_r2", metrics["r2"], on_epoch=True, prog_bar=True)
+        self.log("val_r2", metrics["r2"], on_epoch=True, prog_bar=pb)
 
         return loss
 
@@ -561,6 +601,7 @@ def train_pixel_regressor(
     save_top_k: int = 1,
     checkpoint_path: Optional[str] = None,
     input_bands: Optional[List[int]] = None,
+    verbose: bool = True,
     **kwargs: Any,
 ) -> PixelRegressionModel:
     """
@@ -592,6 +633,8 @@ def train_pixel_regressor(
         save_top_k: Number of best models to save.
         checkpoint_path: Path to checkpoint to resume from.
         input_bands: Band indices to use (1-indexed).
+        verbose: Whether to show detailed training logs, progress bars,
+            and callback messages. Defaults to True.
         **kwargs: Additional arguments for Trainer.
 
     Returns:
@@ -624,9 +667,10 @@ def train_pixel_regressor(
     if preprocessing is not None:
         pp_mean = preprocessing.get("mean")
         pp_std = preprocessing.get("std")
-        # Only apply encoder preprocessing when channel count matches;
-        # for multi-spectral data (>3 bands) the ImageNet mean/std is
-        # inappropriate and hurts convergence.
+        # Only apply encoder preprocessing when channel count matches
+        # (e.g. 3-band RGB with ImageNet weights).  For multi-spectral
+        # inputs the ImageNet statistics are inappropriate; the
+        # normalize_input flag already scales values to [0, 1].
         if pp_mean is not None and pp_std is not None and len(pp_mean) == in_channels:
             image_mean = pp_mean
             image_std = pp_std
@@ -677,7 +721,7 @@ def train_pixel_regressor(
         mode=mode,
         save_top_k=save_top_k,
         save_last=True,
-        verbose=True,
+        verbose=verbose,
     )
     callbacks.append(checkpoint_callback)
 
@@ -685,9 +729,16 @@ def train_pixel_regressor(
         monitor=monitor_metric,
         patience=patience,
         mode=mode,
-        verbose=True,
+        verbose=verbose,
     )
     callbacks.append(early_stop_callback)
+
+    if not verbose:
+        import logging
+
+        logging.getLogger("lightning.pytorch").setLevel(logging.WARNING)
+        callbacks.append(_CompactProgressBar())
+        model._prog_bar_metrics = False
 
     logger = CSVLogger(model_dir, name="lightning_logs")
 
@@ -698,13 +749,16 @@ def train_pixel_regressor(
         callbacks=callbacks,
         logger=logger,
         log_every_n_steps=10,
+        enable_model_summary=verbose,
         **kwargs,
     )
 
-    print(
-        f"Training {architecture} with {encoder_name} encoder for {num_epochs} epochs..."
-    )
-    print(f"Loss function: {loss_type.upper()}")
+    if verbose:
+        print(
+            f"Training {architecture} with {encoder_name} encoder"
+            f" for {num_epochs} epochs..."
+        )
+        print(f"Loss function: {loss_type.upper()}")
 
     trainer.fit(
         model,
@@ -715,11 +769,13 @@ def train_pixel_regressor(
 
     best_model_path = checkpoint_callback.best_model_path
     if best_model_path:
-        print(f"\nBest model saved at: {best_model_path}")
+        if verbose:
+            print(f"\nBest model saved at: {best_model_path}")
         model = PixelRegressionModel.load_from_checkpoint(best_model_path)
         model.best_model_path = best_model_path
     else:
-        print("\nBest model path not found; returning last epoch model.")
+        if verbose:
+            print("\nBest model path not found; returning last epoch model.")
 
     return model
 
@@ -802,7 +858,9 @@ def predict_raster(
                 getattr(model, "hparams", None), "encoder_weights", None
             )
             model_in_channels = getattr(
-                getattr(model, "hparams", None), "in_channels", len(input_bands)
+                getattr(model, "hparams", None),
+                "in_channels",
+                len(input_bands),
             )
             if encoder_name and encoder_weights:
                 preprocessing = _infer_preprocessing_params(
@@ -811,9 +869,6 @@ def predict_raster(
                 if preprocessing is not None:
                     pp_mean = preprocessing.get("mean")
                     pp_std = preprocessing.get("std")
-                    # Only apply encoder preprocessing when channel count
-                    # matches to avoid incorrect normalization for
-                    # multi-spectral inputs.
                     if (
                         pp_mean is not None
                         and pp_std is not None
@@ -1297,12 +1352,18 @@ def plot_training_history(
         )
 
     df = pd.read_csv(csv_path)
+    _n_epochs = df["epoch"].nunique() if "epoch" in df.columns else len(df)
+    print(f"Reading logs: {csv_path} ({_n_epochs} epochs)")
 
-    # Group rows by epoch and take the last value per epoch (Lightning logs
-    # one row per step; epoch-level metrics appear on the last step of each
-    # epoch).
+    # Group rows by epoch – Lightning logs multiple rows per epoch (one per
+    # step plus validation).  Use ``last()`` with ``skipna`` so we keep the
+    # last non-null value for every column within each epoch.
     if "epoch" in df.columns:
-        df_epoch = df.groupby("epoch").last().reset_index()
+        try:
+            df_epoch = df.groupby("epoch").last(skipna=True).reset_index()
+        except TypeError:
+            # older pandas without skipna
+            df_epoch = df.groupby("epoch").last().reset_index()
     else:
         df_epoch = df
 
@@ -1433,9 +1494,20 @@ def visualize_prediction(
     import rasterio
 
     with rasterio.open(input_raster) as src:
-        rgb = src.read(rgb_bands)
-        # Normalize for display
-        rgb = np.clip(rgb / np.percentile(rgb, 98) if rgb.max() > 1 else rgb, 0, 1)
+        rgb = src.read(rgb_bands).astype(np.float64)
+        # Per-band 2–98 percentile stretch for proper RGB display
+        for i in range(rgb.shape[0]):
+            band = rgb[i]
+            valid = band[
+                np.isfinite(band) & (band != src.nodata if src.nodata else True)
+            ]
+            if valid.size > 0:
+                p2, p98 = np.percentile(valid, [2, 98])
+                if p98 > p2:
+                    rgb[i] = (band - p2) / (p98 - p2)
+                else:
+                    rgb[i] = band / p98 if p98 > 0 else band
+        rgb = np.clip(rgb, 0, 1)
         rgb = np.transpose(rgb, (1, 2, 0))
 
     with rasterio.open(pred_raster) as src:
@@ -1470,8 +1542,7 @@ def visualize_prediction(
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
-    plt.show()
-
+    plt.close(fig)
     return fig
 
 
