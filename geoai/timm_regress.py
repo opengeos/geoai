@@ -622,8 +622,14 @@ def train_pixel_regressor(
     image_mean = None
     image_std = None
     if preprocessing is not None:
-        image_mean = preprocessing.get("mean")
-        image_std = preprocessing.get("std")
+        pp_mean = preprocessing.get("mean")
+        pp_std = preprocessing.get("std")
+        # Only apply encoder preprocessing when channel count matches;
+        # for multi-spectral data (>3 bands) the ImageNet mean/std is
+        # inappropriate and hurts convergence.
+        if pp_mean is not None and pp_std is not None and len(pp_mean) == in_channels:
+            image_mean = pp_mean
+            image_std = pp_std
 
     # Create datasets
     train_dataset = PixelRegressionDataset(
@@ -772,7 +778,7 @@ def predict_raster(
         width = src.width
 
         if input_bands is None:
-            input_bands = list(range(1, min(4, src.count + 1)))
+            input_bands = list(range(1, src.count + 1))
 
         print(f"Input raster: {width}x{height}")
         print(f"Tile size: {tile_size}, overlap: {overlap}, stride: {stride}")
@@ -795,13 +801,26 @@ def predict_raster(
             encoder_weights = getattr(
                 getattr(model, "hparams", None), "encoder_weights", None
             )
+            model_in_channels = getattr(
+                getattr(model, "hparams", None), "in_channels", len(input_bands)
+            )
             if encoder_name and encoder_weights:
                 preprocessing = _infer_preprocessing_params(
                     encoder_name, encoder_weights
                 )
                 if preprocessing is not None:
-                    image_mean = preprocessing.get("mean")
-                    image_std = preprocessing.get("std")
+                    pp_mean = preprocessing.get("mean")
+                    pp_std = preprocessing.get("std")
+                    # Only apply encoder preprocessing when channel count
+                    # matches to avoid incorrect normalization for
+                    # multi-spectral inputs.
+                    if (
+                        pp_mean is not None
+                        and pp_std is not None
+                        and len(pp_mean) == model_in_channels
+                    ):
+                        image_mean = pp_mean
+                        image_std = pp_std
 
         # Collect tiles
         tiles = []
@@ -1108,11 +1127,12 @@ def plot_scatter(
     sample_size: int = 10000,
     title: str = "Predicted vs Actual",
     valid_range: Optional[Tuple[float, float]] = None,
+    fit_line: bool = True,
     figsize: Tuple[int, int] = (10, 8),
     save_path: Optional[str] = None,
 ):
     """
-    Plot scatter plot of predicted vs actual values.
+    Plot scatter plot of predicted vs actual values with optional trend line.
 
     Args:
         true_raster: Path to ground truth raster.
@@ -1120,6 +1140,7 @@ def plot_scatter(
         sample_size: Number of points to plot (sampled if needed).
         title: Title for the plot.
         valid_range: Tuple of (min, max) valid values for filtering outliers.
+        fit_line: Whether to show a linear regression trend line.
         figsize: Figure size.
         save_path: Path to save figure.
 
@@ -1176,6 +1197,22 @@ def plot_scatter(
     max_val = max(y_true.max(), y_pred.max())
     ax.plot([min_val, max_val], [min_val, max_val], "r--", lw=2, label="1:1 Line")
 
+    # Add linear regression trend line
+    if fit_line:
+        coeffs = np.polyfit(y_true, y_pred, 1)
+        slope, intercept = coeffs
+        fit_x = np.array([min_val, max_val])
+        fit_y = slope * fit_x + intercept
+        ax.plot(
+            fit_x,
+            fit_y,
+            "b-",
+            lw=2,
+            label=f"Fit: y = {slope:.3f}x + {intercept:.3f}",
+        )
+        metrics["slope"] = float(slope)
+        metrics["intercept"] = float(intercept)
+
     ax.set_xlabel("Actual Values", fontsize=12)
     ax.set_ylabel("Predicted Values", fontsize=12)
     ax.set_title(
@@ -1193,6 +1230,181 @@ def plot_scatter(
     plt.show()
 
     return fig, metrics
+
+
+def plot_training_history(
+    log_dir: str,
+    metrics: Optional[List[str]] = None,
+    figsize: Optional[Tuple[int, int]] = None,
+    tail: Optional[int] = None,
+    save_path: Optional[str] = None,
+):
+    """
+    Plot training history curves from Lightning CSV logs.
+
+    Reads the ``metrics.csv`` file produced by :class:`CSVLogger` and plots
+    the requested training and validation metrics over epochs.
+
+    Args:
+        log_dir: Path to the model output directory (the same ``output_dir``
+            passed to :func:`train_pixel_regressor`).  The function searches
+            for ``lightning_logs/version_*/metrics.csv`` inside a ``models``
+            sub-directory (or directly under *log_dir*).
+        metrics: List of metric names to plot.  Each name is matched against
+            the CSV columns; both the ``train_`` and ``val_`` variants are
+            plotted when available.  Defaults to ``["loss", "r2"]``.
+        figsize: Figure size as ``(width, height)``.  Defaults to
+            ``(6 * n_metrics, 5)``.
+        tail: If given, only plot the last *tail* epochs.  Useful for
+            skipping early warm-up instability. By default the function
+            automatically skips early epochs when extreme outliers would
+            compress the y-axis (more than 10× the stable range).
+        save_path: If given, save the figure to this path.
+
+    Returns:
+        Tuple of (figure, pandas.DataFrame of the loaded metrics).
+    """
+    import glob
+
+    import matplotlib.pyplot as plt
+
+    try:
+        import pandas as pd
+    except ImportError:
+        raise ImportError("pandas is required for plot_training_history")
+
+    if metrics is None:
+        metrics = ["loss", "r2"]
+
+    # Locate metrics.csv
+    search_paths = [
+        os.path.join(log_dir, "models", "lightning_logs", "version_*", "metrics.csv"),
+        os.path.join(log_dir, "lightning_logs", "version_*", "metrics.csv"),
+        os.path.join(log_dir, "version_*", "metrics.csv"),
+    ]
+
+    csv_path = None
+    for pattern in search_paths:
+        matches = sorted(glob.glob(pattern))
+        if matches:
+            csv_path = matches[-1]  # latest version
+            break
+
+    if csv_path is None:
+        raise FileNotFoundError(
+            f"No metrics.csv found under '{log_dir}'. "
+            "Looked for lightning_logs/version_*/metrics.csv"
+        )
+
+    df = pd.read_csv(csv_path)
+
+    # Group rows by epoch and take the last value per epoch (Lightning logs
+    # one row per step; epoch-level metrics appear on the last step of each
+    # epoch).
+    if "epoch" in df.columns:
+        df_epoch = df.groupby("epoch").last().reset_index()
+    else:
+        df_epoch = df
+
+    # Apply tail filter
+    if tail is not None:
+        df_epoch = df_epoch.tail(tail).reset_index(drop=True)
+
+    n_metrics = len(metrics)
+    if figsize is None:
+        figsize = (6 * n_metrics, 5)
+
+    fig, axes = plt.subplots(1, n_metrics, figsize=figsize)
+    if n_metrics == 1:
+        axes = [axes]
+
+    for ax, metric in zip(axes, metrics):
+        train_col = (
+            f"train_{metric}_epoch"
+            if f"train_{metric}_epoch" in df_epoch.columns
+            else f"train_{metric}"
+        )
+        val_col = f"val_{metric}"
+
+        has_train = train_col in df_epoch.columns
+        has_val = val_col in df_epoch.columns
+
+        if not has_train and not has_val:
+            ax.set_title(f"{metric} (no data)")
+            continue
+
+        x = df_epoch["epoch"] if "epoch" in df_epoch.columns else df_epoch.index
+
+        if has_train:
+            train_data = df_epoch[train_col].dropna()
+            ax.plot(
+                x[train_data.index],
+                train_data.values,
+                label=f"Train {metric}",
+                linewidth=2,
+            )
+        if has_val:
+            val_data = df_epoch[val_col].dropna()
+            ax.plot(
+                x[val_data.index],
+                val_data.values,
+                label=f"Val {metric}",
+                linewidth=2,
+            )
+
+        # Auto-zoom: if early outliers compress the view, clip y-axis to
+        # the range of the stable second half of training.
+        if tail is None:
+            n_epochs = len(df_epoch)
+            if n_epochs >= 10:
+                half = n_epochs // 2
+                second_half_vals = []
+                all_vals = []
+                if has_train:
+                    col_data = df_epoch[train_col].dropna()
+                    all_vals.extend(col_data.values)
+                    second_half_vals.extend(
+                        df_epoch[train_col].iloc[half:].dropna().values
+                    )
+                if has_val:
+                    col_data = df_epoch[val_col].dropna()
+                    all_vals.extend(col_data.values)
+                    second_half_vals.extend(
+                        df_epoch[val_col].iloc[half:].dropna().values
+                    )
+                if second_half_vals and all_vals:
+                    sh_arr = np.array(second_half_vals)
+                    all_arr = np.array(all_vals)
+                    sh_min, sh_max = sh_arr.min(), sh_arr.max()
+                    sh_range = sh_max - sh_min if sh_max != sh_min else 1.0
+                    full_range = all_arr.max() - all_arr.min()
+                    if full_range == 0:
+                        full_range = 1.0
+                    # If full range is >5× the stable range, zoom in
+                    if full_range > 5 * sh_range:
+                        margin = sh_range * 0.3
+                        ax.set_ylim(sh_min - margin, sh_max + margin)
+
+        label = (
+            metric.upper()
+            if len(metric) <= 4
+            else metric.replace("_", " ").title()
+        )
+        ax.set_xlabel("Epoch", fontsize=12)
+        ax.set_ylabel(label, fontsize=12)
+        ax.set_title(f"Training & Validation {label}", fontsize=14)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        print(f"Figure saved to: {save_path}")
+
+    plt.show()
+
+    return fig, df_epoch
 
 
 def visualize_prediction(
@@ -1282,16 +1494,18 @@ def plot_regression_results(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     title: str = "Regression Results",
+    fit_line: bool = True,
     figsize: Tuple[int, int] = (12, 5),
     save_path: Optional[str] = None,
 ):
     """
-    Plot regression results: scatter plot and residual plot.
+    Plot regression results: scatter plot with trend line and residual plot.
 
     Args:
         y_true: Ground truth values.
         y_pred: Predicted values.
         title: Title for the plots.
+        fit_line: Whether to show a linear regression trend line.
         figsize: Figure size.
         save_path: Path to save the figure.
     """
@@ -1310,6 +1524,20 @@ def plot_regression_results(
     min_val = min(y_true.min(), y_pred.min())
     max_val = max(y_true.max(), y_pred.max())
     ax1.plot([min_val, max_val], [min_val, max_val], "r--", lw=2, label="1:1 Line")
+
+    # Add linear regression trend line
+    if fit_line:
+        coeffs = np.polyfit(y_true, y_pred, 1)
+        slope, intercept = coeffs
+        fit_x = np.array([min_val, max_val])
+        fit_y = slope * fit_x + intercept
+        ax1.plot(
+            fit_x,
+            fit_y,
+            "b-",
+            lw=2,
+            label=f"Fit: y = {slope:.3f}x + {intercept:.3f}",
+        )
 
     r2 = r2_score(y_true, y_pred)
     ax1.set_xlabel("Actual Values", fontsize=12)

@@ -137,6 +137,7 @@ from .timm_regress import (
     evaluate_regression,
     plot_regression_comparison,
     plot_scatter,
+    plot_training_history,
     visualize_prediction,
     plot_regression_results,
     # Backward compatibility aliases
