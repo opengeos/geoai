@@ -128,6 +128,25 @@ from .timm_segment import (
     push_timm_model_to_hub,
 )
 
+from .timm_regress import (
+    PixelRegressionModel,
+    PixelRegressionDataset,
+    create_regression_tiles,
+    train_pixel_regressor,
+    predict_raster,
+    evaluate_regression,
+    plot_regression_comparison,
+    plot_scatter,
+    plot_training_history,
+    visualize_prediction,
+    plot_regression_results,
+    # Backward compatibility aliases
+    TimmRegressor,
+    RegressionDataset,
+    train_timm_regressor,
+    create_regression_patches,
+)
+
 # Import tools subpackage
 from . import tools
 
