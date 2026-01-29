@@ -2,7 +2,7 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model for image captioning, querying, object detection, and semantic segmentation model training and inference.
-version=0.3.1
+version=0.4.0
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -42,6 +42,9 @@ experimental=False
 deprecated=False
 
 changelog=
+    0.4.0
+        - Add support for exporting data in COCO and YOLO formats (#488)
+        - Fix loading model progress bar issue (#488)
     0.3.1
         - Fix CUDA device detection issue
     0.3.0

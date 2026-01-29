@@ -186,6 +186,7 @@ class TileExportWorker(QThread):
         tile_size: int,
         stride: int,
         buffer_radius: float,
+        metadata_format: str = "PASCAL_VOC",
     ):
         super().__init__()
         self.raster_path = raster_path
@@ -194,6 +195,7 @@ class TileExportWorker(QThread):
         self.tile_size = tile_size
         self.stride = stride
         self.buffer_radius = buffer_radius
+        self.metadata_format = metadata_format
 
     def run(self):
         """Execute tile export."""
@@ -202,7 +204,7 @@ class TileExportWorker(QThread):
 
             geoai = get_geoai()
 
-            self.progress.emit("Exporting tiles...")
+            self.progress.emit(f"Exporting tiles in {self.metadata_format} format...")
 
             geoai.export_geotiff_tiles(
                 in_raster=self.raster_path,
@@ -211,6 +213,7 @@ class TileExportWorker(QThread):
                 tile_size=self.tile_size,
                 stride=self.stride,
                 buffer_radius=self.buffer_radius,
+                metadata_format=self.metadata_format,
             )
 
             self.finished.emit(self.output_dir)
@@ -551,6 +554,18 @@ class SegmentationDockWidget(QDockWidget):
         self.buffer_spin.setDecimals(2)
         self.buffer_spin.setStyleSheet(self.spin_style)
         tile_layout.addRow("Buffer:", self.buffer_spin)
+
+        # Export format selection
+        self.tile_export_format_combo = QComboBox()
+        self.tile_export_format_combo.setStyleSheet(self.combo_style)
+        self.tile_export_format_combo.addItems(["PASCAL_VOC", "COCO", "YOLO"])
+        self.tile_export_format_combo.setToolTip(
+            "Export format for training data:\n"
+            "- PASCAL_VOC: XML annotation files (default)\n"
+            "- COCO: JSON annotation file (for instance segmentation)\n"
+            "- YOLO: Text files with normalized coordinates"
+        )
+        tile_layout.addRow("Format:", self.tile_export_format_combo)
 
         tile_group.setLayout(tile_layout)
         layout.addWidget(tile_group)
@@ -1255,7 +1270,8 @@ class SegmentationDockWidget(QDockWidget):
 
         self.export_tiles_btn.setEnabled(False)
         self.tile_progress.setRange(0, 0)
-        self.log("Starting tile export...")
+        export_format = self.tile_export_format_combo.currentText()
+        self.log(f"Starting tile export in {export_format} format...")
 
         self.tile_worker = TileExportWorker(
             raster_path,
@@ -1264,6 +1280,7 @@ class SegmentationDockWidget(QDockWidget):
             self.tile_size_spin.value(),
             self.stride_spin.value(),
             self.buffer_spin.value(),
+            export_format,
         )
         self.tile_worker.finished.connect(self.on_tile_export_finished)
         self.tile_worker.error.connect(self.on_tile_export_error)
@@ -1275,7 +1292,8 @@ class SegmentationDockWidget(QDockWidget):
         self.tile_progress.setValue(100)
         self.export_tiles_btn.setEnabled(True)
 
-        self.log(f"Tiles exported to: {output_dir}")
+        export_format = self.tile_export_format_combo.currentText()
+        self.log(f"Tiles exported to: {output_dir} (format: {export_format})")
 
         # Auto-fill training tab
         self.images_dir_edit.setText(os.path.join(output_dir, "images"))
@@ -1291,7 +1309,8 @@ class SegmentationDockWidget(QDockWidget):
         QMessageBox.information(
             self,
             "Success",
-            f"Tiles exported to:\n{output_dir}\n\nSwitched to Train tab.",
+            f"Tiles exported to:\n{output_dir}\n\n"
+            f"Format: {export_format}\n\nSwitched to Train tab.",
         )
 
     def on_tile_export_error(self, error: str):
