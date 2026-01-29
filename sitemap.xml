@@ -341,6 +341,10 @@
          <lastmod>2026-01-29</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/examples/train_timm_regressor/</loc>
+         <lastmod>2026-01-29</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/examples/train_timm_segmentation/</loc>
          <lastmod>2026-01-29</lastmod>
     </url>
