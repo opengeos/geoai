@@ -1385,11 +1385,7 @@ def plot_training_history(
                         margin = sh_range * 0.3
                         ax.set_ylim(sh_min - margin, sh_max + margin)
 
-        label = (
-            metric.upper()
-            if len(metric) <= 4
-            else metric.replace("_", " ").title()
-        )
+        label = metric.upper() if len(metric) <= 4 else metric.replace("_", " ").title()
         ax.set_xlabel("Epoch", fontsize=12)
         ax.set_ylabel(label, fontsize=12)
         ax.set_title(f"Training & Validation {label}", fontsize=14)
