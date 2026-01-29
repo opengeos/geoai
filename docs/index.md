@@ -6,7 +6,7 @@
 [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/geoai.svg)](https://anaconda.org/conda-forge/geoai)
 [![Conda Recipe](https://img.shields.io/badge/recipe-geoai-green.svg)](https://github.com/conda-forge/geoai-py-feedstock)
 [![image](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://tinyurl.com/GeoAI-Tutorials)
+[![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 [![QGIS](https://img.shields.io/badge/QGIS-plugin-orange.svg)](https://opengeoai.org/qgis_plugin)
 
 [![logo](https://raw.githubusercontent.com/opengeos/geoai/master/docs/assets/logo_rect.png)](https://github.com/opengeos/geoai/blob/master/docs/assets/logo.png)
