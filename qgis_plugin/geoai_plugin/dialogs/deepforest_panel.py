@@ -1351,9 +1351,24 @@ class DeepForestDockWidget(QDockWidget):
                 df = df.drop(columns=["geometry"])
             gdf = gpd.GeoDataFrame(df, geometry=geometries)
 
-        # Set CRS if available from the current layer
-        if self.current_layer and self.current_layer.crs().isValid():
-            gdf.set_crs(self.current_layer.crs().toWkt(), inplace=True)
+        # Set CRS from the source raster file (most reliable) or QGIS layer
+        crs_wkt = None
+        if self.current_image_path:
+            try:
+                import rasterio
+
+                with rasterio.open(self.current_image_path) as src:
+                    if src.crs is not None:
+                        crs_wkt = src.crs.to_wkt()
+            except Exception:
+                pass
+        if crs_wkt is None and self.current_layer and self.current_layer.crs().isValid():
+            crs_wkt = self.current_layer.crs().toWkt()
+        if crs_wkt:
+            try:
+                gdf.set_crs(crs_wkt, inplace=True, allow_override=True)
+            except Exception:
+                gdf.crs = crs_wkt
 
         # Determine driver
         if "GeoJSON" in format_text:
