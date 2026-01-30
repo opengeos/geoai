@@ -23,7 +23,7 @@ bibliography: paper.bib
 
 `GeoAI` is a comprehensive Python package designed to bridge artificial intelligence (AI) and geospatial data analysis, providing researchers and practitioners with intuitive tools for applying machine learning techniques to geographic data. The package offers a unified framework for processing satellite imagery, aerial photographs, and vector data using state-of-the-art deep learning models. `GeoAI` integrates popular AI frameworks including `PyTorch` [@Paszke2019], `Transformers` [@Wolf2019], `PyTorch Segmentation Models` [@Iakubovskii2019], and specialized geospatial libraries like `torchange` [@Zheng2024], enabling users to perform complex geospatial analyses with minimal code.
 
-The package provides five core capabilities:
+The package provides six core capabilities:
 
 1. Interactive and programmatic search and download of remote sensing imagery and geospatial data.
 2. Automated dataset preparation with image chips and label generation.
