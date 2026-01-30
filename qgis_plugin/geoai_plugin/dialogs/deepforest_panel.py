@@ -143,7 +143,7 @@ class DeepForestDockWidget(QDockWidget):
 
         # Header with link to DeepForest repo
         header_label = QLabel(
-            '<b>DeepForest</b> — '
+            "<b>DeepForest</b> — "
             '<a href="https://github.com/weecology/DeepForest">GitHub</a> · '
             '<a href="https://deepforest.readthedocs.io">Docs</a>'
         )
