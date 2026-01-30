@@ -65,6 +65,20 @@ class DeepForestModelLoadWorker(QThread):
     def run(self):
         """Load the DeepForest model in background."""
         try:
+            # Prevent PyTorch Lightning distributed process spawning inside QGIS
+            os.environ["WORLD_SIZE"] = "1"
+            os.environ["RANK"] = "0"
+            os.environ["LOCAL_RANK"] = "0"
+            os.environ["MASTER_ADDR"] = "127.0.0.1"
+            os.environ["MASTER_PORT"] = "12355"
+            if torch is not None:
+                torch.set_float32_matmul_precision("medium")
+                if (
+                    torch.cuda.is_available()
+                    and "CUDA_VISIBLE_DEVICES" not in os.environ
+                ):
+                    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
             self.progress.emit("Importing DeepForest...")
             from deepforest import main
 
@@ -900,6 +914,25 @@ class DeepForestDockWidget(QDockWidget):
         from PIL import Image
 
         Image.MAX_IMAGE_PIXELS = None
+
+        # Prevent PyTorch Lightning from spawning distributed processes
+        # which would crash QGIS. Force single-process, single-GPU mode.
+        import torch
+
+        torch.set_float32_matmul_precision("medium")
+        os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
+        os.environ["WORLD_SIZE"] = "1"
+        os.environ["RANK"] = "0"
+        os.environ["LOCAL_RANK"] = "0"
+        os.environ["MASTER_ADDR"] = "127.0.0.1"
+        os.environ["MASTER_PORT"] = "12355"
+        # Prevent Lightning from using DDP strategy
+        os.environ["PL_TRAINER_STRATEGY"] = "auto"
+        os.environ["PL_ACCELERATOR"] = "gpu"
+        # Limit to single GPU to avoid multi-process spawn
+        if "CUDA_VISIBLE_DEVICES" not in os.environ:
+            if torch.cuda.is_available():
+                os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
         if self.deepforest is None:
             self.show_error("Please load the model first.")
