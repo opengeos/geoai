@@ -36,7 +36,6 @@ from qgis.PyQt.QtWidgets import (
     QScrollArea,
 )
 from qgis.core import (
-    QgsCoordinateTransform,
     QgsProject,
     QgsRasterFileWriter,
     QgsRasterLayer,
@@ -119,8 +118,9 @@ class DeepForestDockWidget(QDockWidget):
         self.current_layer = None
         self.current_image_path = None
 
-        # Store predictions
+        # Store predictions and mode
         self.predictions = None
+        self.prediction_mode = None  # "single" or "tile"
 
         # Track temporary files for cleanup
         self._temp_files = []
@@ -827,7 +827,7 @@ class DeepForestDockWidget(QDockWidget):
                         try:
                             self._temp_files.remove(temp_export_path)
                         except ValueError:
-                            pass
+                            pass  # File was not tracked; safe to ignore
                 except Exception as cleanup_error:
                     self.log_message(
                         f"Failed to clean up temporary export file '{temp_export_path}': {cleanup_error}",
@@ -907,18 +907,23 @@ class DeepForestDockWidget(QDockWidget):
             if mode == "Single Image":
                 # Use predict_image for single images
                 result = self.deepforest.predict_image(path=self.current_image_path)
+                self.prediction_mode = "single"
             else:
                 # Use predict_tile for large geospatial tiles
                 patch_size = self.patch_size_spin.value()
                 patch_overlap = self.patch_overlap_spin.value()
                 iou_threshold = self.iou_threshold_spin.value()
 
+                dataloader_strategy = self.dataloader_combo.currentText()
+
                 result = self.deepforest.predict_tile(
                     path=self.current_image_path,
                     patch_size=patch_size,
                     patch_overlap=patch_overlap,
                     iou_threshold=iou_threshold,
+                    dataloader_strategy=dataloader_strategy,
                 )
+                self.prediction_mode = "tile"
 
             # Apply score threshold filter
             score_threshold = self.score_threshold_spin.value()
@@ -1033,6 +1038,23 @@ class DeepForestDockWidget(QDockWidget):
         finally:
             self.progress_bar.setVisible(False)
 
+    def _pixel_to_geo_box(self, xmin, ymin, xmax, ymax, transform):
+        """Convert pixel bounding box coordinates to geographic coordinates.
+
+        Args:
+            xmin, ymin, xmax, ymax: Pixel-space bounding box.
+            transform: Affine transform from rasterio.
+
+        Returns:
+            shapely.geometry.box in geographic coordinates.
+        """
+        from shapely.geometry import box
+
+        # Convert pixel corners to geographic coordinates using the affine transform
+        geo_xmin, geo_ymin = transform * (xmin, ymax)  # lower-left
+        geo_xmax, geo_ymax = transform * (xmax, ymin)  # upper-right
+        return box(geo_xmin, geo_ymin, geo_xmax, geo_ymax)
+
     def _save_as_vector(self, output_path, format_text):
         """Save predictions as vector format."""
         import geopandas as gpd
@@ -1042,13 +1064,31 @@ class DeepForestDockWidget(QDockWidget):
         if (
             hasattr(self.predictions, "geometry")
             and "geometry" in self.predictions.columns
+            and self.prediction_mode == "tile"
         ):
             gdf = self.predictions.copy()
         else:
-            # Create geometry from bounding box coordinates
+            # predict_image returns pixel-space coordinates; convert to
+            # geographic coordinates using the source raster's transform
+            # so that exported vectors align with the map.
+            transform = None
+            if self.prediction_mode == "single" and self.current_image_path:
+                try:
+                    import rasterio
+
+                    with rasterio.open(self.current_image_path) as src:
+                        transform = src.transform
+                except Exception:
+                    pass  # Fall back to raw pixel coords if rasterio unavailable
+
             geometries = []
             for _, row in self.predictions.iterrows():
-                geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
+                if transform is not None:
+                    geom = self._pixel_to_geo_box(
+                        row.xmin, row.ymin, row.xmax, row.ymax, transform
+                    )
+                else:
+                    geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
                 geometries.append(geom)
 
             gdf = gpd.GeoDataFrame(self.predictions, geometry=geometries)
@@ -1068,7 +1108,13 @@ class DeepForestDockWidget(QDockWidget):
         gdf.to_file(output_path, driver=driver)
 
     def _save_as_raster(self, output_path):
-        """Save predictions as raster by rasterizing bounding boxes."""
+        """Save predictions as raster by rasterizing bounding boxes.
+
+        For predict_tile results, geometries are already in map coordinates and
+        can be rasterized directly. For predict_image results, pixel-space
+        bounding boxes are converted to geographic coordinates using the source
+        raster's affine transform before rasterizing.
+        """
         try:
             import rasterio
             from rasterio.features import rasterize
@@ -1084,10 +1130,23 @@ class DeepForestDockWidget(QDockWidget):
             width = src.width
             height = src.height
 
+        is_pixel_coords = self.prediction_mode == "single"
+
         # Create geometries from bounding boxes
         shapes = []
         for idx, row in self.predictions.iterrows():
-            geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
+            if is_pixel_coords:
+                # Convert pixel coords to geographic coords for rasterization
+                geom = self._pixel_to_geo_box(
+                    row.xmin, row.ymin, row.xmax, row.ymax, transform
+                )
+            elif (
+                hasattr(self.predictions, "geometry")
+                and "geometry" in self.predictions.columns
+            ):
+                geom = row.geometry
+            else:
+                geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
             # Use index + 1 as pixel value (0 is background)
             shapes.append((geom, idx + 1))
 

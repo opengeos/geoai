@@ -518,14 +518,14 @@ class GeoAIPlugin:
                             try:
                                 deepforest_obj.model.cpu()
                             except Exception:
-                                pass
+                                pass  # Model may not be on GPU or already freed
                             try:
                                 for param in deepforest_obj.model.parameters():
                                     param.data = None
                                     if param.grad is not None:
                                         param.grad = None
                             except Exception:
-                                pass
+                                pass  # Some parameters may be read-only or already cleared
                             del deepforest_obj.model
                             deepforest_obj.model = None
 
@@ -534,7 +534,7 @@ class GeoAIPlugin:
                             try:
                                 setattr(deepforest_obj, attr, None)
                             except Exception:
-                                pass
+                                pass  # Some attributes may be read-only or protected
 
                         # Delete the deepforest object
                         self._deepforest_dock.deepforest = None
@@ -562,7 +562,7 @@ class GeoAIPlugin:
                         if hasattr(self._deepforest_dock, "predictions"):
                             self._deepforest_dock.predictions = None
             except Exception:
-                pass
+                pass  # Best-effort cleanup; continue to garbage collection
 
         # Run garbage collection multiple times
         for _ in range(5):
