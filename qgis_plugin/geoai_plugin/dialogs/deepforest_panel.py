@@ -36,6 +36,7 @@ from qgis.PyQt.QtWidgets import (
     QScrollArea,
 )
 from qgis.core import (
+    QgsFillSymbol,
     QgsProject,
     QgsRasterFileWriter,
     QgsRasterLayer,
@@ -1005,6 +1006,7 @@ class DeepForestDockWidget(QDockWidget):
 
             layer = QgsVectorLayer(temp_path, "deepforest_detections", "ogr")
             if layer.isValid():
+                self._apply_semi_transparent_style(layer)
                 QgsProject.instance().addMapLayer(layer)
                 self.results_text.append(f"\nAuto-saved to: {temp_path}")
                 self.log_message(f"Auto-saved detections to: {temp_path}")
@@ -1066,6 +1068,8 @@ class DeepForestDockWidget(QDockWidget):
                     layer = QgsVectorLayer(output_path, layer_name, "ogr")
 
                 if layer.isValid():
+                    if isinstance(layer, QgsVectorLayer):
+                        self._apply_semi_transparent_style(layer)
                     QgsProject.instance().addMapLayer(layer)
 
             self.results_text.append(f"\nSaved to: {output_path}")
@@ -1401,6 +1405,21 @@ class DeepForestDockWidget(QDockWidget):
                 f.write(
                     f"{class_idx} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n"
                 )
+
+    def _apply_semi_transparent_style(self, layer):
+        """Apply a semi-transparent fill style to a vector layer."""
+        try:
+            symbol = QgsFillSymbol.createSimple(
+                {
+                    "color": "0,255,0,128",       # green fill, 50% transparent
+                    "outline_color": "0,180,0,255",  # solid green outline
+                    "outline_width": "0.4",
+                }
+            )
+            layer.renderer().setSymbol(symbol)
+            layer.triggerRepaint()
+        except Exception:
+            pass  # Non-critical; default style is acceptable
 
     def show_error(self, message):
         """Show an error message."""
