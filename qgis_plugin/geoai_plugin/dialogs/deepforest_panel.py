@@ -167,11 +167,25 @@ class DeepForestPredictWorker(QThread):
                 ):
                     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-            # Configure model for optimal performance inside QGIS
-            self.model.config["workers"] = 0  # No multiprocessing in QGIS
+            # Configure model for optimal performance inside QGIS.
+            # Force single-device to prevent Lightning DDP hangs.
+            self.model.config["workers"] = 0
             self.model.config["batch_size"] = self.batch_size
-            self.model.config["devices"] = 1  # Single device only
-            self.model.config["accelerator"] = "auto"
+            self.model.config["devices"] = 1
+            self.model.config["accelerator"] = "gpu" if (
+                torch is not None and torch.cuda.is_available()
+            ) else "cpu"
+
+            # Pre-create the trainer with explicit safe settings so that
+            # predict_tile does not re-initialize Lightning with DDP.
+            self.progress.emit("Initializing prediction engine...")
+            try:
+                self.model.create_trainer(
+                    accelerator=self.model.config["accelerator"],
+                    devices=1,
+                )
+            except Exception:
+                pass  # Fall back to predict_tile's internal trainer creation
 
             # Check if image has an alpha channel and strip it if needed.
             # DeepForest expects 3-channel RGB input.
@@ -200,10 +214,26 @@ class DeepForestPredictWorker(QThread):
                 result = self.model.predict_image(path=image_path)
                 pred_mode = "single"
             else:
-                self.progress.emit(
-                    f"Running prediction on large tile "
-                    f"(patch_size={self.patch_size}, overlap={self.patch_overlap})..."
-                )
+                # Estimate number of patches for progress info
+                try:
+                    from PIL import Image as PILImage
+                    with PILImage.open(image_path) as img:
+                        w, h = img.size
+                    stride = int(self.patch_size * (1 - self.patch_overlap))
+                    n_cols = max(1, (w - self.patch_size) // stride + 1)
+                    n_rows = max(1, (h - self.patch_size) // stride + 1)
+                    n_patches = n_cols * n_rows
+                    self.progress.emit(
+                        f"Processing ~{n_patches} patches "
+                        f"({w}x{h} image, patch={self.patch_size}, "
+                        f"batch={self.batch_size})..."
+                    )
+                except Exception:
+                    self.progress.emit(
+                        f"Running prediction on large tile "
+                        f"(patch_size={self.patch_size})..."
+                    )
+
                 result = self.model.predict_tile(
                     path=image_path,
                     patch_size=self.patch_size,
