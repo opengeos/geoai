@@ -76,11 +76,17 @@ class DeepForestModelLoadWorker(QThread):
 
             # Move to appropriate device if CUDA is available and requested
             if self.device and self.device != "auto":
-                if self.device == "cuda" and torch is not None and torch.cuda.is_available():
+                if (
+                    self.device == "cuda"
+                    and torch is not None
+                    and torch.cuda.is_available()
+                ):
                     try:
                         model.model.to("cuda")
                     except Exception as e:
-                        self.progress.emit(f"Warning: Could not move model to CUDA: {e}")
+                        self.progress.emit(
+                            f"Warning: Could not move model to CUDA: {e}"
+                        )
                 elif self.device == "cpu":
                     try:
                         model.model.to("cpu")
@@ -175,13 +181,15 @@ class DeepForestDockWidget(QDockWidget):
         model_row = QHBoxLayout()
         model_row.addWidget(QLabel("Model:"))
         self.model_combo = QComboBox()
-        self.model_combo.addItems([
-            "weecology/deepforest-tree",
-            "weecology/deepforest-bird", 
-            "weecology/deepforest-livestock",
-            "weecology/everglades-nest-detection",
-            "weecology/cropmodel-deadtrees"
-        ])
+        self.model_combo.addItems(
+            [
+                "weecology/deepforest-tree",
+                "weecology/deepforest-bird",
+                "weecology/deepforest-livestock",
+                "weecology/everglades-nest-detection",
+                "weecology/cropmodel-deadtrees",
+            ]
+        )
         model_row.addWidget(self.model_combo)
         model_layout_inner.addLayout(model_row)
 
@@ -368,12 +376,14 @@ class DeepForestDockWidget(QDockWidget):
         format_row = QHBoxLayout()
         format_row.addWidget(QLabel("Format:"))
         self.output_format_combo = QComboBox()
-        self.output_format_combo.addItems([
-            "Vector (GeoPackage)",
-            "Vector (Shapefile)", 
-            "Vector (GeoJSON)",
-            "Raster (GeoTIFF)"
-        ])
+        self.output_format_combo.addItems(
+            [
+                "Vector (GeoPackage)",
+                "Vector (Shapefile)",
+                "Vector (GeoJSON)",
+                "Raster (GeoTIFF)",
+            ]
+        )
         format_row.addWidget(self.output_format_combo)
         format_layout.addLayout(format_row)
 
@@ -491,9 +501,7 @@ class DeepForestDockWidget(QDockWidget):
 
     def browse_export_dir(self):
         """Browse for export directory."""
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Export Directory", ""
-        )
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Export Directory", "")
         if dir_path:
             self.export_dir_edit.setText(dir_path)
 
@@ -886,7 +894,7 @@ class DeepForestDockWidget(QDockWidget):
             QCoreApplication.processEvents()
 
             mode = self.mode_combo.currentText()
-            
+
             if mode == "Single Image":
                 # Use predict_image for single images
                 result = self.deepforest.predict_image(path=self.current_image_path)
@@ -895,18 +903,18 @@ class DeepForestDockWidget(QDockWidget):
                 patch_size = self.patch_size_spin.value()
                 patch_overlap = self.patch_overlap_spin.value()
                 iou_threshold = self.iou_threshold_spin.value()
-                
+
                 result = self.deepforest.predict_tile(
                     path=self.current_image_path,
                     patch_size=patch_size,
                     patch_overlap=patch_overlap,
-                    iou_threshold=iou_threshold
+                    iou_threshold=iou_threshold,
                 )
 
             # Apply score threshold filter
             score_threshold = self.score_threshold_spin.value()
             if score_threshold > 0 and result is not None and not result.empty:
-                if 'score' in result.columns:
+                if "score" in result.columns:
                     result = result[result.score >= score_threshold]
 
             self.predictions = result
@@ -914,7 +922,9 @@ class DeepForestDockWidget(QDockWidget):
             # Update results
             if result is not None and not result.empty:
                 num_detections = len(result)
-                self.predict_status_label.setText(f"Found {num_detections} detection(s).")
+                self.predict_status_label.setText(
+                    f"Found {num_detections} detection(s)."
+                )
                 self.predict_status_label.setStyleSheet("color: green;")
 
                 # Show summary in results text
@@ -922,20 +932,24 @@ class DeepForestDockWidget(QDockWidget):
                 summary += f"Mode: {mode}\n"
                 summary += f"Image: {os.path.basename(self.current_image_path)}\n"
                 summary += f"Detections: {num_detections}\n"
-                
-                if 'score' in result.columns:
+
+                if "score" in result.columns:
                     summary += f"Score range: {result.score.min():.3f} - {result.score.max():.3f}\n"
-                
-                if 'label' in result.columns:
+
+                if "label" in result.columns:
                     labels = result.label.value_counts()
                     summary += f"Labels: {dict(labels)}\n"
 
                 self.results_text.setText(summary)
-                self.log_message(f"Prediction complete. Found {num_detections} detections.")
+                self.log_message(
+                    f"Prediction complete. Found {num_detections} detections."
+                )
             else:
                 self.predict_status_label.setText("No detections found.")
                 self.predict_status_label.setStyleSheet("color: orange;")
-                self.results_text.setText("No detections found. Try adjusting the score threshold.")
+                self.results_text.setText(
+                    "No detections found. Try adjusting the score threshold."
+                )
 
         except Exception as e:
             self.predict_status_label.setText("Prediction failed!")
@@ -992,12 +1006,12 @@ class DeepForestDockWidget(QDockWidget):
                     if use_temp_file
                     else os.path.basename(output_path)
                 )
-                
+
                 if "Raster" in format_text:
                     layer = QgsRasterLayer(output_path, layer_name)
                 else:
                     layer = QgsVectorLayer(output_path, layer_name, "ogr")
-                    
+
                 if layer.isValid():
                     QgsProject.instance().addMapLayer(layer)
 
@@ -1016,7 +1030,10 @@ class DeepForestDockWidget(QDockWidget):
         from shapely.geometry import box
 
         # Check if predictions already has geometry (from predict_tile)
-        if hasattr(self.predictions, 'geometry') and 'geometry' in self.predictions.columns:
+        if (
+            hasattr(self.predictions, "geometry")
+            and "geometry" in self.predictions.columns
+        ):
             gdf = self.predictions.copy()
         else:
             # Create geometry from bounding box coordinates
@@ -1024,7 +1041,7 @@ class DeepForestDockWidget(QDockWidget):
             for _, row in self.predictions.iterrows():
                 geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
                 geometries.append(geom)
-            
+
             gdf = gpd.GeoDataFrame(self.predictions, geometry=geometries)
 
         # Set CRS if available from the current layer
@@ -1071,18 +1088,14 @@ class DeepForestDockWidget(QDockWidget):
             out_shape=(height, width),
             transform=transform,
             fill=0,
-            dtype=rasterio.uint16
+            dtype=rasterio.uint16,
         )
 
         # Update profile for single band output
-        profile.update({
-            'count': 1,
-            'dtype': rasterio.uint16,
-            'compress': 'lzw'
-        })
+        profile.update({"count": 1, "dtype": rasterio.uint16, "compress": "lzw"})
 
         # Write raster
-        with rasterio.open(output_path, 'w', **profile) as dst:
+        with rasterio.open(output_path, "w", **profile) as dst:
             dst.write(raster, 1)
 
     def export_training_data(self):
@@ -1143,7 +1156,7 @@ class DeepForestDockWidget(QDockWidget):
             "info": {
                 "description": "DeepForest Detection Export",
                 "version": "1.0",
-                "year": 2024
+                "year": 2024,
             },
             "licenses": [],
             "images": [
@@ -1151,26 +1164,24 @@ class DeepForestDockWidget(QDockWidget):
                     "id": 1,
                     "width": img_width,
                     "height": img_height,
-                    "file_name": image_name
+                    "file_name": image_name,
                 }
             ],
             "annotations": [],
-            "categories": []
+            "categories": [],
         }
 
         # Get unique labels
-        if 'label' in self.predictions.columns:
+        if "label" in self.predictions.columns:
             unique_labels = self.predictions.label.unique()
         else:
-            unique_labels = ['detection']
+            unique_labels = ["detection"]
 
         # Create categories
         for idx, label in enumerate(unique_labels):
-            coco_data["categories"].append({
-                "id": idx + 1,
-                "name": label,
-                "supercategory": "object"
-            })
+            coco_data["categories"].append(
+                {"id": idx + 1, "name": label, "supercategory": "object"}
+            )
 
         # Create annotations
         for ann_id, (_, row) in enumerate(self.predictions.iterrows()):
@@ -1179,7 +1190,7 @@ class DeepForestDockWidget(QDockWidget):
             area = bbox_width * bbox_height
 
             category_id = 1  # Default
-            if 'label' in self.predictions.columns:
+            if "label" in self.predictions.columns:
                 category_id = list(unique_labels).index(row.label) + 1
 
             annotation = {
@@ -1188,17 +1199,17 @@ class DeepForestDockWidget(QDockWidget):
                 "category_id": category_id,
                 "bbox": [row.xmin, row.ymin, bbox_width, bbox_height],
                 "area": area,
-                "iscrowd": 0
+                "iscrowd": 0,
             }
-            
-            if 'score' in row:
+
+            if "score" in row:
                 annotation["score"] = float(row.score)
 
             coco_data["annotations"].append(annotation)
 
         # Save COCO JSON
         coco_path = os.path.join(export_dir, "annotations.json")
-        with open(coco_path, 'w') as f:
+        with open(coco_path, "w") as f:
             json.dump(coco_data, f, indent=2)
 
     def _export_yolo(self, export_dir):
@@ -1216,26 +1227,26 @@ class DeepForestDockWidget(QDockWidget):
             img_width, img_height = img.size
 
         # Get unique labels
-        if 'label' in self.predictions.columns:
+        if "label" in self.predictions.columns:
             unique_labels = list(self.predictions.label.unique())
         else:
-            unique_labels = ['detection']
+            unique_labels = ["detection"]
 
         # Create classes.txt
         classes_path = os.path.join(export_dir, "classes.txt")
-        with open(classes_path, 'w') as f:
+        with open(classes_path, "w") as f:
             for label in unique_labels:
                 f.write(f"{label}\n")
 
         # Create YOLO annotation file
-        label_name = os.path.splitext(image_name)[0] + '.txt'
+        label_name = os.path.splitext(image_name)[0] + ".txt"
         label_path = os.path.join(export_dir, label_name)
 
-        with open(label_path, 'w') as f:
+        with open(label_path, "w") as f:
             for _, row in self.predictions.iterrows():
                 # Get class index
                 class_idx = 0  # Default
-                if 'label' in self.predictions.columns:
+                if "label" in self.predictions.columns:
                     class_idx = unique_labels.index(row.label)
 
                 # Convert to YOLO format (normalized xywh)
@@ -1244,7 +1255,9 @@ class DeepForestDockWidget(QDockWidget):
                 width = (row.xmax - row.xmin) / img_width
                 height = (row.ymax - row.ymin) / img_height
 
-                f.write(f"{class_idx} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n")
+                f.write(
+                    f"{class_idx} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n"
+                )
 
     def show_error(self, message):
         """Show an error message."""

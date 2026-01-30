@@ -511,7 +511,10 @@ class GeoAIPlugin:
                     deepforest_obj = self._deepforest_dock.deepforest
                     if deepforest_obj is not None:
                         # Clear the model
-                        if hasattr(deepforest_obj, "model") and deepforest_obj.model is not None:
+                        if (
+                            hasattr(deepforest_obj, "model")
+                            and deepforest_obj.model is not None
+                        ):
                             try:
                                 deepforest_obj.model.cpu()
                             except Exception:
@@ -540,11 +543,17 @@ class GeoAIPlugin:
 
                         # Update UI status
                         if hasattr(self._deepforest_dock, "model_status"):
-                            self._deepforest_dock.model_status.setText("Model: Not loaded")
-                            self._deepforest_dock.model_status.setStyleSheet("color: gray;")
+                            self._deepforest_dock.model_status.setText(
+                                "Model: Not loaded"
+                            )
+                            self._deepforest_dock.model_status.setStyleSheet(
+                                "color: gray;"
+                            )
                         if hasattr(self._deepforest_dock, "image_status"):
                             self._deepforest_dock.image_status.setText("Image: Not set")
-                            self._deepforest_dock.image_status.setStyleSheet("color: gray;")
+                            self._deepforest_dock.image_status.setStyleSheet(
+                                "color: gray;"
+                            )
                         # Clear internal state
                         if hasattr(self._deepforest_dock, "current_image_path"):
                             self._deepforest_dock.current_image_path = None
