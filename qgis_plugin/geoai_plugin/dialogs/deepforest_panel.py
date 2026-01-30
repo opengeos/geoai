@@ -172,9 +172,9 @@ class DeepForestPredictWorker(QThread):
             self.model.config["workers"] = 0
             self.model.config["batch_size"] = self.batch_size
             self.model.config["devices"] = 1
-            self.model.config["accelerator"] = "gpu" if (
-                torch is not None and torch.cuda.is_available()
-            ) else "cpu"
+            self.model.config["accelerator"] = (
+                "gpu" if (torch is not None and torch.cuda.is_available()) else "cpu"
+            )
 
             # Pre-create the trainer with explicit safe settings so that
             # predict_tile does not re-initialize Lightning with DDP.
@@ -217,6 +217,7 @@ class DeepForestPredictWorker(QThread):
                 # Estimate number of patches for progress info
                 try:
                     from PIL import Image as PILImage
+
                     with PILImage.open(image_path) as img:
                         w, h = img.size
                     stride = int(self.patch_size * (1 - self.patch_overlap))
