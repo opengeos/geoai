@@ -1010,9 +1010,7 @@ class DeepForestDockWidget(QDockWidget):
                 self.log_message(f"Auto-saved detections to: {temp_path}")
 
         except Exception as e:
-            self.log_message(
-                f"Auto-show failed: {str(e)}", level=Qgis.Warning
-            )
+            self.log_message(f"Auto-show failed: {str(e)}", level=Qgis.Warning)
 
     def save_results(self):
         """Save the prediction results."""
