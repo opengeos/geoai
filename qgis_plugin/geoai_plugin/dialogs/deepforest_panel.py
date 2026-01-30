@@ -165,9 +165,31 @@ class DeepForestPredictWorker(QThread):
                 ):
                     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
+            # Check if image has an alpha channel and strip it if needed.
+            # DeepForest expects 3-channel RGB input.
+            image_path = self.image_path
+            temp_rgb_path = None
+            try:
+                import rasterio
+
+                with rasterio.open(image_path) as src:
+                    if src.count >= 4:
+                        self.progress.emit(
+                            "Stripping alpha channel (converting to 3-band RGB)..."
+                        )
+                        profile = src.profile.copy()
+                        profile.update(count=3)
+                        temp_rgb_path = image_path + ".deepforest_rgb.tif"
+                        with rasterio.open(temp_rgb_path, "w", **profile) as dst:
+                            for band in range(1, 4):
+                                dst.write(src.read(band), band)
+                        image_path = temp_rgb_path
+            except Exception:
+                pass  # If rasterio check fails, try with original image
+
             if self.mode == "Single Image":
                 self.progress.emit("Running prediction on single image...")
-                result = self.model.predict_image(path=self.image_path)
+                result = self.model.predict_image(path=image_path)
                 pred_mode = "single"
             else:
                 self.progress.emit(
@@ -175,13 +197,20 @@ class DeepForestPredictWorker(QThread):
                     f"(patch_size={self.patch_size}, overlap={self.patch_overlap})..."
                 )
                 result = self.model.predict_tile(
-                    path=self.image_path,
+                    path=image_path,
                     patch_size=self.patch_size,
                     patch_overlap=self.patch_overlap,
                     iou_threshold=self.iou_threshold,
                     dataloader_strategy=self.dataloader_strategy,
                 )
                 pred_mode = "tile"
+
+            # Clean up temporary RGB file
+            if temp_rgb_path and os.path.exists(temp_rgb_path):
+                try:
+                    os.remove(temp_rgb_path)
+                except Exception:
+                    pass  # Best-effort cleanup
 
             # Apply score threshold filter
             if (
