@@ -489,6 +489,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#deepforest-panel-object-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeepForest Panel (Object Detection)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#gpu-memory-management" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -690,6 +701,34 @@
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deepforest-panel-object-detection_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeepForest Panel (Object Detection)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DeepForest Panel (Object Detection)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-pretrained-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Pretrained Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -3746,6 +3785,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#deepforest-panel-object-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeepForest Panel (Object Detection)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#gpu-memory-management" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3951,6 +4001,34 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#deepforest-panel-object-detection_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeepForest Panel (Object Detection)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DeepForest Panel (Object Detection)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-pretrained-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Pretrained Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#clear-gpu-memory" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4067,7 +4145,7 @@
 
 
 <h1 id="qgis-plugin-for-geoai">QGIS Plugin for GeoAI<a class="headerlink" href="#qgis-plugin-for-geoai" title="Permanent link">&para;</a></h1>
-<p>A QGIS plugin that brings the <a href="https://github.com/opengeos/geoai">geoai</a> models into dockable panels (Moondream VLM, segmentation training/inference, SamGeo) so you can keep QGIS as your main workspace while experimenting with GeoAI.</p>
+<p>A QGIS plugin that brings the <a href="https://github.com/opengeos/geoai">geoai</a> models into dockable panels (Moondream VLM, segmentation training/inference, SamGeo, DeepForest) so you can keep QGIS as your main workspace while experimenting with GeoAI.</p>
 <h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Create a Pixi project and install the dependencies.</li>
@@ -4088,7 +4166,7 @@
 <li>QGIS 3.28 or later</li>
 <li>Python 3.10+ (Pixi recommended)</li>
 <li>PyTorch (CUDA if you want GPU acceleration)</li>
-<li><code>geoai</code> and <code>samgeo</code> packages</li>
+<li><code>geoai</code>, <code>samgeo</code>, and <code>deepforest</code> packages</li>
 </ul>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <p>Each tool lives inside a dockable panel that can be attached to either side of the QGIS interface, so you can keep layers, maps, and models visible simultaneously.</p>
@@ -4112,6 +4190,12 @@
 <li><strong>Interactive Tab</strong>: Segment using point prompts (foreground/background) or box prompts drawn on the map</li>
 <li><strong>Batch Tab</strong>: Process multiple points interactively or from vector files/layers</li>
 <li><strong>Output Tab</strong>: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)</li>
+</ul>
+<h3 id="deepforest-panel-object-detection">DeepForest Panel (Object Detection)<a class="headerlink" href="#deepforest-panel-object-detection" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model Tab</strong>: Load pretrained <a href="https://deepforest.readthedocs.io">DeepForest</a> models from Hugging Face for tree crown, bird, livestock, nest, and dead tree detection</li>
+<li><strong>Predict Tab</strong>: Run predictions on single images or large geospatial tiles with configurable patch size, overlap, IoU threshold, and score filtering</li>
+<li><strong>Output Tab</strong>: Save detection results as georeferenced vector (GeoPackage, Shapefile, GeoJSON) or raster (GeoTIFF), and export training data in COCO or YOLO format</li>
 </ul>
 <h3 id="gpu-memory-management">GPU Memory Management<a class="headerlink" href="#gpu-memory-management" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4164,7 +4248,8 @@
 <span class="normal">14</span>
 <span class="normal">15</span>
 <span class="normal">16</span>
-<span class="normal">17</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
+<span class="normal">17</span>
+<span class="normal">18</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
 <span class="n">channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
 <span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;geo&quot;</span>
 <span class="n">platforms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;linux-64&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;win-64&quot;</span><span class="p">]</span>
@@ -4180,6 +4265,7 @@
 <span class="n">geoai</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.24.0&quot;</span>
 <span class="n">segment-geospatial</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=1.2.0&quot;</span>
 <span class="n">sam3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.1.0.20251211&quot;</span>
+<span class="n">deepforest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=2.0.0&quot;</span>
 <span class="n">libopenblas</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.3.30&quot;</span>
 </code></pre></div></td></tr></table></div>
 <ul>
@@ -4200,7 +4286,8 @@
 <span class="normal">13</span>
 <span class="normal">14</span>
 <span class="normal">15</span>
-<span class="normal">16</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
+<span class="normal">16</span>
+<span class="normal">17</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
 <span class="n">channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
 <span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;geo&quot;</span>
 <span class="n">platforms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;linux-64&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;win-64&quot;</span><span class="p">]</span>
@@ -4216,6 +4303,7 @@
 <span class="n">geoai</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.24.0&quot;</span>
 <span class="n">segment-geospatial</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=1.2.0&quot;</span>
 <span class="n">sam3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.1.0.20251211&quot;</span>
+<span class="n">deepforest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=2.0.0&quot;</span>
 </code></pre></div></td></tr></table></div>
 <ul>
 <li>For CPU:</li>
@@ -4233,7 +4321,8 @@
 <span class="normal">11</span>
 <span class="normal">12</span>
 <span class="normal">13</span>
-<span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
+<span class="normal">14</span>
+<span class="normal">15</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
 <span class="n">channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
 <span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;geo&quot;</span>
 <span class="n">platforms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;linux-64&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;win-64&quot;</span><span class="p">]</span>
@@ -4246,6 +4335,7 @@
 <span class="n">geoai</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.24.0&quot;</span>
 <span class="n">segment-geospatial</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=1.2.0&quot;</span>
 <span class="n">sam3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.1.0.20251211&quot;</span>
+<span class="n">deepforest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=2.0.0&quot;</span>
 <span class="n">libopenblas</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.3.30&quot;</span>
 </code></pre></div></td></tr></table></div>
 <hr />
@@ -4414,6 +4504,98 @@ python<span class="w"> </span>install.py
 <p><img alt="" src="https://github.com/user-attachments/assets/5c80cc57-3870-4a20-bb74-73e394ef22a6" /></p>
 </li>
 </ol>
+<h3 id="deepforest-panel-object-detection_1">DeepForest Panel (Object Detection)<a class="headerlink" href="#deepforest-panel-object-detection_1" title="Permanent link">&para;</a></h3>
+<p>The DeepForest panel provides object detection in remote sensing imagery using pretrained deep learning models from the <a href="https://deepforest.readthedocs.io">DeepForest</a> library.</p>
+<h4 id="supported-pretrained-models">Supported Pretrained Models<a class="headerlink" href="#supported-pretrained-models" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Hugging Face ID</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tree Crown Detection</td>
+<td><code>weecology/deepforest-tree</code></td>
+<td>Detect individual tree crowns in RGB imagery</td>
+</tr>
+<tr>
+<td>Bird Detection</td>
+<td><code>weecology/deepforest-bird</code></td>
+<td>Detect birds in aerial/satellite imagery</td>
+</tr>
+<tr>
+<td>Livestock Detection</td>
+<td><code>weecology/deepforest-livestock</code></td>
+<td>Detect livestock in aerial imagery</td>
+</tr>
+<tr>
+<td>Nest Detection</td>
+<td><code>weecology/everglades-nest-detection</code></td>
+<td>Detect bird nests in Everglades imagery</td>
+</tr>
+<tr>
+<td>Dead Tree Detection</td>
+<td><code>weecology/cropmodel-deadtrees</code></td>
+<td>Detect dead trees in forest imagery</td>
+</tr>
+</tbody>
+</table>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>DeepForest</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>DeepForest</code>)</li>
+<li>
+<p>In the <strong>Model</strong> tab:</p>
+<ul>
+<li>Select a pretrained model from the dropdown (e.g., Tree Crown Detection)</li>
+<li>Configure device (auto, cuda, cpu)</li>
+<li>Click "Load Model" to download and initialize the model</li>
+<li>Select a raster layer or browse for an image file and click "Set Image from Layer" or "Set Image from File"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/a4b0c1d2-85e0-442d-9574-919f4bc59c67" /></p>
+</li>
+<li>
+<p>In the <strong>Predict</strong> tab:</p>
+<ul>
+<li>Choose prediction mode:<ul>
+<li><strong>Single Image</strong>: Predict on the entire image at once (best for small images)</li>
+<li><strong>Large Tile</strong>: Split large geospatial tiles into overlapping patches for prediction</li>
+</ul>
+</li>
+<li>For Large Tile mode, configure:<ul>
+<li><strong>Patch Size</strong>: Size of each prediction window (default 400px; experiment with 400–800 for 0.1m data)</li>
+<li><strong>Patch Overlap</strong>: Overlap between adjacent patches (default 0.25)</li>
+<li><strong>IoU Threshold</strong>: Overlap threshold for suppressing duplicate detections (default 0.15)</li>
+<li><strong>Dataloader Strategy</strong>: Memory management strategy (single, batch, or window)</li>
+</ul>
+</li>
+<li>Set the <strong>Score Threshold</strong> to filter low-confidence detections (default 0.3)</li>
+<li>Click "Run Prediction"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/200782fe-290d-4882-9b8d-4dcaeafad1b0" /></p>
+<p><img alt="" src="https://github.com/user-attachments/assets/3523f9d7-a8d4-4b9e-839b-6616730dd452" /></p>
+</li>
+<li>
+<p>In the <strong>Output</strong> tab:</p>
+<ul>
+<li>Select output format:<ul>
+<li><strong>Vector</strong>: GeoPackage, Shapefile, or GeoJSON (saves bounding boxes as polygons with score and label attributes)</li>
+<li><strong>Raster</strong>: GeoTIFF (rasterizes bounding boxes onto the source raster)</li>
+</ul>
+</li>
+<li>Click "Save Results" to export</li>
+<li>To export training data for model fine-tuning:<ul>
+<li>Select, <strong>PASCAL_VOC</strong>, <strong>COCO</strong> or <strong>YOLO</strong> format</li>
+<li>Choose an output directory</li>
+<li>Click "Export Training Data"</li>
+</ul>
+</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/4a0ef60a-fb1f-4084-a65c-34b886c9ef01" /></p>
+</li>
+</ol>
 <h3 id="clear-gpu-memory">Clear GPU Memory<a class="headerlink" href="#clear-gpu-memory" title="Permanent link">&para;</a></h3>
 <p>Click the <strong>GPU</strong> button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.</p>
 <p><img alt="" src="https://github.com/user-attachments/assets/76c9dd8a-581c-4975-9ecb-4bfe301447bd" /></p>
@@ -4486,7 +4668,7 @@ python<span class="w"> </span>install.py
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 25, 2026 13:07:33 UTC"><span class="timeago" datetime="2026-01-25T13:07:33+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 25, 2026 13:07:33 UTC">2026-01-25</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 30, 2026 04:28:56 UTC"><span class="timeago" datetime="2026-01-30T04:28:56+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 30, 2026 04:28:56 UTC">2026-01-30</span>
   </span>
 
     
