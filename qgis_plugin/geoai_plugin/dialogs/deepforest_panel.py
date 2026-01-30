@@ -1309,54 +1309,34 @@ class DeepForestDockWidget(QDockWidget):
 
         preds = self.predictions
 
-        # Check if predictions already have a usable geometry column
-        has_geometry_col = (
-            "geometry" in preds.columns and self.prediction_mode == "tile"
-        )
+        # DeepForest always returns pixel-space coordinates in
+        # xmin/ymin/xmax/ymax (and geometry if present) for both
+        # predict_image and predict_tile. Convert to geographic
+        # coordinates using the source raster's affine transform.
+        transform = None
+        if self.current_image_path:
+            try:
+                import rasterio
 
-        if has_geometry_col and isinstance(preds, gpd.GeoDataFrame):
-            # predict_tile returned a proper GeoDataFrame — use as-is
-            gdf = preds.copy()
-        elif self.prediction_mode == "tile":
-            # predict_tile returned coordinates already in map space.
-            # Build geometry directly from xmin/ymin/xmax/ymax — do NOT
-            # apply the pixel-to-geo transform (they are NOT pixel coords).
-            geometries = [
-                box(row.xmin, row.ymin, row.xmax, row.ymax)
-                for _, row in preds.iterrows()
-            ]
-            df = pd.DataFrame(preds)
-            if "geometry" in df.columns:
-                df = df.drop(columns=["geometry"])
-            gdf = gpd.GeoDataFrame(df, geometry=geometries)
-        else:
-            # predict_image returns pixel-space coordinates.
-            # Convert to geographic coords using the source raster's
-            # affine transform so vectors align with the map.
-            transform = None
-            if self.current_image_path:
-                try:
-                    import rasterio
+                with rasterio.open(self.current_image_path) as src:
+                    transform = src.transform
+            except Exception:
+                pass  # Fall back to raw pixel coords
 
-                    with rasterio.open(self.current_image_path) as src:
-                        transform = src.transform
-                except Exception:
-                    pass  # Fall back to raw pixel coords
+        geometries = []
+        for _, row in preds.iterrows():
+            if transform is not None:
+                geom = self._pixel_to_geo_box(
+                    row.xmin, row.ymin, row.xmax, row.ymax, transform
+                )
+            else:
+                geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
+            geometries.append(geom)
 
-            geometries = []
-            for _, row in preds.iterrows():
-                if transform is not None:
-                    geom = self._pixel_to_geo_box(
-                        row.xmin, row.ymin, row.xmax, row.ymax, transform
-                    )
-                else:
-                    geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
-                geometries.append(geom)
-
-            df = pd.DataFrame(preds)
-            if "geometry" in df.columns:
-                df = df.drop(columns=["geometry"])
-            gdf = gpd.GeoDataFrame(df, geometry=geometries)
+        df = pd.DataFrame(preds)
+        if "geometry" in df.columns:
+            df = df.drop(columns=["geometry"])
+        gdf = gpd.GeoDataFrame(df, geometry=geometries)
 
         # Set CRS from the source raster file (most reliable) or QGIS layer
         crs_wkt = None
@@ -1420,17 +1400,13 @@ class DeepForestDockWidget(QDockWidget):
 
         preds = self.predictions
 
-        # Build (geometry, value) pairs for rasterize()
+        # DeepForest always returns pixel-space bounding boxes.
+        # Convert to geographic coordinates for rasterization.
         shapes = []
         for i, (idx, row) in enumerate(preds.iterrows()):
-            if self.prediction_mode == "tile":
-                # predict_tile: xmin/ymin/xmax/ymax already in map coords
-                geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
-            else:
-                # predict_image: pixel-space coords → convert to map coords
-                geom = self._pixel_to_geo_box(
-                    row.xmin, row.ymin, row.xmax, row.ymax, transform
-                )
+            geom = self._pixel_to_geo_box(
+                row.xmin, row.ymin, row.xmax, row.ymax, transform
+            )
             # Use sequential value (1-based, 0 is background)
             shapes.append((geom, i + 1))
 
