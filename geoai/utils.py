@@ -9512,7 +9512,6 @@ def smooth_vector(
     return smoothed_vector_data
 
 
-
 def flipnslide_augmentation(
     image,
     tile_size=256,
@@ -9628,8 +9627,7 @@ def flipnslide_augmentation(
     # Check if image is large enough for tiling
     if height < tile_size or width < tile_size:
         raise ValueError(
-            f"Image size ({height}x{width}) is smaller than "
-            f"tile_size ({tile_size})"
+            f"Image size ({height}x{width}) is smaller than " f"tile_size ({tile_size})"
         )
 
     tiles = []
@@ -9676,15 +9674,9 @@ def flipnslide_augmentation(
         inner_height = inner_image.shape[1]
         inner_width = inner_image.shape[2]
 
-        for idx_h, row in enumerate(
-            range(0, inner_height - tile_size + 1, stride)
-        ):
-            for idx_w, col in enumerate(
-                range(0, inner_width - tile_size + 1, stride)
-            ):
-                tile = inner_image[
-                    :, row : row + tile_size, col : col + tile_size
-                ]
+        for idx_h, row in enumerate(range(0, inner_height - tile_size + 1, stride)):
+            for idx_w, col in enumerate(range(0, inner_width - tile_size + 1, stride)):
+                tile = inner_image[:, row : row + tile_size, col : col + tile_size]
 
                 if idx_h % 2 == 0 and idx_w % 2 == 0:
                     # Horizontal flip
@@ -9809,9 +9801,7 @@ def export_flipnslide_tiles(
                     raise ValueError(
                         f"CRS mismatch: image ({src.crs}) vs mask ({class_src.crs})"
                     )
-                if (class_src.width != src.width) or (
-                    class_src.height != src.height
-                ):
+                if (class_src.width != src.width) or (class_src.height != src.height):
                     raise ValueError(
                         f"Dimension mismatch: image "
                         f"({src.width}x{src.height}) vs mask "
