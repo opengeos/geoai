@@ -898,6 +898,7 @@ class DeepForestDockWidget(QDockWidget):
         """Run DeepForest prediction on the current image."""
         # Disable PIL decompression bomb check for large geospatial tiles
         from PIL import Image
+
         Image.MAX_IMAGE_PIXELS = None
 
         if self.deepforest is None:
