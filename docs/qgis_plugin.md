@@ -401,6 +401,8 @@ Steps:
     - Click "Load Model" to download and initialize the model
     - Select a raster layer or browse for an image file and click "Set Image from Layer" or "Set Image from File"
 
+    ![](https://github.com/user-attachments/assets/a4b0c1d2-85e0-442d-9574-919f4bc59c67)
+
 3. In the **Predict** tab:
 
     - Choose prediction mode:
@@ -414,6 +416,8 @@ Steps:
     - Set the **Score Threshold** to filter low-confidence detections (default 0.3)
     - Click "Run Prediction"
 
+    ![](https://github.com/user-attachments/assets/200782fe-290d-4882-9b8d-4dcaeafad1b0)
+
 4. In the **Output** tab:
 
     - Select output format:
@@ -424,6 +428,8 @@ Steps:
         - Select **COCO** or **YOLO** format
         - Choose an output directory
         - Click "Export Training Data"
+
+    ![](https://github.com/user-attachments/assets/4a0ef60a-fb1f-4084-a65c-34b886c9ef01)
 
 ### Clear GPU Memory
 
