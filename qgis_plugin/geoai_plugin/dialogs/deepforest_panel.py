@@ -896,6 +896,10 @@ class DeepForestDockWidget(QDockWidget):
 
     def run_prediction(self):
         """Run DeepForest prediction on the current image."""
+        # Disable PIL decompression bomb check for large geospatial tiles
+        from PIL import Image
+        Image.MAX_IMAGE_PIXELS = None
+
         if self.deepforest is None:
             self.show_error("Please load the model first.")
             return
