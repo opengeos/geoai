@@ -1040,9 +1040,7 @@ class DeepForestDockWidget(QDockWidget):
 
         if result is not None and not result.empty:
             num_detections = len(result)
-            self.predict_status_label.setText(
-                f"Found {num_detections} detection(s)."
-            )
+            self.predict_status_label.setText(f"Found {num_detections} detection(s).")
             self.predict_status_label.setStyleSheet("color: green;")
 
             mode = self.mode_combo.currentText()
@@ -1062,9 +1060,7 @@ class DeepForestDockWidget(QDockWidget):
                 summary += f"Labels: {dict(labels)}\n"
 
             self.results_text.setText(summary)
-            self.log_message(
-                f"Prediction complete. Found {num_detections} detections."
-            )
+            self.log_message(f"Prediction complete. Found {num_detections} detections.")
 
             # Auto-show results on map
             self._auto_show_results()
