@@ -128,8 +128,9 @@ class DeepForestPredictWorker(QThread):
         patch_size: int = 400,
         patch_overlap: float = 0.25,
         iou_threshold: float = 0.15,
-        dataloader_strategy: str = "single",
+        dataloader_strategy: str = "batch",
         score_threshold: float = 0.3,
+        batch_size: int = 4,
     ):
         super().__init__()
         self.model = model
@@ -140,6 +141,7 @@ class DeepForestPredictWorker(QThread):
         self.iou_threshold = iou_threshold
         self.dataloader_strategy = dataloader_strategy
         self.score_threshold = score_threshold
+        self.batch_size = batch_size
 
     def run(self):
         """Run prediction in background."""
@@ -164,6 +166,12 @@ class DeepForestPredictWorker(QThread):
                     and "CUDA_VISIBLE_DEVICES" not in os.environ
                 ):
                     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+            # Configure model for optimal performance inside QGIS
+            self.model.config["workers"] = 0  # No multiprocessing in QGIS
+            self.model.config["batch_size"] = self.batch_size
+            self.model.config["devices"] = 1  # Single device only
+            self.model.config["accelerator"] = "auto"
 
             # Check if image has an alpha channel and strip it if needed.
             # DeepForest expects 3-channel RGB input.
@@ -462,11 +470,30 @@ class DeepForestDockWidget(QDockWidget):
         iou_threshold_row.addWidget(self.iou_threshold_spin)
         tile_settings_layout.addLayout(iou_threshold_row)
 
+        # Batch size
+        batch_size_row = QHBoxLayout()
+        batch_size_row.addWidget(QLabel("Batch Size:"))
+        self.batch_size_spin = QSpinBox()
+        self.batch_size_spin.setRange(1, 128)
+        self.batch_size_spin.setValue(4)
+        self.batch_size_spin.setToolTip(
+            "Number of patches to process simultaneously.\n"
+            "Higher values speed up prediction but use more GPU memory.\n"
+            "Default: 4. Reduce if you get out-of-memory errors."
+        )
+        batch_size_row.addWidget(self.batch_size_spin)
+        tile_settings_layout.addLayout(batch_size_row)
+
         # Dataloader strategy
         dataloader_row = QHBoxLayout()
         dataloader_row.addWidget(QLabel("Dataloader Strategy:"))
         self.dataloader_combo = QComboBox()
-        self.dataloader_combo.addItems(["single", "batch", "window"])
+        self.dataloader_combo.addItems(["batch", "single", "window"])
+        self.dataloader_combo.setToolTip(
+            "batch: fastest, loads entire image into GPU memory\n"
+            "single: loads full image to RAM, processes patches one at a time\n"
+            "window: most memory-efficient, reads only needed windows from disk"
+        )
         dataloader_row.addWidget(self.dataloader_combo)
         tile_settings_layout.addLayout(dataloader_row)
 
@@ -1050,6 +1077,7 @@ class DeepForestDockWidget(QDockWidget):
             iou_threshold=self.iou_threshold_spin.value(),
             dataloader_strategy=self.dataloader_combo.currentText(),
             score_threshold=self.score_threshold_spin.value(),
+            batch_size=self.batch_size_spin.value(),
         )
         self.predict_worker.finished.connect(self._on_prediction_finished)
         self.predict_worker.error.connect(self._on_prediction_error)
