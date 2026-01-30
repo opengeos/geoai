@@ -418,6 +418,8 @@ Steps:
 
     ![](https://github.com/user-attachments/assets/200782fe-290d-4882-9b8d-4dcaeafad1b0)
 
+    ![](https://github.com/user-attachments/assets/3523f9d7-a8d4-4b9e-839b-6616730dd452)
+
 4. In the **Output** tab:
 
     - Select output format:
