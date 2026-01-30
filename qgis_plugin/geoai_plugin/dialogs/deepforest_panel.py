@@ -401,6 +401,14 @@ class DeepForestDockWidget(QDockWidget):
         self.add_to_map_check.setChecked(True)
         format_layout.addWidget(self.add_to_map_check)
 
+        # Auto-show results after prediction
+        self.auto_show_check = QCheckBox("Auto-show results after prediction")
+        self.auto_show_check.setChecked(True)
+        self.auto_show_check.setToolTip(
+            "Automatically save and display results on the map after running prediction"
+        )
+        format_layout.addWidget(self.auto_show_check)
+
         # Output path
         output_path_row = QHBoxLayout()
         self.output_path_edit = QLineEdit()
@@ -958,6 +966,9 @@ class DeepForestDockWidget(QDockWidget):
                 self.log_message(
                     f"Prediction complete. Found {num_detections} detections."
                 )
+
+                # Auto-show results on map
+                self._auto_show_results()
             else:
                 self.predict_status_label.setText("No detections found.")
                 self.predict_status_label.setStyleSheet("color: orange;")
@@ -972,6 +983,36 @@ class DeepForestDockWidget(QDockWidget):
 
         finally:
             self.progress_bar.setVisible(False)
+
+    def _auto_show_results(self):
+        """Automatically save and show results on the map after prediction."""
+        if not self.auto_show_check.isChecked():
+            return
+
+        if self.predictions is None or self.predictions.empty:
+            return
+
+        try:
+            # Always auto-show as vector (GeoPackage) for best map display
+            temp_file = tempfile.NamedTemporaryFile(
+                suffix=".gpkg", delete=False, prefix="deepforest_"
+            )
+            temp_path = temp_file.name
+            temp_file.close()
+            self._temp_files.append(temp_path)
+
+            self._save_as_vector(temp_path, "GeoPackage")
+
+            layer = QgsVectorLayer(temp_path, "deepforest_detections", "ogr")
+            if layer.isValid():
+                QgsProject.instance().addMapLayer(layer)
+                self.results_text.append(f"\nAuto-saved to: {temp_path}")
+                self.log_message(f"Auto-saved detections to: {temp_path}")
+
+        except Exception as e:
+            self.log_message(
+                f"Auto-show failed: {str(e)}", level=Qgis.Warning
+            )
 
     def save_results(self):
         """Save the prediction results."""
@@ -1041,8 +1082,13 @@ class DeepForestDockWidget(QDockWidget):
     def _pixel_to_geo_box(self, xmin, ymin, xmax, ymax, transform):
         """Convert pixel bounding box coordinates to geographic coordinates.
 
+        DeepForest predict_image returns pixel-space boxes where:
+          xmin/xmax = column indices, ymin/ymax = row indices.
+        Rasterio's affine transform maps (col, row) → (x, y).
+
         Args:
-            xmin, ymin, xmax, ymax: Pixel-space bounding box.
+            xmin, ymin, xmax, ymax: Pixel-space bounding box
+                (xmin=col_min, ymin=row_min, xmax=col_max, ymax=row_max).
             transform: Affine transform from rasterio.
 
         Returns:
@@ -1050,39 +1096,61 @@ class DeepForestDockWidget(QDockWidget):
         """
         from shapely.geometry import box
 
-        # Convert pixel corners to geographic coordinates using the affine transform
-        geo_xmin, geo_ymin = transform * (xmin, ymax)  # lower-left
-        geo_xmax, geo_ymax = transform * (xmax, ymin)  # upper-right
-        return box(geo_xmin, geo_ymin, geo_xmax, geo_ymax)
+        # (col, row) → (x, y) via affine transform
+        # top-left pixel corner
+        geo_x1, geo_y1 = transform * (xmin, ymin)
+        # bottom-right pixel corner
+        geo_x2, geo_y2 = transform * (xmax, ymax)
+        # box() expects (minx, miny, maxx, maxy)
+        return box(
+            min(geo_x1, geo_x2),
+            min(geo_y1, geo_y2),
+            max(geo_x1, geo_x2),
+            max(geo_y1, geo_y2),
+        )
 
     def _save_as_vector(self, output_path, format_text):
-        """Save predictions as vector format."""
+        """Save predictions as vector format.
+
+        predict_tile returns a GeoDataFrame with geometry already in map coords.
+        predict_image returns a plain DataFrame with pixel-space xmin/ymin/xmax/ymax
+        that must be converted to geographic coordinates via the source raster's
+        affine transform.
+        """
         import geopandas as gpd
         from shapely.geometry import box
+        import pandas as pd
 
-        # Check if predictions already has geometry (from predict_tile)
-        if (
-            hasattr(self.predictions, "geometry")
-            and "geometry" in self.predictions.columns
+        preds = self.predictions
+
+        # Determine if we already have usable geometry from predict_tile
+        has_geo_geometry = (
+            isinstance(preds, gpd.GeoDataFrame)
+            and "geometry" in preds.columns
             and self.prediction_mode == "tile"
-        ):
-            gdf = self.predictions.copy()
+        )
+
+        if has_geo_geometry:
+            gdf = preds.copy()
+            # Ensure it's a proper GeoDataFrame
+            if not isinstance(gdf, gpd.GeoDataFrame):
+                gdf = gpd.GeoDataFrame(gdf, geometry="geometry")
         else:
-            # predict_image returns pixel-space coordinates; convert to
-            # geographic coordinates using the source raster's transform
-            # so that exported vectors align with the map.
+            # Build geometry from bounding box columns.
+            # For predict_image on georeferenced rasters, convert pixel coords
+            # to geographic coords using the source raster's affine transform.
             transform = None
-            if self.prediction_mode == "single" and self.current_image_path:
+            if self.current_image_path:
                 try:
                     import rasterio
 
                     with rasterio.open(self.current_image_path) as src:
                         transform = src.transform
                 except Exception:
-                    pass  # Fall back to raw pixel coords if rasterio unavailable
+                    pass  # Fall back to raw pixel coords
 
             geometries = []
-            for _, row in self.predictions.iterrows():
+            for _, row in preds.iterrows():
                 if transform is not None:
                     geom = self._pixel_to_geo_box(
                         row.xmin, row.ymin, row.xmax, row.ymax, transform
@@ -1091,11 +1159,15 @@ class DeepForestDockWidget(QDockWidget):
                     geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
                 geometries.append(geom)
 
-            gdf = gpd.GeoDataFrame(self.predictions, geometry=geometries)
+            # Drop any existing non-shapely 'geometry' column to avoid conflict
+            df = pd.DataFrame(preds)
+            if "geometry" in df.columns:
+                df = df.drop(columns=["geometry"])
+            gdf = gpd.GeoDataFrame(df, geometry=geometries)
 
         # Set CRS if available from the current layer
         if self.current_layer and self.current_layer.crs().isValid():
-            gdf.crs = self.current_layer.crs().toWkt()
+            gdf.set_crs(self.current_layer.crs().toWkt(), inplace=True)
 
         # Determine driver
         if "GeoJSON" in format_text:
@@ -1111,17 +1183,21 @@ class DeepForestDockWidget(QDockWidget):
         """Save predictions as raster by rasterizing bounding boxes.
 
         For predict_tile results, geometries are already in map coordinates and
-        can be rasterized directly. For predict_image results, pixel-space
-        bounding boxes are converted to geographic coordinates using the source
-        raster's affine transform before rasterizing.
+        can be rasterized directly with the source raster's transform.
+        For predict_image results, pixel-space bounding boxes are converted to
+        geographic coordinates first so rasterize() works correctly with the
+        source raster's affine transform.
         """
         try:
             import rasterio
             from rasterio.features import rasterize
             from shapely.geometry import box
             import numpy as np
+            import geopandas as gpd
         except ImportError:
-            raise ImportError("Rasterio and shapely are required for raster output")
+            raise ImportError(
+                "Rasterio, shapely, and geopandas are required for raster output"
+            )
 
         # Get source raster properties
         with rasterio.open(self.current_image_path) as src:
@@ -1130,25 +1206,26 @@ class DeepForestDockWidget(QDockWidget):
             width = src.width
             height = src.height
 
-        is_pixel_coords = self.prediction_mode == "single"
+        preds = self.predictions
+        has_geo_geometry = (
+            isinstance(preds, gpd.GeoDataFrame)
+            and "geometry" in preds.columns
+            and self.prediction_mode == "tile"
+        )
 
-        # Create geometries from bounding boxes
+        # Build (geometry, value) pairs for rasterize()
         shapes = []
-        for idx, row in self.predictions.iterrows():
-            if is_pixel_coords:
-                # Convert pixel coords to geographic coords for rasterization
+        for i, (idx, row) in enumerate(preds.iterrows()):
+            if has_geo_geometry:
+                # predict_tile: geometry already in map coords
+                geom = row.geometry
+            else:
+                # predict_image: pixel-space coords → convert to map coords
                 geom = self._pixel_to_geo_box(
                     row.xmin, row.ymin, row.xmax, row.ymax, transform
                 )
-            elif (
-                hasattr(self.predictions, "geometry")
-                and "geometry" in self.predictions.columns
-            ):
-                geom = row.geometry
-            else:
-                geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
-            # Use index + 1 as pixel value (0 is background)
-            shapes.append((geom, idx + 1))
+            # Use sequential value (1-based, 0 is background)
+            shapes.append((geom, i + 1))
 
         # Rasterize
         raster = rasterize(
