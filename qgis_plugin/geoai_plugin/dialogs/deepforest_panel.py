@@ -438,7 +438,7 @@ class DeepForestDockWidget(QDockWidget):
         export_format_row = QHBoxLayout()
         export_format_row.addWidget(QLabel("Format:"))
         self.export_format_combo = QComboBox()
-        self.export_format_combo.addItems(["COCO", "YOLO"])
+        self.export_format_combo.addItems(["PASCAL_VOC", "COCO", "YOLO"])
         export_format_row.addWidget(self.export_format_combo)
         export_layout.addLayout(export_format_row)
 
@@ -1272,7 +1272,9 @@ class DeepForestDockWidget(QDockWidget):
             self.progress_bar.setRange(0, 0)
             QCoreApplication.processEvents()
 
-            if format_type == "COCO":
+            if format_type == "PASCAL_VOC":
+                self._export_pascal_voc(export_dir)
+            elif format_type == "COCO":
                 self._export_coco(export_dir)
             elif format_type == "YOLO":
                 self._export_yolo(export_dir)
@@ -1285,6 +1287,67 @@ class DeepForestDockWidget(QDockWidget):
 
         finally:
             self.progress_bar.setVisible(False)
+
+    def _export_pascal_voc(self, export_dir):
+        """Export to PASCAL VOC XML format."""
+        import shutil
+        from PIL import Image
+        import xml.etree.ElementTree as ET
+
+        # Copy image to export directory
+        image_name = os.path.basename(self.current_image_path)
+        images_dir = os.path.join(export_dir, "JPEGImages")
+        annotations_dir = os.path.join(export_dir, "Annotations")
+        os.makedirs(images_dir, exist_ok=True)
+        os.makedirs(annotations_dir, exist_ok=True)
+
+        dest_image = os.path.join(images_dir, image_name)
+        shutil.copy2(self.current_image_path, dest_image)
+
+        # Get image dimensions
+        with Image.open(self.current_image_path) as img:
+            img_width, img_height = img.size
+            img_depth = len(img.getbands())
+
+        # Build XML annotation
+        annotation = ET.Element("annotation")
+        ET.SubElement(annotation, "folder").text = "JPEGImages"
+        ET.SubElement(annotation, "filename").text = image_name
+
+        source = ET.SubElement(annotation, "source")
+        ET.SubElement(source, "database").text = "DeepForest"
+
+        size = ET.SubElement(annotation, "size")
+        ET.SubElement(size, "width").text = str(img_width)
+        ET.SubElement(size, "height").text = str(img_height)
+        ET.SubElement(size, "depth").text = str(img_depth)
+
+        ET.SubElement(annotation, "segmented").text = "0"
+
+        for _, row in self.predictions.iterrows():
+            obj = ET.SubElement(annotation, "object")
+            label = str(row.label) if "label" in row.index else "object"
+            ET.SubElement(obj, "name").text = label
+            ET.SubElement(obj, "pose").text = "Unspecified"
+            ET.SubElement(obj, "truncated").text = "0"
+            ET.SubElement(obj, "difficult").text = "0"
+
+            bndbox = ET.SubElement(obj, "bndbox")
+            ET.SubElement(bndbox, "xmin").text = str(int(round(row.xmin)))
+            ET.SubElement(bndbox, "ymin").text = str(int(round(row.ymin)))
+            ET.SubElement(bndbox, "xmax").text = str(int(round(row.xmax)))
+            ET.SubElement(bndbox, "ymax").text = str(int(round(row.ymax)))
+
+        # Write XML file
+        xml_name = os.path.splitext(image_name)[0] + ".xml"
+        xml_path = os.path.join(annotations_dir, xml_name)
+        tree = ET.ElementTree(annotation)
+        ET.indent(tree, space="  ")
+        tree.write(xml_path, encoding="utf-8", xml_declaration=True)
+
+        self.results_text.append(
+            f"PASCAL VOC export: {len(self.predictions)} annotations"
+        )
 
     def _export_coco(self, export_dir):
         """Export to COCO format."""
@@ -1431,7 +1494,7 @@ class DeepForestDockWidget(QDockWidget):
             renderer.setRasterTransparency(transparency)
 
             # Make all other values semi-transparent (50% opacity)
-            renderer.setOpacity(0.5)
+            renderer.setOpacity(0.8)
 
             layer.triggerRepaint()
         except Exception:
