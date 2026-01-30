@@ -2477,6 +2477,333 @@ def evaluate_semantic(
     }
 
 
+class FocalLoss(torch.nn.Module):
+    """
+    Focal Loss for addressing class imbalance in segmentation tasks.
+
+    Implements the focal loss from:
+        Lin, T. Y., Goyal, P., Girshick, R., He, K., & Dollár, P. (2017).
+        Focal loss for dense object detection. ICCV.
+
+    The focal loss modulates the standard cross-entropy loss so that
+    well-classified examples are down-weighted, letting the model focus
+    on hard, misclassified examples:
+
+        FL = -alpha * (1 - p_t)^gamma * log(p_t)
+
+    Args:
+        alpha (float): Weighting factor for balancing positive vs. negative
+            examples. Defaults to 1.0.
+        gamma (float): Focusing exponent applied as ``(1 - p_t) ** gamma``.
+            Higher values down-weight easy examples more aggressively.
+            Defaults to 2.0.
+        ignore_index (int or bool): Target value that is ignored during loss
+            computation.  Pass ``False`` to disable ignoring entirely.
+            Defaults to ``-100``.
+        reduction (str): Reduction to apply to the output (``'mean'``,
+            ``'sum'``, or ``'none'``). Defaults to ``'mean'``.
+        weight (torch.Tensor or None): Manual per-class rescaling weights.
+            Must be a 1-D tensor of length ``num_classes``. Defaults to None.
+
+    Returns:
+        torch.Tensor: Scalar loss (if ``reduction`` is ``'mean'`` or ``'sum'``)
+        or per-pixel loss tensor (if ``reduction`` is ``'none'``).
+
+    Example:
+        >>> criterion = FocalLoss(alpha=1.0, gamma=2.0, ignore_index=0)
+        >>> logits = torch.randn(4, 5, 256, 256)   # (N, C, H, W)
+        >>> targets = torch.randint(0, 5, (4, 256, 256))
+        >>> loss = criterion(logits, targets)
+    """
+
+    def __init__(
+        self,
+        alpha: float = 1.0,
+        gamma: float = 2.0,
+        ignore_index: Union[int, bool] = -100,
+        reduction: str = "mean",
+        weight: Optional[torch.Tensor] = None,
+    ) -> None:
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+        self.weight = weight
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Compute focal loss.
+
+        Args:
+            inputs (torch.Tensor): Predictions of shape ``(N, C, H, W)``
+                where *C* is the number of classes.
+            targets (torch.Tensor): Ground-truth class indices of shape
+                ``(N, H, W)``.
+
+        Returns:
+            torch.Tensor: Loss value.
+        """
+        # Resolve ignore_index: False -> disabled (-100 won't match any real target)
+        ignore_idx = -100 if self.ignore_index is False else self.ignore_index
+
+        # log-softmax -> NLL gives per-pixel CE with proper ignore handling
+        log_pt = F.log_softmax(inputs, dim=1)
+        ce_loss = F.nll_loss(
+            log_pt,
+            targets,
+            ignore_index=ignore_idx,
+            weight=self.weight,
+            reduction="none",
+        )
+
+        # Probability of true class
+        pt = torch.exp(-ce_loss)
+
+        # Focal modulation: FL = -alpha * (1 - pt)^gamma * log(pt)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+
+        # Reduction
+        if self.reduction == "mean":
+            if ignore_idx != -100:
+                valid = targets != ignore_idx
+                if valid.any():
+                    return focal_loss[valid].mean()
+                return torch.tensor(0.0, device=inputs.device, requires_grad=True)
+            return focal_loss.mean()
+        elif self.reduction == "sum":
+            if ignore_idx != -100:
+                valid = targets != ignore_idx
+                return focal_loss[valid].sum()
+            return focal_loss.sum()
+        return focal_loss
+
+
+def get_loss_function(
+    loss_name: str = "crossentropy",
+    ignore_index: Union[int, bool] = -100,
+    num_classes: int = 2,
+    use_class_weights: bool = False,
+    class_weights: Optional[torch.Tensor] = None,
+    focal_alpha: float = 1.0,
+    focal_gamma: float = 2.0,
+    device: Optional[torch.device] = None,
+) -> torch.nn.Module:
+    """
+    Return a configured loss function for semantic segmentation.
+
+    Supports standard cross-entropy and focal loss, with optional per-class
+    weights and a flexible ``ignore_index`` that can be disabled entirely
+    by passing ``False``.
+
+    Args:
+        loss_name (str): Loss function name — ``"crossentropy"`` or
+            ``"focal"``. Defaults to ``"crossentropy"``.
+        ignore_index (int or bool): Target value to ignore.  Pass ``False``
+            to disable ignoring.  Defaults to ``-100``.
+        num_classes (int): Number of classes. Defaults to 2.
+        use_class_weights (bool): Whether to apply *class_weights*.
+            Defaults to False.
+        class_weights (torch.Tensor or None): Per-class weight tensor.
+            Only used when *use_class_weights* is True.
+        focal_alpha (float): Alpha for focal loss. Defaults to 1.0.
+        focal_gamma (float): Gamma for focal loss. Defaults to 2.0.
+        device (torch.device or None): Target device for the weight tensor.
+
+    Returns:
+        torch.nn.Module: Configured loss function.
+
+    Raises:
+        ValueError: If *loss_name* is not recognized.
+
+    Example:
+        >>> criterion = get_loss_function(
+        ...     "focal",
+        ...     ignore_index=0,
+        ...     use_class_weights=True,
+        ...     class_weights=torch.tensor([0.0, 1.2, 0.8, 3.5]),
+        ...     focal_gamma=2.0,
+        ... )
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    weights = class_weights if use_class_weights and class_weights is not None else None
+    if weights is not None:
+        weights = weights.to(device)
+
+    # Normalise ignore_index for PyTorch (False -> -100, which never matches)
+    ignore_idx = -100 if ignore_index is False else ignore_index
+
+    name = loss_name.lower()
+
+    if name == "crossentropy":
+        print(
+            f"Loss: CrossEntropy | class weights {'enabled' if weights is not None else 'disabled'} "
+            f"| ignore_index={ignore_index}"
+        )
+        return torch.nn.CrossEntropyLoss(weight=weights, ignore_index=ignore_idx)
+
+    if name == "focal":
+        print(
+            f"Loss: Focal (alpha={focal_alpha}, gamma={focal_gamma}) "
+            f"| class weights {'enabled' if weights is not None else 'disabled'} "
+            f"| ignore_index={ignore_index}"
+        )
+        return FocalLoss(
+            alpha=focal_alpha,
+            gamma=focal_gamma,
+            ignore_index=ignore_index,  # FocalLoss handles False internally
+            reduction="mean",
+            weight=weights,
+        )
+
+    raise ValueError(
+        f"Unknown loss function: '{loss_name}'. Supported: 'crossentropy', 'focal'."
+    )
+
+
+def compute_class_weights(
+    labels_dir: str,
+    num_classes: int,
+    ignore_index: Union[int, bool] = -100,
+    custom_multipliers: Optional[Dict[int, float]] = None,
+    max_weight: float = 50.0,
+    use_inverse_frequency: bool = True,
+) -> torch.Tensor:
+    """
+    Compute per-class weights from label tiles for imbalanced datasets.
+
+    Reads every label GeoTIFF/image in *labels_dir*, counts pixels per class,
+    and returns a weight tensor suitable for ``CrossEntropyLoss(weight=...)``
+    or ``FocalLoss(weight=...)``.
+
+    Two modes are available:
+
+    * **Inverse-frequency** (*use_inverse_frequency=True*, default) — rare
+      classes receive higher weights.  Optional *custom_multipliers* are
+      applied **on top** of the computed weights.
+    * **Pure custom** (*use_inverse_frequency=False*) — all classes start at
+      weight 1.0 and *custom_multipliers* override individual classes.
+
+    Args:
+        labels_dir (str): Directory containing label raster/image files.
+        num_classes (int): Total number of classes.
+        ignore_index (int or bool): Class index to ignore (weight set to 0).
+            Pass ``False`` or ``-100`` to disable ignoring. Defaults to ``-100``.
+        custom_multipliers (dict or None): ``{class_id: multiplier}`` applied
+            after weight computation.  Example: ``{1: 0.5, 7: 2.0}``.
+        max_weight (float): Cap to prevent extreme values. Defaults to 50.0.
+        use_inverse_frequency (bool): Enable inverse-frequency weighting.
+            Defaults to True.
+
+    Returns:
+        torch.Tensor: Weight tensor of shape ``(num_classes,)``.
+
+    Raises:
+        ValueError: If no valid pixels are found in *labels_dir*.
+
+    Example:
+        >>> weights = compute_class_weights(
+        ...     "tiles/labels", num_classes=5, ignore_index=0,
+        ...     custom_multipliers={1: 1.5, 4: 0.8},
+        ... )
+        >>> print(weights)
+        tensor([0.0000, 1.8000, 1.2000, 0.9500, 0.6400])
+    """
+    label_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+    label_files = [
+        os.path.join(labels_dir, f)
+        for f in os.listdir(labels_dir)
+        if f.lower().endswith(label_extensions)
+    ]
+
+    print(f"Computing class weights from {len(label_files)} label files...")
+
+    # Determine effective ignore index
+    ign = None if (ignore_index is False or ignore_index == -100) else int(ignore_index)
+
+    class_counts: Counter = Counter()
+    total_pixels = 0
+
+    for label_file in label_files:
+        try:
+            with rasterio.open(label_file) as src:
+                label_data = src.read(1)
+        except Exception:
+            try:
+                with Image.open(label_file) as img:
+                    if img.mode != "L":
+                        img = img.convert("L")
+                    label_data = np.array(img)
+            except Exception as exc:
+                print(f"Warning: could not read {label_file}: {exc}")
+                continue
+
+        for cid in range(num_classes):
+            if ign is not None and cid == ign:
+                continue
+            count = int((label_data == cid).sum())
+            class_counts[cid] += count
+            total_pixels += count
+
+    if total_pixels == 0:
+        raise ValueError("No valid pixels found in label files.")
+
+    # Build weight tensor
+    weights = torch.ones(num_classes)
+
+    if use_inverse_frequency:
+        for cid in range(num_classes):
+            if ign is not None and cid == ign:
+                weights[cid] = 0.0
+            elif class_counts[cid] > 0:
+                weights[cid] = total_pixels / class_counts[cid]
+            else:
+                weights[cid] = 0.0
+        # Normalise so non-zero weights have mean 1.0
+        nz = weights[weights > 0]
+        if len(nz) > 0:
+            weights = weights / nz.mean()
+    else:
+        if ign is not None:
+            weights[ign] = 0.0
+
+    # Custom multipliers
+    if custom_multipliers:
+        print(f"Applying custom multipliers: {custom_multipliers}")
+        for cid, mult in custom_multipliers.items():
+            if 0 <= cid < num_classes:
+                old = weights[cid].item()
+                if use_inverse_frequency:
+                    weights[cid] *= mult
+                else:
+                    weights[cid] = mult
+                print(f"  Class {cid}: {old:.4f} -> {weights[cid].item():.4f}")
+
+    # Cap extreme weights
+    capped = False
+    for cid in range(num_classes):
+        if weights[cid] > max_weight:
+            print(f"  Class {cid}: capped {weights[cid].item():.4f} -> {max_weight}")
+            weights[cid] = max_weight
+            capped = True
+    if not capped:
+        print(f"  No weights exceeded the cap of {max_weight}")
+
+    # Summary
+    print(f"\nClass pixel counts: {dict(class_counts)}")
+    print("Final class weights:")
+    for cid in range(num_classes):
+        pct = (class_counts.get(cid, 0) / total_pixels * 100) if total_pixels else 0
+        print(
+            f"  Class {cid}: weight={weights[cid].item():.4f}, "
+            f"pixels={class_counts.get(cid, 0):,} ({pct:.2f}%)"
+        )
+
+    return weights
+
+
 def train_segmentation_model(
     images_dir: str,
     labels_dir: str,
@@ -2506,6 +2833,15 @@ def train_segmentation_model(
     early_stopping_patience: Optional[int] = None,
     train_transforms: Optional[Callable] = None,
     val_transforms: Optional[Callable] = None,
+    loss_function: str = "crossentropy",
+    ignore_index: Union[int, bool] = False,
+    use_class_weights: bool = False,
+    class_weights: Optional[torch.Tensor] = None,
+    custom_class_multipliers: Optional[Dict[int, float]] = None,
+    max_class_weight: float = 50.0,
+    use_inverse_frequency: bool = True,
+    focal_alpha: float = 1.0,
+    focal_gamma: float = 2.0,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -2569,6 +2905,27 @@ def train_segmentation_model(
         val_transforms (callable, optional): Custom transforms for validation data.
             Should be a callable that accepts (image, mask) tensors and returns transformed (image, mask).
             If None, uses default transforms (no augmentation). Defaults to None.
+        loss_function (str): Loss function name — ``"crossentropy"`` (default) or ``"focal"``.
+            Use ``"focal"`` for datasets with severe class imbalance.
+        ignore_index (int or bool): Target class value to ignore during training.
+            Pass an integer (e.g., ``0``) to ignore a specific class, or ``False``
+            to include all pixels. Defaults to ``False``.
+        use_class_weights (bool): Whether to compute and apply per-class weights
+            to the loss function. Requires *labels_dir* to be readable.
+            Defaults to ``False``.
+        class_weights (torch.Tensor, optional): Precomputed class weight tensor.
+            If given together with ``use_class_weights=True``, these weights are
+            used directly instead of being computed from label tiles.
+        custom_class_multipliers (dict, optional): Per-class multiplier dict
+            ``{class_id: multiplier}`` applied after weight computation.
+            Only used when *use_class_weights* is True and *class_weights*
+            is None.
+        max_class_weight (float): Cap extreme class weights. Defaults to 50.0.
+        use_inverse_frequency (bool): Use inverse-frequency weighting (True) or
+            uniform weights (False) before applying custom multipliers.
+            Defaults to True.
+        focal_alpha (float): Alpha for focal loss. Defaults to 1.0.
+        focal_gamma (float): Gamma for focal loss. Defaults to 2.0.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -2810,8 +3167,30 @@ def train_segmentation_model(
         print(f"Using {torch.cuda.device_count()} GPUs for training")
         model = torch.nn.DataParallel(model)
 
-    # Set up loss function (CrossEntropyLoss for multi-class, can also use F1Loss)
-    criterion = torch.nn.CrossEntropyLoss()
+    # Compute class weights if requested (and not already provided)
+    if use_class_weights and class_weights is None:
+        if verbose:
+            print("\nComputing class weights from label tiles...")
+        class_weights = compute_class_weights(
+            labels_dir=labels_dir,
+            num_classes=num_classes,
+            ignore_index=ignore_index,
+            custom_multipliers=custom_class_multipliers,
+            max_weight=max_class_weight,
+            use_inverse_frequency=use_inverse_frequency,
+        )
+
+    # Set up loss function
+    criterion = get_loss_function(
+        loss_name=loss_function,
+        ignore_index=ignore_index,
+        num_classes=num_classes,
+        use_class_weights=use_class_weights,
+        class_weights=class_weights,
+        focal_alpha=focal_alpha,
+        focal_gamma=focal_gamma,
+        device=device,
+    )
 
     # Set up optimizer
     optimizer = torch.optim.Adam(

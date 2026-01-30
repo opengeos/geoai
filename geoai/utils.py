@@ -3090,6 +3090,7 @@ def export_geotiff_tiles(
     all_touched=True,
     create_overview=False,
     skip_empty_tiles=False,
+    min_feature_ratio=False,
     metadata_format="PASCAL_VOC",
     apply_augmentation=False,
     augmentation_count=3,
@@ -3112,6 +3113,11 @@ def export_geotiff_tiles(
         all_touched (bool): Whether to use all_touched=True in rasterization (for vector data)
         create_overview (bool): Whether to create an overview image of all tiles
         skip_empty_tiles (bool): If True, skip tiles with no features
+        min_feature_ratio (float or False): Minimum ratio of non-background pixels
+            required to keep a tile.  Only applies when ``skip_empty_tiles=True``
+            and ``in_class_data`` is provided.  Set to ``False`` (default) to
+            disable ratio filtering, or a float between 0.0 and 1.0 (e.g. 0.1
+            means at least 10 % of pixels must be non-background). Defaults to False.
         metadata_format (str): Output metadata format (PASCAL_VOC, COCO, YOLO). Default: PASCAL_VOC
         apply_augmentation (bool): If True, generate augmented versions of each tile.
             This will create multiple variants of each tile using data augmentation techniques.
@@ -3134,6 +3140,10 @@ def export_geotiff_tiles(
         >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif',
         ...                      apply_augmentation=True)
         >>>
+        >>> # Export with min_feature_ratio filtering (keep tiles with >=10% features)
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif',
+        ...                      skip_empty_tiles=True, min_feature_ratio=0.1)
+        >>>
         >>> # Export with custom augmentation
         >>> import albumentations as A
         >>> custom_transform = A.Compose([
@@ -3149,6 +3159,24 @@ def export_geotiff_tiles(
     import logging
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
+
+    # Validate min_feature_ratio
+    if min_feature_ratio is not False:
+        if not isinstance(min_feature_ratio, (int, float)) or not (
+            0.0 <= min_feature_ratio <= 1.0
+        ):
+            warnings.warn(
+                f"min_feature_ratio must be False or a float in [0, 1], "
+                f"got {min_feature_ratio!r}. Disabling ratio filtering."
+            )
+            min_feature_ratio = False
+        elif not quiet:
+            print(
+                f"Feature-ratio filtering enabled: min_feature_ratio={min_feature_ratio}"
+            )
+
+    # Track ratio-skipped tiles
+    tiles_skipped_ratio = 0
 
     # Initialize augmentation transforms if needed
     if apply_augmentation:
@@ -3488,6 +3516,22 @@ def export_geotiff_tiles(
                     pbar.update(1)
                     tile_index += 1
                     continue
+
+                # Apply min_feature_ratio filtering (only when enabled and tile has some features)
+                if (
+                    in_class_data is not None
+                    and skip_empty_tiles
+                    and has_features
+                    and min_feature_ratio is not False
+                ):
+                    total_pixels = label_mask.size
+                    feature_pixels = int(np.count_nonzero(label_mask))
+                    ratio = feature_pixels / total_pixels if total_pixels > 0 else 0.0
+                    if ratio < min_feature_ratio:
+                        tiles_skipped_ratio += 1
+                        pbar.update(1)
+                        tile_index += 1
+                        continue
 
                 # Read image data
                 image_data = src.read(window=window)
@@ -3877,6 +3921,10 @@ def export_geotiff_tiles(
                     print(
                         f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
                     )
+            if min_feature_ratio is not False:
+                print(
+                    f"Tiles skipped (feature ratio < {min_feature_ratio}): {tiles_skipped_ratio}"
+                )
             if stats["errors"] > 0:
                 print(f"Errors encountered: {stats['errors']}")
             print(f"Output saved to: {out_folder}")
