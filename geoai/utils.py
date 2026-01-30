@@ -9467,3 +9467,422 @@ def smooth_vector(
     if output_path is not None:
         smoothed_vector_data.to_file(output_path)
     return smoothed_vector_data
+
+
+# ---------------------------------------------------------------------------
+# Spline smoothing utilities for tiling-artifact-free inference
+# ---------------------------------------------------------------------------
+
+# Module-level cache for 2D spline windows (avoids recomputation).
+_cached_2d_windows: Dict[str, np.ndarray] = {}
+
+
+def _spline_window(window_size: int, power: int = 2) -> np.ndarray:
+    """Create a 1-D spline window for smooth patch blending.
+
+    The window is constructed by combining triangular outer tails with a
+    smooth inner plateau so that overlapping patches blend seamlessly.
+
+    Args:
+        window_size (int): Length of the 1-D window (should match the patch
+            size used during inference).
+        power (int): Exponent applied to the triangular basis.  Higher values
+            produce a sharper transition near patch edges.  Defaults to ``2``.
+
+    Returns:
+        np.ndarray: 1-D array of length *window_size* with values normalised
+        so that the average weight equals 1.
+
+    References:
+        https://github.com/Vooban/Smoothly-Blend-Image-Patches
+    """
+    from scipy.signal.windows import triang
+
+    intersection = int(window_size / 4)
+    wind_outer = (abs(2 * triang(window_size)) ** power) / 2
+    wind_outer[intersection:-intersection] = 0
+
+    wind_inner = 1 - (abs(2 * (triang(window_size) - 1)) ** power) / 2
+    wind_inner[:intersection] = 0
+    wind_inner[-intersection:] = 0
+
+    wind = wind_inner + wind_outer
+    wind = wind / np.average(wind)
+    return wind
+
+
+def _window_2D(window_size: int, power: int = 2) -> "torch.Tensor":
+    """Generate a 2-D spline blending window (cached).
+
+    The 2-D window is the outer product of two identical 1-D spline windows
+    produced by :func:`_spline_window`.  Results are cached so that repeated
+    calls with the same parameters return instantly.
+
+    Args:
+        window_size (int): Spatial size of the square window.
+        power (int): Exponent forwarded to :func:`_spline_window`.
+            Defaults to ``2``.
+
+    Returns:
+        torch.Tensor: Float tensor of shape ``(1, 1, window_size, window_size)``.
+
+    References:
+        https://github.com/Vooban/Smoothly-Blend-Image-Patches
+    """
+    import torch
+
+    key = f"{window_size}_{power}"
+    if key not in _cached_2d_windows:
+        wind = _spline_window(window_size, power)
+        _cached_2d_windows[key] = np.outer(wind, wind)
+    return (
+        torch.tensor(_cached_2d_windows[key], dtype=torch.float32)
+        .unsqueeze(0)
+        .unsqueeze(0)
+    )
+
+
+def split_tensor_to_patches(
+    tensor: "torch.Tensor",
+    patch_size: int = 256,
+    overlap: int = 128,
+) -> Tuple["torch.Tensor", Tuple[int, int]]:
+    """Split a 4-D tensor into overlapping patches using :meth:`torch.Tensor.unfold`.
+
+    Args:
+        tensor (torch.Tensor): Input tensor of shape ``(B, C, H, W)``.
+        patch_size (int): Spatial size of each square patch.  Defaults to ``256``.
+        overlap (int): Number of overlapping pixels between adjacent patches.
+            Defaults to ``128``.
+
+    Returns:
+        Tuple[torch.Tensor, Tuple[int, int]]:
+            - **patches** – Tensor of shape ``(N, C, patch_size, patch_size)`` where
+              *N = B × h_steps × w_steps*.
+            - **grid_size** – ``(h_steps, w_steps)`` giving the number of patches
+              along each spatial dimension.
+    """
+    stride = patch_size - overlap
+    patches = tensor.unfold(2, patch_size, stride).unfold(3, patch_size, stride)
+    batch, channels, h_steps, w_steps, _, _ = patches.shape
+    patches = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
+    patches = patches.view(-1, channels, patch_size, patch_size)
+    return patches, (h_steps, w_steps)
+
+
+def reconstruct_from_patches(
+    patches: "torch.Tensor",
+    grid_size: Tuple[int, int],
+    output_size: Tuple[int, int, int, int],
+    patch_size: int = 256,
+    overlap: int = 128,
+    power: int = 2,
+) -> "torch.Tensor":
+    """Reconstruct a tensor from overlapping patches with spline blending.
+
+    Each patch is weighted by a 2-D spline window before accumulation so
+    that the overlap regions transition smoothly, eliminating tiling
+    artefacts.
+
+    Args:
+        patches (torch.Tensor): Patches of shape ``(N, C, patch_size, patch_size)``.
+        grid_size (Tuple[int, int]): ``(h_steps, w_steps)`` – number of patches
+            along each spatial axis (as returned by :func:`split_tensor_to_patches`).
+        output_size (Tuple[int, int, int, int]): Desired output shape
+            ``(B, C, H, W)``.
+        patch_size (int): Spatial size of each patch.  Defaults to ``256``.
+        overlap (int): Overlap that was used when splitting.  Defaults to ``128``.
+        power (int): Exponent for the spline window.  Defaults to ``2``.
+
+    Returns:
+        torch.Tensor: Reconstructed tensor of shape *output_size*.
+
+    References:
+        https://github.com/Vooban/Smoothly-Blend-Image-Patches
+    """
+    import torch
+
+    batch_size, out_channels, _height, _width = output_size
+    h_steps, w_steps = grid_size
+    stride = patch_size - overlap
+
+    reconstructed = torch.zeros(output_size, device=patches.device)
+    counter = torch.zeros_like(reconstructed)
+
+    window_2d = _window_2D(patch_size, power=power).to(patches.device)
+    patches_per_batch = h_steps * w_steps
+
+    for b in range(batch_size):
+        batch_patches = patches[b * patches_per_batch : (b + 1) * patches_per_batch]
+        for idx in range(patches_per_batch):
+            i = idx // w_steps
+            j = idx % w_steps
+            y_start = i * stride
+            x_start = j * stride
+
+            current_patch = batch_patches[idx].unsqueeze(0)
+            patch_window = window_2d.repeat(1, out_channels, 1, 1)
+            weighted_patch = current_patch * patch_window
+
+            reconstructed[
+                b : b + 1,
+                :,
+                y_start : y_start + patch_size,
+                x_start : x_start + patch_size,
+            ] += weighted_patch
+            counter[
+                b : b + 1,
+                :,
+                y_start : y_start + patch_size,
+                x_start : x_start + patch_size,
+            ] += patch_window
+
+    reconstructed = reconstructed / (counter + 1e-8)
+    return reconstructed
+
+
+def predict_raster_smooth(
+    infile: str,
+    model: Any,
+    outfile: str,
+    patch_size: int = 256,
+    overlap: int = 128,
+    num_workers: int = 1,
+    device: Optional[str] = None,
+    use_tta: bool = False,
+    num_classes: int = 2,
+    num_channels: Optional[int] = None,
+    normalize: bool = True,
+    quiet: bool = False,
+) -> str:
+    """Run tiling-artifact-free inference on a raster using spline blending.
+
+    This function reads an input GeoTIFF with rasterio windowed I/O (memory-
+    efficient), splits each window into overlapping patches, runs a PyTorch
+    segmentation model, and reconstructs the output using 2-D spline
+    blending to eliminate tiling artefacts.  An optional test-time
+    augmentation (D4 dihedral group: 4 rotations × 2 flips) is available.
+
+    The output is a single-band GeoTIFF containing the argmax class label
+    at every pixel.
+
+    Args:
+        infile (str): Path to the input GeoTIFF raster.
+        model (torch.nn.Module): Trained PyTorch segmentation model.  Must
+            accept tensors of shape ``(B, C, H, W)`` and return logits of
+            shape ``(B, num_classes, H, W)``.
+        outfile (str): Path for the output GeoTIFF prediction raster.
+        patch_size (int): Spatial size of each inference patch.  Must be a
+            multiple of 32.  Defaults to ``256``.
+        overlap (int): Number of overlapping pixels between adjacent patches.
+            Defaults to ``128``.
+        num_workers (int): Number of threads for parallel window processing.
+            Defaults to ``1``.
+        device (str, optional): PyTorch device string (e.g. ``"cuda"``).
+            Auto-detected when *None*.
+        use_tta (bool): If *True*, apply D4 test-time augmentation (8
+            geometric transforms) and average the predictions.  Increases
+            inference time ×8 but can improve accuracy.  Defaults to
+            *False*.
+        num_classes (int): Number of output classes expected from the model.
+            Defaults to ``2``.
+        num_channels (int, optional): Number of input bands to read.
+            If *None* all bands of the raster are used.
+        normalize (bool): If *True* and pixel values exceed 1.0, divide by
+            255.  Defaults to *True*.
+        quiet (bool): If *True*, suppress progress output.  Defaults to
+            *False*.
+
+    Returns:
+        str: Path to the output raster (*outfile*).
+
+    Example:
+        >>> import geoai
+        >>> import torch
+        >>> model = torch.load("model.pth")  # doctest: +SKIP
+        >>> geoai.predict_raster_smooth(   # doctest: +SKIP
+        ...     infile="input.tif",
+        ...     model=model,
+        ...     outfile="prediction.tif",
+        ...     patch_size=256,
+        ...     overlap=128,
+        ...     use_tta=True,
+        ... )
+
+    References:
+        - Spline blending:
+          https://github.com/Vooban/Smoothly-Blend-Image-Patches
+        - Issue discussion:
+          https://github.com/opengeos/geoai/issues/87
+    """
+    import logging
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from pathlib import Path
+
+    import rasterio as rio
+    import torch
+    import torchvision.transforms.functional as TF
+    from rasterio.windows import Window
+    from tqdm.auto import tqdm
+
+    logger = logging.getLogger(__name__)
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = model.to(device)
+    model.eval()
+
+    # ------------------------------------------------------------------
+    # D4 test-time augmentation helpers
+    # ------------------------------------------------------------------
+    def _d4_transforms(image: torch.Tensor) -> torch.Tensor:
+        """Return a batch of 8 D4 transforms of *image* (C, H, W)."""
+        return torch.stack(
+            [
+                image,
+                TF.rotate(image, 90),
+                TF.rotate(image, 180),
+                TF.rotate(image, 270),
+                TF.hflip(image),
+                TF.vflip(image),
+                TF.vflip(TF.rotate(image, 90)),
+                TF.hflip(TF.rotate(image, 90)),
+            ]
+        )
+
+    def _inverse_d4(outputs: torch.Tensor) -> torch.Tensor:
+        """Apply inverse D4 transforms and return the stack."""
+        inverses = [
+            lambda x: x,
+            lambda x: TF.rotate(x, -90),
+            lambda x: TF.rotate(x, -180),
+            lambda x: TF.rotate(x, -270),
+            lambda x: TF.hflip(x),
+            lambda x: TF.vflip(x),
+            lambda x: TF.rotate(TF.vflip(x), -90),
+            lambda x: TF.rotate(TF.hflip(x), -90),
+        ]
+        return torch.stack(
+            [fn(out) for fn, out in zip(inverses, outputs)]
+        )
+
+    # ------------------------------------------------------------------
+    # Open input, prepare output
+    # ------------------------------------------------------------------
+    with rio.open(infile) as src:
+        profile = src.profile.copy()
+        profile.update(
+            blockxsize=patch_size,
+            blockysize=patch_size,
+            tiled=True,
+            count=1,
+            dtype="uint8",
+            compress="lzw",
+        )
+
+        in_bands = num_channels if num_channels else src.count
+        full_overlap_size = patch_size + overlap * 2
+
+        with rio.open(Path(outfile), "w", **profile) as dst:
+            windows = [window for _ij, window in dst.block_windows()]
+
+            read_lock = threading.Lock()
+            write_lock = threading.Lock()
+
+            def _process_window(window: Window) -> None:
+                """Read a window with overlap, infer, blend, and write."""
+                # ---- read with overlap padding ----
+                with read_lock:
+                    ov_window = Window(
+                        col_off=window.col_off - overlap,
+                        row_off=window.row_off - overlap,
+                        width=full_overlap_size,
+                        height=full_overlap_size,
+                    )
+                    src_array = src.read(
+                        list(range(1, in_bands + 1)),
+                        boundless=True,
+                        window=ov_window,
+                        fill_value=0.0,
+                    )
+
+                image = torch.from_numpy(src_array).float()  # (C, H, W)
+                if normalize and image.max() > 1.0:
+                    image = image / 255.0
+
+                image = image.unsqueeze(0)  # (1, C, H, W)
+
+                # ---- split into overlapping patches ----
+                patches, grid_size = split_tensor_to_patches(
+                    image, patch_size, overlap
+                )
+                patches = torch.nan_to_num(patches, nan=0.0, neginf=0.0, posinf=0.0)
+                patches = patches.to(device)
+
+                # ---- inference ----
+                with torch.no_grad():
+                    if use_tta:
+                        # Run each patch through all 8 D4 transforms
+                        all_outputs = []
+                        for p_idx in range(patches.shape[0]):
+                            aug_batch = _d4_transforms(patches[p_idx])  # (8, C, H, W)
+                            aug_out = model(aug_batch.to(device))
+                            inv_out = _inverse_d4(aug_out)
+                            all_outputs.append(inv_out.mean(dim=0))
+                        output = torch.stack(all_outputs, dim=0)
+                    else:
+                        output = model(patches)
+
+                # ---- reconstruct with spline blending ----
+                _, out_c, _, _ = output.shape
+                recon = reconstruct_from_patches(
+                    output,
+                    grid_size,
+                    (1, out_c, full_overlap_size, full_overlap_size),
+                    patch_size,
+                    overlap,
+                )
+
+                # Crop to the core patch_size region (remove overlap padding)
+                result = (
+                    torch.argmax(
+                        recon[
+                            :,
+                            :,
+                            overlap : patch_size + overlap,
+                            overlap : patch_size + overlap,
+                        ],
+                        dim=1,
+                    )
+                    .squeeze()
+                    .cpu()
+                    .numpy()
+                    .astype(np.uint8)
+                )
+
+                with write_lock:
+                    dst.write(result, 1, window=window)
+
+            # ----------------------------------------------------------
+            # Process all windows (optionally parallel)
+            # ----------------------------------------------------------
+            desc = os.path.basename(outfile)
+            with tqdm(total=len(windows), desc=desc, disable=quiet) as pbar:
+                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    futures = {
+                        executor.submit(_process_window, w): w for w in windows
+                    }
+                    try:
+                        for future in as_completed(futures):
+                            future.result()
+                            pbar.update(1)
+                    except Exception as exc:
+                        logger.error("Error during smooth inference: %s", exc)
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise
+
+    if not quiet:
+        print(f"Smooth prediction saved to {outfile}")
+    return outfile
