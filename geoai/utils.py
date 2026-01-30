@@ -9764,9 +9764,7 @@ def predict_raster_smooth(
             lambda x: TF.rotate(TF.vflip(x), -90),
             lambda x: TF.rotate(TF.hflip(x), -90),
         ]
-        return torch.stack(
-            [fn(out) for fn, out in zip(inverses, outputs)]
-        )
+        return torch.stack([fn(out) for fn, out in zip(inverses, outputs)])
 
     # ------------------------------------------------------------------
     # Open input, prepare output
@@ -9815,9 +9813,7 @@ def predict_raster_smooth(
                 image = image.unsqueeze(0)  # (1, C, H, W)
 
                 # ---- split into overlapping patches ----
-                patches, grid_size = split_tensor_to_patches(
-                    image, patch_size, overlap
-                )
+                patches, grid_size = split_tensor_to_patches(image, patch_size, overlap)
                 patches = torch.nan_to_num(patches, nan=0.0, neginf=0.0, posinf=0.0)
                 patches = patches.to(device)
 
@@ -9871,9 +9867,7 @@ def predict_raster_smooth(
             desc = os.path.basename(outfile)
             with tqdm(total=len(windows), desc=desc, disable=quiet) as pbar:
                 with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                    futures = {
-                        executor.submit(_process_window, w): w for w in windows
-                    }
+                    futures = {executor.submit(_process_window, w): w for w in windows}
                     try:
                         for future in as_completed(futures):
                             future.result()
