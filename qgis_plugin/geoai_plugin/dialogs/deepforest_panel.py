@@ -141,6 +141,15 @@ class DeepForestDockWidget(QDockWidget):
         main_layout = QVBoxLayout()
         main_widget.setLayout(main_layout)
 
+        # Header with link to DeepForest repo
+        header_label = QLabel(
+            '<b>DeepForest</b> — '
+            '<a href="https://github.com/weecology/DeepForest">GitHub</a> · '
+            '<a href="https://deepforest.readthedocs.io">Docs</a>'
+        )
+        header_label.setOpenExternalLinks(True)
+        main_layout.addWidget(header_label)
+
         # Tab widget for different modes
         self.tab_widget = QTabWidget()
 
