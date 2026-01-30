@@ -1311,8 +1311,7 @@ class DeepForestDockWidget(QDockWidget):
 
         # Check if predictions already have a usable geometry column
         has_geometry_col = (
-            "geometry" in preds.columns
-            and self.prediction_mode == "tile"
+            "geometry" in preds.columns and self.prediction_mode == "tile"
         )
 
         if has_geometry_col and isinstance(preds, gpd.GeoDataFrame):
