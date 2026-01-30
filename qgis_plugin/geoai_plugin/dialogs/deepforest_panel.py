@@ -1309,22 +1309,31 @@ class DeepForestDockWidget(QDockWidget):
 
         preds = self.predictions
 
-        # Determine if we already have usable geometry from predict_tile
-        has_geo_geometry = (
-            isinstance(preds, gpd.GeoDataFrame)
-            and "geometry" in preds.columns
+        # Check if predictions already have a usable geometry column
+        has_geometry_col = (
+            "geometry" in preds.columns
             and self.prediction_mode == "tile"
         )
 
-        if has_geo_geometry:
+        if has_geometry_col and isinstance(preds, gpd.GeoDataFrame):
+            # predict_tile returned a proper GeoDataFrame — use as-is
             gdf = preds.copy()
-            # Ensure it's a proper GeoDataFrame
-            if not isinstance(gdf, gpd.GeoDataFrame):
-                gdf = gpd.GeoDataFrame(gdf, geometry="geometry")
+        elif self.prediction_mode == "tile":
+            # predict_tile returned coordinates already in map space.
+            # Build geometry directly from xmin/ymin/xmax/ymax — do NOT
+            # apply the pixel-to-geo transform (they are NOT pixel coords).
+            geometries = [
+                box(row.xmin, row.ymin, row.xmax, row.ymax)
+                for _, row in preds.iterrows()
+            ]
+            df = pd.DataFrame(preds)
+            if "geometry" in df.columns:
+                df = df.drop(columns=["geometry"])
+            gdf = gpd.GeoDataFrame(df, geometry=geometries)
         else:
-            # Build geometry from bounding box columns.
-            # For predict_image on georeferenced rasters, convert pixel coords
-            # to geographic coords using the source raster's affine transform.
+            # predict_image returns pixel-space coordinates.
+            # Convert to geographic coords using the source raster's
+            # affine transform so vectors align with the map.
             transform = None
             if self.current_image_path:
                 try:
@@ -1345,7 +1354,6 @@ class DeepForestDockWidget(QDockWidget):
                     geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
                 geometries.append(geom)
 
-            # Drop any existing non-shapely 'geometry' column to avoid conflict
             df = pd.DataFrame(preds)
             if "geometry" in df.columns:
                 df = df.drop(columns=["geometry"])
@@ -1412,18 +1420,13 @@ class DeepForestDockWidget(QDockWidget):
             height = src.height
 
         preds = self.predictions
-        has_geo_geometry = (
-            isinstance(preds, gpd.GeoDataFrame)
-            and "geometry" in preds.columns
-            and self.prediction_mode == "tile"
-        )
 
         # Build (geometry, value) pairs for rasterize()
         shapes = []
         for i, (idx, row) in enumerate(preds.iterrows()):
-            if has_geo_geometry:
-                # predict_tile: geometry already in map coords
-                geom = row.geometry
+            if self.prediction_mode == "tile":
+                # predict_tile: xmin/ymin/xmax/ymax already in map coords
+                geom = box(row.xmin, row.ymin, row.xmax, row.ymax)
             else:
                 # predict_image: pixel-space coords → convert to map coords
                 geom = self._pixel_to_geo_box(
