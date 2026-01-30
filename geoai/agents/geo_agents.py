@@ -851,11 +851,12 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
 
         return None
 
-    def ask(self, prompt: str) -> str:
+    def ask(self, prompt: str, visualize: bool = True) -> str:
         """Send a single-turn prompt to the agent.
 
         Args:
             prompt: The text prompt to send to the agent.
+            visualize: If True, automatically add found items to the map. Defaults to True.
 
         Returns:
             The agent's response as a string (JSON format for search queries).
@@ -870,13 +871,19 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
 
             items = search_payload.get("items") or []
             if items:
-                return json.dumps(items[0], indent=2)
+                item = items[0]
+                # Visualize on map if requested
+                if visualize:
+                    self._visualize_stac_item(item)
+                return json.dumps(item, indent=2)
 
             return json.dumps({"error": "No items found"}, indent=2)
 
         return getattr(result, "final_text", str(result))
 
-    def search_and_get_first_item(self, prompt: str) -> Optional[Dict[str, Any]]:
+    def search_and_get_first_item(
+        self, prompt: str, visualize: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """Search for imagery and return the first item as a structured dict.
 
         This method sends a search query to the agent, extracts the search results
@@ -896,6 +903,7 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
         Args:
             prompt: Natural language search query (e.g., "Find Sentinel-2 imagery
                     over San Francisco in September 2024").
+            visualize: If True, automatically add found items to the map. Defaults to True.
 
         Returns:
             Dictionary containing STACItemInfo fields (id, collection, datetime,
@@ -920,7 +928,11 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
 
             items = search_payload.get("items") or []
             if items:
-                return items[0]
+                item = items[0]
+                # Visualize on map if requested
+                if visualize:
+                    self._visualize_stac_item(item)
+                return item
 
             print("No items found in search results")
             return None
@@ -938,6 +950,10 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             if not all(k in item_data for k in ["id", "collection"]):
                 print("Response missing required fields (id, collection)")
                 return None
+
+            # Visualize on map if requested
+            if visualize:
+                self._visualize_stac_item(item_data)
 
             return item_data
 
@@ -1171,7 +1187,8 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
                 self.callback_handler = callback_handler
 
                 # Get the structured search result directly (will show progress via callback)
-                item_data = self.search_and_get_first_item(text)
+                # Pass visualize=False since we handle visualization separately below
+                item_data = self.search_and_get_first_item(text, visualize=False)
 
                 if item_data is not None:
                     # Update status for visualization step
