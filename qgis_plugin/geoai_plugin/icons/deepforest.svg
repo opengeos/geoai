@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Tree crown (three layered triangles for a conifer/pine tree) -->
+  <polygon points="12,2 7,9 17,9" fill="#2E7D32"/>
+  <polygon points="12,5 5.5,13 18.5,13" fill="#388E3C"/>
+  <polygon points="12,8 4,17 20,17" fill="#43A047"/>
+  <!-- Trunk -->
+  <rect x="10.5" y="17" width="3" height="5" rx="0.5" fill="#5D4037"/>
+</svg>
