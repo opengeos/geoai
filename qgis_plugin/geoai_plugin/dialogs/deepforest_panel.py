@@ -113,6 +113,91 @@ class DeepForestModelLoadWorker(QThread):
             self.error.emit(str(e))
 
 
+class DeepForestPredictWorker(QThread):
+    """Worker thread for running DeepForest predictions."""
+
+    finished = pyqtSignal(object, str)  # Emits (result_df, mode)
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
+
+    def __init__(
+        self,
+        model,
+        image_path: str,
+        mode: str,
+        patch_size: int = 400,
+        patch_overlap: float = 0.25,
+        iou_threshold: float = 0.15,
+        dataloader_strategy: str = "single",
+        score_threshold: float = 0.3,
+    ):
+        super().__init__()
+        self.model = model
+        self.image_path = image_path
+        self.mode = mode
+        self.patch_size = patch_size
+        self.patch_overlap = patch_overlap
+        self.iou_threshold = iou_threshold
+        self.dataloader_strategy = dataloader_strategy
+        self.score_threshold = score_threshold
+
+    def run(self):
+        """Run prediction in background."""
+        try:
+            from PIL import Image
+
+            Image.MAX_IMAGE_PIXELS = None
+
+            # Prevent PyTorch Lightning distributed process spawning
+            os.environ["WORLD_SIZE"] = "1"
+            os.environ["RANK"] = "0"
+            os.environ["LOCAL_RANK"] = "0"
+            os.environ["MASTER_ADDR"] = "127.0.0.1"
+            os.environ["MASTER_PORT"] = "12355"
+            os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
+            os.environ["PL_TRAINER_STRATEGY"] = "auto"
+            os.environ["PL_ACCELERATOR"] = "gpu"
+            if torch is not None:
+                torch.set_float32_matmul_precision("medium")
+                if (
+                    torch.cuda.is_available()
+                    and "CUDA_VISIBLE_DEVICES" not in os.environ
+                ):
+                    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+            if self.mode == "Single Image":
+                self.progress.emit("Running prediction on single image...")
+                result = self.model.predict_image(path=self.image_path)
+                pred_mode = "single"
+            else:
+                self.progress.emit(
+                    f"Running prediction on large tile "
+                    f"(patch_size={self.patch_size}, overlap={self.patch_overlap})..."
+                )
+                result = self.model.predict_tile(
+                    path=self.image_path,
+                    patch_size=self.patch_size,
+                    patch_overlap=self.patch_overlap,
+                    iou_threshold=self.iou_threshold,
+                    dataloader_strategy=self.dataloader_strategy,
+                )
+                pred_mode = "tile"
+
+            # Apply score threshold filter
+            if (
+                self.score_threshold > 0
+                and result is not None
+                and not result.empty
+                and "score" in result.columns
+            ):
+                result = result[result.score >= self.score_threshold]
+
+            self.finished.emit(result, pred_mode)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class DeepForestDockWidget(QDockWidget):
     """Dock widget for DeepForest tree detection operations."""
 
@@ -140,8 +225,9 @@ class DeepForestDockWidget(QDockWidget):
         # Track temporary files for cleanup
         self._temp_files = []
 
-        # Model loading worker
+        # Workers
         self.model_load_worker = None
+        self.predict_worker = None
 
         self._setup_ui()
 
@@ -909,31 +995,7 @@ class DeepForestDockWidget(QDockWidget):
             self.progress_bar.setVisible(False)
 
     def run_prediction(self):
-        """Run DeepForest prediction on the current image."""
-        # Disable PIL decompression bomb check for large geospatial tiles
-        from PIL import Image
-
-        Image.MAX_IMAGE_PIXELS = None
-
-        # Prevent PyTorch Lightning from spawning distributed processes
-        # which would crash QGIS. Force single-process, single-GPU mode.
-        import torch
-
-        torch.set_float32_matmul_precision("medium")
-        os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
-        os.environ["WORLD_SIZE"] = "1"
-        os.environ["RANK"] = "0"
-        os.environ["LOCAL_RANK"] = "0"
-        os.environ["MASTER_ADDR"] = "127.0.0.1"
-        os.environ["MASTER_PORT"] = "12355"
-        # Prevent Lightning from using DDP strategy
-        os.environ["PL_TRAINER_STRATEGY"] = "auto"
-        os.environ["PL_ACCELERATOR"] = "gpu"
-        # Limit to single GPU to avoid multi-process spawn
-        if "CUDA_VISIBLE_DEVICES" not in os.environ:
-            if torch.cuda.is_available():
-                os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
+        """Run DeepForest prediction on the current image (async via QThread)."""
         if self.deepforest is None:
             self.show_error("Please load the model first.")
             return
@@ -942,86 +1004,84 @@ class DeepForestDockWidget(QDockWidget):
             self.show_error("Please set an image first.")
             return
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            self.predict_status_label.setText("Running prediction...")
-            self.predict_status_label.setStyleSheet("color: orange;")
-            QCoreApplication.processEvents()
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.predict_status_label.setText("Running prediction...")
+        self.predict_status_label.setStyleSheet("color: orange;")
+        self.predict_btn.setEnabled(False)
+
+        mode = self.mode_combo.currentText()
+
+        self.predict_worker = DeepForestPredictWorker(
+            model=self.deepforest,
+            image_path=self.current_image_path,
+            mode=mode,
+            patch_size=self.patch_size_spin.value(),
+            patch_overlap=self.patch_overlap_spin.value(),
+            iou_threshold=self.iou_threshold_spin.value(),
+            dataloader_strategy=self.dataloader_combo.currentText(),
+            score_threshold=self.score_threshold_spin.value(),
+        )
+        self.predict_worker.finished.connect(self._on_prediction_finished)
+        self.predict_worker.error.connect(self._on_prediction_error)
+        self.predict_worker.progress.connect(self._on_prediction_progress)
+        self.predict_worker.start()
+
+    def _on_prediction_progress(self, message: str):
+        """Handle prediction progress updates."""
+        self.predict_status_label.setText(message)
+
+    def _on_prediction_finished(self, result, pred_mode: str):
+        """Handle successful prediction."""
+        self.predictions = result
+        self.prediction_mode = pred_mode
+        self.progress_bar.setVisible(False)
+        self.predict_btn.setEnabled(True)
+
+        if result is not None and not result.empty:
+            num_detections = len(result)
+            self.predict_status_label.setText(
+                f"Found {num_detections} detection(s)."
+            )
+            self.predict_status_label.setStyleSheet("color: green;")
 
             mode = self.mode_combo.currentText()
+            summary = f"DeepForest Prediction Results:\n"
+            summary += f"Mode: {mode}\n"
+            summary += f"Image: {os.path.basename(self.current_image_path)}\n"
+            summary += f"Detections: {num_detections}\n"
 
-            if mode == "Single Image":
-                # Use predict_image for single images
-                result = self.deepforest.predict_image(path=self.current_image_path)
-                self.prediction_mode = "single"
-            else:
-                # Use predict_tile for large geospatial tiles
-                patch_size = self.patch_size_spin.value()
-                patch_overlap = self.patch_overlap_spin.value()
-                iou_threshold = self.iou_threshold_spin.value()
-
-                dataloader_strategy = self.dataloader_combo.currentText()
-
-                result = self.deepforest.predict_tile(
-                    path=self.current_image_path,
-                    patch_size=patch_size,
-                    patch_overlap=patch_overlap,
-                    iou_threshold=iou_threshold,
-                    dataloader_strategy=dataloader_strategy,
-                )
-                self.prediction_mode = "tile"
-
-            # Apply score threshold filter
-            score_threshold = self.score_threshold_spin.value()
-            if score_threshold > 0 and result is not None and not result.empty:
-                if "score" in result.columns:
-                    result = result[result.score >= score_threshold]
-
-            self.predictions = result
-
-            # Update results
-            if result is not None and not result.empty:
-                num_detections = len(result)
-                self.predict_status_label.setText(
-                    f"Found {num_detections} detection(s)."
-                )
-                self.predict_status_label.setStyleSheet("color: green;")
-
-                # Show summary in results text
-                summary = f"DeepForest Prediction Results:\n"
-                summary += f"Mode: {mode}\n"
-                summary += f"Image: {os.path.basename(self.current_image_path)}\n"
-                summary += f"Detections: {num_detections}\n"
-
-                if "score" in result.columns:
-                    summary += f"Score range: {result.score.min():.3f} - {result.score.max():.3f}\n"
-
-                if "label" in result.columns:
-                    labels = result.label.value_counts()
-                    summary += f"Labels: {dict(labels)}\n"
-
-                self.results_text.setText(summary)
-                self.log_message(
-                    f"Prediction complete. Found {num_detections} detections."
+            if "score" in result.columns:
+                summary += (
+                    f"Score range: {result.score.min():.3f} - "
+                    f"{result.score.max():.3f}\n"
                 )
 
-                # Auto-show results on map
-                self._auto_show_results()
-            else:
-                self.predict_status_label.setText("No detections found.")
-                self.predict_status_label.setStyleSheet("color: orange;")
-                self.results_text.setText(
-                    "No detections found. Try adjusting the score threshold."
-                )
+            if "label" in result.columns:
+                labels = result.label.value_counts()
+                summary += f"Labels: {dict(labels)}\n"
 
-        except Exception as e:
-            self.predict_status_label.setText("Prediction failed!")
-            self.predict_status_label.setStyleSheet("color: red;")
-            self.show_error(f"Prediction failed: {str(e)}")
+            self.results_text.setText(summary)
+            self.log_message(
+                f"Prediction complete. Found {num_detections} detections."
+            )
 
-        finally:
-            self.progress_bar.setVisible(False)
+            # Auto-show results on map
+            self._auto_show_results()
+        else:
+            self.predict_status_label.setText("No detections found.")
+            self.predict_status_label.setStyleSheet("color: orange;")
+            self.results_text.setText(
+                "No detections found. Try adjusting the score threshold."
+            )
+
+    def _on_prediction_error(self, error_message: str):
+        """Handle prediction error."""
+        self.progress_bar.setVisible(False)
+        self.predict_btn.setEnabled(True)
+        self.predict_status_label.setText("Prediction failed!")
+        self.predict_status_label.setStyleSheet("color: red;")
+        self.show_error(f"Prediction failed: {error_message}")
 
     def _auto_show_results(self):
         """Automatically save and show results on the map after prediction."""
@@ -1564,10 +1624,14 @@ class DeepForestDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
-        # Stop model loading worker if running
+        # Stop workers if running
         if self.model_load_worker is not None and self.model_load_worker.isRunning():
             self.model_load_worker.terminate()
             self.model_load_worker.wait()
+
+        if self.predict_worker is not None and self.predict_worker.isRunning():
+            self.predict_worker.terminate()
+            self.predict_worker.wait()
 
         # Clean up temporary files
         for temp_file in self._temp_files:
