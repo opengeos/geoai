@@ -9561,7 +9561,19 @@ def split_tensor_to_patches(
               *N = B × h_steps × w_steps*.
             - **grid_size** – ``(h_steps, w_steps)`` giving the number of patches
               along each spatial dimension.
+
+    Raises:
+        ValueError: If *overlap* >= *patch_size* or either is not a positive
+            integer.
     """
+    if not isinstance(patch_size, int) or patch_size <= 0:
+        raise ValueError(f"patch_size must be a positive integer, got {patch_size}")
+    if not isinstance(overlap, int) or overlap < 0:
+        raise ValueError(f"overlap must be a non-negative integer, got {overlap}")
+    if overlap >= patch_size:
+        raise ValueError(
+            f"overlap ({overlap}) must be less than patch_size ({patch_size})"
+        )
     stride = patch_size - overlap
     patches = tensor.unfold(2, patch_size, stride).unfold(3, patch_size, stride)
     batch, channels, h_steps, w_steps, _, _ = patches.shape
@@ -9650,7 +9662,6 @@ def predict_raster_smooth(
     num_workers: int = 1,
     device: Optional[str] = None,
     use_tta: bool = False,
-    num_classes: int = 2,
     num_channels: Optional[int] = None,
     normalize: bool = True,
     quiet: bool = False,
@@ -9672,8 +9683,8 @@ def predict_raster_smooth(
             accept tensors of shape ``(B, C, H, W)`` and return logits of
             shape ``(B, num_classes, H, W)``.
         outfile (str): Path for the output GeoTIFF prediction raster.
-        patch_size (int): Spatial size of each inference patch.  Must be a
-            multiple of 32.  Defaults to ``256``.
+        patch_size (int): Spatial size of each inference patch.  Should be a
+            multiple of 32 for most model architectures.  Defaults to ``256``.
         overlap (int): Number of overlapping pixels between adjacent patches.
             Defaults to ``128``.
         num_workers (int): Number of threads for parallel window processing.
@@ -9684,8 +9695,6 @@ def predict_raster_smooth(
             geometric transforms) and average the predictions.  Increases
             inference time ×8 but can improve accuracy.  Defaults to
             *False*.
-        num_classes (int): Number of output classes expected from the model.
-            Defaults to ``2``.
         num_channels (int, optional): Number of input bands to read.
             If *None* all bands of the raster are used.
         normalize (bool): If *True* and pixel values exceed 1.0, divide by
@@ -9824,7 +9833,7 @@ def predict_raster_smooth(
                         all_outputs = []
                         for p_idx in range(patches.shape[0]):
                             aug_batch = _d4_transforms(patches[p_idx])  # (8, C, H, W)
-                            aug_out = model(aug_batch.to(device))
+                            aug_out = model(aug_batch)
                             inv_out = _inverse_d4(aug_out)
                             all_outputs.append(inv_out.mean(dim=0))
                         output = torch.stack(all_outputs, dim=0)
@@ -9841,14 +9850,17 @@ def predict_raster_smooth(
                     overlap,
                 )
 
-                # Crop to the core patch_size region (remove overlap padding)
+                # Crop to the core region (remove overlap padding), then
+                # trim to match the actual window dimensions at image edges.
+                win_h = int(window.height)
+                win_w = int(window.width)
                 result = (
                     torch.argmax(
                         recon[
                             :,
                             :,
-                            overlap : patch_size + overlap,
-                            overlap : patch_size + overlap,
+                            overlap : overlap + win_h,
+                            overlap : overlap + win_w,
                         ],
                         dim=1,
                     )
