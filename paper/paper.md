@@ -32,7 +32,7 @@ The package provides six core capabilities:
 5. Interactive visualization through integration with `Leafmap` [@Wu2021] and `MapLibre`.
 6. Seamless `QGIS` integration via a dedicated `GeoAI` plugin, enabling users to run AI-powered geospatial workflows directly within the `QGIS` desktop environment, without writing code.
 
-`GeoAI` addresses the growing demand for accessible AI tools in geospatial research by providing high-level APIs that abstract complex machine learning workflows while maintaining flexibility for advanced users. The package supports multiple data formats (GeoTIFF, JPEG2000,GeoJSON, Shapefile, GeoPackage) and includes automatic device management for GPU acceleration when available. With over 10 modules and extensive notebook examples, `GeoAI` serves as both a research tool and educational resource for the geospatial AI community.
+`GeoAI` addresses the growing demand for accessible AI tools in geospatial research by providing high-level APIs that abstract complex machine learning workflows while maintaining flexibility for advanced users. The package supports multiple data formats (GeoTIFF, JPEG2000, GeoJSON, Shapefile, GeoPackage) and includes automatic device management for GPU acceleration when available. With over 10 modules and extensive notebook examples, `GeoAI` serves as both a research tool and educational resource for the geospatial AI community.
 
 # Statement of Need
 
