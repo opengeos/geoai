@@ -1070,6 +1070,8 @@ class DeepForestDockWidget(QDockWidget):
                 if layer.isValid():
                     if isinstance(layer, QgsVectorLayer):
                         self._apply_semi_transparent_style(layer)
+                    elif isinstance(layer, QgsRasterLayer):
+                        self._apply_raster_transparency(layer)
                     QgsProject.instance().addMapLayer(layer)
 
             self.results_text.append(f"\nSaved to: {output_path}")
@@ -1406,13 +1408,42 @@ class DeepForestDockWidget(QDockWidget):
                     f"{class_idx} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n"
                 )
 
+    def _apply_raster_transparency(self, layer):
+        """Make value 0 fully transparent and other values semi-transparent."""
+        try:
+            from qgis.core import (
+                QgsRasterTransparency,
+                QgsRasterRenderer,
+            )
+
+            renderer = layer.renderer()
+            if renderer is None:
+                return
+
+            # Make value 0 fully transparent via no-data
+            # Set the transparent pixel list for band 1
+            transparency = QgsRasterTransparency()
+            tr_pixel = QgsRasterTransparency.TransparentSingleValuePixel()
+            tr_pixel.min = 0.0
+            tr_pixel.max = 0.0
+            tr_pixel.percentTransparent = 100.0
+            transparency.setTransparentSingleValuePixelList([tr_pixel])
+            renderer.setRasterTransparency(transparency)
+
+            # Make all other values semi-transparent (50% opacity)
+            renderer.setOpacity(0.5)
+
+            layer.triggerRepaint()
+        except Exception:
+            pass  # Non-critical; default rendering is acceptable
+
     def _apply_semi_transparent_style(self, layer):
         """Apply a semi-transparent fill style to a vector layer."""
         try:
             symbol = QgsFillSymbol.createSimple(
                 {
-                    "color": "0,255,0,128",  # green fill, 50% transparent
-                    "outline_color": "0,180,0,255",  # solid green outline
+                    "color": "0,255,0,50",  # green fill, 50% transparent
+                    "outline_color": "255,0,0,255",  # solid green outline
                     "outline_width": "0.4",
                 }
             )
