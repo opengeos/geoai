@@ -1,6 +1,6 @@
 # QGIS Plugin for GeoAI
 
-A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, segmentation training/inference, SamGeo) so you can keep QGIS as your main workspace while experimenting with GeoAI.
+A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, segmentation training/inference, SamGeo, DeepForest) so you can keep QGIS as your main workspace while experimenting with GeoAI.
 
 ## Quick Start
 
@@ -31,7 +31,7 @@ Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video 
 -   QGIS 3.28 or later
 -   Python 3.10+ (Pixi recommended)
 -   PyTorch (CUDA if you want GPU acceleration)
--   `geoai` and `samgeo` packages
+-   `geoai`, `samgeo`, and `deepforest` packages
 
 ## Features
 
@@ -57,6 +57,12 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 -   **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
 -   **Batch Tab**: Process multiple points interactively or from vector files/layers
 -   **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)
+
+### DeepForest Panel (Object Detection)
+
+-   **Model Tab**: Load pretrained [DeepForest](https://deepforest.readthedocs.io) models from Hugging Face for tree crown, bird, livestock, nest, and dead tree detection
+-   **Predict Tab**: Run predictions on single images or large geospatial tiles with configurable patch size, overlap, IoU threshold, and score filtering
+-   **Output Tab**: Save detection results as georeferenced vector (GeoPackage, Shapefile, GeoJSON) or raster (GeoTIFF), and export training data in COCO or YOLO format
 
 ### GPU Memory Management
 
@@ -134,6 +140,7 @@ pyqt = "5.15.*"
 geoai = ">=0.24.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
+deepforest = ">=2.0.0"
 libopenblas = ">=0.3.30"
 ```
 
@@ -156,6 +163,7 @@ pyqt = "5.15.*"
 geoai = ">=0.24.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
+deepforest = ">=2.0.0"
 ```
 
 - For CPU:
@@ -174,6 +182,7 @@ pyqt = "5.15.*"
 geoai = ">=0.24.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
+deepforest = ">=2.0.0"
 libopenblas = ">=0.3.30"
 ```
 
@@ -367,6 +376,62 @@ Steps:
     - Click "Save Masks" to export results
 
     ![](https://github.com/user-attachments/assets/5c80cc57-3870-4a20-bb74-73e394ef22a6)
+
+### DeepForest Panel (Object Detection)
+
+The DeepForest panel provides object detection in remote sensing imagery using pretrained deep learning models from the [DeepForest](https://deepforest.readthedocs.io) library.
+
+#### Supported Pretrained Models
+
+| Model | Hugging Face ID | Description |
+|-------|----------------|-------------|
+| Tree Crown Detection | `weecology/deepforest-tree` | Detect individual tree crowns in RGB imagery |
+| Bird Detection | `weecology/deepforest-bird` | Detect birds in aerial/satellite imagery |
+| Livestock Detection | `weecology/deepforest-livestock` | Detect livestock in aerial imagery |
+| Nest Detection | `weecology/everglades-nest-detection` | Detect bird nests in Everglades imagery |
+| Dead Tree Detection | `weecology/cropmodel-deadtrees` | Detect dead trees in forest imagery |
+
+Steps:
+
+1. Click the **DeepForest** button in the GeoAI toolbar (or `GeoAI` menu → `DeepForest`)
+2. In the **Model** tab:
+
+    - Select a pretrained model from the dropdown (e.g., Tree Crown Detection)
+    - Configure device (auto, cuda, cpu)
+    - Click "Load Model" to download and initialize the model
+    - Select a raster layer or browse for an image file and click "Set Image from Layer" or "Set Image from File"
+
+    ![](https://github.com/user-attachments/assets/a4b0c1d2-85e0-442d-9574-919f4bc59c67)
+
+3. In the **Predict** tab:
+
+    - Choose prediction mode:
+        - **Single Image**: Predict on the entire image at once (best for small images)
+        - **Large Tile**: Split large geospatial tiles into overlapping patches for prediction
+    - For Large Tile mode, configure:
+        - **Patch Size**: Size of each prediction window (default 400px; experiment with 400–800 for 0.1m data)
+        - **Patch Overlap**: Overlap between adjacent patches (default 0.25)
+        - **IoU Threshold**: Overlap threshold for suppressing duplicate detections (default 0.15)
+        - **Dataloader Strategy**: Memory management strategy (single, batch, or window)
+    - Set the **Score Threshold** to filter low-confidence detections (default 0.3)
+    - Click "Run Prediction"
+
+    ![](https://github.com/user-attachments/assets/200782fe-290d-4882-9b8d-4dcaeafad1b0)
+
+    ![](https://github.com/user-attachments/assets/3523f9d7-a8d4-4b9e-839b-6616730dd452)
+
+4. In the **Output** tab:
+
+    - Select output format:
+        - **Vector**: GeoPackage, Shapefile, or GeoJSON (saves bounding boxes as polygons with score and label attributes)
+        - **Raster**: GeoTIFF (rasterizes bounding boxes onto the source raster)
+    - Click "Save Results" to export
+    - To export training data for model fine-tuning:
+        - Select, **PASCAL_VOC**, **COCO** or **YOLO** format
+        - Choose an output directory
+        - Click "Export Training Data"
+
+    ![](https://github.com/user-attachments/assets/4a0ef60a-fb1f-4084-a65c-34b886c9ef01)
 
 ### Clear GPU Memory
 

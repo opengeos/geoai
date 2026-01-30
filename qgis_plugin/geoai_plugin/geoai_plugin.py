@@ -31,6 +31,7 @@ class GeoAIPlugin:
         self._moondream_dock = None
         self._segmentation_dock = None
         self._samgeo_dock = None
+        self._deepforest_dock = None
 
     def add_action(
         self,
@@ -106,6 +107,10 @@ class GeoAIPlugin:
         if not os.path.exists(samgeo_icon):
             samgeo_icon = ":/images/themes/default/mIconPolygonLayer.svg"
 
+        deepforest_icon = os.path.join(icon_base, "deepforest.svg")
+        if not os.path.exists(deepforest_icon):
+            deepforest_icon = ":/images/themes/default/mIconPointLayer.svg"
+
         about_icon = os.path.join(icon_base, "about.svg")
         if not os.path.exists(about_icon):
             about_icon = ":/images/themes/default/mActionHelpContents.svg"
@@ -136,6 +141,16 @@ class GeoAIPlugin:
             "SamGeo",
             self.toggle_samgeo_dock,
             status_tip="Toggle SamGeo Segmentation panel (supports SAM1, SAM2, and SAM3 models)",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add DeepForest action (checkable for dock toggle)
+        self.deepforest_action = self.add_action(
+            deepforest_icon,
+            "DeepForest",
+            self.toggle_deepforest_dock,
+            status_tip="Toggle DeepForest Tree Detection panel (tree crown detection and forest analysis)",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
@@ -200,6 +215,11 @@ class GeoAIPlugin:
             self.iface.removeDockWidget(self._samgeo_dock)
             self._samgeo_dock.deleteLater()
             self._samgeo_dock = None
+
+        if self._deepforest_dock:
+            self.iface.removeDockWidget(self._deepforest_dock)
+            self._deepforest_dock.deleteLater()
+            self._deepforest_dock = None
 
         # Remove actions from menu
         for action in self.actions:
@@ -329,6 +349,44 @@ class GeoAIPlugin:
         """Handle SamGeo dock visibility change."""
         self.samgeo_action.setChecked(visible)
 
+    def toggle_deepforest_dock(self):
+        """Toggle the DeepForest dock widget visibility."""
+        if self._deepforest_dock is None:
+            try:
+                from .dialogs.deepforest_panel import DeepForestDockWidget
+
+                self._deepforest_dock = DeepForestDockWidget(
+                    self.iface, self.iface.mainWindow()
+                )
+                self._deepforest_dock.setObjectName("GeoAIDeepForestDock")
+                self._deepforest_dock.visibilityChanged.connect(
+                    self._on_deepforest_visibility_changed
+                )
+                self.iface.addDockWidget(Qt.RightDockWidgetArea, self._deepforest_dock)
+                self._deepforest_dock.show()
+                self._deepforest_dock.raise_()
+                return
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self.iface.mainWindow(),
+                    "Error",
+                    f"Failed to create DeepForest panel:\n{str(e)}",
+                )
+                self.deepforest_action.setChecked(False)
+                return
+
+        # Toggle visibility
+        if self._deepforest_dock.isVisible():
+            self._deepforest_dock.hide()
+        else:
+            self._deepforest_dock.show()
+            self._deepforest_dock.raise_()
+
+    def _on_deepforest_visibility_changed(self, visible):
+        """Handle DeepForest dock visibility change."""
+        self.deepforest_action.setChecked(visible)
+
     def clear_gpu_memory(self):
         """Clear GPU memory and release CUDA resources."""
         import gc
@@ -446,6 +504,66 @@ class GeoAIPlugin:
             except Exception:
                 pass
 
+        # Clear DeepForest model if loaded
+        if self._deepforest_dock is not None:
+            try:
+                if hasattr(self._deepforest_dock, "deepforest"):
+                    deepforest_obj = self._deepforest_dock.deepforest
+                    if deepforest_obj is not None:
+                        # Clear the model
+                        if (
+                            hasattr(deepforest_obj, "model")
+                            and deepforest_obj.model is not None
+                        ):
+                            try:
+                                deepforest_obj.model.cpu()
+                            except Exception:
+                                pass  # Model may not be on GPU or already freed
+                            try:
+                                for param in deepforest_obj.model.parameters():
+                                    param.data = None
+                                    if param.grad is not None:
+                                        param.grad = None
+                            except Exception:
+                                pass  # Some parameters may be read-only or already cleared
+                            del deepforest_obj.model
+                            deepforest_obj.model = None
+
+                        # Clear any other attributes
+                        for attr in list(vars(deepforest_obj).keys()):
+                            try:
+                                setattr(deepforest_obj, attr, None)
+                            except Exception:
+                                pass  # Some attributes may be read-only or protected
+
+                        # Delete the deepforest object
+                        self._deepforest_dock.deepforest = None
+                        del deepforest_obj
+                        cleared_items.append("DeepForest model")
+
+                        # Update UI status
+                        if hasattr(self._deepforest_dock, "model_status"):
+                            self._deepforest_dock.model_status.setText(
+                                "Model: Not loaded"
+                            )
+                            self._deepforest_dock.model_status.setStyleSheet(
+                                "color: gray;"
+                            )
+                        if hasattr(self._deepforest_dock, "image_status"):
+                            self._deepforest_dock.image_status.setText("Image: Not set")
+                            self._deepforest_dock.image_status.setStyleSheet(
+                                "color: gray;"
+                            )
+                        # Clear internal state
+                        if hasattr(self._deepforest_dock, "current_image_path"):
+                            self._deepforest_dock.current_image_path = None
+                        if hasattr(self._deepforest_dock, "current_layer"):
+                            self._deepforest_dock.current_layer = None
+                        if hasattr(self._deepforest_dock, "predictions"):
+                            self._deepforest_dock.predictions = None
+            except Exception:
+                pass  # Best-effort cleanup; continue to garbage collection
+
         # Run garbage collection multiple times
         for _ in range(5):
             gc.collect()
@@ -523,6 +641,7 @@ class GeoAIPlugin:
 <li><b>Moondream Vision-Language Model:</b> AI-powered image captioning, querying, object detection, and point localization</li>
 <li><b>Semantic Segmentation:</b> Train and run inference with deep learning models (U-Net, DeepLabV3+, FPN, etc.)</li>
 <li><b>SamGeo:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
+<li><b>DeepForest:</b> Tree crown detection and forest analysis using pretrained deep learning models</li>
 </ul>
 
 <h3>Links:</h3>
