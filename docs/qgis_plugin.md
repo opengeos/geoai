@@ -425,7 +425,7 @@ Steps:
         - **Raster**: GeoTIFF (rasterizes bounding boxes onto the source raster)
     - Click "Save Results" to export
     - To export training data for model fine-tuning:
-        - Select **COCO** or **YOLO** format
+        - Select, **PASCAL_VOC**, **COCO** or **YOLO** format
         - Choose an output directory
         - Click "Export Training Data"
 
