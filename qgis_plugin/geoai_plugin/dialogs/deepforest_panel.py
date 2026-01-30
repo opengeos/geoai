@@ -1411,7 +1411,7 @@ class DeepForestDockWidget(QDockWidget):
         try:
             symbol = QgsFillSymbol.createSimple(
                 {
-                    "color": "0,255,0,128",       # green fill, 50% transparent
+                    "color": "0,255,0,128",  # green fill, 50% transparent
                     "outline_color": "0,180,0,255",  # solid green outline
                     "outline_width": "0.4",
                 }
