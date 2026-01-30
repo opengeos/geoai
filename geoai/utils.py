@@ -3918,9 +3918,15 @@ def export_geotiff_tiles(
                     f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
                 )
                 if stats["tiles_with_features"] > 0:
-                    print(
-                        f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
-                    )
+                    if min_feature_ratio is not False:
+                        print(
+                            "Note: average feature pixels per tile not reported "
+                            "when min_feature_ratio filter is active."
+                        )
+                    else:
+                        print(
+                            f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
+                        )
             if min_feature_ratio is not False:
                 print(
                     f"Tiles skipped (feature ratio < {min_feature_ratio}): {tiles_skipped_ratio}"

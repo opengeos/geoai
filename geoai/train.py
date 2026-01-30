@@ -4,6 +4,7 @@ import os
 import platform
 import random
 import time
+from collections import Counter
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -2843,7 +2844,7 @@ def train_segmentation_model(
     focal_alpha: float = 1.0,
     focal_gamma: float = 2.0,
     **kwargs: Any,
-) -> torch.nn.Module:
+) -> None:
     """
     Train a semantic segmentation model for object detection using segmentation-models-pytorch.
 
