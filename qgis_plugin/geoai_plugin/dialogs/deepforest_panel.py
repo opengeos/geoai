@@ -1362,7 +1362,11 @@ class DeepForestDockWidget(QDockWidget):
                         crs_wkt = src.crs.to_wkt()
             except Exception:
                 pass
-        if crs_wkt is None and self.current_layer and self.current_layer.crs().isValid():
+        if (
+            crs_wkt is None
+            and self.current_layer
+            and self.current_layer.crs().isValid()
+        ):
             crs_wkt = self.current_layer.crs().toWkt()
         if crs_wkt:
             try:
