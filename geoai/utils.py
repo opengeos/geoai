@@ -3094,6 +3094,7 @@ def export_geotiff_tiles(
     apply_augmentation=False,
     augmentation_count=3,
     augmentation_transforms=None,
+    tiling_strategy="grid",
 ):
     """
     Export georeferenced GeoTIFF tiles and labels from raster and classification data.
@@ -3122,6 +3123,10 @@ def export_geotiff_tiles(
             If None and apply_augmentation=True, uses default transforms from
             get_default_augmentation_transforms(). Should be an albumentations.Compose object.
             Defaults to None.
+        tiling_strategy (str, optional): Tiling strategy to use. Options are:
+            - "grid": Regular grid tiling with specified stride (default behavior)
+            - "flipnslide": Flip-n-Slide augmentation strategy with overlapping tiles
+            Defaults to "grid".
 
     Returns:
         None: Tiles and labels are saved to out_folder.
@@ -3144,11 +3149,49 @@ def export_geotiff_tiles(
         ...                      apply_augmentation=True,
         ...                      augmentation_count=5,
         ...                      augmentation_transforms=custom_transform)
+        >>>
+        >>> # Export with Flip-n-Slide tiling strategy
+        >>> export_geotiff_tiles('image.tif', 'output/', 'labels.tif',
+        ...                      tiling_strategy='flipnslide')
     """
 
     import logging
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
+
+    # Handle FlipnSlide tiling strategy
+    if tiling_strategy == "flipnslide":
+        if apply_augmentation:
+            warnings.warn(
+                "apply_augmentation is ignored when using tiling_strategy='flipnslide'. "
+                "FlipnSlide applies its own augmentation scheme."
+            )
+        if stride != 128:
+            warnings.warn(
+                "stride parameter is ignored when using tiling_strategy='flipnslide'. "
+                "FlipnSlide uses its own stride pattern (tile_size/2)."
+            )
+
+        # Use the dedicated FlipnSlide export function
+        stats = export_flipnslide_tiles(
+            in_raster=in_raster,
+            out_folder=out_folder,
+            in_class_data=in_class_data,
+            tile_size=tile_size,
+            quiet=quiet,
+        )
+
+        if not quiet:
+            print("Used Flip-n-Slide tiling strategy")
+            print(
+                f"Generated {stats['total_tiles']} tiles with spatial context preservation"
+            )
+
+        return
+    elif tiling_strategy != "grid":
+        raise ValueError(
+            f"Unknown tiling_strategy '{tiling_strategy}'. Must be 'grid' or 'flipnslide'."
+        )
 
     # Initialize augmentation transforms if needed
     if apply_augmentation:
@@ -9467,3 +9510,507 @@ def smooth_vector(
     if output_path is not None:
         smoothed_vector_data.to_file(output_path)
     return smoothed_vector_data
+
+
+def flipnslide_augmentation(
+    image,
+    tile_size=256,
+    output_format="numpy",
+    crop_to_multiple=True,
+):
+    """
+    Apply Flip-n-Slide tiling strategy for geospatial imagery data augmentation.
+
+    This function implements the Flip-n-Slide algorithm from "A Concise Tiling
+    Strategy for Preserving Spatial Context in Earth Observation Imagery" by
+    Abrahams et al., presented at the ML4RS workshop at ICLR 2024 (best short
+    paper). The strategy generates overlapping tiles with diverse augmentations
+    while eliminating redundant pixel representations.
+
+    The algorithm produces two sets of tiles:
+
+    1. **Standard overlapping tiles** with half-stride (stride = tile_size / 2)
+       and rotational augmentations determined by grid position:
+
+       - Even row, even col: identity (no augmentation)
+       - Odd row, even col: 180 degree rotation
+       - Even row, odd col: 90 degree rotation
+       - Odd row, odd col: 270 degree rotation
+
+    2. **Inner offset tiles** extracted from the image interior (inset by
+       tile_size / 2 from each edge) with the same half-stride, applying flip
+       and rotation augmentations:
+
+       - Even row, even col: horizontal flip
+       - Even row, odd col: vertical flip
+       - Odd row, odd col: 90 degree rotation + horizontal flip
+       - Odd row, even col: 90 degree rotation + vertical flip
+
+    Args:
+        image (Union[str, numpy.ndarray]): Input image as a numpy array of
+            shape ``(channels, height, width)`` or a file path to a raster
+            readable by rasterio.
+        tile_size (int, optional): Size of each square tile in pixels.
+            Defaults to 256.
+        output_format (str, optional): ``"numpy"`` to return a
+            :class:`numpy.ndarray` or ``"torch"`` to return a
+            :class:`torch.Tensor`. Defaults to ``"numpy"``.
+        crop_to_multiple (bool, optional): If ``True``, crop the image to the
+            nearest dimensions that are multiples of *tile_size* before tiling.
+            Defaults to ``True``.
+
+    Returns:
+        Tuple[Union[numpy.ndarray, torch.Tensor], List[int]]:
+            - **tiles** -- Array of shape
+              ``(num_tiles, channels, tile_size, tile_size)``.
+            - **augmentation_indices** -- List of integers indicating the
+              augmentation applied to each tile:
+
+              - 0: Identity (no augmentation)
+              - 1: 180 degree rotation
+              - 2: 90 degree rotation
+              - 3: 270 degree rotation
+              - 4: Horizontal flip
+              - 5: Vertical flip
+              - 6: 90 degree rotation + horizontal flip
+              - 7: 90 degree rotation + vertical flip
+
+    Example:
+        >>> import numpy as np
+        >>> image = np.random.rand(3, 512, 512)
+        >>> tiles, aug_indices = flipnslide_augmentation(image, tile_size=256)
+        >>> print(f"Generated {tiles.shape[0]} tiles of shape {tiles.shape[1:]}")
+        >>> print(f"Augmentation types used: {sorted(set(aug_indices))}")
+
+    References:
+        Abrahams, E., Snow, T., Siegfried, M. R., & Perez, F. (2024).
+        *A Concise Tiling Strategy for Preserving Spatial Context in Earth
+        Observation Imagery*. ML4RS Workshop @ ICLR 2024.
+        https://doi.org/10.48550/arXiv.2404.10927
+    """
+    # Load image if path provided
+    if isinstance(image, str):
+        import rasterio
+
+        with rasterio.open(image) as src:
+            image = src.read()
+
+    # Ensure numpy array
+    if not isinstance(image, np.ndarray):
+        try:
+            image = image.cpu().numpy()
+        except AttributeError:
+            image = np.asarray(image)
+
+    # Validate input shape
+    if image.ndim != 3:
+        raise ValueError(
+            f"Image must be a 3-D array (channels, height, width), "
+            f"got shape {image.shape}"
+        )
+
+    channels, height, width = image.shape
+
+    # Crop to nearest multiple of tile_size if requested
+    if crop_to_multiple:
+        new_height = (height // tile_size) * tile_size
+        new_width = (width // tile_size) * tile_size
+        if new_height == 0 or new_width == 0:
+            raise ValueError(
+                f"Image size ({height}x{width}) is smaller than "
+                f"tile_size ({tile_size})"
+            )
+        if new_height < height or new_width < width:
+            image = image[:, :new_height, :new_width]
+            height, width = new_height, new_width
+
+    # Check if image is large enough for tiling
+    if height < tile_size or width < tile_size:
+        raise ValueError(
+            f"Image size ({height}x{width}) is smaller than " f"tile_size ({tile_size})"
+        )
+
+    tiles = []
+    augmentation_indices = []
+
+    # Half-stride for overlapping tiles
+    stride = tile_size // 2
+
+    # ------------------------------------------------------------------
+    # Stage 1: Standard overlapping tiles with rotational augmentations
+    # ------------------------------------------------------------------
+    for idx_h, row in enumerate(range(0, height - tile_size + 1, stride)):
+        for idx_w, col in enumerate(range(0, width - tile_size + 1, stride)):
+            tile = image[:, row : row + tile_size, col : col + tile_size]
+
+            if idx_h % 2 == 0 and idx_w % 2 == 0:
+                # Identity
+                aug_tile = tile.copy()
+                aug_idx = 0
+            elif idx_h % 2 == 1 and idx_w % 2 == 0:
+                # 180 degree rotation
+                aug_tile = np.rot90(tile, 2, axes=(1, 2)).copy()
+                aug_idx = 1
+            elif idx_h % 2 == 0 and idx_w % 2 == 1:
+                # 90 degree rotation
+                aug_tile = np.rot90(tile, 1, axes=(1, 2)).copy()
+                aug_idx = 2
+            else:
+                # 270 degree rotation
+                aug_tile = np.rot90(tile, 3, axes=(1, 2)).copy()
+                aug_idx = 3
+
+            tiles.append(aug_tile)
+            augmentation_indices.append(aug_idx)
+
+    # ------------------------------------------------------------------
+    # Stage 2: Inner offset tiles with flip + rotation augmentations
+    # The inner image is inset by tile_size/2 from each edge, matching the
+    # original FlipnSlide implementation.
+    # ------------------------------------------------------------------
+    inset = tile_size // 2
+    if height - 2 * inset >= tile_size and width - 2 * inset >= tile_size:
+        inner_image = image[:, inset : height - inset, inset : width - inset]
+        inner_height = inner_image.shape[1]
+        inner_width = inner_image.shape[2]
+
+        for idx_h, row in enumerate(range(0, inner_height - tile_size + 1, stride)):
+            for idx_w, col in enumerate(range(0, inner_width - tile_size + 1, stride)):
+                tile = inner_image[:, row : row + tile_size, col : col + tile_size]
+
+                if idx_h % 2 == 0 and idx_w % 2 == 0:
+                    # Horizontal flip
+                    aug_tile = tile[:, :, ::-1].copy()
+                    aug_idx = 4
+                elif idx_h % 2 == 0 and idx_w % 2 == 1:
+                    # Vertical flip
+                    aug_tile = tile[:, ::-1, :].copy()
+                    aug_idx = 5
+                elif idx_h % 2 == 1 and idx_w % 2 == 1:
+                    # 90 degree rotation + horizontal flip
+                    aug_tile = np.rot90(tile, 1, axes=(1, 2))
+                    aug_tile = aug_tile[:, :, ::-1].copy()
+                    aug_idx = 6
+                else:
+                    # 90 degree rotation + vertical flip
+                    aug_tile = np.rot90(tile, 1, axes=(1, 2))
+                    aug_tile = aug_tile[:, ::-1, :].copy()
+                    aug_idx = 7
+
+                tiles.append(aug_tile)
+                augmentation_indices.append(aug_idx)
+
+    # Stack into array
+    tiles_array = np.stack(tiles, axis=0)
+
+    # Optionally convert to torch tensor
+    if output_format == "torch":
+        tiles_array = torch.from_numpy(tiles_array)
+    elif output_format != "numpy":
+        raise ValueError(
+            f"output_format must be 'numpy' or 'torch', got '{output_format}'"
+        )
+
+    return tiles_array, augmentation_indices
+
+
+def export_flipnslide_tiles(
+    in_raster,
+    out_folder,
+    in_class_data=None,
+    tile_size=256,
+    output_format="tif",
+    crop_to_multiple=True,
+    quiet=False,
+):
+    """
+    Export georeferenced tiles using the Flip-n-Slide augmentation strategy.
+
+    This function applies the Flip-n-Slide tiling algorithm to an image raster
+    (and optionally a corresponding label/mask raster), preserving spatial
+    relationships and geospatial information. Each tile is saved as an
+    individual GeoTIFF file with proper CRS and geotransform.
+
+    Args:
+        in_raster (str): Path to the input raster image.
+        out_folder (str): Path to the output folder where tiles will be saved.
+        in_class_data (str, optional): Path to a classification/mask file.
+            Can be a raster file (GeoTIFF, etc.) or vector file (GeoJSON,
+            Shapefile, etc.). When provided, matching mask tiles are generated
+            with identical augmentations. Vector files are rasterized to match
+            the input raster dimensions and CRS. Defaults to None.
+        tile_size (int, optional): Size of each square tile in pixels.
+            Defaults to 256.
+        output_format (str, optional): File extension for the output tiles
+            (e.g., ``"tif"``). Defaults to ``"tif"``.
+        crop_to_multiple (bool, optional): If ``True``, crop the image to the
+            nearest dimensions that are multiples of *tile_size* before tiling.
+            Defaults to ``True``.
+        quiet (bool, optional): If ``True``, suppress progress output.
+            Defaults to ``False``.
+
+    Returns:
+        dict: Statistics dictionary with keys:
+
+            - ``'total_tiles'`` -- Number of tiles generated.
+            - ``'tile_size'`` -- Size of each tile.
+            - ``'augmentation_counts'`` -- Count of each augmentation type.
+            - ``'output_folder'`` -- Path to the output folder.
+            - ``'has_labels'`` -- Whether label tiles were generated.
+
+    Example:
+        >>> stats = export_flipnslide_tiles("image.tif", "output_tiles/")
+        >>> print(f"Generated {stats['total_tiles']} tiles")
+
+        >>> stats = export_flipnslide_tiles(
+        ...     "image.tif", "output_tiles/",
+        ...     in_class_data="mask.tif", tile_size=512,
+        ... )
+
+    Notes:
+        Both input raster and class data (if provided) must share the same CRS
+        and spatial extent for proper alignment.
+    """
+    import logging
+    from collections import Counter
+
+    logging.getLogger("rasterio").setLevel(logging.ERROR)
+
+    # Create output directories
+    os.makedirs(out_folder, exist_ok=True)
+    image_dir = os.path.join(out_folder, "images")
+    os.makedirs(image_dir, exist_ok=True)
+
+    has_labels = in_class_data is not None
+    if has_labels:
+        label_dir = os.path.join(out_folder, "labels")
+        os.makedirs(label_dir, exist_ok=True)
+
+    with rasterio.open(in_raster) as src:
+        if not quiet:
+            print(f"Input raster: {in_raster}")
+            print(f"  CRS: {src.crs}")
+            print(f"  Dimensions: {src.width} x {src.height}")
+            print(f"  Bands: {src.count}")
+
+        image_data = src.read()
+
+        # Read class data if provided (handle both raster and vector)
+        class_data = None
+        if has_labels:
+            # Detect if input is raster or vector
+            is_class_data_raster = False
+            file_ext = Path(in_class_data).suffix.lower()
+
+            # Common raster extensions
+            if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
+                try:
+                    with rasterio.open(in_class_data) as test_src:
+                        is_class_data_raster = True
+                except Exception:
+                    is_class_data_raster = False
+            else:
+                # Common vector extensions
+                vector_extensions = [
+                    ".geojson",
+                    ".json",
+                    ".shp",
+                    ".gpkg",
+                    ".fgb",
+                    ".parquet",
+                    ".geoparquet",
+                ]
+                if file_ext in vector_extensions:
+                    is_class_data_raster = False
+                else:
+                    # Unknown extension - try raster first, then vector
+                    try:
+                        with rasterio.open(in_class_data) as test_src:
+                            is_class_data_raster = True
+                    except Exception:
+                        is_class_data_raster = False
+
+            if is_class_data_raster:
+                # Handle raster class data
+                with rasterio.open(in_class_data) as class_src:
+                    if class_src.crs != src.crs:
+                        raise ValueError(
+                            f"CRS mismatch: image ({src.crs}) vs mask ({class_src.crs})"
+                        )
+                    if (class_src.width != src.width) or (
+                        class_src.height != src.height
+                    ):
+                        raise ValueError(
+                            f"Dimension mismatch: image "
+                            f"({src.width}x{src.height}) vs mask "
+                            f"({class_src.width}x{class_src.height})"
+                        )
+                    class_data = class_src.read()
+                    if not quiet:
+                        print(f"  Class data (raster): {in_class_data}")
+            else:
+                # Handle vector class data
+                try:
+                    gdf = gpd.read_file(in_class_data)
+                    if not quiet:
+                        print(f"  Class data (vector): {in_class_data}")
+                        print(f"    Loaded {len(gdf)} features")
+                        print(f"    Vector CRS: {gdf.crs}")
+
+                    # Reproject to match raster CRS if needed
+                    if gdf.crs != src.crs:
+                        if not quiet:
+                            print(f"    Reprojecting from {gdf.crs} to {src.crs}")
+                        gdf = gdf.to_crs(src.crs)
+
+                    # Rasterize vector data to match raster dimensions
+                    if len(gdf) > 0:
+                        # Create binary mask: 1 for features, 0 for background
+                        geometries = [
+                            (geom, 1) for geom in gdf.geometry if geom is not None
+                        ]
+                        if geometries:
+                            rasterized = features.rasterize(
+                                geometries,
+                                out_shape=(src.height, src.width),
+                                transform=src.transform,
+                                fill=0,
+                                all_touched=True,
+                                dtype=np.uint8,
+                            )
+                            # Reshape to match expected format (bands, height, width)
+                            class_data = rasterized.reshape(1, src.height, src.width)
+                        else:
+                            # No valid geometries, create empty mask
+                            class_data = np.zeros(
+                                (1, src.height, src.width), dtype=np.uint8
+                            )
+                    else:
+                        # Empty geodataframe, create empty mask
+                        class_data = np.zeros(
+                            (1, src.height, src.width), dtype=np.uint8
+                        )
+
+                except Exception as e:
+                    raise ValueError(
+                        f"Could not read {in_class_data} as vector file: {e}"
+                    )
+
+        # Apply FlipnSlide augmentation
+        image_tiles, aug_indices = flipnslide_augmentation(
+            image_data, tile_size=tile_size, crop_to_multiple=crop_to_multiple
+        )
+
+        class_tiles = None
+        if has_labels:
+            class_tiles, _ = flipnslide_augmentation(
+                class_data, tile_size=tile_size, crop_to_multiple=crop_to_multiple
+            )
+
+        if not quiet:
+            print(
+                f"\nGenerated {len(image_tiles)} tiles with "
+                f"Flip-n-Slide augmentation"
+            )
+
+        # Determine cropped dimensions for geo-transform calculation
+        _channels, orig_h, orig_w = image_data.shape
+        if crop_to_multiple:
+            height = (orig_h // tile_size) * tile_size
+            width = (orig_w // tile_size) * tile_size
+        else:
+            height, width = orig_h, orig_w
+
+        transform = src.transform
+        stride = tile_size // 2
+        inset = tile_size // 2
+
+        # Build tile positions mirroring flipnslide_augmentation order
+        tile_positions = []
+
+        # Stage 1 - standard overlapping tiles
+        for row in range(0, height - tile_size + 1, stride):
+            for col in range(0, width - tile_size + 1, stride):
+                tile_positions.append((row, col))
+
+        # Stage 2 - inner offset tiles
+        inner_h = height - 2 * inset
+        inner_w = width - 2 * inset
+        if inner_h >= tile_size and inner_w >= tile_size:
+            for row in range(0, inner_h - tile_size + 1, stride):
+                for col in range(0, inner_w - tile_size + 1, stride):
+                    tile_positions.append((inset + row, inset + col))
+
+        # Augmentation label names for filenames
+        aug_names = {
+            0: "identity",
+            1: "rot180",
+            2: "rot90",
+            3: "rot270",
+            4: "hflip",
+            5: "vflip",
+            6: "rot90_hflip",
+            7: "rot90_vflip",
+        }
+
+        # Save tiles
+        for i, (tile_row, tile_col) in enumerate(tile_positions):
+            tile_transform = rasterio.transform.from_bounds(
+                transform.c + tile_col * transform.a,
+                transform.f + (tile_row + tile_size) * transform.e,
+                transform.c + (tile_col + tile_size) * transform.a,
+                transform.f + tile_row * transform.e,
+                tile_size,
+                tile_size,
+            )
+
+            image_profile = src.profile.copy()
+            image_profile.update(
+                {
+                    "height": tile_size,
+                    "width": tile_size,
+                    "count": image_tiles.shape[1],
+                    "transform": tile_transform,
+                }
+            )
+
+            aug_label = aug_names.get(aug_indices[i], str(aug_indices[i]))
+            fname = f"tile_{i:06d}_{aug_label}.{output_format}"
+
+            image_path = os.path.join(image_dir, fname)
+            with rasterio.open(image_path, "w", **image_profile) as dst:
+                dst.write(image_tiles[i])
+
+            if has_labels:
+                class_profile = image_profile.copy()
+                class_profile.update(
+                    {
+                        "count": class_tiles.shape[1],
+                        "dtype": class_tiles.dtype,
+                    }
+                )
+                class_path = os.path.join(label_dir, fname)
+                with rasterio.open(class_path, "w", **class_profile) as dst:
+                    dst.write(class_tiles[i])
+
+    # Statistics
+    aug_counts = Counter(aug_indices)
+    stats = {
+        "total_tiles": len(image_tiles),
+        "tile_size": tile_size,
+        "augmentation_counts": dict(aug_counts),
+        "output_folder": out_folder,
+        "has_labels": has_labels,
+    }
+
+    if not quiet:
+        print("\n--- Flip-n-Slide Export Summary ---")
+        print(f"  Total tiles : {stats['total_tiles']}")
+        print(f"  Tile size   : {tile_size}x{tile_size}")
+        print(f"  Augmentations: {dict(aug_counts)}")
+        if has_labels:
+            print("  Exported both image and label tiles")
+        else:
+            print("  Exported image tiles only")
+
+    return stats
