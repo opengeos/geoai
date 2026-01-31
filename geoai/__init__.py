@@ -106,6 +106,9 @@ from .utils import (
     regularization,
     hybrid_regularization,
     adaptive_regularization,
+    predict_raster_smooth,
+    split_tensor_to_patches,
+    reconstruct_from_patches,
 )
 
 from .timm_train import (
