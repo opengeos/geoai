@@ -61,6 +61,7 @@ plugins:
                   "examples/building_footprints_*.ipynb",
                   "examples/data_visualization.ipynb",
                   "examples/data_augmentation.ipynb",
+                  "examples/flipnslide_augmentation.ipynb",
                   "examples/train_*.ipynb",
                   "examples/water_dynamics.ipynb",
                   "examples/wetland_mapping.ipynb",
@@ -113,6 +114,7 @@ nav:
           - examples/create_training_data.ipynb
           - examples/export_training_data_formats.ipynb
           - examples/data_augmentation.ipynb
+          - examples/flipnslide_augmentation.ipynb
           - examples/building_footprints_usa.ipynb
           - examples/building_footprints_africa.ipynb
           - examples/building_footprints_china.ipynb

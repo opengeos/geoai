@@ -106,6 +106,8 @@ from .utils import (
     regularization,
     hybrid_regularization,
     adaptive_regularization,
+    flipnslide_augmentation,
+    export_flipnslide_tiles,
 )
 
 from .timm_train import (
