@@ -108,6 +108,21 @@ from .utils import (
     adaptive_regularization,
 )
 
+from .train import (
+    FocalLoss,
+    get_loss_function,
+    compute_class_weights,
+)
+
+from .landcover_train import (
+    LandcoverCrossEntropyLoss,
+    landcover_iou,
+    get_landcover_loss_function,
+    train_segmentation_landcover,
+)
+
+from .landcover_utils import export_landcover_tiles
+
 from .timm_train import (
     get_timm_model,
     modify_first_conv_for_channels,
