@@ -9734,9 +9734,11 @@ def export_flipnslide_tiles(
     Args:
         in_raster (str): Path to the input raster image.
         out_folder (str): Path to the output folder where tiles will be saved.
-        in_class_data (str, optional): Path to a classification/mask raster.
-            When provided, matching mask tiles are generated with identical
-            augmentations. Defaults to None.
+        in_class_data (str, optional): Path to a classification/mask file.
+            Can be a raster file (GeoTIFF, etc.) or vector file (GeoJSON, 
+            Shapefile, etc.). When provided, matching mask tiles are generated 
+            with identical augmentations. Vector files are rasterized to match
+            the input raster dimensions and CRS. Defaults to None.
         tile_size (int, optional): Size of each square tile in pixels.
             Defaults to 256.
         output_format (str, optional): File extension for the output tiles
