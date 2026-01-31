@@ -9793,23 +9793,90 @@ def export_flipnslide_tiles(
 
         image_data = src.read()
 
-        # Read class data if provided
+        # Read class data if provided (handle both raster and vector)
         class_data = None
         if has_labels:
-            with rasterio.open(in_class_data) as class_src:
-                if class_src.crs != src.crs:
+            # Detect if input is raster or vector
+            is_class_data_raster = False
+            file_ext = Path(in_class_data).suffix.lower()
+            
+            # Common raster extensions
+            if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
+                try:
+                    with rasterio.open(in_class_data) as test_src:
+                        is_class_data_raster = True
+                except Exception:
+                    is_class_data_raster = False
+            else:
+                # Common vector extensions
+                vector_extensions = [".geojson", ".json", ".shp", ".gpkg", ".fgb", ".parquet", ".geoparquet"]
+                if file_ext in vector_extensions:
+                    is_class_data_raster = False
+                else:
+                    # Unknown extension - try raster first, then vector
+                    try:
+                        with rasterio.open(in_class_data) as test_src:
+                            is_class_data_raster = True
+                    except Exception:
+                        is_class_data_raster = False
+            
+            if is_class_data_raster:
+                # Handle raster class data
+                with rasterio.open(in_class_data) as class_src:
+                    if class_src.crs != src.crs:
+                        raise ValueError(
+                            f"CRS mismatch: image ({src.crs}) vs mask ({class_src.crs})"
+                        )
+                    if (class_src.width != src.width) or (class_src.height != src.height):
+                        raise ValueError(
+                            f"Dimension mismatch: image "
+                            f"({src.width}x{src.height}) vs mask "
+                            f"({class_src.width}x{class_src.height})"
+                        )
+                    class_data = class_src.read()
+                    if not quiet:
+                        print(f"  Class data (raster): {in_class_data}")
+            else:
+                # Handle vector class data
+                try:
+                    gdf = gpd.read_file(in_class_data)
+                    if not quiet:
+                        print(f"  Class data (vector): {in_class_data}")
+                        print(f"    Loaded {len(gdf)} features")
+                        print(f"    Vector CRS: {gdf.crs}")
+                    
+                    # Reproject to match raster CRS if needed
+                    if gdf.crs != src.crs:
+                        if not quiet:
+                            print(f"    Reprojecting from {gdf.crs} to {src.crs}")
+                        gdf = gdf.to_crs(src.crs)
+                    
+                    # Rasterize vector data to match raster dimensions
+                    if len(gdf) > 0:
+                        # Create binary mask: 1 for features, 0 for background
+                        geometries = [(geom, 1) for geom in gdf.geometry if geom is not None]
+                        if geometries:
+                            rasterized = features.rasterize(
+                                geometries,
+                                out_shape=(src.height, src.width),
+                                transform=src.transform,
+                                fill=0,
+                                all_touched=True,
+                                dtype=np.uint8
+                            )
+                            # Reshape to match expected format (bands, height, width)
+                            class_data = rasterized.reshape(1, src.height, src.width)
+                        else:
+                            # No valid geometries, create empty mask
+                            class_data = np.zeros((1, src.height, src.width), dtype=np.uint8)
+                    else:
+                        # Empty geodataframe, create empty mask
+                        class_data = np.zeros((1, src.height, src.width), dtype=np.uint8)
+                        
+                except Exception as e:
                     raise ValueError(
-                        f"CRS mismatch: image ({src.crs}) vs mask ({class_src.crs})"
+                        f"Could not read {in_class_data} as vector file: {e}"
                     )
-                if (class_src.width != src.width) or (class_src.height != src.height):
-                    raise ValueError(
-                        f"Dimension mismatch: image "
-                        f"({src.width}x{src.height}) vs mask "
-                        f"({class_src.width}x{class_src.height})"
-                    )
-                class_data = class_src.read()
-                if not quiet:
-                    print(f"  Class data: {in_class_data}")
 
         # Apply FlipnSlide augmentation
         image_tiles, aug_indices = flipnslide_augmentation(
