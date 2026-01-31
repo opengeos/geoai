@@ -1305,7 +1305,7 @@ class MoondreamGeo:
             try:
                 summary_result = self.model.query(question=summary_prompt)
                 combined_answer = summary_result.get("answer", "")
-            except:
+            except Exception:
                 # Fall back to concatenation if summarization fails
                 combined_answer = " ".join([ta["answer"] for ta in tile_answers])
         else:
@@ -1411,7 +1411,7 @@ class MoondreamGeo:
             try:
                 summary_result = self.model.query(question=summary_prompt)
                 combined_caption = summary_result.get("answer", "")
-            except:
+            except Exception:
                 # Fall back to concatenation if summarization fails
                 combined_caption = " ".join([tc["caption"] for tc in tile_captions])
         else:

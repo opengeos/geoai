@@ -1717,21 +1717,21 @@ class ObjectDetector:
                             confidence = None
                             try:
                                 confidence = row.confidence
-                            except:
+                            except Exception:
                                 pass
 
                             # Method 2: Try dictionary-style access
                             if confidence is None:
                                 try:
                                     confidence = row["confidence"]
-                                except:
+                                except Exception:
                                     pass
 
                             # Method 3: Try accessing by index from the GeoDataFrame
                             if confidence is None:
                                 try:
                                     confidence = gdf.iloc[idx]["confidence"]
-                                except:
+                                except Exception:
                                     pass
 
                             if confidence is not None:
@@ -1879,19 +1879,19 @@ class ObjectDetector:
                                 confidence = None
                                 try:
                                     confidence = row.confidence
-                                except:
+                                except Exception:
                                     pass
 
                                 if confidence is None:
                                     try:
                                         confidence = row["confidence"]
-                                    except:
+                                    except Exception:
                                         pass
 
                                 if confidence is None:
                                     try:
                                         confidence = visible_gdf.iloc[idx]["confidence"]
-                                    except:
+                                    except Exception:
                                         pass
 
                                 if confidence is not None:

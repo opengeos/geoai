@@ -2131,7 +2131,7 @@ def get_smp_model(
                     "pan",
                     "upernet",
                 ]
-        except:
+        except Exception:
             available_archs = [
                 "unet",
                 "fpn",

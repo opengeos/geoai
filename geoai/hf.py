@@ -343,7 +343,7 @@ def mask_generation(
                 # Try to convert from tensor or other format if needed
                 try:
                     mask_data = np.array(mask_data)
-                except:
+                except Exception:
                     print(f"Could not convert mask at index {i} to numpy array")
                     continue
 
@@ -395,7 +395,7 @@ def mask_generation(
                 try:
                     mask_data = np.array(mask_result)
                     score = 1.0  # Default score
-                except:
+                except Exception:
                     print(f"Could not process mask at index {i}")
                     continue
 
@@ -404,7 +404,7 @@ def mask_generation(
                 if not isinstance(mask_data, np.ndarray):
                     try:
                         mask_data = np.array(mask_data)
-                    except:
+                    except Exception:
                         print(f"Could not convert mask at index {i} to numpy array")
                         continue
 

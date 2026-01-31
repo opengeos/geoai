@@ -810,7 +810,7 @@ class PrithviProcessor:
             meta = src.meta
             try:
                 coords = src.tags()
-            except:
+            except Exception:
                 coords = None
 
         return img, meta, coords
