@@ -20804,21 +20804,21 @@ handling, specifically designed for landcover classification tasks.</p>
                             <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                             <span class="c1"># Method 2: Try dictionary-style access</span>
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="c1"># Method 3: Try accessing by index from the GeoDataFrame</span>
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -20966,19 +20966,19 @@ handling, specifically designed for landcover classification tasks.</p>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                                 <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                     <span class="k">try</span><span class="p">:</span>
                                         <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                    <span class="k">except</span><span class="p">:</span>
+                                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                         <span class="k">pass</span>
 
                                 <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                     <span class="k">try</span><span class="p">:</span>
                                         <span class="n">confidence</span> <span class="o">=</span> <span class="n">visible_gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                    <span class="k">except</span><span class="p">:</span>
+                                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                         <span class="k">pass</span>
 
                                 <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -27246,21 +27246,21 @@ ensuring proper alignment between the GeoDataFrame polygons and the image.</p>
                         <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                         <span class="k">try</span><span class="p">:</span>
                             <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                        <span class="k">except</span><span class="p">:</span>
+                        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                             <span class="k">pass</span>
 
                         <span class="c1"># Method 2: Try dictionary-style access</span>
                         <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                         <span class="c1"># Method 3: Try accessing by index from the GeoDataFrame</span>
                         <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                         <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -27408,19 +27408,19 @@ ensuring proper alignment between the GeoDataFrame polygons and the image.</p>
                             <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">visible_gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -48562,7 +48562,7 @@ a labeled mask GeoTIFF, and saves mask scores and geometries to a CSV file.</p>
                 <span class="c1"># Try to convert from tensor or other format if needed</span>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="n">mask_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mask_data</span><span class="p">)</span>
-                <span class="k">except</span><span class="p">:</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not convert mask at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> to numpy array&quot;</span><span class="p">)</span>
                     <span class="k">continue</span>
 
@@ -48614,7 +48614,7 @@ a labeled mask GeoTIFF, and saves mask scores and geometries to a CSV file.</p>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="n">mask_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mask_result</span><span class="p">)</span>
                     <span class="n">score</span> <span class="o">=</span> <span class="mf">1.0</span>  <span class="c1"># Default score</span>
-                <span class="k">except</span><span class="p">:</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not process mask at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
                     <span class="k">continue</span>
 
@@ -48623,7 +48623,7 @@ a labeled mask GeoTIFF, and saves mask scores and geometries to a CSV file.</p>
                 <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mask_data</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
                     <span class="k">try</span><span class="p">:</span>
                         <span class="n">mask_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mask_data</span><span class="p">)</span>
-                    <span class="k">except</span><span class="p">:</span>
+                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not convert mask at index </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> to numpy array&quot;</span><span class="p">)</span>
                         <span class="k">continue</span>
 

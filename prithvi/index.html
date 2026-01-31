@@ -5820,7 +5820,7 @@ for masked autoencoding and feature extraction on multi-temporal satellite image
             <span class="n">meta</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">meta</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">coords</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">tags</span><span class="p">()</span>
-            <span class="k">except</span><span class="p">:</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                 <span class="n">coords</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="k">return</span> <span class="n">img</span><span class="p">,</span> <span class="n">meta</span><span class="p">,</span> <span class="n">coords</span>
@@ -7701,7 +7701,7 @@ for visualization, unlike process_files() which saves to disk.</p>
         <span class="n">meta</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">meta</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">coords</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">tags</span><span class="p">()</span>
-        <span class="k">except</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
             <span class="n">coords</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">return</span> <span class="n">img</span><span class="p">,</span> <span class="n">meta</span><span class="p">,</span> <span class="n">coords</span>

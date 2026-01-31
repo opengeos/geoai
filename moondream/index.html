@@ -6590,7 +6590,7 @@ object detection, and pointing.</p>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">summary_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">question</span><span class="o">=</span><span class="n">summary_prompt</span><span class="p">)</span>
                 <span class="n">combined_answer</span> <span class="o">=</span> <span class="n">summary_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;answer&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-            <span class="k">except</span><span class="p">:</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                 <span class="c1"># Fall back to concatenation if summarization fails</span>
                 <span class="n">combined_answer</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">ta</span><span class="p">[</span><span class="s2">&quot;answer&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">ta</span> <span class="ow">in</span> <span class="n">tile_answers</span><span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
@@ -6696,7 +6696,7 @@ object detection, and pointing.</p>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">summary_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">question</span><span class="o">=</span><span class="n">summary_prompt</span><span class="p">)</span>
                 <span class="n">combined_caption</span> <span class="o">=</span> <span class="n">summary_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;answer&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-            <span class="k">except</span><span class="p">:</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                 <span class="c1"># Fall back to concatenation if summarization fails</span>
                 <span class="n">combined_caption</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">tc</span><span class="p">[</span><span class="s2">&quot;caption&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">tc</span> <span class="ow">in</span> <span class="n">tile_captions</span><span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
@@ -7587,7 +7587,7 @@ Options: "concatenate", "summarize". Default "concatenate".</p>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">summary_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">question</span><span class="o">=</span><span class="n">summary_prompt</span><span class="p">)</span>
             <span class="n">combined_caption</span> <span class="o">=</span> <span class="n">summary_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;answer&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-        <span class="k">except</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
             <span class="c1"># Fall back to concatenation if summarization fails</span>
             <span class="n">combined_caption</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">tc</span><span class="p">[</span><span class="s2">&quot;caption&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">tc</span> <span class="ow">in</span> <span class="n">tile_captions</span><span class="p">])</span>
     <span class="k">else</span><span class="p">:</span>
@@ -10605,7 +10605,7 @@ Options: "concatenate", "summarize". Default "concatenate".</p>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">summary_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">question</span><span class="o">=</span><span class="n">summary_prompt</span><span class="p">)</span>
             <span class="n">combined_answer</span> <span class="o">=</span> <span class="n">summary_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;answer&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-        <span class="k">except</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
             <span class="c1"># Fall back to concatenation if summarization fails</span>
             <span class="n">combined_answer</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">ta</span><span class="p">[</span><span class="s2">&quot;answer&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">ta</span> <span class="ow">in</span> <span class="n">tile_answers</span><span class="p">])</span>
     <span class="k">else</span><span class="p">:</span>

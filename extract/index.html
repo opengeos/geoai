@@ -12690,21 +12690,21 @@ proper coverage of the entire raster including edges.</p>
                             <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                             <span class="c1"># Method 2: Try dictionary-style access</span>
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="c1"># Method 3: Try accessing by index from the GeoDataFrame</span>
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -12852,19 +12852,19 @@ proper coverage of the entire raster including edges.</p>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                                 <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                     <span class="k">try</span><span class="p">:</span>
                                         <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                    <span class="k">except</span><span class="p">:</span>
+                                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                         <span class="k">pass</span>
 
                                 <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                     <span class="k">try</span><span class="p">:</span>
                                         <span class="n">confidence</span> <span class="o">=</span> <span class="n">visible_gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                    <span class="k">except</span><span class="p">:</span>
+                                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                         <span class="k">pass</span>
 
                                 <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -19132,21 +19132,21 @@ ensuring proper alignment between the GeoDataFrame polygons and the image.</p>
                         <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                         <span class="k">try</span><span class="p">:</span>
                             <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                        <span class="k">except</span><span class="p">:</span>
+                        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                             <span class="k">pass</span>
 
                         <span class="c1"># Method 2: Try dictionary-style access</span>
                         <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                         <span class="c1"># Method 3: Try accessing by index from the GeoDataFrame</span>
                         <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                         <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -19294,19 +19294,19 @@ ensuring proper alignment between the GeoDataFrame polygons and the image.</p>
                             <span class="n">confidence</span> <span class="o">=</span> <span class="kc">None</span>
                             <span class="k">try</span><span class="p">:</span>
                                 <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">confidence</span>
-                            <span class="k">except</span><span class="p">:</span>
+                            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                 <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                                 <span class="k">try</span><span class="p">:</span>
                                     <span class="n">confidence</span> <span class="o">=</span> <span class="n">visible_gdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="s2">&quot;confidence&quot;</span><span class="p">]</span>
-                                <span class="k">except</span><span class="p">:</span>
+                                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                                     <span class="k">pass</span>
 
                             <span class="k">if</span> <span class="n">confidence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
