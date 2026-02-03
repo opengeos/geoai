@@ -166,6 +166,7 @@ nav:
           - examples/moondream.ipynb
           - examples/moondream_gui.ipynb
           - examples/AutoModel.ipynb
+          - examples/onnx.ipynb
           - examples/smooth_vector.ipynb
           - examples/timelapse.ipynb
           - examples/prithvi.ipynb
