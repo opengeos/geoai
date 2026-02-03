@@ -150,6 +150,7 @@ nav:
           - examples/building_detection_lidar.ipynb
           - examples/instance_segmentation.ipynb
           - examples/change_detection.ipynb
+          - examples/changestar.ipynb
           - examples/JPEG2000.ipynb
           - examples/DINOv3.ipynb
           - examples/DINOv3_visualization.ipynb
