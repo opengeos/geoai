@@ -1,0 +1,3 @@
+# canopy module
+
+::: geoai.canopy
