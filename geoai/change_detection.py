@@ -1891,31 +1891,32 @@ class ChangeStarDetection:
             for k, v in prediction.items()
         }
 
+        # The model already applies logit_to_prob_() during inference,
+        # so outputs are probabilities — do NOT apply sigmoid/softmax again.
+
         # Extract change prediction (always single-channel)
-        change_logits = prediction["change_prediction"].squeeze(0)  # (1, H, W)
-        change_prob = torch.sigmoid(change_logits.squeeze(0)).numpy()  # (H, W)
+        change_prob = prediction["change_prediction"].squeeze(0)  # (1, H, W)
+        change_prob = change_prob.squeeze(0).numpy()  # (H, W)
         change_map = (change_prob > 0.5).astype(np.uint8)
 
         # Extract semantic predictions (may be single or multi-class)
-        t1_logits = prediction["t1_semantic_prediction"].squeeze(0)  # (C, H, W)
-        t2_logits = prediction["t2_semantic_prediction"].squeeze(0)  # (C, H, W)
+        t1_probs = prediction["t1_semantic_prediction"].squeeze(0)  # (C, H, W)
+        t2_probs = prediction["t2_semantic_prediction"].squeeze(0)  # (C, H, W)
 
-        num_classes = t1_logits.shape[0]
+        num_classes = t1_probs.shape[0]
 
         if num_classes == 1:
-            # Binary: sigmoid → (H, W) probability
-            t1_sem_prob = torch.sigmoid(t1_logits.squeeze(0)).numpy()
-            t2_sem_prob = torch.sigmoid(t2_logits.squeeze(0)).numpy()
+            # Binary: squeeze class dim → (H, W)
+            t1_sem_prob = t1_probs.squeeze(0).numpy()
+            t2_sem_prob = t2_probs.squeeze(0).numpy()
             t1_semantic = (t1_sem_prob > 0.5).astype(np.uint8)
             t2_semantic = (t2_sem_prob > 0.5).astype(np.uint8)
         else:
-            # Multi-class: softmax → argmax for labels, max prob for prob map
-            t1_probs = torch.softmax(t1_logits, dim=0).numpy()  # (C, H, W)
-            t2_probs = torch.softmax(t2_logits, dim=0).numpy()  # (C, H, W)
-            t1_semantic = np.argmax(t1_probs, axis=0).astype(np.uint8)  # (H, W)
-            t2_semantic = np.argmax(t2_probs, axis=0).astype(np.uint8)  # (H, W)
-            t1_sem_prob = t1_probs  # (C, H, W)
-            t2_sem_prob = t2_probs  # (C, H, W)
+            # Multi-class: argmax for labels
+            t1_sem_prob = t1_probs.numpy()  # (C, H, W)
+            t2_sem_prob = t2_probs.numpy()  # (C, H, W)
+            t1_semantic = np.argmax(t1_sem_prob, axis=0).astype(np.uint8)  # (H, W)
+            t2_semantic = np.argmax(t2_sem_prob, axis=0).astype(np.uint8)  # (H, W)
 
         return {
             "change_map": change_map,
