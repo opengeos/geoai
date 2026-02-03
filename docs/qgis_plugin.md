@@ -137,10 +137,9 @@ python = "3.12.*"
 pytorch-gpu = ">=2.7.1,<3"
 qgis = "3.42.*"
 pyqt = "5.15.*"
-geoai = ">=0.24.0"
+geoai = ">=0.27.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
-deepforest = ">=2.0.0"
 libopenblas = ">=0.3.30"
 ```
 
@@ -160,10 +159,10 @@ python = "3.12.*"
 pytorch-gpu = ">=2.7.1,<3"
 qgis = "3.42.*"
 pyqt = "5.15.*"
-geoai = ">=0.24.0"
+geoai = ">=0.27.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
-deepforest = ">=2.0.0"
+libopenblas = ">=0.3.30"
 ```
 
 - For CPU:
@@ -179,10 +178,9 @@ python = "3.12.*"
 pytorch-cpu = ">=2.7.1,<3"
 qgis = "3.42.*"
 pyqt = "5.15.*"
-geoai = ">=0.24.0"
+geoai = ">=0.27.0"
 segment-geospatial = ">=1.2.0"
 sam3 = ">=0.1.0.20251211"
-deepforest = ">=2.0.0"
 libopenblas = ">=0.3.30"
 ```
 
@@ -221,6 +219,18 @@ If CUDA is `False`, check:
 
 ---
 
+#### 6) Install DeepForest
+
+DeepForest is not included in the GeoAI package, so you need to install it manually.
+
+```bash
+pixi run pip install deepforest
+```
+
+DeepForest might downgrade numpy to 1.26.4. You can use the following command to upgrade numpy to the latest version:
+```bash
+pixi run pip install -U numpy transformers
+```
 
 #### Request access to SAM 3
 
@@ -383,13 +393,13 @@ The DeepForest panel provides object detection in remote sensing imagery using p
 
 #### Supported Pretrained Models
 
-| Model | Hugging Face ID | Description |
-|-------|----------------|-------------|
-| Tree Crown Detection | `weecology/deepforest-tree` | Detect individual tree crowns in RGB imagery |
-| Bird Detection | `weecology/deepforest-bird` | Detect birds in aerial/satellite imagery |
-| Livestock Detection | `weecology/deepforest-livestock` | Detect livestock in aerial imagery |
-| Nest Detection | `weecology/everglades-nest-detection` | Detect bird nests in Everglades imagery |
-| Dead Tree Detection | `weecology/cropmodel-deadtrees` | Detect dead trees in forest imagery |
+| Model                | Hugging Face ID                       | Description                                  |
+| -------------------- | ------------------------------------- | -------------------------------------------- |
+| Tree Crown Detection | `weecology/deepforest-tree`           | Detect individual tree crowns in RGB imagery |
+| Bird Detection       | `weecology/deepforest-bird`           | Detect birds in aerial/satellite imagery     |
+| Livestock Detection  | `weecology/deepforest-livestock`      | Detect livestock in aerial imagery           |
+| Nest Detection       | `weecology/everglades-nest-detection` | Detect bird nests in Everglades imagery      |
+| Dead Tree Detection  | `weecology/cropmodel-deadtrees`       | Detect dead trees in forest imagery          |
 
 Steps:
 
