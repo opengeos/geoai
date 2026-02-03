@@ -1891,19 +1891,31 @@ class ChangeStarDetection:
             for k, v in prediction.items()
         }
 
-        # Extract predictions
-        change_prob = torch.sigmoid(prediction["change_prediction"].squeeze()).numpy()
+        # Extract change prediction (always single-channel)
+        change_logits = prediction["change_prediction"].squeeze(0)  # (1, H, W)
+        change_prob = torch.sigmoid(change_logits.squeeze(0)).numpy()  # (H, W)
         change_map = (change_prob > 0.5).astype(np.uint8)
 
-        t1_sem_prob = torch.sigmoid(
-            prediction["t1_semantic_prediction"].squeeze()
-        ).numpy()
-        t1_semantic = (t1_sem_prob > 0.5).astype(np.uint8)
+        # Extract semantic predictions (may be single or multi-class)
+        t1_logits = prediction["t1_semantic_prediction"].squeeze(0)  # (C, H, W)
+        t2_logits = prediction["t2_semantic_prediction"].squeeze(0)  # (C, H, W)
 
-        t2_sem_prob = torch.sigmoid(
-            prediction["t2_semantic_prediction"].squeeze()
-        ).numpy()
-        t2_semantic = (t2_sem_prob > 0.5).astype(np.uint8)
+        num_classes = t1_logits.shape[0]
+
+        if num_classes == 1:
+            # Binary: sigmoid → (H, W) probability
+            t1_sem_prob = torch.sigmoid(t1_logits.squeeze(0)).numpy()
+            t2_sem_prob = torch.sigmoid(t2_logits.squeeze(0)).numpy()
+            t1_semantic = (t1_sem_prob > 0.5).astype(np.uint8)
+            t2_semantic = (t2_sem_prob > 0.5).astype(np.uint8)
+        else:
+            # Multi-class: softmax → argmax for labels, max prob for prob map
+            t1_probs = torch.softmax(t1_logits, dim=0).numpy()  # (C, H, W)
+            t2_probs = torch.softmax(t2_logits, dim=0).numpy()  # (C, H, W)
+            t1_semantic = np.argmax(t1_probs, axis=0).astype(np.uint8)  # (H, W)
+            t2_semantic = np.argmax(t2_probs, axis=0).astype(np.uint8)  # (H, W)
+            t1_sem_prob = t1_probs  # (C, H, W)
+            t2_sem_prob = t2_probs  # (C, H, W)
 
         return {
             "change_map": change_map,
@@ -1912,6 +1924,7 @@ class ChangeStarDetection:
             "t2_semantic": t2_semantic,
             "t1_semantic_prob": t1_sem_prob.astype(np.float32),
             "t2_semantic_prob": t2_sem_prob.astype(np.float32),
+            "num_semantic_classes": num_classes,
         }
 
     def predict(
@@ -1990,14 +2003,18 @@ class ChangeStarDetection:
                 img1, img2, tile_size=tile_size, overlap=overlap
             )
 
-        # Apply threshold
+        # Apply threshold for change map (always binary)
         result["change_map"] = (result["change_prob"] > threshold).astype(np.uint8)
-        result["t1_semantic"] = (result["t1_semantic_prob"] > threshold).astype(
-            np.uint8
-        )
-        result["t2_semantic"] = (result["t2_semantic_prob"] > threshold).astype(
-            np.uint8
-        )
+
+        # Semantic maps: multi-class uses argmax (already computed), binary uses threshold
+        num_classes = result.get("num_semantic_classes", 1)
+        if num_classes == 1:
+            result["t1_semantic"] = (result["t1_semantic_prob"] > threshold).astype(
+                np.uint8
+            )
+            result["t2_semantic"] = (result["t2_semantic_prob"] > threshold).astype(
+                np.uint8
+            )
 
         # Save outputs
         if output_change:
@@ -2050,11 +2067,12 @@ class ChangeStarDetection:
         h, w = img1.shape[:2]
         stride = tile_size - overlap
 
-        # Initialize output arrays
+        # Initialize output arrays (semantic arrays may be multi-class)
         change_prob = np.zeros((h, w), dtype=np.float32)
-        t1_sem_prob = np.zeros((h, w), dtype=np.float32)
-        t2_sem_prob = np.zeros((h, w), dtype=np.float32)
         count = np.zeros((h, w), dtype=np.float32)
+        t1_sem_prob = None  # initialized on first tile
+        t2_sem_prob = None
+        num_classes = 1
 
         # Process tiles
         for y in range(0, h, stride):
@@ -2089,31 +2107,64 @@ class ChangeStarDetection:
                     )
 
                 tile_result = self._predict_tile(tile1, tile2)
+                num_classes = tile_result.get("num_semantic_classes", 1)
+
+                # Lazy-init semantic accumulators on first tile
+                if t1_sem_prob is None:
+                    if num_classes > 1:
+                        t1_sem_prob = np.zeros((num_classes, h, w), dtype=np.float32)
+                        t2_sem_prob = np.zeros((num_classes, h, w), dtype=np.float32)
+                    else:
+                        t1_sem_prob = np.zeros((h, w), dtype=np.float32)
+                        t2_sem_prob = np.zeros((h, w), dtype=np.float32)
 
                 # Crop padding if applied
                 tile_change = tile_result["change_prob"][:th, :tw]
-                tile_t1 = tile_result["t1_semantic_prob"][:th, :tw]
-                tile_t2 = tile_result["t2_semantic_prob"][:th, :tw]
 
-                # Accumulate (average overlapping regions)
+                # Accumulate change
                 change_prob[y_start:y_end, x_start:x_end] += tile_change
-                t1_sem_prob[y_start:y_end, x_start:x_end] += tile_t1
-                t2_sem_prob[y_start:y_end, x_start:x_end] += tile_t2
                 count[y_start:y_end, x_start:x_end] += 1
+
+                # Accumulate semantic probabilities
+                if num_classes > 1:
+                    tile_t1 = tile_result["t1_semantic_prob"][:, :th, :tw]
+                    tile_t2 = tile_result["t2_semantic_prob"][:, :th, :tw]
+                    t1_sem_prob[:, y_start:y_end, x_start:x_end] += tile_t1
+                    t2_sem_prob[:, y_start:y_end, x_start:x_end] += tile_t2
+                else:
+                    tile_t1 = tile_result["t1_semantic_prob"][:th, :tw]
+                    tile_t2 = tile_result["t2_semantic_prob"][:th, :tw]
+                    t1_sem_prob[y_start:y_end, x_start:x_end] += tile_t1
+                    t2_sem_prob[y_start:y_end, x_start:x_end] += tile_t2
+
+        # Handle case where no tiles were processed
+        if t1_sem_prob is None:
+            t1_sem_prob = np.zeros((h, w), dtype=np.float32)
+            t2_sem_prob = np.zeros((h, w), dtype=np.float32)
 
         # Average overlapping regions
         mask = count > 0
         change_prob[mask] /= count[mask]
-        t1_sem_prob[mask] /= count[mask]
-        t2_sem_prob[mask] /= count[mask]
+        if num_classes > 1:
+            for c in range(num_classes):
+                t1_sem_prob[c][mask] /= count[mask]
+                t2_sem_prob[c][mask] /= count[mask]
+            t1_semantic = np.argmax(t1_sem_prob, axis=0).astype(np.uint8)
+            t2_semantic = np.argmax(t2_sem_prob, axis=0).astype(np.uint8)
+        else:
+            t1_sem_prob[mask] /= count[mask]
+            t2_sem_prob[mask] /= count[mask]
+            t1_semantic = (t1_sem_prob > 0.5).astype(np.uint8)
+            t2_semantic = (t2_sem_prob > 0.5).astype(np.uint8)
 
         return {
             "change_map": (change_prob > 0.5).astype(np.uint8),
             "change_prob": change_prob,
-            "t1_semantic": (t1_sem_prob > 0.5).astype(np.uint8),
-            "t2_semantic": (t2_sem_prob > 0.5).astype(np.uint8),
+            "t1_semantic": t1_semantic,
+            "t2_semantic": t2_semantic,
             "t1_semantic_prob": t1_sem_prob,
             "t2_semantic_prob": t2_sem_prob,
+            "num_semantic_classes": num_classes,
         }
 
     def _save_raster(
@@ -2267,12 +2318,16 @@ class ChangeStarDetection:
         axes[2].set_title("Change Map")
         axes[2].axis("off")
 
-        axes[3].imshow(result["t1_semantic"], cmap="gray")
-        axes[3].set_title("T1 Buildings")
+        num_classes = result.get("num_semantic_classes", 1)
+        sem_cmap = "gray" if num_classes == 1 else "tab10"
+        sem_label = "Buildings" if num_classes == 1 else "Semantic"
+
+        axes[3].imshow(result["t1_semantic"], cmap=sem_cmap)
+        axes[3].set_title(f"T1 {sem_label}")
         axes[3].axis("off")
 
-        axes[4].imshow(result["t2_semantic"], cmap="gray")
-        axes[4].set_title("T2 Buildings")
+        axes[4].imshow(result["t2_semantic"], cmap=sem_cmap)
+        axes[4].set_title(f"T2 {sem_label}")
         axes[4].axis("off")
 
         plt.tight_layout()
@@ -2322,20 +2377,22 @@ class ChangeStarDetection:
 
         fig, axes = plt.subplots(1, 3, figsize=figsize)
 
-        # Before image with T1 buildings overlay
+        # Before image with T1 semantic overlay
+        num_classes = result.get("num_semantic_classes", 1)
         axes[0].imshow(img1)
         change_overlay_t1 = np.zeros((*result["t1_semantic"].shape, 4))
-        change_overlay_t1[result["t1_semantic"] == 1] = [0, 0, 1, alpha]
+        change_overlay_t1[result["t1_semantic"] > 0] = [0, 0, 1, alpha]
         axes[0].imshow(change_overlay_t1)
-        axes[0].set_title(f"{title1}\n(Blue = Buildings)")
+        sem_label = "Buildings" if num_classes == 1 else "Semantic"
+        axes[0].set_title(f"{title1}\n(Blue = {sem_label})")
         axes[0].axis("off")
 
-        # After image with T2 buildings overlay
+        # After image with T2 semantic overlay
         axes[1].imshow(img2)
         change_overlay_t2 = np.zeros((*result["t2_semantic"].shape, 4))
-        change_overlay_t2[result["t2_semantic"] == 1] = [0, 0, 1, alpha]
+        change_overlay_t2[result["t2_semantic"] > 0] = [0, 0, 1, alpha]
         axes[1].imshow(change_overlay_t2)
-        axes[1].set_title(f"{title2}\n(Blue = Buildings)")
+        axes[1].set_title(f"{title2}\n(Blue = {sem_label})")
         axes[1].axis("off")
 
         # After image with change overlay
