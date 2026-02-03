@@ -69,6 +69,10 @@
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/onnx/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/prithvi/</loc>
          <lastmod>2026-02-03</lastmod>
     </url>
@@ -266,6 +270,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/moondream_sliding_window/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/onnx/</loc>
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
