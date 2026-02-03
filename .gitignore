@@ -36,6 +36,7 @@ docs/examples/ndvi_regression_output/
 docs/examples/timm_regression_output/
 docs/examples/ndvi_model/
 *.pth
+*.ckpt
 
 # Distribution / packaging
 .Python

@@ -201,3 +201,21 @@ try:
 except ImportError:
     # Prithvi not available (missing dependency)
     pass
+
+# Wetland Mapping with Foundation Models
+try:
+    from .wetland_mapping import (
+        WetlandDatasetBuilder,
+        WetlandPrithviModel,
+        WetlandSatlasModel,
+        WetlandDataset,
+        train_wetland_model,
+        predict_wetlands_large_image,
+        create_wetland_dataset,
+        get_wetland_classes,
+        visualize_wetland_predictions,
+        WETLAND_CLASSES,
+    )
+except ImportError:
+    # Wetland mapping not available (missing dependency)
+    pass
