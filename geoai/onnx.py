@@ -202,8 +202,7 @@ def export_to_onnx(
                 )
         except Exception as exc:
             raise ValueError(
-                "Cannot determine the model task. "
-                "Please specify task= explicitly."
+                "Cannot determine the model task. " "Please specify task= explicitly."
             ) from exc
 
     model = model_cls.from_pretrained(model_name_or_path, **kwargs)
@@ -765,9 +764,7 @@ class ONNXGeoModel:
                         tile_result = self._predict_single(
                             tile, None, threshold, return_probabilities
                         )
-                        tile_mask = tile_result.get(
-                            "mask", tile_result.get("output")
-                        )
+                        tile_mask = tile_result.get("mask", tile_result.get("output"))
                         if tile_mask is not None:
                             if tile_mask.ndim > 2:
                                 tile_mask = tile_mask.squeeze()
