@@ -1,11 +1,28 @@
-cff-version: 1.1.0
-message: "If you use this software, please cite it as below."
+cff-version: "1.2.0"
 authors:
-    - family-names: Wu
-      given-names: Qiusheng
-      orcid: https://orcid.org/0000-0001-5437-4073
-title: "GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization"
-version: 0.14.0
-doi: 10.21105/joss.09025
-date-released: 2025-10-05
-url: "https://github.com/opengeos/goeai"
+- family-names: Wu
+  given-names: Qiusheng
+  orcid: "https://orcid.org/0000-0001-5437-4073"
+doi: 10.5281/zenodo.18424048
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Wu
+    given-names: Qiusheng
+    orcid: "https://orcid.org/0000-0001-5437-4073"
+  date-published: 2026-02-03
+  doi: 10.21105/joss.09605
+  issn: 2475-9066
+  issue: 118
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 9605
+  title: "GeoAI: A Python package for integrating artificial
+    intelligence with geospatial data analysis and visualization"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.09605"
+  volume: 11
+title: "GeoAI: A Python package for integrating artificial intelligence
+  with geospatial data analysis and visualization"
