@@ -213,3 +213,14 @@ try:
 except ImportError:
     # Prithvi not available (missing dependency)
     pass
+
+# ChangeStar building change detection
+try:
+    from .change_detection import (
+        ChangeStarDetection,
+        changestar_detect,
+        list_changestar_models,
+    )
+except ImportError:
+    # ChangeStar not available (missing torchange dependency)
+    pass

@@ -1595,3 +1595,828 @@ def download_checkpoint(
             download_file(url, checkpoint)
 
     return checkpoint
+
+
+# Available ChangeStar model variants
+CHANGESTAR_MODELS = {
+    "s0_s1c1_vitb": "s0_init_s1c1_changestar_vitb_1x256",
+    "s0_s1c5_vitb": "s0_init_s1c5_changestar_vitb_1x256",
+    "s0_s9c1_vitb": "s0_init_s9c1_changestar_vitb_1x256",
+    "s0_xview2_s1c5_vitb": "s0_init_xView2_ft_s1c5_changestar_vitb_1x256",
+    "s1_s1c1_vitb": "s1_init_s1c1_changestar_vitb_1x256",
+    "s1_s1c1_vitl": "s1_init_s1c1_changestar_vitl_1x256",
+    "s9_s9c1_vitb": "s9_init_s9c1_changestar_vitb_1x256",
+}
+
+
+def list_changestar_models() -> Dict[str, str]:
+    """List available ChangeStar model variants.
+
+    Returns:
+        Dict[str, str]: A dictionary mapping short model names to their
+            full function names in torchange.
+
+    Example:
+        >>> from geoai.change_detection import list_changestar_models
+        >>> models = list_changestar_models()
+        >>> for short_name, full_name in models.items():
+        ...     print(f"{short_name}: {full_name}")
+    """
+    return dict(CHANGESTAR_MODELS)
+
+
+class ChangeStarDetection:
+    """Change detection using ChangeStar models from the torchange package.
+
+    ChangeStar is a building change detection model that uses Changen2
+    pre-trained weights for zero-shot or fine-tuned building change detection.
+    It takes two images (before/after) and outputs change maps and semantic
+    segmentation maps.
+
+    This class wraps the torchange ChangeStar models with GeoTIFF I/O
+    support, tiled processing for large rasters, and vector output
+    capabilities.
+
+    Args:
+        model_name (str): Short name of the ChangeStar model variant.
+            Use :func:`list_changestar_models` to see available options.
+            Defaults to ``"s1_s1c1_vitb"``.
+        device (str or None): Device to use for inference (``"cuda"``,
+            ``"cpu"``, or ``None`` for auto-detection). Defaults to ``None``.
+
+    Raises:
+        ImportError: If ``torchange`` or ``albumentations`` is not installed.
+        ValueError: If an invalid ``model_name`` is provided.
+
+    Example:
+        >>> from geoai.change_detection import ChangeStarDetection
+        >>> detector = ChangeStarDetection(model_name="s1_s1c1_vitb")
+        >>> result = detector.predict("before.tif", "after.tif")
+    """
+
+    def __init__(
+        self,
+        model_name: str = "s1_s1c1_vitb",
+        device: Optional[str] = None,
+    ):
+        self.model_name = model_name
+        self.device = device
+        self.model = None
+        self._preprocess = None
+        self._init_model()
+
+    def _init_model(self):
+        """Initialize the ChangeStar model and preprocessing pipeline."""
+        try:
+            import torch
+            from torchange.models import changen2
+            import albumentations as A
+            import albumentations.pytorch
+        except ImportError as e:
+            raise ImportError(
+                "The 'torchange' and 'albumentations' packages are required "
+                "for ChangeStar change detection. "
+                "Please install them using: pip install torchange albumentations\n"
+                f"Original error: {e}"
+            ) from e
+
+        if self.model_name not in CHANGESTAR_MODELS:
+            raise ValueError(
+                f"Invalid model_name: '{self.model_name}'. "
+                f"Available models: {list(CHANGESTAR_MODELS.keys())}"
+            )
+
+        # Get the model constructor function
+        func_name = CHANGESTAR_MODELS[self.model_name]
+        model_fn = getattr(changen2, func_name)
+        self.model = model_fn()
+        self.model.eval()
+
+        # Set device
+        if self.device is None:
+            try:
+                import ever as er
+
+                self._device = er.auto_device()
+            except ImportError:
+                self._device = torch.device(
+                    "cuda" if torch.cuda.is_available() else "cpu"
+                )
+        else:
+            self._device = torch.device(self.device)
+
+        self.model = self.model.to(self._device)
+
+        # Set up preprocessing
+        self._preprocess = A.Compose(
+            [A.Normalize(), A.pytorch.ToTensorV2()],
+            additional_targets={"image2": "image"},
+        )
+
+    def _read_geotiff(
+        self, path: str, window=None
+    ) -> Tuple[np.ndarray, Any, Any, Tuple[int, int]]:
+        """Read a GeoTIFF file and return image data with georeference info.
+
+        Args:
+            path (str): Path to the GeoTIFF file.
+            window: Optional rasterio window for reading a subset.
+
+        Returns:
+            Tuple of (image_array, transform, crs, shape):
+                - image_array: numpy array with shape (H, W, 3) in uint8.
+                - transform: rasterio affine transform.
+                - crs: coordinate reference system.
+                - shape: original (height, width) of the read region.
+        """
+        with rasterio.open(path) as src:
+            if window is not None:
+                img_data = src.read(window=window)
+                transform = src.window_transform(window)
+            else:
+                img_data = src.read()
+                transform = src.transform
+            crs = src.crs
+
+            # Convert from (bands, height, width) to (height, width, bands)
+            img_data = np.transpose(img_data, (1, 2, 0))
+
+            # Use only RGB bands (first 3 channels)
+            if img_data.shape[2] >= 3:
+                img_data = img_data[:, :, :3]
+
+            # Normalize to 0-255 range if needed
+            if img_data.dtype != np.uint8:
+                img_min = img_data.min()
+                img_max = img_data.max()
+                if img_max > img_min:
+                    img_data = (
+                        (img_data - img_min) / (img_max - img_min) * 255
+                    ).astype(np.uint8)
+                else:
+                    img_data = np.zeros_like(img_data, dtype=np.uint8)
+
+            shape = img_data.shape[:2]
+            return img_data, transform, crs, shape
+
+    def _read_and_align_images(
+        self, image1_path: str, image2_path: str
+    ) -> Tuple[np.ndarray, np.ndarray, Any, Any, Tuple[int, int]]:
+        """Read and align two GeoTIFF images by their spatial overlap.
+
+        Args:
+            image1_path (str): Path to the first (before) image.
+            image2_path (str): Path to the second (after) image.
+
+        Returns:
+            Tuple of (img1, img2, transform, crs, shape):
+                - img1: first image as (H, W, 3) uint8 array.
+                - img2: second image as (H, W, 3) uint8 array.
+                - transform: affine transform for the overlap area.
+                - crs: coordinate reference system.
+                - shape: (height, width) of the overlap area.
+
+        Raises:
+            ValueError: If the images do not overlap.
+        """
+        with rasterio.open(image1_path) as src1, rasterio.open(image2_path) as src2:
+            bounds1 = src1.bounds
+            bounds2 = src2.bounds
+
+            left = max(bounds1.left, bounds2.left)
+            bottom = max(bounds1.bottom, bounds2.bottom)
+            right = min(bounds1.right, bounds2.right)
+            top = min(bounds1.top, bounds2.top)
+
+            if left >= right or bottom >= top:
+                raise ValueError("Images do not overlap")
+
+            intersection_bounds = (left, bottom, right, top)
+
+            window1 = from_bounds(*intersection_bounds, src1.transform)
+            window2 = from_bounds(*intersection_bounds, src2.transform)
+
+            img1_data = src1.read(window=window1)
+            img2_data = src2.read(window=window2)
+
+            transform = src1.window_transform(window1)
+            crs = src1.crs
+
+            img1_data = np.transpose(img1_data, (1, 2, 0))
+            img2_data = np.transpose(img2_data, (1, 2, 0))
+
+            # Use only RGB bands
+            if img1_data.shape[2] >= 3:
+                img1_data = img1_data[:, :, :3]
+            if img2_data.shape[2] >= 3:
+                img2_data = img2_data[:, :, :3]
+
+            # Normalize to uint8
+            for arr_name in ["img1_data", "img2_data"]:
+                arr = locals()[arr_name]
+                if arr.dtype != np.uint8:
+                    arr_min = arr.min()
+                    arr_max = arr.max()
+                    if arr_max > arr_min:
+                        arr = ((arr - arr_min) / (arr_max - arr_min) * 255).astype(
+                            np.uint8
+                        )
+                    else:
+                        arr = np.zeros_like(arr, dtype=np.uint8)
+                    if arr_name == "img1_data":
+                        img1_data = arr
+                    else:
+                        img2_data = arr
+
+            # Ensure same size by resizing img2 to match img1
+            if img1_data.shape[:2] != img2_data.shape[:2]:
+                img2_data = resize(
+                    img2_data,
+                    img1_data.shape[:2],
+                    preserve_range=True,
+                    anti_aliasing=True,
+                ).astype(np.uint8)
+
+            shape = img1_data.shape[:2]
+            return img1_data, img2_data, transform, crs, shape
+
+    def _preprocess_pair(self, img1: np.ndarray, img2: np.ndarray):
+        """Preprocess a pair of images for model input.
+
+        Args:
+            img1 (np.ndarray): First image as (H, W, 3) uint8 array.
+            img2 (np.ndarray): Second image as (H, W, 3) uint8 array.
+
+        Returns:
+            torch.Tensor: Concatenated and normalized tensor of shape
+                (1, 6, H, W).
+        """
+        import torch
+
+        data = self._preprocess(image=img1, image2=img2)
+        img = torch.cat([data["image"], data["image2"]], dim=0)  # (6, H, W)
+        return img.unsqueeze(0)  # (1, 6, H, W)
+
+    def _predict_tile(self, img1: np.ndarray, img2: np.ndarray) -> Dict[str, Any]:
+        """Run model inference on a single tile pair.
+
+        Args:
+            img1 (np.ndarray): First image tile as (H, W, 3) uint8 array.
+            img2 (np.ndarray): Second image tile as (H, W, 3) uint8 array.
+
+        Returns:
+            Dict[str, Any]: Dictionary with keys:
+                - ``"change_map"``: binary change map as (H, W) uint8 array.
+                - ``"change_prob"``: change probability as (H, W) float32 array.
+                - ``"t1_semantic"``: semantic segmentation for t1 as
+                  (H, W) uint8 array.
+                - ``"t2_semantic"``: semantic segmentation for t2 as
+                  (H, W) uint8 array.
+                - ``"t1_semantic_prob"``: semantic probability for t1 as
+                  (H, W) float32 array.
+                - ``"t2_semantic_prob"``: semantic probability for t2 as
+                  (H, W) float32 array.
+        """
+        import torch
+
+        input_tensor = self._preprocess_pair(img1, img2)
+        input_tensor = input_tensor.to(self._device)
+
+        with torch.no_grad():
+            prediction = self.model(input_tensor)
+
+        # Move all tensors to CPU
+        prediction = {
+            k: v.detach().cpu() if isinstance(v, torch.Tensor) else v
+            for k, v in prediction.items()
+        }
+
+        # Extract predictions
+        change_prob = torch.sigmoid(prediction["change_prediction"].squeeze()).numpy()
+        change_map = (change_prob > 0.5).astype(np.uint8)
+
+        t1_sem_prob = torch.sigmoid(
+            prediction["t1_semantic_prediction"].squeeze()
+        ).numpy()
+        t1_semantic = (t1_sem_prob > 0.5).astype(np.uint8)
+
+        t2_sem_prob = torch.sigmoid(
+            prediction["t2_semantic_prediction"].squeeze()
+        ).numpy()
+        t2_semantic = (t2_sem_prob > 0.5).astype(np.uint8)
+
+        return {
+            "change_map": change_map,
+            "change_prob": change_prob.astype(np.float32),
+            "t1_semantic": t1_semantic,
+            "t2_semantic": t2_semantic,
+            "t1_semantic_prob": t1_sem_prob.astype(np.float32),
+            "t2_semantic_prob": t2_sem_prob.astype(np.float32),
+        }
+
+    def predict(
+        self,
+        image1_path: str,
+        image2_path: str,
+        output_change: Optional[str] = None,
+        output_t1_semantic: Optional[str] = None,
+        output_t2_semantic: Optional[str] = None,
+        output_vector: Optional[str] = None,
+        tile_size: int = 1024,
+        overlap: int = 64,
+        threshold: float = 0.5,
+        **kwargs: Any,
+    ) -> Dict[str, np.ndarray]:
+        """Run change detection on two GeoTIFF images.
+
+        Supports tiled processing for large rasters. When the image is
+        larger than ``tile_size``, it is split into overlapping tiles,
+        each tile is processed independently, and results are stitched
+        back together.
+
+        Args:
+            image1_path (str): Path to the first (before) GeoTIFF image.
+            image2_path (str): Path to the second (after) GeoTIFF image.
+            output_change (str or None): Path to save the binary change
+                mask as a GeoTIFF. Defaults to ``None``.
+            output_t1_semantic (str or None): Path to save the t1 semantic
+                segmentation as a GeoTIFF. Defaults to ``None``.
+            output_t2_semantic (str or None): Path to save the t2 semantic
+                segmentation as a GeoTIFF. Defaults to ``None``.
+            output_vector (str or None): Path to save change polygons as
+                a vector file (e.g., GeoJSON, GPKG). Defaults to ``None``.
+            tile_size (int): Size of tiles for processing large images.
+                Defaults to ``1024``.
+            overlap (int): Overlap between tiles in pixels. Defaults to
+                ``64``.
+            threshold (float): Probability threshold for binary change map.
+                Defaults to ``0.5``.
+            **kwargs: Additional keyword arguments (currently unused).
+
+        Returns:
+            Dict[str, np.ndarray]: Dictionary with keys:
+                - ``"change_map"``: binary change map as (H, W) uint8 array.
+                - ``"change_prob"``: change probability as (H, W)
+                  float32 array.
+                - ``"t1_semantic"``: semantic segmentation for t1 as
+                  (H, W) uint8 array.
+                - ``"t2_semantic"``: semantic segmentation for t2 as
+                  (H, W) uint8 array.
+                - ``"t1_semantic_prob"``: semantic probability for t1 as
+                  (H, W) float32 array.
+                - ``"t2_semantic_prob"``: semantic probability for t2 as
+                  (H, W) float32 array.
+
+        Example:
+            >>> detector = ChangeStarDetection(model_name="s1_s1c1_vitb")
+            >>> result = detector.predict(
+            ...     "before.tif",
+            ...     "after.tif",
+            ...     output_change="change_map.tif",
+            ...     output_vector="changes.gpkg",
+            ... )
+        """
+        # Read and align images
+        img1, img2, transform, crs, shape = self._read_and_align_images(
+            image1_path, image2_path
+        )
+        h, w = shape
+
+        # Decide whether to use tiled processing
+        if h <= tile_size and w <= tile_size:
+            result = self._predict_tile(img1, img2)
+        else:
+            result = self._predict_tiled(
+                img1, img2, tile_size=tile_size, overlap=overlap
+            )
+
+        # Apply threshold
+        result["change_map"] = (result["change_prob"] > threshold).astype(np.uint8)
+        result["t1_semantic"] = (result["t1_semantic_prob"] > threshold).astype(
+            np.uint8
+        )
+        result["t2_semantic"] = (result["t2_semantic_prob"] > threshold).astype(
+            np.uint8
+        )
+
+        # Save outputs
+        if output_change:
+            self._save_raster(
+                result["change_map"], output_change, transform, crs, dtype=np.uint8
+            )
+
+        if output_t1_semantic:
+            self._save_raster(
+                result["t1_semantic"],
+                output_t1_semantic,
+                transform,
+                crs,
+                dtype=np.uint8,
+            )
+
+        if output_t2_semantic:
+            self._save_raster(
+                result["t2_semantic"],
+                output_t2_semantic,
+                transform,
+                crs,
+                dtype=np.uint8,
+            )
+
+        if output_vector:
+            self._save_vector(result["change_map"], output_vector, transform, crs)
+
+        return result
+
+    def _predict_tiled(
+        self,
+        img1: np.ndarray,
+        img2: np.ndarray,
+        tile_size: int = 1024,
+        overlap: int = 64,
+    ) -> Dict[str, np.ndarray]:
+        """Process large images in overlapping tiles and merge results.
+
+        Args:
+            img1 (np.ndarray): First image as (H, W, 3) uint8 array.
+            img2 (np.ndarray): Second image as (H, W, 3) uint8 array.
+            tile_size (int): Size of each tile. Defaults to ``1024``.
+            overlap (int): Number of pixels to overlap between tiles.
+                Defaults to ``64``.
+
+        Returns:
+            Dict[str, np.ndarray]: Merged prediction results.
+        """
+        h, w = img1.shape[:2]
+        stride = tile_size - overlap
+
+        # Initialize output arrays
+        change_prob = np.zeros((h, w), dtype=np.float32)
+        t1_sem_prob = np.zeros((h, w), dtype=np.float32)
+        t2_sem_prob = np.zeros((h, w), dtype=np.float32)
+        count = np.zeros((h, w), dtype=np.float32)
+
+        # Process tiles
+        for y in range(0, h, stride):
+            for x in range(0, w, stride):
+                # Calculate tile bounds
+                y_end = min(y + tile_size, h)
+                x_end = min(x + tile_size, w)
+                y_start = max(0, y_end - tile_size)
+                x_start = max(0, x_end - tile_size)
+
+                tile1 = img1[y_start:y_end, x_start:x_end]
+                tile2 = img2[y_start:y_end, x_start:x_end]
+
+                # Skip empty tiles
+                if tile1.max() == 0 and tile2.max() == 0:
+                    continue
+
+                # Pad if needed
+                th, tw = tile1.shape[:2]
+                if th < tile_size or tw < tile_size:
+                    pad_h = tile_size - th
+                    pad_w = tile_size - tw
+                    tile1 = np.pad(
+                        tile1,
+                        ((0, pad_h), (0, pad_w), (0, 0)),
+                        mode="reflect",
+                    )
+                    tile2 = np.pad(
+                        tile2,
+                        ((0, pad_h), (0, pad_w), (0, 0)),
+                        mode="reflect",
+                    )
+
+                tile_result = self._predict_tile(tile1, tile2)
+
+                # Crop padding if applied
+                tile_change = tile_result["change_prob"][:th, :tw]
+                tile_t1 = tile_result["t1_semantic_prob"][:th, :tw]
+                tile_t2 = tile_result["t2_semantic_prob"][:th, :tw]
+
+                # Accumulate (average overlapping regions)
+                change_prob[y_start:y_end, x_start:x_end] += tile_change
+                t1_sem_prob[y_start:y_end, x_start:x_end] += tile_t1
+                t2_sem_prob[y_start:y_end, x_start:x_end] += tile_t2
+                count[y_start:y_end, x_start:x_end] += 1
+
+        # Average overlapping regions
+        mask = count > 0
+        change_prob[mask] /= count[mask]
+        t1_sem_prob[mask] /= count[mask]
+        t2_sem_prob[mask] /= count[mask]
+
+        return {
+            "change_map": (change_prob > 0.5).astype(np.uint8),
+            "change_prob": change_prob,
+            "t1_semantic": (t1_sem_prob > 0.5).astype(np.uint8),
+            "t2_semantic": (t2_sem_prob > 0.5).astype(np.uint8),
+            "t1_semantic_prob": t1_sem_prob,
+            "t2_semantic_prob": t2_sem_prob,
+        }
+
+    def _save_raster(
+        self,
+        data: np.ndarray,
+        output_path: str,
+        transform: Any,
+        crs: Any,
+        dtype=np.uint8,
+    ) -> None:
+        """Save a 2D array as a GeoTIFF.
+
+        Args:
+            data (np.ndarray): 2D array to save.
+            output_path (str): Path for the output GeoTIFF.
+            transform: Rasterio affine transform.
+            crs: Coordinate reference system.
+            dtype: Output data type. Defaults to ``np.uint8``.
+        """
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+        with rasterio.open(
+            output_path,
+            "w",
+            driver="GTiff",
+            height=data.shape[0],
+            width=data.shape[1],
+            count=1,
+            dtype=dtype,
+            crs=crs,
+            transform=transform,
+            compress="lzw",
+        ) as dst:
+            dst.write(data.astype(dtype), 1)
+
+    def _save_vector(
+        self,
+        change_map: np.ndarray,
+        output_path: str,
+        transform: Any,
+        crs: Any,
+    ) -> None:
+        """Convert a binary change map to vector polygons and save.
+
+        Args:
+            change_map (np.ndarray): Binary change map as (H, W) uint8.
+            output_path (str): Path for the output vector file
+                (GeoJSON, GPKG, etc.).
+            transform: Rasterio affine transform.
+            crs: Coordinate reference system.
+        """
+        try:
+            import geopandas as gpd
+            from rasterio.features import shapes
+            from shapely.geometry import shape as shapely_shape
+        except ImportError as e:
+            print(
+                f"Warning: Cannot save vector output. "
+                f"Missing dependency: {e}. "
+                f"Install geopandas and shapely."
+            )
+            return
+
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+        # Extract polygons from the binary mask
+        mask = change_map.astype(np.uint8)
+        geometries = []
+        values = []
+
+        for geom, val in shapes(mask, transform=transform):
+            if val == 1:  # Only keep change regions
+                geometries.append(shapely_shape(geom))
+                values.append(int(val))
+
+        if not geometries:
+            print("No change polygons found.")
+            return
+
+        gdf = gpd.GeoDataFrame(
+            {"change": values},
+            geometry=geometries,
+            crs=crs,
+        )
+
+        # Determine driver from extension
+        ext = os.path.splitext(output_path)[1].lower()
+        driver_map = {
+            ".geojson": "GeoJSON",
+            ".json": "GeoJSON",
+            ".gpkg": "GPKG",
+            ".shp": "ESRI Shapefile",
+        }
+        driver = driver_map.get(ext, "GPKG")
+
+        gdf.to_file(output_path, driver=driver)
+
+    def visualize(
+        self,
+        image1_path: str,
+        image2_path: str,
+        result: Optional[Dict[str, np.ndarray]] = None,
+        figsize: Tuple[int, int] = (20, 5),
+        title1: str = "Before (T1)",
+        title2: str = "After (T2)",
+        **kwargs: Any,
+    ) -> plt.Figure:
+        """Visualize change detection results.
+
+        Shows the before image, after image, change map, and optionally
+        the semantic segmentation maps side by side.
+
+        Args:
+            image1_path (str): Path to the first (before) image.
+            image2_path (str): Path to the second (after) image.
+            result (Dict or None): Pre-computed prediction result from
+                :meth:`predict`. If ``None``, prediction is run first.
+                Defaults to ``None``.
+            figsize (Tuple[int, int]): Figure size. Defaults to
+                ``(20, 5)``.
+            title1 (str): Title for the before image. Defaults to
+                ``"Before (T1)"``.
+            title2 (str): Title for the after image. Defaults to
+                ``"After (T2)"``.
+            **kwargs: Additional keyword arguments passed to
+                :meth:`predict`.
+
+        Returns:
+            matplotlib.figure.Figure: The figure object.
+
+        Example:
+            >>> detector = ChangeStarDetection()
+            >>> fig = detector.visualize("before.tif", "after.tif")
+        """
+        if result is None:
+            result = self.predict(image1_path, image2_path, **kwargs)
+
+        img1, img2, _, _, _ = self._read_and_align_images(image1_path, image2_path)
+
+        fig, axes = plt.subplots(1, 5, figsize=figsize)
+
+        axes[0].imshow(img1)
+        axes[0].set_title(title1)
+        axes[0].axis("off")
+
+        axes[1].imshow(img2)
+        axes[1].set_title(title2)
+        axes[1].axis("off")
+
+        axes[2].imshow(result["change_map"], cmap="gray")
+        axes[2].set_title("Change Map")
+        axes[2].axis("off")
+
+        axes[3].imshow(result["t1_semantic"], cmap="gray")
+        axes[3].set_title("T1 Buildings")
+        axes[3].axis("off")
+
+        axes[4].imshow(result["t2_semantic"], cmap="gray")
+        axes[4].set_title("T2 Buildings")
+        axes[4].axis("off")
+
+        plt.tight_layout()
+        return fig
+
+    def visualize_overlay(
+        self,
+        image1_path: str,
+        image2_path: str,
+        result: Optional[Dict[str, np.ndarray]] = None,
+        figsize: Tuple[int, int] = (15, 5),
+        alpha: float = 0.4,
+        title1: str = "Before (T1)",
+        title2: str = "After (T2)",
+        **kwargs: Any,
+    ) -> plt.Figure:
+        """Visualize results with change map overlaid on the images.
+
+        Args:
+            image1_path (str): Path to the first (before) image.
+            image2_path (str): Path to the second (after) image.
+            result (Dict or None): Pre-computed prediction result from
+                :meth:`predict`. If ``None``, prediction is run first.
+                Defaults to ``None``.
+            figsize (Tuple[int, int]): Figure size. Defaults to
+                ``(15, 5)``.
+            alpha (float): Transparency for the overlay. Defaults to
+                ``0.4``.
+            title1 (str): Title for the before image. Defaults to
+                ``"Before (T1)"``.
+            title2 (str): Title for the after image. Defaults to
+                ``"After (T2)"``.
+            **kwargs: Additional keyword arguments passed to
+                :meth:`predict`.
+
+        Returns:
+            matplotlib.figure.Figure: The figure object.
+
+        Example:
+            >>> detector = ChangeStarDetection()
+            >>> fig = detector.visualize_overlay("before.tif", "after.tif")
+        """
+        if result is None:
+            result = self.predict(image1_path, image2_path, **kwargs)
+
+        img1, img2, _, _, _ = self._read_and_align_images(image1_path, image2_path)
+
+        fig, axes = plt.subplots(1, 3, figsize=figsize)
+
+        # Before image with T1 buildings overlay
+        axes[0].imshow(img1)
+        change_overlay_t1 = np.zeros((*result["t1_semantic"].shape, 4))
+        change_overlay_t1[result["t1_semantic"] == 1] = [0, 0, 1, alpha]
+        axes[0].imshow(change_overlay_t1)
+        axes[0].set_title(f"{title1}\n(Blue = Buildings)")
+        axes[0].axis("off")
+
+        # After image with T2 buildings overlay
+        axes[1].imshow(img2)
+        change_overlay_t2 = np.zeros((*result["t2_semantic"].shape, 4))
+        change_overlay_t2[result["t2_semantic"] == 1] = [0, 0, 1, alpha]
+        axes[1].imshow(change_overlay_t2)
+        axes[1].set_title(f"{title2}\n(Blue = Buildings)")
+        axes[1].axis("off")
+
+        # After image with change overlay
+        axes[2].imshow(img2)
+        change_overlay = np.zeros((*result["change_map"].shape, 4))
+        change_overlay[result["change_map"] == 1] = [1, 0, 0, alpha]
+        axes[2].imshow(change_overlay)
+        axes[2].set_title("Change Detection\n(Red = Change)")
+        axes[2].axis("off")
+
+        plt.tight_layout()
+        return fig
+
+
+def changestar_detect(
+    image1_path: str,
+    image2_path: str,
+    model_name: str = "s1_s1c1_vitb",
+    output_change: Optional[str] = None,
+    output_t1_semantic: Optional[str] = None,
+    output_t2_semantic: Optional[str] = None,
+    output_vector: Optional[str] = None,
+    tile_size: int = 1024,
+    overlap: int = 64,
+    threshold: float = 0.5,
+    device: Optional[str] = None,
+    **kwargs: Any,
+) -> Dict[str, np.ndarray]:
+    """Convenience function for ChangeStar building change detection.
+
+    Creates a :class:`ChangeStarDetection` instance and runs prediction
+    in one step. For repeated use, instantiate :class:`ChangeStarDetection`
+    directly to avoid reloading the model.
+
+    Args:
+        image1_path (str): Path to the first (before) GeoTIFF image.
+        image2_path (str): Path to the second (after) GeoTIFF image.
+        model_name (str): Short name of the ChangeStar model variant.
+            Use :func:`list_changestar_models` to see options.
+            Defaults to ``"s1_s1c1_vitb"``.
+        output_change (str or None): Path to save the binary change mask
+            as a GeoTIFF. Defaults to ``None``.
+        output_t1_semantic (str or None): Path to save the t1 semantic
+            segmentation as a GeoTIFF. Defaults to ``None``.
+        output_t2_semantic (str or None): Path to save the t2 semantic
+            segmentation as a GeoTIFF. Defaults to ``None``.
+        output_vector (str or None): Path to save change polygons as a
+            vector file. Defaults to ``None``.
+        tile_size (int): Size of tiles for processing large images.
+            Defaults to ``1024``.
+        overlap (int): Overlap between tiles in pixels. Defaults to
+            ``64``.
+        threshold (float): Probability threshold for binary change map.
+            Defaults to ``0.5``.
+        device (str or None): Device for inference. Defaults to ``None``
+            (auto-detect).
+        **kwargs: Additional keyword arguments passed to
+            :meth:`ChangeStarDetection.predict`.
+
+    Returns:
+        Dict[str, np.ndarray]: Dictionary with prediction results.
+
+    Example:
+        >>> from geoai import changestar_detect
+        >>> result = changestar_detect(
+        ...     "before.tif",
+        ...     "after.tif",
+        ...     output_change="change_map.tif",
+        ...     output_vector="changes.gpkg",
+        ... )
+    """
+    detector = ChangeStarDetection(model_name=model_name, device=device)
+    return detector.predict(
+        image1_path,
+        image2_path,
+        output_change=output_change,
+        output_t1_semantic=output_t1_semantic,
+        output_t2_semantic=output_t2_semantic,
+        output_vector=output_vector,
+        tile_size=tile_size,
+        overlap=overlap,
+        threshold=threshold,
+        **kwargs,
+    )
