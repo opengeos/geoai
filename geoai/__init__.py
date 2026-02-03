@@ -172,6 +172,18 @@ except ImportError:
     # super_resolution not available (missing dependency)
     pass
 
+# ONNX Runtime support
+try:
+    from .onnx import (
+        ONNXGeoModel,
+        export_to_onnx,
+        onnx_semantic_segmentation,
+        onnx_image_classification,
+    )
+except ImportError:
+    # ONNX not available (missing dependency)
+    pass
+
 # Moondream Vision Language Model
 try:
     from .moondream import (
