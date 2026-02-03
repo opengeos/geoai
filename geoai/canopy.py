@@ -140,7 +140,11 @@ class _Block(nn.Module):
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.attn = attn_class(
-            dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            attn_drop=attn_drop,
+            proj_drop=drop,
         )
         self.ls1 = (
             _LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
@@ -160,7 +164,9 @@ class _Block(nn.Module):
 
 
 class _PatchEmbed(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, norm_layer=None):
+    def __init__(
+        self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, norm_layer=None
+    ):
         super().__init__()
         if isinstance(img_size, int):
             img_size = (img_size, img_size)
@@ -168,11 +174,16 @@ class _PatchEmbed(nn.Module):
             patch_size = (patch_size, patch_size)
         self.img_size = img_size
         self.patch_size = patch_size
-        self.patches_resolution = (img_size[0] // patch_size[0], img_size[1] // patch_size[1])
+        self.patches_resolution = (
+            img_size[0] // patch_size[0],
+            img_size[1] // patch_size[1],
+        )
         self.num_patches = self.patches_resolution[0] * self.patches_resolution[1]
         self.in_chans = in_chans
         self.embed_dim = embed_dim
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj = nn.Conv2d(
+            in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
+        )
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
     def forward(self, x):
@@ -241,7 +252,10 @@ class _DinoVisionTransformer(nn.Module):
 
         self.embed_dim = embed_dim
         self.patch_embed = _PatchEmbed(
-            img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim
+            img_size=img_size,
+            patch_size=patch_size,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
         )
         num_patches = self.patch_embed.num_patches
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -291,9 +305,9 @@ class _DinoVisionTransformer(nn.Module):
         h0 = h // self.patch_embed.patch_size[1]
         w0, h0 = w0 + 0.1, h0 + 0.1
         patch_pos_embed = nn.functional.interpolate(
-            patch_pos_embed.reshape(1, int(math.sqrt(N)), int(math.sqrt(N)), dim).permute(
-                0, 3, 1, 2
-            ),
+            patch_pos_embed.reshape(
+                1, int(math.sqrt(N)), int(math.sqrt(N)), dim
+            ).permute(0, 3, 1, 2),
             scale_factor=(w0 / math.sqrt(N), h0 / math.sqrt(N)),
             mode="bicubic",
             align_corners=True,
@@ -407,7 +421,9 @@ class _SSLVisionTransformer(_DinoVisionTransformer):
 
 def _kaiming_init(module, a=0, mode="fan_out", nonlinearity="relu", bias=0):
     if hasattr(module, "weight") and module.weight is not None:
-        nn.init.kaiming_normal_(module.weight, a=a, mode=mode, nonlinearity=nonlinearity)
+        nn.init.kaiming_normal_(
+            module.weight, a=a, mode=mode, nonlinearity=nonlinearity
+        )
     if hasattr(module, "bias") and module.bias is not None:
         nn.init.constant_(module.bias, bias)
 
@@ -495,7 +511,9 @@ class _HeadDepth(nn.Module):
             _Interpolate(scale_factor=2, mode="bilinear", align_corners=True),
             nn.Conv2d(features // 2, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 1 if not classify else n_bins, kernel_size=1, stride=1, padding=0),
+            nn.Conv2d(
+                32, 1 if not classify else n_bins, kernel_size=1, stride=1, padding=0
+            ),
         )
 
     def forward(self, x):
@@ -517,21 +535,35 @@ class _ReassembleBlocks(nn.Module):
         self.patch_size = patch_size
         self.projects = nn.ModuleList(
             [
-                _ConvModule(in_channels=in_channels, out_channels=oc, kernel_size=1, act_cfg=None)
+                _ConvModule(
+                    in_channels=in_channels,
+                    out_channels=oc,
+                    kernel_size=1,
+                    act_cfg=None,
+                )
                 for oc in out_channels
             ]
         )
         self.resize_layers = nn.ModuleList(
             [
-                nn.ConvTranspose2d(out_channels[0], out_channels[0], kernel_size=4, stride=4, padding=0),
-                nn.ConvTranspose2d(out_channels[1], out_channels[1], kernel_size=2, stride=2, padding=0),
+                nn.ConvTranspose2d(
+                    out_channels[0], out_channels[0], kernel_size=4, stride=4, padding=0
+                ),
+                nn.ConvTranspose2d(
+                    out_channels[1], out_channels[1], kernel_size=2, stride=2, padding=0
+                ),
                 nn.Identity(),
-                nn.Conv2d(out_channels[3], out_channels[3], kernel_size=3, stride=2, padding=1),
+                nn.Conv2d(
+                    out_channels[3], out_channels[3], kernel_size=3, stride=2, padding=1
+                ),
             ]
         )
         if self.readout_type == "project":
             self.readout_projects = nn.ModuleList(
-                [nn.Sequential(nn.Linear(2 * in_channels, in_channels), nn.GELU()) for _ in range(len(self.projects))]
+                [
+                    nn.Sequential(nn.Linear(2 * in_channels, in_channels), nn.GELU())
+                    for _ in range(len(self.projects))
+                ]
             )
 
     def forward(self, inputs):
@@ -607,7 +639,9 @@ class _FeatureFusionBlock(nn.Module):
                 res = inputs[1]
             x = x + self.res_conv_unit1(res)
         x = self.res_conv_unit2(x)
-        x = _resize(x, scale_factor=2, mode="bilinear", align_corners=self.align_corners)
+        x = _resize(
+            x, scale_factor=2, mode="bilinear", align_corners=self.align_corners
+        )
         x = self.project(x)
         return x
 
@@ -638,7 +672,14 @@ class _DPTHead(nn.Module):
         )
         self.convs = nn.ModuleList(
             [
-                _ConvModule(channel, self.channels, kernel_size=3, padding=1, act_cfg=None, bias=False)
+                _ConvModule(
+                    channel,
+                    self.channels,
+                    kernel_size=3,
+                    padding=1,
+                    act_cfg=None,
+                    bias=False,
+                )
                 for channel in post_process_channels
             ]
         )
@@ -647,7 +688,9 @@ class _DPTHead(nn.Module):
         )
         self.fusion_blocks[0].res_conv_unit1 = None
         torch.manual_seed(1)
-        self.project = _ConvModule(self.channels, self.channels, kernel_size=3, padding=1)
+        self.project = _ConvModule(
+            self.channels, self.channels, kernel_size=3, padding=1
+        )
         self.conv_depth = _HeadDepth(self.channels, self.classify, self.n_bins)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
@@ -788,7 +831,9 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
     return checkpoint_path
 
 
-def _load_model(model_name: str, checkpoint_path: str, device: str = "cpu") -> nn.Module:
+def _load_model(
+    model_name: str, checkpoint_path: str, device: str = "cpu"
+) -> nn.Module:
     """Load a canopy height model from a checkpoint.
 
     Args:
@@ -1136,7 +1181,11 @@ class CanopyHeightEstimation:
                 height_map = src.read(1)
             fig, ax = plt.subplots(1, 1, figsize=(figsize[0] // 2, figsize[1]))
             if vmax is None:
-                vmax = np.percentile(height_map[height_map > 0], 98) if np.any(height_map > 0) else 1
+                vmax = (
+                    np.percentile(height_map[height_map > 0], 98)
+                    if np.any(height_map > 0)
+                    else 1
+                )
             im = ax.imshow(height_map, cmap=cmap, vmin=vmin, vmax=vmax)
             ax.set_title(title or "Canopy Height Map")
             ax.set_xlabel("Pixels")
