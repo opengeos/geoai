@@ -98,6 +98,7 @@ nav:
     - Home: index.md
     - Installation: installation.md
     - QGIS Plugin: qgis_plugin.md
+    - Citations: citations.md
     - Contributing: contributing.md
     - Changelog: https://github.com/opengeos/geoai/releases
     - Report Issues: https://github.com/opengeos/geoai/issues

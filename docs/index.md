@@ -42,7 +42,7 @@ The package's design philosophy emphasizes simplicity without sacrificing functi
 
 If you find GeoAI useful in your research, please consider citing the following paper to support my work. Thank you for your support.
 
--   Wu, Q. (2025). GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization. _Journal of Open Source Software_, 9025. [https://doi.org/10.21105/joss.09025](https://github.com/openjournals/joss-papers/blob/joss.09605/joss.09605/10.21105.joss.09605.pdf) (Under Review)
+-   Wu, Q., (2026). GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization. _Journal of Open Source Software_, 11(118), 9605, <https://doi.org/10.21105/joss.09605>.
 
 ## 🚀 Key Features
 
