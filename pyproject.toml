@@ -39,6 +39,7 @@ dependencies = {file = ["requirements.txt"]}
 extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "smoothify"]
 building = ["buildingregulariser"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
+onnx = ["onnx", "onnxruntime"]
 sr = ["opensr-model"]
 
 [tool.distutils.bdist_wheel]

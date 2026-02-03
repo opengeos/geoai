@@ -190,6 +190,7 @@ nav:
           - map_tools module: map_tools.md
           - map_widgets module: map_widgets.md
           - moondream module: moondream.md
+          - onnx module: onnx.md
           - prithvi module: prithvi.md
           - sam module: sam.md
           - segmentation module: segmentation.md
