@@ -41,7 +41,7 @@ import rasterio
 from PIL import Image
 from rasterio.features import shapes
 from rasterio.windows import Window
-from shapely.geometry import box, shape
+from shapely.geometry import shape
 from tqdm import tqdm
 
 
@@ -219,7 +219,7 @@ def export_to_onnx(
             elif isinstance(size, (list, tuple)) and len(size) == 2:
                 input_height, input_width = size
     except Exception:
-        pass
+        pass  # processor introspection is optional; fall back to defaults
 
     # ------------------------------------------------------------------
     # Build dummy input & dynamic axes
@@ -503,7 +503,7 @@ class ONNXGeoModel:
                     ):
                         return ONNXGeoModel.load_geotiff(source, window, bands)
             except (rasterio.RasterioIOError, rasterio.errors.RasterioIOError):
-                pass
+                pass  # not a rasterio-compatible file; fall through to PIL
 
             image = Image.open(source).convert("RGB")
             data = np.array(image).transpose(2, 0, 1)
@@ -535,7 +535,7 @@ class ONNXGeoModel:
     ) -> np.ndarray:
         """Prepare a CHW uint‑capable array for the ONNX model.
 
-        The method converts to 3‑channel RGB, normalises to ``[0, 1]``
+        The method converts to 3‑channel RGB, normalizes to ``[0, 1]``
         float32, resizes to the model's expected spatial dimensions and
         adds a batch dimension.
 
@@ -548,6 +548,7 @@ class ONNXGeoModel:
             Numpy array of shape ``(1, 3, H, W)`` ready for the ONNX
             session.
         """
+        # Lazy import to avoid QGIS opencv conflicts
         import cv2
 
         # CHW → HWC
@@ -564,7 +565,7 @@ class ONNXGeoModel:
         elif img.shape[-1] > 3:
             img = img[..., :3]
 
-        # Percentile normalisation → uint8
+        # Percentile normalization → uint8
         if img.dtype != np.uint8:
             for i in range(img.shape[-1]):
                 band = img[..., i].astype(np.float32)
@@ -581,7 +582,7 @@ class ONNXGeoModel:
         if th and tw and (img.shape[0] != th or img.shape[1] != tw):
             img = cv2.resize(img, (tw, th), interpolation=cv2.INTER_LINEAR)
 
-        # Normalise to float32 [0, 1]
+        # Normalize to float32 [0, 1]
         img = img.astype(np.float32) / 255.0
 
         # HWC → NCHW
@@ -621,7 +622,7 @@ class ONNXGeoModel:
             threshold: Threshold for binary masks (segmentation).
             box_threshold: Confidence threshold for detections.
             min_object_area: Minimum polygon area in pixels for
-                vectorisation.
+                vectorization.
             simplify_tolerance: Tolerance for polygon simplification.
             batch_size: Batch size for tiled processing (reserved for
                 future use).
@@ -639,9 +640,9 @@ class ONNXGeoModel:
         """
         # Handle URL sources
         if isinstance(source, str) and source.startswith(("http://", "https://")):
-            import requests as _requests
+            import requests
 
-            pil_image = Image.open(_requests.get(source, stream=True).raw)
+            pil_image = Image.open(requests.get(source, stream=True).raw)
             data = np.array(pil_image.convert("RGB")).transpose(2, 0, 1)
             metadata = None
         else:
@@ -708,6 +709,7 @@ class ONNXGeoModel:
         return_probabilities: bool = False,
     ) -> Dict[str, Any]:
         """Run inference on a single (non-tiled) image."""
+        # Lazy import to avoid QGIS opencv conflicts
         import cv2
 
         original_h = data.shape[1] if data.ndim == 3 else data.shape[0]
@@ -730,6 +732,7 @@ class ONNXGeoModel:
         return_probabilities: bool = False,
     ) -> Dict[str, Any]:
         """Run tiled inference for large images."""
+        # Lazy import to avoid QGIS opencv conflicts
         import cv2
 
         if data.ndim == 3:
@@ -820,6 +823,7 @@ class ONNXGeoModel:
         Returns:
             Result dictionary.
         """
+        # Lazy import to avoid QGIS opencv conflicts
         import cv2
 
         result: Dict[str, Any] = {}
@@ -887,7 +891,7 @@ class ONNXGeoModel:
         return result
 
     # ------------------------------------------------------------------
-    # Vectorisation
+    # Vectorization
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -904,7 +908,7 @@ class ONNXGeoModel:
         Args:
             mask: Binary or probability mask array.
             metadata: Geospatial metadata dictionary.
-            threshold: Threshold for binarising probability masks.
+            threshold: Threshold for binarizing probability masks.
             min_object_area: Minimum polygon area in pixels.
             max_object_area: Maximum polygon area in pixels (optional).
             simplify_tolerance: Tolerance for polygon simplification.
@@ -914,7 +918,7 @@ class ONNXGeoModel:
             polygons are found.
         """
         if metadata is None or metadata.get("crs") is None:
-            print("Warning: No CRS information available for vectorisation")
+            print("Warning: No CRS information available for vectorization")
             return None
 
         if mask.dtype in (np.float32, np.float64):
@@ -925,7 +929,7 @@ class ONNXGeoModel:
         transform = metadata.get("transform")
         crs = metadata.get("crs")
         if transform is None:
-            print("Warning: No transform available for vectorisation")
+            print("Warning: No transform available for vectorization")
             return None
 
         polygons: List = []
@@ -949,7 +953,7 @@ class ONNXGeoModel:
                         polygons.append(poly)
                         values.append(value)
         except Exception as e:
-            print(f"Error during vectorisation: {e}")
+            print(f"Error during vectorization: {e}")
             return None
 
         if not polygons:
@@ -1087,7 +1091,7 @@ def onnx_semantic_segmentation(
         threshold: Threshold for binary masks.
         tile_size: Tile size for processing large images.
         overlap: Overlap between tiles.
-        min_object_area: Minimum object area for vectorisation.
+        min_object_area: Minimum object area for vectorization.
         simplify_tolerance: Tolerance for polygon simplification.
         providers: ONNX Runtime execution providers.
         **kwargs: Additional arguments passed to :meth:`ONNXGeoModel.predict`.
