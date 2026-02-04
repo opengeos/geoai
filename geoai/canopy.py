@@ -849,12 +849,17 @@ def _load_model(
 
     if info["compressed"]:
         ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        model = torch.quantization.quantize_dynamic(
-            model,
-            {nn.Linear, nn.Conv2d, nn.ConvTranspose2d},
-            dtype=torch.qint8,
-        )
+        if device == "cpu":
+            model = torch.quantization.quantize_dynamic(
+                model,
+                {nn.Linear, nn.Conv2d, nn.ConvTranspose2d},
+                dtype=torch.qint8,
+            )
+        # Compressed checkpoints store quantized state dicts. Load with
+        # strict=False so non-quantized models ignore the extra keys.
         model.load_state_dict(ckpt, strict=False)
+        if device != "cpu":
+            model = model.to(device)
     else:
         ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
         state_dict = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
@@ -936,12 +941,10 @@ class CanopyHeightEstimation:
                 device = "cpu"
 
         if info["compressed"] and device != "cpu":
-            warnings.warn(
-                f"Compressed model '{model_name}' only supports CPU inference. "
-                "Switching to CPU.",
-                stacklevel=2,
-            )
-            device = "cpu"
+            # Quantized models don't support CUDA natively. Load without
+            # quantization so the model can run on GPU.
+            info = dict(info)  # copy so we don't mutate the global
+            info["compressed"] = False
 
         self.device = device
 
