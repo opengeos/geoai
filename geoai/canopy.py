@@ -7,17 +7,15 @@ research (https://github.com/facebookresearch/HighResCanopyHeight).
 Reference:
     Tolan et al., "Very high resolution canopy height maps from RGB imagery
     using self-supervised vision transformer and convolutional decoder trained
-    on Aerial Lidar," Remote Sensing of Environment, 2023.
+    on Aerial Lidar," Remote Sensing of Environment, 2024.
     https://doi.org/10.1016/j.rse.2023.113888
 """
 
 import math
 import os
 import warnings
-from collections import OrderedDict
 from functools import partial
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,7 +24,6 @@ try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-    from torch import Tensor
 except ImportError:
     raise ImportError(
         "PyTorch is required for canopy height estimation. "
@@ -35,8 +32,6 @@ except ImportError:
 
 try:
     import rasterio
-    from rasterio.transform import from_bounds
-    from rasterio.windows import Window
 except ImportError:
     raise ImportError(
         "Rasterio is required for canopy height estimation. "
@@ -468,7 +463,6 @@ class _ConvModule(nn.Module):
         self.groups = self.conv.groups
         if self.with_activation:
             self.activate = nn.ReLU()
-        torch.manual_seed(1)
         self.init_weights()
 
     @property
@@ -661,7 +655,6 @@ class _DPTHead(nn.Module):
         super().__init__()
         if post_process_channels is None:
             post_process_channels = [128, 256, 512, 1024]
-        torch.manual_seed(1)
         self.channels = channels
         self.min_depth = 0.001
         self.max_depth = 10
@@ -687,7 +680,6 @@ class _DPTHead(nn.Module):
             [_FeatureFusionBlock(self.channels) for _ in range(len(self.convs))]
         )
         self.fusion_blocks[0].res_conv_unit1 = None
-        torch.manual_seed(1)
         self.project = _ConvModule(
             self.channels,
             self.channels,
@@ -852,6 +844,9 @@ def _load_model(
     model = _SSLAE(classify=True, huge=info["huge"]).eval()
 
     if info["compressed"]:
+        # weights_only=False is required for quantized checkpoints which
+        # contain non-tensor objects (packed params, scales, zero points).
+        # Checkpoints are only loaded from trusted Meta S3 URLs.
         ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         # Compressed checkpoints store quantized state dicts.  Always load
         # into a quantized model on CPU first so keys match correctly.
@@ -893,6 +888,8 @@ def _load_model(
             model.load_state_dict(float_sd, strict=False)
             model = model.to(device)
     else:
+        # weights_only=False is needed because some checkpoints wrap
+        # state_dict in a Lightning-style dict.  Only trusted Meta URLs.
         ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
         state_dict = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
         # Remove 'chm_module_.' prefix if present (from SSLModule wrapper)
@@ -1078,6 +1075,11 @@ class CanopyHeightEstimation:
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"Input file not found: {input_path}")
 
+        if overlap < 0 or overlap >= tile_size:
+            raise ValueError(
+                f"overlap must be >= 0 and < tile_size ({tile_size}), got {overlap}"
+            )
+
         with rasterio.open(input_path) as src:
             # Read the image
             img = src.read()  # (bands, height, width)
@@ -1100,10 +1102,14 @@ class CanopyHeightEstimation:
             elif img.dtype in (np.float32, np.float64):
                 img = img.astype(np.float32)
                 # Clip to [0, 1] if needed
-                if img.max() > 1.0:
-                    img = img / img.max()
+                img_max = img.max()
+                if img_max > 1.0:
+                    img = img / img_max
             else:
-                img = img.astype(np.float32) / img.max()
+                img = img.astype(np.float32)
+                img_max = img.max()
+                if img_max > 0:
+                    img = img / img_max
 
         # Calculate tile grid
         step = tile_size - overlap
@@ -1275,11 +1281,15 @@ class CanopyHeightEstimation:
                     img_display = np.moveaxis(img, 0, 2)
                 elif img.dtype == np.uint16:
                     img_float = img.astype(np.float32)
-                    img_display = np.moveaxis(img_float / img_float.max(), 0, 2)
+                    img_max = img_float.max()
+                    if img_max > 0:
+                        img_float = img_float / img_max
+                    img_display = np.moveaxis(img_float, 0, 2)
                 else:
                     img_float = img.astype(np.float32)
-                    if img_float.max() > 1.0:
-                        img_float = img_float / img_float.max()
+                    img_max = img_float.max()
+                    if img_max > 1.0:
+                        img_float = img_float / img_max
                     img_display = np.moveaxis(img_float, 0, 2)
 
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
