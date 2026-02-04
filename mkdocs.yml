@@ -175,6 +175,7 @@ nav:
           - examples/prithvi.ipynb
           - examples/train_timm_regressor.ipynb
           - examples/canopy_height.ipynb
+          - examples/tessera.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -200,6 +201,7 @@ nav:
           - prithvi module: prithvi.md
           - sam module: sam.md
           - segmentation module: segmentation.md
+          - tessera module: tessera.md
           - timm_train module: timm_train.md
           - timm_segment module: timm_segment.md
           - train module: train.md
