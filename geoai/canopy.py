@@ -689,7 +689,11 @@ class _DPTHead(nn.Module):
         self.fusion_blocks[0].res_conv_unit1 = None
         torch.manual_seed(1)
         self.project = _ConvModule(
-            self.channels, self.channels, kernel_size=3, padding=1
+            self.channels,
+            self.channels,
+            kernel_size=3,
+            padding=1,
+            act_cfg={"type": "ReLU"},
         )
         self.conv_depth = _HeadDepth(self.channels, self.classify, self.n_bins)
         self.relu = nn.ReLU()
@@ -849,16 +853,44 @@ def _load_model(
 
     if info["compressed"]:
         ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        # Compressed checkpoints store quantized state dicts.  Always load
+        # into a quantized model on CPU first so keys match correctly.
+        model_q = torch.quantization.quantize_dynamic(
+            model,
+            {nn.Linear, nn.Conv2d, nn.ConvTranspose2d},
+            dtype=torch.qint8,
+        )
+        model_q.load_state_dict(ckpt, strict=False)
         if device == "cpu":
-            model = torch.quantization.quantize_dynamic(
-                model,
-                {nn.Linear, nn.Conv2d, nn.ConvTranspose2d},
-                dtype=torch.qint8,
-            )
-        # Compressed checkpoints store quantized state dicts. Load with
-        # strict=False so non-quantized models ignore the extra keys.
-        model.load_state_dict(ckpt, strict=False)
-        if device != "cpu":
+            model = model_q
+        else:
+            # Dequantize: extract float32 weights from quantized modules,
+            # load into a fresh float model, and move to GPU.
+            float_sd = {}
+            for name, mod in model_q.named_modules():
+                _qtypes = (
+                    torch.ao.nn.quantized.dynamic.Linear,
+                    torch.ao.nn.quantized.Linear,
+                    torch.ao.nn.quantized.Conv2d,
+                    torch.ao.nn.quantized.ConvTranspose2d,
+                )
+                if isinstance(mod, _qtypes):
+                    w = mod.weight()
+                    float_sd[name + ".weight"] = w.dequantize() if w.is_quantized else w
+                    b = mod.bias()
+                    if b is not None:
+                        float_sd[name + ".bias"] = (
+                            b.dequantize() if b.is_quantized else b
+                        )
+                elif hasattr(mod, "weight") and isinstance(mod.weight, nn.Parameter):
+                    float_sd[name + ".weight"] = mod.weight.data
+                    if hasattr(mod, "bias") and mod.bias is not None:
+                        float_sd[name + ".bias"] = mod.bias.data
+            for name, param in model_q.named_parameters():
+                if name not in float_sd:
+                    float_sd[name] = param.data
+            model = _SSLAE(classify=True, huge=info["huge"]).eval()
+            model.load_state_dict(float_sd, strict=False)
             model = model.to(device)
     else:
         ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
@@ -916,8 +948,9 @@ class CanopyHeightEstimation:
             checkpoint_path: Optional path to a local checkpoint file.
                 If None, the checkpoint will be downloaded automatically.
             device: Device to run inference on ('cpu', 'cuda', 'cuda:0', etc.).
-                If None, automatically selects CUDA if available. Note that
-                compressed models only support CPU inference.
+                If None, automatically selects CUDA if available.  Compressed
+                (quantized) models are loaded without quantization when placed
+                on GPU, which is faster than CPU inference for large images.
             cache_dir: Directory to cache downloaded model checkpoints.
                 Defaults to ~/.cache/geoai/canopy/.
         """
@@ -931,20 +964,12 @@ class CanopyHeightEstimation:
 
         info = MODEL_VARIANTS[model_name]
 
-        # Determine device
+        # Determine device – prefer CUDA when available for all model variants
         if device is None:
-            if info["compressed"]:
-                device = "cpu"
-            elif torch.cuda.is_available():
+            if torch.cuda.is_available():
                 device = "cuda"
             else:
                 device = "cpu"
-
-        if info["compressed"] and device != "cpu":
-            # Quantized models don't support CUDA natively. Load without
-            # quantization so the model can run on GPU.
-            info = dict(info)  # copy so we don't mutate the global
-            info["compressed"] = False
 
         self.device = device
 
@@ -976,12 +1001,40 @@ class CanopyHeightEstimation:
         std = torch.tensor(self._norm_std, device=img_tensor.device).view(1, 3, 1, 1)
         return (img_tensor - mean) / std
 
+    @staticmethod
+    def _make_weight_map(tile_size: int, overlap: int) -> np.ndarray:
+        """Create a 2D raised-cosine weight map for smooth tile blending.
+
+        Produces a weight map that is 1.0 in the non-overlapping centre and
+        tapers smoothly to 0 at the edges using a cosine ramp over the
+        overlap region.  When multiple overlapping tiles are accumulated
+        with these weights the result is seamless.
+
+        Args:
+            tile_size: Size of each square tile.
+            overlap: Number of pixels that overlap between adjacent tiles.
+
+        Returns:
+            2D float32 array of shape (tile_size, tile_size).
+        """
+        if overlap <= 0:
+            return np.ones((tile_size, tile_size), dtype=np.float32)
+
+        ramp = np.linspace(0.0, 1.0, overlap, dtype=np.float32)
+        ramp = 0.5 * (1.0 - np.cos(np.pi * ramp))  # raised cosine
+
+        w = np.ones(tile_size, dtype=np.float32)
+        w[:overlap] = ramp
+        w[-overlap:] = ramp[::-1]
+
+        return np.outer(w, w)
+
     def predict(
         self,
         input_path: str,
         output_path: Optional[str] = None,
         tile_size: int = 256,
-        overlap: int = 0,
+        overlap: int = 128,
         batch_size: int = 4,
         scale_factor: float = 10.0,
         **kwargs,
@@ -990,7 +1043,8 @@ class CanopyHeightEstimation:
 
         Processes the input image in tiles of the specified size, runs
         inference on each tile, and assembles the results into a full
-        canopy height map.
+        canopy height map.  Adjacent tiles overlap and are blended using
+        raised-cosine weights for seamless output.
 
         Args:
             input_path: Path to the input GeoTIFF file (RGB imagery).
@@ -998,8 +1052,10 @@ class CanopyHeightEstimation:
                 map as a GeoTIFF. If None, only returns the numpy array.
             tile_size: Size of tiles for processing (default: 256).
                 The model expects 256x256 tiles.
-            overlap: Number of pixels of overlap between tiles (default: 0).
-                Using overlap can reduce edge artifacts.
+            overlap: Number of pixels of overlap between tiles (default: 128).
+                Using overlap with blending weights eliminates tile-boundary
+                artefacts.  Higher values (up to tile_size // 2) give
+                smoother results at the cost of more computation.
             batch_size: Number of tiles to process at once (default: 4).
                 Larger values use more memory but process faster.
             scale_factor: Factor to multiply model output by to get height
@@ -1017,7 +1073,7 @@ class CanopyHeightEstimation:
             >>> estimator = CanopyHeightEstimation()
             >>> heights = estimator.predict("aerial_image.tif",
             ...                              output_path="canopy_height.tif",
-            ...                              overlap=32)
+            ...                              overlap=128)
         """
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"Input file not found: {input_path}")
@@ -1060,6 +1116,9 @@ class CanopyHeightEstimation:
         padded_img = np.zeros((3, padded_h, padded_w), dtype=np.float32)
         padded_img[:, :height, :width] = img
 
+        # Blending weight map (raised-cosine taper in overlap regions)
+        weight_map = self._make_weight_map(tile_size, overlap)
+
         # Output arrays
         output = np.zeros((padded_h, padded_w), dtype=np.float32)
         count = np.zeros((padded_h, padded_w), dtype=np.float32)
@@ -1076,13 +1135,17 @@ class CanopyHeightEstimation:
                 positions.append((y, x))
 
                 if len(tiles) == batch_size:
-                    self._process_batch(tiles, positions, output, count, scale_factor)
+                    self._process_batch(
+                        tiles, positions, output, count, scale_factor, weight_map
+                    )
                     tiles = []
                     positions = []
 
         # Process remaining tiles
         if tiles:
-            self._process_batch(tiles, positions, output, count, scale_factor)
+            self._process_batch(
+                tiles, positions, output, count, scale_factor, weight_map
+            )
 
         # Average overlapping regions
         count[count == 0] = 1
@@ -1117,6 +1180,7 @@ class CanopyHeightEstimation:
         output: np.ndarray,
         count: np.ndarray,
         scale_factor: float,
+        weight_map: Optional[np.ndarray] = None,
     ):
         """Process a batch of tiles through the model.
 
@@ -1126,6 +1190,8 @@ class CanopyHeightEstimation:
             output: Output array to accumulate predictions.
             count: Count array for averaging overlapping tiles.
             scale_factor: Scale factor for model output.
+            weight_map: Optional 2D weight array for blending overlapping
+                tiles.  If None, uniform weights (1.0) are used.
         """
         tile_size = tiles[0].shape[1]
         batch = torch.from_numpy(np.stack(tiles)).to(self.device)
@@ -1138,9 +1204,12 @@ class CanopyHeightEstimation:
 
         pred = pred.cpu().numpy()
 
+        if weight_map is None:
+            weight_map = np.ones((tile_size, tile_size), dtype=np.float32)
+
         for i, (y, x) in enumerate(positions):
-            output[y : y + tile_size, x : x + tile_size] += pred[i, 0]
-            count[y : y + tile_size, x : x + tile_size] += 1
+            output[y : y + tile_size, x : x + tile_size] += pred[i, 0] * weight_map
+            count[y : y + tile_size, x : x + tile_size] += weight_map
 
     def visualize(
         self,
@@ -1250,7 +1319,7 @@ def canopy_height_estimation(
     checkpoint_path: Optional[str] = None,
     device: Optional[str] = None,
     tile_size: int = 256,
-    overlap: int = 0,
+    overlap: int = 128,
     batch_size: int = 4,
     cache_dir: str = DEFAULT_CACHE_DIR,
     **kwargs,
@@ -1267,7 +1336,8 @@ def canopy_height_estimation(
         checkpoint_path: Optional path to a local checkpoint file.
         device: Device to run inference on. If None, auto-selects.
         tile_size: Size of tiles for processing (default: 256).
-        overlap: Overlap between tiles in pixels (default: 0).
+        overlap: Overlap between tiles in pixels (default: 128).
+            Higher values give smoother results.
         batch_size: Number of tiles per batch (default: 4).
         cache_dir: Directory to cache model checkpoints.
         **kwargs: Additional keyword arguments passed to predict().
