@@ -72,6 +72,7 @@ plugins:
                   "examples/water_detection.ipynb",
                   "examples/batch_segmentation.ipynb",
                   "examples/building_detection_lidar.ipynb",
+                  "examples/canopy_height.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -173,6 +174,7 @@ nav:
           - examples/timelapse.ipynb
           - examples/prithvi.ipynb
           - examples/train_timm_regressor.ipynb
+          - examples/canopy_height.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -181,6 +183,7 @@ nav:
           - workshops/AGU_2025.ipynb
     - API Reference:
           - auto module: auto.md
+          - canopy module: canopy.md
           - change_detection module: change_detection.md
           - classify module: classify.md
           - detectron2 module: detectron2.md

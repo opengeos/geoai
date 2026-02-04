@@ -224,3 +224,14 @@ try:
 except ImportError:
     # ChangeStar not available (missing torchange dependency)
     pass
+
+# Canopy height estimation (Meta's HighResCanopyHeight)
+try:
+    from .canopy import (
+        CanopyHeightEstimation,
+        canopy_height_estimation,
+        list_canopy_models,
+    )
+except ImportError:
+    # Canopy height estimation not available (missing torch dependency)
+    pass
