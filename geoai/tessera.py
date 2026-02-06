@@ -16,13 +16,15 @@ Reference:
 """
 
 import logging
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# TESSERA embedding dimensions (128 channels)
+TESSERA_EMBEDDING_DIM = 128
 
 
 def _check_geotessera():
@@ -399,8 +401,10 @@ def tessera_visualize_rgb(
             rgb = np.stack([src.read(b + 1) for b in bands], axis=-1).astype(np.float32)
     else:
         # Merge multiple tiles
-        datasets = [rasterio.open(f) for f in tiff_files]
+        datasets = []
         try:
+            for f in tiff_files:
+                datasets.append(rasterio.open(f))
             merged, _ = merge(datasets, indexes=[b + 1 for b in bands])
             rgb = np.moveaxis(merged, 0, -1).astype(np.float32)
         finally:
@@ -631,17 +635,19 @@ def tessera_sample_points(
                 values = tile["embedding"][px_y, px_x, :].tolist()
                 embedding_values.append(values)
             else:
-                embedding_values.append([np.nan] * 128)
-        except Exception as e:
-            logger.warning(f"Error sampling point ({point_lon}, {point_lat}): {e}")
-            embedding_values.append([np.nan] * 128)
+                embedding_values.append([np.nan] * TESSERA_EMBEDDING_DIM)
+        except Exception:
+            logger.exception("Error sampling point (%s, %s)", point_lon, point_lat)
+            embedding_values.append([np.nan] * TESSERA_EMBEDDING_DIM)
 
     # Add embedding columns to the GeoDataFrame
-    embedding_cols = [f"tessera_{i}" for i in range(128)]
-    embedding_df = gpd.pd.DataFrame(embedding_values, columns=embedding_cols)
+    import pandas as pd
+
+    embedding_cols = [f"tessera_{i}" for i in range(TESSERA_EMBEDDING_DIM)]
+    embedding_df = pd.DataFrame(embedding_values, columns=embedding_cols)
     embedding_df.index = gdf.index
 
-    result = gpd.pd.concat([gdf, embedding_df], axis=1)
+    result = pd.concat([gdf, embedding_df], axis=1)
     result = gpd.GeoDataFrame(result, geometry=gdf.geometry.name, crs=gdf.crs)
 
     return result
