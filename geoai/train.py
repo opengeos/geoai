@@ -1855,19 +1855,14 @@ class SemanticSegmentationDataset(Dataset):
         # Normalize mask values to expected class range [0, num_classes-1]
         # This handles cases where masks contain pixel values outside the expected range
         unique_vals = np.unique(label_mask)
-        if len(unique_vals) > 2:
-            # For multi-class case, we need to map values to proper class indices
-            # For now, we'll use a simple thresholding approach for binary segmentation
-            if self.num_classes == 2:
-                # Binary segmentation: convert to 0 (background) and 1 (foreground)
+        if self.num_classes == 2:
+            # Binary segmentation: normalize any non-zero value to foreground (1)
+            if unique_vals.max() > 1:
                 label_mask = (label_mask > 0).astype(np.int64)
-            else:
-                # For multi-class, we could implement more sophisticated mapping
-                # For now, just ensure values are in valid range
-                label_mask = np.clip(label_mask, 0, self.num_classes - 1)
-        elif len(unique_vals) == 2 and unique_vals.max() > 1:
-            # Binary mask with values not in [0,1] range - normalize to [0,1]
-            label_mask = (label_mask > 0).astype(np.int64)
+        else:
+            # Multi-class segmentation:
+            # Preserve class IDs and only clamp to valid range
+            label_mask = np.clip(label_mask, 0, self.num_classes - 1)
 
         # Convert to tensor
         mask = torch.as_tensor(label_mask, dtype=torch.long)
