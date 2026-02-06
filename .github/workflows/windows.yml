@@ -35,6 +35,6 @@ jobs:
             #       unzip proj-data.zip -d proj-data
             #       cp -r proj-data/* $(python -m pyproj -v | grep "PROJ_LIB" | cut -d ' ' -f 2)
 
-            # - name: Test import
-            #   run: |
-            #       uv run python -c "import geoai; print('geoai import successful')"
+            - name: Test import
+              run: |
+                  uv run python -c "import geoai; print('geoai import successful')"
