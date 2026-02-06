@@ -1857,7 +1857,7 @@ class SemanticSegmentationDataset(Dataset):
         unique_vals = np.unique(label_mask)
         if self.num_classes == 2:
             # Binary segmentation: normalize any non-zero value to foreground (1)
-            if len(unique_vals) > 1 and unique_vals.max() > 1:
+            if unique_vals.max() > 1:
                 label_mask = (label_mask > 0).astype(np.int64)
         else:
             # Multi-class segmentation:
