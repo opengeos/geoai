@@ -9,6 +9,7 @@ from enum import Enum
 
 class ErrorCategory(str, Enum):
     """Error categories for structured error responses."""
+
     CLIENT_ERROR = "client_error"  # Invalid inputs, missing files, bad parameters
     SERVER_ERROR = "server_error"  # Internal failures, OOM, model load failures
     EXTERNAL_ERROR = "external_error"  # Network failures, API rate limits
@@ -92,11 +93,15 @@ class FileAccessError(GeoAIError):
 
         suggestion = None
         if operation == "read":
-            suggestion = "Ensure the file exists in the input directory and is readable."
+            suggestion = (
+                "Ensure the file exists in the input directory and is readable."
+            )
         elif operation == "write":
             suggestion = "Ensure the output directory is writable."
         elif operation == "access":
-            suggestion = "Check that the file path is within the allowed workspace directories."
+            suggestion = (
+                "Check that the file path is within the allowed workspace directories."
+            )
 
         super().__init__(
             message=message,
@@ -217,7 +222,7 @@ def format_error_response(error: Exception) -> dict[str, Any]:
                 "message": error.message,
                 "category": error.category.value,
                 "details": error.details,
-            }
+            },
         }
         if error.suggestion:
             response["error"]["suggestion"] = error.suggestion
@@ -233,5 +238,5 @@ def format_error_response(error: Exception) -> dict[str, Any]:
             "category": ErrorCategory.SERVER_ERROR.value,
             "details": {"type": type(error).__name__},
             "suggestion": "An unexpected error occurred. Please check the logs for details.",
-        }
+        },
     }

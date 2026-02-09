@@ -164,5 +164,6 @@ class TestConfig:
         # This test would need environment variable mocking
         # Simplified version just checks the load_config function exists
         from geoai_mcp_server.config import load_config
+
         config = load_config()
         assert isinstance(config, GeoAIConfig)

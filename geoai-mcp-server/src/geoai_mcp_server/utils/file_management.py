@@ -64,15 +64,13 @@ def validate_input_path(path: str | Path) -> Path:
         raise FileAccessError(
             message=f"Access denied: path is outside the allowed input directory",
             file_path=str(path),
-            operation="access"
+            operation="access",
         )
 
     # Check existence
     if not full_path.exists():
         raise FileAccessError(
-            message=f"File not found: {path}",
-            file_path=str(path),
-            operation="read"
+            message=f"File not found: {path}", file_path=str(path), operation="read"
         )
 
     return full_path
@@ -109,7 +107,7 @@ def validate_output_path(path: str | Path, config: Optional[Any] = None) -> Path
         raise FileAccessError(
             message=f"Access denied: path is outside the allowed output directory",
             file_path=str(path),
-            operation="access"
+            operation="access",
         )
 
     # Ensure parent directory exists
@@ -138,28 +136,28 @@ def get_safe_input_path(filename: str, config: Optional[Any] = None) -> Path:
             message="Filename cannot contain '..'",
             parameter_name="filename",
             received_value=filename,
-            expected="A filename without directory traversal"
+            expected="A filename without directory traversal",
         )
 
     if config is None:
         config = get_config()
-    
+
     full_path = (config.input_dir / filename).resolve()
-    
+
     # Security check: ensure path is within input directory
     if not _is_path_within_directory(full_path, config.input_dir):
         logger.warning(f"Path traversal attempt blocked: {filename}")
         raise FileAccessError(
             message="Input path is outside allowed directory",
             file_path=filename,
-            operation="read"
+            operation="read",
         )
 
     if not full_path.exists():
         raise FileAccessError(
             message=f"File not found in input directory: {filename}",
             file_path=filename,
-            operation="read"
+            operation="read",
         )
 
     return full_path
@@ -184,7 +182,7 @@ def get_safe_output_path(filename: str, create_subdirs: bool = True) -> Path:
             message="Filename cannot contain '..'",
             parameter_name="filename",
             received_value=filename,
-            expected="A filename without directory traversal"
+            expected="A filename without directory traversal",
         )
 
     config = get_config()
@@ -195,7 +193,7 @@ def get_safe_output_path(filename: str, create_subdirs: bool = True) -> Path:
         raise FileAccessError(
             message="Output path is outside allowed directory",
             file_path=filename,
-            operation="write"
+            operation="write",
         )
 
     if create_subdirs:
@@ -232,7 +230,10 @@ def list_input_files(
 
     # Filter by extensions if specified
     if extensions:
-        extensions = [ext.lower() if ext.startswith('.') else f'.{ext.lower()}' for ext in extensions]
+        extensions = [
+            ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+            for ext in extensions
+        ]
         files = [f for f in files if f.suffix.lower() in extensions]
 
     # Return only files (not directories)
@@ -260,7 +261,7 @@ def generate_output_filename(
     base_name = Path(base_name).stem
 
     # Sanitize base name
-    base_name = re.sub(r'[^\w\-]', '_', base_name)
+    base_name = re.sub(r"[^\w\-]", "_", base_name)
 
     # Build filename
     parts = [base_name, operation]
@@ -270,8 +271,8 @@ def generate_output_filename(
         parts.append(timestamp)
 
     # Ensure extension starts with dot
-    if not extension.startswith('.'):
-        extension = f'.{extension}'
+    if not extension.startswith("."):
+        extension = f".{extension}"
 
     return "_".join(parts) + extension
 
@@ -285,7 +286,7 @@ def _format_size(size_bytes: int) -> str:
     Returns:
         Human-readable size string
     """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_bytes < 1024.0:
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024.0

@@ -34,7 +34,7 @@ def validate_bbox(
             message="Bounding box must be a list or tuple",
             parameter_name="bbox",
             received_value=type(bbox).__name__,
-            expected="[min_lon, min_lat, max_lon, max_lat]"
+            expected="[min_lon, min_lat, max_lon, max_lat]",
         )
 
     if len(bbox) != 4:
@@ -42,7 +42,7 @@ def validate_bbox(
             message=f"Bounding box must have exactly 4 values, got {len(bbox)}",
             parameter_name="bbox",
             received_value=str(bbox),
-            expected="[min_lon, min_lat, max_lon, max_lat]"
+            expected="[min_lon, min_lat, max_lon, max_lat]",
         )
 
     try:
@@ -52,7 +52,7 @@ def validate_bbox(
             message=f"Bounding box values must be numbers: {e}",
             parameter_name="bbox",
             received_value=str(bbox),
-            expected="Numeric values"
+            expected="Numeric values",
         )
 
     # Validate coordinate ranges for WGS84
@@ -62,14 +62,14 @@ def validate_bbox(
                 message="Longitude must be between -180 and 180",
                 parameter_name="bbox",
                 received_value=f"lon: [{min_lon}, {max_lon}]",
-                expected="Longitude in range [-180, 180]"
+                expected="Longitude in range [-180, 180]",
             )
         if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
             raise InputValidationError(
                 message="Latitude must be between -90 and 90",
                 parameter_name="bbox",
                 received_value=f"lat: [{min_lat}, {max_lat}]",
-                expected="Latitude in range [-90, 90]"
+                expected="Latitude in range [-90, 90]",
             )
 
     # Validate min < max
@@ -78,14 +78,14 @@ def validate_bbox(
             message="min_lon must be less than max_lon",
             parameter_name="bbox",
             received_value=f"min_lon={min_lon}, max_lon={max_lon}",
-            expected="min_lon < max_lon"
+            expected="min_lon < max_lon",
         )
     if min_lat >= max_lat:
         raise InputValidationError(
             message="min_lat must be less than max_lat",
             parameter_name="bbox",
             received_value=f"min_lat={min_lat}, max_lat={max_lat}",
-            expected="min_lat < max_lat"
+            expected="min_lat < max_lat",
         )
 
     return (min_lon, min_lat, max_lon, max_lat)
@@ -108,7 +108,7 @@ def validate_image_path(
         InputValidationError: If path is invalid
     """
     if allowed_extensions is None:
-        allowed_extensions = ['.tif', '.tiff', '.png', '.jpg', '.jpeg', '.jp2']
+        allowed_extensions = [".tif", ".tiff", ".png", ".jpg", ".jpeg", ".jp2"]
 
     path = Path(path)
 
@@ -120,7 +120,7 @@ def validate_image_path(
                 message=f"Unsupported image format: {ext}",
                 parameter_name="image_path",
                 received_value=str(path),
-                expected=f"One of: {', '.join(allowed_extensions)}"
+                expected=f"One of: {', '.join(allowed_extensions)}",
             )
 
     return path
@@ -153,7 +153,7 @@ def validate_text_prompts(
             message="Prompts must be a string or list of strings",
             parameter_name="prompts",
             received_value=type(prompts).__name__,
-            expected="String or list of strings"
+            expected="String or list of strings",
         )
 
     if len(prompts) == 0:
@@ -161,7 +161,7 @@ def validate_text_prompts(
             message="At least one prompt is required",
             parameter_name="prompts",
             received_value="empty list",
-            expected="At least one text prompt"
+            expected="At least one text prompt",
         )
 
     if len(prompts) > max_prompts:
@@ -169,7 +169,7 @@ def validate_text_prompts(
             message=f"Too many prompts (max {max_prompts})",
             parameter_name="prompts",
             received_value=f"{len(prompts)} prompts",
-            expected=f"At most {max_prompts} prompts"
+            expected=f"At most {max_prompts} prompts",
         )
 
     validated = []
@@ -179,7 +179,7 @@ def validate_text_prompts(
                 message=f"Prompt {i+1} must be a string",
                 parameter_name=f"prompts[{i}]",
                 received_value=type(prompt).__name__,
-                expected="String"
+                expected="String",
             )
 
         # Strip and validate
@@ -189,7 +189,7 @@ def validate_text_prompts(
                 message=f"Prompt {i+1} is empty",
                 parameter_name=f"prompts[{i}]",
                 received_value="empty string",
-                expected="Non-empty text"
+                expected="Non-empty text",
             )
 
         if len(prompt) > max_length:
@@ -197,11 +197,11 @@ def validate_text_prompts(
                 message=f"Prompt {i+1} is too long ({len(prompt)} chars, max {max_length})",
                 parameter_name=f"prompts[{i}]",
                 received_value=f"{len(prompt)} characters",
-                expected=f"At most {max_length} characters"
+                expected=f"At most {max_length} characters",
             )
 
         # Basic sanitization (remove control characters)
-        prompt = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', prompt)
+        prompt = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", prompt)
 
         validated.append(prompt)
 
@@ -219,16 +219,16 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
         Sanitized filename
     """
     # Remove/replace dangerous characters
-    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', filename)
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", filename)
 
     # Remove leading/trailing dots and spaces
-    filename = filename.strip('. ')
+    filename = filename.strip(". ")
 
     # Truncate if too long (preserving extension)
     if len(filename) > max_length:
-        base, ext = filename.rsplit('.', 1) if '.' in filename else (filename, '')
+        base, ext = filename.rsplit(".", 1) if "." in filename else (filename, "")
         max_base = max_length - len(ext) - 1
-        filename = base[:max_base] + ('.' + ext if ext else '')
+        filename = base[:max_base] + ("." + ext if ext else "")
 
     # Fallback for empty result
     if not filename:
@@ -256,7 +256,7 @@ def validate_confidence_threshold(threshold: float) -> float:
             message="Confidence threshold must be a number",
             parameter_name="threshold",
             received_value=str(threshold),
-            expected="A number between 0 and 1"
+            expected="A number between 0 and 1",
         )
 
     if not 0 <= threshold <= 1:
@@ -264,7 +264,7 @@ def validate_confidence_threshold(threshold: float) -> float:
             message=f"Confidence threshold must be between 0 and 1, got {threshold}",
             parameter_name="threshold",
             received_value=str(threshold),
-            expected="A value between 0 and 1"
+            expected="A value between 0 and 1",
         )
 
     return threshold
@@ -289,7 +289,7 @@ def validate_tile_size(tile_size: int) -> int:
             message="Tile size must be an integer",
             parameter_name="tile_size",
             received_value=str(tile_size),
-            expected="An integer (e.g., 256, 512, 1024)"
+            expected="An integer (e.g., 256, 512, 1024)",
         )
 
     if tile_size < 64:
@@ -297,7 +297,7 @@ def validate_tile_size(tile_size: int) -> int:
             message="Tile size too small (minimum 64)",
             parameter_name="tile_size",
             received_value=str(tile_size),
-            expected="At least 64 pixels"
+            expected="At least 64 pixels",
         )
 
     if tile_size > 4096:
@@ -305,7 +305,7 @@ def validate_tile_size(tile_size: int) -> int:
             message="Tile size too large (maximum 4096)",
             parameter_name="tile_size",
             received_value=str(tile_size),
-            expected="At most 4096 pixels"
+            expected="At most 4096 pixels",
         )
 
     return tile_size
@@ -330,7 +330,7 @@ def validate_num_classes(num_classes: int) -> int:
             message="Number of classes must be an integer",
             parameter_name="num_classes",
             received_value=str(num_classes),
-            expected="A positive integer"
+            expected="A positive integer",
         )
 
     if num_classes < 2:
@@ -338,7 +338,7 @@ def validate_num_classes(num_classes: int) -> int:
             message="Number of classes must be at least 2",
             parameter_name="num_classes",
             received_value=str(num_classes),
-            expected="At least 2 classes"
+            expected="At least 2 classes",
         )
 
     if num_classes > 1000:
@@ -346,7 +346,7 @@ def validate_num_classes(num_classes: int) -> int:
             message="Number of classes too large (maximum 1000)",
             parameter_name="num_classes",
             received_value=str(num_classes),
-            expected="At most 1000 classes"
+            expected="At most 1000 classes",
         )
 
     return num_classes

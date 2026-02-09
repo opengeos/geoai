@@ -19,12 +19,18 @@ class GeoAIConfig:
     """Configuration settings for the GeoAI MCP Server."""
 
     # Workspace directories
-    input_dir: Path = field(default_factory=lambda: Path(os.getenv("GEOAI_INPUT_DIR", "./input")))
-    output_dir: Path = field(default_factory=lambda: Path(os.getenv("GEOAI_OUTPUT_DIR", "./output")))
+    input_dir: Path = field(
+        default_factory=lambda: Path(os.getenv("GEOAI_INPUT_DIR", "./input"))
+    )
+    output_dir: Path = field(
+        default_factory=lambda: Path(os.getenv("GEOAI_OUTPUT_DIR", "./output"))
+    )
 
     # Resource limits
     timeout: int = field(default_factory=lambda: int(os.getenv("GEOAI_TIMEOUT", "300")))
-    max_memory_gb: int = field(default_factory=lambda: int(os.getenv("GEOAI_MAX_MEMORY_GB", "8")))
+    max_memory_gb: int = field(
+        default_factory=lambda: int(os.getenv("GEOAI_MAX_MEMORY_GB", "8"))
+    )
     device: str = field(default_factory=lambda: os.getenv("GEOAI_DEVICE", "auto"))
 
     # Logging
@@ -32,7 +38,9 @@ class GeoAIConfig:
     log_file: Optional[str] = field(default_factory=lambda: os.getenv("GEOAI_LOG_FILE"))
 
     # Model configuration
-    model_cache_size: int = field(default_factory=lambda: int(os.getenv("GEOAI_MODEL_CACHE_SIZE", "3")))
+    model_cache_size: int = field(
+        default_factory=lambda: int(os.getenv("GEOAI_MODEL_CACHE_SIZE", "3"))
+    )
 
     def __post_init__(self) -> None:
         """Validate and initialize configuration."""
@@ -78,12 +86,16 @@ class GeoAIConfig:
         # Validate device
         valid_devices = ["auto", "cuda", "mps", "cpu"]
         if self.device not in valid_devices:
-            errors.append(f"Invalid device '{self.device}'. Must be one of: {valid_devices}")
+            errors.append(
+                f"Invalid device '{self.device}'. Must be one of: {valid_devices}"
+            )
 
         # Validate log level
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if self.log_level.upper() not in valid_levels:
-            errors.append(f"Invalid log level '{self.log_level}'. Must be one of: {valid_levels}")
+            errors.append(
+                f"Invalid log level '{self.log_level}'. Must be one of: {valid_levels}"
+            )
 
         return errors
 
@@ -98,6 +110,7 @@ class GeoAIConfig:
 
         try:
             import torch
+
             if torch.cuda.is_available():
                 return "cuda"
             elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -129,11 +142,12 @@ def setup_logging(config: GeoAIConfig) -> logging.Logger:
     # Create formatter
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Always add stderr handler (safe for STDIO transport)
     import sys
+
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(formatter)
     logger.addHandler(stderr_handler)
@@ -165,7 +179,7 @@ def get_config() -> GeoAIConfig:
 
 def load_config() -> GeoAIConfig:
     """Load and validate configuration.
-    
+
     This is an alias for get_config() that also validates
     and sets up the configuration on first call.
 
@@ -173,11 +187,11 @@ def load_config() -> GeoAIConfig:
         GeoAIConfig instance
     """
     config = get_config()
-    
+
     # Create directories if they don't exist
     config.input_dir.mkdir(parents=True, exist_ok=True)
     config.output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     return config
 
 

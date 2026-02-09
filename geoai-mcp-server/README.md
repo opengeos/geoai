@@ -50,8 +50,8 @@ The GeoAI MCP Server bridges the gap between powerful geospatial AI tools and co
 
 Add the following to your Claude Desktop configuration file:
 
-**Linux:** `~/.config/Claude/claude_desktop_config.json`  
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
+**Linux:** `~/.config/Claude/claude_desktop_config.json`
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
@@ -146,9 +146,9 @@ geoai-mcp-server/
 > **User:** Find all buildings in the satellite image `urban_area.tif`
 
 > **Claude:** I'll segment the buildings using text prompts...
-> 
+>
 > *[Uses `segment_objects_with_prompts` with prompts=["building"]]*
-> 
+>
 > Found 147 buildings in the image. The results have been saved to `urban_area_segmented.geojson`.
 
 ### Change Detection
@@ -156,9 +156,9 @@ geoai-mcp-server/
 > **User:** What changed between `area_2020.tif` and `area_2023.tif`?
 
 > **Claude:** I'll analyze the temporal changes between these images...
-> 
+>
 > *[Uses `detect_temporal_changes`]*
-> 
+>
 > Detected 12.3% change in the area. The change map shows new construction in the northeast quadrant and vegetation loss in the south.
 
 ### Downloading Imagery
@@ -166,9 +166,9 @@ geoai-mcp-server/
 > **User:** Download recent NAIP imagery for San Francisco
 
 > **Claude:** I'll download NAIP imagery for the San Francisco area...
-> 
+>
 > *[Uses `download_satellite_imagery` with data_source="naip"]*
-> 
+>
 > Downloaded 5 images totaling 234 MB. Files saved to the output directory.
 
 ## ⚙️ Configuration
