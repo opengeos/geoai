@@ -65,22 +65,22 @@ class TestValidation:
     def test_validate_bbox_valid(self):
         """Test valid bounding box validation."""
         # Should not raise
-        validate_bbox(-122.5, 37.7, -122.4, 37.8)
+        validate_bbox([-122.5, 37.7, -122.4, 37.8])
 
     def test_validate_bbox_invalid_lon(self):
         """Test invalid longitude."""
         with pytest.raises(InputValidationError):
-            validate_bbox(-200, 37.7, -122.4, 37.8)
+            validate_bbox([-200, 37.7, -122.4, 37.8])
 
     def test_validate_bbox_invalid_lat(self):
         """Test invalid latitude."""
         with pytest.raises(InputValidationError):
-            validate_bbox(-122.5, 100, -122.4, 37.8)
+            validate_bbox([-122.5, 100, -122.4, 37.8])
 
     def test_validate_bbox_inverted(self):
         """Test inverted bounding box."""
         with pytest.raises(InputValidationError):
-            validate_bbox(-122.4, 37.7, -122.5, 37.8)  # min > max
+            validate_bbox([-122.4, 37.7, -122.5, 37.8])  # min > max
 
     def test_validate_confidence_threshold_valid(self):
         """Test valid confidence threshold."""
