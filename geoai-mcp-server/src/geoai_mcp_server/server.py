@@ -233,8 +233,15 @@ async def segment_objects_with_prompts(
             # SAM with automatic prompt generation
             segmenter = sam_module.SamGeo(model_type="vit_h")
             segmenter.set_image(str(full_input_path))
-            masks = segmenter.generate(output=str(output_path))
 
+            # Always generate a raster mask first, then convert to vector if needed.
+            # Use a raster-friendly extension when the requested output is vector (e.g., GEOJSON).
+            if input_data.output_format == OutputFormat.GEOJSON:
+                raster_output_path = output_path.with_suffix(".tif")
+            else:
+                raster_output_path = output_path
+
+            masks = segmenter.generate(output=str(raster_output_path))
         # Save results
         if input_data.output_format == OutputFormat.GEOJSON:
             # Convert masks to vector
