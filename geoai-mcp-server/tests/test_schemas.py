@@ -10,14 +10,12 @@ from geoai_mcp_server.schemas import (
     DetectFeaturesInput,
     ChangeDetectionInput,
     DownloadImageryInput,
-    CanopyHeightInput,
     VLMAnalysisInput,
     CleanResultsInput,
     OutputFormat,
     DataSource,
     SegmentationModel,
     DetectionTarget,
-    FoundationModel,
 )
 
 
