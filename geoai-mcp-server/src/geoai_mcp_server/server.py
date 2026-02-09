@@ -339,14 +339,32 @@ async def auto_segment_image(
         segmenter = sam_module.SamGeo(model_type="vit_h")
         segmenter.set_image(str(full_input_path))
 
-        # Generate all masks
-        masks = segmenter.generate(output=str(output_path))
+        # Generate raster mask first
+        if input_data.output_format == OutputFormat.GEOTIFF:
+            raster_output_path = output_path
+        else:
+            temp_dir = config.output_dir / "temp"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_filename = generate_output_filename(
+                input_data.image_path, "auto_segmented_mask", "tif"
+            )
+            raster_output_path = temp_dir / temp_filename
+
+        masks = segmenter.generate(output=str(raster_output_path))
+
+        # Convert to vector output if requested
+        if input_data.output_format != OutputFormat.GEOTIFF:
+            utils_module = _get_geoai_module("utils")
+            utils_module.raster_to_vector(
+                str(raster_output_path),
+                str(output_path),
+            )
 
         # Filter by size if specified
         num_objects = len(masks) if hasattr(masks, "__len__") else 0
 
-        # Clean results if requested
-        if clean_results and input_data.output_format == OutputFormat.GEOJSON:
+        # Clean results if requested (vector outputs only)
+        if clean_results and input_data.output_format != OutputFormat.GEOTIFF:
             utils_module = _get_geoai_module("utils")
             utils_module.clean_segmentation(
                 str(output_path),
@@ -1225,9 +1243,8 @@ async def clean_segmentation_results(
 
             gdf = gpd.read_file(str(full_input_path))
             original_count = len(gdf)
-        except Exception:
-            pass
-
+        except Exception as e:
+            logger.debug("Unable to load GeoJSON for cleaning stats: %s", e)
         # Apply cleaning operations
         result_gdf = gdf.copy() if "gdf" in dir() else None
         objects_removed = 0

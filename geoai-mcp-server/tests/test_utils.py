@@ -55,8 +55,8 @@ class TestErrorHandling:
 
     def test_timeout_error(self):
         """Test timeout error."""
-        error = TimeoutError("Operation exceeded 60 seconds", timeout=60)
-        assert error.timeout == 60
+        error = TimeoutError("Operation exceeded 60 seconds", timeout_seconds=60)
+        assert error.details["timeout_seconds"] == 60
 
 
 class TestValidation:
