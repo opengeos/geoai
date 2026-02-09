@@ -70,7 +70,6 @@ from .utils.error_handling import (
     InputValidationError,
     FileAccessError,
     ModelLoadError,
-    ProcessingError,
 )
 from .utils.file_management import (
     validate_input_path,
