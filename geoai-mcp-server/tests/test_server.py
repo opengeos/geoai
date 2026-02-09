@@ -1,9 +1,7 @@
 """Tests for GeoAI MCP Server tools."""
 
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock, patch
-import asyncio
+from unittest.mock import MagicMock, patch
 
 
 class TestSegmentationTools:
@@ -15,7 +13,6 @@ class TestSegmentationTools:
     ):
         """Test segmentation with missing input file."""
         from geoai_mcp_server.server import segment_objects_with_prompts
-        from geoai_mcp_server.config import GeoAIConfig
 
         # Patch config
         with patch("geoai_mcp_server.server.config") as mock_config:

@@ -6,7 +6,7 @@ Handles environment variables, defaults, and runtime configuration.
 import os
 import logging
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
@@ -116,6 +116,7 @@ class GeoAIConfig:
             elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 return "mps"
         except ImportError:
+            # torch not installed, fall back to CPU
             pass
 
         return "cpu"

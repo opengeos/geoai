@@ -179,19 +179,20 @@ geoai-mcp-server/
 |----------|-------------|---------|
 | `GEOAI_INPUT_DIR` | Directory for input files | `./input` |
 | `GEOAI_OUTPUT_DIR` | Directory for output files | `./output` |
-| `GEOAI_TEMP_DIR` | Temporary file directory | `./temp` |
+| `GEOAI_TIMEOUT` | Operation timeout in seconds | `300` |
+| `GEOAI_MAX_MEMORY_GB` | Maximum memory usage in GB | `8` |
+| `GEOAI_DEVICE` | Device preference: `auto`, `cuda`, `mps`, `cpu` | `auto` |
 | `GEOAI_LOG_LEVEL` | Logging level | `INFO` |
-| `GEOAI_MAX_FILE_SIZE_MB` | Maximum file size limit | `5000` |
-| `GEOAI_MAX_PROCESSING_TIME` | Max processing time (seconds) | `3600` |
+| `GEOAI_LOG_FILE` | Optional log file path | None (stderr only) |
+| `GEOAI_MODEL_CACHE_SIZE` | Number of models to cache | `3` |
 
 ### Security
 
 The server implements several security measures:
 
 - **Sandboxed file access** - Files can only be read from/written to configured directories
-- **Path traversal protection** - Prevents `../` attacks
-- **File size limits** - Configurable maximum file sizes
-- **Processing timeouts** - Prevents runaway processes
+- **Path traversal protection** - Prevents `../` attacks using proper path containment checks
+- **Glob pattern validation** - Prevents sandbox escape via malicious patterns
 
 ## 🧪 Development
 

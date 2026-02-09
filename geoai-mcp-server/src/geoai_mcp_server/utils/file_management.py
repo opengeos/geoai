@@ -4,7 +4,6 @@ Provides secure file access within designated workspace directories.
 Prevents directory traversal attacks and unauthorized file access.
 """
 
-import os
 import re
 from pathlib import Path
 from datetime import datetime
@@ -30,8 +29,11 @@ def _is_path_within_directory(path: Path, directory: Path) -> bool:
     try:
         resolved_path = path.resolve()
         resolved_dir = directory.resolve()
-        return str(resolved_path).startswith(str(resolved_dir))
-    except Exception:
+        # Use is_relative_to() for proper path containment check
+        # This prevents prefix-matching bypasses (e.g., /safe vs /safe_evil)
+        return resolved_path.is_relative_to(resolved_dir)
+    except (ValueError, Exception):
+        # is_relative_to raises ValueError if paths are not relative
         return False
 
 
@@ -218,15 +220,32 @@ def list_input_files(
 
     Returns:
         List of Path objects for matching files
+
+    Raises:
+        InputValidationError: If pattern contains path traversal attempts
     """
+    # Security: reject patterns that could escape the base directory
+    if ".." in pattern or pattern.startswith("/") or pattern.startswith("\\"):
+        raise InputValidationError(
+            message="Pattern cannot contain '..' or absolute path prefixes",
+            parameter_name="pattern",
+            received_value=pattern,
+            expected="A safe glob pattern without directory traversal",
+        )
+
     if base_dir is None:
         config = get_config()
         base_dir = config.input_dir
+
+    base_dir = base_dir.resolve()
 
     if recursive:
         files = list(base_dir.rglob(pattern))
     else:
         files = list(base_dir.glob(pattern))
+
+    # Security: filter out any files that somehow escaped base_dir
+    files = [f for f in files if _is_path_within_directory(f, base_dir)]
 
     # Filter by extensions if specified
     if extensions:

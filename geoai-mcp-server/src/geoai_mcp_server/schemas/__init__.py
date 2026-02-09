@@ -6,6 +6,8 @@ from .tool_schemas import (
     OutputFormat,
     DataSource,
     ModelType,
+    SegmentationModel,
+    DetectionTarget,
     # Segmentation schemas
     SegmentObjectsInput,
     AutoSegmentInput,
@@ -41,6 +43,8 @@ __all__ = [
     "OutputFormat",
     "DataSource",
     "ModelType",
+    "SegmentationModel",
+    "DetectionTarget",
     "SegmentObjectsInput",
     "AutoSegmentInput",
     "SegmentationResult",

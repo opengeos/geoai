@@ -1,6 +1,5 @@
 """Pytest configuration and fixtures for GeoAI MCP Server tests."""
 
-import os
 import sys
 import tempfile
 from pathlib import Path
@@ -34,10 +33,10 @@ def sample_config(temp_input_dir: Path, temp_output_dir: Path):
     return GeoAIConfig(
         input_dir=temp_input_dir,
         output_dir=temp_output_dir,
-        temp_dir=temp_output_dir / "temp",
+        timeout=60,
+        max_memory_gb=4,
+        device="cpu",
         log_level="DEBUG",
-        max_file_size_mb=100,
-        max_processing_time_seconds=60,
     )
 
 
