@@ -35,6 +35,7 @@ def mcp(*args, **kwargs):
     to avoid importing the side-effectful ``server`` module at package import time.
     """
     from .server import mcp as _mcp
+
     return _mcp(*args, **kwargs)
 
 
@@ -46,7 +47,10 @@ def main(*args, **kwargs):
     to avoid importing the side-effectful ``server`` module at package import time.
     """
     from .server import main as _main
+
     return _main(*args, **kwargs)
+
+
 __all__ = [
     "GeoAIConfig",
     "load_config",
