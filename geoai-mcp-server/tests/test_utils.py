@@ -108,7 +108,7 @@ class TestValidation:
         assert "<" not in result
         assert ">" not in result
         assert result.endswith(".tif")
-        
+
         result = sanitize_filename("path/to/file.tif")
         assert "/" not in result
         assert result.endswith(".tif")
