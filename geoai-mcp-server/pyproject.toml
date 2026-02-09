@@ -1,0 +1,81 @@
+[project]
+name = "geoai-mcp-server"
+version = "0.1.0"
+description = "Model Context Protocol (MCP) server for GeoAI - exposing geospatial AI capabilities to LLM applications"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "GeoAI Community", email = "geoai@example.com" }
+]
+keywords = [
+    "mcp",
+    "geoai",
+    "geospatial",
+    "ai",
+    "satellite-imagery",
+    "segmentation",
+    "remote-sensing",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "mcp>=1.0.0,<2.0.0",
+    "geoai-py>=0.29.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "aiofiles>=23.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+geoai-mcp-server = "geoai_mcp_server.server:main"
+
+[project.urls]
+Homepage = "https://github.com/opengeos/geoai"
+Documentation = "https://opengeoai.org"
+Repository = "https://github.com/opengeos/geoai"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/geoai_mcp_server"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
