@@ -25,8 +25,28 @@ __version__ = "0.1.0"
 __author__ = "GeoAI Team"
 
 from .config import GeoAIConfig, load_config
-from .server import mcp, main
 
+
+def mcp(*args, **kwargs):
+    """
+    Entry point for the GeoAI MCP server.
+
+    This function lazily imports and delegates to ``geoai_mcp_server.server.mcp``
+    to avoid importing the side-effectful ``server`` module at package import time.
+    """
+    from .server import mcp as _mcp
+    return _mcp(*args, **kwargs)
+
+
+def main(*args, **kwargs):
+    """
+    Main CLI entry point for running the GeoAI MCP server.
+
+    This function lazily imports and delegates to ``geoai_mcp_server.server.main``
+    to avoid importing the side-effectful ``server`` module at package import time.
+    """
+    from .server import main as _main
+    return _main(*args, **kwargs)
 __all__ = [
     "GeoAIConfig",
     "load_config",
