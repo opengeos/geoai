@@ -52,6 +52,7 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QThread, pyqtSignal
 
 from .map_tools import PointPromptTool, BoxPromptTool
+from .._pkg_resources_compat import ensure_pkg_resources
 
 
 class SamGeoModelLoadWorker(QThread):
@@ -80,6 +81,11 @@ class SamGeoModelLoadWorker(QThread):
         """Load the SamGeo model in background."""
         try:
             self.progress.emit("Initializing SamGeo...")
+            shim_installed = ensure_pkg_resources()
+            if shim_installed:
+                self.progress.emit(
+                    "Installed pkg_resources compatibility shim for runtime imports..."
+                )
 
             if "SamGeo3" in self.model_version:
                 from samgeo import SamGeo3
