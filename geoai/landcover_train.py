@@ -292,17 +292,17 @@ def landcover_iou(
     elif mode == "sparse_labels":
         # Default background class is 0 if not specified
         bg_class = background_class if background_class is not None else 0
-        
+
         ious = []
         recalls = []
         precisions = []
         per_class_ious = []
-        
+
         # Mask for labeled pixels (ground truth is NOT background)
         labeled_mask = target != bg_class
         if isinstance(ignore_index, int):
             labeled_mask = labeled_mask & (target != ignore_index)
-        
+
         for cls in range(num_classes):
             # Skip background class and ignore_index
             if cls == bg_class:
@@ -315,34 +315,34 @@ def landcover_iou(
                 recalls.append(0.0)
                 precisions.append(0.0)
                 continue
-            
+
             # Where prediction says this class
             pred_cls = pred == cls
             # Where ground truth says this class
             target_cls = target == cls
-            
+
             # TRUE POSITIVE: Prediction matches target (both say this class)
             tp = (pred_cls & target_cls).sum().float()
-            
+
             # FALSE NEGATIVE: Target says this class but prediction doesn't
             fn = (target_cls & ~pred_cls).sum().float()
-            
-            # FALSE POSITIVE (SPARSE VERSION): 
+
+            # FALSE POSITIVE (SPARSE VERSION):
             # Prediction says this class, target says DIFFERENT class (but NOT background)
             # Key: We don't count predictions in background as FP!
             fp_sparse = (pred_cls & ~target_cls & labeled_mask).sum().float()
-            
+
             # Standard IoU but with sparse FP definition
             # Union = TP + FN + FP_sparse
             union_sparse = tp + fn + fp_sparse
-            
+
             if union_sparse > 0:
                 iou = (tp + smooth) / (union_sparse + smooth)
                 ious.append(iou.item())
                 per_class_ious.append(iou.item())
             else:
                 per_class_ious.append(0.0)
-            
+
             # Also compute recall and precision for diagnostic purposes
             # Recall: Of all true positives, how many did we find?
             if (tp + fn) > 0:
@@ -350,17 +350,17 @@ def landcover_iou(
                 recalls.append(recall.item())
             else:
                 recalls.append(0.0)
-            
+
             # Precision (sparse): Of predictions in labeled areas, how many are correct?
             if (tp + fp_sparse) > 0:
                 precision = tp / (tp + fp_sparse)
                 precisions.append(precision.item())
             else:
                 precisions.append(0.0)
-        
+
         # Mean IoU across classes (excluding background)
         mean_sparse_iou = sum(ious) / len(ious) if ious else 0.0
-        
+
         return mean_sparse_iou, per_class_ious, recalls, precisions
 
     else:
@@ -731,11 +731,16 @@ def train_segmentation_landcover(
     # Create custom loss function using landcover-specific implementation
     # This ensures ignore_index and class_weights are properly used
     import torch
-    device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
+    device = (
+        device
+        if device is not None
+        else torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    )
+
     if class_weights_tensor is not None:
         class_weights_tensor = class_weights_tensor.to(device)
-    
+
     # Create the loss function with proper ignore_index support
     criterion = get_landcover_loss_function(
         loss_name=loss_function,
@@ -747,9 +752,11 @@ def train_segmentation_landcover(
         focal_gamma=focal_gamma,
         device=device,
     )
-    
+
     if verbose:
-        print(f"✅ Created {loss_function} loss function with ignore_index={ignore_idx_for_loss}")
+        print(
+            f"✅ Created {loss_function} loss function with ignore_index={ignore_idx_for_loss}"
+        )
         if use_class_weights:
             print(f"✅ Class weights applied: {class_weights_tensor}")
 
@@ -758,26 +765,32 @@ def train_segmentation_landcover(
     # ==========================================================================
     # This ensures ALL IoU modes work correctly, not just sparse_labels
     # The base geoai training function ignores validation_iou_mode parameter
-    
+
     if verbose:
         mode_descriptions = {
             "standard": "STANDARD (unweighted mean IoU)",
             "perclass_frequency": "PER-CLASS FREQUENCY-WEIGHTED IoU",
             "boundary_weighted": f"BOUNDARY-WEIGHTED IoU (wIoU, α={boundary_alpha})",
-            "sparse_labels": f"SPARSE LABELS IoU (bg={background_class} ignored)"
+            "sparse_labels": f"SPARSE LABELS IoU (bg={background_class} ignored)",
         }
         print("\n" + "=" * 60)
-        print(f"🎯 CUSTOM TRAINING LOOP: {mode_descriptions.get(validation_iou_mode, validation_iou_mode)}")
+        print(
+            f"🎯 CUSTOM TRAINING LOOP: {mode_descriptions.get(validation_iou_mode, validation_iou_mode)}"
+        )
         print("=" * 60)
         if validation_iou_mode == "sparse_labels":
-            print(f"📊 Background class: {background_class} (predictions here NOT penalized)")
+            print(
+                f"📊 Background class: {background_class} (predictions here NOT penalized)"
+            )
         elif validation_iou_mode == "boundary_weighted":
-            print(f"📊 Boundary alpha: {boundary_alpha} (higher = more focus on boundaries)")
+            print(
+                f"📊 Boundary alpha: {boundary_alpha} (higher = more focus on boundaries)"
+            )
         elif validation_iou_mode == "perclass_frequency":
             print(f"📊 Classes weighted by pixel frequency in dataset")
         print(f"📊 Using {validation_iou_mode} IoU for model selection during training")
         print("=" * 60 + "\n")
-    
+
     model = _train_with_custom_iou(
         images_dir=images_dir,
         labels_dir=labels_dir,
@@ -806,7 +819,11 @@ def train_segmentation_landcover(
         validation_iou_mode=validation_iou_mode,
         boundary_alpha=boundary_alpha,
         background_class=background_class,
-        ignore_index=ignore_idx_for_loss if isinstance(ignore_idx_for_loss, int) and ignore_idx_for_loss != -100 else False,
+        ignore_index=(
+            ignore_idx_for_loss
+            if isinstance(ignore_idx_for_loss, int) and ignore_idx_for_loss != -100
+            else False
+        ),
         training_callback=training_callback,
         **kwargs,
     )
@@ -820,33 +837,33 @@ def _compute_boundary_weight_map(
 ) -> torch.Tensor:
     """
     Compute boundary weight map for boundary-weighted IoU.
-    
+
     Pixels near class boundaries get higher weight.
     Uses distance transform from scipy.
-    
+
     Args:
         target: Ground truth tensor (N, H, W)
         alpha: Weight decay rate (higher = sharper boundary focus)
         num_classes: Number of classes (for edge detection)
-    
+
     Returns:
         Weight map (N, H, W) with values in [0, 1]
     """
     import numpy as np
     from scipy import ndimage
-    
+
     batch_size = target.shape[0]
     weight_maps = []
-    
+
     for b in range(batch_size):
         label = target[b].numpy()
-        
+
         # Find boundaries using gradient magnitude
         # Boundaries are where adjacent pixels have different classes
         gradient_x = np.abs(np.diff(label, axis=1, prepend=label[:, :1]))
         gradient_y = np.abs(np.diff(label, axis=0, prepend=label[:1, :]))
         boundary = (gradient_x > 0) | (gradient_y > 0)
-        
+
         # Compute distance transform from boundaries
         # Distance is 0 at boundary, increases away from boundary
         if boundary.any():
@@ -862,9 +879,9 @@ def _compute_boundary_weight_map(
         else:
             # No boundaries found - uniform weight
             weight = np.ones_like(label, dtype=np.float32)
-        
+
         weight_maps.append(torch.from_numpy(weight.astype(np.float32)))
-    
+
     return torch.stack(weight_maps, dim=0)
 
 
@@ -902,11 +919,11 @@ def _train_with_custom_iou(
 ) -> torch.nn.Module:
     """
     Internal training function with custom IoU modes for model selection.
-    
+
     This implements a custom training loop that uses landcover_iou with
     the specified mode for validation and model selection, instead of
     the standard geoai IoU which only supports mean IoU.
-    
+
     Supports all landcover_iou modes:
     - "standard": Simple unweighted mean IoU
     - "perclass_frequency": Classes weighted by pixel frequency
@@ -920,31 +937,39 @@ def _train_with_custom_iou(
     from PIL import Image
     from sklearn.model_selection import train_test_split
     from torch.utils.data import DataLoader, Dataset
-    
+
     # Try to import segmentation_models_pytorch
     try:
         import segmentation_models_pytorch as smp
     except ImportError:
-        raise ImportError("segmentation_models_pytorch not found. Install with: pip install segmentation-models-pytorch")
-    
+        raise ImportError(
+            "segmentation_models_pytorch not found. Install with: pip install segmentation-models-pytorch"
+        )
+
     # Set random seed for reproducibility
     torch.manual_seed(seed)
     np.random.seed(seed)
-    
+
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # Get image and label files
     image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
-    image_files = sorted([
-        os.path.join(images_dir, f) for f in os.listdir(images_dir)
-        if f.lower().endswith(image_extensions)
-    ])
-    label_files = sorted([
-        os.path.join(labels_dir, f) for f in os.listdir(labels_dir)
-        if f.lower().endswith(image_extensions)
-    ])
-    
+    image_files = sorted(
+        [
+            os.path.join(images_dir, f)
+            for f in os.listdir(images_dir)
+            if f.lower().endswith(image_extensions)
+        ]
+    )
+    label_files = sorted(
+        [
+            os.path.join(labels_dir, f)
+            for f in os.listdir(labels_dir)
+            if f.lower().endswith(image_extensions)
+        ]
+    )
+
     # Ensure matching files
     if len(image_files) != len(label_files):
         print("Warning: Number of image files and label files don't match!")
@@ -955,23 +980,24 @@ def _train_with_custom_iou(
             if os.path.exists(os.path.join(labels_dir, os.path.basename(f)))
         ]
         image_files = [
-            f for f, b in zip(image_files, basenames)
+            f
+            for f, b in zip(image_files, basenames)
             if os.path.exists(os.path.join(labels_dir, b))
         ]
         print(f"Using {len(image_files)} matching files")
-    
+
     print(f"Found {len(image_files)} image files and {len(label_files)} label files")
-    
+
     if len(image_files) == 0:
         raise FileNotFoundError("No matching image and label files found")
-    
+
     # Split data into train and validation sets
     train_imgs, val_imgs, train_labels, val_labels = train_test_split(
         image_files, label_files, test_size=val_split, random_state=seed
     )
-    
+
     print(f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images")
-    
+
     # Simple dataset class for sparse labels training
     class SparseLabelsDataset(Dataset):
         def __init__(self, image_files, label_files, num_channels, target_size=None):
@@ -979,16 +1005,16 @@ def _train_with_custom_iou(
             self.label_files = label_files
             self.num_channels = num_channels
             self.target_size = target_size
-        
+
         def __len__(self):
             return len(self.image_files)
-        
+
         def __getitem__(self, idx):
             # Load image
             img_path = self.image_files[idx]
             if img_path.lower().endswith((".tif", ".tiff")):
                 with rasterio.open(img_path) as src:
-                    image = src.read()[:self.num_channels]  # (C, H, W)
+                    image = src.read()[: self.num_channels]  # (C, H, W)
             else:
                 with Image.open(img_path) as img:
                     image = np.array(img)
@@ -996,8 +1022,8 @@ def _train_with_custom_iou(
                         image = np.expand_dims(image, 0)
                     elif image.ndim == 3:
                         image = np.transpose(image, (2, 0, 1))
-                    image = image[:self.num_channels]
-            
+                    image = image[: self.num_channels]
+
             # Load label
             label_path = self.label_files[idx]
             if label_path.lower().endswith((".tif", ".tiff")):
@@ -1006,49 +1032,64 @@ def _train_with_custom_iou(
             else:
                 with Image.open(label_path) as lbl:
                     label = np.array(lbl)
-            
+
             # Normalize image to 0-1
             image = image.astype(np.float32)
             if image.max() > 1.0:
                 image = image / 255.0
-            
+
             # Resize if needed
             if self.target_size is not None:
                 from PIL import Image as PILImage
+
                 # Resize image
                 c, h, w = image.shape
-                img_pil = PILImage.fromarray((image.transpose(1, 2, 0) * 255).astype(np.uint8))
-                img_pil = img_pil.resize((self.target_size[1], self.target_size[0]), PILImage.BILINEAR)
+                img_pil = PILImage.fromarray(
+                    (image.transpose(1, 2, 0) * 255).astype(np.uint8)
+                )
+                img_pil = img_pil.resize(
+                    (self.target_size[1], self.target_size[0]), PILImage.BILINEAR
+                )
                 image = np.array(img_pil).astype(np.float32) / 255.0
                 if image.ndim == 2:
                     image = np.expand_dims(image, 0)
                 else:
                     image = image.transpose(2, 0, 1)
-                
+
                 # Resize label
                 lbl_pil = PILImage.fromarray(label.astype(np.uint8))
-                lbl_pil = lbl_pil.resize((self.target_size[1], self.target_size[0]), PILImage.NEAREST)
+                lbl_pil = lbl_pil.resize(
+                    (self.target_size[1], self.target_size[0]), PILImage.NEAREST
+                )
                 label = np.array(lbl_pil)
-            
+
             return torch.from_numpy(image), torch.from_numpy(label.astype(np.int64))
-    
+
     # Create datasets
-    train_dataset = SparseLabelsDataset(train_imgs, train_labels, num_channels, target_size)
+    train_dataset = SparseLabelsDataset(
+        train_imgs, train_labels, num_channels, target_size
+    )
     val_dataset = SparseLabelsDataset(val_imgs, val_labels, num_channels, target_size)
-    
+
     # Create data loaders
     if num_workers is None:
         num_workers = 0 if platform.system() in ["Darwin", "Windows"] else 4
-    
+
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True,
-        num_workers=num_workers, pin_memory=True
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False,
-        num_workers=num_workers, pin_memory=True
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
     )
-    
+
     # Test data loader
     print("Testing data loader...")
     try:
@@ -1063,7 +1104,7 @@ def _train_with_custom_iou(
             ) from e
         else:
             raise
-    
+
     # Initialize model using segmentation_models_pytorch
     arch_map = {
         "unet": smp.Unet,
@@ -1076,10 +1117,12 @@ def _train_with_custom_iou(
         "manet": smp.MAnet,
         "pan": smp.PAN,
     }
-    
+
     if architecture.lower() not in arch_map:
-        raise ValueError(f"Unknown architecture: {architecture}. Available: {list(arch_map.keys())}")
-    
+        raise ValueError(
+            f"Unknown architecture: {architecture}. Available: {list(arch_map.keys())}"
+        )
+
     model = arch_map[architecture.lower()](
         encoder_name=encoder_name,
         encoder_weights=encoder_weights,
@@ -1088,40 +1131,42 @@ def _train_with_custom_iou(
         activation=None,
     )
     model.to(device)
-    
+
     # Enable multi-GPU training if available
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs for training")
         model = torch.nn.DataParallel(model)
-    
+
     # ===== PERFORMANCE OPTIMIZATIONS =====
     # Enable cuDNN auto-tuner for optimal conv algorithms (fixed input size)
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
         print("⚡ cuDNN benchmark mode enabled")
-    
+
     # Setup mixed precision training (AMP) for ~2x speedup
     use_amp = torch.cuda.is_available()
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
     if use_amp:
         print("⚡ Mixed precision training (AMP) enabled")
-    
+
     print(f"Starting training with {architecture} + {encoder_name}")
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
-    
+
     # Setup optimizer and scheduler
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=5
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=learning_rate, weight_decay=weight_decay
     )
-    
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="max", factor=0.5, patience=5
+    )
+
     # Training state
     best_iou = 0.0
     start_epoch = 0
     train_losses = []
     val_losses = []
     val_ious = []
-    
+
     # Load checkpoint if provided
     if checkpoint_path is not None and os.path.exists(checkpoint_path):
         print(f"Loading checkpoint from {checkpoint_path}")
@@ -1133,88 +1178,94 @@ def _train_with_custom_iou(
                     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
                     start_epoch = checkpoint.get("epoch", 0) + 1
                     best_iou = checkpoint.get("best_iou", 0.0)
-                    print(f"Resuming from epoch {start_epoch}, best IoU: {best_iou:.4f}")
+                    print(
+                        f"Resuming from epoch {start_epoch}, best IoU: {best_iou:.4f}"
+                    )
         else:
             model.load_state_dict(checkpoint)
-    
+
     # Training loop
     mode_labels = {
         "standard": "STANDARD (unweighted mean)",
         "mean": "STANDARD (unweighted mean)",
         "perclass_frequency": "PER-CLASS FREQUENCY-WEIGHTED",
         "boundary_weighted": f"BOUNDARY-WEIGHTED (wIoU, α={boundary_alpha})",
-        "sparse_labels": f"SPARSE LABELS (bg={background_class} ignored)"
+        "sparse_labels": f"SPARSE LABELS (bg={background_class} ignored)",
     }
-    print(f"\n🚀 Starting training with {mode_labels.get(validation_iou_mode, validation_iou_mode)} IoU...")
-    
+    print(
+        f"\n🚀 Starting training with {mode_labels.get(validation_iou_mode, validation_iou_mode)} IoU..."
+    )
+
     for epoch in range(start_epoch, num_epochs):
         # ===== TRAINING PHASE =====
         model.train()
         epoch_loss = 0.0
         num_batches = 0
-        
+
         for batch_idx, (images, targets) in enumerate(train_loader):
             # Non-blocking transfers overlap CPU→GPU copy with computation
             images = images.to(device, non_blocking=True)
             targets = targets.to(device, non_blocking=True)
-            
+
             # set_to_none=True is faster than zero_grad()
             optimizer.zero_grad(set_to_none=True)
-            
+
             # Mixed precision forward pass
             with torch.cuda.amp.autocast(enabled=use_amp):
                 outputs = model(images)
                 loss = criterion(outputs, targets)
-            
+
             # Scaled backward pass for mixed precision
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            
+
             epoch_loss += loss.item()
             num_batches += 1
-            
+
             if verbose and batch_idx % print_freq == 0:
-                print(f"  Epoch {epoch+1} [{batch_idx}/{len(train_loader)}] Loss: {loss.item():.4f}")
-        
+                print(
+                    f"  Epoch {epoch+1} [{batch_idx}/{len(train_loader)}] Loss: {loss.item():.4f}"
+                )
+
         train_loss = epoch_loss / num_batches
         train_losses.append(train_loss)
-        
+
         # ===== VALIDATION PHASE WITH CUSTOM IoU =====
         model.eval()
         val_loss = 0.0
         all_preds = []
         all_targets = []
-        
+
         with torch.no_grad():
             for images, targets in val_loader:
                 # Non-blocking transfers
                 images = images.to(device, non_blocking=True)
                 targets = targets.to(device, non_blocking=True)
-                
+
                 # Mixed precision inference
                 with torch.cuda.amp.autocast(enabled=use_amp):
                     outputs = model(images)
                     loss = criterion(outputs, targets)
                 val_loss += loss.item()
-                
+
                 # Collect predictions and targets for custom IoU
                 # Keep argmax on GPU, only move final result to CPU
                 preds = torch.argmax(outputs, dim=1).cpu()
                 all_preds.append(preds)
                 all_targets.append(targets.cpu())
-        
+
         val_loss = val_loss / len(val_loader)
         val_losses.append(val_loss)
-        
+
         # Concatenate all predictions and targets
         all_preds = torch.cat(all_preds, dim=0)
         all_targets = torch.cat(all_targets, dim=0)
-        
+
         # Calculate IoU based on validation_iou_mode
         # Map "standard" to "mean" for landcover_iou
         iou_mode = "mean" if validation_iou_mode == "standard" else validation_iou_mode
-        
+
         if iou_mode == "mean":
             # Standard mean IoU
             val_iou = landcover_iou(
@@ -1225,7 +1276,7 @@ def _train_with_custom_iou(
                 mode="mean",
             )
             iou_display = f"Val IoU: {val_iou:.4f}"
-            
+
         elif iou_mode == "perclass_frequency":
             # Per-class frequency weighted IoU
             val_iou, per_class_ious, class_counts = landcover_iou(
@@ -1236,7 +1287,7 @@ def _train_with_custom_iou(
                 mode="perclass_frequency",
             )
             iou_display = f"Val wIoU: {val_iou:.4f} (freq-weighted)"
-            
+
         elif iou_mode == "boundary_weighted":
             # Boundary-weighted IoU - compute boundary weight map
             boundary_weight_map = _compute_boundary_weight_map(
@@ -1251,7 +1302,7 @@ def _train_with_custom_iou(
                 boundary_weight_map=boundary_weight_map,
             )
             iou_display = f"Val wIoU: {val_iou:.4f} (boundary, α={boundary_alpha})"
-            
+
         elif iou_mode == "sparse_labels":
             # Sparse labels IoU - FP only in labeled areas
             val_iou, per_class_ious, recalls, precisions = landcover_iou(
@@ -1262,16 +1313,18 @@ def _train_with_custom_iou(
                 mode="sparse_labels",
                 background_class=background_class,
             )
-            iou_display = f"Val Sparse IoU: {val_iou:.4f} (bg={background_class} ignored)"
-            
+            iou_display = (
+                f"Val Sparse IoU: {val_iou:.4f} (bg={background_class} ignored)"
+            )
+
         else:
             raise ValueError(f"Unknown validation_iou_mode: {validation_iou_mode}")
-        
+
         val_ious.append(val_iou)
-        
+
         # Update learning rate based on IoU
         lr_scheduler.step(val_iou)
-        
+
         # Print metrics
         print(
             f"Epoch {epoch+1}/{num_epochs}: "
@@ -1279,13 +1332,13 @@ def _train_with_custom_iou(
             f"Val Loss: {val_loss:.4f}, "
             f"{iou_display}"
         )
-        
+
         # Call training callback if provided
         if training_callback is not None:
             try:
                 # Determine if this is the best epoch
                 is_best = val_iou > best_iou
-                
+
                 # Call callback with positional arguments
                 training_callback(
                     epoch=epoch,
@@ -1293,35 +1346,38 @@ def _train_with_custom_iou(
                     val_loss=val_loss,
                     val_iou=val_iou,
                     val_dice=0.0,  # Dice score not computed in this loop
-                    is_best=is_best
+                    is_best=is_best,
                 )
             except Exception as e:
                 print(f"Warning: Training callback error: {e}")
-        
+
         # Save best model based on validation IoU
         if val_iou > best_iou:
             best_iou = val_iou
             print(f"🎯 New best model! {iou_display}")
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
-        
+
         # Save checkpoint every 10 epochs if not save_best_only
         if not save_best_only and ((epoch + 1) % 10 == 0 or epoch == num_epochs - 1):
-            torch.save({
-                "epoch": epoch,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "scheduler_state_dict": lr_scheduler.state_dict(),
-                "best_iou": best_iou,
-                "architecture": architecture,
-                "encoder_name": encoder_name,
-                "num_channels": num_channels,
-                "num_classes": num_classes,
-                "train_losses": train_losses,
-                "val_losses": val_losses,
-                "val_ious": val_ious,
-                "validation_iou_mode": validation_iou_mode,
-            }, os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}.pth"))
-    
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": lr_scheduler.state_dict(),
+                    "best_iou": best_iou,
+                    "architecture": architecture,
+                    "encoder_name": encoder_name,
+                    "num_channels": num_channels,
+                    "num_classes": num_classes,
+                    "train_losses": train_losses,
+                    "val_losses": val_losses,
+                    "val_ious": val_ious,
+                    "validation_iou_mode": validation_iou_mode,
+                },
+                os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}.pth"),
+            )
+
     # Mode-agnostic display labels
     mode_labels = {
         "standard": "Standard IoU",
@@ -1331,47 +1387,51 @@ def _train_with_custom_iou(
         "sparse_labels": "Sparse Labels IoU",
     }
     iou_label = mode_labels.get(validation_iou_mode, validation_iou_mode)
-    
+
     print(f"\n✅ Training complete! Best {iou_label}: {best_iou:.4f}")
     print(f"📁 Best model saved to: {os.path.join(output_dir, 'best_model.pth')}")
-    
+
     # Plot training curves if requested
     if plot_curves:
         try:
             import matplotlib.pyplot as plt
-            
+
             fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-            
+
             # Loss plot
-            axes[0].plot(train_losses, label='Train Loss')
-            axes[0].plot(val_losses, label='Val Loss')
-            axes[0].set_xlabel('Epoch')
-            axes[0].set_ylabel('Loss')
-            axes[0].set_title('Training and Validation Loss')
+            axes[0].plot(train_losses, label="Train Loss")
+            axes[0].plot(val_losses, label="Val Loss")
+            axes[0].set_xlabel("Epoch")
+            axes[0].set_ylabel("Loss")
+            axes[0].set_title("Training and Validation Loss")
             axes[0].legend()
-            
+
             # IoU plot
-            axes[1].plot(val_ious, label=f'Val {iou_label}', color='green')
-            axes[1].axhline(y=best_iou, color='r', linestyle='--', label=f'Best: {best_iou:.4f}')
-            axes[1].set_xlabel('Epoch')
+            axes[1].plot(val_ious, label=f"Val {iou_label}", color="green")
+            axes[1].axhline(
+                y=best_iou, color="r", linestyle="--", label=f"Best: {best_iou:.4f}"
+            )
+            axes[1].set_xlabel("Epoch")
             axes[1].set_ylabel(iou_label)
-            axes[1].set_title(f'Validation {iou_label}')
+            axes[1].set_title(f"Validation {iou_label}")
             axes[1].legend()
-            
+
             plt.tight_layout()
-            plot_filename = f'training_curves_{validation_iou_mode}.png'
+            plot_filename = f"training_curves_{validation_iou_mode}.png"
             plt.savefig(os.path.join(output_dir, plot_filename), dpi=150)
             plt.show()
-            print(f"📊 Training curves saved to: {os.path.join(output_dir, plot_filename)}")
+            print(
+                f"📊 Training curves saved to: {os.path.join(output_dir, plot_filename)}"
+            )
         except Exception as e:
             print(f"Warning: Could not plot training curves: {e}")
-    
+
     # Load best model weights
     best_model_path = os.path.join(output_dir, "best_model.pth")
     if os.path.exists(best_model_path):
         model.load_state_dict(torch.load(best_model_path, map_location=device))
         print(f"✅ Loaded best model ({iou_label}: {best_iou:.4f})")
-    
+
     return model
 
 
@@ -1389,13 +1449,13 @@ def evaluate_sparse_iou(
 ) -> Dict[str, Any]:
     """
     Evaluate a trained model using sparse labels IoU.
-    
+
     This function is designed for incomplete/sparse ground truth where
     background (0) means "unlabeled" rather than "definitely not this class".
     Predictions in background areas are NOT penalized as false positives.
-    
+
     Use this for post-training evaluation when your training masks are incomplete.
-    
+
     Args:
         model: Trained segmentation model
         images_dir: Directory containing validation images
@@ -1409,7 +1469,7 @@ def evaluate_sparse_iou(
             - If False: no class ignored (default)
         device: Torch device (auto-detected if None)
         verbose: Print detailed results (default: True)
-    
+
     Returns:
         Dictionary containing:
         - 'mean_sparse_iou': Mean IoU across all non-background classes
@@ -1418,7 +1478,7 @@ def evaluate_sparse_iou(
         - 'per_class_precision': Dict of class_id -> precision
         - 'mean_recall': Mean recall across classes
         - 'mean_precision': Mean precision across classes
-    
+
     Example:
         >>> model = torch.load("best_model.pth")
         >>> results = evaluate_sparse_iou(
@@ -1433,72 +1493,82 @@ def evaluate_sparse_iou(
     import os
     import rasterio
     from torch.utils.data import DataLoader, Dataset
-    
+
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     model.to(device)
     model.eval()
-    
+
     # Get all image and label files
     image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
-    image_files = sorted([
-        os.path.join(images_dir, f) for f in os.listdir(images_dir)
-        if f.lower().endswith(image_extensions)
-    ])
-    label_files = sorted([
-        os.path.join(labels_dir, f) for f in os.listdir(labels_dir)
-        if f.lower().endswith(image_extensions)
-    ])
-    
+    image_files = sorted(
+        [
+            os.path.join(images_dir, f)
+            for f in os.listdir(images_dir)
+            if f.lower().endswith(image_extensions)
+        ]
+    )
+    label_files = sorted(
+        [
+            os.path.join(labels_dir, f)
+            for f in os.listdir(labels_dir)
+            if f.lower().endswith(image_extensions)
+        ]
+    )
+
     if len(image_files) != len(label_files):
-        raise ValueError(f"Mismatch: {len(image_files)} images vs {len(label_files)} labels")
-    
+        raise ValueError(
+            f"Mismatch: {len(image_files)} images vs {len(label_files)} labels"
+        )
+
     if verbose:
         print(f"\n{'='*60}")
         print("SPARSE LABELS IoU EVALUATION")
         print(f"{'='*60}")
         print(f"📁 Evaluating {len(image_files)} image-label pairs")
-        print(f"📊 Background class: {background_class} (predictions here NOT penalized)")
+        print(
+            f"📊 Background class: {background_class} (predictions here NOT penalized)"
+        )
         print(f"📊 Number of classes: {num_classes}")
-    
+
     # Accumulate predictions and targets
     all_preds = []
     all_targets = []
-    
+
     with torch.no_grad():
         for i, (img_path, label_path) in enumerate(zip(image_files, label_files)):
             # Load image
             with rasterio.open(img_path) as src:
                 image = src.read()[:num_channels]  # (C, H, W)
-            
+
             # Load label
             with rasterio.open(label_path) as src:
                 label = src.read(1)  # (H, W)
-            
+
             # Normalize image to 0-1 range
-            image = image.astype('float32')
+            image = image.astype("float32")
             if image.max() > 1.0:
                 image = image / 255.0
-            
+
             # Convert to tensor and add batch dimension
             image_tensor = torch.from_numpy(image).unsqueeze(0).to(device)
             label_tensor = torch.from_numpy(label).unsqueeze(0)
-            
+
             # Get prediction
             output = model(image_tensor)
             pred = torch.argmax(output, dim=1).cpu()
-            
+
             all_preds.append(pred)
             all_targets.append(label_tensor)
-            
+
             if verbose and (i + 1) % 50 == 0:
                 print(f"   Processed {i + 1}/{len(image_files)} tiles...")
-    
+
     # Concatenate all predictions and targets
     all_preds = torch.cat(all_preds, dim=0)
     all_targets = torch.cat(all_targets, dim=0)
-    
+
     # Calculate sparse IoU
     mean_iou, per_class_ious, recalls, precisions = landcover_iou(
         pred=all_preds,
@@ -1508,39 +1578,45 @@ def evaluate_sparse_iou(
         mode="sparse_labels",
         background_class=background_class,
     )
-    
+
     # Build results dictionary
     per_class_iou_dict = {}
     per_class_recall_dict = {}
     per_class_precision_dict = {}
-    
+
     class_idx = 0
     for cls in range(num_classes):
         if cls == background_class:
             continue
         if isinstance(ignore_index, int) and cls == ignore_index:
             continue
-        
+
         per_class_iou_dict[cls] = per_class_ious[cls]
-        per_class_recall_dict[cls] = recalls[class_idx] if class_idx < len(recalls) else 0.0
-        per_class_precision_dict[cls] = precisions[class_idx] if class_idx < len(precisions) else 0.0
+        per_class_recall_dict[cls] = (
+            recalls[class_idx] if class_idx < len(recalls) else 0.0
+        )
+        per_class_precision_dict[cls] = (
+            precisions[class_idx] if class_idx < len(precisions) else 0.0
+        )
         class_idx += 1
-    
+
     # Calculate means (excluding background)
     valid_recalls = [r for r in recalls if r > 0]
     valid_precisions = [p for p in precisions if p > 0]
     mean_recall = sum(valid_recalls) / len(valid_recalls) if valid_recalls else 0.0
-    mean_precision = sum(valid_precisions) / len(valid_precisions) if valid_precisions else 0.0
-    
+    mean_precision = (
+        sum(valid_precisions) / len(valid_precisions) if valid_precisions else 0.0
+    )
+
     results = {
-        'mean_sparse_iou': mean_iou,
-        'per_class_iou': per_class_iou_dict,
-        'per_class_recall': per_class_recall_dict,
-        'per_class_precision': per_class_precision_dict,
-        'mean_recall': mean_recall,
-        'mean_precision': mean_precision,
+        "mean_sparse_iou": mean_iou,
+        "per_class_iou": per_class_iou_dict,
+        "per_class_recall": per_class_recall_dict,
+        "per_class_precision": per_class_precision_dict,
+        "mean_recall": mean_recall,
+        "mean_precision": mean_precision,
     }
-    
+
     if verbose:
         print(f"\n📊 SPARSE LABELS IoU RESULTS:")
         print(f"   (Predictions in background areas NOT counted as false positives)")
@@ -1551,12 +1627,14 @@ def evaluate_sparse_iou(
             recall = per_class_recall_dict.get(cls, 0.0)
             precision = per_class_precision_dict.get(cls, 0.0)
             print(f"   {cls:<8} {iou:>8.4f} {recall:>8.4f} {precision:>10.4f}")
-        
+
         print(f"   {'-'*36}")
-        print(f"   {'MEAN':<8} {mean_iou:>8.4f} {mean_recall:>8.4f} {mean_precision:>10.4f}")
+        print(
+            f"   {'MEAN':<8} {mean_iou:>8.4f} {mean_recall:>8.4f} {mean_precision:>10.4f}"
+        )
         print(f"\n✅ Sparse IoU evaluation complete!")
         print(f"{'='*60}\n")
-    
+
     return results
 
 
