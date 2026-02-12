@@ -50,4 +50,5 @@ jobs:
 
             - name: Running pytest
               run: |
-                  uv run pytest . --verbose
+                  export PYTHONPATH=$(pwd)
+                  uv run pytest tests --verbose
