@@ -694,5 +694,5 @@ class TestImportsFromInit(unittest.TestCase):
         self.assertIn("google_satellite", geoai.EMBEDDING_DATASETS)
 
 
-if __name__ == "__main__":
-    unittest.main()
+# if __name__ == "__main__":
+#     unittest.main()
