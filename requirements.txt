@@ -23,7 +23,7 @@ timm
 tokenizers>=0.22.1
 torch
 # torchange
-torchgeo>=0.9.0
+torchgeo
 torchinfo
 tqdm
 transformers>=4.57.1
