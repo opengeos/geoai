@@ -2,7 +2,7 @@
 
 __author__ = """Qiusheng Wu"""
 __email__ = "giswqs@gmail.com"
-__version__ = "0.28.0"
+__version__ = "0.29.1"
 
 
 import os
@@ -249,4 +249,26 @@ try:
     )
 except ImportError:
     # TESSERA not available (missing geotessera dependency)
+    pass
+  
+# TorchGeo embedding datasets (v0.9.0+)
+try:
+    from .embeddings import (
+        list_embedding_datasets,
+        load_embedding_dataset,
+        get_embedding_info,
+        extract_patch_embeddings,
+        extract_pixel_embeddings,
+        visualize_embeddings,
+        plot_embedding_vector,
+        plot_embedding_raster,
+        cluster_embeddings,
+        embedding_similarity,
+        train_embedding_classifier,
+        compare_embeddings,
+        embedding_to_geotiff,
+        EMBEDDING_DATASETS,
+    )
+except ImportError:
+    # Embeddings not available (missing torchgeo >= 0.9.0 or sklearn)
     pass
