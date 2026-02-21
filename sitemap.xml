@@ -101,6 +101,10 @@
          <lastmod>2026-02-21</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/tessera/</loc>
+         <lastmod>2026-02-21</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/timm_segment/</loc>
          <lastmod>2026-02-21</lastmod>
     </url>
@@ -322,6 +326,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/solar_panel_detection/</loc>
+         <lastmod>2026-02-21</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/tessera/</loc>
          <lastmod>2026-02-21</lastmod>
     </url>
     <url>
