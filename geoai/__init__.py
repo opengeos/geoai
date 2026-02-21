@@ -250,7 +250,7 @@ try:
 except ImportError:
     # TESSERA not available (missing geotessera dependency)
     pass
-  
+
 # TorchGeo embedding datasets (v0.9.0+)
 try:
     from .embeddings import (
