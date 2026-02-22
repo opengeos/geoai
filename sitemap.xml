@@ -121,6 +121,10 @@
          <lastmod>2026-02-22</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/water/</loc>
+         <lastmod>2026-02-22</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/examples/AI_agents/</loc>
          <lastmod>2026-02-22</lastmod>
     </url>
@@ -414,6 +418,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/water_dynamics/</loc>
+         <lastmod>2026-02-22</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/water_segmentation/</loc>
          <lastmod>2026-02-22</lastmod>
     </url>
     <url>
