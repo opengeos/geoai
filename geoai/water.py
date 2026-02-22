@@ -12,7 +12,7 @@ Reference:
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union  # List used in BAND_ORDER_PRESETS
 
 BAND_ORDER_PRESETS: Dict[str, List[int]] = {
     "naip": [1, 2, 3, 4],
@@ -34,13 +34,13 @@ Each preset maps to a list of 1-based band indices in the order
 
 
 def segment_water(
-    input_path: Union[str, "Path", List[Union[str, "Path"]]],
+    input_path: Union[str, "Path"],
     band_order: Union[List[int], str] = "naip",
     output_raster: Optional[str] = None,
     output_vector: Optional[str] = None,
     batch_size: int = 4,
     device: Optional[str] = None,
-    dtype: str = "float32",
+    dtype: str = "float16",
     no_data_value: int = 0,
     patch_size: int = 1000,
     overlap_size: int = 300,
@@ -64,8 +64,7 @@ def segment_water(
     other multispectral sensors with Red, Green, Blue, and NIR bands.
 
     Args:
-        input_path: Path to input GeoTIFF file(s). Can be a single path
-            (string or Path) or a list of paths for batch processing.
+        input_path: Path to input GeoTIFF file (string or Path).
         band_order: Band indices for Red, Green, Blue, NIR channels
             (1-based, as used by rasterio). Can be a list of 4 integers
             or a string preset: ``"naip"`` ([1,2,3,4]),
@@ -83,7 +82,7 @@ def segment_water(
             ``"float32"``, ``"float16"``, or ``"bfloat16"``. Using
             ``"float16"`` is recommended as it is faster and uses less
             memory while the output is always a binary mask.
-            Defaults to ``"float32"``.
+            Defaults to ``"float16"``.
         no_data_value: Value representing no-data pixels in the input imagery.
             Defaults to 0.
         patch_size: Size of patches for sliding-window inference in pixels.
@@ -151,7 +150,8 @@ def segment_water(
     except ImportError:
         raise ImportError(
             "omniwatermask is required for water segmentation. "
-            "Install it with: pip install omniwatermask"
+            "Install it with: pip install omniwatermask "
+            "or pip install geoai-py[extra]"
         )
 
     import rasterio
@@ -183,21 +183,11 @@ def segment_water(
             f"got {type(band_order).__name__}."
         )
 
-    # Normalize input path(s)
-    if isinstance(input_path, (str, Path)):
-        input_path = Path(input_path)
-        if not input_path.exists():
-            raise FileNotFoundError(f"Input file not found: {input_path}")
-        scene_paths = [input_path]
-        single_input = True
-    else:
-        scene_paths = []
-        for p in input_path:
-            p = Path(p)
-            if not p.exists():
-                raise FileNotFoundError(f"Input file not found: {p}")
-            scene_paths.append(p)
-        single_input = len(scene_paths) == 1
+    # Normalize input path
+    input_path = Path(input_path)
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    scene_paths = [input_path]
 
     # Determine output raster path
     if output_raster is None:
@@ -206,6 +196,19 @@ def segment_water(
 
     output_raster = str(output_raster)
     output_raster_path = Path(output_raster)
+
+    # Check overwrite for output files
+    if not overwrite:
+        if output_raster_path.exists():
+            raise FileExistsError(
+                f"Output raster '{output_raster}' already exists and "
+                "overwrite is set to False."
+            )
+        if output_vector is not None and Path(output_vector).exists():
+            raise FileExistsError(
+                f"Output vector '{output_vector}' already exists and "
+                "overwrite is set to False."
+            )
 
     # Map dtype string to torch.dtype
     dtype_map = {
