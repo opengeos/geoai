@@ -74,6 +74,7 @@ plugins:
                   "examples/building_detection_lidar.ipynb",
                   "examples/building_detection_whu.ipynb",
                   "examples/canopy_height.ipynb",
+                  "examples/water_segmentation.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -150,6 +151,7 @@ nav:
           - examples/water_detection.ipynb
           - examples/water_detection_s2.ipynb
           - examples/water_detection_s2_hf.ipynb
+          - examples/water_segmentation.ipynb
           - examples/batch_segmentation.ipynb
           - examples/building_detection_lidar.ipynb
           - examples/instance_segmentation.ipynb
@@ -209,3 +211,4 @@ nav:
           - timm_segment module: timm_segment.md
           - train module: train.md
           - utils module: utils.md
+          - water module: water.md
