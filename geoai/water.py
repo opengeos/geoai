@@ -40,7 +40,7 @@ def segment_water(
     output_vector: Optional[str] = None,
     batch_size: int = 4,
     device: Optional[str] = None,
-    dtype: str = "float16",
+    dtype: str = "float32",
     no_data_value: int = 0,
     patch_size: int = 1000,
     overlap_size: int = 300,
@@ -82,7 +82,7 @@ def segment_water(
             ``"float32"``, ``"float16"``, or ``"bfloat16"``. Using
             ``"float16"`` is recommended as it is faster and uses less
             memory while the output is always a binary mask.
-            Defaults to ``"float16"``.
+            Defaults to ``"float32"``.
         no_data_value: Value representing no-data pixels in the input imagery.
             Defaults to 0.
         patch_size: Size of patches for sliding-window inference in pixels.
