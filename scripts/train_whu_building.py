@@ -115,7 +115,9 @@ def prepare_whu_from_raw(raw_dir, output_dir="whu_building_dataset"):
             + glob.glob(os.path.join(split_dir, lbl_dir_name, "*.tif"))
         )
 
-        print(f"Processing {split}: {len(image_files)} images, {len(label_files)} labels")
+        print(
+            f"Processing {split}: {len(image_files)} images, {len(label_files)} labels"
+        )
 
         for img_path, lbl_path in tqdm(
             zip(image_files, label_files), total=len(image_files), desc=split
@@ -367,9 +369,7 @@ def main():
     parser.add_argument(
         "--epochs", type=int, default=50, help="Number of training epochs."
     )
-    parser.add_argument(
-        "--lr", type=float, default=1e-4, help="Learning rate."
-    )
+    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument(
         "--push-to-hub",
         action="store_true",
