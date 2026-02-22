@@ -72,6 +72,7 @@ plugins:
                   "examples/water_detection.ipynb",
                   "examples/batch_segmentation.ipynb",
                   "examples/building_detection_lidar.ipynb",
+                  "examples/building_detection_whu.ipynb",
                   "examples/canopy_height.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
@@ -176,6 +177,7 @@ nav:
           - examples/train_timm_regressor.ipynb
           - examples/canopy_height.ipynb
           - examples/tessera.ipynb
+          - examples/building_detection_whu.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb

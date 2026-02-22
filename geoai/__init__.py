@@ -128,6 +128,7 @@ from .timm_segment import (
     train_timm_segmentation_model,
     timm_semantic_segmentation,
     push_timm_model_to_hub,
+    timm_segmentation_from_hub,
 )
 
 from .timm_regress import (
