@@ -12,7 +12,7 @@ Reference:
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union  # List used in BAND_ORDER_PRESETS
+from typing import Any, Dict, List, Optional, Union
 
 BAND_ORDER_PRESETS: Dict[str, List[int]] = {
     "naip": [1, 2, 3, 4],
@@ -33,8 +33,100 @@ Each preset maps to a list of 1-based band indices in the order
 """
 
 
+def _extract_water_band(src_path: str, dst_path: str) -> None:
+    """Extract the water mask band from a multi-band OmniWaterMask output.
+
+    OmniWaterMask outputs 2 bands: band 1 = water predictions,
+    band 2 = no data mask. This function saves only band 1.
+
+    Args:
+        src_path: Path to the multi-band OmniWaterMask output GeoTIFF.
+        dst_path: Path to save the single-band water mask GeoTIFF.
+    """
+    import rasterio
+
+    with rasterio.open(src_path) as src:
+        water_band = src.read(1)
+        profile = src.profile.copy()
+        profile.update(count=1)
+        description = src.descriptions[0] if src.descriptions else "Water predictions"
+
+    with rasterio.open(dst_path, "w", **profile) as dst:
+        dst.write(water_band, 1)
+        dst.set_band_description(1, description)
+
+
+def _vectorize_mask(
+    raster_path: str,
+    output_vector: str,
+    min_area: float,
+    smooth: bool,
+    smooth_iterations: int,
+    overwrite: bool,
+    verbose: bool,
+) -> "gpd.GeoDataFrame":
+    """Vectorize a water mask raster to polygons with optional smoothing.
+
+    Args:
+        raster_path: Path to the water mask GeoTIFF.
+        output_vector: Path to save the output vector file.
+        min_area: Minimum polygon area in square map units.
+        smooth: Whether to smooth polygons.
+        smooth_iterations: Number of smoothing iterations.
+        overwrite: Whether to overwrite existing files.
+        verbose: Whether to print progress messages.
+
+    Returns:
+        GeoDataFrame with vectorized water body polygons.
+    """
+    from .utils import add_geometric_properties, raster_to_vector, smooth_vector
+
+    if not overwrite and Path(output_vector).exists():
+        raise FileExistsError(
+            f"Output vector '{output_vector}' already exists and "
+            "overwrite is set to False."
+        )
+
+    if verbose:
+        print("Converting water mask to vector polygons...")
+
+    gdf = raster_to_vector(
+        raster_path=raster_path,
+        output_path=None,
+        min_area=min_area,
+    )
+
+    if smooth and len(gdf) > 0:
+        if verbose:
+            print(f"Smoothing polygons ({smooth_iterations} iterations)...")
+        gdf = smooth_vector(
+            gdf,
+            smooth_iterations=smooth_iterations,
+        )
+
+    gdf = add_geometric_properties(gdf, area_unit="m2", length_unit="m")
+
+    # Save to file
+    output_vector = str(output_vector)
+    ext = Path(output_vector).suffix.lower()
+    if ext == ".geojson":
+        gdf.to_file(output_vector, driver="GeoJSON")
+    elif ext == ".gpkg":
+        gdf.to_file(output_vector, driver="GPKG")
+    elif ext in (".shp", ".shapefile"):
+        gdf.to_file(output_vector, driver="ESRI Shapefile")
+    else:
+        gdf.to_file(output_vector)
+
+    if verbose:
+        print(f"Water body polygons saved to: {output_vector}")
+        print(f"Total water bodies detected: {len(gdf)}")
+
+    return gdf
+
+
 def segment_water(
-    input_path: Union[str, "Path"],
+    input_path: Union[str, "Path", List[Union[str, "Path"]]],
     band_order: Union[List[int], str] = "naip",
     output_raster: Optional[str] = None,
     output_vector: Optional[str] = None,
@@ -55,7 +147,7 @@ def segment_water(
     smooth_iterations: int = 3,
     verbose: bool = True,
     **kwargs: Any,
-) -> Union[str, "gpd.GeoDataFrame"]:
+) -> Union[str, "gpd.GeoDataFrame", List[str], List["gpd.GeoDataFrame"]]:
     """Segment water bodies from satellite or aerial imagery using OmniWaterMask.
 
     Uses a sensor-agnostic deep learning model combined with NDWI and
@@ -64,7 +156,10 @@ def segment_water(
     other multispectral sensors with Red, Green, Blue, and NIR bands.
 
     Args:
-        input_path: Path to input GeoTIFF file (string or Path).
+        input_path: Path to input GeoTIFF file(s). Can be a single path
+            (string or Path) or a list of paths for batch processing.
+            When a list is provided, each scene is processed and output
+            files are named based on each input filename.
         band_order: Band indices for Red, Green, Blue, NIR channels
             (1-based, as used by rasterio). Can be a list of 4 integers
             or a string preset: ``"naip"`` ([1,2,3,4]),
@@ -72,9 +167,13 @@ def segment_water(
             Defaults to ``"naip"``.
         output_raster: Path to save the output water mask GeoTIFF. If None,
             derives from input filename (e.g., ``input_water_mask.tif``).
+            For multiple inputs, this is ignored and output names are
+            derived from each input filename.
         output_vector: Path to save vectorized water body polygons (e.g.,
             GeoJSON, GPKG, Shapefile). If provided, the raster mask is
-            converted to vector polygons. Defaults to None.
+            converted to vector polygons. For multiple inputs, this is
+            ignored and output names are derived from each input filename
+            using the same extension. Defaults to None.
         batch_size: Number of scenes to process in parallel. Defaults to 4.
         device: Device for inference (e.g., ``"cuda"``, ``"cpu"``, ``"mps"``).
             If None, auto-selects the best available device. Defaults to None.
@@ -115,10 +214,14 @@ def segment_water(
             ``omniwatermask.make_water_mask()``.
 
     Returns:
-        If ``output_vector`` is provided, returns a ``GeoDataFrame`` with
-        vectorized (and optionally smoothed) water body polygons.
-        Otherwise, returns the file path (str) to the output water mask
-        GeoTIFF.
+        For a single input file:
+            If ``output_vector`` is provided, returns a ``GeoDataFrame``
+            with vectorized (and optionally smoothed) water body polygons.
+            Otherwise, returns the file path (str) to the output water
+            mask GeoTIFF.
+        For multiple input files:
+            Returns a list of results (list of str paths or list of
+            GeoDataFrames), one per input file.
 
     Raises:
         ImportError: If omniwatermask is not installed.
@@ -144,6 +247,11 @@ def segment_water(
         ...     smooth_iterations=3,
         ...     min_area=100,
         ... )
+        >>> # Batch processing multiple files
+        >>> results = geoai.segment_water(
+        ...     ["scene1.tif", "scene2.tif"],
+        ...     band_order="sentinel2",
+        ... )
     """
     try:
         from omniwatermask import make_water_mask
@@ -154,7 +262,6 @@ def segment_water(
             "or pip install geoai-py[extra]"
         )
 
-    import rasterio
     import torch
 
     # Resolve band order
@@ -183,25 +290,41 @@ def segment_water(
             f"got {type(band_order).__name__}."
         )
 
-    # Normalize input path
-    input_path = Path(input_path)
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input file not found: {input_path}")
-    scene_paths = [input_path]
+    # Normalize input path(s)
+    if isinstance(input_path, (str, Path)):
+        scene_paths = [Path(input_path)]
+        multi_input = False
+    else:
+        scene_paths = [Path(p) for p in input_path]
+        multi_input = len(scene_paths) > 1
 
-    # Determine output raster path
-    if output_raster is None:
-        stem = scene_paths[0].stem
-        output_raster = str(scene_paths[0].parent / f"{stem}_water_mask.tif")
+    for p in scene_paths:
+        if not p.exists():
+            raise FileNotFoundError(f"Input file not found: {p}")
 
-    output_raster = str(output_raster)
-    output_raster_path = Path(output_raster)
+    # Determine output raster path(s)
+    if multi_input:
+        # For multiple inputs, derive output names from each input
+        output_dir = Path.cwd() if output_raster is None else Path(output_raster)
+        if output_raster is not None and not output_dir.suffix:
+            # output_raster is treated as a directory for multi-input
+            os.makedirs(output_dir, exist_ok=True)
+        else:
+            output_dir = Path.cwd()
+        raster_paths = [
+            str(output_dir / f"{p.stem}_water_mask.tif") for p in scene_paths
+        ]
+    else:
+        if output_raster is None:
+            stem = scene_paths[0].stem
+            output_raster = str(scene_paths[0].parent / f"{stem}_water_mask.tif")
+        raster_paths = [str(output_raster)]
 
-    # Check overwrite for output files
-    if not overwrite:
-        if output_raster_path.exists():
+    # Check overwrite for output files (single input only; multi checked per-file)
+    if not multi_input and not overwrite:
+        if Path(raster_paths[0]).exists():
             raise FileExistsError(
-                f"Output raster '{output_raster}' already exists and "
+                f"Output raster '{raster_paths[0]}' already exists and "
                 "overwrite is set to False."
             )
         if output_vector is not None and Path(output_vector).exists():
@@ -225,6 +348,9 @@ def segment_water(
     else:
         inference_dtype = dtype
 
+    # Determine the output directory for OmniWaterMask
+    owm_output_dir = Path(raster_paths[0]).parent
+
     # Build kwargs for make_water_mask
     owm_kwargs = {
         "scene_paths": scene_paths,
@@ -238,10 +364,8 @@ def segment_water(
         "use_osm_building": use_osm_building,
         "use_osm_roads": use_osm_roads,
         "overwrite": overwrite,
+        "output_dir": owm_output_dir,
     }
-
-    # Set output directory to the parent directory of the output raster
-    owm_kwargs["output_dir"] = output_raster_path.parent
 
     if cache_dir is not None:
         owm_kwargs["cache_dir"] = Path(cache_dir)
@@ -265,70 +389,56 @@ def segment_water(
     if not result_paths:
         raise RuntimeError("OmniWaterMask did not produce any output files.")
 
-    # Extract water mask band only (OmniWaterMask outputs 2 bands:
-    # band 1 = water predictions, band 2 = no data mask)
-    result_path = result_paths[0]
-    os.makedirs(output_raster_path.parent, exist_ok=True)
+    # Process each result: extract water band and optionally vectorize
+    output_rasters = []
+    output_gdfs = []
 
-    with rasterio.open(str(result_path)) as src:
-        water_band = src.read(1)
-        profile = src.profile.copy()
-        profile.update(count=1)
-        if src.descriptions:
-            description = src.descriptions[0]
-        else:
-            description = "Water predictions"
-
-    with rasterio.open(output_raster, "w", **profile) as dst:
-        dst.write(water_band, 1)
-        dst.set_band_description(1, description)
-
-    # Clean up original multi-band file if it differs from output
-    if Path(result_path).resolve() != output_raster_path.resolve():
-        os.remove(str(result_path))
-
-    if verbose:
-        print(f"Water mask saved to: {output_raster}")
-
-    # Vectorize if requested
-    if output_vector is not None:
-        from .utils import add_geometric_properties, raster_to_vector, smooth_vector
-
-        if verbose:
-            print("Converting water mask to vector polygons...")
-
-        gdf = raster_to_vector(
-            raster_path=output_raster,
-            output_path=None,
-            min_area=min_area,
+    for i, result_path in enumerate(result_paths):
+        dst_raster = (
+            raster_paths[i]
+            if i < len(raster_paths)
+            else str(owm_output_dir / f"{scene_paths[i].stem}_water_mask.tif")
         )
 
-        if smooth and len(gdf) > 0:
-            if verbose:
-                print(f"Smoothing polygons ({smooth_iterations} iterations)...")
-            gdf = smooth_vector(
-                gdf,
-                smooth_iterations=smooth_iterations,
-            )
+        os.makedirs(Path(dst_raster).parent, exist_ok=True)
+        _extract_water_band(str(result_path), dst_raster)
 
-        gdf = add_geometric_properties(gdf, area_unit="m2", length_unit="m")
-
-        # Save to file
-        output_vector = str(output_vector)
-        ext = Path(output_vector).suffix.lower()
-        if ext == ".geojson":
-            gdf.to_file(output_vector, driver="GeoJSON")
-        elif ext == ".gpkg":
-            gdf.to_file(output_vector, driver="GPKG")
-        elif ext in (".shp", ".shapefile"):
-            gdf.to_file(output_vector, driver="ESRI Shapefile")
-        else:
-            gdf.to_file(output_vector)
+        # Clean up original multi-band file if it differs from output
+        if Path(result_path).resolve() != Path(dst_raster).resolve():
+            try:
+                os.remove(str(result_path))
+            except OSError:
+                pass
 
         if verbose:
-            print(f"Water body polygons saved to: {output_vector}")
-            print(f"Total water bodies detected: {len(gdf)}")
+            print(f"Water mask saved to: {dst_raster}")
 
-        return gdf
+        output_rasters.append(dst_raster)
 
-    return output_raster
+        # Vectorize if requested
+        if output_vector is not None:
+            if multi_input:
+                # Derive per-file vector name from input stem
+                vec_ext = Path(output_vector).suffix or ".geojson"
+                vec_path = str(
+                    Path(dst_raster).parent
+                    / f"{scene_paths[i].stem}_water_bodies{vec_ext}"
+                )
+            else:
+                vec_path = str(output_vector)
+
+            gdf = _vectorize_mask(
+                raster_path=dst_raster,
+                output_vector=vec_path,
+                min_area=min_area,
+                smooth=smooth,
+                smooth_iterations=smooth_iterations,
+                overwrite=overwrite,
+                verbose=verbose,
+            )
+            output_gdfs.append(gdf)
+
+    # Return results
+    if output_vector is not None:
+        return output_gdfs if multi_input else output_gdfs[0]
+    return output_rasters if multi_input else output_rasters[0]
