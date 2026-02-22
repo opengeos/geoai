@@ -149,6 +149,7 @@ nav:
           - examples/load_model_checkpoint.ipynb
           - examples/water_detection.ipynb
           - examples/water_detection_s2.ipynb
+          - examples/water_detection_s2_hf.ipynb
           - examples/batch_segmentation.ipynb
           - examples/building_detection_lidar.ipynb
           - examples/instance_segmentation.ipynb
