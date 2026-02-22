@@ -1098,3 +1098,88 @@ def push_timm_model_to_hub(
     url = f"https://huggingface.co/{repo_id}"
     print(f"Model successfully pushed to: {url}")
     return url
+
+
+def timm_segmentation_from_hub(
+    input_path: str,
+    output_path: str,
+    repo_id: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    batch_size: int = 4,
+    device: Optional[str] = None,
+    quiet: bool = False,
+    token: Optional[str] = None,
+    **kwargs: Any,
+) -> None:
+    """Perform semantic segmentation using a model from HuggingFace Hub.
+
+    Downloads the model and config from the specified HuggingFace repository
+    and runs sliding-window inference on the input GeoTIFF.
+
+    Args:
+        input_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output segmentation mask.
+        repo_id (str): HuggingFace repository ID
+            (e.g., 'giswqs/whu-building-unetplusplus-convnext-base').
+        window_size (int): Size of sliding window for inference. Defaults to 512.
+        overlap (int): Overlap between adjacent windows. Defaults to 256.
+        batch_size (int): Batch size for inference. Defaults to 4.
+        device (str, optional): Device to use ('cuda' or 'cpu').
+            Auto-detected if None.
+        quiet (bool): If True, suppress progress messages. Defaults to False.
+        token (str, optional): HuggingFace API token. If None, uses
+            logged-in token.
+        **kwargs: Additional arguments passed to timm_semantic_segmentation.
+    """
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        raise ImportError(
+            "huggingface_hub is required. Install it with: pip install huggingface-hub"
+        )
+
+    import json
+
+    # Download model and config from HuggingFace Hub
+    if not quiet:
+        print(f"Downloading model from {repo_id}...")
+
+    model_path = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
+    config_path = hf_hub_download(repo_id=repo_id, filename="config.json", token=token)
+
+    # Load config
+    with open(config_path) as f:
+        config = json.load(f)
+
+    if not quiet:
+        print(f"Model config: {config}")
+
+    encoder_name = config.get("encoder_name", "resnet50")
+    architecture = config.get("architecture", "unet")
+    num_channels = config.get("num_channels", 3)
+    num_classes = config.get("num_classes", 2)
+    use_timm_model = config.get("use_timm_model", False)
+    timm_model_name = config.get("timm_model_name", None)
+
+    # Run inference using existing function
+    timm_semantic_segmentation(
+        input_path=input_path,
+        output_path=output_path,
+        model_path=model_path,
+        encoder_name=encoder_name,
+        architecture=architecture,
+        num_channels=num_channels,
+        num_classes=num_classes,
+        window_size=window_size,
+        overlap=overlap,
+        batch_size=batch_size,
+        device=device,
+        quiet=quiet,
+        use_timm_model=use_timm_model,
+        timm_model_name=timm_model_name,
+        **kwargs,
+    )
+
+    if not quiet:
+        print(f"Segmentation saved to {output_path}")
