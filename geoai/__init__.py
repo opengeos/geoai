@@ -273,3 +273,10 @@ try:
 except ImportError:
     # Embeddings not available (missing torchgeo >= 0.9.0 or sklearn)
     pass
+
+# OmniWaterMask water body segmentation
+try:
+    from .water import segment_water, BAND_ORDER_PRESETS
+except ImportError:
+    # OmniWaterMask not available (missing omniwatermask dependency)
+    pass

@@ -37,6 +37,8 @@ docs/examples/timm_regression_output/
 docs/examples/ndvi_model/
 *.pth
 *.ckpt
+docs/examples/cache/
+docs/examples/*_cache/
 # Distribution / packaging
 .Python
 env/
