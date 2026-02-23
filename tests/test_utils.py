@@ -70,6 +70,49 @@ class TestUtilsFunctions(unittest.TestCase):
         except ImportError as e:
             self.fail(f"Failed to import geoai.utils: {e}")
 
+    def test_get_device_cpu_fallback(self):
+        """Test device detection falls back to CPU when no GPU available."""
+        with patch("torch.cuda.is_available", return_value=False):
+            with patch("torch.backends.mps.is_available", return_value=False):
+                device = utils.get_device()
+                self.assertEqual(str(device.type), "cpu")
+
+    def test_empty_cache_no_error(self):
+        """Test that empty_cache runs without error."""
+        try:
+            utils.empty_cache()
+        except Exception as e:
+            self.fail(f"empty_cache raised {type(e).__name__}: {e}")
+
+    def test_install_package_signature(self):
+        """Test that install_package has expected parameter."""
+        import inspect
+
+        sig = inspect.signature(utils.install_package)
+        self.assertIn("package", sig.parameters)
+
+    @patch("subprocess.Popen")
+    def test_install_package_calls_pip(self, mock_popen):
+        """Test that install_package invokes pip via subprocess."""
+        mock_process = mock_popen.return_value
+        mock_process.stdout.readline.side_effect = [b"", b""]
+        mock_process.poll.return_value = 0
+        mock_process.wait.return_value = 0
+        utils.install_package("fake-package")
+        self.assertTrue(mock_popen.called)
+
+    def test_key_functions_in_all(self):
+        """Test that key functions are listed in __all__."""
+        expected = [
+            "get_raster_info",
+            "get_vector_info",
+            "calc_iou",
+            "download_file",
+            "temp_file_path",
+        ]
+        for name in expected:
+            self.assertIn(name, utils.__all__, f"{name} not found in utils.__all__")
+
 
 if __name__ == "__main__":
     unittest.main()
