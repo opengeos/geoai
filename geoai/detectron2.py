@@ -2,6 +2,8 @@
 See https://github.com/facebookresearch/detectron2 for more details.
 """
 
+from __future__ import annotations
+
 import os
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
