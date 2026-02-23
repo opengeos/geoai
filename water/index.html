@@ -3836,7 +3836,7 @@ calculations and OpenStreetMap reference data.</p>
 
 
 <h2 id="geoai.water.segment_water" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">segment_water</span><span class="p">(</span><span class="n">input_path</span><span class="p">,</span> <span class="n">band_order</span><span class="o">=</span><span class="s1">&#39;naip&#39;</span><span class="p">,</span> <span class="n">output_raster</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">output_vector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float32&#39;</span><span class="p">,</span> <span class="n">no_data_value</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">patch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">overlap_size</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">use_osm_water</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_osm_building</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_osm_roads</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">cache_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">model_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_area</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">smooth_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">segment_water</span><span class="p">(</span><span class="n">input_path</span><span class="p">,</span> <span class="n">band_order</span><span class="o">=</span><span class="s1">&#39;naip&#39;</span><span class="p">,</span> <span class="n">output_raster</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">output_vector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float32&#39;</span><span class="p">,</span> <span class="n">no_data_value</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">patch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">overlap_size</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">use_osm_water</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_osm_building</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_osm_roads</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">cache_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">model_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">smooth_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#geoai.water.segment_water" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -4148,15 +4148,16 @@ Defaults to True.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>min_area</code>
+                <code>min_size</code>
             </td>
             <td>
-                  <code><span title="float">float</span></code>
+                  <code><span title="int">int</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Minimum polygon area in square map units to keep during
-vectorization. Defaults to 10.</p>
+                <p>Minimum polygon size in pixels to keep during
+vectorization. Polygons with fewer pixels are removed.
+Defaults to 10.</p>
               </div>
             </td>
             <td>
@@ -4339,7 +4340,7 @@ does not contain exactly 4 band indices.</p>
 ...     output_vector="water_bodies.geojson",
 ...     smooth=True,
 ...     smooth_iterations=3,
-...     min_area=100,
+...     min_size=10,
 ... )</p>
 <h3 id="geoai.water.segment_water--batch-processing-multiple-files">Batch processing multiple files<a class="headerlink" href="#geoai.water.segment_water--batch-processing-multiple-files" title="Permanent link">&para;</a></h3>
 <p>results = geoai.segment_water(
@@ -4353,14 +4354,7 @@ does not contain exactly 4 band indices.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/water.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
 <span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
@@ -4669,7 +4663,15 @@ does not contain exactly 4 band indices.</p>
 <span class="normal">441</span>
 <span class="normal">442</span>
 <span class="normal">443</span>
-<span class="normal">444</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_water</span><span class="p">(</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_water</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;Path&quot;</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;Path&quot;</span><span class="p">]]],</span>
     <span class="n">band_order</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;naip&quot;</span><span class="p">,</span>
     <span class="n">output_raster</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -4686,7 +4688,7 @@ does not contain exactly 4 band indices.</p>
     <span class="n">cache_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">model_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="n">min_area</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">min_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">smooth</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">smooth_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
     <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -4745,8 +4747,9 @@ does not contain exactly 4 band indices.</p>
 <span class="sd">            If None, uses the default location. Defaults to None.</span>
 <span class="sd">        overwrite: Whether to overwrite existing output files.</span>
 <span class="sd">            Defaults to True.</span>
-<span class="sd">        min_area: Minimum polygon area in square map units to keep during</span>
-<span class="sd">            vectorization. Defaults to 10.</span>
+<span class="sd">        min_size: Minimum polygon size in pixels to keep during</span>
+<span class="sd">            vectorization. Polygons with fewer pixels are removed.</span>
+<span class="sd">            Defaults to 10.</span>
 <span class="sd">        smooth: Whether to smooth vectorized polygons using the smoothify</span>
 <span class="sd">            library. Only applies when ``output_vector`` is provided.</span>
 <span class="sd">            Defaults to True.</span>
@@ -4789,7 +4792,7 @@ does not contain exactly 4 band indices.</p>
 <span class="sd">        ...     output_vector=&quot;water_bodies.geojson&quot;,</span>
 <span class="sd">        ...     smooth=True,</span>
 <span class="sd">        ...     smooth_iterations=3,</span>
-<span class="sd">        ...     min_area=100,</span>
+<span class="sd">        ...     min_size=10,</span>
 <span class="sd">        ... )</span>
 <span class="sd">        &gt;&gt;&gt; # Batch processing multiple files</span>
 <span class="sd">        &gt;&gt;&gt; results = geoai.segment_water(</span>
@@ -4974,7 +4977,7 @@ does not contain exactly 4 band indices.</p>
             <span class="n">gdf</span> <span class="o">=</span> <span class="n">_vectorize_mask</span><span class="p">(</span>
                 <span class="n">raster_path</span><span class="o">=</span><span class="n">dst_raster</span><span class="p">,</span>
                 <span class="n">output_vector</span><span class="o">=</span><span class="n">vec_path</span><span class="p">,</span>
-                <span class="n">min_area</span><span class="o">=</span><span class="n">min_area</span><span class="p">,</span>
+                <span class="n">min_size</span><span class="o">=</span><span class="n">min_size</span><span class="p">,</span>
                 <span class="n">smooth</span><span class="o">=</span><span class="n">smooth</span><span class="p">,</span>
                 <span class="n">smooth_iterations</span><span class="o">=</span><span class="n">smooth_iterations</span><span class="p">,</span>
                 <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span>
