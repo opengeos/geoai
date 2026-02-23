@@ -43,7 +43,9 @@ def info(filepath):
     if ext in vector_extensions:
         from geoai.utils import get_vector_info
 
-        get_vector_info(filepath)
+        info_dict = get_vector_info(filepath)
+        for key, value in info_dict.items():
+            click.echo(f"{key}: {value}")
     elif ext in raster_extensions:
         from geoai.utils import get_raster_info
 
@@ -70,7 +72,9 @@ def info(filepath):
             try:
                 from geoai.utils import get_vector_info
 
-                get_vector_info(filepath)
+                info_dict = get_vector_info(filepath)
+                for key, value in info_dict.items():
+                    click.echo(f"{key}: {value}")
             except Exception as e:
                 click.echo(f"Error: Could not read file: {e}", err=True)
                 sys.exit(1)

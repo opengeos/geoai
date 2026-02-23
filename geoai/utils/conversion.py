@@ -350,8 +350,15 @@ def bbox_to_xy(
             if coord_crs != src.crs:
                 from rasterio.warp import transform as transform_coords
 
-                minx, miny = transform_coords(minx, miny, coord_crs, src.crs, **kwargs)
-                maxx, maxy = transform_coords(maxx, maxy, coord_crs, src.crs, **kwargs)
+                minx_list, miny_list = transform_coords(
+                    coord_crs, src.crs, [minx], [miny], **kwargs
+                )
+                maxx_list, maxy_list = transform_coords(
+                    coord_crs, src.crs, [maxx], [maxy], **kwargs
+                )
+
+                minx, miny = minx_list[0], miny_list[0]
+                maxx, maxy = maxx_list[0], maxy_list[0]
 
                 rows1, cols1 = rasterio.transform.rowcol(
                     src.transform, minx, miny, **kwargs

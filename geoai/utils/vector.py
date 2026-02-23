@@ -455,7 +455,7 @@ def add_geometric_properties(
             'area', 'length', 'perimeter', 'centroid_x', 'centroid_y', 'bounds',
             'convex_hull_area', 'orientation', 'complexity', 'area_bbox',
             'area_convex', 'area_filled', 'major_length', 'minor_length',
-            'eccentricity', 'diameter_areagth', 'extent', 'solidity',
+            'eccentricity', 'diameter_area', 'extent', 'solidity',
             'elongation'.
             Defaults to ['area', 'length'] if None.
         area_unit: String specifying the unit for area calculation ('m2', 'km2',
@@ -779,7 +779,7 @@ def add_geometric_properties(
             result["elongation"] = axes_data.apply(lambda x: x[4] if x else None)
 
     # Equivalent diameter based on area
-    if "diameter_areagth" in properties:
+    if "diameter_area" in properties:
 
         def get_equivalent_diameter(geom):
             if not isinstance(geom, (Polygon, MultiPolygon)) or geom.area <= 0:
@@ -787,18 +787,18 @@ def add_geometric_properties(
             # Diameter of a circle with the same area: d = 2 * sqrt(A / π)
             return 2 * np.sqrt(geom.area / np.pi)
 
-        result["diameter_areagth"] = result.geometry.apply(get_equivalent_diameter)
+        result["diameter_area"] = result.geometry.apply(get_equivalent_diameter)
 
         # Convert to requested units
         if length_unit == "km":
-            result["diameter_areagth"] = result["diameter_areagth"] / 1_000
+            result["diameter_area"] = result["diameter_area"] / 1_000
             result.rename(
-                columns={"diameter_areagth": "equivalent_diameter_area_km"},
+                columns={"diameter_area": "equivalent_diameter_area_km"},
                 inplace=True,
             )
         else:
             result.rename(
-                columns={"diameter_areagth": "equivalent_diameter_area_m"},
+                columns={"diameter_area": "equivalent_diameter_area_m"},
                 inplace=True,
             )
 
