@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../examples/moondream_sliding_window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Moondream sliding window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../examples/AutoModel/" class="md-nav__link">
         
   
@@ -2557,6 +2585,34 @@
     
   
     Tessera
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/torchgeo_embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Torchgeo embeddings
   
 
     
@@ -4929,6 +4985,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    embeddings module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../extract/" class="md-nav__link">
         
   
@@ -4965,6 +5049,62 @@
     
   
     hf module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../landcover_train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    landcover_train module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../landcover_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    landcover_utils module
   
 
     
@@ -5153,6 +5293,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../segment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    segment module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../segmentation/" class="md-nav__link">
         
   
@@ -5209,14 +5377,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../timm_train/" class="md-nav__link">
+      <a href="../timm_regress/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    timm_train module
+    timm_regress module
   
 
     
@@ -5245,6 +5413,34 @@
     
   
     timm_segment module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timm_train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    timm_train module
   
 
     
@@ -33563,7 +33759,8 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">452</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">451</span>
+<span class="normal">452</span>
 <span class="normal">453</span>
 <span class="normal">454</span>
 <span class="normal">455</span>
@@ -33692,8 +33889,7 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
 <span class="normal">578</span>
 <span class="normal">579</span>
 <span class="normal">580</span>
-<span class="normal">581</span>
-<span class="normal">582</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_class_weights</span><span class="p">(</span>
+<span class="normal">581</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_class_weights</span><span class="p">(</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">ignore_index</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">100</span><span class="p">,</span>
@@ -33782,7 +33978,7 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
 
     <span class="c1"># Apply custom multipliers if provided</span>
     <span class="k">if</span> <span class="n">custom_multipliers</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🎯 Applying custom multipliers: </span><span class="si">{</span><span class="n">custom_multipliers</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Applying custom multipliers: </span><span class="si">{</span><span class="n">custom_multipliers</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">class_id</span><span class="p">,</span> <span class="n">multiplier</span> <span class="ow">in</span> <span class="n">custom_multipliers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">class_id</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">class_id</span> <span class="o">&gt;=</span> <span class="n">num_classes</span><span class="p">:</span>
                 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Invalid class_id </span><span class="si">{</span><span class="n">class_id</span><span class="si">}</span><span class="s2">, skipping&quot;</span><span class="p">)</span>
@@ -33794,11 +33990,11 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
                 <span class="sa">f</span><span class="s2">&quot;  Class </span><span class="si">{</span><span class="n">class_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">original_weight</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> × </span><span class="si">{</span><span class="n">multiplier</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span>
             <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">ℹ️  No custom multipliers provided, using computed weights as-is&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">No custom multipliers provided, using computed weights as-is&quot;</span><span class="p">)</span>
 
     <span class="c1"># Apply maximum weight cap to prevent extreme values</span>
     <span class="n">weights_capped</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🔒 Applying maximum weight cap of </span><span class="si">{</span><span class="n">max_weight</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Applying maximum weight cap of </span><span class="si">{</span><span class="n">max_weight</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">class_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_classes</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">max_weight</span><span class="p">:</span>
             <span class="nb">print</span><span class="p">(</span>
@@ -33821,7 +34017,7 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
         <span class="p">)</span>
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ignore_index</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">ignore_index</span> <span class="o">&lt;</span> <span class="n">num_classes</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">⚠️  Note: Class </span><span class="si">{</span><span class="n">ignore_index</span><span class="si">}</span><span class="s2"> (ignore_index) has weight 0.0&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Note: Class </span><span class="si">{</span><span class="n">ignore_index</span><span class="si">}</span><span class="s2"> (ignore_index) has weight 0.0&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">weights</span>
 </code></pre></div></td></tr></table></div>
@@ -38007,7 +38203,8 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1438</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1437</span>
+<span class="normal">1438</span>
 <span class="normal">1439</span>
 <span class="normal">1440</span>
 <span class="normal">1441</span>
@@ -38204,10 +38401,7 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 <span class="normal">1632</span>
 <span class="normal">1633</span>
 <span class="normal">1634</span>
-<span class="normal">1635</span>
-<span class="normal">1636</span>
-<span class="normal">1637</span>
-<span class="normal">1638</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_sparse_iou</span><span class="p">(</span>
+<span class="normal">1635</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_sparse_iou</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -38298,11 +38492,9 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;SPARSE LABELS IoU EVALUATION&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📁 Evaluating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_files</span><span class="p">)</span><span class="si">}</span><span class="s2"> image-label pairs&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;📊 Background class: </span><span class="si">{</span><span class="n">background_class</span><span class="si">}</span><span class="s2"> (predictions here NOT penalized)&quot;</span>
-        <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📊 Number of classes: </span><span class="si">{</span><span class="n">num_classes</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Evaluating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_files</span><span class="p">)</span><span class="si">}</span><span class="s2"> image-label pairs&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Background class: </span><span class="si">{</span><span class="n">background_class</span><span class="si">}</span><span class="s2"> (predictions here NOT penalized)&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of classes: </span><span class="si">{</span><span class="n">num_classes</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Accumulate predictions and targets</span>
     <span class="n">all_preds</span> <span class="o">=</span> <span class="p">[]</span>
@@ -38390,7 +38582,7 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
     <span class="p">}</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">📊 SPARSE LABELS IoU RESULTS:&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">SPARSE LABELS IoU RESULTS:&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   (Predictions in background areas NOT counted as false positives)&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">   </span><span class="si">{</span><span class="s1">&#39;Class&#39;</span><span class="si">:</span><span class="s2">&lt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;IoU&#39;</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Recall&#39;</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Precision&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="s1">&#39;-&#39;</span><span class="o">*</span><span class="mi">36</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -38404,7 +38596,7 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
         <span class="nb">print</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="s1">&#39;MEAN&#39;</span><span class="si">:</span><span class="s2">&lt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mean_iou</span><span class="si">:</span><span class="s2">&gt;8.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mean_recall</span><span class="si">:</span><span class="s2">&gt;8.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mean_precision</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ Sparse IoU evaluation complete!&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Sparse IoU evaluation complete!&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">results</span>
@@ -47477,7 +47669,8 @@ CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">372</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
+<span class="normal">372</span>
 <span class="normal">373</span>
 <span class="normal">374</span>
 <span class="normal">375</span>
@@ -47553,8 +47746,7 @@ CUDA (NVIDIA GPU) &gt; MPS (Apple Silicon GPU) &gt; CPU</p>
 <span class="normal">445</span>
 <span class="normal">446</span>
 <span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_landcover_loss_function</span><span class="p">(</span>
+<span class="normal">448</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_landcover_loss_function</span><span class="p">(</span>
     <span class="n">loss_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;crossentropy&quot;</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
     <span class="n">ignore_index</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">100</span><span class="p">,</span>
@@ -50555,8 +50747,7 @@ dictionary mapping label names to confidence scores)</p>
 <span class="normal">365</span>
 <span class="normal">366</span>
 <span class="normal">367</span>
-<span class="normal">368</span>
-<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">landcover_iou</span><span class="p">(</span>
+<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">landcover_iou</span><span class="p">(</span>
     <span class="n">pred</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="n">target</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -50598,9 +50789,8 @@ dictionary mapping label names to confidence scores)</p>
         <span class="n">pred</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="c1"># Ensure correct shape</span>
-    <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">pred</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">target</span><span class="o">.</span><span class="n">shape</span>
-    <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Shape mismatch: pred </span><span class="si">{</span><span class="n">pred</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, target </span><span class="si">{</span><span class="n">target</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">if</span> <span class="n">pred</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">target</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape mismatch: pred </span><span class="si">{</span><span class="n">pred</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, target </span><span class="si">{</span><span class="n">target</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Create mask for valid pixels</span>
     <span class="c1"># Handle ignore_index: int means specific class, False means don&#39;t ignore</span>
@@ -61970,7 +62160,8 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">585</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">584</span>
+<span class="normal">585</span>
 <span class="normal">586</span>
 <span class="normal">587</span>
 <span class="normal">588</span>
@@ -62214,8 +62405,7 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
 <span class="normal">826</span>
 <span class="normal">827</span>
 <span class="normal">828</span>
-<span class="normal">829</span>
-<span class="normal">830</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_segmentation_landcover</span><span class="p">(</span>
+<span class="normal">829</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_segmentation_landcover</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -62388,10 +62578,10 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;✅ Created </span><span class="si">{</span><span class="n">loss_function</span><span class="si">}</span><span class="s2"> loss function with ignore_index=</span><span class="si">{</span><span class="n">ignore_idx_for_loss</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="n">loss_function</span><span class="si">}</span><span class="s2"> loss function with ignore_index=</span><span class="si">{</span><span class="n">ignore_idx_for_loss</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="n">use_class_weights</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ Class weights applied: </span><span class="si">{</span><span class="n">class_weights_tensor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Class weights applied: </span><span class="si">{</span><span class="n">class_weights_tensor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># ==========================================================================</span>
     <span class="c1"># ALL MODES: Use custom training loop with landcover_iou for model selection</span>
@@ -62408,20 +62598,20 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
         <span class="p">}</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;🎯 CUSTOM TRAINING LOOP: </span><span class="si">{</span><span class="n">mode_descriptions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">validation_iou_mode</span><span class="p">,</span><span class="w"> </span><span class="n">validation_iou_mode</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;CUSTOM TRAINING LOOP: </span><span class="si">{</span><span class="n">mode_descriptions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">validation_iou_mode</span><span class="p">,</span><span class="w"> </span><span class="n">validation_iou_mode</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">validation_iou_mode</span> <span class="o">==</span> <span class="s2">&quot;sparse_labels&quot;</span><span class="p">:</span>
             <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;📊 Background class: </span><span class="si">{</span><span class="n">background_class</span><span class="si">}</span><span class="s2"> (predictions here NOT penalized)&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Background class: </span><span class="si">{</span><span class="n">background_class</span><span class="si">}</span><span class="s2"> (predictions here NOT penalized)&quot;</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">validation_iou_mode</span> <span class="o">==</span> <span class="s2">&quot;boundary_weighted&quot;</span><span class="p">:</span>
             <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;📊 Boundary alpha: </span><span class="si">{</span><span class="n">boundary_alpha</span><span class="si">}</span><span class="s2"> (higher = more focus on boundaries)&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Boundary alpha: </span><span class="si">{</span><span class="n">boundary_alpha</span><span class="si">}</span><span class="s2"> (higher = more focus on boundaries)&quot;</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">validation_iou_mode</span> <span class="o">==</span> <span class="s2">&quot;perclass_frequency&quot;</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📊 Classes weighted by pixel frequency in dataset&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📊 Using </span><span class="si">{</span><span class="n">validation_iou_mode</span><span class="si">}</span><span class="s2"> IoU for model selection during training&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Classes weighted by pixel frequency in dataset&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="n">validation_iou_mode</span><span class="si">}</span><span class="s2"> IoU for model selection during training&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="n">model</span> <span class="o">=</span> <span class="n">_train_with_custom_iou</span><span class="p">(</span>

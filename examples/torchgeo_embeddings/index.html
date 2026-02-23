@@ -15,6 +15,10 @@
         <link rel="canonical" href="https://opengeoai.org/examples/torchgeo_embeddings/">
       
       
+        <link rel="prev" href="../tessera/">
+      
+      
+        <link rel="next" href="../building_detection_whu/">
       
       
         
@@ -451,18 +455,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
@@ -483,7 +489,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2349,6 +2355,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../moondream_sliding_window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Moondream sliding window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../AutoModel/" class="md-nav__link">
         
   
@@ -2561,6 +2595,336 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Torchgeo embeddings
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Torchgeo embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#embedding-dataset-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embedding Dataset Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#install-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Package
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import Libraries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-browse-available-embedding-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Browse Available Embedding Datasets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-download-clay-embeddings-sf-bay-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Download Clay Embeddings (SF Bay Area)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Download Clay Embeddings (SF Bay Area)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#download-all-embedding-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Download all embedding tiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extract-embedding-vectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extract embedding vectors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-visualize-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Visualize Embeddings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Visualize Embeddings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#plot-individual-embedding-vectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot individual embedding vectors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pca-projection-of-all-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PCA projection of all embeddings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-cluster-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Cluster Embeddings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-similarity-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Similarity Search
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-classification-with-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Classification with Embeddings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Classification with Embeddings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prepare-training-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare training data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#train-a-k-nn-classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train a k-NN classifier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare-different-classifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compare different classifiers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visualize-classified-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visualize classified embeddings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-comparing-embeddings-for-change-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Comparing Embeddings for Change Detection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-using-torchgeo-dataset-classes-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Using TorchGeo Dataset Classes Directly
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3101,6 +3465,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    embeddings module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../extract/" class="md-nav__link">
         
   
@@ -3137,6 +3529,62 @@
     
   
     hf module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../landcover_train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    landcover_train module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../landcover_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    landcover_utils module
   
 
     
@@ -3325,6 +3773,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../segment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    segment module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../segmentation/" class="md-nav__link">
         
   
@@ -3381,14 +3857,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../timm_train/" class="md-nav__link">
+      <a href="../../timm_regress/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    timm_train module
+    timm_regress module
   
 
     
@@ -3417,6 +3893,34 @@
     
   
     timm_segment module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../timm_train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    timm_train module
   
 
     

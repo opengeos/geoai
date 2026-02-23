@@ -45,6 +45,10 @@
          <lastmod>2026-02-23</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/embeddings/</loc>
+         <lastmod>2026-02-23</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/extract/</loc>
          <lastmod>2026-02-23</lastmod>
     </url>
@@ -62,6 +66,14 @@
     </url>
     <url>
          <loc>https://opengeoai.org/installation/</loc>
+         <lastmod>2026-02-23</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/landcover_train/</loc>
+         <lastmod>2026-02-23</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/landcover_utils/</loc>
          <lastmod>2026-02-23</lastmod>
     </url>
     <url>
@@ -102,6 +114,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/tessera/</loc>
+         <lastmod>2026-02-23</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/timm_regress/</loc>
          <lastmod>2026-02-23</lastmod>
     </url>
     <url>
