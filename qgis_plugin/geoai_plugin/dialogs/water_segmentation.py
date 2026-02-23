@@ -468,7 +468,9 @@ class WaterSegmentationDockWidget(QDockWidget):
         self.osm_water_check.setChecked(True)
         layout.addWidget(self.osm_water_check)
 
-        self.osm_building_check = QCheckBox("Use OSM Buildings (reduce false positives)")
+        self.osm_building_check = QCheckBox(
+            "Use OSM Buildings (reduce false positives)"
+        )
         self.osm_building_check.setChecked(True)
         layout.addWidget(self.osm_building_check)
 
@@ -884,9 +886,7 @@ class WaterSegmentationDockWidget(QDockWidget):
                 if vector_layer.isValid():
                     self._apply_water_vector_style(vector_layer)
                     QgsProject.instance().addMapLayer(vector_layer)
-                    self.log_message(
-                        f"Water body polygons added to map: {vector_path}"
-                    )
+                    self.log_message(f"Water body polygons added to map: {vector_path}")
                 else:
                     self.log_message(
                         f"Failed to load vector layer: {vector_path}",
