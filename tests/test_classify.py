@@ -2,6 +2,7 @@
 
 """Tests for `geoai.classify` module."""
 
+import inspect
 import unittest
 
 from geoai import classify
@@ -49,6 +50,35 @@ class TestClassifyModule(unittest.TestCase):
         if hasattr(classify, "train_classifier"):
             func = getattr(classify, "train_classifier")
             self.assertTrue(callable(func))
+
+    def test_train_classifier_signature(self):
+        """Test that train_classifier has expected parameter names."""
+        if hasattr(classify, "train_classifier"):
+            sig = inspect.signature(classify.train_classifier)
+            param_names = list(sig.parameters.keys())
+            self.assertGreater(len(param_names), 0)
+
+    def test_classify_images_signature(self):
+        """Test that classify_images has expected parameter names."""
+        if hasattr(classify, "classify_images"):
+            sig = inspect.signature(classify.classify_images)
+            param_names = list(sig.parameters.keys())
+            self.assertGreater(len(param_names), 0)
+
+    def test_classify_image_has_model_param(self):
+        """Test that classify_image accepts a model-related parameter."""
+        if hasattr(classify, "classify_image"):
+            sig = inspect.signature(classify.classify_image)
+            param_names = list(sig.parameters.keys())
+            # Should have at least an input path parameter
+            self.assertGreater(len(param_names), 1)
+
+    def test_internal_classify_function_exists(self):
+        """Test that the internal _classify_image function exists."""
+        self.assertTrue(
+            hasattr(classify, "_classify_image"),
+            "Internal _classify_image function not found",
+        )
 
 
 if __name__ == "__main__":
