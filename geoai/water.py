@@ -59,7 +59,7 @@ def _extract_water_band(src_path: str, dst_path: str) -> None:
 def _vectorize_mask(
     raster_path: str,
     output_vector: str,
-    min_area: float,
+    min_size: int,
     smooth: bool,
     smooth_iterations: int,
     overwrite: bool,
@@ -70,7 +70,7 @@ def _vectorize_mask(
     Args:
         raster_path: Path to the water mask GeoTIFF.
         output_vector: Path to save the output vector file.
-        min_area: Minimum polygon area in square map units.
+        min_size: Minimum polygon size in pixels.
         smooth: Whether to smooth polygons.
         smooth_iterations: Number of smoothing iterations.
         overwrite: Whether to overwrite existing files.
@@ -79,6 +79,8 @@ def _vectorize_mask(
     Returns:
         GeoDataFrame with vectorized water body polygons.
     """
+    import rasterio
+
     from .utils import add_geometric_properties, raster_to_vector, smooth_vector
 
     if not overwrite and Path(output_vector).exists():
@@ -86,6 +88,11 @@ def _vectorize_mask(
             f"Output vector '{output_vector}' already exists and "
             "overwrite is set to False."
         )
+
+    # Convert pixel count to area in map units
+    with rasterio.open(raster_path) as src:
+        pixel_area = abs(src.transform.a * src.transform.e)
+    min_area = min_size * pixel_area
 
     if verbose:
         print("Converting water mask to vector polygons...")
@@ -142,7 +149,7 @@ def segment_water(
     cache_dir: Optional[str] = None,
     model_dir: Optional[str] = None,
     overwrite: bool = True,
-    min_area: float = 10,
+    min_size: int = 10,
     smooth: bool = True,
     smooth_iterations: int = 3,
     verbose: bool = True,
@@ -201,8 +208,9 @@ def segment_water(
             If None, uses the default location. Defaults to None.
         overwrite: Whether to overwrite existing output files.
             Defaults to True.
-        min_area: Minimum polygon area in square map units to keep during
-            vectorization. Defaults to 10.
+        min_size: Minimum polygon size in pixels to keep during
+            vectorization. Polygons with fewer pixels are removed.
+            Defaults to 10.
         smooth: Whether to smooth vectorized polygons using the smoothify
             library. Only applies when ``output_vector`` is provided.
             Defaults to True.
@@ -245,7 +253,7 @@ def segment_water(
         ...     output_vector="water_bodies.geojson",
         ...     smooth=True,
         ...     smooth_iterations=3,
-        ...     min_area=100,
+        ...     min_size=10,
         ... )
         >>> # Batch processing multiple files
         >>> results = geoai.segment_water(
@@ -430,7 +438,7 @@ def segment_water(
             gdf = _vectorize_mask(
                 raster_path=dst_raster,
                 output_vector=vec_path,
-                min_area=min_area,
+                min_size=min_size,
                 smooth=smooth,
                 smooth_iterations=smooth_iterations,
                 overwrite=overwrite,

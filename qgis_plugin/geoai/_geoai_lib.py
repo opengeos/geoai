@@ -20,140 +20,158 @@ from typing import Optional
 import importlib
 import importlib.metadata
 import importlib.util
+import logging
 import sys
 
 _CACHED: Optional[ModuleType] = None
+_log = logging.getLogger(__name__)
 
 
-def _is_module_from_dir(mod: ModuleType, directory: Path) -> bool:
+def _is_plugin_module(mod: ModuleType) -> bool:
     """
-    Returns True if the given module's __file__ is located within the specified directory.
+    Returns True if *mod* is a QGIS plugin package rather than the external geoai library.
 
-    Returns False if the module has no __file__, or if path resolution fails (e.g., due to
-    being on different filesystems or invalid paths). Only ValueError and OSError from
-    path resolution/comparison are caught and treated as a negative result.
+    Detection uses the ``classFactory`` function that every QGIS plugin exposes in its
+    ``__init__.py``.  This is more robust than path-based checks because the plugin can
+    live at the installed QGIS plugins directory **or** inside the source repository
+    (e.g. when the repo root is on ``sys.path`` via an editable install).
     """
-    try:
-        mod_file = getattr(mod, "__file__", None)
-        if not mod_file:
-            return False
-        return Path(mod_file).resolve().is_relative_to(directory.resolve())
-    except (ValueError, OSError):
-        return False
+    return callable(getattr(mod, "classFactory", None))
 
 
-def _import_geoai_without_plugin_shadow(plugin_pkg_dir: Path) -> Optional[ModuleType]:
+def _save_geoai_modules() -> dict:
+    """Remove and return all ``geoai`` and ``geoai.*`` entries from ``sys.modules``."""
+    saved = {}
+    for key in list(sys.modules.keys()):
+        if key == "geoai" or key.startswith("geoai."):
+            saved[key] = sys.modules.pop(key)
+    return saved
+
+
+def _restore_geoai_modules(saved: dict) -> None:
+    """Remove current ``geoai`` entries from ``sys.modules`` and restore *saved* ones."""
+    for key in list(sys.modules.keys()):
+        if key == "geoai" or key.startswith("geoai."):
+            del sys.modules[key]
+    sys.modules.update(saved)
+
+
+def _find_geoai_init_from_dist(dist_name: str) -> Optional[Path]:
     """
-    Try to import `geoai` while temporarily removing the plugin path from sys.path.
+    Find the ``__init__.py`` of the external ``geoai`` package from an installed distribution.
 
-    This avoids relying on `importlib.metadata` (which can be incomplete in some QGIS
-    Python setups) and is the most direct way to bypass the shadowing.
-    """
-    plugin_parent = plugin_pkg_dir.parent
-    orig_sys_path = list(sys.path)
-    orig_geoai_mod = sys.modules.get("geoai")
-
-    try:
-        # Remove the directory that contains the plugin package named `geoai`
-        sys.path = [p for p in sys.path if Path(p).resolve() != plugin_parent.resolve()]
-
-        # Remove shadowed module entry so import attempts re-resolution
-        if "geoai" in sys.modules:
-            del sys.modules["geoai"]
-
-        imported = importlib.import_module("geoai")
-
-        # If we somehow still got the plugin, treat as failure.
-        if _is_module_from_dir(imported, plugin_pkg_dir):
-            if orig_geoai_mod is not None:
-                sys.modules["geoai"] = orig_geoai_mod
-            return None
-        return imported
-    except (ImportError, ModuleNotFoundError):
-        return None
-    finally:
-        # Restore sys.path and the original shadow module (if any)
-        sys.path = orig_sys_path
-        if orig_geoai_mod is not None:
-            sys.modules["geoai"] = orig_geoai_mod
-
-
-def _load_external_geoai_from_dist(dist_name: str) -> Optional[ModuleType]:
-    """
-    Load the external geoai package from an installed distribution.
-
-    We load it under an alias module name (geoai_external) to avoid conflicting with the
-    plugin package (which may also be named `geoai`).
+    Handles both regular and editable installs:
+    - Regular installs list all files in ``dist.files`` (RECORD).
+    - Editable installs only list the dist-info files, but register a meta-path finder
+      whose ``MAPPING`` dict contains the package directory path.
     """
     try:
         dist = importlib.metadata.distribution(dist_name)
     except importlib.metadata.PackageNotFoundError:
         return None
 
-    files = list(dist.files or [])
-    init_rel = None
-    for f in files:
-        # dist.files entries are pathlib-ish objects; compare as posix
+    # Strategy A: look in dist.files (works for regular installs)
+    for f in dist.files or []:
         if str(f).replace("\\", "/").endswith("geoai/__init__.py"):
-            init_rel = f
-            break
-    if init_rel is None:
-        return None
+            init_path = Path(dist.locate_file(f)).resolve()
+            if init_path.exists():
+                return init_path
 
-    init_path = Path(dist.locate_file(init_rel)).resolve()
+    # Strategy B: look in editable-install finder modules.
+    # Setuptools editable installs register a meta-path finder class whose *module*
+    # has a top-level MAPPING dict (e.g. {'geoai': '/path/to/geoai'}).
+    for finder in sys.meta_path:
+        finder_mod = sys.modules.get(getattr(finder, "__module__", ""), None)
+        if finder_mod is None:
+            continue
+        mapping = getattr(finder_mod, "MAPPING", None)
+        if not isinstance(mapping, dict):
+            continue
+        pkg_dir = mapping.get("geoai")
+        if pkg_dir is None:
+            continue
+        init_path = Path(pkg_dir).resolve() / "__init__.py"
+        if init_path.exists():
+            _log.debug("Found geoai via editable finder MAPPING: %s", init_path)
+            return init_path
+
+    return None
+
+
+def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
+    """
+    Load the external geoai package from an explicit ``__init__.py`` path.
+
+    The module is loaded under its real name ``geoai`` so that relative imports
+    inside the library (e.g. ``from .water import segment_water``) resolve
+    correctly.  We temporarily take over ``sys.modules["geoai"]`` during loading
+    and restore the plugin's entries afterward.
+    """
     pkg_dir = init_path.parent
 
-    alias_name = "geoai_external"
-    existing = sys.modules.get(alias_name)
-    if existing is not None:
-        return existing
+    saved = _save_geoai_modules()
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "geoai",
+            str(init_path),
+            submodule_search_locations=[str(pkg_dir)],
+        )
+        if spec is None or spec.loader is None:
+            _log.debug("spec_from_file_location returned None for %s", init_path)
+            return None
 
-    spec = importlib.util.spec_from_file_location(
-        alias_name,
-        str(init_path),
-        submodule_search_locations=[str(pkg_dir)],
-    )
-    if spec is None or spec.loader is None:
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["geoai"] = module
+        spec.loader.exec_module(module)
+
+        if _is_plugin_module(module):
+            _log.debug(
+                "Loaded module from %s is the plugin, not the library", init_path
+            )
+            return None
+
+        _log.debug("Loaded external geoai from %s", init_path)
+        return module
+    except Exception as exc:
+        _log.debug("Failed to load geoai from %s: %s", init_path, exc)
         return None
-
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[alias_name] = module
-    spec.loader.exec_module(module)
-    return module
+    finally:
+        _restore_geoai_modules(saved)
 
 
 def get_geoai() -> ModuleType:
     """
-    Return the external `geoai` library module.
+    Return the external ``geoai`` library module.
 
-    If the plugin package name shadows `geoai`, we load the external library under the
-    alias module name `geoai_external`.
+    Tries two strategies in order:
+
+    1. Normal ``import geoai`` — works when the plugin is NOT named ``geoai``.
+    2. Locate the installed distribution (``geoai-py`` or ``geoai``) via
+       ``importlib.metadata`` (including editable-install finders) and load the
+       library from its ``__init__.py`` file path.
+
+    The result is cached after the first successful resolution.
     """
     global _CACHED
     if _CACHED is not None:
         return _CACHED
 
-    plugin_dir = Path(__file__).resolve().parent
-
-    # First try a normal import. This works when the plugin package is NOT named `geoai`.
+    # Strategy 1: normal import (works when plugin package is NOT named `geoai`)
     try:
         imported = importlib.import_module("geoai")
-        # If `geoai` resolves to the plugin itself, it is shadowed.
-        if not _is_module_from_dir(imported, plugin_dir):
+        if not _is_plugin_module(imported):
             _CACHED = imported
             return imported
     except (ImportError, ModuleNotFoundError, AttributeError):
         pass
 
-    # Shadowed: try to import by temporarily removing the plugin from sys.path.
-    imported = _import_geoai_without_plugin_shadow(plugin_dir)
-    if imported is not None:
-        _CACHED = imported
-        return imported
-
-    # Shadowed: try loading from installed distributions.
+    # Strategy 2: find the external library via distribution metadata / editable
+    # finders and load it by explicit file path.
     for dist_name in ("geoai-py", "geoai"):
-        ext = _load_external_geoai_from_dist(dist_name)
+        init_path = _find_geoai_init_from_dist(dist_name)
+        if init_path is None:
+            continue
+        ext = _load_geoai_from_path(init_path)
         if ext is not None:
             _CACHED = ext
             return ext
@@ -168,5 +186,6 @@ def get_geoai() -> ModuleType:
         "In QGIS, open Python Console and run:\n"
         "  import sys, subprocess\n"
         "  subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'geoai-py'])\n"
-        "If you encounter issues, please consult the QGIS documentation for your platform regarding installing Python packages for use in QGIS.\n"
+        "If you encounter issues, please consult the QGIS documentation for your "
+        "platform regarding installing Python packages for use in QGIS.\n"
     )

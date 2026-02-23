@@ -21,7 +21,6 @@ from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDockWidget,
-    QDoubleSpinBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -109,7 +108,7 @@ class WaterSegmentationWorker(QThread):
         use_osm_water,
         use_osm_building,
         use_osm_roads,
-        min_area,
+        min_size,
         smooth,
         smooth_iterations,
     ):
@@ -129,7 +128,7 @@ class WaterSegmentationWorker(QThread):
             use_osm_water: Whether to use OSM water features.
             use_osm_building: Whether to use OSM building data.
             use_osm_roads: Whether to use OSM road data.
-            min_area: Minimum polygon area for vectorization.
+            min_size: Minimum polygon size in pixels for vectorization.
             smooth: Whether to smooth vectorized polygons.
             smooth_iterations: Number of smoothing iterations.
         """
@@ -147,7 +146,7 @@ class WaterSegmentationWorker(QThread):
         self.use_osm_water = use_osm_water
         self.use_osm_building = use_osm_building
         self.use_osm_roads = use_osm_roads
-        self.min_area = min_area
+        self.min_size = min_size
         self.smooth = smooth
         self.smooth_iterations = smooth_iterations
 
@@ -171,7 +170,7 @@ class WaterSegmentationWorker(QThread):
                 "use_osm_water": self.use_osm_water,
                 "use_osm_building": self.use_osm_building,
                 "use_osm_roads": self.use_osm_roads,
-                "min_area": self.min_area,
+                "min_size": self.min_size,
                 "smooth": self.smooth,
                 "smooth_iterations": self.smooth_iterations,
                 "overwrite": True,
@@ -195,13 +194,20 @@ class WaterSegmentationWorker(QThread):
             finally:
                 sys.stdout = old_stdout
 
-            # Determine output paths
-            output_raster = self.output_raster or ""
-            output_vector = self.output_vector or ""
-
-            # If no output_vector was set, result is the raster path string
-            if not self.output_vector and isinstance(result, str):
+            # Determine output paths.
+            # segment_water returns a raster path (str) when no vector output
+            # is requested, or a GeoDataFrame when vectorization is enabled.
+            # The raster is always produced regardless, so derive its path.
+            if isinstance(result, str):
                 output_raster = result
+            elif self.output_raster:
+                output_raster = self.output_raster
+            else:
+                # Auto-derived by segment_water: <stem>_water_mask.tif
+                stem = os.path.splitext(self.input_path)[0]
+                output_raster = f"{stem}_water_mask.tif"
+
+            output_vector = self.output_vector or ""
 
             self.finished.emit(output_raster, output_vector)
 
@@ -501,14 +507,14 @@ class WaterSegmentationDockWidget(QDockWidget):
         vec_layout.setContentsMargins(0, 0, 0, 0)
 
         # Min area
-        min_area_row = QHBoxLayout()
-        min_area_row.addWidget(QLabel("Min Area (map units²):"))
-        self.min_area_spin = QDoubleSpinBox()
-        self.min_area_spin.setRange(0.0, 100000.0)
-        self.min_area_spin.setValue(10.0)
-        self.min_area_spin.setSingleStep(5.0)
-        min_area_row.addWidget(self.min_area_spin)
-        vec_layout.addLayout(min_area_row)
+        min_size_row = QHBoxLayout()
+        min_size_row.addWidget(QLabel("Min Size (pixels):"))
+        self.min_size_spin = QSpinBox()
+        self.min_size_spin.setRange(0, 100000)
+        self.min_size_spin.setValue(10)
+        self.min_size_spin.setSingleStep(5)
+        min_size_row.addWidget(self.min_size_spin)
+        vec_layout.addLayout(min_size_row)
 
         # Smooth
         self.smooth_check = QCheckBox("Smooth polygons")
@@ -840,7 +846,7 @@ class WaterSegmentationDockWidget(QDockWidget):
             use_osm_water=self.osm_water_check.isChecked(),
             use_osm_building=self.osm_building_check.isChecked(),
             use_osm_roads=self.osm_roads_check.isChecked(),
-            min_area=self.min_area_spin.value(),
+            min_size=self.min_size_spin.value(),
             smooth=self.smooth_check.isChecked(),
             smooth_iterations=self.smooth_iterations_spin.value(),
         )
@@ -862,6 +868,7 @@ class WaterSegmentationDockWidget(QDockWidget):
         self.status_label.setStyleSheet("color: green;")
 
         if raster_path:
+            self.output_raster_edit.setText(raster_path)
             self.results_text.append(f"Raster output: {raster_path}")
         if vector_path:
             self.results_text.append(f"Vector output: {vector_path}")
