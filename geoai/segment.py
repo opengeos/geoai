@@ -21,6 +21,13 @@ from transformers import (
     pipeline,
 )
 
+__all__ = [
+    "BoundingBox",
+    "DetectionResult",
+    "GroundedSAM",
+    "CLIPSegmentation",
+]
+
 
 @dataclass
 class BoundingBox:

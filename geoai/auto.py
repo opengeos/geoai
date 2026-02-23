@@ -21,6 +21,7 @@ Example:
     >>> result = model.predict("input.tif", output_path="output.tif")
 """
 
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -54,6 +55,23 @@ from transformers.utils import logging as hf_logging
 from .utils import get_device
 
 hf_logging.set_verbosity_error()  # silence HF load reports
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "AutoGeoImageProcessor",
+    "AutoGeoModel",
+    "semantic_segmentation",
+    "depth_estimation",
+    "image_classification",
+    "object_detection",
+    "get_hf_tasks",
+    "get_hf_model_config",
+    "show_image",
+    "show_detections",
+    "show_segmentation",
+    "show_depth",
+]
 
 
 class AutoGeoImageProcessor:
@@ -151,6 +169,10 @@ class AutoGeoImageProcessor:
                     pretrained_model_name_or_path, **kwargs
                 )
             except Exception:
+                logger.debug(
+                    "AutoImageProcessor failed for %s, falling back to AutoProcessor",
+                    pretrained_model_name_or_path,
+                )
                 processor = AutoProcessor.from_pretrained(
                     pretrained_model_name_or_path, **kwargs
                 )
@@ -595,6 +617,11 @@ class AutoGeoModel:
                 use_full_processor=needs_full_processor,
             )
         except Exception:
+            logger.debug(
+                "Failed to create AutoGeoImageProcessor for %s, "
+                "proceeding without processor",
+                pretrained_model_name_or_path,
+            )
             processor = None
 
         instance = cls(
@@ -642,6 +669,11 @@ class AutoGeoModel:
             else:
                 return AutoModel.from_pretrained(model_name_or_path, **kwargs)
         except Exception:
+            logger.debug(
+                "Task-specific model loading failed for %s, "
+                "falling back to AutoModel",
+                model_name_or_path,
+            )
             return AutoModel.from_pretrained(model_name_or_path, **kwargs)
 
     def predict(
@@ -740,6 +772,10 @@ class AutoGeoModel:
                                 "height": src.height,
                             }
                     except Exception:
+                        logger.debug(
+                            "Failed to load %s as GeoTIFF, falling back to PIL",
+                            source,
+                        )
                         # Fall back to PIL for regular images
                         pil_image = Image.open(source).convert("RGB")
                         data = np.array(pil_image).transpose(2, 0, 1)
@@ -938,7 +974,7 @@ class AutoGeoModel:
                             count_output[y_start:y_end, x_start:x_end] += 1
 
                     except Exception as e:
-                        print(f"Error processing tile ({x}, {y}): {e}")
+                        logger.warning("Error processing tile (%d, %d): %s", x, y, e)
 
                     pbar.update(1)
 
@@ -1003,6 +1039,9 @@ class AutoGeoModel:
                             data = data.astype(np.uint8)
                         pil_image = Image.fromarray(data.transpose(1, 2, 0))
                 except Exception:
+                    logger.debug(
+                        "Failed to load source as GeoTIFF, falling back to PIL"
+                    )
                     pil_image = Image.open(source)
         elif isinstance(source, np.ndarray):
             if source.ndim == 3 and source.shape[0] in [1, 3, 4]:
@@ -1107,7 +1146,7 @@ class AutoGeoModel:
                         ]
             except Exception as e:
                 # Fallback for models without grounded post-processing
-                print(f"Warning: Using fallback detection processing: {e}")
+                logger.warning("Using fallback detection processing: %s", e)
                 if hasattr(outputs, "pred_boxes"):
                     boxes = outputs.pred_boxes[0].cpu().numpy()
                     logits = outputs.logits[0].cpu()
@@ -1308,7 +1347,7 @@ class AutoGeoModel:
                         values.append(value)
 
         except Exception as e:
-            print(f"Error during vectorization: {e}")
+            logger.warning("Error during vectorization: %s", e)
             return None
 
         if not polygons:
@@ -1685,7 +1724,7 @@ def _load_image_for_display(
                     img = img.astype(np.uint8)
                 return img, metadata
         except Exception:
-            pass
+            logger.debug("Failed to load %s as GeoTIFF with rasterio", source)
 
         # Try as regular image
         img = np.array(Image.open(source).convert("RGB"))

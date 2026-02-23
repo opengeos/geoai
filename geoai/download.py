@@ -1,6 +1,7 @@
 """This module provides functions to download data, including NAIP imagery and building data from Overture Maps."""
 
 import datetime
+import json
 import logging
 import os
 import subprocess

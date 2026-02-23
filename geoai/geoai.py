@@ -3,6 +3,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+import torch
+
 logging.getLogger("maplibre").setLevel(logging.ERROR)
 
 import leafmap

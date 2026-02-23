@@ -26,6 +26,10 @@ from rasterio import features
 from rasterio.windows import Window
 from tqdm import tqdm
 
+__all__ = [
+    "export_landcover_tiles",
+]
+
 
 def export_landcover_tiles(
     in_raster: str,
