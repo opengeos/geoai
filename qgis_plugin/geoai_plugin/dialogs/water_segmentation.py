@@ -502,7 +502,7 @@ class WaterSegmentationDockWidget(QDockWidget):
 
         # Min area
         min_area_row = QHBoxLayout()
-        min_area_row.addWidget(QLabel("Min Area (m²):"))
+        min_area_row.addWidget(QLabel("Min Area (map units²):"))
         self.min_area_spin = QDoubleSpinBox()
         self.min_area_spin.setRange(0.0, 100000.0)
         self.min_area_spin.setValue(10.0)
