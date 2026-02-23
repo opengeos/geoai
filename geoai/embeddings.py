@@ -39,6 +39,23 @@ import torch
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "list_embedding_datasets",
+    "load_embedding_dataset",
+    "get_embedding_info",
+    "extract_patch_embeddings",
+    "extract_pixel_embeddings",
+    "visualize_embeddings",
+    "plot_embedding_vector",
+    "plot_embedding_raster",
+    "cluster_embeddings",
+    "embedding_similarity",
+    "train_embedding_classifier",
+    "compare_embeddings",
+    "embedding_to_geotiff",
+    "EMBEDDING_DATASETS",
+]
+
 # ---------------------------------------------------------------------------
 # Embedding dataset registry
 # ---------------------------------------------------------------------------

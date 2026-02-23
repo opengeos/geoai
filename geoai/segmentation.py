@@ -75,12 +75,13 @@ class CustomDataset(Dataset):
             image = transformed["image"]
             mask = transformed["mask"]
 
-        assert (
-            mask.max() < self.num_classes
-        ), f"Mask values should be less than {self.num_classes}, but found {mask.max()}"
-        assert (
-            mask.min() >= 0
-        ), f"Mask values should be greater than or equal to 0, but found {mask.min()}"
+        if mask.max() >= self.num_classes:
+            raise ValueError(
+                f"Mask values should be less than {self.num_classes}, "
+                f"but found {mask.max()}"
+            )
+        if mask.min() < 0:
+            raise ValueError(f"Mask values should be >= 0, but found {mask.min()}")
 
         mask = mask.clone().detach().long()
 

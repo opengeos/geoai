@@ -174,9 +174,8 @@ def landcover_iou(
         pred = torch.argmax(pred, dim=1)
 
     # Ensure correct shape
-    assert (
-        pred.shape == target.shape
-    ), f"Shape mismatch: pred {pred.shape}, target {target.shape}"
+    if pred.shape != target.shape:
+        raise ValueError(f"Shape mismatch: pred {pred.shape}, target {target.shape}")
 
     # Create mask for valid pixels
     # Handle ignore_index: int means specific class, False means don't ignore
@@ -538,7 +537,7 @@ def compute_class_weights(
 
     # Apply custom multipliers if provided
     if custom_multipliers:
-        print(f"\n🎯 Applying custom multipliers: {custom_multipliers}")
+        print(f"\nApplying custom multipliers: {custom_multipliers}")
         for class_id, multiplier in custom_multipliers.items():
             if class_id < 0 or class_id >= num_classes:
                 print(f"Warning: Invalid class_id {class_id}, skipping")
@@ -550,11 +549,11 @@ def compute_class_weights(
                 f"  Class {class_id}: {original_weight:.4f} × {multiplier} = {weights[class_id].item():.4f}"
             )
     else:
-        print("\nℹ️  No custom multipliers provided, using computed weights as-is")
+        print("\nNo custom multipliers provided, using computed weights as-is")
 
     # Apply maximum weight cap to prevent extreme values
     weights_capped = False
-    print(f"\n🔒 Applying maximum weight cap of {max_weight}...")
+    print(f"\nApplying maximum weight cap of {max_weight}...")
     for class_id in range(num_classes):
         if weights[class_id] > max_weight:
             print(
@@ -577,7 +576,7 @@ def compute_class_weights(
         )
 
     if isinstance(ignore_index, int) and 0 <= ignore_index < num_classes:
-        print(f"\n⚠️  Note: Class {ignore_index} (ignore_index) has weight 0.0")
+        print(f"\nNote: Class {ignore_index} (ignore_index) has weight 0.0")
 
     return weights
 
@@ -755,10 +754,10 @@ def train_segmentation_landcover(
 
     if verbose:
         print(
-            f"✅ Created {loss_function} loss function with ignore_index={ignore_idx_for_loss}"
+            f"Created {loss_function} loss function with ignore_index={ignore_idx_for_loss}"
         )
         if use_class_weights:
-            print(f"✅ Class weights applied: {class_weights_tensor}")
+            print(f"Class weights applied: {class_weights_tensor}")
 
     # ==========================================================================
     # ALL MODES: Use custom training loop with landcover_iou for model selection
@@ -775,20 +774,20 @@ def train_segmentation_landcover(
         }
         print("\n" + "=" * 60)
         print(
-            f"🎯 CUSTOM TRAINING LOOP: {mode_descriptions.get(validation_iou_mode, validation_iou_mode)}"
+            f"CUSTOM TRAINING LOOP: {mode_descriptions.get(validation_iou_mode, validation_iou_mode)}"
         )
         print("=" * 60)
         if validation_iou_mode == "sparse_labels":
             print(
-                f"📊 Background class: {background_class} (predictions here NOT penalized)"
+                f"Background class: {background_class} (predictions here NOT penalized)"
             )
         elif validation_iou_mode == "boundary_weighted":
             print(
-                f"📊 Boundary alpha: {boundary_alpha} (higher = more focus on boundaries)"
+                f"Boundary alpha: {boundary_alpha} (higher = more focus on boundaries)"
             )
         elif validation_iou_mode == "perclass_frequency":
-            print(f"📊 Classes weighted by pixel frequency in dataset")
-        print(f"📊 Using {validation_iou_mode} IoU for model selection during training")
+            print("Classes weighted by pixel frequency in dataset")
+        print(f"Using {validation_iou_mode} IoU for model selection during training")
         print("=" * 60 + "\n")
 
     model = _train_with_custom_iou(
@@ -1141,13 +1140,13 @@ def _train_with_custom_iou(
     # Enable cuDNN auto-tuner for optimal conv algorithms (fixed input size)
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
-        print("⚡ cuDNN benchmark mode enabled")
+        print("cuDNN benchmark mode enabled")
 
     # Setup mixed precision training (AMP) for ~2x speedup
     use_amp = torch.cuda.is_available()
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
     if use_amp:
-        print("⚡ Mixed precision training (AMP) enabled")
+        print("Mixed precision training (AMP) enabled")
 
     print(f"Starting training with {architecture} + {encoder_name}")
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
@@ -1193,7 +1192,7 @@ def _train_with_custom_iou(
         "sparse_labels": f"SPARSE LABELS (bg={background_class} ignored)",
     }
     print(
-        f"\n🚀 Starting training with {mode_labels.get(validation_iou_mode, validation_iou_mode)} IoU..."
+        f"\nStarting training with {mode_labels.get(validation_iou_mode, validation_iou_mode)} IoU..."
     )
 
     for epoch in range(start_epoch, num_epochs):
@@ -1354,7 +1353,7 @@ def _train_with_custom_iou(
         # Save best model based on validation IoU
         if val_iou > best_iou:
             best_iou = val_iou
-            print(f"🎯 New best model! {iou_display}")
+            print(f"New best model! {iou_display}")
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
 
         # Save checkpoint every 10 epochs if not save_best_only
@@ -1388,8 +1387,8 @@ def _train_with_custom_iou(
     }
     iou_label = mode_labels.get(validation_iou_mode, validation_iou_mode)
 
-    print(f"\n✅ Training complete! Best {iou_label}: {best_iou:.4f}")
-    print(f"📁 Best model saved to: {os.path.join(output_dir, 'best_model.pth')}")
+    print(f"\nTraining complete! Best {iou_label}: {best_iou:.4f}")
+    print(f"Best model saved to: {os.path.join(output_dir, 'best_model.pth')}")
 
     # Plot training curves if requested
     if plot_curves:
@@ -1421,7 +1420,7 @@ def _train_with_custom_iou(
             plt.savefig(os.path.join(output_dir, plot_filename), dpi=150)
             plt.show()
             print(
-                f"📊 Training curves saved to: {os.path.join(output_dir, plot_filename)}"
+                f"Training curves saved to: {os.path.join(output_dir, plot_filename)}"
             )
         except Exception as e:
             print(f"Warning: Could not plot training curves: {e}")
@@ -1430,7 +1429,7 @@ def _train_with_custom_iou(
     best_model_path = os.path.join(output_dir, "best_model.pth")
     if os.path.exists(best_model_path):
         model.load_state_dict(torch.load(best_model_path, map_location=device))
-        print(f"✅ Loaded best model ({iou_label}: {best_iou:.4f})")
+        print(f"Loaded best model ({iou_label}: {best_iou:.4f})")
 
     return model
 
@@ -1526,11 +1525,9 @@ def evaluate_sparse_iou(
         print(f"\n{'='*60}")
         print("SPARSE LABELS IoU EVALUATION")
         print(f"{'='*60}")
-        print(f"📁 Evaluating {len(image_files)} image-label pairs")
-        print(
-            f"📊 Background class: {background_class} (predictions here NOT penalized)"
-        )
-        print(f"📊 Number of classes: {num_classes}")
+        print(f"Evaluating {len(image_files)} image-label pairs")
+        print(f"Background class: {background_class} (predictions here NOT penalized)")
+        print(f"Number of classes: {num_classes}")
 
     # Accumulate predictions and targets
     all_preds = []
@@ -1618,7 +1615,7 @@ def evaluate_sparse_iou(
     }
 
     if verbose:
-        print(f"\n📊 SPARSE LABELS IoU RESULTS:")
+        print("\nSPARSE LABELS IoU RESULTS:")
         print(f"   (Predictions in background areas NOT counted as false positives)")
         print(f"\n   {'Class':<8} {'IoU':>8} {'Recall':>8} {'Precision':>10}")
         print(f"   {'-'*36}")
@@ -1632,7 +1629,7 @@ def evaluate_sparse_iou(
         print(
             f"   {'MEAN':<8} {mean_iou:>8.4f} {mean_recall:>8.4f} {mean_precision:>10.4f}"
         )
-        print(f"\n✅ Sparse IoU evaluation complete!")
+        print("\nSparse IoU evaluation complete!")
         print(f"{'='*60}\n")
 
     return results

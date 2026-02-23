@@ -1,0 +1,3 @@
+# embeddings module
+
+::: geoai.embeddings
