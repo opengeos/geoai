@@ -1,0 +1,3 @@
+# cli module
+
+::: geoai.cli
