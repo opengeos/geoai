@@ -31,7 +31,7 @@ from qgis.PyQt.QtGui import QFont
 # GitHub URLs for the plugin
 GITHUB_REPO = "opengeos/geoai"
 GITHUB_BRANCH = "main"
-PLUGIN_PATH = "qgis_plugin/geoai_plugin"
+PLUGIN_PATH = "qgis_plugin/geoai"
 METADATA_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{PLUGIN_PATH}/metadata.txt"
 ZIP_URL = f"https://github.com/{GITHUB_REPO}/archive/refs/heads/{GITHUB_BRANCH}.zip"
 
@@ -126,7 +126,7 @@ class DownloadWorker(QThread):
             self.progress.emit(70, "Locating plugin files...")
 
             # Find the plugin directory in the extracted files
-            # The structure will be: geoai-main/qgis_plugin/geoai_plugin/
+            # The structure will be: geoai-main/qgis_plugin/geoai/
             extracted_plugin_dir = None
             for root, dirs, files in os.walk(extract_dir):
                 if "metadata.txt" in files and "geoai_plugin.py" in files:

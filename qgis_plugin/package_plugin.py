@@ -3,7 +3,7 @@
 Package the GeoAI QGIS plugin for upload to the official QGIS plugin repository.
 
 This script creates a zip file with the following characteristics:
-- Root folder renamed from 'geoai_plugin' to 'geoai'
+- Root folder in zip named 'geoai'
 - Excludes generated files (ui_*.py, resources_rc.py, etc.)
 - Excludes __MACOSX, .git, __pycache__, and other hidden directories
 - Excludes .pyc files and other compiled Python files
@@ -106,7 +106,7 @@ def package_plugin(
     Package the QGIS plugin into a zip file.
 
     Args:
-        source_dir: Path to the geoai_plugin directory
+        source_dir: Path to the geoai plugin directory
         output_path: Optional path for the output zip file
         target_name: Name for the root folder in the zip (default: 'geoai')
         include_version: Whether to include version in the zip filename
@@ -247,7 +247,7 @@ def main():
         "-s",
         type=Path,
         default=None,
-        help="Source directory (default: geoai_plugin in the same folder as this script)",
+        help="Source directory (default: geoai in the same folder as this script)",
     )
     parser.add_argument(
         "--no-version",
@@ -264,7 +264,7 @@ def main():
 
     # Determine source directory
     script_dir = Path(__file__).parent.resolve()
-    source_dir = args.source if args.source else script_dir / "geoai_plugin"
+    source_dir = args.source if args.source else script_dir / "geoai"
 
     try:
         # Create the package

@@ -53,7 +53,7 @@ def install_plugin(source_dir: Path, plugin_dir: Path) -> bool:
     Returns:
         True if installation was successful, False otherwise.
     """
-    target_dir = plugin_dir / "geoai_plugin"
+    target_dir = plugin_dir / "geoai"
 
     # Create plugin directory if it doesn't exist
     plugin_dir.mkdir(parents=True, exist_ok=True)
@@ -79,7 +79,7 @@ def remove_plugin(plugin_dir: Path) -> bool:
     Returns:
         True if removal was successful, False otherwise.
     """
-    target_dir = plugin_dir / "geoai_plugin"
+    target_dir = plugin_dir / "geoai"
 
     if target_dir.exists():
         print(f"Removing plugin: {target_dir}")
@@ -108,7 +108,7 @@ def main():
 
     # Get script directory
     script_dir = Path(__file__).parent.resolve()
-    source_dir = script_dir / "geoai_plugin"
+    source_dir = script_dir / "geoai"
 
     if not source_dir.exists():
         print(f"Error: Plugin source directory not found: {source_dir}")
