@@ -2,7 +2,7 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model for image captioning, querying, object detection, and semantic segmentation model training and inference.
-version=0.6.0
+version=0.7.0
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -42,6 +42,8 @@ experimental=False
 deprecated=False
 
 changelog=
+    0.7.0
+        - Add instance segmentation panel to QGIS plugin (#550)
     0.6.0
         - Add Water Segmentation panel to QGIS plugin (#545)
         - Fix SAM3 load in QGIS when pkg_resources is unavailable (#530)
