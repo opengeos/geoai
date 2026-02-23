@@ -1,8 +1,8 @@
 """
-Semantic Segmentation Dock Widget for GeoAI Plugin
+Instance Segmentation Dock Widget for GeoAI Plugin
 
-This dock widget provides an interface for training semantic segmentation models
-and running inference, combined in a single dockable panel.
+This dock widget provides an interface for training Mask R-CNN instance
+segmentation models and running inference, combined in a single dockable panel.
 """
 
 import os
@@ -29,6 +29,7 @@ from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QTabWidget,
     QScrollArea,
+    QSplitter,
 )
 
 from qgis.core import QgsProject, QgsVectorLayer, QgsRasterLayer
@@ -63,8 +64,8 @@ class OutputCapture:
             self.buffer = ""
 
 
-class TrainingWorker(QThread):
-    """Worker thread for training segmentation models."""
+class InstanceTrainingWorker(QThread):
+    """Worker thread for training Mask R-CNN instance segmentation models."""
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
@@ -76,9 +77,6 @@ class TrainingWorker(QThread):
         images_dir: str,
         labels_dir: str,
         output_dir: str,
-        architecture: str,
-        encoder_name: str,
-        encoder_weights: str,
         num_channels: int,
         num_classes: int,
         batch_size: int,
@@ -86,15 +84,12 @@ class TrainingWorker(QThread):
         learning_rate: float,
         val_split: float,
         input_format: str = "directory",
-        plot_curves: bool = False,
+        visualize: bool = False,
     ):
         super().__init__()
         self.images_dir = images_dir
         self.labels_dir = labels_dir
         self.output_dir = output_dir
-        self.architecture = architecture
-        self.encoder_name = encoder_name
-        self.encoder_weights = encoder_weights
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.batch_size = batch_size
@@ -102,7 +97,7 @@ class TrainingWorker(QThread):
         self.learning_rate = learning_rate
         self.val_split = val_split
         self.input_format = input_format
-        self.plot_curves = plot_curves
+        self.visualize = visualize
         self._epoch_pattern = None
 
     def _parse_output_line(self, line: str):
@@ -111,17 +106,15 @@ class TrainingWorker(QThread):
 
         if self._epoch_pattern is None:
             self._epoch_pattern = re.compile(
-                r"Epoch (\d+)/(\d+): Train Loss: ([\d.]+), Val Loss: ([\d.]+), "
-                r"Val IoU: ([\d.]+), Val F1: ([\d.]+)"
+                r"Epoch (\d+)/(\d+): Train Loss: ([\d.]+|inf), "
+                r"Val Loss: ([\d.]+|inf), Val IoU: ([\d.]+|inf)"
             )
 
         match = self._epoch_pattern.search(line)
         if match:
             current_epoch = int(match.group(1))
             total_epochs = int(match.group(2))
-            metrics = (
-                f"Loss: {match.group(3)}, IoU: {match.group(5)}, F1: {match.group(6)}"
-            )
+            metrics = f"Loss: {match.group(3)}, IoU: {match.group(5)}"
             self.epoch_progress.emit(current_epoch, total_epochs, metrics)
 
     def run(self):
@@ -133,31 +126,26 @@ class TrainingWorker(QThread):
 
             geoai = get_geoai()
 
-            self.progress.emit("Starting training...")
+            self.progress.emit("Starting Mask R-CNN training...")
 
             # Capture stdout to parse epoch progress in real-time
             old_stdout = sys.stdout
             sys.stdout = OutputCapture(self._parse_output_line, old_stdout)
 
             try:
-                geoai.train_segmentation_model(
+                geoai.train_instance_segmentation_model(
                     images_dir=self.images_dir,
                     labels_dir=self.labels_dir,
                     output_dir=self.output_dir,
                     input_format=self.input_format,
-                    architecture=self.architecture,
-                    encoder_name=self.encoder_name,
-                    encoder_weights=(
-                        self.encoder_weights if self.encoder_weights != "None" else None
-                    ),
                     num_channels=self.num_channels,
                     num_classes=self.num_classes,
                     batch_size=self.batch_size,
                     num_epochs=self.num_epochs,
                     learning_rate=self.learning_rate,
                     val_split=self.val_split,
+                    visualize=self.visualize,
                     verbose=True,
-                    plot_curves=self.plot_curves,
                 )
             finally:
                 sys.stdout = old_stdout
@@ -171,7 +159,7 @@ class TrainingWorker(QThread):
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
-class TileExportWorker(QThread):
+class InstanceTileExportWorker(QThread):
     """Worker thread for exporting training tiles."""
 
     finished = pyqtSignal(str)
@@ -224,8 +212,8 @@ class TileExportWorker(QThread):
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
-class InferenceWorker(QThread):
-    """Worker thread for running segmentation inference."""
+class InstanceInferenceWorker(QThread):
+    """Worker thread for running instance segmentation inference."""
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
@@ -236,58 +224,57 @@ class InferenceWorker(QThread):
         input_path: str,
         output_path: str,
         model_path: str,
-        architecture: str,
-        encoder_name: str,
         num_channels: int,
         num_classes: int,
         window_size: int,
         overlap: int,
+        confidence_threshold: float,
         batch_size: int,
-        probability_path: Optional[str] = None,
-        probability_threshold: Optional[float] = None,
     ):
         super().__init__()
         self.input_path = input_path
         self.output_path = output_path
         self.model_path = model_path
-        self.architecture = architecture
-        self.encoder_name = encoder_name
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.window_size = window_size
         self.overlap = overlap
+        self.confidence_threshold = confidence_threshold
         self.batch_size = batch_size
-        self.probability_path = probability_path
-        self.probability_threshold = probability_threshold
+
+    def _forward_line(self, line: str):
+        """Forward stdout lines as progress messages."""
+        self.progress.emit(line)
 
     def run(self):
         """Execute the inference."""
+        import sys
+
         try:
             from .._geoai_lib import get_geoai
 
             geoai = get_geoai()
 
-            self.progress.emit("Running inference...")
+            self.progress.emit("Running instance segmentation inference...")
 
-            kwargs = {}
-            if self.probability_path:
-                kwargs["probability_path"] = self.probability_path
-            if self.probability_threshold is not None:
-                kwargs["probability_threshold"] = self.probability_threshold
+            # Capture stdout to forward progress messages to the log
+            old_stdout = sys.stdout
+            sys.stdout = OutputCapture(self._forward_line, old_stdout)
 
-            geoai.semantic_segmentation(
-                input_path=self.input_path,
-                output_path=self.output_path,
-                model_path=self.model_path,
-                architecture=self.architecture,
-                encoder_name=self.encoder_name,
-                num_channels=self.num_channels,
-                num_classes=self.num_classes,
-                window_size=self.window_size,
-                overlap=self.overlap,
-                batch_size=self.batch_size,
-                **kwargs,
-            )
+            try:
+                geoai.instance_segmentation(
+                    input_path=self.input_path,
+                    output_path=self.output_path,
+                    model_path=self.model_path,
+                    num_channels=self.num_channels,
+                    num_classes=self.num_classes,
+                    window_size=self.window_size,
+                    overlap=self.overlap,
+                    confidence_threshold=self.confidence_threshold,
+                    batch_size=self.batch_size,
+                )
+            finally:
+                sys.stdout = old_stdout
 
             self.finished.emit(self.output_path)
 
@@ -391,7 +378,7 @@ class SmoothVectorWorker(QThread):
             )
 
             # Apply smoothing
-            smoothed_gdf = geoai.smooth_vector(
+            geoai.smooth_vector(
                 gdf,
                 smooth_iterations=self.smooth_iterations,
                 output_path=self.output_path,
@@ -405,17 +392,17 @@ class SmoothVectorWorker(QThread):
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
-class SegmentationDockWidget(QDockWidget):
-    """Dockable widget for segmentation training and inference."""
+class InstanceSegmentationDockWidget(QDockWidget):
+    """Dockable widget for instance segmentation training and inference."""
 
     def __init__(self, iface, parent=None):
-        """Initialize the segmentation dock widget.
+        """Initialize the instance segmentation dock widget.
 
         Args:
             iface: QGIS interface instance.
             parent: Parent widget.
         """
-        super().__init__("GeoAI - Semantic Segmentation", parent)
+        super().__init__("GeoAI - Instance Segmentation", parent)
         self.iface = iface
         self.train_worker = None
         self.tile_worker = None
@@ -437,15 +424,18 @@ class SegmentationDockWidget(QDockWidget):
         self.btn_style = f"QPushButton {{ min-height: {self.input_height}px; max-height: {self.input_height}px; }}"
         self.spin_style = f"QSpinBox, QDoubleSpinBox {{ min-height: {self.input_height}px; max-height: {self.input_height}px; }}"
 
-        # Main scroll area
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # Vertical splitter: tabs on top, log on bottom (user can drag to resize)
+        splitter = QSplitter(Qt.Vertical)
 
-        main_widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(5)
+        # Top part: scrollable tabs
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        tab_container = QWidget()
+        tab_layout = QVBoxLayout()
+        tab_layout.setContentsMargins(5, 5, 5, 5)
+        tab_layout.setSpacing(5)
 
         # Tab widget
         self.tab_widget = QTabWidget()
@@ -465,21 +455,26 @@ class SegmentationDockWidget(QDockWidget):
         self.setup_inference_tab()
         self.tab_widget.addTab(self.inference_tab, "3. Inference")
 
-        layout.addWidget(self.tab_widget)
+        tab_layout.addWidget(self.tab_widget)
+        tab_container.setLayout(tab_layout)
+        self.scroll_area.setWidget(tab_container)
+        splitter.addWidget(self.scroll_area)
 
-        # Log output
+        # Bottom part: log output (resizable via splitter)
         log_group = QGroupBox("Log")
         log_layout = QVBoxLayout()
+        log_layout.setContentsMargins(5, 2, 5, 2)
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(120)
         log_layout.addWidget(self.log_text)
         log_group.setLayout(log_layout)
-        layout.addWidget(log_group)
+        splitter.addWidget(log_group)
 
-        main_widget.setLayout(layout)
-        scroll.setWidget(main_widget)
-        self.setWidget(scroll)
+        # Give tabs ~70% and log ~30% of available space
+        splitter.setStretchFactor(0, 7)
+        splitter.setStretchFactor(1, 3)
+
+        self.setWidget(splitter)
 
         self.setMinimumWidth(350)
 
@@ -640,83 +635,26 @@ class SegmentationDockWidget(QDockWidget):
         data_group.setLayout(data_layout)
         layout.addWidget(data_group)
 
-        # Model Architecture Group
-        arch_group = QGroupBox("Model")
-        arch_layout = QFormLayout()
-        arch_layout.setSpacing(5)
-
-        self.architecture_combo = QComboBox()
-        self.architecture_combo.setStyleSheet(self.combo_style)
-        self.architecture_combo.addItems(
-            [
-                "unet",
-                "unetplusplus",
-                "deeplabv3",
-                "deeplabv3plus",
-                "fpn",
-                "pspnet",
-                "linknet",
-                "manet",
-                "pan",
-                "upernet",
-                "segformer",
-            ]
-        )
-        arch_layout.addRow("Architecture:", self.architecture_combo)
-
-        self.encoder_combo = QComboBox()
-        self.encoder_combo.setStyleSheet(self.combo_style)
-        self.encoder_combo.addItems(
-            [
-                "resnet18",
-                "resnet34",
-                "resnet50",
-                "resnet101",
-                "resnet152",
-                "resnext50_32x4d",
-                "resnext101_32x4d",
-                "efficientnet-b0",
-                "efficientnet-b1",
-                "efficientnet-b2",
-                "efficientnet-b3",
-                "efficientnet-b4",
-                "efficientnet-b5",
-                "mobilenet_v2",
-                "mobileone_s0",
-                "mobileone_s1",
-                "vgg16",
-                "vgg19",
-                "densenet121",
-                "densenet169",
-                "mit_b0",
-                "mit_b1",
-                "mit_b2",
-            ]
-        )
-        self.encoder_combo.setCurrentText("resnet34")
-        arch_layout.addRow("Encoder:", self.encoder_combo)
-
-        self.encoder_weights_combo = QComboBox()
-        self.encoder_weights_combo.setStyleSheet(self.combo_style)
-        self.encoder_weights_combo.addItems(
-            ["imagenet", "ssl", "swsl", "advprop", "noisy-student", "None"]
-        )
-        arch_layout.addRow("Weights:", self.encoder_weights_combo)
+        # Model Settings Group
+        model_group = QGroupBox("Model (Mask R-CNN)")
+        model_layout = QFormLayout()
+        model_layout.setSpacing(5)
 
         self.num_channels_spin = QSpinBox()
         self.num_channels_spin.setRange(1, 12)
         self.num_channels_spin.setValue(3)
         self.num_channels_spin.setStyleSheet(self.spin_style)
-        arch_layout.addRow("Channels:", self.num_channels_spin)
+        model_layout.addRow("Channels:", self.num_channels_spin)
 
         self.num_classes_spin = QSpinBox()
         self.num_classes_spin.setRange(2, 100)
         self.num_classes_spin.setValue(2)
         self.num_classes_spin.setStyleSheet(self.spin_style)
-        arch_layout.addRow("Classes:", self.num_classes_spin)
+        self.num_classes_spin.setToolTip("Number of classes including background")
+        model_layout.addRow("Classes:", self.num_classes_spin)
 
-        arch_group.setLayout(arch_layout)
-        layout.addWidget(arch_group)
+        model_group.setLayout(model_layout)
+        layout.addWidget(model_group)
 
         # Training Parameters Group
         params_group = QGroupBox("Parameters")
@@ -724,22 +662,22 @@ class SegmentationDockWidget(QDockWidget):
         params_layout.setSpacing(5)
 
         self.batch_size_spin = QSpinBox()
-        self.batch_size_spin.setRange(1, 64)
-        self.batch_size_spin.setValue(8)
+        self.batch_size_spin.setRange(1, 32)
+        self.batch_size_spin.setValue(4)
         self.batch_size_spin.setStyleSheet(self.spin_style)
         params_layout.addRow("Batch Size:", self.batch_size_spin)
 
         self.epochs_spin = QSpinBox()
         self.epochs_spin.setRange(1, 1000)
-        self.epochs_spin.setValue(50)
+        self.epochs_spin.setValue(10)
         self.epochs_spin.setStyleSheet(self.spin_style)
         params_layout.addRow("Epochs:", self.epochs_spin)
 
         self.learning_rate_spin = QDoubleSpinBox()
-        self.learning_rate_spin.setDecimals(6)  # Must set decimals before setValue
+        self.learning_rate_spin.setDecimals(6)
         self.learning_rate_spin.setRange(0.00001, 1.0)
-        self.learning_rate_spin.setValue(0.001)
-        self.learning_rate_spin.setSingleStep(0.0001)
+        self.learning_rate_spin.setValue(0.005)
+        self.learning_rate_spin.setSingleStep(0.001)
         self.learning_rate_spin.setStyleSheet(self.spin_style)
         params_layout.addRow("LR:", self.learning_rate_spin)
 
@@ -768,9 +706,9 @@ class SegmentationDockWidget(QDockWidget):
         model_output_layout.addWidget(self.model_output_browse_btn)
         output_layout.addRow("Output:", model_output_layout)
 
-        self.plot_curves_check = QCheckBox("Save training curves plot")
-        self.plot_curves_check.setChecked(True)
-        output_layout.addRow("", self.plot_curves_check)
+        self.visualize_check = QCheckBox("Save prediction visualizations")
+        self.visualize_check.setChecked(False)
+        output_layout.addRow("", self.visualize_check)
 
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
@@ -832,57 +770,6 @@ class SegmentationDockWidget(QDockWidget):
         model_path_layout.addWidget(self.model_browse_btn)
         model_layout.addRow("Model:", model_path_layout)
 
-        self.inf_architecture_combo = QComboBox()
-        self.inf_architecture_combo.setStyleSheet(self.combo_style)
-        self.inf_architecture_combo.addItems(
-            [
-                "unet",
-                "unetplusplus",
-                "deeplabv3",
-                "deeplabv3plus",
-                "fpn",
-                "pspnet",
-                "linknet",
-                "manet",
-                "pan",
-                "upernet",
-                "segformer",
-            ]
-        )
-        model_layout.addRow("Arch:", self.inf_architecture_combo)
-
-        self.inf_encoder_combo = QComboBox()
-        self.inf_encoder_combo.setStyleSheet(self.combo_style)
-        self.inf_encoder_combo.addItems(
-            [
-                "resnet18",
-                "resnet34",
-                "resnet50",
-                "resnet101",
-                "resnet152",
-                "resnext50_32x4d",
-                "resnext101_32x4d",
-                "efficientnet-b0",
-                "efficientnet-b1",
-                "efficientnet-b2",
-                "efficientnet-b3",
-                "efficientnet-b4",
-                "efficientnet-b5",
-                "mobilenet_v2",
-                "mobileone_s0",
-                "mobileone_s1",
-                "vgg16",
-                "vgg19",
-                "densenet121",
-                "densenet169",
-                "mit_b0",
-                "mit_b1",
-                "mit_b2",
-            ]
-        )
-        self.inf_encoder_combo.setCurrentText("resnet34")
-        model_layout.addRow("Encoder:", self.inf_encoder_combo)
-
         self.inf_num_channels_spin = QSpinBox()
         self.inf_num_channels_spin.setRange(1, 12)
         self.inf_num_channels_spin.setValue(3)
@@ -915,22 +802,20 @@ class SegmentationDockWidget(QDockWidget):
         self.overlap_spin.setStyleSheet(self.spin_style)
         settings_layout.addRow("Overlap:", self.overlap_spin)
 
+        self.confidence_spin = QDoubleSpinBox()
+        self.confidence_spin.setRange(0.0, 1.0)
+        self.confidence_spin.setValue(0.5)
+        self.confidence_spin.setDecimals(2)
+        self.confidence_spin.setSingleStep(0.05)
+        self.confidence_spin.setStyleSheet(self.spin_style)
+        self.confidence_spin.setToolTip("Confidence threshold for detections")
+        settings_layout.addRow("Confidence:", self.confidence_spin)
+
         self.inf_batch_size_spin = QSpinBox()
         self.inf_batch_size_spin.setRange(1, 64)
         self.inf_batch_size_spin.setValue(4)
         self.inf_batch_size_spin.setStyleSheet(self.spin_style)
         settings_layout.addRow("Batch:", self.inf_batch_size_spin)
-
-        self.threshold_check = QCheckBox("Use threshold")
-        settings_layout.addRow("", self.threshold_check)
-
-        self.threshold_spin = QDoubleSpinBox()
-        self.threshold_spin.setRange(0.0, 1.0)
-        self.threshold_spin.setValue(0.5)
-        self.threshold_spin.setDecimals(2)
-        self.threshold_spin.setEnabled(False)
-        self.threshold_spin.setStyleSheet(self.spin_style)
-        settings_layout.addRow("Threshold:", self.threshold_spin)
 
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
@@ -953,22 +838,6 @@ class SegmentationDockWidget(QDockWidget):
         self.add_to_map_check = QCheckBox("Add result to map")
         self.add_to_map_check.setChecked(True)
         output_layout.addRow("", self.add_to_map_check)
-
-        self.save_probability_check = QCheckBox("Save probability map")
-        self.save_probability_check.setChecked(False)
-        output_layout.addRow("", self.save_probability_check)
-
-        prob_output_layout = QHBoxLayout()
-        self.probability_path_edit = QLineEdit()
-        self.probability_path_edit.setPlaceholderText("Probability output path...")
-        self.probability_path_edit.setStyleSheet(self.line_style)
-        self.probability_path_edit.setEnabled(False)
-        prob_output_layout.addWidget(self.probability_path_edit)
-        self.probability_browse_btn = QPushButton("...")
-        self.probability_browse_btn.setFixedSize(30, self.input_height)
-        self.probability_browse_btn.setEnabled(False)
-        prob_output_layout.addWidget(self.probability_browse_btn)
-        output_layout.addRow("Prob:", prob_output_layout)
 
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
@@ -1031,7 +900,7 @@ class SegmentationDockWidget(QDockWidget):
         self.min_area_spin = QDoubleSpinBox()
         self.min_area_spin.setRange(0.0, 10000.0)
         self.min_area_spin.setValue(0.0)
-        self.min_area_spin.setSuffix(" m²")
+        self.min_area_spin.setSuffix(" m\u00b2")
         self.min_area_spin.setStyleSheet(self.spin_style)
         vectorize_layout.addRow("Min Area:", self.min_area_spin)
 
@@ -1074,21 +943,18 @@ class SegmentationDockWidget(QDockWidget):
         self.train_btn.clicked.connect(self.start_training)
 
         # Inference tab
+        self.inf_raster_layer_combo.layerChanged.connect(
+            self.on_inf_raster_layer_changed
+        )
+        self.inf_raster_path_edit.textChanged.connect(self.on_inf_raster_path_changed)
         self.inf_raster_browse_btn.clicked.connect(self.browse_inf_raster)
         self.model_browse_btn.clicked.connect(self.browse_model)
         self.output_browse_btn.clicked.connect(self.browse_output)
         self.vector_output_browse_btn.clicked.connect(self.browse_vector_output)
-        self.threshold_check.toggled.connect(self.threshold_spin.setEnabled)
-        self.save_probability_check.toggled.connect(self.on_probability_check_toggled)
-        self.probability_browse_btn.clicked.connect(self.browse_probability)
         self.run_inference_btn.clicked.connect(self.run_inference)
         self.vectorize_btn.clicked.connect(self.vectorize_mask)
 
-        # Sync architecture and encoder between train and inference tabs
-        self.architecture_combo.currentTextChanged.connect(
-            self.sync_architecture_to_inference
-        )
-        self.encoder_combo.currentTextChanged.connect(self.sync_encoder_to_inference)
+        # Sync model settings between train and inference tabs
         self.num_channels_spin.valueChanged.connect(self.sync_channels_to_inference)
         self.num_classes_spin.valueChanged.connect(self.sync_classes_to_inference)
 
@@ -1125,15 +991,23 @@ class SegmentationDockWidget(QDockWidget):
             if layer and not self.output_path_edit.text():
                 source = layer.source()
                 base, ext = os.path.splitext(source)
-                self.output_path_edit.setText(f"{base}_segmentation.tif")
+                self.output_path_edit.setText(f"{base}_instance_seg.tif")
 
-    def sync_architecture_to_inference(self, text):
-        """Sync architecture selection to inference tab."""
-        self.inf_architecture_combo.setCurrentText(text)
+    def _update_output_from_source(self, source: str):
+        """Update output path based on a raster source path."""
+        if source:
+            base, _ = os.path.splitext(source)
+            self.output_path_edit.setText(f"{base}_instance_seg.tif")
 
-    def sync_encoder_to_inference(self, text):
-        """Sync encoder selection to inference tab."""
-        self.inf_encoder_combo.setCurrentText(text)
+    def on_inf_raster_layer_changed(self, layer):
+        """Update output path when the inference raster layer changes."""
+        if layer and not self.inf_raster_path_edit.text():
+            self._update_output_from_source(layer.source())
+
+    def on_inf_raster_path_changed(self, text):
+        """Update output path when the inference raster path changes."""
+        if text:
+            self._update_output_from_source(text)
 
     def sync_channels_to_inference(self, value):
         """Sync channels to inference tab."""
@@ -1151,6 +1025,7 @@ class SegmentationDockWidget(QDockWidget):
 
     # Browse methods
     def browse_raster(self):
+        """Browse for a raster file."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)"
         )
@@ -1158,6 +1033,7 @@ class SegmentationDockWidget(QDockWidget):
             self.raster_path_edit.setText(file_path)
 
     def browse_vector(self):
+        """Browse for a vector file."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp);;All (*)"
         )
@@ -1165,26 +1041,31 @@ class SegmentationDockWidget(QDockWidget):
             self.vector_path_edit.setText(file_path)
 
     def browse_tile_output(self):
+        """Browse for tile output directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
             self.tile_output_dir_edit.setText(dir_path)
 
     def browse_images_dir(self):
+        """Browse for images directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Images Directory")
         if dir_path:
             self.images_dir_edit.setText(dir_path)
 
     def browse_labels_dir(self):
+        """Browse for labels directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Labels Directory")
         if dir_path:
             self.labels_dir_edit.setText(dir_path)
 
     def browse_model_output(self):
+        """Browse for model output directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
             self.model_output_dir_edit.setText(dir_path)
 
     def browse_inf_raster(self):
+        """Browse for inference input raster."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)"
         )
@@ -1192,6 +1073,7 @@ class SegmentationDockWidget(QDockWidget):
             self.inf_raster_path_edit.setText(file_path)
 
     def browse_model(self):
+        """Browse for a trained model file."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Model", "", "PyTorch Model (*.pth *.pt);;All (*)"
         )
@@ -1199,6 +1081,7 @@ class SegmentationDockWidget(QDockWidget):
             self.model_path_edit.setText(file_path)
 
     def browse_output(self):
+        """Browse for inference output path."""
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Output", "", "GeoTIFF (*.tif)"
         )
@@ -1208,6 +1091,7 @@ class SegmentationDockWidget(QDockWidget):
             self.output_path_edit.setText(file_path)
 
     def browse_vector_output(self):
+        """Browse for vector output path."""
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp)"
         )
@@ -1226,28 +1110,9 @@ class SegmentationDockWidget(QDockWidget):
         self.smooth_iterations_spin.setVisible(is_smooth)
         self._smooth_iterations_label.setVisible(is_smooth)
 
-    def on_probability_check_toggled(self, checked):
-        """Enable/disable probability path input based on checkbox."""
-        self.probability_path_edit.setEnabled(checked)
-        self.probability_browse_btn.setEnabled(checked)
-        # Auto-generate probability path from output path
-        if checked and not self.probability_path_edit.text():
-            output_path = self.output_path_edit.text()
-            if output_path:
-                base, ext = os.path.splitext(output_path)
-                self.probability_path_edit.setText(f"{base}_probability{ext}")
-
-    def browse_probability(self):
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Probability Map", "", "GeoTIFF (*.tif)"
-        )
-        if file_path:
-            if not file_path.endswith(".tif"):
-                file_path += ".tif"
-            self.probability_path_edit.setText(file_path)
-
     # Export tiles
     def export_tiles(self):
+        """Export training tiles from raster and vector data."""
         raster_layer = self.raster_layer_combo.currentLayer()
         raster_path = (
             raster_layer.source()
@@ -1273,7 +1138,7 @@ class SegmentationDockWidget(QDockWidget):
         export_format = self.tile_export_format_combo.currentText()
         self.log(f"Starting tile export in {export_format} format...")
 
-        self.tile_worker = TileExportWorker(
+        self.tile_worker = InstanceTileExportWorker(
             raster_path,
             vector_path,
             output_dir,
@@ -1288,6 +1153,7 @@ class SegmentationDockWidget(QDockWidget):
         self.tile_worker.start()
 
     def on_tile_export_finished(self, output_dir: str):
+        """Handle tile export completion."""
         self.tile_progress.setRange(0, 100)
         self.tile_progress.setValue(100)
         self.export_tiles_btn.setEnabled(True)
@@ -1314,6 +1180,7 @@ class SegmentationDockWidget(QDockWidget):
         )
 
     def on_tile_export_error(self, error: str):
+        """Handle tile export error."""
         self.tile_progress.setRange(0, 100)
         self.tile_progress.setValue(0)
         self.export_tiles_btn.setEnabled(True)
@@ -1322,6 +1189,7 @@ class SegmentationDockWidget(QDockWidget):
 
     # Training
     def start_training(self):
+        """Start Mask R-CNN training."""
         images_dir = self.images_dir_edit.text()
         labels_dir = self.labels_dir_edit.text()
         output_dir = self.model_output_dir_edit.text()
@@ -1335,17 +1203,15 @@ class SegmentationDockWidget(QDockWidget):
         self.train_progress.setRange(0, num_epochs)
         self.train_progress.setValue(0)
         self.train_progress.setFormat("Epoch %v/%m")
-        self.log(f"Starting training: {self.architecture_combo.currentText()}")
-        self.log(f"  Encoder: {self.encoder_combo.currentText()}")
+        self.log("Starting Mask R-CNN training...")
+        self.log(f"  Channels: {self.num_channels_spin.value()}")
+        self.log(f"  Classes: {self.num_classes_spin.value()}")
         self.log(f"  Epochs: {num_epochs}, Batch size: {self.batch_size_spin.value()}")
 
-        self.train_worker = TrainingWorker(
+        self.train_worker = InstanceTrainingWorker(
             images_dir,
             labels_dir,
             output_dir,
-            self.architecture_combo.currentText(),
-            self.encoder_combo.currentText(),
-            self.encoder_weights_combo.currentText(),
             self.num_channels_spin.value(),
             self.num_classes_spin.value(),
             self.batch_size_spin.value(),
@@ -1353,7 +1219,7 @@ class SegmentationDockWidget(QDockWidget):
             self.learning_rate_spin.value(),
             self.val_split_spin.value(),
             self.input_format_combo.currentText(),
-            self.plot_curves_check.isChecked(),
+            self.visualize_check.isChecked(),
         )
         self.train_worker.finished.connect(self.on_training_finished)
         self.train_worker.error.connect(self.on_training_error)
@@ -1367,6 +1233,7 @@ class SegmentationDockWidget(QDockWidget):
         self.log(f"Epoch {current_epoch}/{total_epochs}: {metrics}")
 
     def on_training_finished(self, model_path: str):
+        """Handle training completion."""
         self.train_progress.setValue(self.train_progress.maximum())
         self.train_progress.setFormat("Complete")
         self.train_btn.setEnabled(True)
@@ -1389,23 +1256,12 @@ class SegmentationDockWidget(QDockWidget):
                 pass
 
         self.log(f"Model saved to: {model_path}")
-
-        # Check for training curves plot
-        if self.plot_curves_check.isChecked():
-            curves_path = os.path.join(output_dir, "training_curves.png")
-            if os.path.exists(curves_path):
-                self.log(f"Training curves saved to: {curves_path}")
-
         self.log("=" * 40)
 
         # Auto-fill inference tab
         self.model_path_edit.setText(model_path)
 
         # Sync model settings to inference tab
-        self.inf_architecture_combo.setCurrentText(
-            self.architecture_combo.currentText()
-        )
-        self.inf_encoder_combo.setCurrentText(self.encoder_combo.currentText())
         self.inf_num_channels_spin.setValue(self.num_channels_spin.value())
         self.inf_num_classes_spin.setValue(self.num_classes_spin.value())
 
@@ -1419,6 +1275,7 @@ class SegmentationDockWidget(QDockWidget):
         )
 
     def on_training_error(self, error: str):
+        """Handle training error."""
         self.train_progress.setRange(0, 100)
         self.train_progress.setValue(0)
         self.train_progress.setFormat("")
@@ -1428,6 +1285,7 @@ class SegmentationDockWidget(QDockWidget):
 
     # Inference
     def run_inference(self):
+        """Run instance segmentation inference."""
         layer = self.inf_raster_layer_combo.currentLayer()
         input_path = (
             layer.source()
@@ -1444,34 +1302,18 @@ class SegmentationDockWidget(QDockWidget):
 
         self.run_inference_btn.setEnabled(False)
         self.inference_progress.setRange(0, 0)
-        self.log("Starting inference...")
+        self.log("Starting instance segmentation inference...")
 
-        threshold = (
-            self.threshold_spin.value() if self.threshold_check.isChecked() else None
-        )
-
-        probability_path = None
-        if self.save_probability_check.isChecked():
-            probability_path = self.probability_path_edit.text()
-            if not probability_path:
-                # Auto-generate from output path
-                base, ext = os.path.splitext(output_path)
-                probability_path = f"{base}_probability{ext}"
-                self.probability_path_edit.setText(probability_path)
-
-        self.inference_worker = InferenceWorker(
+        self.inference_worker = InstanceInferenceWorker(
             input_path,
             output_path,
             model_path,
-            self.inf_architecture_combo.currentText(),
-            self.inf_encoder_combo.currentText(),
             self.inf_num_channels_spin.value(),
             self.inf_num_classes_spin.value(),
             self.window_size_spin.value(),
             self.overlap_spin.value(),
+            self.confidence_spin.value(),
             self.inf_batch_size_spin.value(),
-            probability_path=probability_path,
-            probability_threshold=threshold,
         )
         self.inference_worker.finished.connect(self.on_inference_finished)
         self.inference_worker.error.connect(self.on_inference_error)
@@ -1479,34 +1321,58 @@ class SegmentationDockWidget(QDockWidget):
         self.inference_worker.start()
 
     def on_inference_finished(self, output_path: str):
+        """Handle inference completion."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(100)
         self.run_inference_btn.setEnabled(True)
         self.vectorize_btn.setEnabled(True)
         self.last_output_path = output_path
 
-        self.log(f"Inference complete: {output_path}")
+        self.log(f"Instance segmentation complete: {output_path}")
 
-        # Log probability path if saved
-        if self.save_probability_check.isChecked():
-            prob_path = self.probability_path_edit.text()
-            if prob_path and os.path.exists(prob_path):
-                self.log(f"Probability map saved: {prob_path}")
+        # Check if result contains any instances
+        num_instances = 0
+        try:
+            import numpy as np
+
+            try:
+                import rasterio
+
+                with rasterio.open(output_path) as src:
+                    data = src.read(1)
+                    num_instances = int(data.max())
+                    self.log(f"Detected instances: {num_instances}")
+            except ImportError:
+                pass
+        except Exception:
+            pass
 
         if self.add_to_map_check.isChecked():
-            layer = QgsRasterLayer(output_path, "Semantic Segmentation Result")
+            layer = QgsRasterLayer(output_path, "Instance Segmentation Result")
             if layer.isValid():
                 QgsProject.instance().addMapLayer(layer)
                 self.iface.mapCanvas().refresh()
 
-        message = f"Output saved to:\n{output_path}"
-        if self.save_probability_check.isChecked():
-            prob_path = self.probability_path_edit.text()
-            message += f"\n\nProbability map:\n{prob_path}"
-
-        QMessageBox.information(self, "Success", message)
+        if num_instances == 0:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                f"Output saved to:\n{output_path}\n\n"
+                "No instances were detected. Try:\n"
+                "- Lowering the confidence threshold\n"
+                "- Using a model trained on similar data\n"
+                "- Checking that num_classes and num_channels match the trained model",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Output saved to:\n{output_path}\n\n"
+                f"Detected {num_instances} instances.",
+            )
 
     def on_inference_error(self, error: str):
+        """Handle inference error."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(0)
         self.run_inference_btn.setEnabled(True)
@@ -1515,6 +1381,7 @@ class SegmentationDockWidget(QDockWidget):
 
     # Vectorize
     def vectorize_mask(self):
+        """Vectorize the inference output mask."""
         mask_path = self.last_output_path or self.output_path_edit.text()
         vector_output = self.vector_output_edit.text()
 
@@ -1563,6 +1430,7 @@ class SegmentationDockWidget(QDockWidget):
             self.vectorize_worker.start()
 
     def on_vectorize_finished(self, output_path: str):
+        """Handle vectorization completion."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(100)
         self.vectorize_btn.setEnabled(True)
@@ -1578,6 +1446,7 @@ class SegmentationDockWidget(QDockWidget):
         QMessageBox.information(self, "Success", f"Saved to:\n{output_path}")
 
     def on_vectorize_error(self, error: str):
+        """Handle vectorization error."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(0)
         self.vectorize_btn.setEnabled(True)

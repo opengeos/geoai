@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Individual instance shapes with distinct colors and dashed outlines -->
+  <rect x="2" y="3" width="8" height="7" fill="#e74c3c" fill-opacity="0.7" stroke="#c0392b" stroke-width="1" rx="1"/>
+  <rect x="11" y="2" width="11" height="8" fill="#3498db" fill-opacity="0.7" stroke="#2980b9" stroke-width="1" rx="1"/>
+  <rect x="2" y="13" width="10" height="9" fill="#f39c12" fill-opacity="0.7" stroke="#e67e22" stroke-width="1" rx="1"/>
+  <rect x="14" y="12" width="8" height="10" fill="#27ae60" fill-opacity="0.7" stroke="#1e8449" stroke-width="1" rx="1"/>
+</svg>

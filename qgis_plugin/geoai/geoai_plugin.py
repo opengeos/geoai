@@ -30,6 +30,7 @@ class GeoAIPlugin:
         # Dock widgets (lazy loaded)
         self._moondream_dock = None
         self._segmentation_dock = None
+        self._instance_segmentation_dock = None
         self._samgeo_dock = None
         self._deepforest_dock = None
         self._water_segmentation_dock = None
@@ -126,12 +127,26 @@ class GeoAIPlugin:
             parent=self.iface.mainWindow(),
         )
 
-        # Add Segmentation action (checkable for dock toggle)
+        # Add Semantic Segmentation action (checkable for dock toggle)
         self.segmentation_action = self.add_action(
             segment_icon,
-            "Segmentation",
+            "Semantic Segmentation",
             self.toggle_segmentation_dock,
-            status_tip="Toggle Segmentation Training & Inference panel",
+            status_tip="Toggle Semantic Segmentation Training & Inference panel",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add Instance Segmentation action (checkable for dock toggle)
+        instance_seg_icon = os.path.join(icon_base, "instance_segmentation.svg")
+        if not os.path.exists(instance_seg_icon):
+            instance_seg_icon = ":/images/themes/default/mIconPolygonLayer.svg"
+
+        self.instance_segmentation_action = self.add_action(
+            instance_seg_icon,
+            "Instance Segmentation",
+            self.toggle_instance_segmentation_dock,
+            status_tip="Toggle Instance Segmentation panel (Mask R-CNN training & inference)",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
@@ -241,6 +256,11 @@ class GeoAIPlugin:
             self._water_segmentation_dock.deleteLater()
             self._water_segmentation_dock = None
 
+        if self._instance_segmentation_dock:
+            self.iface.removeDockWidget(self._instance_segmentation_dock)
+            self._instance_segmentation_dock.deleteLater()
+            self._instance_segmentation_dock = None
+
         # Remove actions from menu
         for action in self.actions:
             self.iface.removePluginMenu("&GeoAI", action)
@@ -292,7 +312,7 @@ class GeoAIPlugin:
         self.moondream_action.setChecked(visible)
 
     def toggle_segmentation_dock(self):
-        """Toggle the Segmentation dock widget visibility."""
+        """Toggle the Semantic Segmentation dock widget visibility."""
         if self._segmentation_dock is None:
             try:
                 from .dialogs.segmentation import SegmentationDockWidget
@@ -315,7 +335,7 @@ class GeoAIPlugin:
                 QMessageBox.critical(
                     self.iface.mainWindow(),
                     "Error",
-                    f"Failed to create Segmentation panel:\n{str(e)}",
+                    f"Failed to create Semantic Segmentation panel:\n{str(e)}",
                 )
                 self.segmentation_action.setChecked(False)
                 return
@@ -328,7 +348,7 @@ class GeoAIPlugin:
             self._segmentation_dock.raise_()
 
     def _on_segmentation_visibility_changed(self, visible):
-        """Handle Segmentation dock visibility change."""
+        """Handle Semantic Segmentation dock visibility change."""
         self.segmentation_action.setChecked(visible)
 
     def toggle_samgeo_dock(self):
@@ -450,6 +470,50 @@ class GeoAIPlugin:
     def _on_water_segmentation_visibility_changed(self, visible):
         """Handle Water Segmentation dock visibility change."""
         self.water_segmentation_action.setChecked(visible)
+
+    def toggle_instance_segmentation_dock(self):
+        """Toggle the Instance Segmentation dock widget visibility."""
+        if self._instance_segmentation_dock is None:
+            try:
+                from .dialogs.instance_segmentation import (
+                    InstanceSegmentationDockWidget,
+                )
+
+                self._instance_segmentation_dock = InstanceSegmentationDockWidget(
+                    self.iface, self.iface.mainWindow()
+                )
+                self._instance_segmentation_dock.setObjectName(
+                    "GeoAIInstanceSegmentationDock"
+                )
+                self._instance_segmentation_dock.visibilityChanged.connect(
+                    self._on_instance_segmentation_visibility_changed
+                )
+                self.iface.addDockWidget(
+                    Qt.RightDockWidgetArea, self._instance_segmentation_dock
+                )
+                self._instance_segmentation_dock.show()
+                self._instance_segmentation_dock.raise_()
+                return
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self.iface.mainWindow(),
+                    "Error",
+                    f"Failed to create Instance Segmentation panel:\n{str(e)}",
+                )
+                self.instance_segmentation_action.setChecked(False)
+                return
+
+        # Toggle visibility
+        if self._instance_segmentation_dock.isVisible():
+            self._instance_segmentation_dock.hide()
+        else:
+            self._instance_segmentation_dock.show()
+            self._instance_segmentation_dock.raise_()
+
+    def _on_instance_segmentation_visibility_changed(self, visible):
+        """Handle Instance Segmentation dock visibility change."""
+        self.instance_segmentation_action.setChecked(visible)
 
     def clear_gpu_memory(self):
         """Clear GPU memory and release CUDA resources."""
@@ -704,6 +768,7 @@ class GeoAIPlugin:
 <ul>
 <li><b>Moondream Vision-Language Model:</b> AI-powered image captioning, querying, object detection, and point localization</li>
 <li><b>Semantic Segmentation:</b> Train and run inference with deep learning models (U-Net, DeepLabV3+, FPN, etc.)</li>
+<li><b>Instance Segmentation:</b> Train and run Mask R-CNN models for instance-level object detection and segmentation</li>
 <li><b>SamGeo:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
 <li><b>DeepForest:</b> Tree crown detection and forest analysis using pretrained deep learning models</li>
 <li><b>Water Segmentation:</b> Water body detection from satellite/aerial imagery using OmniWaterMask</li>
