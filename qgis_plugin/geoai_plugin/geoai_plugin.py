@@ -32,6 +32,7 @@ class GeoAIPlugin:
         self._segmentation_dock = None
         self._samgeo_dock = None
         self._deepforest_dock = None
+        self._water_segmentation_dock = None
 
     def add_action(
         self,
@@ -155,6 +156,20 @@ class GeoAIPlugin:
             parent=self.iface.mainWindow(),
         )
 
+        # Add Water Segmentation action (checkable for dock toggle)
+        water_icon = os.path.join(icon_base, "water.svg")
+        if not os.path.exists(water_icon):
+            water_icon = ":/images/themes/default/mIconPolygonLayer.svg"
+
+        self.water_segmentation_action = self.add_action(
+            water_icon,
+            "Water Segmentation",
+            self.toggle_water_segmentation_dock,
+            status_tip="Toggle Water Segmentation panel (OmniWaterMask water body detection)",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
         # Add separator to toolbar
         self.toolbar.addSeparator()
 
@@ -220,6 +235,11 @@ class GeoAIPlugin:
             self.iface.removeDockWidget(self._deepforest_dock)
             self._deepforest_dock.deleteLater()
             self._deepforest_dock = None
+
+        if self._water_segmentation_dock:
+            self.iface.removeDockWidget(self._water_segmentation_dock)
+            self._water_segmentation_dock.deleteLater()
+            self._water_segmentation_dock = None
 
         # Remove actions from menu
         for action in self.actions:
@@ -386,6 +406,50 @@ class GeoAIPlugin:
     def _on_deepforest_visibility_changed(self, visible):
         """Handle DeepForest dock visibility change."""
         self.deepforest_action.setChecked(visible)
+
+    def toggle_water_segmentation_dock(self):
+        """Toggle the Water Segmentation dock widget visibility."""
+        if self._water_segmentation_dock is None:
+            try:
+                from .dialogs.water_segmentation import (
+                    WaterSegmentationDockWidget,
+                )
+
+                self._water_segmentation_dock = WaterSegmentationDockWidget(
+                    self.iface, self.iface.mainWindow()
+                )
+                self._water_segmentation_dock.setObjectName(
+                    "GeoAIWaterSegmentationDock"
+                )
+                self._water_segmentation_dock.visibilityChanged.connect(
+                    self._on_water_segmentation_visibility_changed
+                )
+                self.iface.addDockWidget(
+                    Qt.RightDockWidgetArea, self._water_segmentation_dock
+                )
+                self._water_segmentation_dock.show()
+                self._water_segmentation_dock.raise_()
+                return
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self.iface.mainWindow(),
+                    "Error",
+                    f"Failed to create Water Segmentation panel:\n{str(e)}",
+                )
+                self.water_segmentation_action.setChecked(False)
+                return
+
+        # Toggle visibility
+        if self._water_segmentation_dock.isVisible():
+            self._water_segmentation_dock.hide()
+        else:
+            self._water_segmentation_dock.show()
+            self._water_segmentation_dock.raise_()
+
+    def _on_water_segmentation_visibility_changed(self, visible):
+        """Handle Water Segmentation dock visibility change."""
+        self.water_segmentation_action.setChecked(visible)
 
     def clear_gpu_memory(self):
         """Clear GPU memory and release CUDA resources."""
@@ -642,6 +706,7 @@ class GeoAIPlugin:
 <li><b>Semantic Segmentation:</b> Train and run inference with deep learning models (U-Net, DeepLabV3+, FPN, etc.)</li>
 <li><b>SamGeo:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
 <li><b>DeepForest:</b> Tree crown detection and forest analysis using pretrained deep learning models</li>
+<li><b>Water Segmentation:</b> Water body detection from satellite/aerial imagery using OmniWaterMask</li>
 </ul>
 
 <h3>Links:</h3>
