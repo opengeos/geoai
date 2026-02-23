@@ -2493,6 +2493,9 @@ def raster_to_vector(
             masks = {1: (data > threshold)}
             class_values = [1]  # Default class
 
+        # Check if CRS is geographic (area in sq degrees, not sq meters)
+        is_geographic = crs is not None and crs.is_geographic
+
         # Initialize list to store features
         all_features = []
 
@@ -2507,8 +2510,8 @@ def raster_to_vector(
                 # Convert to shapely geometry
                 geom = shape(geom)
 
-                # Skip small polygons
-                if geom.area < min_area:
+                # Skip small polygons (area check deferred for geographic CRS)
+                if not is_geographic and geom.area < min_area:
                     continue
 
                 # Simplify geometry if requested
@@ -2532,6 +2535,12 @@ def raster_to_vector(
             print("Warning: No features were extracted from the raster.")
             # Return empty GeoDataFrame with correct CRS
             gdf = gpd.GeoDataFrame([], geometry=[], crs=crs)
+
+        # For geographic CRS, filter by area using a projected CRS
+        if is_geographic and min_area > 0 and len(gdf) > 0:
+            utm_crs = gdf.estimate_utm_crs()
+            projected_area = gdf.to_crs(utm_crs).geometry.area
+            gdf = gdf[projected_area >= min_area].reset_index(drop=True)
 
         # Save to file if requested
         if output_path is not None:

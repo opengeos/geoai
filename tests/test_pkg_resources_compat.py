@@ -9,7 +9,7 @@ import sys
 
 def _load_compat_module():
     root = Path(__file__).resolve().parents[1]
-    module_path = root / "qgis_plugin" / "geoai_plugin" / "_pkg_resources_compat.py"
+    module_path = root / "qgis_plugin" / "geoai" / "_pkg_resources_compat.py"
     spec = importlib.util.spec_from_file_location(
         "_pkg_resources_compat_test", module_path
     )

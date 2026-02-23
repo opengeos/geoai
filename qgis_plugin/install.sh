@@ -10,7 +10,7 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
     PLUGIN_DIR="$APPDATA/QGIS/QGIS3/profiles/default/python/plugins"
 else
     echo "Unknown OS type: $OSTYPE"
-    echo "Please manually copy the geoai_plugin folder to your QGIS plugins directory."
+    echo "Please manually copy the geoai folder to your QGIS plugins directory."
     exit 1
 fi
 
@@ -21,14 +21,14 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 mkdir -p "$PLUGIN_DIR"
 
 # Remove existing installation
-if [ -d "$PLUGIN_DIR/geoai_plugin" ]; then
+if [ -d "$PLUGIN_DIR/geoai" ]; then
     echo "Removing existing installation..."
-    rm -rf "$PLUGIN_DIR/geoai_plugin"
+    rm -rf "$PLUGIN_DIR/geoai"
 fi
 
 # Copy plugin
 echo "Installing GeoAI plugin to: $PLUGIN_DIR"
-cp -r "$SCRIPT_DIR/geoai_plugin" "$PLUGIN_DIR/"
+cp -r "$SCRIPT_DIR/geoai" "$PLUGIN_DIR/"
 
 echo ""
 echo "Installation complete!"
