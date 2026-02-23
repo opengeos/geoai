@@ -31,6 +31,17 @@ except ImportError as e:
         "Your torchgeo version is too old. Please upgrade to the latest version using 'pip install -U torchgeo'."
     )
 
+__all__ = [
+    "CustomDataset",
+    "ObjectDetector",
+    "BuildingFootprintExtractor",
+    "CarDetector",
+    "ShipDetector",
+    "SolarPanelDetector",
+    "ParkingSplotDetector",
+    "AgricultureFieldDelineator",
+]
+
 
 class CustomDataset(NonGeoDataset):
     """

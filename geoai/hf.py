@@ -11,6 +11,13 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForMaskedImageModeling, pipeline
 
+__all__ = [
+    "get_model_config",
+    "get_model_input_channels",
+    "image_segmentation",
+    "mask_generation",
+]
+
 
 def get_model_config(
     model_id: str,
