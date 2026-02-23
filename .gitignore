@@ -141,3 +141,4 @@ ENV/
 .DS_Store
 CLAUDE.md
 lightning_logs/
+TASKS.md

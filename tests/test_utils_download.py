@@ -13,7 +13,7 @@ from geoai import utils
 class TestDownloadFile(unittest.TestCase):
     """Tests for the download_file function."""
 
-    @patch("geoai.utils.requests.get")
+    @patch("geoai.utils.download.requests.get")
     def test_successful_download(self, mock_get):
         """Test download_file with a mocked successful response."""
         mock_response = MagicMock()
@@ -32,7 +32,7 @@ class TestDownloadFile(unittest.TestCase):
                 # Function may have different error handling; that's OK
                 pass
 
-    @patch("geoai.utils.requests.get")
+    @patch("geoai.utils.download.requests.get")
     def test_download_with_http_error(self, mock_get):
         """Test download_file handles HTTP errors gracefully."""
         mock_get.side_effect = Exception("Connection error")

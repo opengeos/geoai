@@ -39,7 +39,7 @@ jobs:
             - name: Install optional dependencies
               run: |
                   uv pip install --find-links https://girder.github.io/large_image_wheels gdal pyproj
-                  uv pip install pytest
+                  uv pip install pytest pytest-cov
                   uv pip install "geoai-py[extra]"
 
             - name: Test import
@@ -51,4 +51,4 @@ jobs:
             - name: Running pytest
               run: |
                   export PYTHONPATH=$(pwd)
-                  uv run pytest tests --verbose
+                  uv run pytest tests --verbose --cov=geoai --cov-report=term
