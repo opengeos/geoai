@@ -196,6 +196,7 @@ nav:
           - canopy module: canopy.md
           - change_detection module: change_detection.md
           - classify module: classify.md
+          - cli module: cli.md
           - detectron2 module: detectron2.md
           - DINOv3 module: dinov3.md
           - geo_agents module: geo_agents.md

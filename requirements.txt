@@ -1,4 +1,5 @@
 albumentations
+click
 contextily
 datasets>=3.0
 geopandas
