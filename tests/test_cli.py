@@ -38,16 +38,12 @@ class TestCLI(unittest.TestCase):
 
     def test_info_raster(self):
         """Test info command with a raster file."""
-        result = self.runner.invoke(
-            main, ["info", self.test_paths["test_raster_rgb"]]
-        )
+        result = self.runner.invoke(main, ["info", self.test_paths["test_raster_rgb"]])
         self.assertEqual(result.exit_code, 0)
 
     def test_info_vector(self):
         """Test info command with a vector file."""
-        result = self.runner.invoke(
-            main, ["info", self.test_paths["test_polygons"]]
-        )
+        result = self.runner.invoke(main, ["info", self.test_paths["test_polygons"]])
         self.assertEqual(result.exit_code, 0)
 
     def test_info_nonexistent_file(self):
