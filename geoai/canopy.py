@@ -38,6 +38,14 @@ except ImportError:
         "Please install it: pip install rasterio"
     )
 
+__all__ = [
+    "CanopyHeightEstimation",
+    "canopy_height_estimation",
+    "list_canopy_models",
+    "MODEL_VARIANTS",
+    "DEFAULT_CACHE_DIR",
+]
+
 # ---------------------------------------------------------------------------
 # Model architecture components vendored from Meta's HighResCanopyHeight
 # (Apache License 2.0). Adapted for standalone use without external deps.
@@ -61,6 +69,8 @@ def _resize(
 
 
 class _Mlp(nn.Module):
+    """MLP block with GELU activation and optional dropout."""
+
     def __init__(self, in_features, hidden_features=None, out_features=None, drop=0.0):
         super().__init__()
         out_features = out_features or in_features
@@ -80,6 +90,8 @@ class _Mlp(nn.Module):
 
 
 class _Attention(nn.Module):
+    """Multi-head self-attention module."""
+
     def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0.0, proj_drop=0.0):
         super().__init__()
         self.num_heads = num_heads
@@ -108,6 +120,8 @@ class _Attention(nn.Module):
 
 
 class _LayerScale(nn.Module):
+    """Per-channel learnable scaling layer."""
+
     def __init__(self, dim, init_values=1e-5):
         super().__init__()
         self.gamma = nn.Parameter(init_values * torch.ones(dim))
@@ -117,6 +131,8 @@ class _LayerScale(nn.Module):
 
 
 class _Block(nn.Module):
+    """Transformer block with attention, MLP, and optional layer scale."""
+
     def __init__(
         self,
         dim,
@@ -159,6 +175,8 @@ class _Block(nn.Module):
 
 
 class _PatchEmbed(nn.Module):
+    """Patch embedding using 2D convolution."""
+
     def __init__(
         self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, norm_layer=None
     ):
@@ -189,6 +207,8 @@ class _PatchEmbed(nn.Module):
 
 
 class _AdaptivePadding(nn.Module):
+    """Adaptive padding to ensure input is divisible by kernel size."""
+
     def __init__(self, kernel_size=1, stride=1, padding="corner"):
         super().__init__()
         if isinstance(kernel_size, int):
@@ -424,6 +444,8 @@ def _kaiming_init(module, a=0, mode="fan_out", nonlinearity="relu", bias=0):
 
 
 class _ConvModule(nn.Module):
+    """Convolution module with optional activation and Kaiming initialization."""
+
     def __init__(
         self,
         in_channels,
@@ -482,6 +504,8 @@ class _ConvModule(nn.Module):
 
 
 class _Interpolate(nn.Module):
+    """Interpolation module wrapping F.interpolate."""
+
     def __init__(self, scale_factor, mode, align_corners=False):
         super().__init__()
         self.scale_factor = scale_factor
@@ -498,6 +522,8 @@ class _Interpolate(nn.Module):
 
 
 class _HeadDepth(nn.Module):
+    """Depth prediction head with optional classification into bins."""
+
     def __init__(self, features, classify=False, n_bins=256):
         super().__init__()
         self.head = nn.Sequential(
@@ -515,6 +541,8 @@ class _HeadDepth(nn.Module):
 
 
 class _ReassembleBlocks(nn.Module):
+    """Reassemble multi-scale features from ViT for the DPT decoder."""
+
     def __init__(
         self,
         in_channels=1024,
@@ -577,6 +605,8 @@ class _ReassembleBlocks(nn.Module):
 
 
 class _PreActResidualConvUnit(nn.Module):
+    """Pre-activation residual convolution unit."""
+
     def __init__(self, in_channels, dilation=1):
         super().__init__()
         self.conv1 = _ConvModule(
@@ -607,6 +637,8 @@ class _PreActResidualConvUnit(nn.Module):
 
 
 class _FeatureFusionBlock(nn.Module):
+    """Feature fusion block with residual processing and 2x upsampling."""
+
     def __init__(self, in_channels, expand=False, align_corners=True):
         super().__init__()
         self.in_channels = in_channels

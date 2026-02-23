@@ -22,6 +22,20 @@ from .utils import get_device
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "PatchEmbed",
+    "TemporalEncoder",
+    "LocationEncoder",
+    "PrithviViT",
+    "MAEDecoder",
+    "PrithviMAE",
+    "PrithviProcessor",
+    "get_available_prithvi_models",
+    "load_prithvi_model",
+    "prithvi_inference",
+    "AVAILABLE_MODELS",
+]
+
 # Constants
 NO_DATA = -9999
 NO_DATA_FLOAT = 0.0001
@@ -50,7 +64,8 @@ def get_3d_sincos_pos_embed(embed_dim, grid_size, add_cls_token=False):
     Returns:
         Position embeddings (with or without cls token)
     """
-    assert embed_dim % 16 == 0
+    if embed_dim % 16 != 0:
+        raise ValueError(f"embed_dim must be divisible by 16, got {embed_dim}")
 
     t_size, h_size, w_size = grid_size
 
@@ -94,8 +109,10 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
 
 def _get_1d_sincos_embed_from_grid_torch(embed_dim: int, pos: torch.Tensor):
     """Modified torch version of get_1d_sincos_pos_embed_from_grid()."""
-    assert embed_dim % 2 == 0
-    assert pos.dtype in [torch.float32, torch.float16, torch.bfloat16]
+    if embed_dim % 2 != 0:
+        raise ValueError(f"embed_dim must be even, got {embed_dim}")
+    if pos.dtype not in [torch.float32, torch.float16, torch.bfloat16]:
+        raise TypeError(f"pos must be float32, float16, or bfloat16, got {pos.dtype}")
 
     omega = torch.arange(embed_dim // 2, dtype=pos.dtype).to(pos.device)
     omega /= embed_dim / 2.0
@@ -139,9 +156,12 @@ class PatchEmbed(nn.Module):
         self.input_size = input_size
         self.patch_size = patch_size
         self.grid_size = [s // p for s, p in zip(self.input_size, self.patch_size)]
-        assert all(
-            g >= 1 for g in self.grid_size
-        ), "Patch size is bigger than input size."
+        if not all(g >= 1 for g in self.grid_size):
+            raise ValueError(
+                f"Patch size is bigger than input size. "
+                f"grid_size={self.grid_size}, input_size={input_size}, "
+                f"patch_size={patch_size}"
+            )
         self.num_patches = self.grid_size[0] * self.grid_size[1] * self.grid_size[2]
         self.flatten = flatten
 

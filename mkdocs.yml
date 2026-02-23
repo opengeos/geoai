@@ -75,6 +75,8 @@ plugins:
                   "examples/building_detection_whu.ipynb",
                   "examples/canopy_height.ipynb",
                   "examples/water_segmentation.ipynb",
+                  "examples/moondream_sliding_window.ipynb",
+                  "examples/torchgeo_embeddings.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -172,6 +174,7 @@ nav:
           - examples/cloud_detection.ipynb
           - examples/moondream.ipynb
           - examples/moondream_gui.ipynb
+          - examples/moondream_sliding_window.ipynb
           - examples/AutoModel.ipynb
           - examples/onnx.ipynb
           - examples/smooth_vector.ipynb
@@ -180,6 +183,7 @@ nav:
           - examples/train_timm_regressor.ipynb
           - examples/canopy_height.ipynb
           - examples/tessera.ipynb
+          - examples/torchgeo_embeddings.ipynb
           - examples/building_detection_whu.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
@@ -197,18 +201,23 @@ nav:
           - geo_agents module: geo_agents.md
           - geoai module: geoai.md
           - download module: download.md
+          - embeddings module: embeddings.md
           - extract module: extract.md
           - hf module: hf.md
+          - landcover_train module: landcover_train.md
+          - landcover_utils module: landcover_utils.md
           - map_tools module: map_tools.md
           - map_widgets module: map_widgets.md
           - moondream module: moondream.md
           - onnx module: onnx.md
           - prithvi module: prithvi.md
           - sam module: sam.md
+          - segment module: segment.md
           - segmentation module: segmentation.md
           - tessera module: tessera.md
-          - timm_train module: timm_train.md
+          - timm_regress module: timm_regress.md
           - timm_segment module: timm_segment.md
+          - timm_train module: timm_train.md
           - train module: train.md
           - utils module: utils.md
           - water module: water.md
