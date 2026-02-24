@@ -215,7 +215,8 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
     site_packages = pkg_dir.parent  # geoai/__init__.py -> geoai -> site-packages
     _add_windows_dll_directories(site_packages)
 
-    try:
+    def _attempt_load():
+        """Try to load the geoai module once. Returns module or raises."""
         spec = importlib.util.spec_from_file_location(
             "geoai",
             str(init_path),
@@ -223,7 +224,6 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
         )
         if spec is None or spec.loader is None:
             _diag.append(f"  load {init_path}: spec_from_file_location returned None")
-            sys.modules.update(saved)
             return None
 
         module = importlib.util.module_from_spec(spec)
@@ -235,27 +235,12 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
             for key in list(sys.modules.keys()):
                 if key == "geoai" or key.startswith("geoai."):
                     del sys.modules[key]
-            sys.modules.update(saved)
             return None
 
-        _diag.append(f"  load {init_path}: SUCCESS")
-        # Re-register plugin sub-modules that were already loaded so that
-        # relative imports inside the plugin (e.g. ``from .._pkg_resources_compat``)
-        # continue to resolve correctly.
-        plugin_dir = str(Path(__file__).resolve().parent)
-        for key, mod in saved.items():
-            if key.startswith("geoai.") and key not in sys.modules:
-                sys.modules[key] = mod
-        # Add the plugin directory to the external module's __path__ so that
-        # future relative imports from plugin code (e.g. ``from .._geoai_lib``,
-        # ``from .._pkg_resources_compat``) can find plugin-only modules.
-        if hasattr(module, "__path__"):
-            if plugin_dir not in module.__path__:
-                module.__path__.append(plugin_dir)
         return module
-    except Exception as exc:
-        tb_str = traceback.format_exc()
-        _diag.append(f"  load {init_path}: FAILED: {exc}\n{tb_str}")
+
+    def _cleanup_and_restore():
+        """Remove any partial geoai entries and restore saved modules."""
         for key in list(sys.modules.keys()):
             if key == "geoai" or key.startswith("geoai."):
                 try:
@@ -263,6 +248,73 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
                 except KeyError:
                     pass
         sys.modules.update(saved)
+
+    def _finalize(module):
+        """Re-register plugin sub-modules and adjust __path__."""
+        _diag.append(f"  load {init_path}: SUCCESS")
+        plugin_dir = str(Path(__file__).resolve().parent)
+        for key, mod in saved.items():
+            if key.startswith("geoai.") and key not in sys.modules:
+                sys.modules[key] = mod
+        if hasattr(module, "__path__"):
+            if plugin_dir not in module.__path__:
+                module.__path__.append(plugin_dir)
+        return module
+
+    try:
+        module = _attempt_load()
+        if module is None:
+            sys.modules.update(saved)
+            return None
+        return _finalize(module)
+    except OSError as exc:
+        # On Windows, torch DLL loading can fail with WinError 127.
+        # Patch the venv's geoai/__init__.py to guard torch imports,
+        # then retry the load.
+        _diag.append(f"  load {init_path}: OSError: {exc}")
+        _cleanup_and_restore()
+
+        if sys.platform == "win32" and "torch" in str(exc).lower():
+            _diag.append("  Attempting to patch geoai/__init__.py for torch guards")
+            try:
+                from .core.venv_manager import patch_geoai_init_for_torch_guard
+
+                patched = patch_geoai_init_for_torch_guard(str(site_packages))
+            except Exception as patch_exc:
+                _diag.append(f"  patch import failed: {patch_exc}")
+                patched = False
+
+            if patched:
+                _diag.append("  Retrying load after patching")
+                # Re-remove geoai entries for fresh attempt
+                saved2 = {}
+                for key in list(sys.modules.keys()):
+                    if key == "geoai" or key.startswith("geoai."):
+                        saved2[key] = sys.modules.pop(key)
+                try:
+                    module = _attempt_load()
+                    if module is not None:
+                        # Restore plugin sub-modules from original saved set
+                        for key, mod in saved.items():
+                            if key.startswith("geoai.") and key not in sys.modules:
+                                sys.modules[key] = mod
+                        return _finalize(module)
+                except Exception as retry_exc:
+                    tb_str = traceback.format_exc()
+                    _diag.append(f"  retry load FAILED: {retry_exc}\n{tb_str}")
+                # Restore on retry failure
+                for key in list(sys.modules.keys()):
+                    if key == "geoai" or key.startswith("geoai."):
+                        try:
+                            del sys.modules[key]
+                        except KeyError:
+                            pass
+                sys.modules.update(saved)
+        return None
+    except Exception as exc:
+        tb_str = traceback.format_exc()
+        _diag.append(f"  load {init_path}: FAILED: {exc}\n{tb_str}")
+        _cleanup_and_restore()
         return None
 
 

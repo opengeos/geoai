@@ -721,9 +721,11 @@ def ensure_venv_packages_available() -> bool:
 
     # On Windows, register DLL directories for native packages (torch, etc.)
     # so that the OS loader can find their DLLs when importing from the venv
-    # inside QGIS's process.
+    # inside QGIS's process.  Also patch geoai/__init__.py to guard
+    # torch-dependent imports against DLL load failures (WinError 127).
     if sys.platform == "win32":
         _add_windows_dll_directories(site_packages)
+        patch_geoai_init_for_torch_guard(site_packages)
 
     # Fix stale typing_extensions (QGIS may load old version missing TypeIs)
     if "typing_extensions" in sys.modules:
@@ -779,6 +781,100 @@ def _add_windows_dll_directories(site_packages: str) -> None:
                 path_parts.insert(0, dll_dir)
 
     os.environ["PATH"] = os.pathsep.join(path_parts)
+
+
+def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
+    """Patch the venv's geoai/__init__.py to guard torch-dependent imports.
+
+    On Windows, torch DLLs may fail to load inside QGIS's Python process
+    (WinError 127).  This patches the installed geoai library so that
+    ``from .dinov3 import ...`` and similar torch-dependent imports are
+    wrapped in ``try/except (ImportError, OSError)`` blocks, allowing geoai
+    to import successfully even when torch can't load.
+
+    This is idempotent — if the file already has the guards, it's a no-op.
+
+    Args:
+        site_packages: Path to venv site-packages. Uses default if None.
+
+    Returns:
+        True if patched (or already patched), False on failure.
+    """
+    if site_packages is None:
+        site_packages = get_venv_site_packages()
+
+    init_path = os.path.join(site_packages, "geoai", "__init__.py")
+    if not os.path.exists(init_path):
+        return False
+
+    try:
+        with open(init_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Already patched — the guard comment is present
+        if "except (ImportError, OSError):" in content:
+            return True
+
+        # Bare imports that need guarding (torch-dependent modules)
+        bare_imports = [
+            "from .dinov3 import ",
+            "from .timm_train import ",
+            "from .recognize import ",
+            "from .timm_segment import ",
+            "from .timm_regress import ",
+        ]
+
+        patched = False
+        for bare in bare_imports:
+            if bare not in content:
+                continue
+
+            # Find the full import block (may be multi-line with parens)
+            idx = content.index(bare)
+
+            # Check it's not already inside a try block
+            preceding = content[max(0, idx - 50) : idx]
+            if "try:" in preceding.split("\n")[-3:]:
+                continue
+
+            # Find the end of the import statement
+            if "(" in content[idx : idx + 200]:
+                # Multi-line import with parens — find closing paren
+                paren_start = content.index("(", idx)
+                paren_end = content.index(")", paren_start)
+                end_idx = paren_end + 1
+                # Skip trailing newline
+                if end_idx < len(content) and content[end_idx] == "\n":
+                    end_idx += 1
+            else:
+                # Single-line import
+                end_idx = content.index("\n", idx) + 1
+
+            import_block = content[idx:end_idx]
+            # Indent the import block
+            indented = "".join(
+                "    " + line + "\n" if line.strip() else "\n"
+                for line in import_block.rstrip("\n").split("\n")
+            )
+            replacement = (
+                "try:\n" + indented + "except (ImportError, OSError):\n" + "    pass\n"
+            )
+            content = content[:idx] + replacement + content[end_idx:]
+            patched = True
+
+        if patched:
+            with open(init_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            _log(
+                f"Patched geoai/__init__.py for torch import guards",
+                Qgis.Info,
+            )
+
+        return True
+
+    except Exception as exc:
+        _log(f"Failed to patch geoai/__init__.py: {exc}", Qgis.Warning)
+        return False
 
 
 def _fix_proj_data(site_packages: str) -> None:
