@@ -725,6 +725,7 @@ def ensure_venv_packages_available() -> bool:
     # torch-dependent imports against DLL load failures (WinError 127).
     if sys.platform == "win32":
         _add_windows_dll_directories(site_packages)
+        _repair_corrupted_geoai_init(site_packages)
         patch_geoai_init_for_torch_guard(site_packages)
 
     # Fix stale typing_extensions (QGIS may load old version missing TypeIs)
@@ -783,20 +784,83 @@ def _add_windows_dll_directories(site_packages: str) -> None:
     os.environ["PATH"] = os.pathsep.join(path_parts)
 
 
+def _repair_corrupted_geoai_init(site_packages: str) -> None:
+    """Detect and repair a corrupted geoai/__init__.py in the venv.
+
+    A previous version of the patching logic could produce invalid Python
+    (empty ``try:`` blocks).  If the file fails to compile, reinstall
+    geoai-py to get a clean copy.
+
+    Args:
+        site_packages: Path to venv site-packages directory.
+    """
+    init_path = os.path.join(site_packages, "geoai", "__init__.py")
+    if not os.path.exists(init_path):
+        return
+
+    try:
+        with open(init_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        compile(source, init_path, "exec")
+        # File compiles OK — nothing to repair.
+        return
+    except SyntaxError as exc:
+        _log(
+            "geoai/__init__.py has syntax error (line {}), "
+            "reinstalling geoai-py to repair...".format(exc.lineno),
+            Qgis.Warning,
+        )
+
+    # Reinstall geoai-py to get a clean copy.
+    python_path = get_venv_python_path()
+    env = _get_clean_env_for_venv()
+    subprocess_kwargs = _get_subprocess_kwargs()
+
+    try:
+        cmd = [
+            python_path,
+            "-m",
+            "pip",
+            "install",
+            "--force-reinstall",
+            "--no-deps",
+            "--no-warn-script-location",
+            "--disable-pip-version-check",
+            "geoai-py",
+        ]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=env,
+            **subprocess_kwargs,
+        )
+        if result.returncode == 0:
+            _log("Repaired geoai-py via reinstall", Qgis.Success)
+        else:
+            err = result.stderr or result.stdout or ""
+            _log(
+                "Failed to repair geoai-py: {}".format(err[:200]),
+                Qgis.Warning,
+            )
+    except Exception as exc:
+        _log("Exception repairing geoai-py: {}".format(exc), Qgis.Warning)
+
+
 def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
-    """Patch the venv's geoai package to guard torch-dependent imports.
+    """Patch the venv's geoai package so ``except ImportError`` also catches ``OSError``.
 
     On Windows, torch DLLs may fail to load inside QGIS's Python process
-    (WinError 127).  This patches:
+    (WinError 127), raising ``OSError`` instead of ``ImportError``.  The
+    published ``geoai`` package already wraps all optional imports in
+    ``try/except ImportError:`` blocks — this function simply widens those
+    to ``except (ImportError, OSError):`` so they also catch DLL load
+    failures.
 
-    1. ``geoai/__init__.py`` — wraps bare torch-dependent imports
-       (``from .dinov3 import ...``, ``from . import tools``, etc.)
-       in ``try/except (ImportError, OSError)`` blocks.
-    2. ``geoai/__init__.py`` — changes all ``except ImportError:`` to
-       ``except (ImportError, OSError):`` so existing guards also catch
-       OSError from DLL loading failures.
-    3. ``geoai/tools/__init__.py`` — same ``except ImportError:`` →
-       ``except (ImportError, OSError):`` fix.
+    Files patched:
+    - ``geoai/__init__.py``
+    - ``geoai/tools/__init__.py``
 
     This is idempotent — already-patched files are left unchanged.
 
@@ -810,115 +874,42 @@ def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
         site_packages = get_venv_site_packages()
 
     geoai_dir = os.path.join(site_packages, "geoai")
-    init_path = os.path.join(geoai_dir, "__init__.py")
-    tools_init_path = os.path.join(geoai_dir, "tools", "__init__.py")
 
-    if not os.path.exists(init_path):
-        return False
+    # Files to patch: all need "except ImportError:" → "except (ImportError, OSError):"
+    targets = [
+        os.path.join(geoai_dir, "__init__.py"),
+        os.path.join(geoai_dir, "tools", "__init__.py"),
+    ]
 
     any_patched = False
 
-    # --- Patch geoai/__init__.py ---
-    try:
-        with open(init_path, "r", encoding="utf-8") as f:
-            content = f.read()
+    for filepath in targets:
+        if not os.path.exists(filepath):
+            continue
 
-        original_content = content
-
-        # Part 1: Wrap bare torch-dependent imports in try/except
-        bare_imports = [
-            "from .dinov3 import ",
-            "from .timm_train import ",
-            "from .recognize import ",
-            "from .timm_segment import ",
-            "from .timm_regress import ",
-            "from . import tools",
-            "from .object_detect import ",
-            "from .water import ",
-            "from .canopy import ",
-            "from .change_detection import ",
-            "from .prithvi import ",
-            "from .moondream import ",
-        ]
-
-        for bare in bare_imports:
-            if bare not in content:
-                continue
-
-            idx = content.index(bare)
-
-            # Check it's not already inside a try block
-            preceding_lines = content[max(0, idx - 80) : idx].split("\n")
-            already_guarded = any("try:" in line for line in preceding_lines[-4:])
-            if already_guarded:
-                continue
-
-            # Find the end of the import statement
-            if "(" in content[idx : idx + 300]:
-                # Multi-line import with parens — find closing paren
-                paren_start = content.index("(", idx)
-                paren_end = content.index(")", paren_start)
-                end_idx = paren_end + 1
-                # Skip trailing newline
-                if end_idx < len(content) and content[end_idx] == "\n":
-                    end_idx += 1
-            else:
-                # Single-line import
-                end_idx = content.index("\n", idx) + 1
-
-            import_block = content[idx:end_idx]
-            # Indent the import block
-            indented = "".join(
-                "    " + line + "\n" if line.strip() else "\n"
-                for line in import_block.rstrip("\n").split("\n")
-            )
-            replacement = (
-                "try:\n" + indented + "except (ImportError, OSError):\n" + "    pass\n"
-            )
-            content = content[:idx] + replacement + content[end_idx:]
-
-        # Part 2: Change all "except ImportError:" to "except (ImportError, OSError):"
-        content = content.replace(
-            "except ImportError:", "except (ImportError, OSError):"
-        )
-
-        if content != original_content:
-            with open(init_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            _log("Patched geoai/__init__.py for torch guards", Qgis.Info)
-            any_patched = True
-
-    except Exception as exc:
-        _log(f"Failed to patch geoai/__init__.py: {exc}", Qgis.Warning)
-        return False
-
-    # --- Patch geoai/tools/__init__.py ---
-    if os.path.exists(tools_init_path):
         try:
-            with open(tools_init_path, "r", encoding="utf-8") as f:
-                tools_content = f.read()
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
 
-            tools_original = tools_content
-
-            # Change all "except ImportError:" to "except (ImportError, OSError):"
-            tools_content = tools_content.replace(
+            # Simple, safe replacement: widen ImportError guards to also
+            # catch OSError (from DLL load failures on Windows).
+            new_content = content.replace(
                 "except ImportError:", "except (ImportError, OSError):"
             )
 
-            if tools_content != tools_original:
-                with open(tools_init_path, "w", encoding="utf-8") as f:
-                    f.write(tools_content)
+            if new_content != content:
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                rel = os.path.relpath(filepath, site_packages)
                 _log(
-                    "Patched geoai/tools/__init__.py for OSError guards",
+                    "Patched {} for OSError guards".format(rel),
                     Qgis.Info,
                 )
                 any_patched = True
 
         except Exception as exc:
-            _log(
-                f"Failed to patch geoai/tools/__init__.py: {exc}",
-                Qgis.Warning,
-            )
+            rel = os.path.relpath(filepath, site_packages)
+            _log("Failed to patch {}: {}".format(rel, exc), Qgis.Warning)
 
     if not any_patched:
         _log("geoai package already patched, no changes needed", Qgis.Info)
