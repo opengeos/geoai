@@ -30,6 +30,8 @@ from .hf import *
 from .map_widgets import DINOv3GUI
 from .segment import *
 from .train import (
+    COCODetectionDataset,
+    evaluate_coco_metrics,
     get_instance_segmentation_model,
     instance_segmentation,
     instance_segmentation_batch,
@@ -37,6 +39,7 @@ from .train import (
     lightly_embed_images,
     lightly_train_model,
     load_lightly_pretrained_model,
+    multiclass_detection_inference_on_geotiff,
     object_detection,
     object_detection_batch,
     semantic_segmentation,

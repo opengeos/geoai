@@ -142,6 +142,7 @@ nav:
           - examples/train_car_detection.ipynb
           - examples/train_ship_detection.ipynb
           - examples/train_water_detection.ipynb
+          - examples/object_detection_nwpu.ipynb
           - examples/water_dynamics.ipynb
           - examples/wetland_mapping.ipynb
           - examples/wetland_dynamics.ipynb
@@ -210,6 +211,7 @@ nav:
           - hf module: hf.md
           - landcover_train module: landcover_train.md
           - landcover_utils module: landcover_utils.md
+          - object_detect module: object_detect.md
           - map_tools module: map_tools.md
           - map_widgets module: map_widgets.md
           - moondream module: moondream.md
