@@ -93,6 +93,10 @@
          <lastmod>2026-02-24</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/object_detect/</loc>
+         <lastmod>2026-02-24</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/onnx/</loc>
          <lastmod>2026-02-24</lastmod>
     </url>
@@ -330,6 +334,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/moondream_sliding_window/</loc>
+         <lastmod>2026-02-24</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/object_detection_nwpu/</loc>
          <lastmod>2026-02-24</lastmod>
     </url>
     <url>
