@@ -24,10 +24,10 @@ import logging
 import os
 import time
 from abc import ABC, abstractmethod
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from tqdm import tqdm
 
@@ -304,8 +304,8 @@ class GlobStep(PipelineStep):
 class SemanticSegmentationStep(PipelineStep):
     """Run semantic segmentation inference using an SMP model.
 
-    Wraps :func:`geoai.train.semantic_segmentation`. The model is loaded
-    once in :meth:`setup` and reused for every item.
+    Wraps :func:`geoai.train.semantic_segmentation`. Note that the
+    underlying function handles model loading internally on each call.
 
     Args:
         name: Step name.
@@ -363,7 +363,13 @@ class SemanticSegmentationStep(PipelineStep):
         self.suffix = suffix
 
     def setup(self) -> None:
-        """Load the segmentation model onto the target device."""
+        """Verify the segmentation dependency is importable.
+
+        Note:
+            The underlying :func:`geoai.train.semantic_segmentation`
+            handles model loading internally. This method only ensures
+            the dependency can be imported.
+        """
         from geoai.train import semantic_segmentation  # noqa: F401
 
         logger.info("SemanticSegmentationStep ready (model_path=%s)", self.model_path)
@@ -721,8 +727,9 @@ class Pipeline:
     Args:
         steps: Ordered sequence of PipelineStep instances.
         max_workers: Number of parallel workers. ``1`` for sequential.
-        executor_type: ``"thread"`` or ``"process"``. Defaults to
-            ``"thread"`` (safer with GPU models).
+        executor_type: Must be ``"thread"``. Thread-based parallelism is
+            used because GPU models and lambdas cannot be pickled across
+            process boundaries.
         on_error: Error handling policy. ``"skip"`` to continue on failure,
             ``"fail"`` to stop immediately.
         checkpoint_dir: Directory to store checkpoint files. ``None``
@@ -758,27 +765,51 @@ class Pipeline:
         Args:
             steps: Ordered sequence of PipelineStep instances.
             max_workers: Number of parallel workers.
-            executor_type: ``"thread"`` or ``"process"``.
+            executor_type: Must be ``"thread"``.
             on_error: ``"skip"`` or ``"fail"``.
             checkpoint_dir: Directory for checkpoint files.
             item_key_fn: Function to extract a unique key from an item.
             name: Pipeline name.
             quiet: Suppress progress bars.
         """
+        if executor_type != "thread":
+            raise ValueError(
+                f"Unsupported executor_type '{executor_type}'. "
+                "Only 'thread' is supported (GPU models and lambdas "
+                "cannot be pickled across process boundaries)."
+            )
         self.steps = list(steps)
         self.max_workers = max_workers
         self.executor_type = executor_type
         self.on_error = ErrorPolicy(on_error)
         self.checkpoint_dir = checkpoint_dir
-        self.item_key_fn = item_key_fn or (lambda item: item.get("input_path", ""))
+        self.item_key_fn = item_key_fn or (lambda item: item["input_path"])
         self.name = name or "pipeline"
         self.quiet = quiet
         self._checkpoint: Optional[CheckpointManager] = None
 
     def _config_hash(self) -> str:
-        """Compute a hash of the pipeline configuration."""
+        """Compute a hash of the pipeline configuration.
+
+        Includes step types and public parameters so that changing step
+        config (e.g. model_path, num_classes) invalidates the checkpoint.
+        """
+        step_configs = []
+        for step in self.steps:
+            sc: Dict[str, Any] = {
+                "type": step.__class__.__name__,
+                "name": step.name,
+            }
+            for key, value in vars(step).items():
+                if not key.startswith("_") and key != "name":
+                    try:
+                        json.dumps(value)
+                        sc[key] = value
+                    except (TypeError, ValueError):
+                        sc[key] = repr(value)
+            step_configs.append(sc)
         config_str = json.dumps(
-            {"steps": [s.name for s in self.steps], "name": self.name},
+            {"name": self.name, "steps": step_configs},
             sort_keys=True,
         )
         return hashlib.md5(config_str.encode()).hexdigest()[:12]
@@ -842,7 +873,7 @@ class Pipeline:
 
         Provide either *items* directly or *input_dir* (which will be
         expanded via :class:`GlobStep` if present, or auto-globbed for
-        ``.tif`` files).
+        common raster files (``.tif``, ``.tiff``, ``.jp2``, ``.img``)).
 
         Args:
             items: List of work item dicts.
@@ -965,7 +996,7 @@ class Pipeline:
                     raise RuntimeError(
                         f"Pipeline failed on item '{key}': " f"{step_result.error}"
                     )
-                result.failed.append((item, step_result.error))
+                result.failed.append((step_result.item, step_result.error))
                 if self._checkpoint:
                     self._checkpoint.mark_failed(key, step_result.error or "", [])
 
@@ -985,13 +1016,7 @@ class Pipeline:
             items: Items to process.
             result: PipelineResult to populate.
         """
-        executor_cls: Union[type, type] = (
-            ThreadPoolExecutor
-            if self.executor_type == "thread"
-            else ProcessPoolExecutor
-        )
-
-        with executor_cls(max_workers=self.max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_item = {
                 executor.submit(self._process_single_item, item): item for item in items
             }
@@ -1009,16 +1034,18 @@ class Pipeline:
                         if self._checkpoint:
                             self._checkpoint.mark_completed(key, self._step_names())
                     else:
-                        if self.on_error == ErrorPolicy.FAIL:
-                            executor.shutdown(wait=False, cancel_futures=True)
-                            raise RuntimeError(
-                                f"Pipeline failed on '{key}': " f"{step_result.error}"
-                            )
-                        result.failed.append((item, step_result.error))
                         if self._checkpoint:
                             self._checkpoint.mark_failed(
                                 key, step_result.error or "", []
                             )
+                        if self.on_error == ErrorPolicy.FAIL:
+                            if self._checkpoint:
+                                self._checkpoint.save()
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            raise RuntimeError(
+                                f"Pipeline failed on '{key}': " f"{step_result.error}"
+                            )
+                        result.failed.append((step_result.item, step_result.error))
 
                     pbar.update(1)
 

@@ -143,9 +143,10 @@ def pipeline():
 def run(
     config_path, input_dir, output_dir, max_workers, checkpoint_dir, on_error, quiet
 ):
-    """Run a pipeline from a YAML/JSON config file.
+    """Run a pipeline from a JSON or YAML config file.
 
     CONFIG_PATH is the path to a .json or .yaml pipeline definition.
+    YAML support requires PyYAML (pip install pyyaml).
 
     \b
     Examples:

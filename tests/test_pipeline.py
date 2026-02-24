@@ -400,8 +400,29 @@ class TestPipeline(unittest.TestCase):
             pipe.run(items=[{"input_path": "a.tif"}])
         self.assertTrue(state["teardown"])
 
-    def test_multi_step_failure_in_second_step(self):
-        """Failure in a later step is caught; earlier step results are in item."""
+    def test_repr(self):
+        """Pipeline repr includes name and step count."""
+        pipe = Pipeline(steps=[FunctionStep("s1", lambda x: x)], name="my_pipe")
+        r = repr(pipe)
+        self.assertIn("my_pipe", r)
+        self.assertIn("1", r)
+
+    def test_total_duration_populated(self):
+        """PipelineResult has a positive total_duration."""
+        pipe = Pipeline(steps=[FunctionStep("s1", lambda x: x)], quiet=True)
+        result = pipe.run(items=[{"input_path": "a.tif"}])
+        self.assertGreater(result.total_duration, 0)
+
+    def test_invalid_executor_type_raises(self):
+        """Pipeline raises ValueError for unsupported executor_type."""
+        with self.assertRaises(ValueError):
+            Pipeline(
+                steps=[FunctionStep("s1", lambda x: x)],
+                executor_type="process",
+            )
+
+    def test_failed_items_preserve_partial_results(self):
+        """Failed items contain partial results from earlier steps."""
 
         def step1_fn(item):
             item["step1_done"] = True
@@ -420,20 +441,9 @@ class TestPipeline(unittest.TestCase):
         )
         result = pipe.run(items=[{"input_path": "a.tif"}])
         self.assertEqual(len(result.failed), 1)
-        self.assertIn("step2", result.failed[0][1])
-
-    def test_repr(self):
-        """Pipeline repr includes name and step count."""
-        pipe = Pipeline(steps=[FunctionStep("s1", lambda x: x)], name="my_pipe")
-        r = repr(pipe)
-        self.assertIn("my_pipe", r)
-        self.assertIn("1", r)
-
-    def test_total_duration_populated(self):
-        """PipelineResult has a positive total_duration."""
-        pipe = Pipeline(steps=[FunctionStep("s1", lambda x: x)], quiet=True)
-        result = pipe.run(items=[{"input_path": "a.tif"}])
-        self.assertGreater(result.total_duration, 0)
+        failed_item, error_msg = result.failed[0]
+        self.assertTrue(failed_item.get("step1_done"))
+        self.assertIn("step2", error_msg)
 
 
 # ---------------------------------------------------------------------------
