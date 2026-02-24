@@ -126,6 +126,19 @@ class DepsInstallDockWidget(QDockWidget):
         self.reinstall_button.hide()
         layout.addWidget(self.reinstall_button)
 
+        # Help links
+        help_label = QLabel(
+            "<small>"
+            "If you encounter issues, please check the "
+            '<a href="https://opengeoai.org/qgis_plugin/">documentation</a> '
+            "or report a bug on "
+            '<a href="https://github.com/opengeos/geoai/issues">GitHub</a>.'
+            "</small>"
+        )
+        help_label.setWordWrap(True)
+        help_label.setOpenExternalLinks(True)
+        layout.addWidget(help_label)
+
         layout.addStretch()
         self.setWidget(container)
 
