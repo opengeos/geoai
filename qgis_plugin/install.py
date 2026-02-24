@@ -145,9 +145,6 @@ def main():
             print("  2. Go to Plugins -> Manage and Install Plugins...")
             print("  3. Enable 'GeoAI'")
             print()
-            print("Make sure you have the required Python packages installed:")
-            print("  pip install geoai-py torch torchvision")
-            print()
 
     sys.exit(0 if success else 1)
 

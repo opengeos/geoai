@@ -13,61 +13,42 @@ shadowed by the plugin package name.
 
 from __future__ import annotations
 
-from pathlib import Path
-from types import ModuleType
-from typing import Optional
-
 import importlib
 import importlib.metadata
 import importlib.util
 import logging
+import os
 import sys
+import traceback
+from pathlib import Path
+from types import ModuleType
+from typing import Optional
 
 _CACHED: Optional[ModuleType] = None
 _log = logging.getLogger(__name__)
 
+# Diagnostics collected during get_geoai() to help debug failures.
+_diag: list[str] = []
+
 
 def _is_plugin_module(mod: ModuleType) -> bool:
-    """
-    Returns True if *mod* is a QGIS plugin package rather than the external geoai library.
+    """Returns True if *mod* is a QGIS plugin package rather than the external library.
 
     Detection uses the ``classFactory`` function that every QGIS plugin exposes in its
-    ``__init__.py``.  This is more robust than path-based checks because the plugin can
-    live at the installed QGIS plugins directory **or** inside the source repository
-    (e.g. when the repo root is on ``sys.path`` via an editable install).
+    ``__init__.py``.
     """
     return callable(getattr(mod, "classFactory", None))
 
 
-def _save_geoai_modules() -> dict:
-    """Remove and return all ``geoai`` and ``geoai.*`` entries from ``sys.modules``."""
-    saved = {}
-    for key in list(sys.modules.keys()):
-        if key == "geoai" or key.startswith("geoai."):
-            saved[key] = sys.modules.pop(key)
-    return saved
-
-
-def _restore_geoai_modules(saved: dict) -> None:
-    """Remove current ``geoai`` entries from ``sys.modules`` and restore *saved* ones."""
-    for key in list(sys.modules.keys()):
-        if key == "geoai" or key.startswith("geoai."):
-            del sys.modules[key]
-    sys.modules.update(saved)
-
-
 def _find_geoai_init_from_dist(dist_name: str) -> Optional[Path]:
-    """
-    Find the ``__init__.py`` of the external ``geoai`` package from an installed distribution.
+    """Find the ``__init__.py`` of the external ``geoai`` package via distribution metadata.
 
-    Handles both regular and editable installs:
-    - Regular installs list all files in ``dist.files`` (RECORD).
-    - Editable installs only list the dist-info files, but register a meta-path finder
-      whose ``MAPPING`` dict contains the package directory path.
+    Handles both regular and editable installs.
     """
     try:
         dist = importlib.metadata.distribution(dist_name)
     except importlib.metadata.PackageNotFoundError:
+        _diag.append(f"  dist '{dist_name}': not found")
         return None
 
     # Strategy A: look in dist.files (works for regular installs)
@@ -75,11 +56,10 @@ def _find_geoai_init_from_dist(dist_name: str) -> Optional[Path]:
         if str(f).replace("\\", "/").endswith("geoai/__init__.py"):
             init_path = Path(dist.locate_file(f)).resolve()
             if init_path.exists():
+                _diag.append(f"  dist '{dist_name}': found via RECORD: {init_path}")
                 return init_path
 
     # Strategy B: look in editable-install finder modules.
-    # Setuptools editable installs register a meta-path finder class whose *module*
-    # has a top-level MAPPING dict (e.g. {'geoai': '/path/to/geoai'}).
     for finder in sys.meta_path:
         finder_mod = sys.modules.get(getattr(finder, "__module__", ""), None)
         if finder_mod is None:
@@ -92,24 +72,111 @@ def _find_geoai_init_from_dist(dist_name: str) -> Optional[Path]:
             continue
         init_path = Path(pkg_dir).resolve() / "__init__.py"
         if init_path.exists():
-            _log.debug("Found geoai via editable finder MAPPING: %s", init_path)
+            _diag.append(
+                f"  dist '{dist_name}': found via editable MAPPING: {init_path}"
+            )
             return init_path
 
+    _diag.append(f"  dist '{dist_name}': found distribution but no geoai/__init__.py")
     return None
 
 
-def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
-    """
-    Load the external geoai package from an explicit ``__init__.py`` path.
+def _find_geoai_init_from_sys_path() -> Optional[Path]:
+    """Scan ``sys.path`` for a ``geoai/__init__.py`` that belongs to the external library."""
+    plugin_init = Path(__file__).resolve().parent / "__init__.py"
+    for entry in sys.path:
+        candidate = Path(entry) / "geoai" / "__init__.py"
+        try:
+            if candidate.exists() and candidate.resolve() != plugin_init:
+                _diag.append(f"  sys.path scan: found {candidate}")
+                return candidate
+        except (OSError, ValueError):
+            continue
+    _diag.append(
+        f"  sys.path scan: no geoai/__init__.py found (plugin at {plugin_init})"
+    )
+    return None
 
-    The module is loaded under its real name ``geoai`` so that relative imports
-    inside the library (e.g. ``from .water import segment_water``) resolve
-    correctly.  We temporarily take over ``sys.modules["geoai"]`` during loading
-    and restore the plugin's entries afterward.
+
+def _fix_proj_for_qgis() -> None:
+    """Ensure pyproj can find a PROJ database (proj.db) inside QGIS.
+
+    QGIS's pyproj native extensions (``_crs.so``, ``_context.so``) are already
+    loaded and cannot be replaced by the venv's copies (Python caches native
+    extensions per-process).  We must therefore keep QGIS's pyproj and make
+    sure its PROJ context has a valid database path.
+
+    Strategy:
+    1. If pyproj is already imported and working, do nothing.
+    2. Otherwise, find a valid ``proj.db`` (QGIS conda env, or the venv's
+       bundled copy) and call ``pyproj.datadir.set_data_dir()``.
+    """
+    # Quick check: does pyproj.CRS already work?
+    try:
+        import pyproj
+
+        pyproj.CRS("epsg:4326")
+        _diag.append("  pyproj already working, no fix needed")
+        return
+    except Exception:
+        pass
+
+    # Find a proj.db that the already-loaded libproj.so can use.
+    # Prefer QGIS's own PROJ data (matching its libproj version), then
+    # fall back to the venv's bundled copy.
+    qgis_python = sys.executable
+    proj_search_paths = []
+    # QGIS conda env share/proj
+    conda_prefix = os.environ.get("CONDA_PREFIX", "")
+    if conda_prefix:
+        proj_search_paths.append(os.path.join(conda_prefix, "share", "proj"))
+    # Derive from sys.executable (e.g. .../miniconda3/envs/qgis/bin/python3)
+    exe_prefix = os.path.dirname(os.path.dirname(qgis_python))
+    proj_search_paths.append(os.path.join(exe_prefix, "share", "proj"))
+    # sys.prefix
+    proj_search_paths.append(os.path.join(sys.prefix, "share", "proj"))
+
+    for proj_dir in proj_search_paths:
+        if os.path.exists(os.path.join(proj_dir, "proj.db")):
+            try:
+                import pyproj.datadir
+
+                pyproj.datadir.set_data_dir(proj_dir)
+                os.environ["PROJ_DATA"] = proj_dir
+                os.environ["PROJ_LIB"] = proj_dir
+                _diag.append(f"  set pyproj data_dir={proj_dir}")
+                # Verify it works
+                pyproj.CRS("epsg:4326")
+                _diag.append("  pyproj fix verified OK")
+                return
+            except Exception as exc:
+                _diag.append(f"  pyproj fix attempt {proj_dir} failed: {exc}")
+
+    _diag.append("  WARNING: could not fix pyproj PROJ database")
+
+
+def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
+    """Load the external geoai package from an explicit ``__init__.py`` path.
+
+    The external library **permanently** takes over ``sys.modules["geoai"]``
+    (and its submodule entries).  This is safe because the plugin's own code
+    uses only relative imports.
     """
     pkg_dir = init_path.parent
 
-    saved = _save_geoai_modules()
+    # Remove the plugin's geoai entries from sys.modules so the external
+    # library can claim the "geoai" namespace.
+    saved = {}
+    for key in list(sys.modules.keys()):
+        if key == "geoai" or key.startswith("geoai."):
+            saved[key] = sys.modules.pop(key)
+
+    # Fix pyproj PROJ database context.  We must NOT clear pyproj/rasterio
+    # from sys.modules — their native extensions (.so) are cached per-process
+    # and cannot be reloaded from a different path.  Instead, configure the
+    # already-loaded QGIS pyproj to find its own proj.db.
+    _fix_proj_for_qgis()
+
     try:
         spec = importlib.util.spec_from_file_location(
             "geoai",
@@ -117,7 +184,8 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
             submodule_search_locations=[str(pkg_dir)],
         )
         if spec is None or spec.loader is None:
-            _log.debug("spec_from_file_location returned None for %s", init_path)
+            _diag.append(f"  load {init_path}: spec_from_file_location returned None")
+            sys.modules.update(saved)
             return None
 
         module = importlib.util.module_from_spec(spec)
@@ -125,30 +193,56 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
         spec.loader.exec_module(module)
 
         if _is_plugin_module(module):
-            _log.debug(
-                "Loaded module from %s is the plugin, not the library", init_path
-            )
+            _diag.append(f"  load {init_path}: is plugin module, skipping")
+            for key in list(sys.modules.keys()):
+                if key == "geoai" or key.startswith("geoai."):
+                    del sys.modules[key]
+            sys.modules.update(saved)
             return None
 
-        _log.debug("Loaded external geoai from %s", init_path)
+        _diag.append(f"  load {init_path}: SUCCESS")
+        # Re-register plugin sub-modules that were already loaded
+        for key, mod in saved.items():
+            if key.startswith("geoai.") and key not in sys.modules:
+                sys.modules[key] = mod
         return module
     except Exception as exc:
-        _log.debug("Failed to load geoai from %s: %s", init_path, exc)
+        tb_str = traceback.format_exc()
+        _diag.append(f"  load {init_path}: FAILED: {exc}\n{tb_str}")
+        for key in list(sys.modules.keys()):
+            if key == "geoai" or key.startswith("geoai."):
+                try:
+                    del sys.modules[key]
+                except KeyError:
+                    pass
+        sys.modules.update(saved)
         return None
-    finally:
-        _restore_geoai_modules(saved)
+
+
+def _try_ensure_venv_available():
+    """Add the GeoAI plugin venv site-packages to sys.path if available."""
+    try:
+        from .core.venv_manager import ensure_venv_packages_available, venv_exists
+
+        if venv_exists():
+            ensure_venv_packages_available()
+            _diag.append("Strategy 0: venv exists, site-packages added to sys.path")
+        else:
+            _diag.append("Strategy 0: venv does not exist")
+    except Exception as exc:
+        _diag.append(f"Strategy 0: exception: {exc}")
 
 
 def get_geoai() -> ModuleType:
-    """
-    Return the external ``geoai`` library module.
+    """Return the external ``geoai`` library module.
 
-    Tries two strategies in order:
+    Tries four strategies in order:
 
+    0. Ensure the plugin's managed venv site-packages is on ``sys.path``.
     1. Normal ``import geoai`` — works when the plugin is NOT named ``geoai``.
     2. Locate the installed distribution (``geoai-py`` or ``geoai``) via
-       ``importlib.metadata`` (including editable-install finders) and load the
-       library from its ``__init__.py`` file path.
+       ``importlib.metadata`` and load the library from its file path.
+    3. Direct filesystem scan of ``sys.path`` for ``geoai/__init__.py``.
 
     The result is cached after the first successful resolution.
     """
@@ -156,17 +250,29 @@ def get_geoai() -> ModuleType:
     if _CACHED is not None:
         return _CACHED
 
+    _diag.clear()
+    _diag.append(f"Plugin __file__: {__file__}")
+
+    # Strategy 0: ensure venv packages are available on sys.path
+    _try_ensure_venv_available()
+
     # Strategy 1: normal import (works when plugin package is NOT named `geoai`)
+    _diag.append("Strategy 1: importlib.import_module('geoai')")
     try:
         imported = importlib.import_module("geoai")
         if not _is_plugin_module(imported):
+            _diag.append("  result: SUCCESS (not plugin module)")
             _CACHED = imported
             return imported
-    except (ImportError, ModuleNotFoundError, AttributeError):
-        pass
+        else:
+            _diag.append(
+                f"  result: found plugin module at {getattr(imported, '__file__', '?')}"
+            )
+    except (ImportError, ModuleNotFoundError, AttributeError) as exc:
+        _diag.append(f"  result: import error: {exc}")
 
-    # Strategy 2: find the external library via distribution metadata / editable
-    # finders and load it by explicit file path.
+    # Strategy 2: find via distribution metadata
+    _diag.append("Strategy 2: distribution metadata lookup")
     for dist_name in ("geoai-py", "geoai"):
         init_path = _find_geoai_init_from_dist(dist_name)
         if init_path is None:
@@ -176,16 +282,51 @@ def get_geoai() -> ModuleType:
             _CACHED = ext
             return ext
 
+    # Strategy 3: direct sys.path scan
+    _diag.append("Strategy 3: sys.path filesystem scan")
+    # Log the first few sys.path entries containing "geoai" or the venv
+    for idx, entry in enumerate(sys.path[:20]):
+        if "geoai" in entry.lower() or ".qgis_geoai" in entry:
+            _diag.append(f"  sys.path[{idx}]: {entry}")
+    init_path = _find_geoai_init_from_sys_path()
+    if init_path is not None:
+        ext = _load_geoai_from_path(init_path)
+        if ext is not None:
+            _CACHED = ext
+            return ext
+
+    # All strategies failed — build a diagnostic error message
     py = getattr(sys, "executable", "python")
     ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+    diag_text = "\n".join(_diag)
+
+    # Check if the venv geoai package exists on disk
+    venv_check = ""
+    try:
+        from .core.venv_manager import VENV_DIR, get_venv_site_packages
+
+        sp = get_venv_site_packages()
+        geoai_in_venv = os.path.join(sp, "geoai", "__init__.py")
+        venv_check = (
+            f"\n\nVenv check:\n"
+            f"  VENV_DIR: {VENV_DIR}\n"
+            f"  site-packages: {sp}\n"
+            f"  exists: {os.path.exists(sp)}\n"
+            f"  geoai/__init__.py exists: {os.path.exists(geoai_in_venv)}"
+        )
+    except Exception as exc:
+        venv_check = f"\n\nVenv check failed: {exc}"
+
     raise ImportError(
-        "GeoAI plugin could not import the external 'geoai' library because the plugin "
-        "package name shadows it.\n\n"
-        f"QGIS Python:\n  executable: {py}\n  version: {ver}\n\n"
-        "Fix: install the GeoAI Python package into *this same Python environment*.\n"
-        "In QGIS, open Python Console and run:\n"
+        "GeoAI plugin could not import the external 'geoai' library.\n\n"
+        f"QGIS Python:\n  executable: {py}\n  version: {ver}\n"
+        f"{venv_check}\n\n"
+        f"Strategy diagnostics:\n{diag_text}\n\n"
+        "Fix: Click any GeoAI toolbar button to open the dependency installer,\n"
+        "which will automatically download and install all required packages.\n\n"
+        "Alternatively, install the GeoAI Python package manually:\n"
+        "  In QGIS Python Console, run:\n"
         "  import sys, subprocess\n"
         "  subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'geoai-py'])\n"
-        "If you encounter issues, please consult the QGIS documentation for your "
-        "platform regarding installing Python packages for use in QGIS.\n"
     )

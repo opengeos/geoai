@@ -35,6 +35,12 @@ class GeoAIPlugin:
         self._deepforest_dock = None
         self._water_segmentation_dock = None
 
+        # Dependency installation state
+        self._deps_available = False
+        self._deps_install_worker = None
+        self._pending_dock_action = None
+        self._deps_dock = None
+
     def add_action(
         self,
         icon_path,
@@ -230,6 +236,23 @@ class GeoAIPlugin:
 
     def unload(self):
         """Remove the plugin menu item and icon from QGIS GUI."""
+        # Stop install worker if running
+        if self._deps_install_worker:
+            if self._deps_install_worker.isRunning():
+                try:
+                    self._deps_install_worker.cancel()
+                    self._deps_install_worker.terminate()
+                    self._deps_install_worker.wait(5000)
+                except RuntimeError:
+                    pass
+            self._deps_install_worker = None
+
+        # Remove deps dock
+        if self._deps_dock:
+            self.iface.removeDockWidget(self._deps_dock)
+            self._deps_dock.deleteLater()
+            self._deps_dock = None
+
         # Remove dock widgets
         if self._moondream_dock:
             self.iface.removeDockWidget(self._moondream_dock)
@@ -273,8 +296,141 @@ class GeoAIPlugin:
         if self.menu:
             self.menu.deleteLater()
 
+    # ------------------------------------------------------------------
+    # Dependency management
+    # ------------------------------------------------------------------
+
+    def _ensure_dependencies(self, action_name):
+        """Check if dependencies are installed, show installer if not.
+
+        Args:
+            action_name: Name of the dock to open after installation
+                (e.g., 'moondream', 'samgeo').
+
+        Returns:
+            True if dependencies are available, False if installer was shown.
+        """
+        if self._deps_available:
+            return True
+
+        try:
+            from .core.venv_manager import (
+                ensure_venv_packages_available,
+                get_venv_status,
+            )
+
+            is_ready, message = get_venv_status()
+            if is_ready:
+                ensure_venv_packages_available()
+                self._deps_available = True
+                return True
+        except Exception:
+            pass
+
+        # Dependencies not available -- show the installer dock
+        self._pending_dock_action = action_name
+        self._show_deps_install_dock()
+        return False
+
+    def _show_deps_install_dock(self):
+        """Create and show the dependency installation dock widget."""
+        if self._deps_dock is not None:
+            self._deps_dock.show()
+            self._deps_dock.raise_()
+            return
+
+        from .dialogs.deps_install_dialog import DepsInstallDockWidget
+
+        self._deps_dock = DepsInstallDockWidget(self.iface.mainWindow())
+        self._deps_dock.install_requested.connect(self._on_install_requested)
+        self._deps_dock.cancel_requested.connect(self._on_cancel_install)
+
+        self.iface.addDockWidget(Qt.RightDockWidgetArea, self._deps_dock)
+        self._deps_dock.show()
+        self._deps_dock.raise_()
+
+    def _on_install_requested(self):
+        """Handle install button click from the deps dock."""
+        if self._deps_install_worker and self._deps_install_worker.isRunning():
+            return
+
+        from .core.venv_manager import detect_nvidia_gpu
+        from .workers.deps_install_worker import DepsInstallWorker
+
+        has_gpu, _ = detect_nvidia_gpu()
+
+        self._deps_install_worker = DepsInstallWorker(cuda_enabled=has_gpu)
+        self._deps_install_worker.progress.connect(self._on_install_progress)
+        self._deps_install_worker.finished.connect(self._on_install_finished)
+
+        if self._deps_dock:
+            self._deps_dock.show_progress_ui()
+
+        self._deps_install_worker.start()
+
+    def _on_install_progress(self, percent, message):
+        """Handle progress updates from the install worker.
+
+        Args:
+            percent: Progress percentage (0-100).
+            message: Status message.
+        """
+        if self._deps_dock:
+            self._deps_dock.set_progress(percent, message)
+
+    def _on_install_finished(self, success, message):
+        """Handle installation completion.
+
+        Args:
+            success: Whether installation succeeded.
+            message: Completion message.
+        """
+        if self._deps_dock:
+            self._deps_dock.show_complete_ui(success, message)
+
+        if success:
+            self._deps_available = True
+
+            # Ensure venv packages are on sys.path
+            try:
+                from .core.venv_manager import ensure_venv_packages_available
+
+                ensure_venv_packages_available()
+            except Exception:
+                pass
+
+            # Close the deps dock and open the originally requested panel
+            if self._deps_dock:
+                self.iface.removeDockWidget(self._deps_dock)
+                self._deps_dock.deleteLater()
+                self._deps_dock = None
+
+            if self._pending_dock_action:
+                action_map = {
+                    "moondream": self.toggle_moondream_dock,
+                    "segmentation": self.toggle_segmentation_dock,
+                    "instance_segmentation": self.toggle_instance_segmentation_dock,
+                    "samgeo": self.toggle_samgeo_dock,
+                    "deepforest": self.toggle_deepforest_dock,
+                    "water_segmentation": self.toggle_water_segmentation_dock,
+                }
+                callback = action_map.get(self._pending_dock_action)
+                self._pending_dock_action = None
+                if callback:
+                    callback()
+
+    def _on_cancel_install(self):
+        """Handle cancel button click during installation."""
+        if self._deps_install_worker and self._deps_install_worker.isRunning():
+            self._deps_install_worker.cancel()
+        if self._deps_dock:
+            self._deps_dock.show_install_ui()
+
     def toggle_moondream_dock(self):
         """Toggle the Moondream dock widget visibility."""
+        if not self._ensure_dependencies("moondream"):
+            return
+
         if self._moondream_dock is None:
             try:
                 from .dialogs.moondream import MoondreamDockWidget
@@ -313,6 +469,9 @@ class GeoAIPlugin:
 
     def toggle_segmentation_dock(self):
         """Toggle the Semantic Segmentation dock widget visibility."""
+        if not self._ensure_dependencies("segmentation"):
+            return
+
         if self._segmentation_dock is None:
             try:
                 from .dialogs.segmentation import SegmentationDockWidget
@@ -353,6 +512,9 @@ class GeoAIPlugin:
 
     def toggle_samgeo_dock(self):
         """Toggle the SamGeo dock widget visibility."""
+        if not self._ensure_dependencies("samgeo"):
+            return
+
         if self._samgeo_dock is None:
             try:
                 from .dialogs.samgeo import SamGeoDockWidget
@@ -391,6 +553,9 @@ class GeoAIPlugin:
 
     def toggle_deepforest_dock(self):
         """Toggle the DeepForest dock widget visibility."""
+        if not self._ensure_dependencies("deepforest"):
+            return
+
         if self._deepforest_dock is None:
             try:
                 from .dialogs.deepforest_panel import DeepForestDockWidget
@@ -429,6 +594,9 @@ class GeoAIPlugin:
 
     def toggle_water_segmentation_dock(self):
         """Toggle the Water Segmentation dock widget visibility."""
+        if not self._ensure_dependencies("water_segmentation"):
+            return
+
         if self._water_segmentation_dock is None:
             try:
                 from .dialogs.water_segmentation import (
@@ -473,6 +641,9 @@ class GeoAIPlugin:
 
     def toggle_instance_segmentation_dock(self):
         """Toggle the Instance Segmentation dock widget visibility."""
+        if not self._ensure_dependencies("instance_segmentation"):
+            return
+
         if self._instance_segmentation_dock is None:
             try:
                 from .dialogs.instance_segmentation import (
