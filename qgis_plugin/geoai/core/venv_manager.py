@@ -849,9 +849,7 @@ def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
 
             # Check it's not already inside a try block
             preceding_lines = content[max(0, idx - 80) : idx].split("\n")
-            already_guarded = any(
-                "try:" in line for line in preceding_lines[-4:]
-            )
+            already_guarded = any("try:" in line for line in preceding_lines[-4:])
             if already_guarded:
                 continue
 
@@ -875,10 +873,7 @@ def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
                 for line in import_block.rstrip("\n").split("\n")
             )
             replacement = (
-                "try:\n"
-                + indented
-                + "except (ImportError, OSError):\n"
-                + "    pass\n"
+                "try:\n" + indented + "except (ImportError, OSError):\n" + "    pass\n"
             )
             content = content[:idx] + replacement + content[end_idx:]
 
