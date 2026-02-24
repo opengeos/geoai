@@ -849,18 +849,24 @@ def _repair_corrupted_geoai_init(site_packages: str) -> None:
 
 
 def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
-    """Patch the venv's geoai package so ``except ImportError`` also catches ``OSError``.
+    """Patch the venv's geoai package for Windows DLL load failures.
 
     On Windows, torch DLLs may fail to load inside QGIS's Python process
-    (WinError 127), raising ``OSError`` instead of ``ImportError``.  The
-    published ``geoai`` package already wraps all optional imports in
-    ``try/except ImportError:`` blocks — this function simply widens those
-    to ``except (ImportError, OSError):`` so they also catch DLL load
-    failures.
+    (WinError 127), raising ``OSError`` instead of ``ImportError``.
 
-    Files patched:
-    - ``geoai/__init__.py``
-    - ``geoai/tools/__init__.py``
+    This function applies two transformations:
+
+    1. **Widen existing guards**: ``except ImportError:`` →
+       ``except (ImportError, OSError):`` so existing try/except blocks
+       also catch DLL load failures.
+
+    2. **Wrap bare imports**: Any torch-dependent ``from .xxx import ...``
+       that is NOT already inside a ``try`` block gets wrapped in
+       ``try: ... except (ImportError, OSError): pass``.
+
+    Both ``geoai/__init__.py`` and ``geoai/tools/__init__.py`` are patched.
+    The result is verified with ``compile()`` before writing — if the
+    patched code would have a syntax error, the file is left unchanged.
 
     This is idempotent — already-patched files are left unchanged.
 
@@ -875,15 +881,15 @@ def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
 
     geoai_dir = os.path.join(site_packages, "geoai")
 
-    # Files to patch: all need "except ImportError:" → "except (ImportError, OSError):"
-    targets = [
+    # Files to patch with the simple except replacement.
+    simple_targets = [
         os.path.join(geoai_dir, "__init__.py"),
         os.path.join(geoai_dir, "tools", "__init__.py"),
     ]
 
     any_patched = False
 
-    for filepath in targets:
+    for filepath in simple_targets:
         if not os.path.exists(filepath):
             continue
 
@@ -891,8 +897,6 @@ def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Simple, safe replacement: widen ImportError guards to also
-            # catch OSError (from DLL load failures on Windows).
             new_content = content.replace(
                 "except ImportError:", "except (ImportError, OSError):"
             )
@@ -901,19 +905,148 @@ def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(new_content)
                 rel = os.path.relpath(filepath, site_packages)
-                _log(
-                    "Patched {} for OSError guards".format(rel),
-                    Qgis.Info,
-                )
+                _log("Patched {} (except widening)".format(rel), Qgis.Info)
                 any_patched = True
 
         except Exception as exc:
             rel = os.path.relpath(filepath, site_packages)
             _log("Failed to patch {}: {}".format(rel, exc), Qgis.Warning)
 
+    # Wrap bare torch-dependent imports in geoai/__init__.py.
+    init_path = os.path.join(geoai_dir, "__init__.py")
+    if os.path.exists(init_path):
+        try:
+            any_patched |= _wrap_bare_imports(init_path)
+        except Exception as exc:
+            _log(
+                "Failed to wrap bare imports: {}".format(exc), Qgis.Warning
+            )
+
     if not any_patched:
         _log("geoai package already patched, no changes needed", Qgis.Info)
 
+    return True
+
+
+def _wrap_bare_imports(filepath: str) -> bool:
+    """Wrap bare torch-dependent imports in try/except guards.
+
+    Processes the file line-by-line to find import statements that match
+    known torch-dependent patterns and are NOT already inside a try block.
+    Wraps them in ``try: ... except (ImportError, OSError): pass``.
+
+    The patched content is verified with ``compile()`` before writing.
+
+    Args:
+        filepath: Path to the Python file to patch.
+
+    Returns:
+        True if the file was modified.
+    """
+    # Patterns that indicate torch-dependent imports.
+    bare_patterns = [
+        "from .dinov3 import",
+        "from .timm_train import",
+        "from .recognize import",
+        "from .timm_segment import",
+        "from .timm_regress import",
+        "from . import tools",
+        "from .tools import",
+        "from .object_detect import",
+        "from .water import",
+        "from .canopy import",
+        "from .change_detection import",
+        "from .prithvi import",
+        "from .moondream import",
+        "from .map_widgets import",
+        "from .onnx import",
+    ]
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    new_lines = []
+    i = 0
+    modified = False
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        # Check if this line starts a bare import matching our patterns.
+        matches_pattern = any(stripped.startswith(p) for p in bare_patterns)
+
+        if matches_pattern:
+            # Check if already inside a try block (look at preceding
+            # non-blank lines for "try:").
+            already_guarded = False
+            for j in range(len(new_lines) - 1, max(len(new_lines) - 5, -1), -1):
+                prev = new_lines[j].strip()
+                if prev == "try:":
+                    already_guarded = True
+                    break
+                if prev and not prev.startswith("#"):
+                    break  # Non-blank, non-comment line that isn't try:
+
+            if already_guarded:
+                new_lines.append(line)
+                i += 1
+                continue
+
+            # Collect the full import statement (may span multiple lines
+            # if it uses parentheses).
+            import_lines = [line]
+            if "(" in line and ")" not in line:
+                i += 1
+                while i < len(lines):
+                    import_lines.append(lines[i])
+                    if ")" in lines[i]:
+                        i += 1
+                        break
+                    i += 1
+            else:
+                i += 1
+
+            # Determine indentation from the original line.
+            indent = line[: len(line) - len(line.lstrip())]
+
+            # Build the wrapped block.
+            new_lines.append("{}try:\n".format(indent))
+            for imp_line in import_lines:
+                # Add 4 spaces of indentation to the import line.
+                if imp_line.strip():
+                    new_lines.append("{}    {}\n".format(indent, imp_line.strip()))
+                else:
+                    new_lines.append("\n")
+            new_lines.append("{}except (ImportError, OSError):\n".format(indent))
+            new_lines.append("{}    pass\n".format(indent))
+            modified = True
+        else:
+            new_lines.append(line)
+            i += 1
+
+    if not modified:
+        return False
+
+    new_content = "".join(new_lines)
+
+    # Safety check: verify the patched code compiles.
+    try:
+        compile(new_content, filepath, "exec")
+    except SyntaxError as exc:
+        _log(
+            "Patched {} would have syntax error at line {}, "
+            "skipping write".format(filepath, exc.lineno),
+            Qgis.Warning,
+        )
+        return False
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(new_content)
+    _log(
+        "Wrapped bare imports in {}".format(os.path.basename(filepath)),
+        Qgis.Info,
+    )
     return True
 
 
