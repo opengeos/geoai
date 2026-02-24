@@ -105,6 +105,10 @@
          <lastmod>2026-02-24</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/recognize/</loc>
+         <lastmod>2026-02-24</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/sam/</loc>
          <lastmod>2026-02-24</lastmod>
     </url>
@@ -294,6 +298,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/image_chips/</loc>
+         <lastmod>2026-02-24</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/image_recognition/</loc>
          <lastmod>2026-02-24</lastmod>
     </url>
     <url>
