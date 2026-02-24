@@ -31,6 +31,31 @@ _log = logging.getLogger(__name__)
 _diag: list[str] = []
 
 
+class _TorchImportBlocker:
+    """Meta path finder that blocks ``import torch`` with an ImportError.
+
+    On Windows, torch DLLs may fail to load inside QGIS's process with
+    ``OSError`` (WinError 127).  Most code only catches ``ImportError``,
+    so the ``OSError`` propagates and crashes the entire import chain.
+
+    This blocker converts ``import torch`` into a clean ``ImportError``
+    so that existing ``try/except ImportError`` guards work correctly.
+    It should be installed temporarily and removed after use.
+    """
+
+    def find_module(self, fullname, path=None):
+        """Return self as loader for torch and torch sub-modules."""
+        if fullname == "torch" or fullname.startswith("torch."):
+            return self
+        return None
+
+    def load_module(self, fullname):
+        """Raise ImportError for any torch import."""
+        raise ImportError(
+            f"{fullname} is not available (torch DLLs incompatible with QGIS process)"
+        )
+
+
 def _is_plugin_module(mod: ModuleType) -> bool:
     """Returns True if *mod* is a QGIS plugin package rather than the external library.
 
@@ -269,47 +294,50 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
         return _finalize(module)
     except OSError as exc:
         # On Windows, torch DLL loading can fail with WinError 127.
-        # Patch the venv's geoai/__init__.py to guard torch imports,
-        # then retry the load.
+        # Install a torch import blocker so ALL transitive torch imports
+        # raise ImportError, then retry.
         _diag.append(f"  load {init_path}: OSError: {exc}")
         _cleanup_and_restore()
 
         if sys.platform == "win32" and "torch" in str(exc).lower():
-            _diag.append("  Attempting to patch geoai/__init__.py for torch guards")
+            _diag.append("  Installing torch import blocker and retrying")
+
+            # Remove any partial torch entries from sys.modules
+            for key in list(sys.modules.keys()):
+                if key == "torch" or key.startswith("torch."):
+                    del sys.modules[key]
+
+            # Install a meta path finder that blocks torch imports
+            blocker = _TorchImportBlocker()
+            sys.meta_path.insert(0, blocker)
+
+            # Re-remove geoai entries for fresh attempt
+            for key in list(sys.modules.keys()):
+                if key == "geoai" or key.startswith("geoai."):
+                    sys.modules.pop(key, None)
+
             try:
-                from .core.venv_manager import patch_geoai_init_for_torch_guard
-
-                patched = patch_geoai_init_for_torch_guard(str(site_packages))
-            except Exception as patch_exc:
-                _diag.append(f"  patch import failed: {patch_exc}")
-                patched = False
-
-            if patched:
-                _diag.append("  Retrying load after patching")
-                # Re-remove geoai entries for fresh attempt
-                saved2 = {}
-                for key in list(sys.modules.keys()):
-                    if key == "geoai" or key.startswith("geoai."):
-                        saved2[key] = sys.modules.pop(key)
+                module = _attempt_load()
+                if module is not None:
+                    for key, mod in saved.items():
+                        if key.startswith("geoai.") and key not in sys.modules:
+                            sys.modules[key] = mod
+                    _diag.append("  retry with torch blocker: SUCCESS")
+                    return _finalize(module)
+            except Exception as retry_exc:
+                tb_str = traceback.format_exc()
+                _diag.append(
+                    f"  retry with torch blocker FAILED: {retry_exc}\n{tb_str}"
+                )
+            finally:
+                # Always remove the blocker
                 try:
-                    module = _attempt_load()
-                    if module is not None:
-                        # Restore plugin sub-modules from original saved set
-                        for key, mod in saved.items():
-                            if key.startswith("geoai.") and key not in sys.modules:
-                                sys.modules[key] = mod
-                        return _finalize(module)
-                except Exception as retry_exc:
-                    tb_str = traceback.format_exc()
-                    _diag.append(f"  retry load FAILED: {retry_exc}\n{tb_str}")
-                # Restore on retry failure
-                for key in list(sys.modules.keys()):
-                    if key == "geoai" or key.startswith("geoai."):
-                        try:
-                            del sys.modules[key]
-                        except KeyError:
-                            pass
-                sys.modules.update(saved)
+                    sys.meta_path.remove(blocker)
+                except ValueError:
+                    pass
+
+            # Restore on retry failure
+            _cleanup_and_restore()
         return None
     except Exception as exc:
         tb_str = traceback.format_exc()

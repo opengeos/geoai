@@ -193,7 +193,11 @@ except (ImportError, OSError):
     pass
 
 # Import tools subpackage
-from . import tools
+try:
+    from . import tools
+except (ImportError, OSError):
+    # tools subpackage not available (dependency or DLL load failure)
+    pass
 
 # Expose commonly used tools at package level for convenience
 try:
@@ -203,7 +207,7 @@ try:
         clean_raster_batch,
         compare_masks,
     )
-except ImportError:
+except (ImportError, OSError):
     # MultiClean not available (missing dependency)
     pass
 
@@ -211,7 +215,7 @@ except ImportError:
 
 try:
     from .tools import super_resolution
-except ImportError:
+except (ImportError, OSError):
     # super_resolution not available (missing dependency)
     pass
 
@@ -223,7 +227,7 @@ try:
         onnx_semantic_segmentation,
         onnx_image_classification,
     )
-except ImportError:
+except (ImportError, OSError):
     # ONNX not available (missing dependency)
     pass
 
@@ -241,7 +245,7 @@ try:
         moondream_point_sliding_window,
     )
     from .map_widgets import moondream_gui
-except ImportError:
+except (ImportError, OSError):
     # Moondream not available (missing dependency)
     pass
 
@@ -253,7 +257,7 @@ try:
         load_prithvi_model,
         prithvi_inference,
     )
-except ImportError:
+except (ImportError, OSError):
     # Prithvi not available (missing dependency)
     pass
 
@@ -264,7 +268,7 @@ try:
         changestar_detect,
         list_changestar_models,
     )
-except ImportError:
+except (ImportError, OSError):
     # ChangeStar not available (missing torchange dependency)
     pass
 
@@ -275,7 +279,7 @@ try:
         canopy_height_estimation,
         list_canopy_models,
     )
-except ImportError:
+except (ImportError, OSError):
     # Canopy height estimation not available (missing torch dependency)
     pass
 
@@ -290,7 +294,7 @@ try:
         tessera_available_years,
         tessera_sample_points,
     )
-except ImportError:
+except (ImportError, OSError):
     # TESSERA not available (missing geotessera dependency)
     pass
 
@@ -313,7 +317,7 @@ try:
         download_google_satellite_embedding,
         EMBEDDING_DATASETS,
     )
-except ImportError:
+except (ImportError, OSError):
     # Embeddings not available (missing torchgeo >= 0.9.0 or sklearn)
     pass
 
@@ -330,12 +334,12 @@ try:
         visualize_multiclass_detections,
         evaluate_multiclass_detector,
     )
-except ImportError:
+except (ImportError, OSError):
     pass
 
 # OmniWaterMask water body segmentation
 try:
     from .water import segment_water, BAND_ORDER_PRESETS
-except ImportError:
+except (ImportError, OSError):
     # OmniWaterMask not available (missing omniwatermask dependency)
     pass
