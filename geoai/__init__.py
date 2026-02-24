@@ -99,6 +99,16 @@ def set_proj_lib_path(verbose=False):
 # if ("google.colab" not in sys.modules) and (sys.platform != "windows"):
 #     set_proj_lib_path()
 
+from .pipeline import (
+    Pipeline,
+    PipelineStep,
+    FunctionStep,
+    GlobStep,
+    PipelineResult,
+    load_pipeline,
+    register_step,
+)
+
 from .dinov3 import DINOv3GeoProcessor, analyze_image_patches, create_similarity_map
 from .geoai import *
 from .utils import (

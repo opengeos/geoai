@@ -121,5 +121,108 @@ def download(source, bbox, output, year):
             sys.exit(1)
 
 
+@main.group()
+def pipeline():
+    """Run and manage batch processing pipelines."""
+    pass
+
+
+@pipeline.command()
+@click.argument("config_path", type=click.Path(exists=True))
+@click.option("--input-dir", "-i", help="Input directory (overrides config).")
+@click.option("--output-dir", "-o", help="Output directory (overrides config).")
+@click.option("--max-workers", "-w", type=int, help="Number of parallel workers.")
+@click.option("--checkpoint-dir", "-c", help="Checkpoint directory for resume support.")
+@click.option(
+    "--on-error",
+    type=click.Choice(["skip", "fail"]),
+    default=None,
+    help="Error handling policy.",
+)
+@click.option("--quiet", "-q", is_flag=True, help="Suppress progress bars.")
+def run(
+    config_path, input_dir, output_dir, max_workers, checkpoint_dir, on_error, quiet
+):
+    """Run a pipeline from a JSON or YAML config file.
+
+    CONFIG_PATH is the path to a .json or .yaml pipeline definition.
+    YAML support requires PyYAML (pip install pyyaml).
+
+    \b
+    Examples:
+        geoai pipeline run segmentation.yaml -i ./data -o ./results
+        geoai pipeline run batch_config.json --max-workers 4 -c ./checkpoints
+    """
+    from geoai.pipeline import load_pipeline
+
+    overrides = {}
+    if max_workers is not None:
+        overrides["max_workers"] = max_workers
+    if checkpoint_dir is not None:
+        overrides["checkpoint_dir"] = checkpoint_dir
+    if on_error is not None:
+        overrides["on_error"] = on_error
+    if quiet:
+        overrides["quiet"] = quiet
+
+    try:
+        pipe = load_pipeline(config_path, **overrides)
+    except Exception as e:
+        click.echo(f"Error loading pipeline config: {e}", err=True)
+        sys.exit(1)
+
+    kwargs = {}
+    if input_dir:
+        kwargs["input_dir"] = input_dir
+    if output_dir:
+        kwargs["output_dir"] = output_dir
+
+    try:
+        result = pipe.run(**kwargs)
+    except Exception as e:
+        click.echo(f"Pipeline error: {e}", err=True)
+        sys.exit(1)
+
+    summary = result.summary
+    click.echo(f"\nPipeline complete:")
+    click.echo(f"  Completed: {summary['completed']}")
+    click.echo(f"  Failed:    {summary['failed']}")
+    click.echo(f"  Skipped:   {summary['skipped']}")
+    click.echo(f"  Duration:  {summary['total_duration']}s")
+
+    if result.checkpoint_path:
+        click.echo(f"  Checkpoint: {result.checkpoint_path}")
+
+    if result.failed:
+        click.echo("\nFailed items:")
+        for item, error in result.failed[:10]:
+            click.echo(f"  - {item.get('input_path', '?')}: {error}")
+        if len(result.failed) > 10:
+            click.echo(f"  ... and {len(result.failed) - 10} more")
+
+
+@pipeline.command()
+@click.argument("config_path", type=click.Path(exists=True))
+def show(config_path):
+    """Display a pipeline configuration.
+
+    CONFIG_PATH is the path to a .json or .yaml pipeline definition.
+    """
+    from geoai.pipeline import load_pipeline
+
+    try:
+        pipe = load_pipeline(config_path)
+    except Exception as e:
+        click.echo(f"Error loading pipeline config: {e}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Pipeline: {pipe.name}")
+    click.echo(f"Workers:  {pipe.max_workers}")
+    click.echo(f"On error: {pipe.on_error.value}")
+    click.echo(f"Steps ({len(pipe.steps)}):")
+    for i, step in enumerate(pipe.steps, 1):
+        click.echo(f"  {i}. {step}")
+
+
 if __name__ == "__main__":
     main()
