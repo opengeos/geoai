@@ -109,7 +109,12 @@ from .pipeline import (
     register_step,
 )
 
-from .dinov3 import DINOv3GeoProcessor, analyze_image_patches, create_similarity_map
+try:
+    from .dinov3 import DINOv3GeoProcessor, analyze_image_patches, create_similarity_map
+except (ImportError, OSError):
+    # DINOv3 not available (missing torch dependency or DLL load failure)
+    pass
+
 from .geoai import *
 from .utils import (
     orthogonalize,
@@ -120,56 +125,72 @@ from .utils import (
     export_flipnslide_tiles,
 )
 
-from .timm_train import (
-    get_timm_model,
-    modify_first_conv_for_channels,
-    TimmClassifier,
-    RemoteSensingDataset,
-    train_timm_classifier,
-    predict_with_timm,
-    list_timm_models,
-)
+try:
+    from .timm_train import (
+        get_timm_model,
+        modify_first_conv_for_channels,
+        TimmClassifier,
+        RemoteSensingDataset,
+        train_timm_classifier,
+        predict_with_timm,
+        list_timm_models,
+    )
+except (ImportError, OSError):
+    # timm_train not available (missing torch/timm dependency)
+    pass
 
-from .recognize import (
-    ImageDataset,
-    load_image_dataset,
-    train_image_classifier,
-    predict_images,
-    evaluate_classifier,
-    plot_training_history as plot_classification_history,
-    plot_confusion_matrix,
-    plot_predictions,
-)
+try:
+    from .recognize import (
+        ImageDataset,
+        load_image_dataset,
+        train_image_classifier,
+        predict_images,
+        evaluate_classifier,
+        plot_training_history as plot_classification_history,
+        plot_confusion_matrix,
+        plot_predictions,
+    )
+except (ImportError, OSError):
+    # recognize not available (missing torch dependency)
+    pass
 
-from .timm_segment import (
-    TimmSegmentationModel,
-    SegmentationDataset,
-    train_timm_segmentation,
-    predict_segmentation,
-    train_timm_segmentation_model,
-    timm_semantic_segmentation,
-    push_timm_model_to_hub,
-    timm_segmentation_from_hub,
-)
+try:
+    from .timm_segment import (
+        TimmSegmentationModel,
+        SegmentationDataset,
+        train_timm_segmentation,
+        predict_segmentation,
+        train_timm_segmentation_model,
+        timm_semantic_segmentation,
+        push_timm_model_to_hub,
+        timm_segmentation_from_hub,
+    )
+except (ImportError, OSError):
+    # timm_segment not available (missing torch/timm dependency)
+    pass
 
-from .timm_regress import (
-    PixelRegressionModel,
-    PixelRegressionDataset,
-    create_regression_tiles,
-    train_pixel_regressor,
-    predict_raster,
-    evaluate_regression,
-    plot_regression_comparison,
-    plot_scatter,
-    plot_training_history,
-    visualize_prediction,
-    plot_regression_results,
-    # Backward compatibility aliases
-    TimmRegressor,
-    RegressionDataset,
-    train_timm_regressor,
-    create_regression_patches,
-)
+try:
+    from .timm_regress import (
+        PixelRegressionModel,
+        PixelRegressionDataset,
+        create_regression_tiles,
+        train_pixel_regressor,
+        predict_raster,
+        evaluate_regression,
+        plot_regression_comparison,
+        plot_scatter,
+        plot_training_history,
+        visualize_prediction,
+        plot_regression_results,
+        # Backward compatibility aliases
+        TimmRegressor,
+        RegressionDataset,
+        train_timm_regressor,
+        create_regression_patches,
+    )
+except (ImportError, OSError):
+    # timm_regress not available (missing torch/timm dependency)
+    pass
 
 # Import tools subpackage
 from . import tools
