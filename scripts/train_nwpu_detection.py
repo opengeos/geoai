@@ -38,7 +38,7 @@ def download_dataset(data_dir="NWPU-VHR-10"):
         dict: Dataset split information including paths and class names.
     """
     print("Downloading NWPU-VHR-10 dataset...")
-    dataset_path = geoai.download_nwpu_vhr10()
+    dataset_path = geoai.download_nwpu_vhr10(output_dir=data_dir)
     print(f"Dataset downloaded to: {dataset_path}")
 
     print("\nPreparing train/val splits...")

@@ -446,7 +446,9 @@ class COCODetectionDataset(Dataset):
                 annotations_by_image[img_id] = []
             annotations_by_image[img_id].append(ann)
 
-        # Filter to requested image_ids or all images with annotations
+        # Filter to requested image_ids or all images with annotations.
+        # By default, only images that have at least one annotation are
+        # included.  Pass explicit image_ids to include negatives.
         if image_ids is not None:
             valid_ids = [img_id for img_id in image_ids if img_id in image_info_map]
         else:
@@ -612,8 +614,9 @@ class COCODetectionDataset(Dataset):
             # Get bounding box from annotation or compute from mask
             if "bbox" in ann:
                 x, y, w, h = ann["bbox"]
-                xmin, ymin = int(x), int(y)
-                xmax, ymax = int(x + w), int(y + h)
+                # Keep as floats to avoid systematic box shrinking from truncation
+                xmin, ymin = float(x), float(y)
+                xmax, ymax = float(x + w), float(y + h)
             else:
                 pos = np.where(mask)
                 if len(pos[0]) == 0:
@@ -629,13 +632,16 @@ class COCODetectionDataset(Dataset):
             masks.append(mask)
             labels.append(self.category_mapping.get(ann["category_id"], 1))
 
+        # Use the actual COCO image id (not the dataset index)
+        coco_image_id = info["id"]
+
         # Handle case with no valid instances
         if len(boxes) == 0:
             target = {
                 "boxes": torch.zeros((0, 4), dtype=torch.float32),
                 "labels": torch.zeros((0,), dtype=torch.int64),
                 "masks": torch.zeros((0, height, width), dtype=torch.uint8),
-                "image_id": torch.tensor([idx]),
+                "image_id": torch.tensor([coco_image_id]),
                 "area": torch.zeros((0,), dtype=torch.float32),
                 "iscrowd": torch.zeros((0,), dtype=torch.int64),
             }
@@ -648,7 +654,7 @@ class COCODetectionDataset(Dataset):
                 "boxes": boxes_t,
                 "labels": labels_t,
                 "masks": masks_t,
-                "image_id": torch.tensor([idx]),
+                "image_id": torch.tensor([coco_image_id]),
                 "area": area,
                 "iscrowd": torch.zeros_like(labels_t),
             }
@@ -1107,9 +1113,13 @@ def train_MaskRCNN_model(
             min_area=10,
         )
 
-        # Auto-detect num_classes from annotations if using default
-        if num_classes == 2:
-            num_classes = full_dataset.num_classes
+        # Auto-detect num_classes from annotations when not explicitly set.
+        # We check for the default (2) AND that the dataset has more classes,
+        # so explicitly passing num_classes=2 for a binary COCO dataset still
+        # works (the dataset won't have more than 2 classes in that case).
+        detected = full_dataset.num_classes
+        if num_classes == 2 and detected > 2:
+            num_classes = detected
             if verbose:
                 print(
                     f"Auto-detected {num_classes} classes "
@@ -1902,14 +1912,13 @@ def multiclass_detection_inference_on_geotiff(
         width = src.width
 
         out_meta = meta.copy()
-        out_meta.update({"count": 2, "dtype": "uint16"})
 
         all_detections = []
 
-        steps_y = math.ceil((height - overlap) / (window_size - overlap))
-        steps_x = math.ceil((width - overlap) / (window_size - overlap))
-        last_y = height - window_size
-        last_x = width - window_size
+        stride = window_size - overlap
+        # Compute exact number of steps so loop bounds match total_windows
+        steps_y = max(1, math.ceil((height - window_size) / stride) + 1)
+        steps_x = max(1, math.ceil((width - window_size) / stride) + 1)
         total_windows = steps_y * steps_x
 
         print(
@@ -1923,17 +1932,13 @@ def multiclass_detection_inference_on_geotiff(
         batch_count = 0
         start_time = time.time()
 
-        for i in range(steps_y + 1):
-            y = min(i * (window_size - overlap), last_y)
+        for i in range(steps_y):
+            y = min(i * stride, height - window_size)
             y = max(0, y)
-            if y > last_y and i > 0:
-                continue
 
-            for j in range(steps_x + 1):
-                x = min(j * (window_size - overlap), last_x)
+            for j in range(steps_x):
+                x = min(j * stride, width - window_size)
                 x = max(0, x)
-                if x > last_x and j > 0:
-                    continue
 
                 window = src.read(window=Window(x, y, window_size, window_size))
                 if window.shape[1] == 0 or window.shape[2] == 0:
@@ -1957,7 +1962,7 @@ def multiclass_detection_inference_on_geotiff(
                 batch_positions.append((y, x, actual_height, actual_width))
                 batch_count += 1
 
-                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                if batch_count == batch_size or (i == steps_y - 1 and j == steps_x - 1):
                     with torch.no_grad():
                         outputs = model(batch_inputs)
 
@@ -1984,12 +1989,12 @@ def multiclass_detection_inference_on_geotiff(
                                     box[3] + y_pos,
                                 ]
 
-                                global_mask = np.zeros((height, width), dtype=bool)
-                                global_mask[y_pos : y_pos + h, x_pos : x_pos + w] = mask
-
+                                # Store compact mask (window-sized) with
+                                # offset to avoid full-image allocation
                                 all_detections.append(
                                     {
-                                        "mask": global_mask,
+                                        "mask": mask,
+                                        "mask_offset": (y_pos, x_pos, h, w),
                                         "score": score,
                                         "box": global_box,
                                         "label": label,
@@ -2023,20 +2028,28 @@ def multiclass_detection_inference_on_geotiff(
             final_detections = [all_detections[i] for i in keep_indices]
             print(f"After NMS: {len(final_detections)} detections")
 
-            # Create output rasters
-            class_mask = np.zeros((height, width), dtype=np.uint16)
-            instance_mask = np.zeros((height, width), dtype=np.uint16)
+            # Create output rasters (uint8 for class, uint32 for instance)
+            class_mask = np.zeros((height, width), dtype=np.uint8)
+            instance_mask = np.zeros((height, width), dtype=np.uint32)
 
             final_detections.sort(key=lambda x: x["score"], reverse=True)
 
+            # Materialize full-size masks only for final kept detections
             for instance_id, detection in enumerate(final_detections, 1):
-                mask = detection["mask"]
-                available_pixels = (instance_mask == 0) & mask
+                compact_mask = detection["mask"]
+                y_pos, x_pos, h, w = detection["mask_offset"]
+                full_mask = np.zeros((height, width), dtype=bool)
+                full_mask[y_pos : y_pos + h, x_pos : x_pos + w] = compact_mask
+                # Replace compact mask with full mask for downstream use
+                detection["mask"] = full_mask
+                del detection["mask_offset"]
+
+                available_pixels = (instance_mask == 0) & full_mask
                 class_mask[available_pixels] = detection["label"]
                 instance_mask[available_pixels] = instance_id
         else:
-            class_mask = np.zeros((height, width), dtype=np.uint16)
-            instance_mask = np.zeros((height, width), dtype=np.uint16)
+            class_mask = np.zeros((height, width), dtype=np.uint8)
+            instance_mask = np.zeros((height, width), dtype=np.uint32)
             final_detections = []
 
         inference_time = time.time() - start_time
@@ -2055,8 +2068,10 @@ def multiclass_detection_inference_on_geotiff(
                 )
                 print(f"  {name}: {count} detections")
 
+        # Write class band as uint8, instance band as uint32
+        out_meta.update({"count": 2, "dtype": "uint32"})
         with rasterio.open(output_path, "w", **out_meta) as dst:
-            dst.write(class_mask, 1)
+            dst.write(class_mask.astype(np.uint32), 1)
             dst.write(instance_mask, 2)
 
         print(f"Saved multi-class detection to {output_path}")

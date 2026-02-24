@@ -57,13 +57,15 @@ def download_nwpu_vhr10(
     format (bounding boxes and instance segmentation masks).
 
     Args:
-        output_dir (str): Directory to save the dataset. Defaults to "NWPU-VHR-10".
+        output_dir (str): Path for the downloaded ZIP file and extracted
+            dataset directory. Defaults to "NWPU-VHR-10".
         overwrite (bool): Whether to overwrite existing files. Defaults to False.
 
     Returns:
         str: Path to the extracted dataset directory.
     """
-    data_path = download_file(NWPU_VHR10_URL, overwrite=overwrite)
+    zip_path = output_dir + ".zip"
+    data_path = download_file(NWPU_VHR10_URL, output_path=zip_path, overwrite=overwrite)
     return data_path
 
 
@@ -237,6 +239,10 @@ def prepare_nwpu_vhr10(
     Converts the original text-based annotations to COCO JSON format,
     then splits the dataset into train/val sets. The original dataset uses
     text files with ``(x1,y1),(x2,y2),class_id`` per line for bounding boxes.
+
+    Note: Only images with at least one annotation are included in the
+    train/val splits. The 150 "negative" images in the NWPU-VHR-10 dataset
+    (those without any target objects) are excluded from the splits.
 
     Args:
         data_dir (str): Path to the extracted NWPU-VHR-10 directory.
@@ -586,22 +592,40 @@ def multiclass_detection(
                 dst.write(img_array, 1)
         input_path = temp_tif
 
-    # Load model
-    model = get_instance_segmentation_model(
-        num_classes=num_classes, num_channels=num_channels, pretrained=False
-    )
-
+    # Resolve model path (download if needed)
     if not os.path.exists(model_path):
         hf_repo = repo_id or NWPU_VHR10_HF_REPO
         from huggingface_hub import hf_hub_download
 
         model_path = hf_hub_download(repo_id=hf_repo, filename=model_path)
 
+    # Try to load class_info.json sidecar for num_classes / class_names
+    class_info_path = os.path.join(os.path.dirname(model_path), "class_info.json")
+    if not use_pretrained and os.path.exists(class_info_path):
+        with open(class_info_path, "r") as f:
+            class_info = json.load(f)
+        num_classes = class_info.get("num_classes", num_classes)
+        if class_names is None:
+            class_names = class_info.get("class_names", class_names)
+
+    # Infer num_classes from checkpoint if still using default
     state_dict = torch.load(model_path, map_location=device)
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()
         }
+
+    # The box predictor's cls_score weight shape is [num_classes, hidden_dim]
+    cls_key = "roi_heads.box_predictor.cls_score.weight"
+    if not use_pretrained and cls_key in state_dict:
+        inferred = state_dict[cls_key].shape[0]
+        if inferred != num_classes:
+            num_classes = inferred
+
+    # Load model
+    model = get_instance_segmentation_model(
+        num_classes=num_classes, num_channels=num_channels, pretrained=False
+    )
     model.load_state_dict(state_dict)
 
     result = multiclass_detection_inference_on_geotiff(
