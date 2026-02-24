@@ -918,9 +918,7 @@ def patch_geoai_init_for_torch_guard(site_packages: str = None) -> bool:
         try:
             any_patched |= _wrap_bare_imports(init_path)
         except Exception as exc:
-            _log(
-                "Failed to wrap bare imports: {}".format(exc), Qgis.Warning
-            )
+            _log("Failed to wrap bare imports: {}".format(exc), Qgis.Warning)
 
     if not any_patched:
         _log("geoai package already patched, no changes needed", Qgis.Info)
