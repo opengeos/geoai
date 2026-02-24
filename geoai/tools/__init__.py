@@ -74,3 +74,44 @@ try:
 except ImportError:
     # Super resolution not installed - function will not be available
     pass
+
+# Time-series analysis utilities (rasterio required)
+try:
+    from .timeseries import (
+        validate_temporal_stack,
+        create_temporal_composite,
+        create_cloud_free_composite,
+        calculate_spectral_index_timeseries,
+        detect_change,
+        calculate_temporal_statistics,
+        extract_dates_from_filenames,
+        sort_by_date,
+        COMPOSITE_METHODS,
+        SPECTRAL_INDICES,
+        CHANGE_METHODS,
+        TEMPORAL_STATISTICS,
+        SENTINEL2_DATE_PATTERN,
+        LANDSAT_DATE_PATTERN,
+    )
+
+    __all__.extend(
+        [
+            "validate_temporal_stack",
+            "create_temporal_composite",
+            "create_cloud_free_composite",
+            "calculate_spectral_index_timeseries",
+            "detect_change",
+            "calculate_temporal_statistics",
+            "extract_dates_from_filenames",
+            "sort_by_date",
+            "COMPOSITE_METHODS",
+            "SPECTRAL_INDICES",
+            "CHANGE_METHODS",
+            "TEMPORAL_STATISTICS",
+            "SENTINEL2_DATE_PATTERN",
+            "LANDSAT_DATE_PATTERN",
+        ]
+    )
+except ImportError:
+    # rasterio not installed - time-series functions will not be available
+    pass
