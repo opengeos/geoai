@@ -130,6 +130,17 @@ from .timm_train import (
     list_timm_models,
 )
 
+from .recognize import (
+    ImageDataset,
+    load_image_dataset,
+    train_image_classifier,
+    predict_images,
+    evaluate_classifier,
+    plot_training_history as plot_classification_history,
+    plot_confusion_matrix,
+    plot_predictions,
+)
+
 from .timm_segment import (
     TimmSegmentationModel,
     SegmentationDataset,

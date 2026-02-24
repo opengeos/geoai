@@ -77,6 +77,7 @@ plugins:
                   "examples/water_segmentation.ipynb",
                   "examples/moondream_sliding_window.ipynb",
                   "examples/torchgeo_embeddings.ipynb",
+                  "examples/image_recognition.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -168,6 +169,7 @@ nav:
           - examples/STAC_agents.ipynb
           - examples/catalog_search_agent.ipynb
           - examples/train_timm_classifier.ipynb
+          - examples/image_recognition.ipynb
           - examples/train_timm_segmentation.ipynb
           - examples/lightly_train_self_supervised.ipynb
           - examples/clean_segmentation_results.ipynb
@@ -213,6 +215,7 @@ nav:
           - moondream module: moondream.md
           - onnx module: onnx.md
           - prithvi module: prithvi.md
+          - recognize module: recognize.md
           - sam module: sam.md
           - segment module: segment.md
           - segmentation module: segmentation.md
