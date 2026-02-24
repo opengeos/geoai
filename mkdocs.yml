@@ -184,6 +184,7 @@ nav:
           - examples/canopy_height.ipynb
           - examples/tessera.ipynb
           - examples/torchgeo_embeddings.ipynb
+          - examples/google_satellite_embedding.ipynb
           - examples/building_detection_whu.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb

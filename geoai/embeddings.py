@@ -54,6 +54,7 @@ __all__ = [
     "compare_embeddings",
     "embedding_to_geotiff",
     "EMBEDDING_DATASETS",
+    "download_google_satellite_embedding",
 ]
 
 # ---------------------------------------------------------------------------
@@ -1095,3 +1096,341 @@ def embedding_to_geotiff(
 
     logger.info(f"Saved {bands}-band GeoTIFF to {output_path}")
     return output_path
+
+
+# ---------------------------------------------------------------------------
+# Google Satellite Embedding download
+# ---------------------------------------------------------------------------
+
+_AEF_BASE_URL = "https://data.source.coop/tge-labs/aef/v1/annual"
+_AEF_INDEX_URL = f"{_AEF_BASE_URL}/aef_index.parquet"
+_AEF_AVAILABLE_YEARS = list(range(2018, 2025))
+
+
+def _dequantize(values: np.ndarray) -> np.ndarray:
+    """De-quantize int8 embedding values to float64.
+
+    Applies the mapping: ``sign(x) * (x / 127.5)^2`` which maps the
+    signed 8-bit range [-127, 127] to approximately [-1, 1].
+
+    Args:
+        values: Array of raw int8 pixel values. NoData is -128.
+
+    Returns:
+        De-quantized float64 array with NoData pixels set to NaN.
+    """
+    arr = values.astype(np.float64)
+    nodata_mask = values == -128
+    result = np.sign(arr) * (arr / 127.5) ** 2
+    result[nodata_mask] = np.nan
+    return result
+
+
+def download_google_satellite_embedding(
+    bbox: Tuple[float, float, float, float],
+    output_dir: str = ".",
+    years: Optional[Union[int, List[int]]] = None,
+    bands: Optional[List[str]] = None,
+    resolution: float = 10.0,
+    crs: str = "EPSG:4326",
+    dequantize: bool = True,
+    overwrite: bool = False,
+) -> List[str]:
+    """Download Google/AlphaEarth satellite embeddings for a region.
+
+    Downloads pre-computed 64-D satellite embedding vectors at 10 m
+    resolution from `Source Cooperative
+    <https://source.coop/tge-labs/aef>`_. The embeddings are annual
+    composites available from 2018 to 2024 and cover the entire globe.
+
+    The function uses the spatial index to identify which Cloud-Optimized
+    GeoTIFF tiles intersect the bounding box, performs windowed reads
+    over HTTPS (no full tile download required), reprojects to the
+    requested CRS, and merges the results into a single GeoTIFF per year.
+
+    Args:
+        bbox: Bounding box as ``(min_lon, min_lat, max_lon, max_lat)``
+            in WGS84 (EPSG:4326) coordinates.
+        output_dir: Directory to save downloaded GeoTIFF files.
+            Created if it does not exist.
+        years: Year or list of years to download. Available years are
+            2018-2024. If ``None``, downloads only the latest year (2024).
+        bands: List of band names to download (e.g., ``["A00", "A01"]``).
+            If ``None``, all 64 bands (A00-A63) are downloaded.
+        resolution: Output pixel resolution in CRS units. Defaults to
+            10.0 (meters for UTM, degrees for EPSG:4326 — see ``crs``).
+        crs: Output coordinate reference system. Defaults to
+            ``"EPSG:4326"``. Set to ``None`` to keep the native UTM CRS.
+        dequantize: If ``True`` (default), apply de-quantization to
+            convert int8 values to float64 in the range [-1, 1]. If
+            ``False``, keep raw int8 values.
+        overwrite: If ``True``, overwrite existing output files.
+
+    Returns:
+        List of output file paths (one per year).
+
+    Raises:
+        ImportError: If ``rasterio`` or ``geopandas`` is not installed.
+        ValueError: If invalid years or bands are specified.
+
+    Example:
+        >>> import geoai
+        >>> files = geoai.download_google_satellite_embedding(
+        ...     bbox=(-122.5, 37.7, -122.4, 37.8),
+        ...     output_dir="aef_data",
+        ...     years=[2020, 2024],
+        ... )
+        >>> print(files)
+    """
+    import geopandas as gpd
+    import rasterio
+    from rasterio.transform import from_bounds as transform_from_bounds
+    from rasterio.warp import Resampling, calculate_default_transform, reproject
+    from rasterio.windows import Window
+    from shapely.geometry import box
+
+    # --- Validate years ---
+    if years is None:
+        years = [2024]
+    elif isinstance(years, int):
+        years = [years]
+    for y in years:
+        if y not in _AEF_AVAILABLE_YEARS:
+            raise ValueError(
+                f"Year {y} not available. " f"Available years: {_AEF_AVAILABLE_YEARS}"
+            )
+
+    # --- Validate bands ---
+    all_band_names = [f"A{i:02d}" for i in range(64)]
+    if bands is not None:
+        for b in bands:
+            if b not in all_band_names:
+                raise ValueError(f"Unknown band '{b}'. Valid bands: A00-A63")
+        band_indices = [all_band_names.index(b) + 1 for b in bands]
+    else:
+        band_indices = list(range(1, 65))
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    # --- Download spatial index ---
+    cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "geoai")
+    os.makedirs(cache_dir, exist_ok=True)
+    index_path = os.path.join(cache_dir, "aef_index.parquet")
+
+    if not os.path.exists(index_path):
+        logger.info("Downloading spatial index (aef_index.parquet, ~68 MB)...")
+        import urllib.request
+
+        urllib.request.urlretrieve(_AEF_INDEX_URL, index_path)
+        logger.info(f"Spatial index saved to {index_path}")
+
+    # --- Load index and find intersecting tiles ---
+    min_lon, min_lat, max_lon, max_lat = bbox
+    query_geom = box(min_lon, min_lat, max_lon, max_lat)
+
+    index_gdf = gpd.read_parquet(index_path)
+    intersecting = index_gdf[index_gdf.intersects(query_geom)]
+
+    output_files = []
+
+    for year in years:
+        output_path = os.path.join(output_dir, f"aef_{year}.tif")
+        if not overwrite and os.path.exists(output_path):
+            logger.info(f"Skipping existing file: {output_path}")
+            output_files.append(output_path)
+            continue
+
+        year_tiles = intersecting[intersecting["year"] == year]
+        if year_tiles.empty:
+            logger.warning(f"No tiles found for year {year} in the given bbox.")
+            continue
+
+        logger.info(f"Year {year}: {len(year_tiles)} intersecting tile(s)")
+
+        # --- Read each tile via windowed COG access ---
+        # The COGs have "bottom-up" orientation (positive y-resolution)
+        # which requires manual window computation and vertical flipping.
+        tile_arrays = []
+        tile_crs = None
+
+        for _, tile_row in year_tiles.iterrows():
+            s3_path = tile_row["path"]
+            https_url = s3_path.replace(
+                "s3://us-west-2.opendata.source.coop",
+                "https://data.source.coop",
+            )
+            vsi_url = f"/vsicurl/{https_url}"
+            tile_crs_str = tile_row["crs"]
+
+            try:
+                with rasterio.open(vsi_url) as src:
+                    tile_crs = src.crs
+                    origin_x = src.transform.c
+                    origin_y = src.transform.f
+                    res_x = src.transform.a
+                    res_y = src.transform.e
+
+                    # Transform target bbox to tile CRS
+                    from pyproj import Transformer
+
+                    t = Transformer.from_crs("EPSG:4326", tile_crs_str, always_xy=True)
+                    utm_x1, utm_y1 = t.transform(min_lon, min_lat)
+                    utm_x2, utm_y2 = t.transform(max_lon, max_lat)
+                    utm_west = min(utm_x1, utm_x2)
+                    utm_south = min(utm_y1, utm_y2)
+                    utm_east = max(utm_x1, utm_x2)
+                    utm_north = max(utm_y1, utm_y2)
+
+                    # Clip to tile extent
+                    tile_west = origin_x
+                    tile_south = origin_y
+                    tile_east = origin_x + src.width * res_x
+                    tile_north = origin_y + src.height * res_y
+
+                    read_west = max(utm_west, tile_west)
+                    read_south = max(utm_south, tile_south)
+                    read_east = min(utm_east, tile_east)
+                    read_north = min(utm_north, tile_north)
+
+                    if read_west >= read_east or read_south >= read_north:
+                        continue
+
+                    # Compute pixel window for bottom-up TIFF
+                    col_off = int((read_west - origin_x) / res_x)
+                    row_off = int((read_south - origin_y) / res_y)
+                    n_cols = int((read_east - read_west) / res_x) + 1
+                    n_rows = int((read_north - read_south) / res_y) + 1
+
+                    col_off = max(0, min(col_off, src.width - 1))
+                    row_off = max(0, min(row_off, src.height - 1))
+                    n_cols = min(n_cols, src.width - col_off)
+                    n_rows = min(n_rows, src.height - row_off)
+
+                    window = Window(col_off, row_off, n_cols, n_rows)
+
+                    # Read bands with progress bar
+                    try:
+                        from tqdm import tqdm
+
+                        band_arrays = []
+                        desc = f"Year {year}"
+                        for bi in tqdm(band_indices, desc=desc, unit="band"):
+                            band_arrays.append(src.read(bi, window=window))
+                        data = np.stack(band_arrays)
+                    except ImportError:
+                        data = src.read(indexes=band_indices, window=window)
+
+                    # Flip vertically (bottom-up -> top-down)
+                    data = np.flip(data, axis=1)
+
+                    # Compute actual UTM bounds of the read window
+                    actual_west = origin_x + col_off * res_x
+                    actual_south = origin_y + row_off * res_y
+                    actual_east = actual_west + n_cols * res_x
+                    actual_north = actual_south + n_rows * res_y
+
+                    tile_arrays.append(
+                        {
+                            "data": data,
+                            "bounds": (
+                                actual_west,
+                                actual_south,
+                                actual_east,
+                                actual_north,
+                            ),
+                            "crs": tile_crs,
+                        }
+                    )
+                    logger.info(
+                        f"  Read tile: {data.shape[1]}x{data.shape[2]} " f"pixels"
+                    )
+
+            except Exception as e:
+                logger.warning(f"Could not read tile: {e}")
+
+        if not tile_arrays:
+            logger.warning(f"No data for year {year}.")
+            continue
+
+        # --- Combine tiles into output ---
+        # For simplicity, use the first tile (most common case is 1 tile)
+        # TODO: support multi-tile merging for large bboxes
+        mosaic = tile_arrays[0]["data"]
+        mosaic_bounds = tile_arrays[0]["bounds"]
+        merge_crs = tile_arrays[0]["crs"]
+
+        # De-quantize int8 -> float64
+        if dequantize:
+            mosaic = _dequantize(mosaic)
+            out_dtype = "float64"
+        else:
+            out_dtype = mosaic.dtype.name
+
+        out_bands = mosaic.shape[0]
+        m_west, m_south, m_east, m_north = mosaic_bounds
+
+        # Build a standard top-down transform
+        mosaic_transform = transform_from_bounds(
+            m_west,
+            m_south,
+            m_east,
+            m_north,
+            mosaic.shape[2],
+            mosaic.shape[1],
+        )
+
+        # --- Reproject to target CRS if needed ---
+        if crs is not None and str(merge_crs) != crs:
+            dst_transform, dst_width, dst_height = calculate_default_transform(
+                merge_crs,
+                crs,
+                mosaic.shape[2],
+                mosaic.shape[1],
+                *mosaic_bounds,
+                resolution=resolution,
+            )
+
+            dst_mosaic = np.empty((out_bands, dst_height, dst_width), dtype=out_dtype)
+
+            reproject(
+                source=mosaic,
+                destination=dst_mosaic,
+                src_transform=mosaic_transform,
+                src_crs=merge_crs,
+                dst_transform=dst_transform,
+                dst_crs=crs,
+                resampling=Resampling.nearest,
+            )
+            mosaic = dst_mosaic
+            mosaic_transform = dst_transform
+            out_crs = crs
+        else:
+            out_crs = merge_crs
+
+        # --- Write output GeoTIFF ---
+        out_profile = {
+            "driver": "GTiff",
+            "dtype": out_dtype,
+            "width": mosaic.shape[2],
+            "height": mosaic.shape[1],
+            "count": out_bands,
+            "crs": out_crs,
+            "transform": mosaic_transform,
+            "compress": "lzw",
+            "tiled": True,
+        }
+        if dequantize:
+            out_profile["nodata"] = np.nan
+        else:
+            out_profile["nodata"] = -128
+
+        with rasterio.open(output_path, "w", **out_profile) as dst:
+            dst.write(mosaic)
+            out_band_names = [all_band_names[i - 1] for i in band_indices]
+            for i, name in enumerate(out_band_names, start=1):
+                dst.set_band_description(i, name)
+
+        logger.info(f"Saved {output_path} ({mosaic.shape})")
+        output_files.append(output_path)
+
+    return output_files

@@ -278,6 +278,7 @@ try:
         train_embedding_classifier,
         compare_embeddings,
         embedding_to_geotiff,
+        download_google_satellite_embedding,
         EMBEDDING_DATASETS,
     )
 except ImportError:
