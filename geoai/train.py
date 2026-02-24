@@ -367,6 +367,298 @@ class ObjectDetectionDataset(Dataset):
         return image, target
 
 
+class COCODetectionDataset(Dataset):
+    """Dataset for multi-class object detection from COCO-format annotations.
+
+    Reads images (JPEG/PNG/GeoTIFF) and loads instance masks and class labels
+    from a COCO-format JSON annotation file. Supports multi-class labels
+    unlike ObjectDetectionDataset which only produces binary masks.
+
+    Args:
+        coco_json_path (str): Path to COCO annotations JSON file.
+        images_dir (str): Directory containing image files.
+        image_ids (list, optional): Subset of image IDs to use. If None, uses all.
+        category_mapping (dict, optional): Mapping from COCO category_id to
+            contiguous class labels (1-indexed, 0 is background). If None,
+            auto-generated from the annotations file.
+        transforms (callable, optional): Transforms to apply to images and targets.
+        num_channels (int, optional): Number of image channels. Auto-detected if None.
+        min_area (int): Minimum instance area in pixels. Defaults to 10.
+    """
+
+    def __init__(
+        self,
+        coco_json_path: str,
+        images_dir: str,
+        image_ids: Optional[List[int]] = None,
+        category_mapping: Optional[Dict[int, int]] = None,
+        transforms: Optional[Callable] = None,
+        num_channels: Optional[int] = None,
+        min_area: int = 10,
+    ) -> None:
+        """Initialize COCO detection dataset.
+
+        Args:
+            coco_json_path (str): Path to COCO annotations JSON file.
+            images_dir (str): Directory containing image files.
+            image_ids (list, optional): Subset of image IDs to use. If None,
+                uses all images that have annotations.
+            category_mapping (dict, optional): Mapping from COCO category_id to
+                contiguous class labels (1-indexed). If None, auto-generated.
+            transforms (callable, optional): Transforms to apply.
+            num_channels (int, optional): Number of channels. Auto-detected if None.
+            min_area (int): Minimum instance area in pixels. Defaults to 10.
+        """
+        import json
+
+        self.images_dir = images_dir
+        self.transforms = transforms
+        self.min_area = min_area
+
+        # Load COCO annotations
+        with open(coco_json_path, "r") as f:
+            coco_data = json.load(f)
+
+        # Build category mapping
+        categories = coco_data.get("categories", [])
+        if category_mapping is not None:
+            self.category_mapping = category_mapping
+        else:
+            # Auto-generate contiguous mapping: category_id -> 1, 2, 3, ...
+            sorted_cats = sorted(categories, key=lambda c: c["id"])
+            self.category_mapping = {
+                cat["id"]: idx + 1 for idx, cat in enumerate(sorted_cats)
+            }
+
+        self.class_names = ["background"] + [
+            cat["name"] for cat in sorted(categories, key=lambda c: c["id"])
+        ]
+        self.num_classes = len(self.class_names)
+
+        # Build image info lookup
+        image_info_map = {img["id"]: img for img in coco_data["images"]}
+
+        # Build annotations grouped by image_id
+        annotations_by_image = {}
+        for ann in coco_data.get("annotations", []):
+            img_id = ann["image_id"]
+            if img_id not in annotations_by_image:
+                annotations_by_image[img_id] = []
+            annotations_by_image[img_id].append(ann)
+
+        # Filter to requested image_ids or all images with annotations
+        if image_ids is not None:
+            valid_ids = [img_id for img_id in image_ids if img_id in image_info_map]
+        else:
+            valid_ids = [
+                img_id for img_id in image_info_map if img_id in annotations_by_image
+            ]
+
+        # Build final lists, filtering out images whose files don't exist
+        self.image_info = []
+        self.annotations = []
+        for img_id in valid_ids:
+            info = image_info_map[img_id]
+            img_path = os.path.join(images_dir, info["file_name"])
+            if os.path.exists(img_path):
+                self.image_info.append(info)
+                self.annotations.append(annotations_by_image.get(img_id, []))
+
+        # Auto-detect number of channels from first image
+        if num_channels is not None:
+            self.num_channels = num_channels
+        elif len(self.image_info) > 0:
+            first_path = os.path.join(images_dir, self.image_info[0]["file_name"])
+            if first_path.lower().endswith((".tif", ".tiff")):
+                with rasterio.open(first_path) as src:
+                    self.num_channels = src.count
+            else:
+                img = Image.open(first_path)
+                self.num_channels = len(img.getbands())
+        else:
+            self.num_channels = 3
+
+    def __len__(self) -> int:
+        """Return the number of images in the dataset."""
+        return len(self.image_info)
+
+    def _polygon_to_mask(
+        self, segmentation: List[List[float]], height: int, width: int
+    ) -> np.ndarray:
+        """Convert COCO polygon segmentation to binary mask.
+
+        Args:
+            segmentation (list): List of polygon coordinate lists.
+            height (int): Image height.
+            width (int): Image width.
+
+        Returns:
+            np.ndarray: Binary mask of shape (height, width).
+        """
+        from skimage.draw import polygon as draw_polygon
+
+        mask = np.zeros((height, width), dtype=np.uint8)
+        for poly_coords in segmentation:
+            # COCO format: [x1, y1, x2, y2, ..., xn, yn]
+            coords = np.array(poly_coords).reshape(-1, 2)
+            rr, cc = draw_polygon(coords[:, 1], coords[:, 0], shape=(height, width))
+            mask[rr, cc] = 1
+        return mask
+
+    def _rle_to_mask(self, rle: Dict, height: int, width: int) -> np.ndarray:
+        """Convert COCO RLE segmentation to binary mask.
+
+        Args:
+            rle (dict): RLE encoded mask with 'counts' and 'size' keys.
+            height (int): Image height.
+            width (int): Image width.
+
+        Returns:
+            np.ndarray: Binary mask of shape (height, width).
+        """
+        try:
+            from pycocotools import mask as mask_utils
+
+            if isinstance(rle["counts"], list):
+                # Uncompressed RLE
+                rle_obj = mask_utils.frPyObjects(rle, height, width)
+                return mask_utils.decode(rle_obj).astype(np.uint8)
+            else:
+                return mask_utils.decode(rle).astype(np.uint8)
+        except ImportError:
+            # Fallback: manual RLE decode
+            counts = rle["counts"]
+            if isinstance(counts, str):
+                # Compressed RLE - need pycocotools for this
+                raise ImportError(
+                    "pycocotools is required for compressed RLE masks. "
+                    "Install with: pip install pycocotools"
+                )
+            # Uncompressed RLE: alternating 0-runs and 1-runs
+            mask = np.zeros(height * width, dtype=np.uint8)
+            pos = 0
+            for i, count in enumerate(counts):
+                if i % 2 == 1:  # Odd indices are foreground runs
+                    mask[pos : pos + count] = 1
+                pos += count
+            return mask.reshape((height, width), order="F")
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        """Get a single image and its annotations.
+
+        Args:
+            idx (int): Index of the image to retrieve.
+
+        Returns:
+            Tuple of (image_tensor, target_dict) where target_dict contains
+            boxes, labels, masks, image_id, area, and iscrowd fields.
+        """
+        info = self.image_info[idx]
+        img_path = os.path.join(self.images_dir, info["file_name"])
+        height = info["height"]
+        width = info["width"]
+
+        # Load image
+        if img_path.lower().endswith((".tif", ".tiff")):
+            with rasterio.open(img_path) as src:
+                image = src.read().astype(np.float32)
+        else:
+            img = Image.open(img_path).convert("RGB")
+            image = np.array(img, dtype=np.float32).transpose(2, 0, 1)
+
+        # Normalize to [0, 1]
+        if image.max() > 1.0:
+            image = image / 255.0
+
+        # Handle channel count
+        if image.shape[0] > self.num_channels:
+            image = image[: self.num_channels]
+        elif image.shape[0] < self.num_channels:
+            padded = np.zeros(
+                (self.num_channels, image.shape[1], image.shape[2]),
+                dtype=np.float32,
+            )
+            padded[: image.shape[0]] = image
+            image = padded
+
+        image = torch.as_tensor(image, dtype=torch.float32)
+
+        # Process annotations
+        anns = self.annotations[idx]
+        boxes = []
+        masks = []
+        labels = []
+
+        for ann in anns:
+            # Decode segmentation mask
+            seg = ann.get("segmentation")
+            if seg is None:
+                continue
+
+            if isinstance(seg, dict):
+                # RLE format
+                mask = self._rle_to_mask(seg, height, width)
+            elif isinstance(seg, list) and len(seg) > 0:
+                # Polygon format
+                mask = self._polygon_to_mask(seg, height, width)
+            else:
+                continue
+
+            # Filter by area
+            area = mask.sum()
+            if area < self.min_area:
+                continue
+
+            # Get bounding box from annotation or compute from mask
+            if "bbox" in ann:
+                x, y, w, h = ann["bbox"]
+                xmin, ymin = int(x), int(y)
+                xmax, ymax = int(x + w), int(y + h)
+            else:
+                pos = np.where(mask)
+                if len(pos[0]) == 0:
+                    continue
+                ymin, ymax = int(np.min(pos[0])), int(np.max(pos[0]))
+                xmin, xmax = int(np.min(pos[1])), int(np.max(pos[1]))
+
+            # Skip invalid boxes
+            if xmax <= xmin or ymax <= ymin:
+                continue
+
+            boxes.append([xmin, ymin, xmax, ymax])
+            masks.append(mask)
+            labels.append(self.category_mapping.get(ann["category_id"], 1))
+
+        # Handle case with no valid instances
+        if len(boxes) == 0:
+            target = {
+                "boxes": torch.zeros((0, 4), dtype=torch.float32),
+                "labels": torch.zeros((0,), dtype=torch.int64),
+                "masks": torch.zeros((0, height, width), dtype=torch.uint8),
+                "image_id": torch.tensor([idx]),
+                "area": torch.zeros((0,), dtype=torch.float32),
+                "iscrowd": torch.zeros((0,), dtype=torch.int64),
+            }
+        else:
+            boxes_t = torch.as_tensor(boxes, dtype=torch.float32)
+            labels_t = torch.as_tensor(labels, dtype=torch.int64)
+            masks_t = torch.as_tensor(np.array(masks), dtype=torch.uint8)
+            area = (boxes_t[:, 3] - boxes_t[:, 1]) * (boxes_t[:, 2] - boxes_t[:, 0])
+            target = {
+                "boxes": boxes_t,
+                "labels": labels_t,
+                "masks": masks_t,
+                "image_id": torch.tensor([idx]),
+                "area": area,
+                "iscrowd": torch.zeros_like(labels_t),
+            }
+
+        if self.transforms is not None:
+            image, target = self.transforms(image, target)
+
+        return image, target
+
+
 class Compose:
     """Custom compose transform that works with image and target."""
 
@@ -710,6 +1002,7 @@ def train_MaskRCNN_model(
     output_dir: str,
     input_format: str = "directory",
     num_channels: int = 3,
+    num_classes: int = 2,
     model: Optional[torch.nn.Module] = None,
     pretrained: bool = True,
     pretrained_model_path: Optional[str] = None,
@@ -734,17 +1027,26 @@ def train_MaskRCNN_model(
     Args:
         images_dir (str): Directory containing image GeoTIFF files (for 'directory' format),
             or root directory containing images/ subdirectory (for 'yolo' format),
-            or directory containing images (for 'coco' format).
+            or directory containing images (for 'coco' and 'coco_detection' formats).
         labels_dir (str): Directory containing label GeoTIFF files (for 'directory' format),
-            or path to COCO annotations JSON file (for 'coco' format),
+            or path to COCO annotations JSON file (for 'coco' and 'coco_detection' formats),
             or not used (for 'yolo' format - labels are in images_dir/labels/).
         output_dir (str): Directory to save model checkpoints and results.
-        input_format (str): Input data format - 'directory' (default), 'coco', or 'yolo'.
+        input_format (str): Input data format - 'directory' (default), 'coco',
+            'coco_detection', or 'yolo'.
             - 'directory': Standard directory structure with separate images_dir and labels_dir
-            - 'coco': COCO JSON format (labels_dir should be path to instances.json)
+            - 'coco': COCO JSON format with pre-rendered label TIFFs
+            - 'coco_detection': COCO JSON with direct annotation parsing for multi-class
+              detection. Automatically sets num_classes from annotations if num_classes is
+              2 (default). labels_dir should be the path to the COCO annotations JSON file.
             - 'yolo': YOLO format (images_dir is root with images/ and labels/ subdirectories)
         num_channels (int, optional): Number of input channels. If None, auto-detected.
             Defaults to 3.
+        num_classes (int, optional): Number of output classes including background.
+            For binary detection (e.g., building vs background), use 2.
+            For multi-class detection, use N+1 where N is the number of object
+            classes. For 'coco_detection' format, this is auto-detected from
+            annotations if left at default (2). Defaults to 2.
         model (torch.nn.Module, optional): Predefined model. If None, a new model is created.
         pretrained (bool): Whether to use pretrained backbone. This is ignored if
             pretrained_model_path is provided. Defaults to True.
@@ -789,7 +1091,67 @@ def train_MaskRCNN_model(
     print(f"Using device: {device}")
 
     # Get all image and label files based on input format
-    if input_format.lower() == "coco":
+    use_coco_detection = input_format.lower() == "coco_detection"
+
+    if use_coco_detection:
+        # COCO detection format: read annotations directly from COCO JSON
+        if verbose:
+            print(f"Loading COCO detection annotations from {labels_dir}")
+
+        # Create a full dataset to determine image IDs, then split
+        full_dataset = COCODetectionDataset(
+            coco_json_path=labels_dir,
+            images_dir=images_dir,
+            transforms=None,
+            num_channels=num_channels,
+            min_area=10,
+        )
+
+        # Auto-detect num_classes from annotations if using default
+        if num_classes == 2:
+            num_classes = full_dataset.num_classes
+            if verbose:
+                print(
+                    f"Auto-detected {num_classes} classes "
+                    f"(including background): {full_dataset.class_names}"
+                )
+
+        # Split image indices into train and validation
+        all_indices = list(range(len(full_dataset)))
+        train_indices, val_indices = train_test_split(
+            all_indices, test_size=val_split, random_state=seed
+        )
+
+        # Get image IDs for each split
+        train_image_ids = [full_dataset.image_info[i]["id"] for i in train_indices]
+        val_image_ids = [full_dataset.image_info[i]["id"] for i in val_indices]
+
+        print(
+            f"Training on {len(train_indices)} images, "
+            f"validating on {len(val_indices)} images"
+        )
+
+        # Create split datasets
+        train_dataset = COCODetectionDataset(
+            coco_json_path=labels_dir,
+            images_dir=images_dir,
+            image_ids=train_image_ids,
+            category_mapping=full_dataset.category_mapping,
+            transforms=get_transform(train=True),
+            num_channels=num_channels,
+            min_area=10,
+        )
+        val_dataset = COCODetectionDataset(
+            coco_json_path=labels_dir,
+            images_dir=images_dir,
+            image_ids=val_image_ids,
+            category_mapping=full_dataset.category_mapping,
+            transforms=get_transform(train=False),
+            num_channels=num_channels,
+            min_area=10,
+        )
+
+    elif input_format.lower() == "coco":
         # Parse COCO format annotations
         if verbose:
             print(f"Loading COCO format annotations from {labels_dir}")
@@ -843,22 +1205,28 @@ def train_MaskRCNN_model(
             ]
             print(f"Using {len(image_files)} matching files")
 
-    print(f"Found {len(image_files)} image files and {len(label_files)} label files")
+    if not use_coco_detection:
+        print(
+            f"Found {len(image_files)} image files and {len(label_files)} label files"
+        )
 
-    # Split data into train and validation sets
-    train_imgs, val_imgs, train_labels, val_labels = train_test_split(
-        image_files, label_files, test_size=val_split, random_state=seed
-    )
+        # Split data into train and validation sets
+        train_imgs, val_imgs, train_labels, val_labels = train_test_split(
+            image_files, label_files, test_size=val_split, random_state=seed
+        )
 
-    print(f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images")
+        print(
+            f"Training on {len(train_imgs)} images, "
+            f"validating on {len(val_imgs)} images"
+        )
 
-    # Create datasets
-    train_dataset = ObjectDetectionDataset(
-        train_imgs, train_labels, transforms=get_transform(train=True)
-    )
-    val_dataset = ObjectDetectionDataset(
-        val_imgs, val_labels, transforms=get_transform(train=False)
-    )
+        # Create datasets
+        train_dataset = ObjectDetectionDataset(
+            train_imgs, train_labels, transforms=get_transform(train=True)
+        )
+        val_dataset = ObjectDetectionDataset(
+            val_imgs, val_labels, transforms=get_transform(train=False)
+        )
 
     # Create data loaders
     # Use num_workers=0 on macOS and Windows to avoid multiprocessing issues
@@ -883,10 +1251,10 @@ def train_MaskRCNN_model(
         num_workers=num_workers,
     )
 
-    # Initialize model (2 classes: background and building)
+    # Initialize model
     if model is None:
         model = get_instance_segmentation_model(
-            num_classes=2, num_channels=num_channels, pretrained=pretrained
+            num_classes=num_classes, num_channels=num_channels, pretrained=pretrained
         )
     model.to(device)
 
@@ -1483,6 +1851,476 @@ def instance_segmentation_inference_on_geotiff(
         return output_path, inference_time
 
 
+def multiclass_detection_inference_on_geotiff(
+    model: torch.nn.Module,
+    geotiff_path: str,
+    output_path: str,
+    class_names: Optional[List[str]] = None,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    nms_threshold: float = 0.3,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    device: Optional[torch.device] = None,
+    **kwargs: Any,
+) -> Tuple[str, float, List[Dict]]:
+    """Perform multi-class object detection inference on a GeoTIFF.
+
+    Unlike inference_on_geotiff which produces a binary mask, and
+    instance_segmentation_inference_on_geotiff which produces instance IDs
+    without class info, this function preserves both class labels and
+    instance IDs in the output.
+
+    Args:
+        model (torch.nn.Module): Trained Mask R-CNN model.
+        geotiff_path (str): Path to input GeoTIFF file.
+        output_path (str): Path to save output raster (2-band: class + instance).
+        class_names (list, optional): List of class names (index 0 = background).
+        window_size (int): Size of sliding window for inference. Defaults to 512.
+        overlap (int): Overlap between adjacent windows. Defaults to 256.
+        confidence_threshold (float): Minimum score threshold. Defaults to 0.5.
+        nms_threshold (float): IoU threshold for NMS. Defaults to 0.3.
+        batch_size (int): Inference batch size. Defaults to 4.
+        num_channels (int): Number of input channels. Defaults to 3.
+        device (torch.device, optional): Compute device. If None, auto-detected.
+        **kwargs: Additional arguments.
+
+    Returns:
+        Tuple of (output_path, inference_time, detections_list) where each
+        detection is a dict with keys: mask, score, box, label.
+    """
+    if device is None:
+        device = get_device()
+
+    model.to(device)
+    model.eval()
+
+    with rasterio.open(geotiff_path) as src:
+        meta = src.meta
+        height = src.height
+        width = src.width
+
+        out_meta = meta.copy()
+        out_meta.update({"count": 2, "dtype": "uint16"})
+
+        all_detections = []
+
+        steps_y = math.ceil((height - overlap) / (window_size - overlap))
+        steps_x = math.ceil((width - overlap) / (window_size - overlap))
+        last_y = height - window_size
+        last_x = width - window_size
+        total_windows = steps_y * steps_x
+
+        print(
+            f"Processing {total_windows} windows with size "
+            f"{window_size}x{window_size} and overlap {overlap}..."
+        )
+
+        pbar = tqdm(total=total_windows)
+        batch_inputs = []
+        batch_positions = []
+        batch_count = 0
+        start_time = time.time()
+
+        for i in range(steps_y + 1):
+            y = min(i * (window_size - overlap), last_y)
+            y = max(0, y)
+            if y > last_y and i > 0:
+                continue
+
+            for j in range(steps_x + 1):
+                x = min(j * (window_size - overlap), last_x)
+                x = max(0, x)
+                if x > last_x and j > 0:
+                    continue
+
+                window = src.read(window=Window(x, y, window_size, window_size))
+                if window.shape[1] == 0 or window.shape[2] == 0:
+                    continue
+
+                actual_height, actual_width = window.shape[1], window.shape[2]
+                image = window.astype(np.float32) / 255.0
+
+                if image.shape[0] > num_channels:
+                    image = image[:num_channels]
+                elif image.shape[0] < num_channels:
+                    padded = np.zeros(
+                        (num_channels, image.shape[1], image.shape[2]),
+                        dtype=np.float32,
+                    )
+                    padded[: image.shape[0]] = image
+                    image = padded
+
+                image_tensor = torch.tensor(image, device=device)
+                batch_inputs.append(image_tensor)
+                batch_positions.append((y, x, actual_height, actual_width))
+                batch_count += 1
+
+                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                    with torch.no_grad():
+                        outputs = model(batch_inputs)
+
+                    for idx, output in enumerate(outputs):
+                        y_pos, x_pos, h, w = batch_positions[idx]
+
+                        if len(output["scores"]) > 0:
+                            keep = output["scores"] > confidence_threshold
+                            masks = output["masks"][keep].squeeze(1)
+                            scores = output["scores"][keep]
+                            boxes = output["boxes"][keep]
+                            det_labels = output["labels"][keep]
+
+                            for k in range(len(masks)):
+                                mask = masks[k].cpu().numpy() > 0.5
+                                score = scores[k].cpu().item()
+                                box = boxes[k].cpu().numpy()
+                                label = det_labels[k].cpu().item()
+
+                                global_box = [
+                                    box[0] + x_pos,
+                                    box[1] + y_pos,
+                                    box[2] + x_pos,
+                                    box[3] + y_pos,
+                                ]
+
+                                global_mask = np.zeros((height, width), dtype=bool)
+                                global_mask[y_pos : y_pos + h, x_pos : x_pos + w] = mask
+
+                                all_detections.append(
+                                    {
+                                        "mask": global_mask,
+                                        "score": score,
+                                        "box": global_box,
+                                        "label": label,
+                                    }
+                                )
+
+                    batch_inputs = []
+                    batch_positions = []
+                    batch_count = 0
+                    pbar.update(len(outputs))
+
+        pbar.close()
+        print(f"Collected {len(all_detections)} detections before NMS")
+
+        # Apply class-aware Non-Maximum Suppression
+        if len(all_detections) > 0:
+            boxes = torch.tensor(
+                [det["box"] for det in all_detections], dtype=torch.float32
+            )
+            scores = torch.tensor(
+                [det["score"] for det in all_detections], dtype=torch.float32
+            )
+            det_labels = torch.tensor(
+                [det["label"] for det in all_detections], dtype=torch.int64
+            )
+
+            keep_indices = torchvision.ops.batched_nms(
+                boxes, scores, det_labels, nms_threshold
+            )
+
+            final_detections = [all_detections[i] for i in keep_indices]
+            print(f"After NMS: {len(final_detections)} detections")
+
+            # Create output rasters
+            class_mask = np.zeros((height, width), dtype=np.uint16)
+            instance_mask = np.zeros((height, width), dtype=np.uint16)
+
+            final_detections.sort(key=lambda x: x["score"], reverse=True)
+
+            for instance_id, detection in enumerate(final_detections, 1):
+                mask = detection["mask"]
+                available_pixels = (instance_mask == 0) & mask
+                class_mask[available_pixels] = detection["label"]
+                instance_mask[available_pixels] = instance_id
+        else:
+            class_mask = np.zeros((height, width), dtype=np.uint16)
+            instance_mask = np.zeros((height, width), dtype=np.uint16)
+            final_detections = []
+
+        inference_time = time.time() - start_time
+        print(f"Multi-class detection completed in {inference_time:.2f} seconds")
+        print(f"Final detections: {len(final_detections)}")
+
+        if class_names and len(final_detections) > 0:
+            from collections import Counter
+
+            label_counts = Counter(d["label"] for d in final_detections)
+            for label_id, count in sorted(label_counts.items()):
+                name = (
+                    class_names[label_id]
+                    if label_id < len(class_names)
+                    else f"class_{label_id}"
+                )
+                print(f"  {name}: {count} detections")
+
+        with rasterio.open(output_path, "w", **out_meta) as dst:
+            dst.write(class_mask, 1)
+            dst.write(instance_mask, 2)
+
+        print(f"Saved multi-class detection to {output_path}")
+
+        return output_path, inference_time, final_detections
+
+
+def evaluate_coco_metrics(
+    model: torch.nn.Module,
+    data_loader: DataLoader,
+    device: torch.device,
+    class_names: Optional[List[str]] = None,
+    iou_thresholds: Optional[List[float]] = None,
+    verbose: bool = True,
+) -> Dict[str, float]:
+    """Evaluate object detection model using COCO-style metrics.
+
+    Computes AP (Average Precision) at various IoU thresholds for each class
+    and mAP (mean AP) across all classes.
+
+    Args:
+        model (torch.nn.Module): Trained detection model.
+        data_loader (DataLoader): Validation data loader.
+        device (torch.device): Compute device.
+        class_names (list, optional): List of class names (excluding background).
+            Index 0 corresponds to class label 1.
+        iou_thresholds (list, optional): IoU thresholds for AP calculation.
+            Defaults to [0.5, 0.55, ..., 0.95].
+        verbose (bool): Whether to print progress. Defaults to True.
+
+    Returns:
+        Dict with keys: 'mAP@0.5', 'mAP@0.75', 'mAP@[0.5:0.95]',
+        and per-class 'AP@0.5/<class_name>' entries.
+    """
+    if iou_thresholds is None:
+        iou_thresholds = [0.5 + 0.05 * i for i in range(10)]
+
+    model.eval()
+
+    # Collect all predictions and ground truths
+    all_predictions = []  # list of dicts per image
+    all_targets = []
+
+    if verbose:
+        print("Running inference for evaluation...")
+
+    for images, targets in tqdm(data_loader, disable=not verbose):
+        images = [img.to(device) for img in images]
+
+        with torch.no_grad():
+            outputs = model(images)
+
+        for output, target in zip(outputs, targets):
+            pred = {
+                "boxes": output["boxes"].cpu(),
+                "scores": output["scores"].cpu(),
+                "labels": output["labels"].cpu(),
+            }
+            gt = {
+                "boxes": target["boxes"].cpu(),
+                "labels": target["labels"].cpu(),
+            }
+            all_predictions.append(pred)
+            all_targets.append(gt)
+
+    # Determine all class IDs present
+    all_class_ids = set()
+    for gt in all_targets:
+        all_class_ids.update(gt["labels"].tolist())
+    for pred in all_predictions:
+        all_class_ids.update(pred["labels"].tolist())
+    all_class_ids = sorted(all_class_ids)
+
+    def _compute_iou_matrix(boxes1, boxes2):
+        """Compute IoU between two sets of boxes."""
+        x1 = torch.max(boxes1[:, None, 0], boxes2[None, :, 0])
+        y1 = torch.max(boxes1[:, None, 1], boxes2[None, :, 1])
+        x2 = torch.min(boxes1[:, None, 2], boxes2[None, :, 2])
+        y2 = torch.min(boxes1[:, None, 3], boxes2[None, :, 3])
+
+        inter = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
+        area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])
+        area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])
+        union = area1[:, None] + area2[None, :] - inter
+
+        return inter / (union + 1e-6)
+
+    def _compute_ap(precision, recall):
+        """Compute AP using 101-point interpolation (COCO style)."""
+        recall_points = torch.linspace(0, 1, 101)
+        ap = 0.0
+        for r in recall_points:
+            prec_at_r = precision[recall >= r]
+            if len(prec_at_r) > 0:
+                ap += prec_at_r.max().item()
+        return ap / 101.0
+
+    results = {}
+
+    for iou_thresh in iou_thresholds:
+        per_class_ap = []
+
+        for class_id in all_class_ids:
+            # Gather all predictions and ground truths for this class
+            all_scores = []
+            all_tp = []
+            total_gt = 0
+
+            for pred, gt in zip(all_predictions, all_targets):
+                # Filter predictions for this class
+                pred_mask = pred["labels"] == class_id
+                pred_boxes = pred["boxes"][pred_mask]
+                pred_scores = pred["scores"][pred_mask]
+
+                # Filter ground truths for this class
+                gt_mask = gt["labels"] == class_id
+                gt_boxes = gt["boxes"][gt_mask]
+                total_gt += len(gt_boxes)
+
+                if len(pred_boxes) == 0:
+                    continue
+
+                # Sort by score (descending)
+                sort_idx = torch.argsort(pred_scores, descending=True)
+                pred_boxes = pred_boxes[sort_idx]
+                pred_scores = pred_scores[sort_idx]
+
+                matched_gt = set()
+
+                for pi in range(len(pred_boxes)):
+                    all_scores.append(pred_scores[pi].item())
+
+                    if len(gt_boxes) == 0:
+                        all_tp.append(0)
+                        continue
+
+                    iou_matrix = _compute_iou_matrix(pred_boxes[pi : pi + 1], gt_boxes)
+                    max_iou, max_idx = iou_matrix[0].max(dim=0)
+
+                    if (
+                        max_iou.item() >= iou_thresh
+                        and max_idx.item() not in matched_gt
+                    ):
+                        all_tp.append(1)
+                        matched_gt.add(max_idx.item())
+                    else:
+                        all_tp.append(0)
+
+            if total_gt == 0:
+                continue
+
+            # Sort by score
+            if len(all_scores) == 0:
+                per_class_ap.append(0.0)
+                continue
+
+            sort_idx = sorted(
+                range(len(all_scores)),
+                key=lambda k: all_scores[k],
+                reverse=True,
+            )
+            tp_sorted = torch.tensor([all_tp[i] for i in sort_idx])
+
+            tp_cumsum = torch.cumsum(tp_sorted, dim=0).float()
+            fp_cumsum = torch.cumsum(1 - tp_sorted, dim=0).float()
+
+            precision = tp_cumsum / (tp_cumsum + fp_cumsum)
+            recall = tp_cumsum / total_gt
+
+            ap = _compute_ap(precision, recall)
+            per_class_ap.append(ap)
+
+            # Store per-class AP at 0.5
+            if abs(iou_thresh - 0.5) < 1e-6 and class_names is not None:
+                idx = class_id - 1  # class_id is 1-indexed
+                name = (
+                    class_names[idx] if idx < len(class_names) else f"class_{class_id}"
+                )
+                results[f"AP@0.5/{name}"] = ap
+
+        mean_ap = sum(per_class_ap) / len(per_class_ap) if per_class_ap else 0.0
+
+        if abs(iou_thresh - 0.5) < 1e-6:
+            results["mAP@0.5"] = mean_ap
+        if abs(iou_thresh - 0.75) < 1e-6:
+            results["mAP@0.75"] = mean_ap
+
+    # Compute mAP@[0.5:0.95]
+    all_maps = []
+    for iou_thresh in iou_thresholds:
+        per_class_ap = []
+        for class_id in all_class_ids:
+            all_scores = []
+            all_tp = []
+            total_gt = 0
+
+            for pred, gt in zip(all_predictions, all_targets):
+                pred_mask = pred["labels"] == class_id
+                pred_boxes = pred["boxes"][pred_mask]
+                pred_scores = pred["scores"][pred_mask]
+                gt_mask = gt["labels"] == class_id
+                gt_boxes = gt["boxes"][gt_mask]
+                total_gt += len(gt_boxes)
+
+                if len(pred_boxes) == 0:
+                    continue
+
+                sort_idx = torch.argsort(pred_scores, descending=True)
+                pred_boxes = pred_boxes[sort_idx]
+                pred_scores = pred_scores[sort_idx]
+                matched_gt = set()
+
+                for pi in range(len(pred_boxes)):
+                    all_scores.append(pred_scores[pi].item())
+                    if len(gt_boxes) == 0:
+                        all_tp.append(0)
+                        continue
+                    iou_matrix = _compute_iou_matrix(pred_boxes[pi : pi + 1], gt_boxes)
+                    max_iou, max_idx = iou_matrix[0].max(dim=0)
+                    if (
+                        max_iou.item() >= iou_thresh
+                        and max_idx.item() not in matched_gt
+                    ):
+                        all_tp.append(1)
+                        matched_gt.add(max_idx.item())
+                    else:
+                        all_tp.append(0)
+
+            if total_gt == 0 or len(all_scores) == 0:
+                per_class_ap.append(0.0)
+                continue
+
+            sort_idx = sorted(
+                range(len(all_scores)),
+                key=lambda k: all_scores[k],
+                reverse=True,
+            )
+            tp_sorted = torch.tensor([all_tp[i] for i in sort_idx])
+            tp_cumsum = torch.cumsum(tp_sorted, dim=0).float()
+            fp_cumsum = torch.cumsum(1 - tp_sorted, dim=0).float()
+            precision = tp_cumsum / (tp_cumsum + fp_cumsum)
+            recall = tp_cumsum / total_gt
+            ap = _compute_ap(precision, recall)
+            per_class_ap.append(ap)
+
+        mean_ap = sum(per_class_ap) / len(per_class_ap) if per_class_ap else 0.0
+        all_maps.append(mean_ap)
+
+    results["mAP@[0.5:0.95]"] = sum(all_maps) / len(all_maps) if all_maps else 0.0
+
+    if verbose:
+        print(f"\nEvaluation Results:")
+        print(f"  mAP@0.5:        {results.get('mAP@0.5', 0.0):.4f}")
+        print(f"  mAP@0.75:       {results.get('mAP@0.75', 0.0):.4f}")
+        print(f"  mAP@[0.5:0.95]: {results['mAP@[0.5:0.95]']:.4f}")
+        if class_names:
+            print(f"\n  Per-class AP@0.5:")
+            for key, value in sorted(results.items()):
+                if key.startswith("AP@0.5/"):
+                    print(f"    {key}: {value:.4f}")
+
+    return results
+
+
 def object_detection(
     input_path: str,
     output_path: str,
@@ -1492,6 +2330,7 @@ def object_detection(
     confidence_threshold: float = 0.5,
     batch_size: int = 4,
     num_channels: int = 3,
+    num_classes: int = 2,
     model: Optional[torch.nn.Module] = None,
     pretrained: bool = True,
     device: Optional[torch.device] = None,
@@ -1509,6 +2348,7 @@ def object_detection(
         confidence_threshold (float): Confidence threshold for predictions (0-1).
         batch_size (int): Batch size for inference.
         num_channels (int): Number of channels in the input image and model.
+        num_classes (int): Number of output classes including background. Defaults to 2.
         model (torch.nn.Module, optional): Predefined model. If None, a new model is created.
         pretrained (bool): Whether to use pretrained backbone for model loading.
         device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
@@ -1522,7 +2362,7 @@ def object_detection(
         device = get_device()
     if model is None:
         model = get_instance_segmentation_model(
-            num_classes=2, num_channels=num_channels, pretrained=pretrained
+            num_classes=num_classes, num_channels=num_channels, pretrained=pretrained
         )
 
     if not os.path.exists(model_path):
@@ -1569,6 +2409,7 @@ def object_detection_batch(
     batch_size: int = 4,
     model: Optional[torch.nn.Module] = None,
     num_channels: int = 3,
+    num_classes: int = 2,
     pretrained: bool = True,
     device: Optional[torch.device] = None,
     **kwargs: Any,
@@ -1589,6 +2430,7 @@ def object_detection_batch(
         confidence_threshold (float): Confidence threshold for predictions (0-1).
         batch_size (int): Batch size for inference.
         num_channels (int): Number of channels in the input image and model.
+        num_classes (int): Number of output classes including background. Defaults to 2.
         model (torch.nn.Module, optional): Predefined model. If None, a new model is created.
         pretrained (bool): Whether to use pretrained backbone for model loading.
         device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
@@ -1603,7 +2445,7 @@ def object_detection_batch(
 
     if model is None:
         model = get_instance_segmentation_model(
-            num_classes=2, num_channels=num_channels, pretrained=pretrained
+            num_classes=num_classes, num_channels=num_channels, pretrained=pretrained
         )
 
     if not os.path.exists(output_dir):

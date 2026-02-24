@@ -296,6 +296,22 @@ except ImportError:
     # Embeddings not available (missing torchgeo >= 0.9.0 or sklearn)
     pass
 
+# Multi-class object detection
+try:
+    from .object_detect import (
+        NWPU_VHR10_CLASSES,
+        download_nwpu_vhr10,
+        download_nwpu_vhr10_model,
+        prepare_nwpu_vhr10,
+        train_multiclass_detector,
+        multiclass_detection,
+        detections_to_geodataframe,
+        visualize_multiclass_detections,
+        evaluate_multiclass_detector,
+    )
+except ImportError:
+    pass
+
 # OmniWaterMask water body segmentation
 try:
     from .water import segment_water, BAND_ORDER_PRESETS

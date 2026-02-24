@@ -82,6 +82,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 EuroSAT_RGB/
+docs/examples/**/
 
 # Translations
 *.mo
