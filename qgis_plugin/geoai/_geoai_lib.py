@@ -155,6 +155,39 @@ def _fix_proj_for_qgis() -> None:
     _diag.append("  WARNING: could not fix pyproj PROJ database")
 
 
+def _add_windows_dll_directories(site_packages: Path) -> None:
+    """Register DLL search directories on Windows for native packages.
+
+    On Windows, torch and other native packages ship DLLs in subdirectories
+    (e.g. ``torch/lib/``) that the OS loader doesn't search by default when
+    loading from a foreign venv inside QGIS's process.  We must add them
+    explicitly via ``os.add_dll_directory()`` *and* prepend them to ``PATH``
+    (the latter covers legacy ``LoadLibrary`` calls without search flags).
+    """
+    if sys.platform != "win32":
+        return
+
+    dll_dirs = [
+        site_packages / "torch" / "lib",
+        site_packages / "torch" / "bin",
+        site_packages / "torchvision",
+    ]
+
+    path_parts = os.environ.get("PATH", "").split(os.pathsep)
+    for dll_dir in dll_dirs:
+        if dll_dir.is_dir():
+            dll_dir_str = str(dll_dir)
+            try:
+                os.add_dll_directory(dll_dir_str)
+                _diag.append(f"  add_dll_directory: {dll_dir_str}")
+            except OSError as exc:
+                _diag.append(f"  add_dll_directory {dll_dir_str} failed: {exc}")
+            if dll_dir_str not in path_parts:
+                path_parts.insert(0, dll_dir_str)
+
+    os.environ["PATH"] = os.pathsep.join(path_parts)
+
+
 def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
     """Load the external geoai package from an explicit ``__init__.py`` path.
 
@@ -176,6 +209,11 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
     # and cannot be reloaded from a different path.  Instead, configure the
     # already-loaded QGIS pyproj to find its own proj.db.
     _fix_proj_for_qgis()
+
+    # On Windows, register DLL directories for native packages (torch, etc.)
+    # before loading any modules that depend on them.
+    site_packages = pkg_dir.parent  # geoai/__init__.py -> geoai -> site-packages
+    _add_windows_dll_directories(site_packages)
 
     try:
         spec = importlib.util.spec_from_file_location(

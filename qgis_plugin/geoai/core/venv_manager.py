@@ -719,6 +719,12 @@ def ensure_venv_packages_available() -> bool:
     # bundles its own proj.db and needs PROJ_DATA to point there.
     _fix_proj_data(site_packages)
 
+    # On Windows, register DLL directories for native packages (torch, etc.)
+    # so that the OS loader can find their DLLs when importing from the venv
+    # inside QGIS's process.
+    if sys.platform == "win32":
+        _add_windows_dll_directories(site_packages)
+
     # Fix stale typing_extensions (QGIS may load old version missing TypeIs)
     if "typing_extensions" in sys.modules:
         try:
@@ -741,6 +747,38 @@ def ensure_venv_packages_available() -> bool:
             )
 
     return True
+
+
+def _add_windows_dll_directories(site_packages: str) -> None:
+    """Register DLL search directories for native packages on Windows.
+
+    Torch and other native packages ship DLLs in subdirectories (e.g.
+    ``torch/lib/``) that the OS loader doesn't search by default when loading
+    from a foreign venv inside QGIS's process.  We add them via
+    ``os.add_dll_directory()`` and also prepend to ``PATH`` to cover legacy
+    ``LoadLibrary`` calls without search flags.
+
+    Args:
+        site_packages: Path to the venv site-packages directory.
+    """
+    dll_dirs = [
+        os.path.join(site_packages, "torch", "lib"),
+        os.path.join(site_packages, "torch", "bin"),
+        os.path.join(site_packages, "torchvision"),
+    ]
+
+    path_parts = os.environ.get("PATH", "").split(os.pathsep)
+    for dll_dir in dll_dirs:
+        if os.path.isdir(dll_dir):
+            try:
+                os.add_dll_directory(dll_dir)
+                _log(f"Added DLL directory: {dll_dir}", Qgis.Info)
+            except OSError as exc:
+                _log(f"add_dll_directory({dll_dir}) failed: {exc}", Qgis.Warning)
+            if dll_dir not in path_parts:
+                path_parts.insert(0, dll_dir)
+
+    os.environ["PATH"] = os.pathsep.join(path_parts)
 
 
 def _fix_proj_data(site_packages: str) -> None:
