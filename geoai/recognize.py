@@ -113,7 +113,15 @@ class ImageDataset(Dataset):
 
         Returns:
             Image array with shape ``(C, H, W)`` as float32 in ``[0, 1]``.
+
+        Raises:
+            ImportError: If PIL (Pillow) is not installed.
         """
+        if not PIL_AVAILABLE:
+            raise ImportError(
+                "Pillow is required to load standard images. "
+                "Install with: pip install Pillow"
+            )
         img = Image.open(path).convert("RGB")
         img = img.resize((self.image_size, self.image_size), Image.BILINEAR)
         arr = np.array(img, dtype=np.float32) / 255.0  # (H, W, 3)
@@ -128,27 +136,57 @@ class ImageDataset(Dataset):
 
         Returns:
             Image array with shape ``(C, H, W)`` as float32 in ``[0, 1]``.
+
+        Raises:
+            ImportError: If rasterio is not installed.
         """
+        if not RASTERIO_AVAILABLE:
+            raise ImportError(
+                "rasterio is required to load GeoTIFF images. "
+                "Install with: pip install rasterio"
+            )
         with rasterio.open(path) as src:
             # Read all bands: shape (C, H, W)
             arr = src.read().astype(np.float32)
 
-        # Resize if needed
+        # Resize if needed (use scipy for float-aware resizing, PIL fallback)
         if arr.shape[1] != self.image_size or arr.shape[2] != self.image_size:
-            from PIL import Image as _PILImage
+            try:
+                import scipy.ndimage as _ndi
 
-            channels = []
-            for c in range(arr.shape[0]):
-                band = _PILImage.fromarray(arr[c])
-                band = band.resize(
-                    (self.image_size, self.image_size), _PILImage.BILINEAR
+                zoom_factors = (
+                    1.0,
+                    float(self.image_size) / float(arr.shape[1]),
+                    float(self.image_size) / float(arr.shape[2]),
                 )
-                channels.append(np.array(band, dtype=np.float32))
-            arr = np.stack(channels, axis=0)
+                arr = _ndi.zoom(arr, zoom=zoom_factors, order=1).astype(np.float32)
+            except ImportError:
+                from PIL import Image as _PILImage
 
-        # Normalize to [0, 1]
-        if arr.max() > 1.0:
-            arr = arr / 255.0 if arr.max() <= 255.0 else arr / arr.max()
+                channels = []
+                for c in range(arr.shape[0]):
+                    band = arr[c]
+                    bmin, bmax = float(band.min()), float(band.max())
+                    if bmax > bmin:
+                        band_norm = (band - bmin) / (bmax - bmin)
+                    else:
+                        band_norm = np.zeros_like(band, dtype=np.float32)
+                    band_img = _PILImage.fromarray((band_norm * 255.0).astype(np.uint8))
+                    band_img = band_img.resize(
+                        (self.image_size, self.image_size), _PILImage.BILINEAR
+                    )
+                    band_resized = np.array(band_img, dtype=np.float32) / 255.0
+                    # Rescale back to original range
+                    channels.append(band_resized * (bmax - bmin) + bmin)
+                arr = np.stack(channels, axis=0)
+
+        # Normalize to [0, 1].
+        # Values in (0, 1] are assumed already normalized.
+        # Values > 1 and <= 255 are treated as uint8-range.
+        # Values > 255 are rescaled by the per-array maximum.
+        arr_max = float(arr.max())
+        if arr_max > 1.0:
+            arr = arr / 255.0 if arr_max <= 255.0 else arr / arr_max
 
         return arr
 
@@ -256,23 +294,34 @@ def load_image_dataset(
 
     if not image_paths:
         # Auto-detect nested directory (e.g., ZIP extraction produces
-        # data_dir/inner_dir/ClassA/... instead of data_dir/ClassA/...)
-        subdirs = [
-            d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))
-        ]
-        for subdir in subdirs:
-            nested = os.path.join(data_dir, subdir)
-            nested_classes = [
-                d for d in os.listdir(nested) if os.path.isdir(os.path.join(nested, d))
-            ]
-            if nested_classes:
-                # Check if the nested directory contains images
-                for nc in nested_classes:
-                    nc_dir = os.path.join(nested, nc)
-                    for ext in extensions:
-                        if glob.glob(os.path.join(nc_dir, f"*.{ext}")):
-                            print(f"Auto-detected nested dataset at: {nested}")
-                            return load_image_dataset(nested, extensions)
+        # data_dir/wrapper/ClassA/... instead of data_dir/ClassA/...).
+        # Walk up to 3 levels deep to find an ImageFolder-style root.
+        max_depth = 3
+        for root, dirs, _files in os.walk(data_dir):
+            rel_path = os.path.relpath(root, data_dir)
+            depth = 0 if rel_path == os.curdir else rel_path.count(os.sep) + 1
+            if depth > max_depth:
+                dirs[:] = []
+                continue
+
+            if not dirs:
+                continue
+
+            # Check if any subdirectory of *root* contains matching images
+            has_images = False
+            for d in dirs:
+                candidate = os.path.join(root, d)
+                for ext in extensions:
+                    if glob.glob(os.path.join(candidate, f"*.{ext}")):
+                        has_images = True
+                        break
+                if has_images:
+                    break
+
+            if has_images and root != data_dir:
+                print(f"Auto-detected nested dataset at: {root}")
+                return load_image_dataset(root, extensions)
+
         raise ValueError(f"No images found in {data_dir} with extensions {extensions}")
 
     print(f"Found {len(image_paths)} images in {len(class_names)} classes")
@@ -761,7 +810,8 @@ def plot_confusion_matrix(
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
     # Annotate cells
-    thresh = cm_plot.max() / 2.0
+    cm_max = cm_plot.max()
+    thresh = cm_max / 2.0 if cm_max > 0 else 0.5
     for i in range(n):
         for j in range(n):
             val = cm_plot[i, j]
@@ -805,7 +855,15 @@ def plot_predictions(
 
     Returns:
         Matplotlib :class:`~matplotlib.figure.Figure`.
+
+    Raises:
+        ImportError: If PIL (Pillow) is not installed.
     """
+    if not PIL_AVAILABLE:
+        raise ImportError(
+            "Pillow is required to display images. " "Install with: pip install Pillow"
+        )
+
     num_images = min(num_images, len(image_paths))
     nrows = (num_images + ncols - 1) // ncols
 
@@ -813,7 +871,7 @@ def plot_predictions(
         figsize = (ncols * 4, nrows * 4)
 
     fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
-    axes = np.atleast_2d(axes)
+    axes = np.array(axes).reshape(nrows, ncols)
 
     for idx in range(nrows * ncols):
         ax = axes[idx // ncols, idx % ncols]
