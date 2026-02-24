@@ -201,10 +201,19 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
             return None
 
         _diag.append(f"  load {init_path}: SUCCESS")
-        # Re-register plugin sub-modules that were already loaded
+        # Re-register plugin sub-modules that were already loaded so that
+        # relative imports inside the plugin (e.g. ``from .._pkg_resources_compat``)
+        # continue to resolve correctly.
+        plugin_dir = str(Path(__file__).resolve().parent)
         for key, mod in saved.items():
             if key.startswith("geoai.") and key not in sys.modules:
                 sys.modules[key] = mod
+        # Add the plugin directory to the external module's __path__ so that
+        # future relative imports from plugin code (e.g. ``from .._geoai_lib``,
+        # ``from .._pkg_resources_compat``) can find plugin-only modules.
+        if hasattr(module, "__path__"):
+            if plugin_dir not in module.__path__:
+                module.__path__.append(plugin_dir)
         return module
     except Exception as exc:
         tb_str = traceback.format_exc()
