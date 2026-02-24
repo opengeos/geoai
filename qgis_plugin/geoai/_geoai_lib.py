@@ -31,29 +31,40 @@ _log = logging.getLogger(__name__)
 _diag: list[str] = []
 
 
-class _TorchImportBlocker:
-    """Meta path finder that blocks ``import torch`` with an ImportError.
+def _install_torch_import_blocker():
+    """Monkey-patch ``builtins.__import__`` to block ``import torch``.
 
     On Windows, torch DLLs may fail to load inside QGIS's process with
     ``OSError`` (WinError 127).  Most code only catches ``ImportError``,
     so the ``OSError`` propagates and crashes the entire import chain.
 
-    This blocker converts ``import torch`` into a clean ``ImportError``
-    so that existing ``try/except ImportError`` guards work correctly.
-    It should be installed temporarily and removed after use.
+    This patches ``builtins.__import__`` (the lowest-level import function)
+    so that any ``import torch`` raises a clean ``ImportError``.  This works
+    even when QGIS replaces ``builtins.__import__`` with its own hook
+    (``qgis.utils._import``), because QGIS's hook eventually calls
+    ``_builtin_import`` which is the original — we patch before QGIS does,
+    or we patch QGIS's replacement directly.
+
+    Returns:
+        A callable that, when called, restores the original import function.
     """
+    import builtins
 
-    def find_module(self, fullname, path=None):
-        """Return self as loader for torch and torch sub-modules."""
-        if fullname == "torch" or fullname.startswith("torch."):
-            return self
-        return None
+    original_import = builtins.__import__
 
-    def load_module(self, fullname):
-        """Raise ImportError for any torch import."""
-        raise ImportError(
-            f"{fullname} is not available (torch DLLs incompatible with QGIS process)"
-        )
+    def _torch_blocking_import(name, *args, **kwargs):
+        if name == "torch" or name.startswith("torch."):
+            raise ImportError(
+                f"{name} is not available (torch DLLs incompatible with QGIS process)"
+            )
+        return original_import(name, *args, **kwargs)
+
+    builtins.__import__ = _torch_blocking_import
+
+    def _restore():
+        builtins.__import__ = original_import
+
+    return _restore
 
 
 def _is_plugin_module(mod: ModuleType) -> bool:
@@ -307,9 +318,8 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
                 if key == "torch" or key.startswith("torch."):
                     del sys.modules[key]
 
-            # Install a meta path finder that blocks torch imports
-            blocker = _TorchImportBlocker()
-            sys.meta_path.insert(0, blocker)
+            # Patch builtins.__import__ to block torch imports
+            restore_import = _install_torch_import_blocker()
 
             # Re-remove geoai entries for fresh attempt
             for key in list(sys.modules.keys()):
@@ -330,11 +340,8 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
                     f"  retry with torch blocker FAILED: {retry_exc}\n{tb_str}"
                 )
             finally:
-                # Always remove the blocker
-                try:
-                    sys.meta_path.remove(blocker)
-                except ValueError:
-                    pass
+                # Always restore the original __import__
+                restore_import()
 
             # Restore on retry failure
             _cleanup_and_restore()
