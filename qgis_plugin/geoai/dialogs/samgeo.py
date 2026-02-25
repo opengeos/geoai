@@ -234,7 +234,7 @@ class SamGeoDockWidget(QDockWidget):
         device_row = QHBoxLayout()
         device_row.addWidget(QLabel("Device:"))
         self.device_combo = QComboBox()
-        self.device_combo.addItems(["auto", "cuda", "cpu"])
+        self.device_combo.addItems(["auto", "cuda", "cpu", "mps"])
         device_row.addWidget(self.device_combo)
         backend_layout.addLayout(device_row)
 
@@ -1143,6 +1143,18 @@ class SamGeoDockWidget(QDockWidget):
         if device == "auto":
             device = None
 
+        # Prefer MPS on Apple Silicon in auto mode before checking CUDA.
+        if device is None and torch is not None:
+            try:
+                if (
+                    getattr(torch.backends, "mps", None)
+                    and torch.backends.mps.is_available()
+                ):
+                    device = "mps"
+                    self.log_message("Auto mode: using Apple MPS backend")
+            except Exception as e:
+                self.log_message(f"MPS detection failed: {e}", level=Qgis.Warning)
+
         # Check CUDA availability if using CUDA or auto device selection
         if device == "cuda" or device is None:
             cuda_available, warning_message = self.check_cuda_devices()
@@ -1167,14 +1179,12 @@ class SamGeoDockWidget(QDockWidget):
                     self.log_message(
                         f"Auto mode: CUDA not available, using CPU. Reason: {warning_message}"
                     )
-                    QMessageBox.information(
-                        self,
-                        "Using CPU Mode",
-                        f"CUDA is not available. Automatically using CPU mode.\n\n{warning_message}",
-                    )
+                    # Avoid modal dialogs during auto device selection; these can
+                    # interrupt UI flow and have caused freezes on some platforms.
+                    self.model_status.setText("Loading model (CPU fallback)...")
             elif warning_message:
                 # CUDA is now available but there was a warning (e.g., fixed CUDA_VISIBLE_DEVICES)
-                QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
+                self.log_message(f"CUDA issue fixed: {warning_message}", level=Qgis.Warning)
 
         confidence = self.conf_spin.value()
         enable_interactive = self.interactive_check.isChecked()
