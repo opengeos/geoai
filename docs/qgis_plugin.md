@@ -1,5 +1,9 @@
 # QGIS Plugin for GeoAI
 
+[![QGIS](https://img.shields.io/badge/QGIS-plugin-orange.svg)](https://plugins.qgis.org/plugins/geoai)
+[![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.09605/status.svg)](https://doi.org/10.21105/joss.09605)
+
 A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, semantic segmentation, instance segmentation, SamGeo, DeepForest, water segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
 
 ## Quick Start
