@@ -17,9 +17,9 @@ A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](
 
 ### Installation Tutorial
 
-You can follow this [video tutorial](https://youtu.be/TJmZQXJK-IU) to install the GeoAI QGIS Plugin on Linux/Windows:
+You can follow this [video tutorial](https://youtu.be/L90id_ESQME) to install the GeoAI QGIS Plugin on Linux,Windows:
 
-[![installation](https://github.com/user-attachments/assets/6fa17c97-2ff5-40d6-be16-c6dcfe03f806)](https://youtu.be/TJmZQXJK-IU)
+[![installation](https://github.com/user-attachments/assets/3cda92c0-4de9-4cad-81c8-ddb3c790be91)](https://youtu.be/L90id_ESQME)
 
 ### Usage Tutorial
 
