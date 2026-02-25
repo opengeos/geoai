@@ -31,16 +31,17 @@ REQUIRED_PACKAGES = [
     ("geoai-py", ""),
     ("segment-geospatial", ""),
     ("sam3", ""),
-    ("transformers", ">=5.1.0"),
     ("deepforest", ""),
     ("omniwatermask", ""),
+    # Install last because some packages (e.g., deepforest deps) may downgrade it.
+    ("transformers", ">=5.1.0"),
 ]
 
 DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "6"
+_INSTALL_LOGIC_VERSION = "7"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
