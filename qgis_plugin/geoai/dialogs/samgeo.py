@@ -8,10 +8,13 @@ using the SamGeo library (SAM, SAM2, and SAM3 models).
 import os
 import tempfile
 
+_TORCH_IMPORT_ERROR = None
+
 try:
     import torch
-except ImportError:
+except (ImportError, OSError) as e:
     torch = None
+    _TORCH_IMPORT_ERROR = e
 
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtGui import QColor
@@ -55,6 +58,11 @@ from .map_tools import PointPromptTool, BoxPromptTool
 from .._pkg_resources_compat import ensure_pkg_resources
 
 
+def _use_samgeo_subprocess() -> bool:
+    """Use subprocess SamGeo on Windows to avoid QGIS/PyTorch DLL conflicts."""
+    return os.name == "nt"
+
+
 class SamGeoModelLoadWorker(QThread):
     """Worker thread for loading SamGeo model."""
 
@@ -81,6 +89,21 @@ class SamGeoModelLoadWorker(QThread):
         """Load the SamGeo model in background."""
         try:
             self.progress.emit("Initializing SamGeo...")
+            if _use_samgeo_subprocess():
+                self.progress.emit("Starting SamGeo subprocess worker...")
+                from ..core.samgeo_subprocess import SamGeoSubprocessClient
+
+                model = SamGeoSubprocessClient(
+                    model_version=self.model_version,
+                    backend=self.backend,
+                    device=self.device,
+                    confidence=self.confidence,
+                    enable_interactive=self.enable_interactive,
+                )
+                model.initialize()
+                self.finished.emit(model, getattr(model, "model_name", "SamGeo"))
+                return
+
             shim_installed = ensure_pkg_resources()
             if shim_installed:
                 self.progress.emit(
@@ -1044,9 +1067,16 @@ class SamGeoDockWidget(QDockWidget):
             tuple: (is_cuda_available: bool, warning_message: str or None)
         """
         if torch is None:
+            detail = ""
+            if _TORCH_IMPORT_ERROR is not None:
+                detail = (
+                    f"\n\nPyTorch import error in QGIS process:\n{_TORCH_IMPORT_ERROR}"
+                )
             return (
                 False,
-                "PyTorch is not installed. Please install PyTorch to use CUDA acceleration.",
+                "PyTorch is not available in this QGIS session. "
+                "Please reinstall dependencies or use a subprocess-backed panel."
+                f"{detail}",
             )
 
         # Check if CUDA is available
@@ -1128,6 +1158,18 @@ class SamGeoDockWidget(QDockWidget):
             self.log_message(error_msg)
             return False, error_msg
 
+    def _sam_supports(self, method_name: str) -> bool:
+        """Check feature support on either a real SamGeo object or subprocess proxy."""
+        if self.sam is None:
+            return False
+        supports_method = getattr(self.sam, "supports_method", None)
+        if callable(supports_method):
+            try:
+                return bool(supports_method(method_name))
+            except Exception:
+                return False
+        return hasattr(self.sam, method_name)
+
     def load_model(self):
         """Load the SamGeo model asynchronously."""
         self.progress_bar.setVisible(True)
@@ -1139,12 +1181,34 @@ class SamGeoDockWidget(QDockWidget):
         model_version = self.model_combo.currentText()
         backend = self.backend_combo.currentText()
         device = self.device_combo.currentText()
+        use_subprocess = _use_samgeo_subprocess()
+
+        if torch is None:
+            if use_subprocess:
+                self.log_message(
+                    "PyTorch is unavailable in QGIS process; using SamGeo subprocess worker.",
+                    level=Qgis.Warning,
+                )
+            else:
+                self.progress_bar.setVisible(False)
+                self.load_model_btn.setEnabled(True)
+                err = "PyTorch is not available in the QGIS process."
+                if _TORCH_IMPORT_ERROR is not None:
+                    err += (
+                        "\n\nImport error:\n"
+                        f"{_TORCH_IMPORT_ERROR}\n\n"
+                        "This is typically a Windows QGIS/PyTorch DLL incompatibility."
+                    )
+                self.show_error(err)
+                self.model_status.setText("Model: Failed to load")
+                self.model_status.setStyleSheet("color: red;")
+                return
 
         if device == "auto":
             device = None
 
         # Prefer MPS on Apple Silicon in auto mode before checking CUDA.
-        if device is None and torch is not None:
+        if not use_subprocess and device is None and torch is not None:
             try:
                 if (
                     getattr(torch.backends, "mps", None)
@@ -1156,7 +1220,7 @@ class SamGeoDockWidget(QDockWidget):
                 self.log_message(f"MPS detection failed: {e}", level=Qgis.Warning)
 
         # Check CUDA availability if using CUDA or auto device selection
-        if device == "cuda" or device is None:
+        if not use_subprocess and (device == "cuda" or device is None):
             cuda_available, warning_message = self.check_cuda_devices()
 
             if not cuda_available:
@@ -1599,7 +1663,7 @@ class SamGeoDockWidget(QDockWidget):
             # Use appropriate method based on model type
             # point_crs=None because coordinates are already in pixel space
             # (transformed from canvas CRS to layer CRS in add_point())
-            if hasattr(self.sam, "generate_masks_by_points"):
+            if self._sam_supports("generate_masks_by_points"):
                 self.sam.generate_masks_by_points(
                     point_coords=point_coords.tolist(),
                     point_labels=point_labels.tolist(),
@@ -1734,7 +1798,7 @@ class SamGeoDockWidget(QDockWidget):
             QCoreApplication.processEvents()
 
             # Use appropriate method based on model type
-            if hasattr(self.sam, "generate_masks_by_boxes"):
+            if self._sam_supports("generate_masks_by_boxes"):
                 self.sam.generate_masks_by_boxes(boxes=[self.box_coords])
             else:
                 # Fallback for older SamGeo versions
@@ -1792,7 +1856,7 @@ class SamGeoDockWidget(QDockWidget):
             return
 
         # Check if batch method is available
-        if not hasattr(self.sam, "generate_masks_by_points_patch"):
+        if not self._sam_supports("generate_masks_by_points_patch"):
             self.show_error(
                 "Batch point mode requires SamGeo3 with enable_inst_interactivity=True.\n"
                 "Please reload the model with the correct settings."
@@ -2334,6 +2398,11 @@ class SamGeoDockWidget(QDockWidget):
 
         # Clean up model
         if self.sam is not None:
+            try:
+                if hasattr(self.sam, "close") and callable(getattr(self.sam, "close")):
+                    self.sam.close()
+            except Exception:
+                pass
             del self.sam
             self.sam = None
 

@@ -687,7 +687,7 @@ class GeoAIPlugin:
         self.instance_segmentation_action.setChecked(visible)
 
     def clear_gpu_memory(self):
-        """Clear GPU memory and release CUDA resources."""
+        """Clear accelerator memory and release model resources."""
         import gc
 
         cleared_items = []
@@ -766,6 +766,13 @@ class GeoAIPlugin:
                 if hasattr(self._samgeo_dock, "sam"):
                     sam_obj = self._samgeo_dock.sam
                     if sam_obj is not None:
+                        if hasattr(sam_obj, "close") and callable(
+                            getattr(sam_obj, "close")
+                        ):
+                            try:
+                                sam_obj.close()
+                            except Exception:
+                                pass
                         # Clear the model
                         if hasattr(sam_obj, "model") and sam_obj.model is not None:
                             try:
@@ -874,7 +881,7 @@ class GeoAIPlugin:
         for _ in range(5):
             gc.collect()
 
-        # Clear PyTorch CUDA cache
+        # Clear PyTorch accelerator cache (CUDA or Apple MPS)
         if torch is not None and torch.cuda.is_available():
             try:
                 # Synchronize first
@@ -900,17 +907,48 @@ class GeoAIPlugin:
                     memory_info += "\n\nNote: Some GPU memory may still be held by PyTorch's memory allocator. Restart QGIS to fully release all GPU memory."
             except Exception as e:
                 memory_info = f"\n\nError clearing CUDA: {str(e)}"
+        elif (
+            torch is not None
+            and hasattr(torch, "backends")
+            and hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        ):
+            try:
+                if hasattr(torch, "mps") and hasattr(torch.mps, "synchronize"):
+                    torch.mps.synchronize()
+
+                mps_cache_cleared = False
+                if hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+                    torch.mps.empty_cache()
+                    mps_cache_cleared = True
+
+                gc.collect()
+
+                if hasattr(torch, "mps") and hasattr(torch.mps, "synchronize"):
+                    torch.mps.synchronize()
+
+                if mps_cache_cleared:
+                    cleared_items.append("MPS cache")
+                    memory_info = "\n\nApple Metal (MPS) cache cleared."
+                else:
+                    memory_info = (
+                        "\n\nApple Metal (MPS) is available, but this PyTorch build "
+                        "does not expose torch.mps.empty_cache(). Models were released "
+                        "and garbage collection was run."
+                    )
+            except Exception as e:
+                memory_info = f"\n\nError clearing MPS cache: {str(e)}"
         elif torch is None:
             memory_info = "\n\nPyTorch not installed."
         else:
-            memory_info = "\n\nNo CUDA GPU available."
+            memory_info = "\n\nNo CUDA or MPS accelerator available."
 
         if cleared_items:
             message = f"Cleared: {', '.join(cleared_items)}{memory_info}"
         else:
             message = f"No models loaded to clear.{memory_info}"
 
-        self.iface.statusBarIface().showMessage("GPU memory cleared", 3000)
+        self.iface.statusBarIface().showMessage("Accelerator memory cleared", 3000)
         QMessageBox.information(
             self.iface.mainWindow(),
             "Clear GPU Memory",
