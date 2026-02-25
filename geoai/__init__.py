@@ -115,7 +115,11 @@ except (ImportError, OSError):
     # DINOv3 not available (missing torch dependency or DLL load failure)
     pass
 
-from .geoai import *
+try:
+    from .geoai import *
+except (ImportError, OSError):
+    # Core geoai module not available (missing torch dependency or DLL load failure)
+    pass
 from .utils import (
     orthogonalize,
     regularization,

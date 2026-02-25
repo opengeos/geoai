@@ -943,6 +943,7 @@ def _wrap_bare_imports(filepath: str) -> bool:
     """
     # Patterns that indicate torch-dependent imports.
     bare_patterns = [
+        "from .geoai import",
         "from .dinov3 import",
         "from .timm_train import",
         "from .recognize import",

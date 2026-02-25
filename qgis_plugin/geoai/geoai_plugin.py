@@ -698,7 +698,7 @@ class GeoAIPlugin:
             import torch as _torch
 
             torch = _torch
-        except ImportError:
+        except (ImportError, OSError):
             # PyTorch is optional; continue without GPU memory clearing if not installed.
             pass
 
@@ -708,6 +708,13 @@ class GeoAIPlugin:
                 if hasattr(self._moondream_dock, "moondream"):
                     moondream_obj = self._moondream_dock.moondream
                     if moondream_obj is not None:
+                        if hasattr(moondream_obj, "close") and callable(
+                            getattr(moondream_obj, "close")
+                        ):
+                            try:
+                                moondream_obj.close()
+                            except Exception:
+                                pass
                         # Move model to CPU first to free GPU memory
                         if (
                             hasattr(moondream_obj, "model")

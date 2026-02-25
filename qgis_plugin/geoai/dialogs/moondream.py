@@ -6,6 +6,7 @@ vision-language model for geospatial image analysis in QGIS.
 """
 
 import os
+import shutil
 import tempfile
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -32,6 +33,7 @@ from qgis.PyQt.QtGui import QColor
 
 from qgis.core import (
     QgsProject,
+    QgsVectorFileWriter,
     QgsVectorLayer,
 )
 from qgis.gui import QgsMapLayerComboBox
@@ -53,15 +55,15 @@ class ModelLoadWorker(QThread):
     def run(self):
         """Load the Moondream model in background."""
         try:
-            self.progress.emit("Initializing model...")
+            self.progress.emit("Starting worker subprocess...")
 
-            from .._geoai_lib import get_geoai
+            from ..core.moondream_subprocess import MoondreamSubprocessClient
 
-            geoai = get_geoai()
-            MoondreamGeo = geoai.MoondreamGeo
-
-            self.progress.emit(f"Loading {self.model_name.split('/')[-1]}...")
-            moondream = MoondreamGeo(model_name=self.model_name, device=self.device)
+            moondream = MoondreamSubprocessClient(
+                model_name=self.model_name, device=self.device
+            )
+            self.progress.emit(f"Loading {self.model_name.split('/')[-1]} in worker...")
+            moondream.initialize()
 
             self.finished.emit(moondream)
 
@@ -458,7 +460,7 @@ class MoondreamDockWidget(QDockWidget):
         self.moondream = moondream
         model_name = self.model_combo.currentText()
 
-        self.model_status.setText(f"Loaded: {model_name.split('/')[-1]}")
+        self.model_status.setText(f"Loaded (worker): {model_name.split('/')[-1]}")
         self.model_status.setStyleSheet("color: green;")
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
@@ -596,30 +598,32 @@ class MoondreamDockWidget(QDockWidget):
         elif result_type == "detect":
             object_type = data.get("object_type", "")
             objects = result.get("objects", [])
-            gdf = result.get("gdf")
+            vector_path = result.get("vector_path")
+            feature_count = result.get("vector_feature_count", len(objects))
 
-            text = f"Detected '{object_type}': {len(objects)} object(s)"
-            if gdf is not None and len(gdf) > 0 and self.add_to_map_check.isChecked():
+            text = f"Detected '{object_type}': {feature_count} object(s)"
+            if vector_path and self.add_to_map_check.isChecked():
                 text += "\nBounding boxes added to map."
-                self.add_detection_layer(gdf, object_type)
+                self.add_detection_layer(vector_path, object_type)
 
             self.results_text.setPlainText(text)
-            has_results = gdf is not None and len(gdf) > 0
+            has_results = bool(vector_path and feature_count > 0)
             self.save_btn.setEnabled(has_results)
             self.export_btn.setEnabled(has_results)
 
         elif result_type == "point":
             description = data.get("description", "")
             points = result.get("points", [])
-            gdf = result.get("gdf")
+            vector_path = result.get("vector_path")
+            feature_count = result.get("vector_feature_count", len(points))
 
-            text = f"Located '{description}': {len(points)} point(s)"
-            if gdf is not None and len(gdf) > 0 and self.add_to_map_check.isChecked():
+            text = f"Located '{description}': {feature_count} point(s)"
+            if vector_path and self.add_to_map_check.isChecked():
                 text += "\nPoints added to map."
-                self.add_point_layer(gdf, description)
+                self.add_point_layer(vector_path, description)
 
             self.results_text.setPlainText(text)
-            has_results = gdf is not None and len(gdf) > 0
+            has_results = bool(vector_path and feature_count > 0)
             self.save_btn.setEnabled(has_results)
             self.export_btn.setEnabled(has_results)
 
@@ -633,16 +637,10 @@ class MoondreamDockWidget(QDockWidget):
         self.results_text.setPlainText(f"Error:\n{error_message}")
         QMessageBox.critical(self, "Error", f"Analysis failed:\n{error_message}")
 
-    def add_detection_layer(self, gdf, object_type: str):
+    def add_detection_layer(self, vector_path: str, object_type: str):
         """Add detection results as a vector layer to QGIS."""
         try:
-            temp_dir = tempfile.gettempdir()
-            temp_file = os.path.join(
-                temp_dir, f"moondream_detect_{object_type.replace(' ', '_')}.geojson"
-            )
-            gdf.to_file(temp_file, driver="GeoJSON")
-
-            layer = QgsVectorLayer(temp_file, f"Detections: {object_type}", "ogr")
+            layer = QgsVectorLayer(vector_path, f"Detections: {object_type}", "ogr")
             if layer.isValid():
                 symbol = layer.renderer().symbol()
                 symbol.setColor(self.result_color)
@@ -662,16 +660,10 @@ class MoondreamDockWidget(QDockWidget):
         except Exception as e:
             QMessageBox.warning(self, "Warning", f"Failed to add layer:\n{str(e)}")
 
-    def add_point_layer(self, gdf, description: str):
+    def add_point_layer(self, vector_path: str, description: str):
         """Add point results as a vector layer to QGIS."""
         try:
-            temp_dir = tempfile.gettempdir()
-            temp_file = os.path.join(
-                temp_dir, f"moondream_points_{description.replace(' ', '_')}.geojson"
-            )
-            gdf.to_file(temp_file, driver="GeoJSON")
-
-            layer = QgsVectorLayer(temp_file, f"Points: {description}", "ogr")
+            layer = QgsVectorLayer(vector_path, f"Points: {description}", "ogr")
             if layer.isValid():
                 symbol = layer.renderer().symbol()
                 symbol.setColor(self.result_color)
@@ -715,8 +707,9 @@ class MoondreamDockWidget(QDockWidget):
             return
 
         result = self.last_result.get("result", {})
-        gdf = result.get("gdf")
-        if gdf is None or len(gdf) == 0:
+        vector_path = result.get("vector_path")
+        feature_count = result.get("vector_feature_count", 0)
+        if not vector_path or feature_count <= 0:
             QMessageBox.warning(self, "Warning", "No spatial results to export.")
             return
 
@@ -734,12 +727,6 @@ class MoondreamDockWidget(QDockWidget):
 
             QApplication.processEvents()
 
-            # Save the GeoDataFrame to a temp file for export_geotiff_tiles
-            temp_vector = os.path.join(
-                tempfile.gettempdir(), "moondream_export_temp.geojson"
-            )
-            gdf.to_file(temp_vector, driver="GeoJSON")
-
             # Get export parameters
             export_format = self.export_format_combo.currentText()
             tile_size = self.export_tile_size_spin.value()
@@ -752,16 +739,12 @@ class MoondreamDockWidget(QDockWidget):
             geoai.export_geotiff_tiles(
                 in_raster=self.current_image_path,
                 out_folder=output_dir,
-                in_class_data=temp_vector,
+                in_class_data=vector_path,
                 tile_size=tile_size,
                 stride=tile_size,  # No overlap for detection training
                 metadata_format=export_format,
                 skip_empty_tiles=True,
             )
-
-            # Clean up temp file
-            if os.path.exists(temp_vector):
-                os.remove(temp_vector)
 
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(100)
@@ -796,8 +779,9 @@ class MoondreamDockWidget(QDockWidget):
         result = self.last_result.get("result", {})
 
         if result_type in ["detect", "point"]:
-            gdf = result.get("gdf")
-            if gdf is not None and len(gdf) > 0:
+            vector_path = result.get("vector_path")
+            feature_count = result.get("vector_feature_count", 0)
+            if vector_path and feature_count > 0:
                 file_path, _ = QFileDialog.getSaveFileName(
                     self,
                     "Save Results",
@@ -806,12 +790,7 @@ class MoondreamDockWidget(QDockWidget):
                 )
                 if file_path:
                     try:
-                        if file_path.endswith(".geojson"):
-                            gdf.to_file(file_path, driver="GeoJSON")
-                        elif file_path.endswith(".shp"):
-                            gdf.to_file(file_path, driver="ESRI Shapefile")
-                        else:
-                            gdf.to_file(file_path)
+                        self._save_vector_result(vector_path, file_path)
                         QMessageBox.information(
                             self, "Success", f"Saved to:\n{file_path}"
                         )
@@ -844,10 +823,47 @@ class MoondreamDockWidget(QDockWidget):
         self.save_btn.setEnabled(False)
         self.export_btn.setEnabled(False)
 
+    def _save_vector_result(self, source_path: str, output_path: str):
+        """Save vector results produced by the Moondream worker."""
+        lower = output_path.lower()
+        if lower.endswith(".geojson"):
+            shutil.copy2(source_path, output_path)
+            return
+
+        layer = QgsVectorLayer(source_path, "Moondream Result", "ogr")
+        if not layer.isValid():
+            raise RuntimeError(f"Failed to open vector results: {source_path}")
+
+        if lower.endswith(".shp"):
+            driver = "ESRI Shapefile"
+        elif lower.endswith(".gpkg"):
+            driver = "GPKG"
+        else:
+            driver = "GPKG"
+
+        write_result = QgsVectorFileWriter.writeAsVectorFormat(
+            layer,
+            output_path,
+            "UTF-8",
+            layer.crs(),
+            driver,
+        )
+        error_code = (
+            write_result[0] if isinstance(write_result, tuple) else write_result
+        )
+        if error_code != QgsVectorFileWriter.NoError:
+            raise RuntimeError(f"Failed to save vector layer (driver={driver})")
+
     def closeEvent(self, event):
         """Handle widget close event."""
         for worker in [self.worker, self.model_load_worker]:
             if worker and worker.isRunning():
                 worker.terminate()
                 worker.wait()
+        if self.moondream is not None and hasattr(self.moondream, "close"):
+            try:
+                self.moondream.close()
+            except Exception:
+                pass
+            self.moondream = None
         event.accept()
