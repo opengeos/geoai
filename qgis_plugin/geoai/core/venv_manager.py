@@ -1682,6 +1682,48 @@ def _verify_cuda_in_venv(venv_dir: str) -> bool:
         return False
 
 
+def _is_torch_related_verify_failure(message: str) -> bool:
+    """Return True if a venv verification failure is likely caused by torch/CUDA.
+
+    This is used to decide whether it is appropriate to auto-fallback from CUDA
+    torch to CPU torch. Non-torch package verification failures (e.g. ``sam3``)
+    should NOT trigger a torch reinstall.
+    """
+    msg = (message or "").lower()
+    if not msg:
+        return False
+
+    # Do not treat optional package import failures as torch/CUDA verification
+    # failures, even if their traceback mentions torch imports internally.
+    if "package sam3 is broken" in msg:
+        return False
+
+    torch_markers = (
+        "package torch is broken",
+        "package torchvision is broken",
+        "package geoai-py is broken",
+        "verification error: torch",
+        "verification error: torchvision",
+        "torch not compiled with cuda",
+        "cuda not available",
+        "shm.dll",
+        "torch dll",
+    )
+    return any(marker in msg for marker in torch_markers)
+
+
+def _is_optional_verify_package(package_name: str) -> bool:
+    """Return True if verification failure for this package can be non-fatal.
+
+    Some packages are installed as optional feature backends and may fail to
+    import on specific platforms due to upstream native dependency issues
+    without breaking the core plugin functionality.
+    """
+    if sys.platform == "win32" and package_name == "sam3":
+        return True
+    return False
+
+
 def install_dependencies(
     venv_dir: str = None,
     progress_callback: Optional[Callable[[int, str], None]] = None,
@@ -2173,6 +2215,7 @@ def verify_venv(
     subprocess_kwargs = _get_subprocess_kwargs()
 
     total_packages = len(REQUIRED_PACKAGES)
+    optional_failures: List[str] = []
     for i, (package_name, _) in enumerate(REQUIRED_PACKAGES):
         if progress_callback:
             percent = int((i / total_packages) * 100)
@@ -2205,6 +2248,14 @@ def verify_venv(
                     ),
                     Qgis.Warning,
                 )
+                if _is_optional_verify_package(package_name):
+                    _log(
+                        "Package {} verification failed but is optional on this "
+                        "platform; continuing.".format(package_name),
+                        Qgis.Warning,
+                    )
+                    optional_failures.append(package_name)
+                    continue
                 return False, "Package {} is broken: {}".format(
                     package_name, error_detail[:200]
                 )
@@ -2229,12 +2280,36 @@ def verify_venv(
                     error_detail = (
                         result.stderr[:300] if result.stderr else result.stdout[:300]
                     )
+                    if _is_optional_verify_package(package_name):
+                        _log(
+                            "Package {} verification failed on retry but is optional "
+                            "on this platform; continuing.".format(package_name),
+                            Qgis.Warning,
+                        )
+                        optional_failures.append(package_name)
+                        continue
                     return False, "Package {} is broken: {}".format(
                         package_name, error_detail[:200]
                     )
             except subprocess.TimeoutExpired:
+                if _is_optional_verify_package(package_name):
+                    _log(
+                        "Verification of {} timed out but package is optional on "
+                        "this platform; continuing.".format(package_name),
+                        Qgis.Warning,
+                    )
+                    optional_failures.append(package_name)
+                    continue
                 return False, "Verification error: {} (timed out)".format(package_name)
             except Exception as e:
+                if _is_optional_verify_package(package_name):
+                    _log(
+                        "Verification error for {} but package is optional on this "
+                        "platform; continuing: {}".format(package_name, str(e)[:120]),
+                        Qgis.Warning,
+                    )
+                    optional_failures.append(package_name)
+                    continue
                 return False, "Verification error: {} ({})".format(
                     package_name, str(e)[:100]
                 )
@@ -2248,6 +2323,21 @@ def verify_venv(
 
     if progress_callback:
         progress_callback(100, "Verification complete")
+
+    if optional_failures:
+        unique_optional = sorted(set(optional_failures))
+        _log(
+            "Virtual environment verified with optional package failures: {}".format(
+                ", ".join(unique_optional)
+            ),
+            Qgis.Warning,
+        )
+        return (
+            True,
+            "Virtual environment ready (optional packages unavailable: {})".format(
+                ", ".join(unique_optional)
+            ),
+        )
 
     _log("Virtual environment verified successfully", Qgis.Success)
     return True, "Virtual environment ready"
@@ -2540,14 +2630,21 @@ def create_venv_and_install(
     is_valid, verify_msg = verify_venv(progress_callback=verify_progress)
 
     if not is_valid and cuda_enabled:
-        _log(
-            "Verification failed with CUDA torch, "
-            "falling back to CPU: {}".format(verify_msg),
-            Qgis.Warning,
-        )
-        _reinstall_cpu_torch(VENV_DIR, progress_callback=progress_callback)
-        is_valid, verify_msg = verify_venv(progress_callback=verify_progress)
-        _cuda_fell_back = True
+        if _is_torch_related_verify_failure(verify_msg):
+            _log(
+                "Verification failed with CUDA torch, "
+                "falling back to CPU: {}".format(verify_msg),
+                Qgis.Warning,
+            )
+            _reinstall_cpu_torch(VENV_DIR, progress_callback=progress_callback)
+            is_valid, verify_msg = verify_venv(progress_callback=verify_progress)
+            _cuda_fell_back = True
+        else:
+            _log(
+                "Verification failed, but it does not appear to be a torch/CUDA "
+                "issue. Skipping CPU torch fallback: {}".format(verify_msg),
+                Qgis.Warning,
+            )
 
     # CUDA smoke test
     _cuda_smoke_failed = False

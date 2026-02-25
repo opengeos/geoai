@@ -5,6 +5,9 @@ Shows GPU detection info, progress bars, and status messages during
 the installation process.
 """
 
+import platform
+import sys
+
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
@@ -164,16 +167,38 @@ class DepsInstallDockWidget(QDockWidget):
                     "border-radius: 4px; padding: 8px; margin-top: 8px; }"
                 )
             else:
-                self.gpu_label.setText(
-                    "No NVIDIA GPU detected.\n"
-                    "CPU mode will be used (slower but functional)."
-                )
+                if sys.platform == "darwin":
+                    machine = platform.machine().lower()
+                    if machine in ("arm64", "aarch64"):
+                        msg = (
+                            "No NVIDIA GPU detected (CUDA not applicable on macOS).\n"
+                            "Apple Silicon MPS may still be used at runtime if "
+                            "supported by PyTorch/QGIS. CPU fallback is available."
+                        )
+                    else:
+                        msg = (
+                            "No NVIDIA GPU detected (CUDA unavailable on this system).\n"
+                            "CPU mode will be used. MPS is only available on Apple Silicon."
+                        )
+                else:
+                    msg = (
+                        "No NVIDIA GPU detected.\n"
+                        "CPU mode will be used (slower but functional)."
+                    )
+                self.gpu_label.setText(msg)
                 self.gpu_group.setStyleSheet(
                     "QGroupBox { border: 1px solid #888; "
                     "border-radius: 4px; padding: 8px; margin-top: 8px; }"
                 )
         except Exception:
-            self.gpu_label.setText("Could not detect GPU.\n" "CPU mode will be used.")
+            if sys.platform == "darwin":
+                self.gpu_label.setText(
+                    "Could not detect NVIDIA GPU.\n"
+                    "CUDA will not be enabled. Apple Silicon MPS may still be "
+                    "used at runtime if available."
+                )
+            else:
+                self.gpu_label.setText("Could not detect GPU.\nCPU mode will be used.")
 
     def _on_reinstall_clicked(self):
         """Handle reinstall button click by removing existing venv first."""
