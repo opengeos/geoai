@@ -823,6 +823,13 @@ class GeoAIPlugin:
                 if hasattr(self._deepforest_dock, "deepforest"):
                     deepforest_obj = self._deepforest_dock.deepforest
                     if deepforest_obj is not None:
+                        if hasattr(deepforest_obj, "close") and callable(
+                            getattr(deepforest_obj, "close")
+                        ):
+                            try:
+                                deepforest_obj.close()
+                            except Exception:
+                                pass
                         # Clear the model
                         if (
                             hasattr(deepforest_obj, "model")
