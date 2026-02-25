@@ -27,7 +27,7 @@ try:
             "check_multiclean_available",
         ]
     )
-except ImportError:
+except (ImportError, OSError):
     # MultiClean not installed - functions will not be available
     pass
 
@@ -60,8 +60,8 @@ try:
             "CLOUD_SHADOW",
         ]
     )
-except ImportError:
-    # OmniCloudMask not installed - functions will not be available
+except (ImportError, OSError):
+    # OmniCloudMask not installed or torch DLL load failure
     pass
 
 
@@ -71,8 +71,8 @@ try:
     from .sr import super_resolution
 
     __all__.extend(["super_resolution"])
-except ImportError:
-    # Super resolution not installed - function will not be available
+except (ImportError, OSError):
+    # Super resolution not installed or torch DLL load failure
     pass
 
 # Time-series analysis utilities (rasterio required)
@@ -112,6 +112,6 @@ try:
             "LANDSAT_DATE_PATTERN",
         ]
     )
-except ImportError:
+except (ImportError, OSError):
     # rasterio not installed - time-series functions will not be available
     pass

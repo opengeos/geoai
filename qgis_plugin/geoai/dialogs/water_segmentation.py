@@ -13,7 +13,7 @@ import traceback
 
 try:
     import torch
-except ImportError:
+except (ImportError, OSError):
     torch = None
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -153,9 +153,7 @@ class WaterSegmentationWorker(QThread):
     def run(self):
         """Run water segmentation in background thread."""
         try:
-            from .._geoai_lib import get_geoai
-
-            geoai = get_geoai()
+            from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Starting water segmentation...")
 
@@ -184,32 +182,12 @@ class WaterSegmentationWorker(QThread):
             if self.device:
                 kwargs["device"] = self.device
 
-            # Capture stdout to forward verbose messages
-            old_stdout = sys.stdout
-            sys.stdout = OutputCapture(
-                lambda line: self.progress.emit(line), old_stdout
+            result = run_geoai_task(
+                "segment_water",
+                kwargs,
+                progress_callback=self.progress.emit,
             )
-            try:
-                result = geoai.segment_water(**kwargs)
-            finally:
-                sys.stdout = old_stdout
-
-            # Determine output paths.
-            # segment_water returns a raster path (str) when no vector output
-            # is requested, or a GeoDataFrame when vectorization is enabled.
-            # The raster is always produced regardless, so derive its path.
-            if isinstance(result, str):
-                output_raster = result
-            elif self.output_raster:
-                output_raster = self.output_raster
-            else:
-                # Auto-derived by segment_water: <stem>_water_mask.tif
-                stem = os.path.splitext(self.input_path)[0]
-                output_raster = f"{stem}_water_mask.tif"
-
-            output_vector = self.output_vector or ""
-
-            self.finished.emit(output_raster, output_vector)
+            self.finished.emit(result["output_raster"], result.get("output_vector", ""))
 
         except Exception as e:
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")

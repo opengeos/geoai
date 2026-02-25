@@ -119,39 +119,29 @@ class InstanceTrainingWorker(QThread):
 
     def run(self):
         """Execute the training."""
-        import sys
-
         try:
-            from .._geoai_lib import get_geoai
-
-            geoai = get_geoai()
+            from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Starting Mask R-CNN training...")
-
-            # Capture stdout to parse epoch progress in real-time
-            old_stdout = sys.stdout
-            sys.stdout = OutputCapture(self._parse_output_line, old_stdout)
-
-            try:
-                geoai.train_instance_segmentation_model(
-                    images_dir=self.images_dir,
-                    labels_dir=self.labels_dir,
-                    output_dir=self.output_dir,
-                    input_format=self.input_format,
-                    num_channels=self.num_channels,
-                    num_classes=self.num_classes,
-                    batch_size=self.batch_size,
-                    num_epochs=self.num_epochs,
-                    learning_rate=self.learning_rate,
-                    val_split=self.val_split,
-                    visualize=self.visualize,
-                    verbose=True,
-                )
-            finally:
-                sys.stdout = old_stdout
-
-            model_path = os.path.join(self.output_dir, "best_model.pth")
-            self.finished.emit(model_path)
+            result = run_geoai_task(
+                "train_instance_segmentation_model",
+                {
+                    "images_dir": self.images_dir,
+                    "labels_dir": self.labels_dir,
+                    "output_dir": self.output_dir,
+                    "input_format": self.input_format,
+                    "num_channels": self.num_channels,
+                    "num_classes": self.num_classes,
+                    "batch_size": self.batch_size,
+                    "num_epochs": self.num_epochs,
+                    "learning_rate": self.learning_rate,
+                    "val_split": self.val_split,
+                    "visualize": self.visualize,
+                    "verbose": True,
+                },
+                progress_callback=self._parse_output_line,
+            )
+            self.finished.emit(result["model_path"])
 
         except Exception as e:
             import traceback
@@ -188,20 +178,21 @@ class InstanceTileExportWorker(QThread):
     def run(self):
         """Execute tile export."""
         try:
-            from .._geoai_lib import get_geoai
-
-            geoai = get_geoai()
+            from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit(f"Exporting tiles in {self.metadata_format} format...")
-
-            geoai.export_geotiff_tiles(
-                in_raster=self.raster_path,
-                out_folder=self.output_dir,
-                in_class_data=self.vector_path,
-                tile_size=self.tile_size,
-                stride=self.stride,
-                buffer_radius=self.buffer_radius,
-                metadata_format=self.metadata_format,
+            run_geoai_task(
+                "export_geotiff_tiles",
+                {
+                    "in_raster": self.raster_path,
+                    "out_folder": self.output_dir,
+                    "in_class_data": self.vector_path,
+                    "tile_size": self.tile_size,
+                    "stride": self.stride,
+                    "buffer_radius": self.buffer_radius,
+                    "metadata_format": self.metadata_format,
+                },
+                progress_callback=self.progress.emit,
             )
 
             self.finished.emit(self.output_dir)
@@ -248,33 +239,25 @@ class InstanceInferenceWorker(QThread):
 
     def run(self):
         """Execute the inference."""
-        import sys
-
         try:
-            from .._geoai_lib import get_geoai
-
-            geoai = get_geoai()
+            from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Running instance segmentation inference...")
-
-            # Capture stdout to forward progress messages to the log
-            old_stdout = sys.stdout
-            sys.stdout = OutputCapture(self._forward_line, old_stdout)
-
-            try:
-                geoai.instance_segmentation(
-                    input_path=self.input_path,
-                    output_path=self.output_path,
-                    model_path=self.model_path,
-                    num_channels=self.num_channels,
-                    num_classes=self.num_classes,
-                    window_size=self.window_size,
-                    overlap=self.overlap,
-                    confidence_threshold=self.confidence_threshold,
-                    batch_size=self.batch_size,
-                )
-            finally:
-                sys.stdout = old_stdout
+            run_geoai_task(
+                "instance_segmentation",
+                {
+                    "input_path": self.input_path,
+                    "output_path": self.output_path,
+                    "model_path": self.model_path,
+                    "num_channels": self.num_channels,
+                    "num_classes": self.num_classes,
+                    "window_size": self.window_size,
+                    "overlap": self.overlap,
+                    "confidence_threshold": self.confidence_threshold,
+                    "batch_size": self.batch_size,
+                },
+                progress_callback=self._forward_line,
+            )
 
             self.finished.emit(self.output_path)
 
@@ -307,24 +290,19 @@ class VectorizeWorker(QThread):
     def run(self):
         """Execute vectorization."""
         try:
-            from .._geoai_lib import get_geoai
-
-            geoai = get_geoai()
+            from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Vectorizing mask...")
-
-            gdf = geoai.orthogonalize(
-                self.mask_path,
-                self.output_path,
-                epsilon=self.epsilon,
+            run_geoai_task(
+                "vectorize_mask",
+                {
+                    "mask_path": self.mask_path,
+                    "output_path": self.output_path,
+                    "epsilon": self.epsilon,
+                    "min_area": self.min_area,
+                },
+                progress_callback=self.progress.emit,
             )
-
-            if self.min_area is not None and self.min_area > 0:
-                self.progress.emit(f"Filtering by area (min: {self.min_area})...")
-                gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
-                gdf = gdf[gdf["area_m2"] >= self.min_area]
-                driver = "GeoJSON" if self.output_path.endswith(".geojson") else None
-                gdf.to_file(self.output_path, driver=driver)
 
             self.finished.emit(self.output_path)
 
@@ -359,29 +337,18 @@ class SmoothVectorWorker(QThread):
     def run(self):
         """Execute smoothing."""
         try:
-            from .._geoai_lib import get_geoai
+            from ..core.geoai_task_subprocess import run_geoai_task
 
-            geoai = get_geoai()
-
-            self.progress.emit("Converting raster to vector...")
-
-            # First convert raster to vector (use 0 for min_area if None)
-            min_area_value = self.min_area if self.min_area is not None else 0
-            gdf = geoai.raster_to_vector(
-                self.mask_path,
-                min_area=min_area_value,
-                simplify_tolerance=self.simplify_tolerance,
-            )
-
-            self.progress.emit(
-                f"Smoothing vector (iterations: {self.smooth_iterations})..."
-            )
-
-            # Apply smoothing
-            geoai.smooth_vector(
-                gdf,
-                smooth_iterations=self.smooth_iterations,
-                output_path=self.output_path,
+            run_geoai_task(
+                "smooth_vector",
+                {
+                    "mask_path": self.mask_path,
+                    "output_path": self.output_path,
+                    "smooth_iterations": self.smooth_iterations,
+                    "min_area": self.min_area,
+                    "simplify_tolerance": self.simplify_tolerance,
+                },
+                progress_callback=self.progress.emit,
             )
 
             self.finished.emit(self.output_path)

@@ -109,8 +109,17 @@ from .pipeline import (
     register_step,
 )
 
-from .dinov3 import DINOv3GeoProcessor, analyze_image_patches, create_similarity_map
-from .geoai import *
+try:
+    from .dinov3 import DINOv3GeoProcessor, analyze_image_patches, create_similarity_map
+except (ImportError, OSError):
+    # DINOv3 not available (missing torch dependency or DLL load failure)
+    pass
+
+try:
+    from .geoai import *
+except (ImportError, OSError):
+    # Core geoai module not available (missing torch dependency or DLL load failure)
+    pass
 from .utils import (
     orthogonalize,
     regularization,
@@ -120,59 +129,79 @@ from .utils import (
     export_flipnslide_tiles,
 )
 
-from .timm_train import (
-    get_timm_model,
-    modify_first_conv_for_channels,
-    TimmClassifier,
-    RemoteSensingDataset,
-    train_timm_classifier,
-    predict_with_timm,
-    list_timm_models,
-)
+try:
+    from .timm_train import (
+        get_timm_model,
+        modify_first_conv_for_channels,
+        TimmClassifier,
+        RemoteSensingDataset,
+        train_timm_classifier,
+        predict_with_timm,
+        list_timm_models,
+    )
+except (ImportError, OSError):
+    # timm_train not available (missing torch/timm dependency)
+    pass
 
-from .recognize import (
-    ImageDataset,
-    load_image_dataset,
-    train_image_classifier,
-    predict_images,
-    evaluate_classifier,
-    plot_training_history as plot_classification_history,
-    plot_confusion_matrix,
-    plot_predictions,
-)
+try:
+    from .recognize import (
+        ImageDataset,
+        load_image_dataset,
+        train_image_classifier,
+        predict_images,
+        evaluate_classifier,
+        plot_training_history as plot_classification_history,
+        plot_confusion_matrix,
+        plot_predictions,
+    )
+except (ImportError, OSError):
+    # recognize not available (missing torch dependency)
+    pass
 
-from .timm_segment import (
-    TimmSegmentationModel,
-    SegmentationDataset,
-    train_timm_segmentation,
-    predict_segmentation,
-    train_timm_segmentation_model,
-    timm_semantic_segmentation,
-    push_timm_model_to_hub,
-    timm_segmentation_from_hub,
-)
+try:
+    from .timm_segment import (
+        TimmSegmentationModel,
+        SegmentationDataset,
+        train_timm_segmentation,
+        predict_segmentation,
+        train_timm_segmentation_model,
+        timm_semantic_segmentation,
+        push_timm_model_to_hub,
+        timm_segmentation_from_hub,
+    )
+except (ImportError, OSError):
+    # timm_segment not available (missing torch/timm dependency)
+    pass
 
-from .timm_regress import (
-    PixelRegressionModel,
-    PixelRegressionDataset,
-    create_regression_tiles,
-    train_pixel_regressor,
-    predict_raster,
-    evaluate_regression,
-    plot_regression_comparison,
-    plot_scatter,
-    plot_training_history,
-    visualize_prediction,
-    plot_regression_results,
-    # Backward compatibility aliases
-    TimmRegressor,
-    RegressionDataset,
-    train_timm_regressor,
-    create_regression_patches,
-)
+try:
+    from .timm_regress import (
+        PixelRegressionModel,
+        PixelRegressionDataset,
+        create_regression_tiles,
+        train_pixel_regressor,
+        predict_raster,
+        evaluate_regression,
+        plot_regression_comparison,
+        plot_scatter,
+        plot_training_history,
+        visualize_prediction,
+        plot_regression_results,
+        # Backward compatibility aliases
+        TimmRegressor,
+        RegressionDataset,
+        train_timm_regressor,
+        create_regression_patches,
+    )
+except (ImportError, OSError):
+    # timm_regress not available (missing torch/timm dependency)
+    pass
 
 # Import tools subpackage
-from . import tools
+try:
+    from . import tools
+except (ImportError, OSError):
+    # tools subpackage not available (dependency or DLL load failure)
+    pass
 
 # Expose commonly used tools at package level for convenience
 try:
@@ -182,7 +211,7 @@ try:
         clean_raster_batch,
         compare_masks,
     )
-except ImportError:
+except (ImportError, OSError):
     # MultiClean not available (missing dependency)
     pass
 
@@ -190,7 +219,7 @@ except ImportError:
 
 try:
     from .tools import super_resolution
-except ImportError:
+except (ImportError, OSError):
     # super_resolution not available (missing dependency)
     pass
 
@@ -202,7 +231,7 @@ try:
         onnx_semantic_segmentation,
         onnx_image_classification,
     )
-except ImportError:
+except (ImportError, OSError):
     # ONNX not available (missing dependency)
     pass
 
@@ -220,7 +249,7 @@ try:
         moondream_point_sliding_window,
     )
     from .map_widgets import moondream_gui
-except ImportError:
+except (ImportError, OSError):
     # Moondream not available (missing dependency)
     pass
 
@@ -232,7 +261,7 @@ try:
         load_prithvi_model,
         prithvi_inference,
     )
-except ImportError:
+except (ImportError, OSError):
     # Prithvi not available (missing dependency)
     pass
 
@@ -243,7 +272,7 @@ try:
         changestar_detect,
         list_changestar_models,
     )
-except ImportError:
+except (ImportError, OSError):
     # ChangeStar not available (missing torchange dependency)
     pass
 
@@ -254,7 +283,7 @@ try:
         canopy_height_estimation,
         list_canopy_models,
     )
-except ImportError:
+except (ImportError, OSError):
     # Canopy height estimation not available (missing torch dependency)
     pass
 
@@ -269,7 +298,7 @@ try:
         tessera_available_years,
         tessera_sample_points,
     )
-except ImportError:
+except (ImportError, OSError):
     # TESSERA not available (missing geotessera dependency)
     pass
 
@@ -292,7 +321,7 @@ try:
         download_google_satellite_embedding,
         EMBEDDING_DATASETS,
     )
-except ImportError:
+except (ImportError, OSError):
     # Embeddings not available (missing torchgeo >= 0.9.0 or sklearn)
     pass
 
@@ -309,12 +338,12 @@ try:
         visualize_multiclass_detections,
         evaluate_multiclass_detector,
     )
-except ImportError:
+except (ImportError, OSError):
     pass
 
 # OmniWaterMask water body segmentation
 try:
     from .water import segment_water, BAND_ORDER_PRESETS
-except ImportError:
+except (ImportError, OSError):
     # OmniWaterMask not available (missing omniwatermask dependency)
     pass

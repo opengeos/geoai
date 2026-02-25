@@ -9,10 +9,13 @@ import os
 import json
 import tempfile
 
+_TORCH_IMPORT_ERROR = None
+
 try:
     import torch
-except ImportError:
+except (ImportError, OSError) as e:
     torch = None
+    _TORCH_IMPORT_ERROR = e
 
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtWidgets import (
@@ -49,6 +52,11 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QThread, pyqtSignal
 
 
+def _use_deepforest_subprocess() -> bool:
+    """Use subprocess DeepForest on Windows to avoid QGIS/PyTorch DLL conflicts."""
+    return os.name == "nt"
+
+
 class DeepForestModelLoadWorker(QThread):
     """Worker thread for loading DeepForest model."""
 
@@ -65,6 +73,19 @@ class DeepForestModelLoadWorker(QThread):
     def run(self):
         """Load the DeepForest model in background."""
         try:
+            if _use_deepforest_subprocess():
+                self.progress.emit("Starting DeepForest subprocess worker...")
+                from ..core.deepforest_subprocess import DeepForestSubprocessClient
+
+                model = DeepForestSubprocessClient(
+                    model_name=self.model_name,
+                    revision=self.revision,
+                    device=self.device,
+                )
+                model.initialize()
+                self.finished.emit(model, getattr(model, "model_name", self.model_name))
+                return
+
             # Prevent PyTorch Lightning distributed process spawning inside QGIS
             os.environ["WORLD_SIZE"] = "1"
             os.environ["RANK"] = "0"
@@ -146,6 +167,46 @@ class DeepForestPredictWorker(QThread):
     def run(self):
         """Run prediction in background."""
         try:
+            if hasattr(self.model, "predict_subprocess") and callable(
+                getattr(self.model, "predict_subprocess")
+            ):
+                self.progress.emit("Running prediction in DeepForest subprocess...")
+                payload = self.model.predict_subprocess(
+                    image_path=self.image_path,
+                    mode=self.mode,
+                    patch_size=self.patch_size,
+                    patch_overlap=self.patch_overlap,
+                    iou_threshold=self.iou_threshold,
+                    dataloader_strategy=self.dataloader_strategy,
+                    score_threshold=self.score_threshold,
+                    batch_size=self.batch_size,
+                )
+                pred_mode = payload.get("pred_mode", "single")
+                preds_payload = payload.get("predictions") or {}
+                try:
+                    import pandas as pd
+
+                    records = preds_payload.get("records") or []
+                    columns = preds_payload.get("columns") or []
+                    if records:
+                        result = pd.DataFrame.from_records(records)
+                        # Preserve stable column order from worker when possible.
+                        if columns:
+                            ordered = [c for c in columns if c in result.columns]
+                            extra = [c for c in result.columns if c not in ordered]
+                            result = result[ordered + extra]
+                    else:
+                        result = pd.DataFrame(columns=columns)
+                except Exception:
+                    self.error.emit(
+                        "DeepForest subprocess returned predictions, but pandas "
+                        "is unavailable in QGIS to deserialize them."
+                    )
+                    return
+
+                self.finished.emit(result, pred_mode)
+                return
+
             from PIL import Image
 
             Image.MAX_IMAGE_PIXELS = None
@@ -717,9 +778,16 @@ class DeepForestDockWidget(QDockWidget):
             tuple: (is_cuda_available: bool, warning_message: str or None)
         """
         if torch is None:
+            detail = ""
+            if _TORCH_IMPORT_ERROR is not None:
+                detail = (
+                    f"\n\nPyTorch import error in QGIS process:\n{_TORCH_IMPORT_ERROR}"
+                )
             return (
                 False,
-                "PyTorch is not installed. Please install PyTorch to use CUDA acceleration.",
+                "PyTorch is not available in this QGIS session. "
+                "DeepForest cannot use CUDA in-process."
+                f"{detail}",
             )
 
         # Check if CUDA is available
@@ -809,12 +877,36 @@ class DeepForestDockWidget(QDockWidget):
         model_name = self.model_combo.currentText()
         revision = self.revision_edit.text().strip() or "main"
         device = self.device_combo.currentText()
+        use_subprocess = _use_deepforest_subprocess()
+
+        if torch is None:
+            if use_subprocess:
+                self.log_message(
+                    "PyTorch is unavailable in QGIS process; using DeepForest subprocess worker.",
+                    level=Qgis.Warning,
+                )
+            else:
+                self.progress_bar.setVisible(False)
+                self.load_model_btn.setEnabled(True)
+                err = "PyTorch is not available in the QGIS process."
+                if _TORCH_IMPORT_ERROR is not None:
+                    err += (
+                        "\n\nImport error:\n"
+                        f"{_TORCH_IMPORT_ERROR}\n\n"
+                        "This is typically a Windows QGIS/PyTorch DLL incompatibility. "
+                        "The DeepForest panel can open, but model loading requires a "
+                        "subprocess-backed DeepForest path."
+                    )
+                self.show_error(err)
+                self.model_status.setText("Model: Failed to load")
+                self.model_status.setStyleSheet("color: red;")
+                return
 
         if device == "auto":
             device = None
 
         # Check CUDA availability if using CUDA or auto device selection
-        if device == "cuda" or device is None:
+        if not use_subprocess and (device == "cuda" or device is None):
             cuda_available, warning_message = self.check_cuda_devices()
 
             if not cuda_available:
@@ -1728,6 +1820,13 @@ class DeepForestDockWidget(QDockWidget):
 
         # Clean up model
         if self.deepforest is not None:
+            try:
+                if hasattr(self.deepforest, "close") and callable(
+                    getattr(self.deepforest, "close")
+                ):
+                    self.deepforest.close()
+            except Exception:
+                pass
             del self.deepforest
             self.deepforest = None
 
