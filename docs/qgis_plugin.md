@@ -1,14 +1,17 @@
 # QGIS Plugin for GeoAI
 
-A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, segmentation training/inference, SamGeo, DeepForest) so you can keep QGIS as your main workspace while experimenting with GeoAI.
+[![QGIS](https://img.shields.io/badge/QGIS-plugin-orange.svg)](https://plugins.qgis.org/plugins/geoai)
+[![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.09605/status.svg)](https://doi.org/10.21105/joss.09605)
+
+A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, semantic segmentation, instance segmentation, SamGeo, DeepForest, water segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
 
 ## Quick Start
 
--   Create a Pixi project and install the dependencies.
--   Install the QGIS plugin from the QGIS Plugin Manager.
--   Enable the GeoAI plugin in QGIS.
--   Restart QGIS.
--   Open a GeoAI toolbar panel and try the sample datasets below.
+- Install the QGIS plugin from the QGIS Plugin Manager. Alternatively, you can download the plugin from [here](https://qgis.gishub.org/plugins/geoai.zip) and install it manually.
+- Enable the GeoAI plugin in QGIS.
+- Open any GeoAI toolbar panel — the built-in installer will guide you through dependency setup (one-click).
+- Try the sample datasets below.
 
 ## Video Tutorials
 
@@ -24,14 +27,12 @@ Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video 
 
 [![demo](https://github.com/user-attachments/assets/5aabc3d3-efd1-4011-ab31-2b3f11aab3ed)](https://youtu.be/8-OhlqeoyiY)
 
-
-
 ## Requirements
 
--   QGIS 3.28 or later
--   Python 3.10+ (Pixi recommended)
--   PyTorch (CUDA if you want GPU acceleration)
--   `geoai`, `samgeo`, and `deepforest` packages
+- QGIS 3.28 or later
+- Python 3.10+ (Pixi recommended)
+- PyTorch (CUDA if you want GPU acceleration)
+- `geoai`, `samgeo`, `deepforest`, and `omniwatermask` packages
 
 ## Features
 
@@ -39,40 +40,74 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 ### Moondream Vision-Language Model Panel
 
--   **Caption**: Generate descriptions of geospatial imagery (short, normal, or long)
--   **Query**: Ask questions about images using natural language
--   **Detect**: Detect and locate objects with bounding boxes
--   **Point**: Locate specific objects with point markers
+- **Caption**: Generate descriptions of geospatial imagery (short, normal, or long)
+- **Query**: Ask questions about images using natural language
+- **Detect**: Detect and locate objects with bounding boxes
+- **Point**: Locate specific objects with point markers
 
-### Segmentation Panel (Combined Training & Inference)
+### SemanticSegmentation Panel (Combined Training & Inference)
 
--   **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
--   **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
--   **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.
+- **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
+- **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
+- **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.
+
+### Instance Segmentation Panel (Mask R-CNN)
+
+- **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data with instance-level masks in PASCAL_VOC format, with configurable tile size, stride, and buffer radius
+- **Tab 2 - Train Models**: Train Mask R-CNN instance segmentation models with configurable number of channels, classes, batch size, epochs, learning rate, and validation split
+- **Tab 3 - Run Inference**: Apply trained Mask R-CNN models to new imagery and vectorize results with optional smoothing
 
 ### SamGeo Panel (Segment Anything Model)
 
--   **Model Tab**: Load SAM models (SAM1, SAM2, or SAM3) with configurable backend and device settings
--   **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road")
--   **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
--   **Batch Tab**: Process multiple points interactively or from vector files/layers
--   **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)
+- **Model Tab**: Load SAM models (SAM1, SAM2, or SAM3) with configurable backend and device settings
+- **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road")
+- **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
+- **Batch Tab**: Process multiple points interactively or from vector files/layers
+- **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)
 
 ### DeepForest Panel (Object Detection)
 
--   **Model Tab**: Load pretrained [DeepForest](https://deepforest.readthedocs.io) models from Hugging Face for tree crown, bird, livestock, nest, and dead tree detection
--   **Predict Tab**: Run predictions on single images or large geospatial tiles with configurable patch size, overlap, IoU threshold, and score filtering
--   **Output Tab**: Save detection results as georeferenced vector (GeoPackage, Shapefile, GeoJSON) or raster (GeoTIFF), and export training data in COCO or YOLO format
+- **Model Tab**: Load pretrained [DeepForest](https://deepforest.readthedocs.io) models from Hugging Face for tree crown, bird, livestock, nest, and dead tree detection
+- **Predict Tab**: Run predictions on single images or large geospatial tiles with configurable patch size, overlap, IoU threshold, and score filtering
+- **Output Tab**: Save detection results as georeferenced vector (GeoPackage, Shapefile, GeoJSON) or raster (GeoTIFF), and export training data in COCO or YOLO format
+
+### Water Segmentation Panel (OmniWaterMask)
+
+- **Water Body Detection**: Automated water body segmentation from satellite and aerial imagery using the [OmniWaterMask](https://github.com/NikolasEnt/OmniWaterMask) model
+- **Band Configuration**: Configurable band ordering for multispectral images (RGBN, BGRN, etc.)
+- **Patch-based Inference**: Sliding window inference with configurable patch size, overlap, and batch size
+- **OSM Integration**: Optional OpenStreetMap data for refinement (water features, buildings, roads)
+- **Output Options**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional smoothing and minimum polygon size filtering
 
 ### GPU Memory Management
 
--   **Clear GPU Memory**: Release GPU memory and clear CUDA cache for all loaded models
+- **Clear GPU Memory**: Release GPU memory and clear CUDA cache for all loaded models
 
 ## Installation
 
-### 1. Set up the environment
+There are two ways to set up the GeoAI plugin dependencies:
 
-Installing the GeoAI QGIS plugin on can be challenging due to the complicated pytorch/cuda dependencies. Conda or mamba might take a while to resolve the dependencies, while pip might fail to install the dependencies properly. It is recommended to use [pixi](https://pixi.prefix.dev/latest) to install the dependencies to avoid these issues.
+- **Option A - Built-in Dependency Installer** (simple, recommended for most users): The plugin includes a one-click installer that automatically creates an isolated Python environment at `~/.qgis_geoai/` and installs all required AI packages. See [Built-in Dependency Installer](#built-in-dependency-installer) below.
+- **Option B - Pixi Environment** (advanced, recommended for GPU/CUDA users): Manually create a Pixi environment with full control over PyTorch and CUDA versions. See [Set up the environment with Pixi](#1-set-up-the-environment-with-pixi) below.
+
+### Built-in Dependency Installer
+
+Starting with v1.0.0, the GeoAI plugin includes a built-in dependency installer that handles all setup automatically. When you first open any GeoAI panel, the plugin detects whether the required AI packages are installed. If not, it shows a setup panel that:
+
+- Detects your GPU (NVIDIA CUDA or Apple MPS) and configures PyTorch accordingly
+- Creates an isolated Python virtual environment at `~/.qgis_geoai/`
+- Installs all required packages (PyTorch, geoai, samgeo, deepforest, omniwatermask, transformers) with a single click
+- Shows real-time progress during installation
+
+![dependency installer](https://github.com/user-attachments/assets/d9021180-2ed6-461c-a30e-3b796dea9317)
+
+Simply click **Install Dependencies** and wait for the installation to complete. Once finished, the GeoAI panels will be ready to use. This is a one-time setup.
+
+**Note:** If you need precise control over CUDA versions or want to use the latest PyTorch builds, use the Pixi-based installation below instead.
+
+### 1. Set up the environment with Pixi
+
+Installing the GeoAI QGIS plugin can be challenging due to the complicated pytorch/cuda dependencies. Conda or mamba might take a while to resolve the dependencies, while pip might fail to install the dependencies properly. It is recommended to use [pixi](https://pixi.prefix.dev/latest) to install the dependencies to avoid these issues.
 
 #### 1) Install Pixi
 
@@ -208,14 +243,14 @@ pixi run python -c "import torch; print('PyTorch:', torch.__version__); print('C
 
 Expected output should be like this:
 
--   `PyTorch: 2.9.1`
--   `CUDA available: True`
--   `GPU: NVIDIA RTX 4090`
+- `PyTorch: 2.9.1`
+- `CUDA available: True`
+- `GPU: NVIDIA RTX 4090`
 
 If CUDA is `False`, check:
 
--   `nvidia-smi` works in PowerShell
--   NVIDIA driver is up to date
+- `nvidia-smi` works in PowerShell
+- NVIDIA driver is up to date
 
 ---
 
@@ -228,6 +263,7 @@ pixi run pip install deepforest
 ```
 
 DeepForest might downgrade numpy to 1.26.4. You can use the following command to upgrade numpy to the latest version:
+
 ```bash
 pixi run pip install -U numpy transformers
 ```
@@ -280,10 +316,10 @@ python install.py --remove
 
 Option C — manual copy:
 
--   Copy the `qgis_plugin` folder to your QGIS plugins directory:
-    -   Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
-    -   Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
-    -   macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
+- Copy the `qgis_plugin` folder to your QGIS plugins directory:
+    - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
+    - Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
+    - macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
 
 ### 3. Enable in QGIS
 
@@ -318,16 +354,15 @@ Steps:
 
 Sample datasets:
 
--   [naip_rgb_train.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_rgb_train.tif)
--   [naip_test.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test.tif)
--   [naip_train_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.geojson)
+- [naip_rgb_train.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_rgb_train.tif)
+- [naip_test.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test.tif)
+- [naip_train_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.geojson)
 
 Steps:
 
 1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to pixi project.
 2. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
 3. Use the tabs at the top of the panel to switch between:
-
     - **Create Training Data**: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.
     - **Train Model**: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.
     - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.
@@ -342,16 +377,15 @@ Steps:
 
 Sample dataset:
 
--   [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
--   [wa_building_image.tif](https://github.com/opengeos/datasets/releases/download/places/wa_building_image.tif)
--   [wa_building_centroids.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_centroids.geojson)
--   [wa_building_bboxes.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_bboxes.geojson)
+- [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
+- [wa_building_image.tif](https://github.com/opengeos/datasets/releases/download/places/wa_building_image.tif)
+- [wa_building_centroids.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_centroids.geojson)
+- [wa_building_bboxes.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_bboxes.geojson)
 
 Steps:
 
 1. Click the **SamGeo** button in the GeoAI toolbar (or `GeoAI` menu → `SamGeo`)
 2. In the **Model** tab:
-
     - Select the SAM model version (SamGeo3/SAM3, SamGeo2/SAM2, or SamGeo/SAM1)
     - Configure backend (meta or transformers) and device (auto, cuda, cpu)
     - Click "Load Model" to initialize the model
@@ -360,13 +394,11 @@ Steps:
     ![](https://github.com/user-attachments/assets/600b0879-f851-4423-b668-cb9e8df28425)
 
 3. Choose a segmentation method:
-
     - **Text Tab**: Enter text prompts describing objects to segment (e.g., "tree, building")
 
         ![](https://github.com/user-attachments/assets/da2c17fc-4633-488d-ba44-00f1cd97555c)
 
     - **Interactive Tab**:
-
         - Click "Add Foreground Points" or "Add Background Points" and click on the map
         - Or click "Draw Box" and drag a rectangle on the map
         - Click "Segment by Points" or "Segment by Box"
@@ -378,7 +410,6 @@ Steps:
         ![](https://github.com/user-attachments/assets/104ec741-44cc-404a-9213-36cf78456171)
 
 4. In the **Output** tab:
-
     - Select output format (Raster GeoTIFF, Vector GeoPackage, or Vector Shapefile)
     - For vector output, optionally enable regularization:
         - Check "Regularize polygons (orthogonalize)"
@@ -405,7 +436,6 @@ Steps:
 
 1. Click the **DeepForest** button in the GeoAI toolbar (or `GeoAI` menu → `DeepForest`)
 2. In the **Model** tab:
-
     - Select a pretrained model from the dropdown (e.g., Tree Crown Detection)
     - Configure device (auto, cuda, cpu)
     - Click "Load Model" to download and initialize the model
@@ -414,7 +444,6 @@ Steps:
     ![](https://github.com/user-attachments/assets/a4b0c1d2-85e0-442d-9574-919f4bc59c67)
 
 3. In the **Predict** tab:
-
     - Choose prediction mode:
         - **Single Image**: Predict on the entire image at once (best for small images)
         - **Large Tile**: Split large geospatial tiles into overlapping patches for prediction
@@ -431,7 +460,6 @@ Steps:
     ![](https://github.com/user-attachments/assets/3523f9d7-a8d4-4b9e-839b-6616730dd452)
 
 4. In the **Output** tab:
-
     - Select output format:
         - **Vector**: GeoPackage, Shapefile, or GeoJSON (saves bounding boxes as polygons with score and label attributes)
         - **Raster**: GeoTIFF (rasterizes bounding boxes onto the source raster)
@@ -442,6 +470,40 @@ Steps:
         - Click "Export Training Data"
 
     ![](https://github.com/user-attachments/assets/4a0ef60a-fb1f-4084-a65c-34b886c9ef01)
+
+### Instance Segmentation Panel (Mask R-CNN)
+
+Steps:
+
+1. Click the **Instance Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Instance Segmentation`)
+2. Use the tabs at the top of the panel to switch between:
+    - **Create Training Data**: Select input raster and vector labels, configure tile size, stride, and buffer radius, choose metadata format (PASCAL_VOC), and export instance segmentation tiles to a directory.
+    - **Train Model**: Select the images and labels directories, configure model parameters (number of channels, number of classes, batch size, epochs, learning rate, validation split), and start Mask R-CNN training.
+    - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results with smoothing.
+
+### Water Segmentation Panel (OmniWaterMask)
+
+Steps:
+
+1. Click the **Water Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Water Segmentation`)
+2. Select a raster layer or browse for an image file
+3. Configure band ordering to match your imagery (e.g., RGBN for 4-band imagery)
+4. Configure inference parameters:
+    - **Patch Size**: Size of the sliding window for inference (default 512)
+    - **Overlap Size**: Overlap between adjacent patches (default 256)
+    - **Batch Size**: Number of patches to process in parallel
+    - **Device**: auto, cuda, cpu, or mps
+    - **Precision**: Inference precision (float32, float16, bfloat16)
+5. Optionally enable OSM integration:
+    - **Use OSM Water**: Incorporate OpenStreetMap water features
+    - **Use OSM Buildings**: Use building footprints to refine results
+    - **Use OSM Roads**: Use road data to refine results
+6. Configure output options:
+    - **Output Raster**: Path for the water mask GeoTIFF
+    - **Output Vector**: Path for vectorized water polygons (GeoPackage or Shapefile)
+    - **Min Size**: Minimum polygon area in pixels to filter small artifacts
+    - **Smooth**: Enable polygon smoothing with configurable iterations
+7. Click "Run" to start water segmentation
 
 ### Clear GPU Memory
 
@@ -459,37 +521,37 @@ Go to `GeoAI` menu → `Check for Updates...` to see if a newer version of the G
 
 The QGIS plugin supports any models supported by [Pytorch Segmentation Models](https://smp.readthedocs.io/en/latest/models.html), including:
 
--   U-Net
--   U-Net++
--   DeepLabV3
--   DeepLabV3+
--   FPN (Feature Pyramid Network)
--   PSPNet
--   LinkNet
--   MANet
--   PAN
--   UperNet
--   SegFormer
--   DPT
+- U-Net
+- U-Net++
+- DeepLabV3
+- DeepLabV3+
+- FPN (Feature Pyramid Network)
+- PSPNet
+- LinkNet
+- MANet
+- PAN
+- UperNet
+- SegFormer
+- DPT
 
 ## Supported Encoders (Segmentation)
 
--   ResNet (34, 50, 101, 152)
--   EfficientNet (b0-b4)
--   MobileNetV2
--   VGG (16, 19)
+- ResNet (34, 50, 101, 152)
+- EfficientNet (b0-b4)
+- MobileNetV2
+- VGG (16, 19)
 
 ## Supported SAM Models (SamGeo)
 
--   **SamGeo3 (SAM3)**: Latest version with text prompts, point prompts, and box prompts
--   **SamGeo2 (SAM2)**: Improved version with better performance
--   **SamGeo (SAM1)**: Original Segment Anything Model
+- **SamGeo3 (SAM3)**: Latest version with text prompts, point prompts, and box prompts
+- **SamGeo2 (SAM2)**: Improved version with better performance
+- **SamGeo (SAM1)**: Original Segment Anything Model
 
 ## Troubleshooting
 
--   Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
--   CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
--   Model download failures: check network/firewall, then retry loading models from the panel.
+- Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
+- CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
+- Model download failures: check network/firewall, then retry loading models from the panel.
 
 ## License
 
@@ -497,7 +559,7 @@ MIT License - see [LICENSE](../LICENSE) for details.
 
 ## Links
 
--   [GeoAI Documentation](https://opengeoai.org)
--   [SamGeo Documentation](https://samgeo.gishub.org)
--   [GitHub Repository](https://github.com/opengeos/geoai)
--   [Report Issues](https://github.com/opengeos/geoai/issues)
+- [GeoAI Documentation](https://opengeoai.org)
+- [SamGeo Documentation](https://samgeo.gishub.org)
+- [GitHub Repository](https://github.com/opengeos/geoai)
+- [Report Issues](https://github.com/opengeos/geoai/issues)

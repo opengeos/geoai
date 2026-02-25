@@ -1,8 +1,8 @@
 [general]
 name=GeoAI
 qgisMinimumVersion=3.28
-description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model for image captioning, querying, object detection, and semantic segmentation model training and inference.
-version=0.7.0
+description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model, semantic segmentation, instance segmentation (Mask R-CNN), SamGeo (SAM1/SAM2/SAM3), DeepForest object detection, and water segmentation (OmniWaterMask).
+version=1.0.0
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -19,20 +19,36 @@ about=This plugin provides AI-powered geospatial analysis tools:
     - Run inference on raster imagery
     - Export results as vector or raster data
 
-    SamGeo segmentation:
+    Instance Segmentation (Mask R-CNN):
+    - Train Mask R-CNN models for instance-level object detection and segmentation
+    - Run inference on raster imagery with vectorized output
+
+    SamGeo Segmentation (SAM1, SAM2, SAM3):
     - Segment objects using text prompts (e.g., "tree", "building", "road")
     - Segment using point prompts (foreground/background) or box prompts drawn on the map
     - Process multiple points interactively or from vector files/layers
     - Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization
 
-    Requires the geoai-py Python package and PyTorch with CUDA support for optimal performance.
+    DeepForest Object Detection:
+    - Detect tree crowns, birds, livestock, nests, and dead trees using pretrained models
+    - Run predictions on single images or large tiles with patch-based inference
+
+    Water Segmentation (OmniWaterMask):
+    - Automated water body detection from satellite and aerial imagery
+    - Output as raster or vector with optional OSM data integration
+
+    Built-in Dependency Installer:
+    - One-click installation of all AI dependencies
+    - Automatic GPU detection (NVIDIA CUDA, Apple MPS)
+
+    Requires the geoai-py Python package and PyTorch. CUDA or MPS support recommended for optimal performance.
 
 tracker=https://github.com/opengeos/geoai/issues
 repository=https://github.com/opengeos/geoai
 
 hasProcessingProvider=no
 
-tags=ai, deep learning, segmentation, object detection, moondream, vision language model, machine learning, remote sensing, geospatial
+tags=ai, deep learning, segmentation, object detection, moondream, vision language model, machine learning, remote sensing, geospatial, instance segmentation, water segmentation, deepforest, samgeo, mask rcnn
 
 homepage=https://opengeoai.org
 category=Analysis
@@ -42,6 +58,9 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.0.0
+        - Add a one-click dependency installation system (#562)
+        - Add support for mac mps backend (#562)
     0.7.0
         - Add instance segmentation panel to QGIS plugin (#550)
     0.6.0
