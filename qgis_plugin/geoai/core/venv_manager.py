@@ -1648,30 +1648,35 @@ def _verify_cuda_in_venv(venv_dir: str) -> bool:
     )
 
     try:
-        result = subprocess.run(
-            [python_path, "-c", cuda_test_code],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
-            **subprocess_kwargs,
-        )
-        if result.returncode == 0 and "CUDA OK" in result.stdout:
-            _log(
-                "CUDA verification passed: {}".format(result.stdout.strip()[:200]),
-                Qgis.Success,
+        # Retry once because CUDA initialization can be transiently slow/flaky
+        # immediately after installation on some Windows systems.
+        for attempt in (1, 2):
+            result = subprocess.run(
+                [python_path, "-c", cuda_test_code],
+                capture_output=True,
+                text=True,
+                timeout=180 if attempt == 2 else 120,
+                env=env,
+                **subprocess_kwargs,
             )
-            return True
-        else:
+            if result.returncode == 0 and "CUDA OK" in result.stdout:
+                _log(
+                    "CUDA verification passed: {}".format(result.stdout.strip()[:400]),
+                    Qgis.Success,
+                )
+                return True
+
             out = result.stdout or ""
             err = result.stderr or ""
             _log(
-                "CUDA verification failed.\nstdout: {}\nstderr: {}".format(
-                    out[:200], err[:200]
+                "CUDA verification attempt {} failed (rc={}).\nstdout: {}\nstderr: {}".format(
+                    attempt, result.returncode, out[:400], err[:400]
                 ),
                 Qgis.Warning,
             )
-            return False
+            if attempt == 1:
+                time.sleep(2)
+        return False
     except Exception as e:
         _log(f"CUDA verification exception: {e}", Qgis.Warning)
         return False
@@ -2545,6 +2550,7 @@ def create_venv_and_install(
         _cuda_fell_back = True
 
     # CUDA smoke test
+    _cuda_smoke_failed = False
     if is_valid and cuda_enabled:
         if progress_callback:
             progress_callback(99, "Verifying CUDA functionality...")
@@ -2553,12 +2559,11 @@ def create_venv_and_install(
             _cuda_fell_back = False
         elif not cuda_works and not _cuda_fell_back:
             _log(
-                "CUDA smoke test failed, falling back to CPU torch",
+                "CUDA smoke test failed after install. Keeping CUDA torch installed "
+                "for debugging/manual verification instead of auto-reinstalling CPU torch.",
                 Qgis.Warning,
             )
-            _reinstall_cpu_torch(VENV_DIR, progress_callback=progress_callback)
-            is_valid, verify_msg = verify_venv(progress_callback=verify_progress)
-            _cuda_fell_back = True
+            _cuda_smoke_failed = True
 
     if not is_valid:
         return False, f"Verification failed: {verify_msg}"
@@ -2579,4 +2584,6 @@ def create_venv_and_install(
         return True, "Virtual environment ready [DRIVER_TOO_OLD]"
     if _cuda_fell_back:
         return True, "Virtual environment ready [CUDA_FALLBACK]"
+    if _cuda_smoke_failed:
+        return True, "Virtual environment ready [CUDA_VERIFY_FAILED]"
     return True, "Virtual environment ready"
