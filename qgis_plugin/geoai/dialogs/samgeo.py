@@ -1184,7 +1184,9 @@ class SamGeoDockWidget(QDockWidget):
                     self.model_status.setText("Loading model (CPU fallback)...")
             elif warning_message:
                 # CUDA is now available but there was a warning (e.g., fixed CUDA_VISIBLE_DEVICES)
-                self.log_message(f"CUDA issue fixed: {warning_message}", level=Qgis.Warning)
+                self.log_message(
+                    f"CUDA issue fixed: {warning_message}", level=Qgis.Warning
+                )
 
         confidence = self.conf_spin.value()
         enable_interactive = self.interactive_check.isChecked()
