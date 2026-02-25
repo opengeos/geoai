@@ -580,9 +580,13 @@ def view_vector_interactive(
 
     if "tiles" in kwargs and isinstance(kwargs["tiles"], str):
         if kwargs["tiles"].title() in google_tiles:
-            basemap_layer_name = google_tiles[kwargs["tiles"].title()]["name"]
-            kwargs["tiles"] = google_tiles[kwargs["tiles"].title()]["url"]
-            kwargs["attr"] = "Google"
+            tile_key = kwargs["tiles"].title()
+            basemap_layer_name = google_tiles[tile_key]["name"]
+            url = google_tiles[tile_key]["url"]
+            m.add_tile_layer(url=url, name=basemap_layer_name, attribution="Google")
+            del kwargs["tiles"]
+            if "attr" in kwargs:
+                del kwargs["attr"]
         elif kwargs["tiles"].lower().endswith(".tif"):
             if tiles_args is None:
                 tiles_args = {}
@@ -599,6 +603,9 @@ def view_vector_interactive(
                     attribution="localtileserver",
                     **tiles_args,
                 )
+            del kwargs["tiles"]
+            if "attr" in kwargs:
+                del kwargs["attr"]
 
     if "max_zoom" not in kwargs:
         kwargs["max_zoom"] = 30
