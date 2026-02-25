@@ -39,7 +39,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "2"
+_INSTALL_LOGIC_VERSION = "3"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -171,9 +171,25 @@ def _compute_deps_hash() -> str:
     Returns:
         Hex digest string.
     """
-    data = repr(REQUIRED_PACKAGES).encode("utf-8")
+    data = repr(_get_required_packages()).encode("utf-8")
     data += _INSTALL_LOGIC_VERSION.encode("utf-8")
     return hashlib.md5(data, usedforsecurity=False).hexdigest()
+
+
+def _get_required_packages() -> List[Tuple[str, str]]:
+    """Return platform-aware dependency list.
+
+    On Windows, install ``triton-windows`` so SamGeo3/SAM3 imports can resolve
+    ``import triton`` in the managed venv subprocess worker.
+    """
+    packages = list(REQUIRED_PACKAGES)
+    if sys.platform == "win32":
+        sam3_idx = next(
+            (i for i, (name, _) in enumerate(packages) if name == "sam3"),
+            len(packages),
+        )
+        packages.insert(sam3_idx, ("triton-windows", ""))
+    return packages
 
 
 def _read_deps_hash() -> Optional[str]:
@@ -1736,7 +1752,14 @@ def _is_optional_verify_package(package_name: str) -> bool:
     import on specific platforms due to upstream native dependency issues
     without breaking the core plugin functionality.
     """
-    if sys.platform == "win32" and package_name == "sam3":
+    if sys.platform == "win32" and package_name in ("sam3", "triton-windows"):
+        return True
+    return False
+
+
+def _is_optional_install_package(package_name: str) -> bool:
+    """Return True if install failure for this package can be non-fatal."""
+    if sys.platform == "win32" and package_name == "triton-windows":
         return True
     return False
 
@@ -1772,17 +1795,34 @@ def install_dependencies(
     _cuda_fell_back = False
     _driver_too_old = False
 
-    total_packages = len(REQUIRED_PACKAGES)
+    required_packages = _get_required_packages()
+    total_packages = len(required_packages)
     base_progress = 20
     progress_range = 80
 
     # Weighted progress: torch is heaviest, then geoai-py, segment-geospatial, etc.
-    # Order: torch, torchvision, geoai-py, segment-geospatial, sam3, deepforest,
-    #         omniwatermask
-    if cuda_enabled:
-        _weights = [30, 8, 20, 12, 10, 10, 10]
-    else:
-        _weights = [20, 8, 25, 15, 10, 12, 10]
+    _weight_map_cuda = {
+        "torch": 30,
+        "torchvision": 8,
+        "geoai-py": 20,
+        "segment-geospatial": 12,
+        "triton-windows": 4,
+        "sam3": 10,
+        "deepforest": 10,
+        "omniwatermask": 10,
+    }
+    _weight_map_cpu = {
+        "torch": 20,
+        "torchvision": 8,
+        "geoai-py": 25,
+        "segment-geospatial": 15,
+        "triton-windows": 4,
+        "sam3": 10,
+        "deepforest": 12,
+        "omniwatermask": 10,
+    }
+    _weight_map = _weight_map_cuda if cuda_enabled else _weight_map_cpu
+    _weights = [_weight_map.get(name, 10) for name, _ in required_packages]
     weight_total = sum(_weights)
 
     _cumulative = [0]
@@ -1810,7 +1850,7 @@ def install_dependencies(
                 Qgis.Info,
             )
 
-    for i, (package_name, version_spec) in enumerate(REQUIRED_PACKAGES):
+    for i, (package_name, version_spec) in enumerate(required_packages):
         if cancel_check and cancel_check():
             _log("Installation cancelled by user", Qgis.Warning)
             return False, "Installation cancelled"
@@ -2098,6 +2138,21 @@ def install_dependencies(
                 )
 
         if install_failed:
+            if _is_optional_install_package(package_name):
+                _log(
+                    "Optional package {} failed to install on this platform; "
+                    "continuing. Error: {}".format(
+                        package_name, install_error_msg[:300]
+                    ),
+                    Qgis.Warning,
+                )
+                if progress_callback:
+                    progress_callback(
+                        pkg_end,
+                        "{} optional install failed (continuing)".format(package_name),
+                    )
+                continue
+
             _log(
                 "pip error output: {}".format(install_error_msg[:500]),
                 Qgis.Critical,
@@ -2172,6 +2227,7 @@ def _get_verification_timeout(package_name: str) -> int:
         "torchvision",
         "geoai-py",
         "segment-geospatial",
+        "triton-windows",
         "sam3",
         "deepforest",
     ):
@@ -2199,6 +2255,8 @@ def _get_verification_code(package_name: str) -> str:
         return "import samgeo; print(samgeo.__version__)"
     elif package_name == "sam3":
         return "import sam3; print('ok')"
+    elif package_name == "triton-windows":
+        return "import triton; print('ok')"
     elif package_name == "deepforest":
         return "from deepforest import main; print('ok')"
     elif package_name == "omniwatermask":
@@ -2231,9 +2289,10 @@ def verify_venv(
     env = _get_clean_env_for_venv()
     subprocess_kwargs = _get_subprocess_kwargs()
 
-    total_packages = len(REQUIRED_PACKAGES)
+    required_packages = _get_required_packages()
+    total_packages = len(required_packages)
     optional_failures: List[str] = []
-    for i, (package_name, _) in enumerate(REQUIRED_PACKAGES):
+    for i, (package_name, _) in enumerate(required_packages):
         if progress_callback:
             percent = int((i / total_packages) * 100)
             progress_callback(
