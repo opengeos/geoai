@@ -50,6 +50,7 @@ universal = true
 current_version = "0.31.1"
 commit = true
 tag = true
+tag_name = "v{new_version}"
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
