@@ -31,6 +31,7 @@ REQUIRED_PACKAGES = [
     ("geoai-py", ""),
     ("segment-geospatial", ""),
     ("sam3", ""),
+    ("transformers", ">=5.1.0"),
     ("deepforest", ""),
     ("omniwatermask", ""),
 ]
@@ -39,7 +40,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "3"
+_INSTALL_LOGIC_VERSION = "6"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -1808,6 +1809,7 @@ def install_dependencies(
         "segment-geospatial": 12,
         "triton-windows": 4,
         "sam3": 10,
+        "transformers": 8,
         "deepforest": 10,
         "omniwatermask": 10,
     }
@@ -1818,6 +1820,7 @@ def install_dependencies(
         "segment-geospatial": 15,
         "triton-windows": 4,
         "sam3": 10,
+        "transformers": 8,
         "deepforest": 12,
         "omniwatermask": 10,
     }
@@ -2229,6 +2232,7 @@ def _get_verification_timeout(package_name: str) -> int:
         "segment-geospatial",
         "triton-windows",
         "sam3",
+        "transformers",
         "deepforest",
     ):
         return 120
@@ -2255,6 +2259,14 @@ def _get_verification_code(package_name: str) -> str:
         return "import samgeo; print(samgeo.__version__)"
     elif package_name == "sam3":
         return "import sam3; print('ok')"
+    elif package_name == "transformers":
+        return (
+            "import transformers; "
+            "from packaging.version import parse as _v; "
+            "v = transformers.__version__; "
+            "assert _v(v) >= _v('5.1.0'), f'Expected >=5.1.0, got {v}'; "
+            "print(v)"
+        )
     elif package_name == "triton-windows":
         return "import triton; print('ok')"
     elif package_name == "deepforest":

@@ -6,6 +6,7 @@ using the SamGeo library (SAM, SAM2, and SAM3 models).
 """
 
 import os
+import sys
 import tempfile
 
 _TORCH_IMPORT_ERROR = None
@@ -250,6 +251,8 @@ class SamGeoDockWidget(QDockWidget):
         backend_row.addWidget(QLabel("Backend:"))
         self.backend_combo = QComboBox()
         self.backend_combo.addItems(["meta", "transformers"])
+        if sys.platform == "darwin":
+            self.backend_combo.setCurrentText("transformers")
         backend_row.addWidget(self.backend_combo)
         backend_layout.addLayout(backend_row)
 
