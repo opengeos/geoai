@@ -34,7 +34,10 @@ REQUIRED_PACKAGES = [
     ("deepforest", ""),
     ("omniwatermask", ""),
     # Install last because some packages (e.g., deepforest deps) may downgrade it.
-    ("transformers", ">=5.1.0"),
+    # Version is platform-specific and replaced in _get_required_packages():
+    # - macOS: >=5.1.0 (SAM 3 meta backend requirement)
+    # - Linux/Windows: ==4.57.6 (Moondream stability)
+    ("transformers", ""),
 ]
 
 DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
@@ -185,6 +188,15 @@ def _get_required_packages() -> List[Tuple[str, str]]:
     ``import triton`` in the managed venv subprocess worker.
     """
     packages = list(REQUIRED_PACKAGES)
+    transformers_idx = next(
+        (i for i, (name, _) in enumerate(packages) if name == "transformers"),
+        None,
+    )
+    if transformers_idx is not None:
+        if sys.platform == "darwin":
+            packages[transformers_idx] = ("transformers", ">=5.1.0")
+        else:
+            packages[transformers_idx] = ("transformers", "==4.57.6")
     if sys.platform == "win32":
         sam3_idx = next(
             (i for i, (name, _) in enumerate(packages) if name == "sam3"),
@@ -2261,11 +2273,18 @@ def _get_verification_code(package_name: str) -> str:
     elif package_name == "sam3":
         return "import sam3; print('ok')"
     elif package_name == "transformers":
+        if sys.platform == "darwin":
+            return (
+                "import transformers; "
+                "from packaging.version import parse as _v; "
+                "v = transformers.__version__; "
+                "assert _v(v) >= _v('5.1.0'), f'Expected >=5.1.0 on macOS, got {v}'; "
+                "print(v)"
+            )
         return (
             "import transformers; "
-            "from packaging.version import parse as _v; "
             "v = transformers.__version__; "
-            "assert _v(v) >= _v('5.1.0'), f'Expected >=5.1.0, got {v}'; "
+            "assert v == '4.57.6', f'Expected 4.57.6 on this platform, got {v}'; "
             "print(v)"
         )
     elif package_name == "triton-windows":

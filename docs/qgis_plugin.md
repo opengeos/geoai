@@ -45,7 +45,7 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 - **Detect**: Detect and locate objects with bounding boxes
 - **Point**: Locate specific objects with point markers
 
-### SemanticSegmentation Panel (Combined Training & Inference)
+### Semantic Segmentation Panel (Combined Training & Inference)
 
 - **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
 - **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
@@ -59,7 +59,7 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 ### SamGeo Panel (Segment Anything Model)
 
-- **Model Tab**: Load SAM models (SAM1, SAM2, or SAM3) with configurable backend and device settings
+- **Model Tab**: Load SAM3 with configurable backend and device settings
 - **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road")
 - **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
 - **Batch Tab**: Process multiple points interactively or from vector files/layers

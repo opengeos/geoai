@@ -2,7 +2,7 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model, semantic segmentation, instance segmentation (Mask R-CNN), SamGeo (SAM1/SAM2/SAM3), DeepForest object detection, and water segmentation (OmniWaterMask).
-version=1.0.0
+version=1.0.1
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -58,6 +58,8 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.0.1
+        - Fix Moondream model loading issue with transformers 5.0+ (#571)
     1.0.0
         - Add a one-click dependency installation system (#562)
         - Add support for mac mps backend (#562)
