@@ -915,7 +915,7 @@ class DeepForestDockWidget(QDockWidget):
                     self.progress_bar.setVisible(False)
                     self.load_model_btn.setEnabled(True)
                     error_msg = (
-                        f"CUDA device requested but not available.\n\n{warning_message}\n\n"
+                        f"CUDA device requested but not available.\n\n{warning_message}\n\n"  # nosec B608
                         "Please select 'cpu' from the Device dropdown or fix your CUDA installation."
                     )
                     self.show_error(error_msg)
