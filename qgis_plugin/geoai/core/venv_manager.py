@@ -52,7 +52,9 @@ _CUDA_DRIVER_REQUIREMENTS = {
     "cu121": 530,
 }
 
-# Blackwell (sm_120+) requires cu128; everything else works with cu124.
+# Blackwell (sm_120+) requires cu128.
+# On Windows, prefer cu126 for broader compatibility with newer packages
+# (e.g., sam3) when the driver supports it; otherwise fall back to cu124.
 _MIN_COMPUTE_CAP_FOR_CU128 = 12.0
 
 # Cache for detect_nvidia_gpu() — avoids re-running nvidia-smi.
@@ -288,7 +290,7 @@ def _select_cuda_index(gpu_info: dict) -> Optional[str]:
         gpu_info: Dict with GPU information from detect_nvidia_gpu().
 
     Returns:
-        'cu128', 'cu124', or None if driver is too old.
+        'cu128', 'cu126', 'cu124', or None if driver is too old.
     """
     compute_cap = gpu_info.get("compute_cap")
     gpu_name = gpu_info.get("name", "")
@@ -298,25 +300,40 @@ def _select_cuda_index(gpu_info: dict) -> Optional[str]:
     else:
         needs_cu128 = "RTX 50" in gpu_name.upper()
 
-    cuda_index = "cu128" if needs_cu128 else "cu124"
-
     driver_str = gpu_info.get("driver_version", "")
+    driver_major = None
     if driver_str:
         try:
             driver_major = int(driver_str.split(".")[0])
-            required = _CUDA_DRIVER_REQUIREMENTS.get(cuda_index, 0)
-            if driver_major < required:
-                _log(
-                    "NVIDIA driver {} too old for {} (needs >= {}), "
-                    "will use CPU instead".format(driver_str, cuda_index, required),
-                    Qgis.Warning,
-                )
-                return None
         except (ValueError, IndexError):
             _log(
                 f"Could not parse driver version: {driver_str}",
                 Qgis.Warning,
             )
+
+    if needs_cu128:
+        cuda_index = "cu128"
+    else:
+        # On Windows, prefer cu126 when the driver is recent enough. This
+        # improves compatibility with newer packages that expect CUDA 12.6+.
+        if (
+            sys.platform == "win32"
+            and driver_major is not None
+            and driver_major >= _CUDA_DRIVER_REQUIREMENTS.get("cu126", 0)
+        ):
+            cuda_index = "cu126"
+        else:
+            cuda_index = "cu124"
+
+    if driver_major is not None:
+        required = _CUDA_DRIVER_REQUIREMENTS.get(cuda_index, 0)
+        if driver_major < required:
+            _log(
+                "NVIDIA driver {} too old for {} (needs >= {}), "
+                "will use CPU instead".format(driver_str, cuda_index, required),
+                Qgis.Warning,
+            )
+            return None
 
     return cuda_index
 
