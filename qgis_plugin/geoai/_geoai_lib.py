@@ -419,8 +419,13 @@ def get_geoai() -> ModuleType:
     # Strategy 3: direct sys.path scan
     _diag.append("Strategy 3: sys.path filesystem scan")
     # Log the first few sys.path entries containing "geoai" or the venv
+    _cache_marker = (
+        os.environ.get("GEOAI_CACHE_DIR")
+        or os.environ.get("GEOAI_VENV_DIR")
+        or ".qgis_geoai"
+    )
     for idx, entry in enumerate(sys.path[:20]):
-        if "geoai" in entry.lower() or ".qgis_geoai" in entry:
+        if "geoai" in entry.lower() or _cache_marker in entry:
             _diag.append(f"  sys.path[{idx}]: {entry}")
     init_path = _find_geoai_init_from_sys_path()
     if init_path is not None:

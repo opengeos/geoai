@@ -22,7 +22,11 @@ from typing import Callable, List, Optional, Tuple
 from qgis.core import Qgis, QgsMessageLog
 
 PYTHON_VERSION = f"py{sys.version_info.major}.{sys.version_info.minor}"
-CACHE_DIR = os.path.expanduser("~/.qgis_geoai")
+CACHE_DIR = (
+    os.environ.get("GEOAI_CACHE_DIR")
+    or os.environ.get("GEOAI_VENV_DIR")
+    or os.path.expanduser("~/.qgis_geoai")
+)
 VENV_DIR = os.path.join(CACHE_DIR, f"venv_{PYTHON_VERSION}")
 
 REQUIRED_PACKAGES = [
@@ -90,8 +94,13 @@ def _log_system_info():
         f"  Architecture: {platform.machine()}",
         f"  Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         f"  QGIS: {qgis_version}",
-        "=" * 50,
     ]
+    if os.environ.get("GEOAI_CACHE_DIR"):
+        info_lines.append(f"  GEOAI_CACHE_DIR: {os.environ['GEOAI_CACHE_DIR']}")
+    elif os.environ.get("GEOAI_VENV_DIR"):
+        info_lines.append(f"  GEOAI_VENV_DIR: {os.environ['GEOAI_VENV_DIR']}")
+    info_lines.append(f"  Cache directory: {CACHE_DIR}")
+    info_lines.append("=" * 50)
     for line in info_lines:
         _log(line, Qgis.Info)
 
@@ -2642,6 +2651,23 @@ def create_venv_and_install(
     )
 
     _log_system_info()
+
+    # Early check: verify cache directory is writable
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        test_file = os.path.join(CACHE_DIR, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+    except OSError as e:
+        if os.environ.get("GEOAI_CACHE_DIR") or os.environ.get("GEOAI_VENV_DIR"):
+            hint = f"The GEOAI_CACHE_DIR is set to: {CACHE_DIR}"
+        else:
+            hint = (
+                "Set the GEOAI_CACHE_DIR environment variable to a "
+                "writable directory before launching QGIS."
+            )
+        return False, f"Cannot write to installation directory: {CACHE_DIR}\n{hint}"
 
     rosetta_warning = _check_rosetta_warning()
     if rosetta_warning:

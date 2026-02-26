@@ -103,6 +103,19 @@ Starting with v1.0.0, the GeoAI plugin includes a built-in dependency installer 
 
 Simply click **Install Dependencies** and wait for the installation to complete. Once finished, the GeoAI panels will be ready to use. This is a one-time setup.
 
+**Custom installation location:** If you cannot write to `~/.qgis_geoai/` (e.g., in corporate environments with restricted home directories), set the `GEOAI_CACHE_DIR` environment variable to a writable directory before launching QGIS:
+
+```bash
+# Linux/macOS
+export GEOAI_CACHE_DIR=/path/to/writable/directory
+
+# Windows (Command Prompt)
+set GEOAI_CACHE_DIR=D:\geoai_cache
+
+# Windows (PowerShell)
+$env:GEOAI_CACHE_DIR = "D:\geoai_cache"
+```
+
 **Note:** If you need precise control over CUDA versions or want to use the latest PyTorch builds, use the Pixi-based installation below instead.
 
 ### 1. Set up the environment with Pixi

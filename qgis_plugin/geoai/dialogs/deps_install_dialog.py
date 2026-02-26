@@ -5,6 +5,7 @@ Shows GPU detection info, progress bars, and status messages during
 the installation process.
 """
 
+import os
 import platform
 import sys
 
@@ -61,8 +62,16 @@ class DepsInstallDockWidget(QDockWidget):
         welcome_text.setWordWrap(True)
         welcome_layout.addWidget(welcome_text)
 
+        from ..core.venv_manager import CACHE_DIR
+
+        _home = os.path.expanduser("~")
+        _display = (
+            ("~" + CACHE_DIR[len(_home) :])
+            if CACHE_DIR.startswith(_home)
+            else CACHE_DIR
+        )
         location_label = QLabel(
-            "<small>Installation location: <code>~/.qgis_geoai/</code></small>"
+            f"<small>Installation location: <code>{_display}</code></small>"
         )
         location_label.setWordWrap(True)
         welcome_layout.addWidget(location_label)

@@ -21,7 +21,11 @@ from qgis.core import Qgis, QgsBlockingNetworkRequest, QgsMessageLog
 from qgis.PyQt.QtCore import QUrl
 from qgis.PyQt.QtNetwork import QNetworkRequest
 
-CACHE_DIR = os.path.expanduser("~/.qgis_geoai")
+CACHE_DIR = (
+    os.environ.get("GEOAI_CACHE_DIR")
+    or os.environ.get("GEOAI_VENV_DIR")
+    or os.path.expanduser("~/.qgis_geoai")
+)
 STANDALONE_DIR = os.path.join(CACHE_DIR, "python_standalone")
 
 # Release tag from python-build-standalone
