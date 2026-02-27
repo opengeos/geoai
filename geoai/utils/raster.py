@@ -1288,8 +1288,6 @@ def read_vector(
 
     import urllib.parse
 
-    import fiona
-
     # Determine if source is a URL or local file
     parsed_url = urllib.parse.urlparse(source)
     is_url = parsed_url.scheme in ["http", "https"]
@@ -1313,11 +1311,18 @@ def read_vector(
             return gpd.read_file(source, layer=layer, **kwargs)
         return gpd.read_file(source, **kwargs)
 
-    # Try to use fiona to identify valid layers for formats that might have them
-    # Only attempt this for local files as fiona.listlayers might not work with URLs
+    # Try to identify valid layers for formats that might have them
+    # Only attempt this for local files
     if layer is None and ext in [".gpkg", ".gml"] and not is_url:
         try:
-            layers = fiona.listlayers(source)
+            try:
+                import pyogrio
+
+                layers = pyogrio.list_layers(source)[:, 0].tolist()
+            except ImportError:
+                import fiona
+
+                layers = fiona.listlayers(source)
             if layers:
                 return gpd.read_file(source, layer=layers[0], **kwargs)
         except Exception:
