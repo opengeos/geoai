@@ -57,6 +57,7 @@ class DepsInstallDockWidget(QDockWidget):
             "GeoAI needs to install AI dependencies before you can use it.\n\n"
             "This is a one-time setup that will:\n"
             "  \u2022 Download a Python runtime (~50 MB)\n"
+            "  \u2022 Download a fast package installer (~15 MB)\n"
             "  \u2022 Install AI packages (~1\u20133 GB)"
         )
         welcome_text.setWordWrap(True)

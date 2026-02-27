@@ -20,7 +20,7 @@ jobs:
             - name: Install uv
               uses: astral-sh/setup-uv@v7
               with:
-                  version: "0.4.16"
+                  version: ""
                   enable-cache: false
 
             - name: Install dependencies
@@ -37,4 +37,4 @@ jobs:
 
             - name: Test import
               run: |
-                  uv run python -c "import geoai; print('geoai import successful')"
+                  .venv\Scripts\python -c "import geoai; print('geoai import successful')"

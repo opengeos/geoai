@@ -37,10 +37,10 @@ REQUIRED_PACKAGES = [
     ("sam3", ""),
     ("deepforest", ""),
     ("omniwatermask", ""),
-    # Install last because some packages (e.g., deepforest deps) may downgrade it.
     # Version is platform-specific and replaced in _get_required_packages():
     # - macOS: >=5.1.0 (SAM 3 meta backend requirement)
     # - Linux/Windows: ==4.57.6 (Moondream stability)
+    # Note: ordering doesn't matter with batch installs (resolver handles constraints).
     ("transformers", ""),
 ]
 
@@ -48,7 +48,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "7"
+_INSTALL_LOGIC_VERSION = "9"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -461,6 +461,20 @@ def _get_pip_ssl_flags() -> List[str]:
     ]
 
 
+def _get_uv_ssl_flags() -> List[str]:
+    """Get uv flags to bypass SSL verification for corporate proxies.
+
+    Returns:
+        List of uv command-line flags.
+    """
+    return [
+        "--allow-insecure-host",
+        "pypi.org",
+        "--allow-insecure-host",
+        "files.pythonhosted.org",
+    ]
+
+
 def _is_network_error(output: str) -> bool:
     """Detect transient network/connection errors in pip output.
 
@@ -530,6 +544,24 @@ def _is_windows_process_crash(returncode: int) -> bool:
     if sys.platform != "win32":
         return False
     return returncode in _WINDOWS_CRASH_CODES
+
+
+def _classify_batch_error(error_output: str, package_specs: List[str]) -> Optional[str]:
+    """Identify which package in a batch install caused the failure.
+
+    Args:
+        error_output: Combined stdout+stderr from the failed batch install.
+        package_specs: List of package specifiers that were in the batch.
+
+    Returns:
+        The package name that likely caused the failure, or None.
+    """
+    error_lower = error_output.lower()
+    for spec in package_specs:
+        name = re.split(r"[><=!]", spec)[0].strip()
+        if name.lower().replace("-", "_") in error_lower.replace("-", "_"):
+            return name
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -868,22 +900,36 @@ def _repair_corrupted_geoai_init(site_packages: str) -> None:
         )
 
     # Reinstall geoai-py to get a clean copy.
+    from .uv_manager import get_uv_path, uv_exists
+
     python_path = get_venv_python_path()
     env = _get_clean_env_for_venv()
     subprocess_kwargs = _get_subprocess_kwargs()
 
     try:
-        cmd = [
-            python_path,
-            "-m",
-            "pip",
-            "install",
-            "--force-reinstall",
-            "--no-deps",
-            "--no-warn-script-location",
-            "--disable-pip-version-check",
-            "geoai-py",
-        ]
+        if uv_exists():
+            cmd = [
+                get_uv_path(),
+                "pip",
+                "install",
+                "--python",
+                python_path,
+                "--force-reinstall",
+                "--no-deps",
+                "geoai-py",
+            ]
+        else:
+            cmd = [
+                python_path,
+                "-m",
+                "pip",
+                "install",
+                "--force-reinstall",
+                "--no-deps",
+                "--no-warn-script-location",
+                "--disable-pip-version-check",
+                "geoai-py",
+            ]
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -1273,7 +1319,17 @@ def create_venv(
     system_python = _get_system_python()
     _log(f"Using Python: {system_python}", Qgis.Info)
 
-    cmd = [system_python, "-m", "venv", venv_dir]
+    from .uv_manager import get_uv_path, uv_exists
+
+    use_uv = uv_exists()
+
+    if use_uv:
+        uv_path = get_uv_path()
+        cmd = [uv_path, "venv", "--python", system_python, venv_dir]
+        _log(f"Creating venv with uv: {uv_path}", Qgis.Info)
+    else:
+        cmd = [system_python, "-m", "venv", venv_dir]
+        _log("Creating venv with python -m venv", Qgis.Info)
 
     try:
         env = _get_clean_env_for_venv()
@@ -1288,42 +1344,74 @@ def create_venv(
             **subprocess_kwargs,
         )
 
+        if result.returncode != 0 and use_uv:
+            # uv venv failed; fall back to stdlib venv
+            _log(
+                "uv venv failed ({}), falling back to python -m venv".format(
+                    result.stderr.strip() if result.stderr else result.returncode
+                ),
+                Qgis.Warning,
+            )
+            from .uv_manager import remove_uv
+
+            remove_uv()
+            use_uv = False
+            _cleanup_partial_venv(venv_dir)
+            cmd = [system_python, "-m", "venv", venv_dir]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env=env,
+                **subprocess_kwargs,
+            )
+
         if result.returncode == 0:
             _log("Virtual environment created successfully", Qgis.Success)
 
-            pip_path = get_venv_pip_path(venv_dir)
-            if not os.path.exists(pip_path):
-                _log(
-                    "pip not found in venv, bootstrapping with ensurepip...",
-                    Qgis.Info,
-                )
-                python_in_venv = get_venv_python_path(venv_dir)
-                ensurepip_cmd = [
-                    python_in_venv,
-                    "-m",
-                    "ensurepip",
-                    "--upgrade",
-                ]
-                try:
-                    ensurepip_result = subprocess.run(
-                        ensurepip_cmd,
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                        env=env,
-                        **subprocess_kwargs,
+            # When using uv, pip is not needed in the venv (uv handles
+            # installs directly).  Only bootstrap pip for stdlib venvs.
+            if not use_uv:
+                pip_path = get_venv_pip_path(venv_dir)
+                if not os.path.exists(pip_path):
+                    _log(
+                        "pip not found in venv, bootstrapping with ensurepip...",
+                        Qgis.Info,
                     )
-                    if ensurepip_result.returncode == 0:
-                        _log("pip bootstrapped via ensurepip", Qgis.Success)
-                    else:
-                        err = ensurepip_result.stderr or ensurepip_result.stdout
-                        _log(f"ensurepip failed: {err[:200]}", Qgis.Warning)
+                    python_in_venv = get_venv_python_path(venv_dir)
+                    ensurepip_cmd = [
+                        python_in_venv,
+                        "-m",
+                        "ensurepip",
+                        "--upgrade",
+                    ]
+                    try:
+                        ensurepip_result = subprocess.run(
+                            ensurepip_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                            env=env,
+                            **subprocess_kwargs,
+                        )
+                        if ensurepip_result.returncode == 0:
+                            _log("pip bootstrapped via ensurepip", Qgis.Success)
+                        else:
+                            err = ensurepip_result.stderr or ensurepip_result.stdout
+                            _log(f"ensurepip failed: {err[:200]}", Qgis.Warning)
+                            _cleanup_partial_venv(venv_dir)
+                            return (
+                                False,
+                                f"Failed to bootstrap pip: {err[:200]}",
+                            )
+                    except Exception as e:
+                        _log(f"ensurepip exception: {e}", Qgis.Warning)
                         _cleanup_partial_venv(venv_dir)
-                        return False, f"Failed to bootstrap pip: {err[:200]}"
-                except Exception as e:
-                    _log(f"ensurepip exception: {e}", Qgis.Warning)
-                    _cleanup_partial_venv(venv_dir)
-                    return False, f"Failed to bootstrap pip: {str(e)[:200]}"
+                        return (
+                            False,
+                            f"Failed to bootstrap pip: {str(e)[:200]}",
+                        )
 
             if progress_callback:
                 progress_callback(15, "Virtual environment created")
@@ -1400,30 +1488,25 @@ def _run_pip_install(
     timeout: int,
     env: dict,
     subprocess_kwargs: dict,
-    package_name: str,
-    package_index: int,
-    total_packages: int,
+    label: str,
     progress_start: int,
     progress_end: int,
     progress_callback: Optional[Callable[[int, str], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
-    is_cuda: bool = False,
 ) -> _PipResult:
-    """Run a pip install command with real-time progress updates.
+    """Run a pip/uv install command with real-time progress updates.
 
     Args:
-        cmd: The pip install command to run.
+        cmd: The install command to run.
         timeout: Maximum time in seconds.
         env: Environment variables dict.
         subprocess_kwargs: Platform-specific kwargs for subprocess.
-        package_name: Name of the package being installed.
-        package_index: Index in the package list (0-based).
-        total_packages: Total number of packages.
-        progress_start: Start percentage for this package's progress range.
-        progress_end: End percentage for this package's progress range.
+        label: Human-readable label for progress messages
+            (e.g. "GPU PyTorch (~2.5 GB)" or "remaining dependencies").
+        progress_start: Start percentage for this install's progress range.
+        progress_end: End percentage for this install's progress range.
         progress_callback: Optional progress callback.
         cancel_check: Optional cancellation check callback.
-        is_cuda: Whether this is a CUDA package install.
 
     Returns:
         _PipResult with returncode, stdout, and stderr.
@@ -1512,12 +1595,8 @@ def _run_pip_install(
 
             if last_download_status:
                 msg = "{}... {}".format(last_download_status, elapsed_str)
-            elif is_cuda and package_name == "torch":
-                msg = "Installing GPU PyTorch (~2.5 GB)... {}".format(elapsed_str)
-            elif package_name == "torch":
-                msg = "Downloading PyTorch (~600 MB)... {}".format(elapsed_str)
             else:
-                msg = "Installing {}... {}".format(package_name, elapsed_str)
+                msg = "Installing {}... {}".format(label, elapsed_str)
 
             progress_range = progress_end - progress_start
             if timeout > 0:
@@ -1624,17 +1703,41 @@ def _reinstall_cpu_torch(
         venv_dir: Path to the virtual environment.
         progress_callback: Optional progress callback.
     """
+    from .uv_manager import get_uv_path, uv_exists
+
     python_path = get_venv_python_path(venv_dir)
     env = _get_clean_env_for_venv()
     subprocess_kwargs = _get_subprocess_kwargs()
+    _use_uv = uv_exists()
+    _uv_path = get_uv_path() if _use_uv else None
 
     _log("Reinstalling CPU-only torch/torchvision...", Qgis.Warning)
     if progress_callback:
         progress_callback(96, "CUDA failed, reinstalling CPU torch...")
 
     try:
+        if _use_uv:
+            uninstall_cmd = [
+                _uv_path,
+                "pip",
+                "uninstall",
+                "--python",
+                python_path,
+                "torch",
+                "torchvision",
+            ]
+        else:
+            uninstall_cmd = [
+                python_path,
+                "-m",
+                "pip",
+                "uninstall",
+                "-y",
+                "torch",
+                "torchvision",
+            ]
         subprocess.run(
-            [python_path, "-m", "pip", "uninstall", "-y", "torch", "torchvision"],
+            uninstall_cmd,
             capture_output=True,
             text=True,
             timeout=120,
@@ -1646,19 +1749,33 @@ def _reinstall_cpu_torch(
 
     for pkg in ("torch>=2.0.0", "torchvision>=0.15.0"):
         try:
-            cmd = (
-                [
-                    python_path,
-                    "-m",
-                    "pip",
-                    "install",
-                    "--no-warn-script-location",
-                    "--disable-pip-version-check",
-                    "--prefer-binary",
-                ]
-                + _get_pip_ssl_flags()
-                + [pkg]
-            )
+            if _use_uv:
+                cmd = (
+                    [
+                        _uv_path,
+                        "pip",
+                        "install",
+                        "--python",
+                        python_path,
+                        "--upgrade",
+                    ]
+                    + _get_uv_ssl_flags()
+                    + [pkg]
+                )
+            else:
+                cmd = (
+                    [
+                        python_path,
+                        "-m",
+                        "pip",
+                        "install",
+                        "--no-warn-script-location",
+                        "--disable-pip-version-check",
+                        "--prefer-binary",
+                    ]
+                    + _get_pip_ssl_flags()
+                    + [pkg]
+                )
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -1810,8 +1927,15 @@ def install_dependencies(
     if not venv_exists(venv_dir):
         return False, "Virtual environment does not exist"
 
-    pip_path = get_venv_pip_path(venv_dir)
-    _log(f"Installing dependencies using: {pip_path}", Qgis.Info)
+    from .uv_manager import get_uv_path, uv_exists
+
+    use_uv = uv_exists()
+    uv_path = get_uv_path() if use_uv else None
+    if use_uv:
+        _log(f"Installing dependencies using uv: {uv_path}", Qgis.Info)
+    else:
+        pip_path = get_venv_pip_path(venv_dir)
+        _log(f"Installing dependencies using pip: {pip_path}", Qgis.Info)
     if cuda_enabled:
         _log("CUDA mode enabled - will install GPU-accelerated PyTorch", Qgis.Info)
 
@@ -1819,52 +1943,31 @@ def install_dependencies(
     _driver_too_old = False
 
     required_packages = _get_required_packages()
-    total_packages = len(required_packages)
     base_progress = 20
     progress_range = 80
-
-    # Weighted progress: torch is heaviest, then geoai-py, segment-geospatial, etc.
-    _weight_map_cuda = {
-        "torch": 30,
-        "torchvision": 8,
-        "geoai-py": 20,
-        "segment-geospatial": 12,
-        "triton-windows": 4,
-        "sam3": 10,
-        "transformers": 8,
-        "deepforest": 10,
-        "omniwatermask": 10,
-    }
-    _weight_map_cpu = {
-        "torch": 20,
-        "torchvision": 8,
-        "geoai-py": 25,
-        "segment-geospatial": 15,
-        "triton-windows": 4,
-        "sam3": 10,
-        "transformers": 8,
-        "deepforest": 12,
-        "omniwatermask": 10,
-    }
-    _weight_map = _weight_map_cuda if cuda_enabled else _weight_map_cpu
-    _weights = [_weight_map.get(name, 10) for name, _ in required_packages]
-    weight_total = sum(_weights)
-
-    _cumulative = [0]
-    for w in _weights:
-        _cumulative.append(_cumulative[-1] + w)
-
-    def _pkg_progress_start(idx):
-        return base_progress + int(progress_range * _cumulative[idx] / weight_total)
-
-    def _pkg_progress_end(idx):
-        return base_progress + int(progress_range * _cumulative[idx + 1] / weight_total)
-
     python_path = get_venv_python_path(venv_dir)
+    env = _get_clean_env_for_venv()
+    subprocess_kwargs = _get_subprocess_kwargs()
 
-    # Detect CPU-only torch already in venv (needs force reinstall for CUDA)
+    # -- Partition packages into CUDA (individual) and batch groups -----------
+    cuda_packages: List[Tuple[str, str]] = []
+    batch_packages: List[Tuple[str, str]] = []
+    for pkg_name, ver_spec in required_packages:
+        if cuda_enabled and pkg_name in ("torch", "torchvision"):
+            cuda_packages.append((pkg_name, ver_spec))
+        else:
+            batch_packages.append((pkg_name, ver_spec))
+
+    # Progress allocation: CUDA phase then batch phase
+    cuda_progress_weight = 40 if cuda_packages else 0
+    cuda_start = base_progress
+    cuda_end = base_progress + int(progress_range * cuda_progress_weight / 100)
+    batch_start = cuda_end
+    batch_end = base_progress + progress_range  # == 100
+
+    # -- Phase A: CUDA packages (individual installs) -------------------------
     _force_cuda_reinstall = False
-    if cuda_enabled:
+    if cuda_packages:
         _precheck_env = _get_clean_env_for_venv()
         _precheck_kwargs = _get_subprocess_kwargs()
         if _is_cpu_torch_installed(python_path, _precheck_env, _precheck_kwargs):
@@ -1875,57 +1978,55 @@ def install_dependencies(
                 Qgis.Info,
             )
 
-    for i, (package_name, version_spec) in enumerate(required_packages):
-        if cancel_check and cancel_check():
-            _log("Installation cancelled by user", Qgis.Warning)
-            return False, "Installation cancelled"
+        num_cuda = len(cuda_packages)
+        for ci, (package_name, version_spec) in enumerate(cuda_packages):
+            if cancel_check and cancel_check():
+                _log("Installation cancelled by user", Qgis.Warning)
+                return False, "Installation cancelled"
 
-        package_spec = f"{package_name}{version_spec}"
-        pkg_start = _pkg_progress_start(i)
-        pkg_end = _pkg_progress_end(i)
+            package_spec = f"{package_name}{version_spec}"
+            pkg_start = cuda_start + int((cuda_end - cuda_start) * ci / num_cuda)
+            pkg_end = cuda_start + int((cuda_end - cuda_start) * (ci + 1) / num_cuda)
 
-        is_cuda_package = cuda_enabled and package_name in (
-            "torch",
-            "torchvision",
-        )
-
-        if progress_callback:
-            if package_name == "torch" and cuda_enabled:
-                progress_callback(
-                    pkg_start,
-                    "Installing GPU dependencies... ({}/{})".format(
-                        i + 1, total_packages
-                    ),
-                )
-            elif package_name == "torch":
-                progress_callback(
-                    pkg_start,
-                    "Installing {} (~600MB)... ({}/{})".format(
-                        package_name, i + 1, total_packages
-                    ),
-                )
+            if package_name == "torch":
+                label = "GPU PyTorch (~2.5 GB)"
             else:
+                label = "{} (CUDA)".format(package_name)
+
+            if progress_callback:
                 progress_callback(
                     pkg_start,
-                    "Installing {}... ({}/{})".format(
-                        package_name, i + 1, total_packages
-                    ),
+                    "Installing GPU dependencies... ({}/{})".format(ci + 1, num_cuda),
                 )
+            _log(
+                "[CUDA {}/{}] Installing {}...".format(ci + 1, num_cuda, package_spec),
+                Qgis.Info,
+            )
 
-        _log(f"[{i + 1}/{total_packages}] Installing {package_spec}...", Qgis.Info)
+            # Build install args
+            if use_uv:
+                pip_args = [
+                    "pip",
+                    "install",
+                    "--python",
+                    python_path,
+                    "--upgrade",
+                ]
+                pip_args.extend(_get_uv_ssl_flags())
+                pip_args.append(package_spec)
+            else:
+                pip_args = [
+                    "install",
+                    "--upgrade",
+                    "--no-warn-script-location",
+                    "--disable-pip-version-check",
+                    "--prefer-binary",
+                ]
+                pip_args.extend(_get_pip_ssl_flags())
+                pip_args.extend(_get_pip_proxy_args())
+                pip_args.append(package_spec)
 
-        pip_args = [
-            "install",
-            "--upgrade",
-            "--no-warn-script-location",
-            "--disable-pip-version-check",
-            "--prefer-binary",
-        ]
-        pip_args.extend(_get_pip_ssl_flags())
-        pip_args.extend(_get_pip_proxy_args())
-        pip_args.append(package_spec)
-
-        if is_cuda_package:
+            is_cuda_package = True
             _, gpu_info = detect_nvidia_gpu()
             cuda_index = _select_cuda_index(gpu_info)
             if cuda_index is None:
@@ -1942,7 +2043,7 @@ def install_dependencies(
                     [
                         "--index-url",
                         "https://download.pytorch.org/whl/{}".format(cuda_index),
-                        "--no-cache-dir",
+                        "--no-cache" if use_uv else "--no-cache-dir",
                     ]
                 )
                 _log(
@@ -1950,85 +2051,369 @@ def install_dependencies(
                     Qgis.Info,
                 )
 
-        env = _get_clean_env_for_venv()
-        subprocess_kwargs = _get_subprocess_kwargs()
-
-        # Uninstall CPU torch before CUDA install
-        if _force_cuda_reinstall and is_cuda_package:
-            _log(
-                "Uninstalling CPU {} before CUDA install".format(package_name),
-                Qgis.Info,
-            )
-            try:
-                subprocess.run(
-                    [python_path, "-m", "pip", "uninstall", "-y", package_name],
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                    env=env,
-                    **subprocess_kwargs,
-                )
-            except Exception as exc:
+            # Uninstall CPU torch before CUDA install
+            if _force_cuda_reinstall and is_cuda_package:
                 _log(
-                    f"Failed to uninstall CPU {package_name}: {exc}",
-                    Qgis.Warning,
+                    "Uninstalling CPU {} before CUDA install".format(package_name),
+                    Qgis.Info,
                 )
-
-        if is_cuda_package and package_name in ("torch", "torchvision"):
-            pkg_timeout = 2400
-        elif package_name == "geoai-py":
-            pkg_timeout = 1200  # geoai-py has many transitive deps
-        else:
-            pkg_timeout = 600
-
-        install_failed = False
-        install_error_msg = ""
-        last_returncode = None
-
-        try:
-            base_cmd = [python_path, "-m", "pip"] + pip_args
-
-            result = _run_pip_install(
-                cmd=base_cmd,
-                timeout=pkg_timeout,
-                env=env,
-                subprocess_kwargs=subprocess_kwargs,
-                package_name=package_name,
-                package_index=i,
-                total_packages=total_packages,
-                progress_start=pkg_start,
-                progress_end=pkg_end,
-                progress_callback=progress_callback,
-                cancel_check=cancel_check,
-                is_cuda=is_cuda_package,
-            )
-
-            if result.returncode == -1 and "cancelled" in (result.stderr or "").lower():
-                _log("Installation cancelled by user", Qgis.Warning)
-                return False, "Installation cancelled"
-
-            # Retry on hash mismatch with --no-cache-dir
-            if result.returncode != 0:
-                error_output = result.stderr or result.stdout or ""
-                if _is_hash_mismatch(error_output):
+                try:
+                    if use_uv:
+                        uninstall_cmd = [
+                            uv_path,
+                            "pip",
+                            "uninstall",
+                            "--python",
+                            python_path,
+                            package_name,
+                        ]
+                    else:
+                        uninstall_cmd = [
+                            python_path,
+                            "-m",
+                            "pip",
+                            "uninstall",
+                            "-y",
+                            package_name,
+                        ]
+                    subprocess.run(
+                        uninstall_cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        env=env,
+                        **subprocess_kwargs,
+                    )
+                except Exception as exc:
                     _log(
-                        "Hash mismatch detected, retrying with --no-cache-dir...",
+                        f"Failed to uninstall CPU {package_name}: {exc}",
                         Qgis.Warning,
                     )
-                    nocache_cmd = base_cmd + ["--no-cache-dir"]
-                    result = _run_pip_install(
-                        cmd=nocache_cmd,
-                        timeout=pkg_timeout,
+
+            if use_uv:
+                base_cmd = [uv_path] + pip_args
+            else:
+                base_cmd = [python_path, "-m", "pip"] + pip_args
+
+            install_failed = False
+            install_error_msg = ""
+            last_returncode = None
+            pkg_timeout = 2400
+
+            try:
+                result = _run_pip_install(
+                    cmd=base_cmd,
+                    timeout=pkg_timeout,
+                    env=env,
+                    subprocess_kwargs=subprocess_kwargs,
+                    label=label,
+                    progress_start=pkg_start,
+                    progress_end=pkg_end,
+                    progress_callback=progress_callback,
+                    cancel_check=cancel_check,
+                )
+
+                if (
+                    result.returncode == -1
+                    and "cancelled" in (result.stderr or "").lower()
+                ):
+                    return False, "Installation cancelled"
+
+                # Retry on hash mismatch
+                if result.returncode != 0:
+                    error_output = result.stderr or result.stdout or ""
+                    if _is_hash_mismatch(error_output):
+                        _log(
+                            "Hash mismatch, retrying with --no-cache...",
+                            Qgis.Warning,
+                        )
+                        nocache_flag = "--no-cache" if use_uv else "--no-cache-dir"
+                        result = _run_pip_install(
+                            cmd=base_cmd + [nocache_flag],
+                            timeout=pkg_timeout,
+                            env=env,
+                            subprocess_kwargs=subprocess_kwargs,
+                            label=label,
+                            progress_start=pkg_start,
+                            progress_end=pkg_end,
+                            progress_callback=progress_callback,
+                            cancel_check=cancel_check,
+                        )
+
+                # Retry on network errors
+                if result.returncode != 0:
+                    error_output = result.stderr or result.stdout or ""
+                    if _is_network_error(error_output):
+                        for attempt in range(1, 3):
+                            _log(
+                                "Network error, retrying in 5s "
+                                "(attempt {}/2)...".format(attempt),
+                                Qgis.Warning,
+                            )
+                            if progress_callback:
+                                progress_callback(
+                                    pkg_start,
+                                    "Network error, retrying {}...".format(
+                                        package_name
+                                    ),
+                                )
+                            time.sleep(5)
+                            if cancel_check and cancel_check():
+                                return False, "Installation cancelled"
+                            result = _run_pip_install(
+                                cmd=base_cmd,
+                                timeout=pkg_timeout,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label=label,
+                                progress_start=pkg_start,
+                                progress_end=pkg_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
+                            if result.returncode == 0:
+                                break
+
+                if result.returncode == 0:
+                    _log(
+                        "Successfully installed {}".format(package_spec),
+                        Qgis.Success,
+                    )
+                    if progress_callback:
+                        progress_callback(pkg_end, "{} installed".format(package_name))
+                else:
+                    error_msg = (
+                        result.stderr
+                        or result.stdout
+                        or "Return code {}".format(result.returncode)
+                    )
+                    _log(
+                        "Failed to install {}: {}".format(
+                            package_spec, error_msg[:500]
+                        ),
+                        Qgis.Critical,
+                    )
+                    install_failed = True
+                    install_error_msg = error_msg
+                    last_returncode = result.returncode
+
+            except subprocess.TimeoutExpired:
+                _log(
+                    "Installation of {} timed out".format(package_spec),
+                    Qgis.Critical,
+                )
+                install_failed = True
+                install_error_msg = "Installation of {} timed out".format(package_name)
+            except Exception as e:
+                _log(
+                    "Exception installing {}: {}".format(package_spec, e),
+                    Qgis.Critical,
+                )
+                install_failed = True
+                install_error_msg = "Error installing {}: {}".format(
+                    package_name, str(e)[:200]
+                )
+
+            # CUDA -> CPU fallback
+            if install_failed and is_cuda_package:
+                _log(
+                    "CUDA install of {} failed, falling back to CPU...".format(
+                        package_name
+                    ),
+                    Qgis.Warning,
+                )
+                if progress_callback:
+                    progress_callback(
+                        pkg_start,
+                        "CUDA failed, installing {} (CPU)...".format(package_name),
+                    )
+                if use_uv:
+                    cpu_pip_args = [
+                        "pip",
+                        "install",
+                        "--python",
+                        python_path,
+                        "--upgrade",
+                    ]
+                    cpu_pip_args.extend(_get_uv_ssl_flags())
+                    cpu_pip_args.append(package_spec)
+                    cpu_cmd = [uv_path] + cpu_pip_args
+                else:
+                    cpu_pip_args = [
+                        "install",
+                        "--upgrade",
+                        "--no-warn-script-location",
+                        "--disable-pip-version-check",
+                        "--prefer-binary",
+                    ]
+                    cpu_pip_args.extend(_get_pip_ssl_flags())
+                    cpu_pip_args.append(package_spec)
+                    cpu_cmd = [python_path, "-m", "pip"] + cpu_pip_args
+                try:
+                    cpu_result = _run_pip_install(
+                        cmd=cpu_cmd,
+                        timeout=600,
                         env=env,
                         subprocess_kwargs=subprocess_kwargs,
-                        package_name=package_name,
-                        package_index=i,
-                        total_packages=total_packages,
+                        label="{} (CPU fallback)".format(package_name),
                         progress_start=pkg_start,
                         progress_end=pkg_end,
                         progress_callback=progress_callback,
                         cancel_check=cancel_check,
-                        is_cuda=is_cuda_package,
+                    )
+                    if cpu_result.returncode == 0:
+                        _log(
+                            "Successfully installed {} (CPU)".format(package_spec),
+                            Qgis.Success,
+                        )
+                        if progress_callback:
+                            progress_callback(
+                                pkg_end,
+                                "{} installed (CPU)".format(package_name),
+                            )
+                        install_failed = False
+                        _cuda_fell_back = True
+                    else:
+                        cpu_err = cpu_result.stderr or cpu_result.stdout or ""
+                        install_error_msg = (
+                            "CUDA and CPU install both failed for {}: {}".format(
+                                package_name, cpu_err[:200]
+                            )
+                        )
+                except subprocess.TimeoutExpired:
+                    install_error_msg = (
+                        "CUDA and CPU install both timed out for {}".format(
+                            package_name
+                        )
+                    )
+                except Exception as e:
+                    install_error_msg = (
+                        "CUDA and CPU install both failed for {}: {}".format(
+                            package_name, str(e)[:200]
+                        )
+                    )
+
+            if install_failed:
+                _log(
+                    "pip error output: {}".format(install_error_msg[:500]),
+                    Qgis.Critical,
+                )
+                if _is_ssl_error(install_error_msg):
+                    return (
+                        False,
+                        "Failed to install {}: SSL certificate error".format(
+                            package_name
+                        ),
+                    )
+                if _is_proxy_auth_error(install_error_msg):
+                    return (
+                        False,
+                        "Failed to install {}: proxy authentication "
+                        "required".format(package_name),
+                    )
+                if _is_network_error(install_error_msg):
+                    return (
+                        False,
+                        "Failed to install {}: network error".format(package_name),
+                    )
+                if _is_antivirus_error(install_error_msg):
+                    return (
+                        False,
+                        "Failed to install {}: blocked by antivirus or "
+                        "security policy".format(package_name),
+                    )
+                if last_returncode is not None and _is_windows_process_crash(
+                    last_returncode
+                ):
+                    return (
+                        False,
+                        "Failed to install {}: process crashed "
+                        "(code {})".format(package_name, last_returncode),
+                    )
+                return (
+                    False,
+                    "Failed to install {}: {}".format(
+                        package_name, install_error_msg[:200]
+                    ),
+                )
+
+    # -- Phase B: Batch install remaining packages ----------------------------
+    if batch_packages:
+        if cancel_check and cancel_check():
+            _log("Installation cancelled by user", Qgis.Warning)
+            return False, "Installation cancelled"
+
+        batch_specs = ["{}{}".format(name, ver) for name, ver in batch_packages]
+        _log(
+            "Installing {} packages in batch: {}".format(
+                len(batch_specs), ", ".join(batch_specs)
+            ),
+            Qgis.Info,
+        )
+        if progress_callback:
+            progress_callback(batch_start, "Installing dependencies...")
+
+        if use_uv:
+            pip_args = [
+                "pip",
+                "install",
+                "--python",
+                python_path,
+                "--upgrade",
+            ]
+            pip_args.extend(_get_uv_ssl_flags())
+            pip_args.extend(batch_specs)
+            base_cmd = [uv_path] + pip_args
+        else:
+            pip_args = [
+                "install",
+                "--upgrade",
+                "--no-warn-script-location",
+                "--disable-pip-version-check",
+                "--prefer-binary",
+            ]
+            pip_args.extend(_get_pip_ssl_flags())
+            pip_args.extend(_get_pip_proxy_args())
+            pip_args.extend(batch_specs)
+            base_cmd = [python_path, "-m", "pip"] + pip_args
+
+        batch_timeout = 3600  # 60 min for entire batch
+
+        try:
+            result = _run_pip_install(
+                cmd=base_cmd,
+                timeout=batch_timeout,
+                env=env,
+                subprocess_kwargs=subprocess_kwargs,
+                label="dependencies",
+                progress_start=batch_start,
+                progress_end=batch_end,
+                progress_callback=progress_callback,
+                cancel_check=cancel_check,
+            )
+
+            if result.returncode == -1 and "cancelled" in (result.stderr or "").lower():
+                return False, "Installation cancelled"
+
+            # Retry on hash mismatch
+            if result.returncode != 0:
+                error_output = result.stderr or result.stdout or ""
+                if _is_hash_mismatch(error_output):
+                    _log(
+                        "Hash mismatch, retrying batch with --no-cache...",
+                        Qgis.Warning,
+                    )
+                    nocache_flag = "--no-cache" if use_uv else "--no-cache-dir"
+                    result = _run_pip_install(
+                        cmd=base_cmd + [nocache_flag],
+                        timeout=batch_timeout,
+                        env=env,
+                        subprocess_kwargs=subprocess_kwargs,
+                        label="dependencies (no-cache retry)",
+                        progress_start=batch_start,
+                        progress_end=batch_end,
+                        progress_callback=progress_callback,
+                        cancel_check=cancel_check,
                     )
 
             # Retry on network errors
@@ -2037,185 +2422,147 @@ def install_dependencies(
                 if _is_network_error(error_output):
                     for attempt in range(1, 3):
                         _log(
-                            "Network error, retrying in 5s "
+                            "Network error, retrying batch in 5s "
                             "(attempt {}/2)...".format(attempt),
                             Qgis.Warning,
                         )
                         if progress_callback:
                             progress_callback(
-                                pkg_start,
-                                "Network error, retrying {}...".format(package_name),
+                                batch_start,
+                                "Network error, retrying...",
                             )
                         time.sleep(5)
                         if cancel_check and cancel_check():
                             return False, "Installation cancelled"
                         result = _run_pip_install(
                             cmd=base_cmd,
-                            timeout=pkg_timeout,
+                            timeout=batch_timeout,
                             env=env,
                             subprocess_kwargs=subprocess_kwargs,
-                            package_name=package_name,
-                            package_index=i,
-                            total_packages=total_packages,
-                            progress_start=pkg_start,
-                            progress_end=pkg_end,
+                            label="dependencies (retry {})".format(attempt),
+                            progress_start=batch_start,
+                            progress_end=batch_end,
                             progress_callback=progress_callback,
                             cancel_check=cancel_check,
-                            is_cuda=is_cuda_package,
                         )
                         if result.returncode == 0:
                             break
 
+            # If batch failed, check if an optional package caused it
+            if result.returncode != 0:
+                error_output = result.stderr or result.stdout or ""
+                failed_pkg = _classify_batch_error(error_output, batch_specs)
+                if failed_pkg and _is_optional_install_package(failed_pkg):
+                    _log(
+                        "Optional package {} failed in batch; "
+                        "retrying without it...".format(failed_pkg),
+                        Qgis.Warning,
+                    )
+                    retry_specs = [
+                        s for s in batch_specs if not s.startswith(failed_pkg)
+                    ]
+                    if retry_specs:
+                        if use_uv:
+                            retry_args = [
+                                "pip",
+                                "install",
+                                "--python",
+                                python_path,
+                                "--upgrade",
+                            ]
+                            retry_args.extend(_get_uv_ssl_flags())
+                            retry_args.extend(retry_specs)
+                            retry_cmd = [uv_path] + retry_args
+                        else:
+                            retry_args = [
+                                "install",
+                                "--upgrade",
+                                "--no-warn-script-location",
+                                "--disable-pip-version-check",
+                                "--prefer-binary",
+                            ]
+                            retry_args.extend(_get_pip_ssl_flags())
+                            retry_args.extend(_get_pip_proxy_args())
+                            retry_args.extend(retry_specs)
+                            retry_cmd = [
+                                python_path,
+                                "-m",
+                                "pip",
+                            ] + retry_args
+
+                        result = _run_pip_install(
+                            cmd=retry_cmd,
+                            timeout=batch_timeout,
+                            env=env,
+                            subprocess_kwargs=subprocess_kwargs,
+                            label="dependencies (without {})".format(failed_pkg),
+                            progress_start=batch_start,
+                            progress_end=batch_end,
+                            progress_callback=progress_callback,
+                            cancel_check=cancel_check,
+                        )
+                        if result.returncode == 0:
+                            _log(
+                                "Batch succeeded without optional "
+                                "package {}".format(failed_pkg),
+                                Qgis.Warning,
+                            )
+
             if result.returncode == 0:
-                _log(f"Successfully installed {package_spec}", Qgis.Success)
+                _log("Batch install succeeded for all packages", Qgis.Success)
                 if progress_callback:
-                    progress_callback(pkg_end, f"{package_name} installed")
+                    progress_callback(batch_end, "All dependencies installed")
             else:
-                error_msg = (
-                    result.stderr or result.stdout or f"Return code {result.returncode}"
+                error_output = result.stderr or result.stdout or ""
+                failed_pkg = (
+                    _classify_batch_error(error_output, batch_specs) or "dependencies"
                 )
                 _log(
-                    f"Failed to install {package_spec}: {error_msg[:500]}",
+                    "Batch install failed: {}".format(error_output[:500]),
                     Qgis.Critical,
                 )
-                install_failed = True
-                install_error_msg = error_msg
-                last_returncode = result.returncode
+                if _is_ssl_error(error_output):
+                    return (
+                        False,
+                        "Failed to install {}: SSL certificate "
+                        "error".format(failed_pkg),
+                    )
+                if _is_proxy_auth_error(error_output):
+                    return (
+                        False,
+                        "Failed to install {}: proxy authentication "
+                        "required".format(failed_pkg),
+                    )
+                if _is_network_error(error_output):
+                    return (
+                        False,
+                        "Failed to install {}: network error".format(failed_pkg),
+                    )
+                if _is_antivirus_error(error_output):
+                    return (
+                        False,
+                        "Failed to install {}: blocked by antivirus or "
+                        "security policy".format(failed_pkg),
+                    )
+                if result.returncode is not None and _is_windows_process_crash(
+                    result.returncode
+                ):
+                    return (
+                        False,
+                        "Failed to install {}: process crashed "
+                        "(code {})".format(failed_pkg, result.returncode),
+                    )
+                return (
+                    False,
+                    "Failed to install {}: {}".format(failed_pkg, error_output[:200]),
+                )
 
         except subprocess.TimeoutExpired:
-            _log(f"Installation of {package_spec} timed out", Qgis.Critical)
-            install_failed = True
-            install_error_msg = f"Installation of {package_name} timed out"
+            _log("Batch install timed out", Qgis.Critical)
+            return False, "Dependency installation timed out"
         except Exception as e:
-            _log(
-                f"Exception during installation of {package_spec}: {str(e)}",
-                Qgis.Critical,
-            )
-            install_failed = True
-            install_error_msg = f"Error installing {package_name}: {str(e)[:200]}"
-
-        # CUDA -> CPU fallback
-        if install_failed and is_cuda_package:
-            _log(
-                "CUDA install of {} failed, falling back to CPU...".format(
-                    package_name
-                ),
-                Qgis.Warning,
-            )
-            if progress_callback:
-                progress_callback(
-                    pkg_start,
-                    "CUDA failed, installing {} (CPU)...".format(package_name),
-                )
-
-            cpu_pip_args = [
-                "install",
-                "--upgrade",
-                "--no-warn-script-location",
-                "--disable-pip-version-check",
-                "--prefer-binary",
-            ]
-            cpu_pip_args.extend(_get_pip_ssl_flags())
-            cpu_pip_args.append(package_spec)
-            cpu_cmd = [python_path, "-m", "pip"] + cpu_pip_args
-            try:
-                cpu_result = _run_pip_install(
-                    cmd=cpu_cmd,
-                    timeout=600,
-                    env=env,
-                    subprocess_kwargs=subprocess_kwargs,
-                    package_name=package_name,
-                    package_index=i,
-                    total_packages=total_packages,
-                    progress_start=pkg_start,
-                    progress_end=pkg_end,
-                    progress_callback=progress_callback,
-                    cancel_check=cancel_check,
-                    is_cuda=False,
-                )
-                if cpu_result.returncode == 0:
-                    _log(
-                        "Successfully installed {} (CPU)".format(package_spec),
-                        Qgis.Success,
-                    )
-                    if progress_callback:
-                        progress_callback(
-                            pkg_end, "{} installed (CPU)".format(package_name)
-                        )
-                    install_failed = False
-                    _cuda_fell_back = True
-                else:
-                    cpu_err = cpu_result.stderr or cpu_result.stdout or ""
-                    install_error_msg = (
-                        "CUDA and CPU install both failed for {}: {}".format(
-                            package_name, cpu_err[:200]
-                        )
-                    )
-            except subprocess.TimeoutExpired:
-                install_error_msg = "CUDA and CPU install both timed out for {}".format(
-                    package_name
-                )
-            except Exception as e:
-                install_error_msg = (
-                    "CUDA and CPU install both failed for {}: {}".format(
-                        package_name, str(e)[:200]
-                    )
-                )
-
-        if install_failed:
-            if _is_optional_install_package(package_name):
-                _log(
-                    "Optional package {} failed to install on this platform; "
-                    "continuing. Error: {}".format(
-                        package_name, install_error_msg[:300]
-                    ),
-                    Qgis.Warning,
-                )
-                if progress_callback:
-                    progress_callback(
-                        pkg_end,
-                        "{} optional install failed (continuing)".format(package_name),
-                    )
-                continue
-
-            _log(
-                "pip error output: {}".format(install_error_msg[:500]),
-                Qgis.Critical,
-            )
-
-            if _is_ssl_error(install_error_msg):
-                return False, "Failed to install {}: SSL certificate error".format(
-                    package_name
-                )
-            if _is_proxy_auth_error(install_error_msg):
-                return (
-                    False,
-                    "Failed to install {}: proxy authentication required".format(
-                        package_name
-                    ),
-                )
-            if _is_network_error(install_error_msg):
-                return False, "Failed to install {}: network error".format(package_name)
-            if _is_antivirus_error(install_error_msg):
-                return (
-                    False,
-                    "Failed to install {}: blocked by antivirus or security policy".format(
-                        package_name
-                    ),
-                )
-            if last_returncode is not None and _is_windows_process_crash(
-                last_returncode
-            ):
-                return (
-                    False,
-                    "Failed to install {}: process crashed (code {})".format(
-                        package_name, last_returncode
-                    ),
-                )
-
-            return False, "Failed to install {}: {}".format(
-                package_name, install_error_msg[:200]
-            )
+            _log("Exception during batch install: {}".format(e), Qgis.Critical)
+            return False, "Error installing dependencies: {}".format(str(e)[:200])
 
     if progress_callback:
         progress_callback(100, "All dependencies installed")
@@ -2628,12 +2975,13 @@ def create_venv_and_install(
     cancel_check: Optional[Callable[[], bool]] = None,
     cuda_enabled: bool = False,
 ) -> Tuple[bool, str]:
-    """Complete installation: download Python + create venv + install packages.
+    """Complete installation: download Python + uv + create venv + install.
 
     Progress breakdown:
     - 0-10%: Download Python standalone (~50MB)
-    - 10-15%: Create virtual environment
-    - 15-95%: Install packages
+    - 10-13%: Download uv package installer (~15MB)
+    - 13-18%: Create virtual environment
+    - 18-95%: Install packages
     - 95-100%: Verify installation
 
     Args:
@@ -2649,6 +2997,8 @@ def create_venv_and_install(
         get_python_full_version,
         standalone_python_exists,
     )
+    from .uv_manager import download_uv
+    from .uv_manager import uv_exists as _uv_exists
 
     _log_system_info()
 
@@ -2724,11 +3074,42 @@ def create_venv_and_install(
         if progress_callback:
             progress_callback(10, "Python standalone ready")
 
-    # Step 2: Create venv (10-15%)
+    # Step 1b: Download uv package installer (10-13%)
+    if not _uv_exists():
+        _log("Downloading uv package installer...", Qgis.Info)
+        if progress_callback:
+            progress_callback(10, "Downloading uv package installer...")
+
+        def uv_progress(percent, msg):
+            if progress_callback:
+                # Map 0-100 to 10-13
+                progress_callback(10 + int(percent * 0.03), msg)
+
+        uv_success, uv_msg = download_uv(
+            progress_callback=uv_progress,
+            cancel_check=cancel_check,
+        )
+        if not uv_success:
+            # Non-fatal: fall back to pip for venv creation and installation
+            _log(
+                "uv download failed (will use pip instead): {}".format(uv_msg),
+                Qgis.Warning,
+            )
+        else:
+            _log("uv package installer ready", Qgis.Info)
+
+        if cancel_check and cancel_check():
+            return False, "Installation cancelled"
+    else:
+        _log("uv package installer already installed", Qgis.Info)
+        if progress_callback:
+            progress_callback(13, "uv package installer ready")
+
+    # Step 2: Create venv (13-18%)
     if venv_exists():
         _log("Virtual environment already exists", Qgis.Info)
         if progress_callback:
-            progress_callback(15, "Virtual environment ready")
+            progress_callback(18, "Virtual environment ready")
     else:
         success, msg = create_venv(progress_callback=progress_callback)
         if not success:
@@ -2737,10 +3118,10 @@ def create_venv_and_install(
         if cancel_check and cancel_check():
             return False, "Installation cancelled"
 
-    # Step 3: Install dependencies (15-95%)
+    # Step 3: Install dependencies (18-95%)
     def deps_progress(percent, msg):
         if progress_callback:
-            mapped = 15 + int((percent - 20) * 80 / 80)
+            mapped = 18 + int((percent - 20) * 77 / 80)
             progress_callback(min(mapped, 95), msg)
 
     success, msg = install_dependencies(

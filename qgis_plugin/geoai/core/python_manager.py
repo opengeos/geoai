@@ -67,6 +67,11 @@ def _safe_extract_tar(tar: tarfile.TarFile, dest_dir: str) -> None:
         member_path = os.path.realpath(os.path.join(dest_dir, member.name))
         if not member_path.startswith(dest_dir + os.sep) and member_path != dest_dir:
             raise ValueError(f"Attempted path traversal in tar archive: {member.name}")
+        # On Python <3.12 the ``filter="data"`` safety mechanism is not
+        # available, so explicitly reject symlinks and hardlinks that
+        # could escape the destination directory.
+        if not use_filter and (member.issym() or member.islnk()):
+            raise ValueError(f"Refusing symlink/hardlink in tar archive: {member.name}")
         if use_filter:
             tar.extract(member, dest_dir, filter="data")
         else:
