@@ -138,27 +138,38 @@ class TestLazyImportInfrastructure(unittest.TestCase):
         self.assertEqual(original_name, "plot_training_history")
 
     def test_no_torch_in_sys_modules_after_import(self):
-        """Importing geoai must not load torch into sys.modules."""
-        # Remove geoai and torch from sys.modules to get a clean state
-        mods_to_remove = [k for k in sys.modules if k.startswith("geoai")]
-        saved_mods = {}
-        for k in mods_to_remove:
-            saved_mods[k] = sys.modules.pop(k)
-        saved_torch = sys.modules.pop("torch", None)
+        """Verify that importing geoai does not pull torch into sys.modules."""
+        # Remove all geoai modules
+        saved_geoai = {
+            k: sys.modules.pop(k)
+            for k in list(sys.modules)
+            if k.startswith("geoai")
+        }
+        # Remove all torch modules (torch, torch.nn, torch.cuda, etc.)
+        saved_torch = {
+            k: sys.modules.pop(k)
+            for k in list(sys.modules)
+            if k == "torch" or k.startswith("torch.")
+        }
 
         try:
             importlib.import_module("geoai")
-            self.assertNotIn(
-                "torch",
-                sys.modules,
-                "torch was loaded during import geoai — lazy loading is broken",
+            torch_loaded = [
+                k
+                for k in sys.modules
+                if k == "torch" or k.startswith("torch.")
+            ]
+            self.assertFalse(
+                torch_loaded,
+                f"torch was loaded during import geoai — lazy loading is broken. "
+                f"Found: {torch_loaded}",
             )
         finally:
             # Restore original state
-            for k, v in saved_mods.items():
+            for k, v in saved_geoai.items():
                 sys.modules[k] = v
-            if saved_torch is not None:
-                sys.modules["torch"] = saved_torch
+            for k, v in saved_torch.items():
+                sys.modules[k] = v
 
 
 if __name__ == "__main__":
