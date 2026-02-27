@@ -446,9 +446,7 @@ def __getattr__(name):
 def __dir__():
     """List all public attributes including lazily-loaded symbols."""
     module_attrs = list(globals().keys())
-    return sorted(
-        set(module_attrs) | set(_LAZY_SYMBOL_MAP.keys()) | _LAZY_SUBMODULES
-    )
+    return sorted(set(module_attrs) | set(_LAZY_SYMBOL_MAP.keys()) | _LAZY_SUBMODULES)
 
 
 __all__ = [

@@ -141,9 +141,7 @@ class TestLazyImportInfrastructure(unittest.TestCase):
         """Verify that importing geoai does not pull torch into sys.modules."""
         # Remove all geoai modules
         saved_geoai = {
-            k: sys.modules.pop(k)
-            for k in list(sys.modules)
-            if k.startswith("geoai")
+            k: sys.modules.pop(k) for k in list(sys.modules) if k.startswith("geoai")
         }
         # Remove all torch modules (torch, torch.nn, torch.cuda, etc.)
         saved_torch = {
@@ -155,9 +153,7 @@ class TestLazyImportInfrastructure(unittest.TestCase):
         try:
             importlib.import_module("geoai")
             torch_loaded = [
-                k
-                for k in sys.modules
-                if k == "torch" or k.startswith("torch.")
+                k for k in sys.modules if k == "torch" or k.startswith("torch.")
             ]
             self.assertFalse(
                 torch_loaded,
