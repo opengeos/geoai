@@ -73,12 +73,6 @@ max-line-length = 88
 [project.urls]
 Homepage = "https://github.com/opengeos/geoai"
 
-[tool.uv]
-# pathtools 0.1.2 uses the removed `imp` module and cannot build on Python 3.12+.
-# It is an abandoned transitive dependency (no updates in 7+ years).
-# wandb vendored it since v0.16.0, so it is no longer needed as a standalone package.
-override-dependencies = ["pathtools; python_version < '3.12'"]
-
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"

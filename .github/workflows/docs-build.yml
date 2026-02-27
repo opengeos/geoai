@@ -24,7 +24,7 @@ jobs:
             - name: Install uv
               uses: astral-sh/setup-uv@v7
               with:
-                  version: "0.4.16"
+                  version: ""
                   enable-cache: false
 
             - name: Set up Python ${{ matrix.python-version }}
@@ -51,12 +51,12 @@ jobs:
             - name: Running pytest
               run: |
                   export PYTHONPATH=$(pwd)
-                  uv run pytest tests --verbose
+                  .venv/bin/python -m pytest tests --verbose
 
             - name: Install mkdocs
               run: |
                   uv pip install -r requirements_docs.txt
-                  uv run mkdocs build
+                  .venv/bin/python -m mkdocs build
 
             - name: Deploy to Netlify
               uses: nwtgck/actions-netlify@v3.0
