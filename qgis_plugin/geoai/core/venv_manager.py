@@ -546,9 +546,7 @@ def _is_windows_process_crash(returncode: int) -> bool:
     return returncode in _WINDOWS_CRASH_CODES
 
 
-def _classify_batch_error(
-    error_output: str, package_specs: List[str]
-) -> Optional[str]:
+def _classify_batch_error(error_output: str, package_specs: List[str]) -> Optional[str]:
     """Identify which package in a batch install caused the failure.
 
     Args:
@@ -1987,12 +1985,8 @@ def install_dependencies(
                 return False, "Installation cancelled"
 
             package_spec = f"{package_name}{version_spec}"
-            pkg_start = cuda_start + int(
-                (cuda_end - cuda_start) * ci / num_cuda
-            )
-            pkg_end = cuda_start + int(
-                (cuda_end - cuda_start) * (ci + 1) / num_cuda
-            )
+            pkg_start = cuda_start + int((cuda_end - cuda_start) * ci / num_cuda)
+            pkg_end = cuda_start + int((cuda_end - cuda_start) * (ci + 1) / num_cuda)
 
             if package_name == "torch":
                 label = "GPU PyTorch (~2.5 GB)"
@@ -2002,14 +1996,10 @@ def install_dependencies(
             if progress_callback:
                 progress_callback(
                     pkg_start,
-                    "Installing GPU dependencies... ({}/{})".format(
-                        ci + 1, num_cuda
-                    ),
+                    "Installing GPU dependencies... ({}/{})".format(ci + 1, num_cuda),
                 )
             _log(
-                "[CUDA {}/{}] Installing {}...".format(
-                    ci + 1, num_cuda, package_spec
-                ),
+                "[CUDA {}/{}] Installing {}...".format(ci + 1, num_cuda, package_spec),
                 Qgis.Info,
             )
 
@@ -2123,9 +2113,10 @@ def install_dependencies(
                     cancel_check=cancel_check,
                 )
 
-                if result.returncode == -1 and "cancelled" in (
-                    result.stderr or ""
-                ).lower():
+                if (
+                    result.returncode == -1
+                    and "cancelled" in (result.stderr or "").lower()
+                ):
                     return False, "Installation cancelled"
 
                 # Retry on hash mismatch
@@ -2136,9 +2127,7 @@ def install_dependencies(
                             "Hash mismatch, retrying with --no-cache...",
                             Qgis.Warning,
                         )
-                        nocache_flag = (
-                            "--no-cache" if use_uv else "--no-cache-dir"
-                        )
+                        nocache_flag = "--no-cache" if use_uv else "--no-cache-dir"
                         result = _run_pip_install(
                             cmd=base_cmd + [nocache_flag],
                             timeout=pkg_timeout,
@@ -2191,9 +2180,7 @@ def install_dependencies(
                         Qgis.Success,
                     )
                     if progress_callback:
-                        progress_callback(
-                            pkg_end, "{} installed".format(package_name)
-                        )
+                        progress_callback(pkg_end, "{} installed".format(package_name))
                 else:
                     error_msg = (
                         result.stderr
@@ -2216,9 +2203,7 @@ def install_dependencies(
                     Qgis.Critical,
                 )
                 install_failed = True
-                install_error_msg = "Installation of {} timed out".format(
-                    package_name
-                )
+                install_error_msg = "Installation of {} timed out".format(package_name)
             except Exception as e:
                 _log(
                     "Exception installing {}: {}".format(package_spec, e),
@@ -2240,9 +2225,7 @@ def install_dependencies(
                 if progress_callback:
                     progress_callback(
                         pkg_start,
-                        "CUDA failed, installing {} (CPU)...".format(
-                            package_name
-                        ),
+                        "CUDA failed, installing {} (CPU)...".format(package_name),
                     )
                 if use_uv:
                     cpu_pip_args = [
@@ -2280,9 +2263,7 @@ def install_dependencies(
                     )
                     if cpu_result.returncode == 0:
                         _log(
-                            "Successfully installed {} (CPU)".format(
-                                package_spec
-                            ),
+                            "Successfully installed {} (CPU)".format(package_spec),
                             Qgis.Success,
                         )
                         if progress_callback:
@@ -2293,9 +2274,7 @@ def install_dependencies(
                         install_failed = False
                         _cuda_fell_back = True
                     else:
-                        cpu_err = (
-                            cpu_result.stderr or cpu_result.stdout or ""
-                        )
+                        cpu_err = cpu_result.stderr or cpu_result.stdout or ""
                         install_error_msg = (
                             "CUDA and CPU install both failed for {}: {}".format(
                                 package_name, cpu_err[:200]
@@ -2335,9 +2314,7 @@ def install_dependencies(
                 if _is_network_error(install_error_msg):
                     return (
                         False,
-                        "Failed to install {}: network error".format(
-                            package_name
-                        ),
+                        "Failed to install {}: network error".format(package_name),
                     )
                 if _is_antivirus_error(install_error_msg):
                     return (
@@ -2366,9 +2343,7 @@ def install_dependencies(
             _log("Installation cancelled by user", Qgis.Warning)
             return False, "Installation cancelled"
 
-        batch_specs = [
-            "{}{}".format(name, ver) for name, ver in batch_packages
-        ]
+        batch_specs = ["{}{}".format(name, ver) for name, ver in batch_packages]
         _log(
             "Installing {} packages in batch: {}".format(
                 len(batch_specs), ", ".join(batch_specs)
@@ -2417,9 +2392,7 @@ def install_dependencies(
                 cancel_check=cancel_check,
             )
 
-            if result.returncode == -1 and "cancelled" in (
-                result.stderr or ""
-            ).lower():
+            if result.returncode == -1 and "cancelled" in (result.stderr or "").lower():
                 return False, "Installation cancelled"
 
             # Retry on hash mismatch
@@ -2430,9 +2403,7 @@ def install_dependencies(
                         "Hash mismatch, retrying batch with --no-cache...",
                         Qgis.Warning,
                     )
-                    nocache_flag = (
-                        "--no-cache" if use_uv else "--no-cache-dir"
-                    )
+                    nocache_flag = "--no-cache" if use_uv else "--no-cache-dir"
                     result = _run_pip_install(
                         cmd=base_cmd + [nocache_flag],
                         timeout=batch_timeout,
@@ -2488,9 +2459,7 @@ def install_dependencies(
                         Qgis.Warning,
                     )
                     retry_specs = [
-                        s
-                        for s in batch_specs
-                        if not s.startswith(failed_pkg)
+                        s for s in batch_specs if not s.startswith(failed_pkg)
                     ]
                     if retry_specs:
                         if use_uv:
@@ -2526,9 +2495,7 @@ def install_dependencies(
                             timeout=batch_timeout,
                             env=env,
                             subprocess_kwargs=subprocess_kwargs,
-                            label="dependencies (without {})".format(
-                                failed_pkg
-                            ),
+                            label="dependencies (without {})".format(failed_pkg),
                             progress_start=batch_start,
                             progress_end=batch_end,
                             progress_callback=progress_callback,
@@ -2542,18 +2509,13 @@ def install_dependencies(
                             )
 
             if result.returncode == 0:
-                _log(
-                    "Batch install succeeded for all packages", Qgis.Success
-                )
+                _log("Batch install succeeded for all packages", Qgis.Success)
                 if progress_callback:
-                    progress_callback(
-                        batch_end, "All dependencies installed"
-                    )
+                    progress_callback(batch_end, "All dependencies installed")
             else:
                 error_output = result.stderr or result.stdout or ""
                 failed_pkg = (
-                    _classify_batch_error(error_output, batch_specs)
-                    or "dependencies"
+                    _classify_batch_error(error_output, batch_specs) or "dependencies"
                 )
                 _log(
                     "Batch install failed: {}".format(error_output[:500]),
@@ -2574,9 +2536,7 @@ def install_dependencies(
                 if _is_network_error(error_output):
                     return (
                         False,
-                        "Failed to install {}: network error".format(
-                            failed_pkg
-                        ),
+                        "Failed to install {}: network error".format(failed_pkg),
                     )
                 if _is_antivirus_error(error_output):
                     return (
@@ -2594,21 +2554,15 @@ def install_dependencies(
                     )
                 return (
                     False,
-                    "Failed to install {}: {}".format(
-                        failed_pkg, error_output[:200]
-                    ),
+                    "Failed to install {}: {}".format(failed_pkg, error_output[:200]),
                 )
 
         except subprocess.TimeoutExpired:
             _log("Batch install timed out", Qgis.Critical)
             return False, "Dependency installation timed out"
         except Exception as e:
-            _log(
-                "Exception during batch install: {}".format(e), Qgis.Critical
-            )
-            return False, "Error installing dependencies: {}".format(
-                str(e)[:200]
-            )
+            _log("Exception during batch install: {}".format(e), Qgis.Critical)
+            return False, "Error installing dependencies: {}".format(str(e)[:200])
 
     if progress_callback:
         progress_callback(100, "All dependencies installed")
