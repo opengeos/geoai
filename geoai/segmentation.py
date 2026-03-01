@@ -18,6 +18,32 @@ from transformers import (
 )
 
 
+def _normalize_mask(mask: np.ndarray, num_classes: int) -> np.ndarray:
+    """Normalize mask values to the range ``[0, num_classes - 1]``.
+
+    For binary segmentation (``num_classes == 2``), any non-zero value is
+    mapped to 1.  For multi-class segmentation, values are clipped to
+    ``[0, num_classes - 1]``.
+
+    Args:
+        mask (np.ndarray): Raw mask array with integer pixel values.
+        num_classes (int): Number of segmentation classes.
+
+    Returns:
+        np.ndarray: Normalized mask with dtype int64.
+    """
+    mask = mask.astype(np.int64)
+    unique_vals = np.unique(mask)
+    if num_classes == 2:
+        # Binary: normalize any non-zero value to foreground (1).
+        if unique_vals.max() > 1:
+            mask = (mask > 0).astype(np.int64)
+    else:
+        # Multi-class: preserve class IDs, clamp to valid range.
+        mask = np.clip(mask, 0, num_classes - 1)
+    return mask
+
+
 class CustomDataset(Dataset):
     """Custom Dataset for loading images and masks."""
 
@@ -68,7 +94,7 @@ class CustomDataset(Dataset):
         image = np.array(image)
         mask = np.array(mask)
 
-        mask = (mask > 127).astype(np.uint8)
+        mask = _normalize_mask(mask, self.num_classes)
 
         if self.transform:
             transformed = self.transform(image=image, mask=mask)
@@ -83,7 +109,10 @@ class CustomDataset(Dataset):
         if mask.min() < 0:
             raise ValueError(f"Mask values should be >= 0, but found {mask.min()}")
 
-        mask = mask.clone().detach().long()
+        if not isinstance(mask, torch.Tensor):
+            mask = torch.as_tensor(mask, dtype=torch.long)
+        else:
+            mask = mask.long()
 
         return {"pixel_values": image, "labels": mask}
 
@@ -111,6 +140,7 @@ def prepare_datasets(
     transform: A.Compose,
     test_size: float = 0.2,
     random_state: int = 42,
+    num_classes: int = 2,
 ) -> Tuple[Subset, Subset]:
     """
     Args:
@@ -119,11 +149,14 @@ def prepare_datasets(
         transform (A.Compose): Transformations to be applied.
         test_size (float, optional): Proportion of the dataset to include in the validation split.
         random_state (int, optional): Random seed for shuffling the dataset.
+        num_classes (int, optional): Number of classes in the segmentation masks. Defaults to 2.
 
     Returns:
         tuple: Training and validation datasets.
     """
-    dataset = CustomDataset(images_dir, masks_dir, transform)
+    dataset = CustomDataset(
+        images_dir, masks_dir, transform, num_classes=num_classes
+    )
     train_indices, val_indices = train_test_split(
         list(range(len(dataset))), test_size=test_size, random_state=random_state
     )
@@ -141,6 +174,7 @@ def train_model(
     num_epochs: int = 10,
     batch_size: int = 8,
     learning_rate: float = 5e-5,
+    num_classes: int = 2,
 ) -> str:
     """
     Trains the model and saves the fine-tuned model to the specified path.
@@ -154,14 +188,17 @@ def train_model(
         num_epochs (int, optional): Number of training epochs.
         batch_size (int, optional): Batch size for training and evaluation.
         learning_rate (float, optional): Learning rate for training.
+        num_classes (int, optional): Number of output classes for segmentation. Defaults to 2.
 
     Returns:
         str: Path to the saved fine-tuned model.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = SegformerForSemanticSegmentation.from_pretrained(pretrained_model).to(
-        device
-    )
+    model = SegformerForSemanticSegmentation.from_pretrained(
+        pretrained_model,
+        num_labels=num_classes,
+        ignore_mismatched_sizes=True,
+    ).to(device)
     data_collator = DefaultDataCollator(return_tensors="pt")
 
     training_args = TrainingArguments(
@@ -292,6 +329,7 @@ def visualize_predictions(
     segmented_mask: np.ndarray,
     target_size: Tuple[int, int] = (256, 256),
     reference_image_path: Optional[str] = None,
+    num_classes: int = 2,
 ) -> None:
     """
     Visualizes the original image, segmented mask, and optionally the reference image.
@@ -301,10 +339,26 @@ def visualize_predictions(
         segmented_mask (np.ndarray): Predicted segmentation mask.
         target_size (tuple, optional): Target size for resizing images.
         reference_image_path (str, optional): Path to the reference image.
+        num_classes (int, optional): Number of classes in the segmentation mask.
+            Controls colormap selection. Defaults to 2.
     """
     original_image = Image.open(image_path).convert("RGB")
     original_image = original_image.resize(target_size)
-    segmented_image = Image.fromarray((segmented_mask * 255).astype(np.uint8))
+
+    if num_classes <= 2:
+        # Binary: scale [0, 1] to [0, 255] grayscale.
+        segmented_image = Image.fromarray(
+            (segmented_mask * 255).astype(np.uint8)
+        )
+        cmap = "gray"
+    else:
+        # Multi-class: scale class IDs evenly across [0, 255].
+        max_val = max(num_classes - 1, 1)
+        scaled = (
+            segmented_mask.astype(np.float64) / max_val * 255
+        ).astype(np.uint8)
+        segmented_image = Image.fromarray(scaled)
+        cmap = "tab20"
 
     if reference_image_path:
         reference_image = Image.open(reference_image_path).convert("RGB")
@@ -321,11 +375,11 @@ def visualize_predictions(
     axes[0].axis("off")
 
     if reference_image_path:
-        axes[2].imshow(segmented_image, cmap="gray")
+        axes[2].imshow(segmented_image, cmap=cmap)
         axes[2].set_title("Segmented Image")
         axes[2].axis("off")
     else:
-        axes[1].imshow(segmented_image, cmap="gray")
+        axes[1].imshow(segmented_image, cmap=cmap)
         axes[1].set_title("Segmented Image")
         axes[1].axis("off")
 
@@ -337,16 +391,25 @@ def visualize_predictions(
 if __name__ == "__main__":
     images_dir = "../datasets/Water-Bodies-Dataset/Images"
     masks_dir = "../datasets/Water-Bodies-Dataset/Masks"
+    num_classes = 2
     transform = get_transform()
-    train_dataset, val_dataset = prepare_datasets(images_dir, masks_dir, transform)
+    train_dataset, val_dataset = prepare_datasets(
+        images_dir, masks_dir, transform, num_classes=num_classes
+    )
 
     model_save_path = "./fine_tuned_model"
-    train_model(train_dataset, val_dataset, model_save_path)
+    train_model(
+        train_dataset, val_dataset,
+        model_save_path=model_save_path,
+        num_classes=num_classes,
+    )
 
     image_path = "../datasets/Water-Bodies-Dataset/Images/water_body_44.jpg"
     reference_image_path = image_path.replace("Images", "Masks")
     segmented_mask = segment_image(image_path, model_save_path)
 
     visualize_predictions(
-        image_path, segmented_mask, reference_image_path=reference_image_path
+        image_path, segmented_mask,
+        reference_image_path=reference_image_path,
+        num_classes=num_classes,
     )
