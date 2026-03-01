@@ -154,9 +154,7 @@ def prepare_datasets(
     Returns:
         tuple: Training and validation datasets.
     """
-    dataset = CustomDataset(
-        images_dir, masks_dir, transform, num_classes=num_classes
-    )
+    dataset = CustomDataset(images_dir, masks_dir, transform, num_classes=num_classes)
     train_indices, val_indices = train_test_split(
         list(range(len(dataset))), test_size=test_size, random_state=random_state
     )
@@ -347,16 +345,12 @@ def visualize_predictions(
 
     if num_classes <= 2:
         # Binary: scale [0, 1] to [0, 255] grayscale.
-        segmented_image = Image.fromarray(
-            (segmented_mask * 255).astype(np.uint8)
-        )
+        segmented_image = Image.fromarray((segmented_mask * 255).astype(np.uint8))
         cmap = "gray"
     else:
         # Multi-class: scale class IDs evenly across [0, 255].
         max_val = max(num_classes - 1, 1)
-        scaled = (
-            segmented_mask.astype(np.float64) / max_val * 255
-        ).astype(np.uint8)
+        scaled = (segmented_mask.astype(np.float64) / max_val * 255).astype(np.uint8)
         segmented_image = Image.fromarray(scaled)
         cmap = "tab20"
 
@@ -399,7 +393,8 @@ if __name__ == "__main__":
 
     model_save_path = "./fine_tuned_model"
     train_model(
-        train_dataset, val_dataset,
+        train_dataset,
+        val_dataset,
         model_save_path=model_save_path,
         num_classes=num_classes,
     )
@@ -409,7 +404,8 @@ if __name__ == "__main__":
     segmented_mask = segment_image(image_path, model_save_path)
 
     visualize_predictions(
-        image_path, segmented_mask,
+        image_path,
+        segmented_mask,
         reference_image_path=reference_image_path,
         num_classes=num_classes,
     )
