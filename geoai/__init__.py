@@ -388,6 +388,9 @@ _LAZY_SYMBOL_MAP = {
     # --- geoai.water ---
     "segment_water": ("water", None),
     "BAND_ORDER_PRESETS": ("water", None),
+    # --- geoai.clip_classify ---
+    "CLIPVectorClassifier": ("clip_classify", None),
+    "clip_classify_vector": ("clip_classify", None),
 }
 
 # Submodules that can be imported via `from geoai import <submodule>`
@@ -396,6 +399,7 @@ _LAZY_SUBMODULES = {
     "tools",
     "utils",
     "classify",
+    "clip_classify",
     "download",
     "extract",
     "hf",
