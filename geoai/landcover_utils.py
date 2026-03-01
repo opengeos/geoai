@@ -415,8 +415,12 @@ def _load_raster(filepath: str) -> Tuple[np.ndarray, dict]:
         img = src.read()  # (B, H, W)
         profile = src.profile.copy()
     img = np.moveaxis(img, 0, -1).astype(np.float64)
-    img = np.abs(img)
-    img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
+    if np.any(~np.isfinite(img)):
+        warnings.warn(
+            "Raster contains NaN or infinite values; replacing with 0.",
+            stacklevel=2,
+        )
+        img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
     return img, profile
 
 
@@ -673,7 +677,16 @@ def _lirrn(
             continue
 
         ref_band = ref_img[:, :, j]
-        norm_img[:, :, j] = np.clip(norm_img[:, :, j], ref_band.min(), ref_band.max())
+        ref_min = ref_band.min()
+        ref_max = ref_band.max()
+        if ref_min == ref_max:
+            warnings.warn(
+                f"Band {j}: reference band has constant value "
+                f"{ref_min}; skipping clipping of normalized band.",
+                stacklevel=2,
+            )
+        else:
+            norm_img[:, :, j] = np.clip(norm_img[:, :, j], ref_min, ref_max)
 
     return norm_img, rmse, r_adj
 
