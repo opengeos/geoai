@@ -139,25 +139,13 @@ class TestNormalizeMask(unittest.TestCase):
     """
 
     def _get_normalize_mask(self):
-        """Import _normalize_mask or skip if segmentation deps are missing."""
+        """Import ``_normalize_mask`` or skip the test if unavailable."""
         try:
             from geoai.segmentation import _normalize_mask
 
             return _normalize_mask
         except ImportError:
-            # Fall back to a standalone re-implementation so the core
-            # logic can still be validated without torch/albumentations.
-            def _normalize_mask(mask, num_classes):
-                mask = mask.astype(np.int64)
-                unique_vals = np.unique(mask)
-                if num_classes == 2:
-                    if unique_vals.max() > 1:
-                        mask = (mask > 0).astype(np.int64)
-                else:
-                    mask = np.clip(mask, 0, num_classes - 1)
-                return mask
-
-            return _normalize_mask
+            self.skipTest("geoai.segmentation._normalize_mask not available")
 
     def test_binary_mask_255_to_01(self):
         """Binary mask with 0/255 values maps to 0/1."""
@@ -210,6 +198,14 @@ class TestNormalizeMask(unittest.TestCase):
             mask = np.array([[0, 1]], dtype=np.uint8)
             result = _normalize_mask(mask, num_classes)
             self.assertEqual(result.dtype, np.int64)
+
+    def test_num_classes_below_2_raises(self):
+        """num_classes < 2 raises ValueError."""
+        _normalize_mask = self._get_normalize_mask()
+        mask = np.array([[0, 1]], dtype=np.uint8)
+        for bad_val in [0, 1, -1]:
+            with self.assertRaises(ValueError):
+                _normalize_mask(mask, num_classes=bad_val)
 
 
 class TestVisualizationScaling(unittest.TestCase):

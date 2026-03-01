@@ -27,16 +27,23 @@ def _normalize_mask(mask: np.ndarray, num_classes: int) -> np.ndarray:
 
     Args:
         mask (np.ndarray): Raw mask array with integer pixel values.
-        num_classes (int): Number of segmentation classes.
+        num_classes (int): Number of segmentation classes (must be >= 2).
 
     Returns:
         np.ndarray: Normalized mask with dtype int64.
+
+    Raises:
+        ValueError: If *num_classes* is less than 2.
     """
+    if num_classes < 2:
+        raise ValueError(
+            f"num_classes must be >= 2, got {num_classes}"
+        )
     mask = mask.astype(np.int64)
-    unique_vals = np.unique(mask)
+    mask_max = mask.max()
     if num_classes == 2:
         # Binary: normalize any non-zero value to foreground (1).
-        if unique_vals.max() > 1:
+        if mask_max > 1:
             mask = (mask > 0).astype(np.int64)
     else:
         # Multi-class: preserve class IDs, clamp to valid range.
@@ -89,7 +96,7 @@ class CustomDataset(Dataset):
         mask = Image.open(mask_path).convert("L")
 
         image = image.resize(self.target_size)
-        mask = mask.resize(self.target_size)
+        mask = mask.resize(self.target_size, resample=Image.NEAREST)
 
         image = np.array(image)
         mask = np.array(mask)
