@@ -1,13 +1,14 @@
 """
-Landcover Classification Utilities - Enhanced Tile Export Module
+Landcover Classification Utilities
 
-This module extends the base geoai functionality with specialized utilities
-for discrete landcover classification. It provides enhanced tile generation
-with background filtering capabilities to improve training efficiency.
+This module provides utilities for discrete landcover classification workflows,
+including tile export with background filtering and radiometric normalization
+for multi-temporal image comparability.
 
 Key Features:
 - Enhanced tile filtering with configurable feature ratio thresholds
 - Separate statistics tracking for different skip reasons
+- LIRRN (Location-Independent Relative Radiometric Normalization)
 - Maintains full compatibility with base geoai workflow
 - Optimized for discrete landcover classification tasks
 
@@ -24,10 +25,13 @@ import numpy as np
 import rasterio
 from rasterio import features
 from rasterio.windows import Window
+from skimage.filters import threshold_multiotsu
+from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 
 __all__ = [
     "export_landcover_tiles",
+    "normalize_radiometric",
 ]
 
 
@@ -385,3 +389,475 @@ def export_landcover_tiles(
         print(f"{'='*60}\n")
 
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Radiometric Normalization
+# ---------------------------------------------------------------------------
+
+
+def _load_raster(filepath: str) -> Tuple[np.ndarray, dict]:
+    """Load a multi-band raster as a (H, W, B) float64 array.
+
+    Args:
+        filepath: Path to the raster file.
+
+    Returns:
+        Tuple of (image_array, profile) where image_array has shape (H, W, B)
+        and profile is the rasterio dataset profile dict.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    """
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"Raster file not found: {filepath}")
+    with rasterio.open(filepath) as src:
+        img = src.read()  # (B, H, W)
+        profile = src.profile.copy()
+    img = np.moveaxis(img, 0, -1).astype(np.float64)
+    if np.any(~np.isfinite(img)):
+        warnings.warn(
+            "Raster contains NaN or infinite values; replacing with 0.",
+            stacklevel=2,
+        )
+        img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
+    return img, profile
+
+
+def _save_raster(filepath: str, img: np.ndarray, profile: dict) -> None:
+    """Save a (H, W, B) array as a multi-band GeoTIFF.
+
+    Args:
+        filepath: Output file path.
+        img: Image array with shape (H, W, B).
+        profile: Rasterio profile dict (from ``_load_raster``).
+
+    Raises:
+        ValueError: If *img* is not 3-dimensional.
+    """
+    if img.ndim != 3:
+        raise ValueError(f"Expected 3-D array (H, W, B), got shape {img.shape}")
+    out_profile = profile.copy()
+    out_profile.update(
+        dtype="float64",
+        count=img.shape[2],
+        height=img.shape[0],
+        width=img.shape[1],
+        compress="lzw",
+    )
+    with rasterio.open(filepath, "w", **out_profile) as dst:
+        for i in range(img.shape[2]):
+            dst.write(img[:, :, i], i + 1)
+
+
+def _compute_distances(
+    p_n: int,
+    a1: np.ndarray,
+    b1: np.ndarray,
+    id_indices: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Select *p_n* samples closest to the maximum value, then subsample.
+
+    Args:
+        p_n: Number of candidate samples to draw from each array.
+        a1: Non-zero reference pixel values (1-D).
+        b1: Non-zero subject pixel values (1-D).
+        id_indices: Random indices used to subsample from the candidates.
+
+    Returns:
+        Tuple of (sub_samples, ref_samples) after subsampling.
+    """
+    max_ref = np.max(a1)
+    idx_ref = np.argsort(np.abs(a1 - max_ref))
+    ref_candidates = a1[idx_ref[:p_n]]
+
+    max_sub = np.max(b1)
+    idx_sub = np.argsort(np.abs(b1 - max_sub))
+    sub_candidates = b1[idx_sub[:p_n]]
+
+    safe_indices = id_indices[
+        id_indices < min(len(sub_candidates), len(ref_candidates))
+    ]
+    if len(safe_indices) == 0:
+        return sub_candidates, ref_candidates
+    return sub_candidates[safe_indices], ref_candidates[safe_indices]
+
+
+def _compute_sample(
+    p_n: int,
+    a1: np.ndarray,
+    b1: np.ndarray,
+    id_indices: np.ndarray,
+    num_sampling_rounds: int = 3,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Multiple rounds of distance-based sampling, concatenated (non-zero only).
+
+    Args:
+        p_n: Number of samples per round.
+        a1: Non-zero reference pixel values (1-D).
+        b1: Non-zero subject pixel values (1-D).
+        id_indices: Random subsample indices.
+        num_sampling_rounds: Number of sampling rounds.
+
+    Returns:
+        Tuple of (sub_combined, ref_combined).
+    """
+    pairs = [
+        _compute_distances(p_n, a1, b1, id_indices) for _ in range(num_sampling_rounds)
+    ]
+    sub_combined = np.concatenate([s[s != 0] for s, _ in pairs])
+    ref_combined = np.concatenate([r[r != 0] for _, r in pairs])
+    return sub_combined, ref_combined
+
+
+def _sample_selection(
+    p_n: int,
+    a: np.ndarray,
+    b: np.ndarray,
+    id_indices: np.ndarray,
+    num_sampling_rounds: int = 3,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Select representative sample pairs from a single quantization level.
+
+    Args:
+        p_n: Number of sample points.
+        a: Flattened reference pixels (masked by quantization level; 0 = outside).
+        b: Flattened subject pixels (masked by quantization level; 0 = outside).
+        id_indices: Random sub-sampling indices.
+        num_sampling_rounds: Number of sampling rounds.
+
+    Returns:
+        Tuple of (sub_samples, ref_samples), each 1-D.
+    """
+    a1 = a[a != 0]
+    b1 = b[b != 0]
+
+    if len(a1) == 0 or len(b1) == 0:
+        return np.array([0.0]), np.array([0.0])
+
+    if len(a1) < p_n or len(b1) < p_n:
+        min_len = min(len(a1), len(b1))
+        return b1[:min_len], a1[:min_len]
+
+    sub_1, ref_1 = _compute_sample(p_n, a1, b1, id_indices, num_sampling_rounds)
+
+    sub = np.concatenate([sub_1[sub_1 != 0], sub_1[sub_1 == 0]])
+    ref = np.concatenate([ref_1[ref_1 != 0], ref_1[ref_1 == 0]])
+    return sub, ref
+
+
+def _linear_reg(
+    sub_samples: np.ndarray,
+    ref_samples: np.ndarray,
+    image_band: np.ndarray,
+) -> Tuple[np.ndarray, float, float]:
+    """OLS linear regression to normalize one image band.
+
+    Fits ``ref = intercept + slope * sub`` and applies the transformation
+    to *image_band*.
+
+    Args:
+        sub_samples: Subject sample values (1-D).
+        ref_samples: Reference sample values (1-D).
+        image_band: Full subject band to normalize (H, W).
+
+    Returns:
+        Tuple of (normalized_band, adjusted_r_squared, rmse).
+
+    Raises:
+        ValueError: If fewer than 2 valid samples are available for regression.
+    """
+    mask = (sub_samples != 0) & (ref_samples != 0)
+    sub_clean = sub_samples[mask]
+    ref_clean = ref_samples[mask]
+
+    if len(sub_clean) < 2:
+        raise ValueError(
+            f"Insufficient samples for regression: got {len(sub_clean)}, need >= 2"
+        )
+
+    X = sub_clean.reshape(-1, 1)
+    y = ref_clean
+
+    model = LinearRegression().fit(X, y)
+    intercept, slope = model.intercept_, model.coef_[0]
+
+    norm_band = intercept + slope * image_band
+
+    y_pred = model.predict(X)
+    ss_res = np.sum((y - y_pred) ** 2)
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    n = len(y)
+    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else 0.0
+    r_adj = 1 - (1 - r2) * (n - 1) / (n - 2) if n > 2 else 0.0
+    rmse = float(np.sqrt(np.mean((y - y_pred) ** 2)))
+
+    return norm_band, r_adj, rmse
+
+
+def _lirrn(
+    p_n: int,
+    sub_img: np.ndarray,
+    ref_img: np.ndarray,
+    num_quantisation_classes: int = 3,
+    num_sampling_rounds: int = 3,
+    subsample_ratio: float = 0.1,
+    rng: Optional[np.random.Generator] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Core LIRRN algorithm.
+
+    Implements Location-Independent Relative Radiometric Normalization.
+    Processes each band independently via multi-Otsu thresholding,
+    stratified sampling and per-band linear regression.
+
+    Args:
+        p_n: Number of sample points per quantization level.
+        sub_img: Subject image (H, W, B) float64.
+        ref_img: Reference image (H, W, B) float64.
+        num_quantisation_classes: Number of brightness strata (default 3).
+        num_sampling_rounds: Number of sampling rounds (default 3).
+        subsample_ratio: Fraction of candidates retained (default 0.1).
+        rng: Numpy random Generator for reproducibility.
+
+    Returns:
+        Tuple of (normalized_image, rmse_per_band, r_adj_per_band).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    num_bands = sub_img.shape[2]
+
+    id_indices = rng.integers(0, p_n, size=max(1, round(subsample_ratio * p_n)))
+
+    norm_img = np.zeros_like(sub_img, dtype=np.float64)
+    rmse = np.zeros(num_bands)
+    r_adj = np.zeros(num_bands)
+
+    # Quantize each band into brightness levels via multi-Otsu
+    sub_labels = np.zeros_like(sub_img, dtype=np.int32)
+    ref_labels = np.zeros_like(ref_img, dtype=np.int32)
+
+    for j in range(num_bands):
+        for img, labels in [(sub_img, sub_labels), (ref_img, ref_labels)]:
+            nonzero = img[:, :, j][img[:, :, j] != 0]
+            if len(nonzero) > 0:
+                try:
+                    thresh = threshold_multiotsu(
+                        nonzero, classes=num_quantisation_classes
+                    )
+                    labels[:, :, j] = np.digitize(img[:, :, j], bins=thresh) + 1
+                except ValueError:
+                    labels[:, :, j] = 1
+
+    # For each band: sample from quantization levels then regress
+    for j in range(num_bands):
+        sub_list, ref_list = [], []
+
+        for level in range(1, num_quantisation_classes + 1):
+            a = np.where(ref_labels[:, :, j] == level, ref_img[:, :, j], 0).ravel()
+            b = np.where(sub_labels[:, :, j] == level, sub_img[:, :, j], 0).ravel()
+            sub_s, ref_s = _sample_selection(p_n, a, b, id_indices, num_sampling_rounds)
+            sub_list.append(sub_s)
+            ref_list.append(ref_s)
+
+        all_sub = np.concatenate(sub_list)
+        all_ref = np.concatenate(ref_list)
+
+        try:
+            norm_img[:, :, j], r_adj[j], rmse[j] = _linear_reg(
+                all_sub, all_ref, sub_img[:, :, j]
+            )
+        except ValueError:
+            warnings.warn(
+                f"Band {j}: insufficient samples for regression, "
+                "returning band unchanged.",
+                stacklevel=2,
+            )
+            norm_img[:, :, j] = sub_img[:, :, j]
+            continue
+
+        ref_band = ref_img[:, :, j]
+        ref_min = ref_band.min()
+        ref_max = ref_band.max()
+        if ref_min == ref_max:
+            warnings.warn(
+                f"Band {j}: reference band has constant value "
+                f"{ref_min}; skipping clipping of normalized band.",
+                stacklevel=2,
+            )
+        else:
+            norm_img[:, :, j] = np.clip(norm_img[:, :, j], ref_min, ref_max)
+
+    return norm_img, rmse, r_adj
+
+
+def normalize_radiometric(
+    subject_image: Union[str, np.ndarray],
+    reference_image: Union[str, np.ndarray],
+    output_path: Optional[str] = None,
+    method: str = "lirrn",
+    p_n: int = 500,
+    num_quantisation_classes: int = 3,
+    num_sampling_rounds: int = 3,
+    subsample_ratio: float = 0.1,
+    random_state: Optional[Union[int, np.random.Generator]] = None,
+) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+    """Normalize subject image radiometry to match a reference image.
+
+    Adjusts brightness and contrast of the subject image so that its pixel
+    value distribution matches the reference image. This is essential for
+    multi-temporal analysis where images are acquired under different
+    atmospheric conditions, sensor calibrations, or illumination angles.
+
+    Currently supports the LIRRN (Location-Independent Relative Radiometric
+    Normalization) method, which uses multi-Otsu thresholding and linear
+    regression to identify pseudo-invariant features and transform pixel
+    values band-by-band.
+
+    Reference: doi:10.3390/s24072272
+
+    Args:
+        subject_image: Path to the subject GeoTIFF or numpy array with
+            shape (H, W, B). The image to be normalized.
+        reference_image: Path to the reference GeoTIFF or numpy array with
+            shape (H, W, B). The target radiometry to match.
+        output_path: Path to save the normalized image as GeoTIFF. Only
+            applicable when *subject_image* is a file path (so spatial
+            metadata is available). If None, the array is returned without
+            saving. Default: None.
+        method: Normalization method. Currently only ``"lirrn"`` is
+            supported. Default: ``"lirrn"``.
+        p_n: Number of pseudo-invariant feature samples per quantization
+            level. Higher values increase accuracy but slow computation.
+            Default: 500.
+        num_quantisation_classes: Number of brightness strata for stratified
+            sampling. Default: 3.
+        num_sampling_rounds: Number of iterative refinement rounds for
+            sample selection. Default: 3.
+        subsample_ratio: Fraction of candidates retained for regression.
+            Default: 0.1.
+        random_state: Seed or numpy Generator for reproducible results.
+            Default: None (non-deterministic).
+
+    Returns:
+        Tuple of (normalized_image, metrics) where:
+            - normalized_image: numpy array (H, W, B) float64.
+            - metrics: dict with keys ``"rmse"`` and ``"r_adj"``, each a
+              numpy array of length B.
+
+    Raises:
+        ValueError: If *method* is not ``"lirrn"``.
+        ValueError: If *p_n* < 1 or *num_sampling_rounds* < 1.
+        ValueError: If subject and reference have different band counts.
+        ValueError: If input arrays are not 3-dimensional.
+        ValueError: If *output_path* is set but *subject_image* is an array.
+        FileNotFoundError: If file paths do not point to existing files.
+
+    Examples:
+        Normalize a satellite image using file paths:
+
+        >>> from geoai import normalize_radiometric
+        >>> norm_img, metrics = normalize_radiometric(
+        ...     "subject.tif",
+        ...     "reference.tif",
+        ...     output_path="normalized.tif",
+        ... )
+        >>> print(f"RMSE per band: {metrics['rmse']}")
+
+        Normalize using numpy arrays:
+
+        >>> import numpy as np
+        >>> subject = np.random.rand(100, 100, 4)
+        >>> reference = np.random.rand(120, 120, 4)
+        >>> norm_img, metrics = normalize_radiometric(subject, reference)
+        >>> norm_img.shape
+        (100, 100, 4)
+
+    Note:
+        The subject and reference images must have the same number of bands
+        but may have different spatial dimensions (height and width).
+    """
+    # --- Validate parameters ---
+    if method != "lirrn":
+        raise ValueError(
+            f"Unsupported normalization method {method!r}. "
+            "Currently only 'lirrn' is supported."
+        )
+    if p_n < 1:
+        raise ValueError(f"p_n must be >= 1, got {p_n}")
+    if num_sampling_rounds < 1:
+        raise ValueError(f"num_sampling_rounds must be >= 1, got {num_sampling_rounds}")
+    if subsample_ratio <= 0 or subsample_ratio > 1:
+        raise ValueError(f"subsample_ratio must be in (0, 1], got {subsample_ratio}")
+
+    # --- Resolve inputs ---
+    profile = None
+    if isinstance(subject_image, str):
+        sub_arr, profile = _load_raster(subject_image)
+    else:
+        sub_arr = np.asarray(subject_image, dtype=np.float64)
+        if sub_arr.ndim != 3:
+            raise ValueError(
+                f"subject_image must be 3-D (H, W, B), got {sub_arr.ndim}-D"
+            )
+
+    if isinstance(reference_image, str):
+        ref_arr, _ = _load_raster(reference_image)
+    else:
+        ref_arr = np.asarray(reference_image, dtype=np.float64)
+        if ref_arr.ndim != 3:
+            raise ValueError(
+                f"reference_image must be 3-D (H, W, B), got {ref_arr.ndim}-D"
+            )
+
+    if output_path is not None and profile is None:
+        raise ValueError(
+            "output_path requires subject_image to be a file path "
+            "(not an array) so that spatial metadata is available."
+        )
+
+    # Band count check
+    if sub_arr.shape[2] != ref_arr.shape[2]:
+        raise ValueError(
+            f"Band count mismatch: subject has {sub_arr.shape[2]} bands, "
+            f"reference has {ref_arr.shape[2]} bands."
+        )
+
+    # Handle NaN / inf
+    if np.any(~np.isfinite(sub_arr)):
+        warnings.warn(
+            "subject_image contains NaN or infinite values; " "replacing with 0.",
+            stacklevel=2,
+        )
+        sub_arr = np.nan_to_num(sub_arr, nan=0.0, posinf=0.0, neginf=0.0)
+
+    if np.any(~np.isfinite(ref_arr)):
+        warnings.warn(
+            "reference_image contains NaN or infinite values; " "replacing with 0.",
+            stacklevel=2,
+        )
+        ref_arr = np.nan_to_num(ref_arr, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # --- Build RNG ---
+    if isinstance(random_state, np.random.Generator):
+        rng = random_state
+    else:
+        rng = np.random.default_rng(random_state)
+
+    # --- Run normalization ---
+    norm_img, rmse, r_adj = _lirrn(
+        p_n,
+        sub_arr,
+        ref_arr,
+        num_quantisation_classes=num_quantisation_classes,
+        num_sampling_rounds=num_sampling_rounds,
+        subsample_ratio=subsample_ratio,
+        rng=rng,
+    )
+
+    metrics = {"rmse": rmse, "r_adj": r_adj}
+
+    if output_path is not None:
+        _save_raster(output_path, norm_img, profile)
+
+    return norm_img, metrics
