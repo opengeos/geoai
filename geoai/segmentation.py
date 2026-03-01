@@ -36,9 +36,7 @@ def _normalize_mask(mask: np.ndarray, num_classes: int) -> np.ndarray:
         ValueError: If *num_classes* is less than 2.
     """
     if num_classes < 2:
-        raise ValueError(
-            f"num_classes must be >= 2, got {num_classes}"
-        )
+        raise ValueError(f"num_classes must be >= 2, got {num_classes}")
     mask = mask.astype(np.int64)
     mask_max = mask.max()
     if num_classes == 2:
