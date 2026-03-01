@@ -398,6 +398,14 @@ class TestExtractChip(unittest.TestCase):
             chip = self.clf._extract_chip(src, empty_geom, min_chip_size=1)
         self.assertIsNone(chip)
 
+    def test_narrow_chip_returns_none(self):
+        """Test that a chip small in one dimension is rejected (or, not and)."""
+        with rasterio.open(self.raster_path) as src:
+            # Very narrow horizontally (~1 pixel wide) but tall
+            geom = box(0.001, 0.1, 0.009, 0.9)
+            chip = self.clf._extract_chip(src, geom, min_chip_size=5)
+        self.assertIsNone(chip)
+
     def test_single_band_raster(self):
         """Test chip extraction from a single-band raster."""
         single_path = os.path.join(self.tmpdir, "single.tif")
@@ -412,6 +420,101 @@ class TestExtractChip(unittest.TestCase):
             self.assertEqual(arr.shape[2], 3)
         finally:
             os.unlink(single_path)
+
+
+# ===================================================================
+# Batch classification end-to-end tests (mocked model)
+# ===================================================================
+
+
+class TestClipClassifyBatchPath(unittest.TestCase):
+    """Tests that exercise the batch classification code path."""
+
+    def test_batch_classification_top_k_and_flush(self):
+        """End-to-end test hitting _process_batch, top_k>1, and batch flushing."""
+        import torch
+
+        clf = _mock_classifier()
+
+        # Set up mock model to return realistic tensor outputs
+        embed_dim = 8
+
+        def fake_get_image_features(**kwargs):
+            batch_size = kwargs["pixel_values"].shape[0]
+            return torch.randn(batch_size, embed_dim)
+
+        def fake_get_text_features(**kwargs):
+            batch_size = kwargs["input_ids"].shape[0]
+            return torch.randn(batch_size, embed_dim)
+
+        clf.model.get_image_features = MagicMock(side_effect=fake_get_image_features)
+        clf.model.get_text_features = MagicMock(side_effect=fake_get_text_features)
+        clf.model.logit_scale = torch.nn.Parameter(torch.tensor(1.0))
+
+        # Mock processor to return tensors with the right batch dimension
+        def fake_processor(**kwargs):
+            if "images" in kwargs:
+                n = len(kwargs["images"])
+                return {"pixel_values": torch.randn(n, 3, 224, 224)}
+            if "text" in kwargs:
+                n = len(kwargs["text"])
+                return {
+                    "input_ids": torch.randint(0, 1000, (n, 10)),
+                    "attention_mask": torch.ones(n, 10, dtype=torch.long),
+                }
+            return {}
+
+        clf.processor = MagicMock(side_effect=fake_processor)
+
+        # Create a small test raster on disk
+        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as f:
+            raster_path = f.name
+        try:
+            _create_test_raster(raster_path, height=32, width=32, bands=3)
+
+            # Create multiple polygons within the raster bounds [0, 1] x [0, 1]
+            geoms = [
+                box(0.1, 0.1, 0.3, 0.3),
+                box(0.4, 0.4, 0.6, 0.6),
+                box(0.7, 0.7, 0.9, 0.9),
+            ]
+            gdf = gpd.GeoDataFrame(geometry=geoms, crs="EPSG:4326")
+
+            labels = ["urban", "forest", "water"]
+
+            # Use top_k > 1 and a small batch_size to force batching and flushing.
+            # min_chip_size=1 because the 32x32 raster yields ~6px chips.
+            result = clf.classify(
+                vector_data=gdf,
+                raster_path=raster_path,
+                labels=labels,
+                top_k=2,
+                batch_size=1,
+                min_chip_size=1,
+                quiet=True,
+            )
+
+            # We expect one result per input geometry.
+            self.assertEqual(len(result), len(gdf))
+
+            # Verify main label/confidence columns are present and populated.
+            self.assertIn("clip_label", result.columns)
+            self.assertIn("clip_confidence", result.columns)
+            self.assertFalse(result["clip_label"].isna().any())
+            self.assertFalse(result["clip_confidence"].isna().any())
+
+            # Verify top-k columns are present and contain per-geometry sequences.
+            self.assertIn("clip_top_k_labels", result.columns)
+            self.assertIn("clip_top_k_scores", result.columns)
+            for labels_list, scores_list in zip(
+                result["clip_top_k_labels"], result["clip_top_k_scores"]
+            ):
+                self.assertIsNotNone(labels_list)
+                self.assertIsNotNone(scores_list)
+                self.assertEqual(len(labels_list), 2)
+                self.assertEqual(len(scores_list), 2)
+        finally:
+            os.unlink(raster_path)
 
 
 if __name__ == "__main__":

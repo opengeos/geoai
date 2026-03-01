@@ -24,7 +24,7 @@ import numpy as np
 import rasterio
 import torch
 from PIL import Image
-from rasterio.windows import from_bounds as window_from_bounds
+from rasterio.windows import Window, from_bounds as window_from_bounds
 from tqdm import tqdm
 from transformers import CLIPModel, CLIPProcessor
 
@@ -53,10 +53,8 @@ def _to_rgb_uint8(tile_data: np.ndarray) -> Optional[np.ndarray]:
     bands = tile_data.shape[0]
     if bands >= 3:
         rgb = tile_data[:3].transpose(1, 2, 0)
-    elif bands == 1:
-        rgb = np.repeat(tile_data[0][:, :, np.newaxis], 3, axis=2)
     else:
-        # 2-band: use first band replicated
+        # Single-band or two-band: replicate the first band into 3 channels
         rgb = np.repeat(tile_data[0][:, :, np.newaxis], 3, axis=2)
 
     rgb = rgb.astype(np.float64)
@@ -100,16 +98,17 @@ class CLIPVectorClassifier:
     ) -> None:
         self.model_name = model_name
 
-        if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
+        # Lazy import to avoid pulling in geoai.utils (which eagerly
+        # imports leafmap) at module-collection time.
+        from .utils.device import get_device  # noqa: E402
+
+        self.device = str(device or get_device())
 
         self.processor = CLIPProcessor.from_pretrained(model_name)
         self.model = CLIPModel.from_pretrained(model_name).to(self.device)
         self.model.eval()
 
-        print(f"CLIP model loaded on {self.device}")
+        logger.info("CLIP model loaded on %s", self.device)
 
     def classify(
         self,
@@ -330,10 +329,8 @@ class CLIPVectorClassifier:
         if width < 1 or height < 1:
             return None
 
-        if width < min_chip_size and height < min_chip_size:
+        if width < min_chip_size or height < min_chip_size:
             return None
-
-        from rasterio.windows import Window
 
         pixel_window = Window(col_off, row_off, width, height)
         tile_data = src.read(window=pixel_window)
@@ -434,7 +431,8 @@ def clip_classify_vector(
 
     Raises:
         ValueError: If *labels* is empty.
-        FileNotFoundError: If *raster_path* does not exist.
+        FileNotFoundError: If *raster_path* or *vector_data* (when given as a path)
+            does not exist.
 
     Example:
         >>> from geoai import clip_classify_vector
