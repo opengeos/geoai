@@ -5,6 +5,8 @@
 import inspect
 import unittest
 
+import numpy as np
+
 try:
     import geoai.segmentation
 
@@ -74,6 +76,8 @@ class TestSegmentationSignatures(unittest.TestCase):
         self.assertIn("transform", sig.parameters)
         self.assertIn("test_size", sig.parameters)
         self.assertIn("random_state", sig.parameters)
+        self.assertIn("num_classes", sig.parameters)
+        self.assertEqual(sig.parameters["num_classes"].default, 2)
 
     def test_train_model_params(self):
         """Test train_model has expected parameters."""
@@ -87,6 +91,8 @@ class TestSegmentationSignatures(unittest.TestCase):
         self.assertIn("num_epochs", sig.parameters)
         self.assertIn("batch_size", sig.parameters)
         self.assertIn("learning_rate", sig.parameters)
+        self.assertIn("num_classes", sig.parameters)
+        self.assertEqual(sig.parameters["num_classes"].default, 2)
 
     def test_segment_image_params(self):
         """Test segment_image has expected parameters."""
@@ -107,6 +113,8 @@ class TestSegmentationSignatures(unittest.TestCase):
         self.assertIn("segmented_mask", sig.parameters)
         self.assertIn("target_size", sig.parameters)
         self.assertIn("reference_image_path", sig.parameters)
+        self.assertIn("num_classes", sig.parameters)
+        self.assertEqual(sig.parameters["num_classes"].default, 2)
 
 
 @unittest.skipUnless(HAS_SEGMENTATION, "geoai.segmentation dependencies not available")
@@ -121,6 +129,108 @@ class TestSegmentationGetTransform(unittest.TestCase):
         import albumentations as A
 
         self.assertIsInstance(result, A.Compose)
+
+
+class TestNormalizeMask(unittest.TestCase):
+    """Tests for _normalize_mask helper function.
+
+    These tests exercise pure-numpy logic and do not require torch or
+    other heavy dependencies.
+    """
+
+    def _get_normalize_mask(self):
+        """Import ``_normalize_mask`` or skip the test if unavailable."""
+        try:
+            from geoai.segmentation import _normalize_mask
+
+            return _normalize_mask
+        except ImportError:
+            self.skipTest("geoai.segmentation._normalize_mask not available")
+
+    def test_binary_mask_255_to_01(self):
+        """Binary mask with 0/255 values maps to 0/1."""
+        _normalize_mask = self._get_normalize_mask()
+
+        mask = np.array([[0, 255], [255, 0]], dtype=np.uint8)
+        result = _normalize_mask(mask, num_classes=2)
+        np.testing.assert_array_equal(result, [[0, 1], [1, 0]])
+        self.assertEqual(result.dtype, np.int64)
+
+    def test_binary_mask_already_01(self):
+        """Binary mask already [0, 1] is unchanged."""
+        _normalize_mask = self._get_normalize_mask()
+        mask = np.array([[0, 1], [1, 0]], dtype=np.uint8)
+        result = _normalize_mask(mask, num_classes=2)
+        np.testing.assert_array_equal(result, [[0, 1], [1, 0]])
+
+    def test_binary_mask_mixed_nonzero(self):
+        """Binary: any nonzero value becomes 1."""
+        _normalize_mask = self._get_normalize_mask()
+        mask = np.array([[0, 50], [127, 200]], dtype=np.uint8)
+        result = _normalize_mask(mask, num_classes=2)
+        np.testing.assert_array_equal(result, [[0, 1], [1, 1]])
+
+    def test_multiclass_within_range(self):
+        """Multi-class mask within range is unchanged."""
+        _normalize_mask = self._get_normalize_mask()
+        mask = np.array([[0, 1], [2, 3]], dtype=np.uint8)
+        result = _normalize_mask(mask, num_classes=4)
+        np.testing.assert_array_equal(result, [[0, 1], [2, 3]])
+
+    def test_multiclass_clips_out_of_range(self):
+        """Multi-class mask with out-of-range values is clipped."""
+        _normalize_mask = self._get_normalize_mask()
+        mask = np.array([[0, 5], [10, 255]], dtype=np.uint8)
+        result = _normalize_mask(mask, num_classes=4)
+        np.testing.assert_array_equal(result, [[0, 3], [3, 3]])
+
+    def test_multiclass_preserves_zero(self):
+        """Multi-class: background class 0 is preserved."""
+        _normalize_mask = self._get_normalize_mask()
+        mask = np.zeros((4, 4), dtype=np.uint8)
+        result = _normalize_mask(mask, num_classes=5)
+        np.testing.assert_array_equal(result, np.zeros((4, 4), dtype=np.int64))
+
+    def test_output_dtype_is_int64(self):
+        """Output dtype is always int64 regardless of num_classes."""
+        _normalize_mask = self._get_normalize_mask()
+        for num_classes in [2, 5, 10]:
+            mask = np.array([[0, 1]], dtype=np.uint8)
+            result = _normalize_mask(mask, num_classes)
+            self.assertEqual(result.dtype, np.int64)
+
+    def test_num_classes_below_2_raises(self):
+        """num_classes < 2 raises ValueError."""
+        _normalize_mask = self._get_normalize_mask()
+        mask = np.array([[0, 1]], dtype=np.uint8)
+        for bad_val in [0, 1, -1]:
+            with self.assertRaises(ValueError):
+                _normalize_mask(mask, num_classes=bad_val)
+
+
+class TestVisualizationScaling(unittest.TestCase):
+    """Tests for multi-class mask visualization scaling logic.
+
+    These tests exercise pure-numpy scaling and do not require torch.
+    """
+
+    def test_binary_mask_scales_to_255(self):
+        """Binary mask [0, 1] scales to [0, 255]."""
+        mask = np.array([[0, 1], [1, 0]], dtype=np.int64)
+        result = (mask * 255).astype(np.uint8)
+        self.assertEqual(result.max(), 255)
+        self.assertEqual(result.min(), 0)
+
+    def test_multiclass_mask_no_overflow(self):
+        """Multi-class mask scales without uint8 overflow."""
+        mask = np.array([[0, 1, 2, 3, 4]], dtype=np.int64)
+        num_classes = 5
+        max_val = max(num_classes - 1, 1)
+        scaled = (mask.astype(np.float64) / max_val * 255).astype(np.uint8)
+        self.assertEqual(scaled[0, 0], 0)
+        self.assertEqual(scaled[0, 4], 255)
+        self.assertTrue((scaled >= 0).all())
+        self.assertTrue((scaled <= 255).all())
 
 
 if __name__ == "__main__":
