@@ -12,7 +12,6 @@ import numpy as np
 import rasterio
 from rasterio.transform import from_bounds
 
-
 # ---------------------------------------------------------------------------
 # Helper: create a synthetic raster file
 # ---------------------------------------------------------------------------
@@ -56,9 +55,7 @@ def _mock_clip_seg(**kwargs):
     """Return a CLIPSegmentation instance with mocked model and processor."""
     from geoai.segment import CLIPSegmentation
 
-    with patch.object(
-        CLIPSegmentation, "__init__", lambda self, **kw: None
-    ):
+    with patch.object(CLIPSegmentation, "__init__", lambda self, **kw: None):
         seg = CLIPSegmentation()
 
     seg.device = kwargs.get("device", "cpu")
@@ -155,7 +152,9 @@ class TestCLIPSegNormalization(unittest.TestCase):
         # Mock model forward pass
         fake_logits = torch.zeros(1, 16, 16)
         fake_output = MagicMock()
-        fake_output.logits = fake_logits.unsqueeze(0)  # shape: [1, 1, 16, 16] -> [1, 16, 16]
+        fake_output.logits = fake_logits.unsqueeze(
+            0
+        )  # shape: [1, 1, 16, 16] -> [1, 16, 16]
         seg.model = MagicMock(return_value=fake_output)
         seg.model.__call__ = MagicMock(return_value=fake_output)
 
@@ -302,14 +301,13 @@ class TestCLIPSegBatch(unittest.TestCase):
 
         try:
             _create_test_raster(raster_path, height=32, width=32, bands=3)
-            results = seg.segment_image_batch(
-                [raster_path], nested_dir, "water"
-            )
+            results = seg.segment_image_batch([raster_path], nested_dir, "water")
             self.assertTrue(os.path.isdir(nested_dir))
             self.assertEqual(len(results), 1)
         finally:
             os.unlink(raster_path)
             import shutil
+
             shutil.rmtree(output_dir, ignore_errors=True)
 
 

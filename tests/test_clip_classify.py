@@ -312,9 +312,7 @@ class TestClipClassifyValidation(unittest.TestCase):
 
         clf.processor = MagicMock(side_effect=fake_processor)
 
-        gdf = gpd.GeoDataFrame(
-            geometry=[box(0.1, 0.1, 0.5, 0.5)], crs="EPSG:4326"
-        )
+        gdf = gpd.GeoDataFrame(geometry=[box(0.1, 0.1, 0.5, 0.5)], crs="EPSG:4326")
         original_columns = list(gdf.columns)
 
         with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as f:
@@ -516,7 +514,9 @@ class TestTransformersCompat(unittest.TestCase):
 
         clf.processor = MagicMock(side_effect=fake_processor)
 
-        images = [Image.fromarray(np.random.randint(0, 255, (32, 32, 3), dtype=np.uint8))]
+        images = [
+            Image.fromarray(np.random.randint(0, 255, (32, 32, 3), dtype=np.uint8))
+        ]
         labels = ["urban", "forest"]
         text_embeds = torch.randn(2, embed_dim)
         text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
