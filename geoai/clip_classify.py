@@ -349,7 +349,12 @@ class CLIPVectorClassifier:
             text=texts, return_tensors="pt", padding=True, truncation=True
         )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        text_embeds = self.model.get_text_features(**inputs)
+        text_output = self.model.get_text_features(**inputs)
+        text_embeds = (
+            text_output.pooler_output
+            if hasattr(text_output, "pooler_output")
+            else text_output
+        )
         text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
         return text_embeds
 
@@ -369,7 +374,12 @@ class CLIPVectorClassifier:
         """Classify a batch of images and write results into output lists."""
         inputs = self.processor(images=images, return_tensors="pt", padding=True)
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        image_embeds = self.model.get_image_features(**inputs)
+        image_output = self.model.get_image_features(**inputs)
+        image_embeds = (
+            image_output.pooler_output
+            if hasattr(image_output, "pooler_output")
+            else image_output
+        )
         image_embeds = image_embeds / image_embeds.norm(dim=-1, keepdim=True)
 
         logit_scale = self.model.logit_scale.exp()
