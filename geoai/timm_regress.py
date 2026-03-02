@@ -376,6 +376,19 @@ class PixelRegressionDataset(Dataset):
         # Load target
         with rasterio.open(self.target_paths[idx]) as src:
             target = src.read(self.target_band)
+            if self.target_nodata is not None:
+                tgt_nodata = self.target_nodata
+            else:
+                # Prefer per-band NoData if available, fall back to dataset-level NoData
+                tgt_nodata = None
+                nodatavals = getattr(src, "nodatavals", None)
+                band_index = self.target_band - 1
+                if nodatavals is not None and 0 <= band_index < len(nodatavals):
+                    tgt_nodata = nodatavals[band_index]
+                if tgt_nodata is None:
+                    tgt_nodata = src.nodata
+        if tgt_nodata is not None:
+            target = np.where(target == tgt_nodata, np.nan, target)
 
         # Handle NaN
         image = np.nan_to_num(image, nan=0.0)
