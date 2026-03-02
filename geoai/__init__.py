@@ -391,6 +391,13 @@ _LAZY_SYMBOL_MAP = {
     # --- geoai.clip_classify ---
     "CLIPVectorClassifier": ("clip_classify", None),
     "clip_classify_vector": ("clip_classify", None),
+    # --- geoai.dinov3_finetune ---
+    "DINOv3Segmenter": ("dinov3_finetune", None),
+    "DINOv3SegmentationDataset": ("dinov3_finetune", None),
+    "DPTSegmentationHead": ("dinov3_finetune", None),
+    "LoRALinear": ("dinov3_finetune", None),
+    "train_dinov3_segmentation": ("dinov3_finetune", None),
+    "dinov3_segment_geotiff": ("dinov3_finetune", None),
 }
 
 # Submodules that can be imported via `from geoai import <submodule>`
@@ -408,6 +415,7 @@ _LAZY_SUBMODULES = {
     "agents",
     "landcover_utils",
     "landcover_train",
+    "dinov3_finetune",
 }
 
 
