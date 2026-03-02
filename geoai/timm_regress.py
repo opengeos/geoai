@@ -383,10 +383,7 @@ class PixelRegressionDataset(Dataset):
                 tgt_nodata = None
                 nodatavals = getattr(src, "nodatavals", None)
                 band_index = self.target_band - 1
-                if (
-                    nodatavals is not None
-                    and 0 <= band_index < len(nodatavals)
-                ):
+                if nodatavals is not None and 0 <= band_index < len(nodatavals):
                     tgt_nodata = nodatavals[band_index]
                 if tgt_nodata is None:
                     tgt_nodata = src.nodata
