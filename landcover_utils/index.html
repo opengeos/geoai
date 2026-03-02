@@ -3507,6 +3507,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#geoai.landcover_utils.normalize_radiometric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalize_radiometric
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4086,6 +4097,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#geoai.landcover_utils.normalize_radiometric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalize_radiometric
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4119,13 +4141,14 @@
 <a id="geoai.landcover_utils"></a>
     <div class="doc doc-contents first">
 
-        <p>Landcover Classification Utilities - Enhanced Tile Export Module</p>
-<p>This module extends the base geoai functionality with specialized utilities
-for discrete landcover classification. It provides enhanced tile generation
-with background filtering capabilities to improve training efficiency.</p>
+        <p>Landcover Classification Utilities</p>
+<p>This module provides utilities for discrete landcover classification workflows,
+including tile export with background filtering and radiometric normalization
+for multi-temporal image comparability.</p>
 <p>Key Features:
 - Enhanced tile filtering with configurable feature ratio thresholds
 - Separate statistics tracking for different skip reasons
+- LIRRN (Location-Independent Relative Radiometric Normalization)
 - Maintains full compatibility with base geoai workflow
 - Optimized for discrete landcover classification tasks</p>
 <p>Date: November 2025</p>
@@ -4471,11 +4494,7 @@ parameter counts non-zero pixels as "features".</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 34</span>
-<span class="normal"> 35</span>
-<span class="normal"> 36</span>
-<span class="normal"> 37</span>
-<span class="normal"> 38</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 38</span>
 <span class="normal"> 39</span>
 <span class="normal"> 40</span>
 <span class="normal"> 41</span>
@@ -4824,7 +4843,11 @@ parameter counts non-zero pixels as "features".</p>
 <span class="normal">384</span>
 <span class="normal">385</span>
 <span class="normal">386</span>
-<span class="normal">387</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_landcover_tiles</span><span class="p">(</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_landcover_tiles</span><span class="p">(</span>
     <span class="n">in_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">out_folder</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">in_class_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5178,6 +5201,683 @@ parameter counts non-zero pixels as "features".</p>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">stats</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="geoai.landcover_utils.normalize_radiometric" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">normalize_radiometric</span><span class="p">(</span><span class="n">subject_image</span><span class="p">,</span> <span class="n">reference_image</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;lirrn&#39;</span><span class="p">,</span> <span class="n">p_n</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">num_quantisation_classes</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">num_sampling_rounds</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">subsample_ratio</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#geoai.landcover_utils.normalize_radiometric" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Normalize subject image radiometry to match a reference image.</p>
+<p>Adjusts brightness and contrast of the subject image so that its pixel
+value distribution matches the reference image. This is essential for
+multi-temporal analysis where images are acquired under different
+atmospheric conditions, sensor calibrations, or illumination angles.</p>
+<p>Currently supports the LIRRN (Location-Independent Relative Radiometric
+Normalization) method, which uses multi-Otsu thresholding and linear
+regression to identify pseudo-invariant features and transform pixel
+values band-by-band.</p>
+<p>Reference: doi:10.3390/s24072272</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>subject_image</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="numpy.ndarray">ndarray</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the subject GeoTIFF or numpy array with
+shape (H, W, B). The image to be normalized.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>reference_image</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="numpy.ndarray">ndarray</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the reference GeoTIFF or numpy array with
+shape (H, W, B). The target radiometry to match.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>output_path</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to save the normalized image as GeoTIFF. Only
+applicable when <em>subject_image</em> is a file path (so spatial
+metadata is available). If None, the array is returned without
+saving. Default: None.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>method</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Normalization method. Currently only <code>"lirrn"</code> is
+supported. Default: <code>"lirrn"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;lirrn&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p_n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of pseudo-invariant feature samples per quantization
+level. Higher values increase accuracy but slow computation.
+Default: 500.</p>
+              </div>
+            </td>
+            <td>
+                  <code>500</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_quantisation_classes</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of brightness strata for stratified
+sampling. Default: 3.</p>
+              </div>
+            </td>
+            <td>
+                  <code>3</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_sampling_rounds</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of iterative refinement rounds for
+sample selection. Default: 3.</p>
+              </div>
+            </td>
+            <td>
+                  <code>3</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>subsample_ratio</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fraction of candidates retained for regression.
+Default: 0.1.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.1</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>random_state</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Union">Union</span>[<span title="int">int</span>, <span title="numpy.random.Generator">Generator</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Seed or numpy Generator for reproducible results.
+Default: None (non-deterministic).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Tuple">Tuple</span>[<span title="numpy.ndarray">ndarray</span>, <span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="numpy.ndarray">ndarray</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Tuple of (normalized_image, metrics) where:
+- normalized_image: numpy array (H, W, B) float64.
+- metrics: dict with keys <code>"rmse"</code> and <code>"r_adj"</code>, each a
+  numpy array of length B.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>method</em> is not <code>"lirrn"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>p_n</em> &lt; 1 or <em>num_sampling_rounds</em> &lt; 1.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If subject and reference have different band counts.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If input arrays are not 3-dimensional.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <em>output_path</em> is set but <em>subject_image</em> is an array.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="FileNotFoundError">FileNotFoundError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If file paths do not point to existing files.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Normalize a satellite image using file paths:</p>
+    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span>
+<span class="normal">6</span>
+<span class="normal">7</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">geoai</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_radiometric</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">norm_img</span><span class="p">,</span> <span class="n">metrics</span> <span class="o">=</span> <span class="n">normalize_radiometric</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s2">&quot;subject.tif&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s2">&quot;reference.tif&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">output_path</span><span class="o">=</span><span class="s2">&quot;normalized.tif&quot;</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;RMSE per band: </span><span class="si">{</span><span class="n">metrics</span><span class="p">[</span><span class="s1">&#39;rmse&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+    <p>Normalize using numpy arrays:</p>
+    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span>
+<span class="normal">6</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">subject</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">reference</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">120</span><span class="p">,</span> <span class="mi">120</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">norm_img</span><span class="p">,</span> <span class="n">metrics</span> <span class="o">=</span> <span class="n">normalize_radiometric</span><span class="p">(</span><span class="n">subject</span><span class="p">,</span> <span class="n">reference</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">norm_img</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(100, 100, 4)</span>
+</code></pre></div></td></tr></table></div>
+
+
+<details class="note" open>
+  <summary>Note</summary>
+  <p>The subject and reference images must have the same number of bands
+but may have different spatial dimensions (height and width).</p>
+</details>
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>geoai/landcover_utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">694</span>
+<span class="normal">695</span>
+<span class="normal">696</span>
+<span class="normal">697</span>
+<span class="normal">698</span>
+<span class="normal">699</span>
+<span class="normal">700</span>
+<span class="normal">701</span>
+<span class="normal">702</span>
+<span class="normal">703</span>
+<span class="normal">704</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span>
+<span class="normal">715</span>
+<span class="normal">716</span>
+<span class="normal">717</span>
+<span class="normal">718</span>
+<span class="normal">719</span>
+<span class="normal">720</span>
+<span class="normal">721</span>
+<span class="normal">722</span>
+<span class="normal">723</span>
+<span class="normal">724</span>
+<span class="normal">725</span>
+<span class="normal">726</span>
+<span class="normal">727</span>
+<span class="normal">728</span>
+<span class="normal">729</span>
+<span class="normal">730</span>
+<span class="normal">731</span>
+<span class="normal">732</span>
+<span class="normal">733</span>
+<span class="normal">734</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span>
+<span class="normal">739</span>
+<span class="normal">740</span>
+<span class="normal">741</span>
+<span class="normal">742</span>
+<span class="normal">743</span>
+<span class="normal">744</span>
+<span class="normal">745</span>
+<span class="normal">746</span>
+<span class="normal">747</span>
+<span class="normal">748</span>
+<span class="normal">749</span>
+<span class="normal">750</span>
+<span class="normal">751</span>
+<span class="normal">752</span>
+<span class="normal">753</span>
+<span class="normal">754</span>
+<span class="normal">755</span>
+<span class="normal">756</span>
+<span class="normal">757</span>
+<span class="normal">758</span>
+<span class="normal">759</span>
+<span class="normal">760</span>
+<span class="normal">761</span>
+<span class="normal">762</span>
+<span class="normal">763</span>
+<span class="normal">764</span>
+<span class="normal">765</span>
+<span class="normal">766</span>
+<span class="normal">767</span>
+<span class="normal">768</span>
+<span class="normal">769</span>
+<span class="normal">770</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span>
+<span class="normal">774</span>
+<span class="normal">775</span>
+<span class="normal">776</span>
+<span class="normal">777</span>
+<span class="normal">778</span>
+<span class="normal">779</span>
+<span class="normal">780</span>
+<span class="normal">781</span>
+<span class="normal">782</span>
+<span class="normal">783</span>
+<span class="normal">784</span>
+<span class="normal">785</span>
+<span class="normal">786</span>
+<span class="normal">787</span>
+<span class="normal">788</span>
+<span class="normal">789</span>
+<span class="normal">790</span>
+<span class="normal">791</span>
+<span class="normal">792</span>
+<span class="normal">793</span>
+<span class="normal">794</span>
+<span class="normal">795</span>
+<span class="normal">796</span>
+<span class="normal">797</span>
+<span class="normal">798</span>
+<span class="normal">799</span>
+<span class="normal">800</span>
+<span class="normal">801</span>
+<span class="normal">802</span>
+<span class="normal">803</span>
+<span class="normal">804</span>
+<span class="normal">805</span>
+<span class="normal">806</span>
+<span class="normal">807</span>
+<span class="normal">808</span>
+<span class="normal">809</span>
+<span class="normal">810</span>
+<span class="normal">811</span>
+<span class="normal">812</span>
+<span class="normal">813</span>
+<span class="normal">814</span>
+<span class="normal">815</span>
+<span class="normal">816</span>
+<span class="normal">817</span>
+<span class="normal">818</span>
+<span class="normal">819</span>
+<span class="normal">820</span>
+<span class="normal">821</span>
+<span class="normal">822</span>
+<span class="normal">823</span>
+<span class="normal">824</span>
+<span class="normal">825</span>
+<span class="normal">826</span>
+<span class="normal">827</span>
+<span class="normal">828</span>
+<span class="normal">829</span>
+<span class="normal">830</span>
+<span class="normal">831</span>
+<span class="normal">832</span>
+<span class="normal">833</span>
+<span class="normal">834</span>
+<span class="normal">835</span>
+<span class="normal">836</span>
+<span class="normal">837</span>
+<span class="normal">838</span>
+<span class="normal">839</span>
+<span class="normal">840</span>
+<span class="normal">841</span>
+<span class="normal">842</span>
+<span class="normal">843</span>
+<span class="normal">844</span>
+<span class="normal">845</span>
+<span class="normal">846</span>
+<span class="normal">847</span>
+<span class="normal">848</span>
+<span class="normal">849</span>
+<span class="normal">850</span>
+<span class="normal">851</span>
+<span class="normal">852</span>
+<span class="normal">853</span>
+<span class="normal">854</span>
+<span class="normal">855</span>
+<span class="normal">856</span>
+<span class="normal">857</span>
+<span class="normal">858</span>
+<span class="normal">859</span>
+<span class="normal">860</span>
+<span class="normal">861</span>
+<span class="normal">862</span>
+<span class="normal">863</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_radiometric</span><span class="p">(</span>
+    <span class="n">subject_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="n">reference_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;lirrn&quot;</span><span class="p">,</span>
+    <span class="n">p_n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+    <span class="n">num_quantisation_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">num_sampling_rounds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">subsample_ratio</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">random_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize subject image radiometry to match a reference image.</span>
+
+<span class="sd">    Adjusts brightness and contrast of the subject image so that its pixel</span>
+<span class="sd">    value distribution matches the reference image. This is essential for</span>
+<span class="sd">    multi-temporal analysis where images are acquired under different</span>
+<span class="sd">    atmospheric conditions, sensor calibrations, or illumination angles.</span>
+
+<span class="sd">    Currently supports the LIRRN (Location-Independent Relative Radiometric</span>
+<span class="sd">    Normalization) method, which uses multi-Otsu thresholding and linear</span>
+<span class="sd">    regression to identify pseudo-invariant features and transform pixel</span>
+<span class="sd">    values band-by-band.</span>
+
+<span class="sd">    Reference: doi:10.3390/s24072272</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        subject_image: Path to the subject GeoTIFF or numpy array with</span>
+<span class="sd">            shape (H, W, B). The image to be normalized.</span>
+<span class="sd">        reference_image: Path to the reference GeoTIFF or numpy array with</span>
+<span class="sd">            shape (H, W, B). The target radiometry to match.</span>
+<span class="sd">        output_path: Path to save the normalized image as GeoTIFF. Only</span>
+<span class="sd">            applicable when *subject_image* is a file path (so spatial</span>
+<span class="sd">            metadata is available). If None, the array is returned without</span>
+<span class="sd">            saving. Default: None.</span>
+<span class="sd">        method: Normalization method. Currently only ``&quot;lirrn&quot;`` is</span>
+<span class="sd">            supported. Default: ``&quot;lirrn&quot;``.</span>
+<span class="sd">        p_n: Number of pseudo-invariant feature samples per quantization</span>
+<span class="sd">            level. Higher values increase accuracy but slow computation.</span>
+<span class="sd">            Default: 500.</span>
+<span class="sd">        num_quantisation_classes: Number of brightness strata for stratified</span>
+<span class="sd">            sampling. Default: 3.</span>
+<span class="sd">        num_sampling_rounds: Number of iterative refinement rounds for</span>
+<span class="sd">            sample selection. Default: 3.</span>
+<span class="sd">        subsample_ratio: Fraction of candidates retained for regression.</span>
+<span class="sd">            Default: 0.1.</span>
+<span class="sd">        random_state: Seed or numpy Generator for reproducible results.</span>
+<span class="sd">            Default: None (non-deterministic).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of (normalized_image, metrics) where:</span>
+<span class="sd">            - normalized_image: numpy array (H, W, B) float64.</span>
+<span class="sd">            - metrics: dict with keys ``&quot;rmse&quot;`` and ``&quot;r_adj&quot;``, each a</span>
+<span class="sd">              numpy array of length B.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If *method* is not ``&quot;lirrn&quot;``.</span>
+<span class="sd">        ValueError: If *p_n* &lt; 1 or *num_sampling_rounds* &lt; 1.</span>
+<span class="sd">        ValueError: If subject and reference have different band counts.</span>
+<span class="sd">        ValueError: If input arrays are not 3-dimensional.</span>
+<span class="sd">        ValueError: If *output_path* is set but *subject_image* is an array.</span>
+<span class="sd">        FileNotFoundError: If file paths do not point to existing files.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Normalize a satellite image using file paths:</span>
+
+<span class="sd">        &gt;&gt;&gt; from geoai import normalize_radiometric</span>
+<span class="sd">        &gt;&gt;&gt; norm_img, metrics = normalize_radiometric(</span>
+<span class="sd">        ...     &quot;subject.tif&quot;,</span>
+<span class="sd">        ...     &quot;reference.tif&quot;,</span>
+<span class="sd">        ...     output_path=&quot;normalized.tif&quot;,</span>
+<span class="sd">        ... )</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;RMSE per band: {metrics[&#39;rmse&#39;]}&quot;)</span>
+
+<span class="sd">        Normalize using numpy arrays:</span>
+
+<span class="sd">        &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">        &gt;&gt;&gt; subject = np.random.rand(100, 100, 4)</span>
+<span class="sd">        &gt;&gt;&gt; reference = np.random.rand(120, 120, 4)</span>
+<span class="sd">        &gt;&gt;&gt; norm_img, metrics = normalize_radiometric(subject, reference)</span>
+<span class="sd">        &gt;&gt;&gt; norm_img.shape</span>
+<span class="sd">        (100, 100, 4)</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        The subject and reference images must have the same number of bands</span>
+<span class="sd">        but may have different spatial dimensions (height and width).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># --- Validate parameters ---</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">!=</span> <span class="s2">&quot;lirrn&quot;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unsupported normalization method </span><span class="si">{</span><span class="n">method</span><span class="si">!r}</span><span class="s2">. &quot;</span>
+            <span class="s2">&quot;Currently only &#39;lirrn&#39; is supported.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">p_n</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;p_n must be &gt;= 1, got </span><span class="si">{</span><span class="n">p_n</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_sampling_rounds</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_sampling_rounds must be &gt;= 1, got </span><span class="si">{</span><span class="n">num_sampling_rounds</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subsample_ratio</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">subsample_ratio</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;subsample_ratio must be in (0, 1], got </span><span class="si">{</span><span class="n">subsample_ratio</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Resolve inputs ---</span>
+    <span class="n">profile</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">subject_image</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">sub_arr</span><span class="p">,</span> <span class="n">profile</span> <span class="o">=</span> <span class="n">_load_raster</span><span class="p">(</span><span class="n">subject_image</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sub_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">subject_image</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sub_arr</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;subject_image must be 3-D (H, W, B), got </span><span class="si">{</span><span class="n">sub_arr</span><span class="o">.</span><span class="n">ndim</span><span class="si">}</span><span class="s2">-D&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">reference_image</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">ref_arr</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_load_raster</span><span class="p">(</span><span class="n">reference_image</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">ref_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">reference_image</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ref_arr</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;reference_image must be 3-D (H, W, B), got </span><span class="si">{</span><span class="n">ref_arr</span><span class="o">.</span><span class="n">ndim</span><span class="si">}</span><span class="s2">-D&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">profile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;output_path requires subject_image to be a file path &quot;</span>
+            <span class="s2">&quot;(not an array) so that spatial metadata is available.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Band count check</span>
+    <span class="k">if</span> <span class="n">sub_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="n">ref_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Band count mismatch: subject has </span><span class="si">{</span><span class="n">sub_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2"> bands, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;reference has </span><span class="si">{</span><span class="n">ref_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2"> bands.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Handle NaN / inf</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">sub_arr</span><span class="p">)):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;subject_image contains NaN or infinite values; &quot;</span> <span class="s2">&quot;replacing with 0.&quot;</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sub_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">sub_arr</span><span class="p">,</span> <span class="n">nan</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">posinf</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">neginf</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">ref_arr</span><span class="p">)):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;reference_image contains NaN or infinite values; &quot;</span> <span class="s2">&quot;replacing with 0.&quot;</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">ref_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">ref_arr</span><span class="p">,</span> <span class="n">nan</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">posinf</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">neginf</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="c1"># --- Build RNG ---</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">random_state</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">):</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">random_state</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">random_state</span><span class="p">)</span>
+
+    <span class="c1"># --- Run normalization ---</span>
+    <span class="n">norm_img</span><span class="p">,</span> <span class="n">rmse</span><span class="p">,</span> <span class="n">r_adj</span> <span class="o">=</span> <span class="n">_lirrn</span><span class="p">(</span>
+        <span class="n">p_n</span><span class="p">,</span>
+        <span class="n">sub_arr</span><span class="p">,</span>
+        <span class="n">ref_arr</span><span class="p">,</span>
+        <span class="n">num_quantisation_classes</span><span class="o">=</span><span class="n">num_quantisation_classes</span><span class="p">,</span>
+        <span class="n">num_sampling_rounds</span><span class="o">=</span><span class="n">num_sampling_rounds</span><span class="p">,</span>
+        <span class="n">subsample_ratio</span><span class="o">=</span><span class="n">subsample_ratio</span><span class="p">,</span>
+        <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">metrics</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rmse&quot;</span><span class="p">:</span> <span class="n">rmse</span><span class="p">,</span> <span class="s2">&quot;r_adj&quot;</span><span class="p">:</span> <span class="n">r_adj</span><span class="p">}</span>
+
+    <span class="k">if</span> <span class="n">output_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_save_raster</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">norm_img</span><span class="p">,</span> <span class="n">profile</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">norm_img</span><span class="p">,</span> <span class="n">metrics</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
