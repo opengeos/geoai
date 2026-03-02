@@ -261,6 +261,7 @@ _LAZY_SYMBOL_MAP = {
     "calc_f1_score": ("utils", None),
     # --- geoai.landcover_utils ---
     "export_landcover_tiles": ("landcover_utils", None),
+    "normalize_radiometric": ("landcover_utils", None),
     # --- geoai.landcover_train ---
     "FocalLoss": ("landcover_train", None),
     "LandcoverCrossEntropyLoss": ("landcover_train", None),
