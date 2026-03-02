@@ -359,6 +359,11 @@ class DINOv3Segmenter(_LightningBase):
         if weights_path and os.path.exists(weights_path):
             state_dict = torch.load(weights_path, map_location="cpu")
         else:
+            if weights_path:
+                logger.warning(
+                    "weights_path '%s' not found; downloading SAT-493M defaults",
+                    weights_path,
+                )
             weights_file = hf_hub_download(
                 repo_id="giswqs/geoai", filename="dinov3_vitl16_sat493m.pth"
             )
@@ -804,6 +809,11 @@ def dinov3_segment_geotiff(
     from rasterio.windows import Window
     from tqdm import tqdm
 
+    if overlap >= window_size:
+        raise ValueError(
+            f"overlap ({overlap}) must be less than window_size ({window_size})"
+        )
+
     if device is None:
         dev = _get_device()
     else:
@@ -846,45 +856,83 @@ def dinov3_segment_geotiff(
         votes = np.zeros((num_classes, height, width), dtype=np.float32)
         count = np.zeros((height, width), dtype=np.float32)
 
+        # Precompute the padded tensor size so every window in a batch
+        # has the same spatial dimensions.
+        padded_h = window_size + (patch_size - window_size % patch_size) % patch_size
+        padded_w = padded_h  # square
+
+        def _prepare_window(img: np.ndarray) -> Tuple[np.ndarray, int, int]:
+            """Normalise, channel-select, and pad a raw window."""
+            if img.shape[0] > num_channels:
+                img = img[:num_channels]
+            elif img.shape[0] < num_channels:
+                pad_arr = np.zeros(
+                    (num_channels, img.shape[1], img.shape[2]), dtype=np.float32
+                )
+                pad_arr[: img.shape[0]] = img
+                img = pad_arr
+
+            if img.max() > 1.0:
+                img = img / 255.0
+
+            h, w = img.shape[1], img.shape[2]
+            if h < padded_h or w < padded_w:
+                padded = np.zeros(
+                    (num_channels, padded_h, padded_w), dtype=np.float32
+                )
+                padded[:, :h, :w] = img
+                img = padded
+            return img, h, w
+
+        def _flush_batch(
+            batch_imgs: List[np.ndarray],
+            batch_meta: List[Tuple[int, int, int, int, int, int]],
+        ) -> None:
+            """Run inference on a collected batch and accumulate votes."""
+            tensor = torch.from_numpy(np.stack(batch_imgs)).to(dev)
+            logits = model_module(tensor)
+            probs = torch.softmax(logits, dim=1).cpu().numpy()
+
+            for k, (rs, re, cs, ce, h, w) in enumerate(batch_meta):
+                votes[:, rs:re, cs:ce] += probs[k, :, :h, :w]
+                count[rs:re, cs:ce] += 1.0
+
         with torch.no_grad():
-            for i in tqdm(range(n_rows), disable=quiet, desc="Rows"):
+            batch_imgs: List[np.ndarray] = []
+            batch_meta: List[Tuple[int, int, int, int, int, int]] = []
+
+            total_windows = n_rows * n_cols
+            pbar = tqdm(total=total_windows, disable=quiet, desc="Windows")
+
+            for i in range(n_rows):
                 for j in range(n_cols):
                     row_start = i * stride
                     col_start = j * stride
                     row_end = min(row_start + window_size, height)
                     col_end = min(col_start + window_size, width)
 
-                    win = Window(col_start, row_start, col_end - col_start, row_end - row_start)
-                    img = src.read(window=win).astype(np.float32)
+                    win = Window(
+                        col_start, row_start,
+                        col_end - col_start, row_end - row_start,
+                    )
+                    raw = src.read(window=win).astype(np.float32)
+                    img, h, w = _prepare_window(raw)
 
-                    # Channel handling.
-                    if img.shape[0] > num_channels:
-                        img = img[:num_channels]
-                    elif img.shape[0] < num_channels:
-                        pad = np.zeros((num_channels, img.shape[1], img.shape[2]), dtype=np.float32)
-                        pad[: img.shape[0]] = img
-                        img = pad
+                    batch_imgs.append(img)
+                    batch_meta.append((row_start, row_end, col_start, col_end, h, w))
 
-                    if img.max() > 1.0:
-                        img = img / 255.0
+                    if len(batch_imgs) == batch_size:
+                        _flush_batch(batch_imgs, batch_meta)
+                        pbar.update(len(batch_imgs))
+                        batch_imgs.clear()
+                        batch_meta.clear()
 
-                    h, w = img.shape[1], img.shape[2]
+            # Flush remaining windows.
+            if batch_imgs:
+                _flush_batch(batch_imgs, batch_meta)
+                pbar.update(len(batch_imgs))
 
-                    # Pad to multiple of patch_size.
-                    pad_h = (patch_size - h % patch_size) % patch_size
-                    pad_w = (patch_size - w % patch_size) % patch_size
-                    if pad_h > 0 or pad_w > 0:
-                        img = np.pad(img, ((0, 0), (0, pad_h), (0, pad_w)), mode="reflect")
-
-                    tensor = torch.from_numpy(img).unsqueeze(0).to(dev)
-                    logits = model_module(tensor)  # (1, C, H', W')
-                    probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
-
-                    # Crop padding.
-                    probs = probs[:, :h, :w]
-
-                    votes[:, row_start:row_end, col_start:col_end] += probs
-                    count[row_start:row_end, col_start:col_end] += 1.0
+            pbar.close()
 
         # Majority vote (avoid division by zero).
         count = np.maximum(count, 1.0)

@@ -467,7 +467,8 @@ class TestDINOv3Segmenter(unittest.TestCase):
             B = x.shape[0]
             H_p = x.shape[2] // patch_size
             W_p = x.shape[3] // patch_size
-            return [torch.randn(B, embed_dim, H_p, W_p) for _ in range(n)]
+            num_features = len(n) if isinstance(n, (list, tuple)) else n
+            return [torch.randn(B, embed_dim, H_p, W_p) for _ in range(num_features)]
 
         backbone.get_intermediate_layers = mock_intermediate
         backbone.parameters.return_value = iter(
@@ -661,6 +662,32 @@ class TestSegmentGeotiffFunction(unittest.TestCase):
         self.assertEqual(sig.parameters["batch_size"].default, 4)
         self.assertIsNone(sig.parameters["device"].default)
         self.assertFalse(sig.parameters["quiet"].default)
+
+    def test_overlap_ge_window_size_raises(self):
+        """overlap >= window_size should raise ValueError."""
+        from geoai.dinov3_finetune import dinov3_segment_geotiff
+
+        with self.assertRaises(ValueError):
+            dinov3_segment_geotiff(
+                input_path="dummy.tif",
+                output_path="out.tif",
+                checkpoint_path="model.ckpt",
+                window_size=256,
+                overlap=256,
+            )
+
+    def test_overlap_gt_window_size_raises(self):
+        """overlap > window_size should also raise ValueError."""
+        from geoai.dinov3_finetune import dinov3_segment_geotiff
+
+        with self.assertRaises(ValueError):
+            dinov3_segment_geotiff(
+                input_path="dummy.tif",
+                output_path="out.tif",
+                checkpoint_path="model.ckpt",
+                window_size=256,
+                overlap=512,
+            )
 
 
 if __name__ == "__main__":
