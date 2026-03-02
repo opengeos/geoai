@@ -1,5 +1,6 @@
 """This module provides functionality for segmenting high-resolution satellite imagery using vision-language models."""
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -27,6 +28,8 @@ __all__ = [
     "GroundedSAM",
     "CLIPSegmentation",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -744,14 +747,16 @@ class CLIPSegmentation:
 
     Args:
         model_name (str): Name of the CLIP-Seg model to use. Defaults to "CIDAS/clipseg-rd64-refined".
-        device (str): Device to run the model on ('cuda', 'cpu'). If None, will use CUDA if available.
+        device (str): Device to run the model on ('cuda', 'mps', 'cpu').
+            If None, auto-selects the best available device
+            (CUDA > MPS > CPU) via ``get_device()``.
         tile_size (int): Size of tiles to process the image in chunks. Defaults to 352.
         overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 16.
 
     Attributes:
         processor (CLIPSegProcessor): The processor for the CLIP-Seg model.
         model (CLIPSegForImageSegmentation): The CLIP-Seg model for segmentation.
-        device (str): The device being used ('cuda' or 'cpu').
+        device (str): The device being used ('cuda', 'mps', or 'cpu').
         tile_size (int): Size of tiles for processing.
         overlap (int): Overlap between tiles.
     """
@@ -768,18 +773,20 @@ class CLIPSegmentation:
 
         Args:
             model_name (str): Name of the CLIP-Seg model to use. Defaults to "CIDAS/clipseg-rd64-refined".
-            device (str): Device to run the model on ('cuda', 'cpu'). If None, will use CUDA if available.
+            device (str): Device to run the model on ('cuda', 'mps', 'cpu').
+                If None, auto-selects the best available device
+                (CUDA > MPS > CPU) via ``get_device()``.
             tile_size (int): Size of tiles to process the image in chunks. Defaults to 512.
             overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 32.
         """
         self.tile_size = tile_size
         self.overlap = overlap
 
-        # Set device
-        if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
+        # Lazy import to avoid pulling in geoai.utils (which eagerly
+        # imports leafmap) at module-collection time.
+        from .utils.device import get_device
+
+        self.device = str(device or get_device())
 
         # Load model and processor
         self.processor = CLIPSegProcessor.from_pretrained(model_name)
@@ -787,7 +794,7 @@ class CLIPSegmentation:
             self.device
         )
 
-        print(f"Model loaded on {self.device}")
+        logger.info("CLIPSeg model loaded on %s", self.device)
 
     def segment_image(
         self,
@@ -859,39 +866,50 @@ class CLIPSegmentation:
 
                         # Process the tile
                         try:
-                            # Convert to RGB if necessary (handling different satellite bands)
-                            if tile_data.shape[0] > 3:
-                                # Use first three bands for RGB representation
+                            # Convert to RGB format
+                            bands = tile_data.shape[0]
+                            if bands >= 3:
                                 rgb_tile = tile_data[:3].transpose(1, 2, 0)
-                                # Normalize data to 0-255 range if needed
-                                if rgb_tile.max() > 0:
-                                    rgb_tile = (
-                                        (rgb_tile - rgb_tile.min())
-                                        / (rgb_tile.max() - rgb_tile.min())
-                                        * 255
-                                    ).astype(np.uint8)
-                            elif tile_data.shape[0] == 1:
-                                # Create RGB from grayscale
+                            elif bands == 1:
                                 rgb_tile = np.repeat(
                                     tile_data[0][:, :, np.newaxis], 3, axis=2
                                 )
-                                # Normalize if needed
-                                if rgb_tile.max() > 0:
-                                    rgb_tile = (
-                                        (rgb_tile - rgb_tile.min())
-                                        / (rgb_tile.max() - rgb_tile.min())
-                                        * 255
-                                    ).astype(np.uint8)
                             else:
-                                # Already 3-channel, assume RGB
-                                rgb_tile = tile_data.transpose(1, 2, 0)
-                                # Normalize if needed
-                                if rgb_tile.max() > 0:
-                                    rgb_tile = (
-                                        (rgb_tile - rgb_tile.min())
-                                        / (rgb_tile.max() - rgb_tile.min())
-                                        * 255
-                                    ).astype(np.uint8)
+                                # 2-band: replicate first band into 3 channels
+                                rgb_tile = np.repeat(
+                                    tile_data[0][:, :, np.newaxis], 3, axis=2
+                                )
+
+                            # Normalize to uint8 if needed
+                            if rgb_tile.dtype == np.uint8:
+                                # Already uint8 — skip normalization
+                                if rgb_tile.max() == 0:
+                                    pbar.update(1)
+                                    continue
+                            else:
+                                # Float / other dtypes: per-channel normalization
+                                rgb_tile = rgb_tile.astype(np.float64)
+                                result_tile = np.empty_like(rgb_tile)
+                                all_zero = True
+                                for ch in range(rgb_tile.shape[2]):
+                                    cmin = rgb_tile[:, :, ch].min()
+                                    cmax = rgb_tile[:, :, ch].max()
+                                    if cmax > cmin:
+                                        result_tile[:, :, ch] = (
+                                            (rgb_tile[:, :, ch] - cmin)
+                                            / (cmax - cmin)
+                                            * 255.0
+                                        )
+                                        all_zero = False
+                                    elif cmax > 0:
+                                        result_tile[:, :, ch] = 128.0
+                                        all_zero = False
+                                    else:
+                                        result_tile[:, :, ch] = 0.0
+                                if all_zero:
+                                    pbar.update(1)
+                                    continue
+                                rgb_tile = result_tile.astype(np.uint8)
 
                             # Convert to PIL Image
                             pil_image = Image.fromarray(rgb_tile)
@@ -972,7 +990,9 @@ class CLIPSegmentation:
                             ]
 
                         except Exception as e:
-                            print(f"Error processing tile at ({x}, {y}): {str(e)}")
+                            logger.warning(
+                                "Error processing tile at (%d, %d): %s", x, y, str(e)
+                            )
                             # Continue with next tile
 
                         # Update progress bar
@@ -990,7 +1010,7 @@ class CLIPSegmentation:
                 dst.set_band_description(1, "Binary Segmentation")
                 dst.set_band_description(2, "Probability Scores")
 
-            print(f"Segmentation saved to {output_path}")
+            logger.info("Segmentation saved to %s", output_path)
             return output_path
 
     def segment_image_batch(

@@ -57,16 +57,31 @@ def _to_rgb_uint8(tile_data: np.ndarray) -> Optional[np.ndarray]:
         # Single-band or two-band: replicate the first band into 3 channels
         rgb = np.repeat(tile_data[0][:, :, np.newaxis], 3, axis=2)
 
+    # If already uint8 and in valid range, check for all-zeros and return.
+    if rgb.dtype == np.uint8:
+        if rgb.max() == 0:
+            return None
+        return rgb
+
+    # Float / other dtypes: normalize per-channel to [0, 255] uint8.
     rgb = rgb.astype(np.float64)
-    vmin, vmax = rgb.min(), rgb.max()
-    if vmax > vmin:
-        rgb = (rgb - vmin) / (vmax - vmin) * 255.0
-    elif vmax > 0:
-        rgb = np.full_like(rgb, 128.0)
-    else:
+    result = np.empty_like(rgb)
+    all_constant = True
+    for ch in range(rgb.shape[2]):
+        cmin, cmax = rgb[:, :, ch].min(), rgb[:, :, ch].max()
+        if cmax > cmin:
+            result[:, :, ch] = (rgb[:, :, ch] - cmin) / (cmax - cmin) * 255.0
+            all_constant = False
+        elif cmax > 0:
+            result[:, :, ch] = 128.0
+            all_constant = False
+        else:
+            result[:, :, ch] = 0.0
+
+    if all_constant and rgb.max() == 0:
         return None
 
-    return rgb.astype(np.uint8)
+    return result.astype(np.uint8)
 
 
 class CLIPVectorClassifier:
@@ -79,8 +94,9 @@ class CLIPVectorClassifier:
     Args:
         model_name: Hugging Face model ID for the CLIP model.
             Default: ``"openai/clip-vit-base-patch32"``.
-        device: Device for inference (``"cuda"``, ``"cpu"``).
-            If None, auto-selects CUDA when available.
+        device: Device for inference (``"cuda"``, ``"mps"``, ``"cpu"``).
+            If None, auto-selects the best available device
+            (CUDA > MPS > CPU) via ``get_device()``.
 
     Example:
         >>> classifier = CLIPVectorClassifier()
@@ -170,12 +186,13 @@ class CLIPVectorClassifier:
         gdf = self._load_vector(vector_data)
 
         if len(gdf) == 0:
-            gdf["clip_label"] = []
-            gdf["clip_confidence"] = []
+            result = gdf.copy()
+            result["clip_label"] = []
+            result["clip_confidence"] = []
             if top_k > 1:
-                gdf["clip_top_k_labels"] = []
-                gdf["clip_top_k_scores"] = []
-            return gdf
+                result["clip_top_k_labels"] = []
+                result["clip_top_k_scores"] = []
+            return result
 
         # --- Open raster and align CRS ---
         with rasterio.open(raster_path) as src:
@@ -273,7 +290,7 @@ class CLIPVectorClassifier:
     ) -> gpd.GeoDataFrame:
         """Load and validate vector data."""
         if isinstance(vector_data, gpd.GeoDataFrame):
-            return vector_data.copy()
+            return vector_data
 
         if not isinstance(vector_data, str):
             raise TypeError(
@@ -425,7 +442,9 @@ def clip_classify_vector(
         labels: Candidate category labels for zero-shot classification.
         model_name: Hugging Face model ID for the CLIP model.
             Default: ``"openai/clip-vit-base-patch32"``.
-        device: Device for inference. If None, auto-selects.
+        device: Device for inference (``"cuda"``, ``"mps"``, ``"cpu"``).
+            If None, auto-selects the best available device
+            (CUDA > MPS > CPU) via ``get_device()``.
         label_prefix: Text prefix prepended to each label.
             Default: ``"a satellite image of "``.
         top_k: Number of top predictions per polygon. Default: 1.

@@ -257,6 +257,86 @@ class TestClipClassifyValidation(unittest.TestCase):
         finally:
             os.unlink(raster_path)
 
+    def test_empty_gdf_not_mutated(self):
+        """Test that passing an empty GeoDataFrame does not mutate the original."""
+        clf = _mock_classifier()
+        gdf = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        original_columns = list(gdf.columns)
+        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as f:
+            raster_path = f.name
+        try:
+            _create_test_raster(raster_path)
+            result = clf.classify(
+                vector_data=gdf,
+                raster_path=raster_path,
+                labels=["urban", "forest"],
+            )
+            # Original should be untouched
+            self.assertEqual(list(gdf.columns), original_columns)
+            self.assertNotIn("clip_label", gdf.columns)
+            # Result should have new columns
+            self.assertIn("clip_label", result.columns)
+        finally:
+            os.unlink(raster_path)
+
+    def test_nonempty_gdf_not_mutated(self):
+        """Test that passing a non-empty GeoDataFrame does not mutate the original."""
+        import torch
+
+        clf = _mock_classifier()
+        embed_dim = 8
+
+        def fake_get_image_features(**kwargs):
+            batch_size = kwargs["pixel_values"].shape[0]
+            return torch.randn(batch_size, embed_dim)
+
+        def fake_get_text_features(**kwargs):
+            batch_size = kwargs["input_ids"].shape[0]
+            return torch.randn(batch_size, embed_dim)
+
+        clf.model.get_image_features = MagicMock(side_effect=fake_get_image_features)
+        clf.model.get_text_features = MagicMock(side_effect=fake_get_text_features)
+        clf.model.logit_scale = torch.nn.Parameter(torch.tensor(1.0))
+
+        def fake_processor(**kwargs):
+            if "images" in kwargs:
+                n = len(kwargs["images"])
+                return {"pixel_values": torch.randn(n, 3, 224, 224)}
+            if "text" in kwargs:
+                n = len(kwargs["text"])
+                return {
+                    "input_ids": torch.randint(0, 1000, (n, 10)),
+                    "attention_mask": torch.ones(n, 10, dtype=torch.long),
+                }
+            return {}
+
+        clf.processor = MagicMock(side_effect=fake_processor)
+
+        gdf = gpd.GeoDataFrame(
+            geometry=[box(0.1, 0.1, 0.5, 0.5)], crs="EPSG:4326"
+        )
+        original_columns = list(gdf.columns)
+
+        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as f:
+            raster_path = f.name
+        try:
+            _create_test_raster(raster_path, height=32, width=32)
+            result = clf.classify(
+                vector_data=gdf,
+                raster_path=raster_path,
+                labels=["urban", "forest"],
+                min_chip_size=1,
+                quiet=True,
+            )
+            # Original should be untouched
+            self.assertEqual(list(gdf.columns), original_columns)
+            self.assertNotIn("clip_label", gdf.columns)
+            # Result should have new columns and be a distinct object
+            self.assertIn("clip_label", result.columns)
+            self.assertIsNot(result, gdf)
+        finally:
+            os.unlink(raster_path)
+
 
 # ===================================================================
 # Lazy import registration
@@ -338,6 +418,118 @@ class TestToRgbUint8(unittest.TestCase):
         self.assertEqual(result.dtype, np.uint8)
         self.assertLessEqual(result.max(), 255)
         self.assertGreaterEqual(result.min(), 0)
+
+    def test_uint8_passthrough(self):
+        """Test uint8 input is returned without re-normalization."""
+        data = np.array([[[100, 200]], [[50, 150]], [[10, 250]]], dtype=np.uint8)
+        result = _to_rgb_uint8(data)
+        self.assertIsNotNone(result)
+        # Uint8 data should be passed through without normalization
+        expected = data[:3].transpose(1, 2, 0)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_float_per_channel_normalization(self):
+        """Test per-channel normalization preserves relative structure."""
+        # Channel 0: range [0, 1], Channel 1: constant 5.0, Channel 2: range [10, 20]
+        ch0 = np.array([[0.0, 1.0]], dtype=np.float64)
+        ch1 = np.array([[5.0, 5.0]], dtype=np.float64)
+        ch2 = np.array([[10.0, 20.0]], dtype=np.float64)
+        data = np.stack([ch0, ch1, ch2], axis=0)
+        result = _to_rgb_uint8(data)
+        self.assertIsNotNone(result)
+        # Channel 0: min->0, max->255
+        self.assertEqual(result[0, 0, 0], 0)
+        self.assertEqual(result[0, 1, 0], 255)
+        # Channel 1: constant nonzero -> mapped to 128
+        self.assertEqual(result[0, 0, 1], 128)
+        self.assertEqual(result[0, 1, 1], 128)
+        # Channel 2: min->0, max->255
+        self.assertEqual(result[0, 0, 2], 0)
+        self.assertEqual(result[0, 1, 2], 255)
+
+
+# ===================================================================
+# Transformers 5.x compatibility tests
+# ===================================================================
+
+
+class TestTransformersCompat(unittest.TestCase):
+    """Tests for transformers >= 5.0 BaseModelOutputWithPooling handling."""
+
+    def test_encode_text_unwraps_non_tensor(self):
+        """Test _encode_text handles non-tensor return from get_text_features."""
+        import torch
+
+        clf = _mock_classifier()
+
+        # Simulate BaseModelOutputWithPooling-like object
+        class FakeOutput:
+            def __init__(self, tensor):
+                self.pooler_output = tensor
+
+        embed_dim = 8
+
+        def fake_get_text_features(**kwargs):
+            batch_size = kwargs["input_ids"].shape[0]
+            return FakeOutput(torch.randn(batch_size, embed_dim))
+
+        clf.model.get_text_features = MagicMock(side_effect=fake_get_text_features)
+
+        def fake_processor(**kwargs):
+            n = len(kwargs["text"])
+            return {
+                "input_ids": torch.randint(0, 1000, (n, 10)),
+                "attention_mask": torch.ones(n, 10, dtype=torch.long),
+            }
+
+        clf.processor = MagicMock(side_effect=fake_processor)
+
+        result = clf._encode_text(["urban", "forest"], "a satellite image of ")
+        self.assertIsInstance(result, torch.Tensor)
+        self.assertEqual(result.shape, (2, embed_dim))
+        # Should be normalized
+        norms = result.norm(dim=-1)
+        torch.testing.assert_close(norms, torch.ones(2), atol=1e-5, rtol=1e-5)
+
+    def test_process_batch_unwraps_non_tensor(self):
+        """Test _process_batch handles non-tensor return from get_image_features."""
+        import torch
+        from PIL import Image
+
+        clf = _mock_classifier()
+        embed_dim = 8
+
+        class FakeOutput:
+            def __init__(self, tensor):
+                self.pooler_output = tensor
+
+        def fake_get_image_features(**kwargs):
+            batch_size = kwargs["pixel_values"].shape[0]
+            return FakeOutput(torch.randn(batch_size, embed_dim))
+
+        clf.model.get_image_features = MagicMock(side_effect=fake_get_image_features)
+        clf.model.logit_scale = torch.nn.Parameter(torch.tensor(1.0))
+
+        def fake_processor(**kwargs):
+            n = len(kwargs["images"])
+            return {"pixel_values": torch.randn(n, 3, 224, 224)}
+
+        clf.processor = MagicMock(side_effect=fake_processor)
+
+        images = [Image.fromarray(np.random.randint(0, 255, (32, 32, 3), dtype=np.uint8))]
+        labels = ["urban", "forest"]
+        text_embeds = torch.randn(2, embed_dim)
+        text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
+
+        result_labels = [None]
+        result_confs = [float("nan")]
+
+        clf._process_batch(
+            images, [0], text_embeds, labels, 1, result_labels, result_confs, None, None
+        )
+        self.assertIsNotNone(result_labels[0])
+        self.assertIn(result_labels[0], labels)
+        self.assertFalse(np.isnan(result_confs[0]))
 
 
 # ===================================================================
