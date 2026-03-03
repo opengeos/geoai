@@ -2,7 +2,7 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including Moondream vision-language model, semantic segmentation, instance segmentation (Mask R-CNN), SamGeo (SAM1/SAM2/SAM3), DeepForest object detection, and water segmentation (OmniWaterMask).
-version=1.0.3
+version=1.0.4
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -58,6 +58,8 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.0.4
+        - Fix SamGeo vector output for GeoPackage and Shapefile formats
     1.0.3
         - Use uv for faster QGIS plugin dependency installation (#577)
     1.0.2
