@@ -370,18 +370,26 @@ def view_vector(
     scheme: Optional[str] = None,
     save_path: Optional[str] = None,
     dpi: int = 300,
+    raster_path: Optional[str] = None,
+    raster_bands: Optional[Union[int, List[int]]] = None,
+    raster_cmap: str = "gray",
+    outline_only: bool = False,
+    outline_linewidth: float = 1.0,
 ) -> Any:
     """
     Visualize vector datasets with options for styling, classification, basemaps and more.
 
     This function visualizes GeoDataFrame objects with customizable symbology.
     It supports different vector types (points, lines, polygons), attribute-based
-    classification, and background basemaps.
+    classification, background basemaps, and raster backgrounds with polygon
+    outlines overlaid.
 
     Args:
-        vector_data (geopandas.GeoDataFrame): The vector dataset to visualize.
+        vector_data (Union[str, geopandas.GeoDataFrame]): The vector dataset to
+            visualize. Can be a file path or a GeoDataFrame.
         column (str, optional): Column to use for choropleth mapping. If None,
-            a single color will be used. Defaults to None.
+            a single color will be used. Ignored when outline_only is True.
+            Defaults to None.
         cmap (str or matplotlib.colors.Colormap, optional): Colormap to use for
             choropleth mapping. Defaults to "viridis".
         figsize (tuple, optional): Figure size as (width, height) in inches.
@@ -389,9 +397,9 @@ def view_vector(
         title (str, optional): Title for the plot. Defaults to None.
         legend (bool, optional): Whether to display a legend. Defaults to True.
         basemap (bool, optional): Whether to add a web basemap. Requires contextily.
-            Defaults to False.
-        basemap_type (str, optional): Type of basemap to use. Options: 'streets', 'satellite'.
-            Defaults to 'streets'.
+            Ignored when raster_path is provided. Defaults to False.
+        basemap_type (str, optional): Type of basemap to use. Options: 'streets',
+            'satellite'. Defaults to 'streets'.
         alpha (float, optional): Transparency of the vector features, between 0-1.
             Defaults to 0.7.
         edge_color (str, optional): Color for feature edges. Defaults to "black".
@@ -409,6 +417,20 @@ def view_vector(
         save_path (str, optional): Path to save the figure. If None, the figure
             is not saved. Defaults to None.
         dpi (int, optional): DPI for saved figure. Defaults to 300.
+        raster_path (str, optional): Path to a raster file to display as the
+            background. The vector data will be reprojected to match the raster
+            CRS if needed. When provided, the basemap option is ignored.
+            Defaults to None.
+        raster_bands (int or list of int, optional): Band index or list of band
+            indices (1-indexed) to display from the raster. If None, all bands
+            are shown (RGB if 3 bands). Defaults to None.
+        raster_cmap (str, optional): Colormap for single-band raster display.
+            Defaults to "gray".
+        outline_only (bool, optional): If True, polygon features are drawn as
+            outlines only (no fill), allowing the raster background to show
+            through. Has no effect on point or line geometries. Defaults to False.
+        outline_linewidth (float, optional): Line width for polygon outlines when
+            outline_only is True. Defaults to 1.0.
 
     Returns:
         matplotlib.axes.Axes: The Axes object containing the plot.
@@ -420,6 +442,15 @@ def view_vector(
 
         >>> roads = gpd.read_file("roads.shp")
         >>> view_vector(roads, "type", basemap=True, figsize=(12, 8))
+
+        >>> parcels = gpd.read_file("parcels.shp")
+        >>> view_vector(
+        ...     parcels,
+        ...     raster_path="imagery.tif",
+        ...     outline_only=True,
+        ...     edge_color="yellow",
+        ...     outline_linewidth=2,
+        ... )
     """
     import contextily as ctx
 
@@ -436,11 +467,35 @@ def view_vector(
     # Set up figure and axis
     fig, ax = plt.subplots(figsize=figsize)
 
+    # Display raster as background if provided
+    raster_crs = None
+    if raster_path is not None:
+        with rasterio.open(raster_path) as src:
+            raster_crs = src.crs
+            show_kwargs: Dict[str, Any] = {"ax": ax}
+
+            if raster_bands is not None:
+                show_kwargs["indexes"] = raster_bands
+                n_display = (
+                    1 if isinstance(raster_bands, int) else len(raster_bands)
+                )
+            else:
+                n_display = src.count
+
+            if n_display == 1:
+                show_kwargs["cmap"] = raster_cmap
+
+            show(src, **show_kwargs)
+
+        # Reproject GDF to raster CRS if needed
+        if gdf.crs is not None and raster_crs is not None and gdf.crs != raster_crs:
+            gdf = gdf.to_crs(raster_crs)
+
     # Determine geometry type
     geom_type = gdf.geometry.iloc[0].geom_type
 
     # Plotting parameters
-    plot_kwargs = {"alpha": alpha, "ax": ax}
+    plot_kwargs: Dict[str, Any] = {"alpha": alpha, "ax": ax}
 
     # Set up keyword arguments based on geometry type
     if "Point" in geom_type:
@@ -449,10 +504,15 @@ def view_vector(
     elif "Line" in geom_type:
         plot_kwargs["linewidth"] = 1
     elif "Polygon" in geom_type:
-        plot_kwargs["edgecolor"] = edge_color
+        if outline_only:
+            plot_kwargs["facecolor"] = "none"
+            plot_kwargs["edgecolor"] = edge_color
+            plot_kwargs["linewidth"] = outline_linewidth
+        else:
+            plot_kwargs["edgecolor"] = edge_color
 
-    # Classification options
-    if column is not None:
+    # Classification options (skipped when outline_only is True)
+    if column is not None and not outline_only:
         if scheme is not None:
             # Use mapclassify scheme if provided
             plot_kwargs["scheme"] = scheme
@@ -479,7 +539,7 @@ def view_vector(
             ax=ax, color=highlight_color, edgecolor="black", linewidth=2, zorder=5
         )
 
-    if basemap:
+    if basemap and raster_path is None:
         try:
             basemap_options = {
                 "streets": ctx.providers.OpenStreetMap.Mapnik,
