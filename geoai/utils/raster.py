@@ -101,6 +101,7 @@ def get_raster_info(raster_path: str) -> Dict[str, Any]:
     # Open the raster dataset
     with rasterio.open(raster_path) as src:
         # Get basic metadata
+
         info = {
             "driver": src.driver,
             "width": src.width,
@@ -110,7 +111,7 @@ def get_raster_info(raster_path: str) -> Dict[str, Any]:
             "crs": src.crs.to_string() if src.crs else "No CRS defined",
             "transform": src.transform,
             "bounds": src.bounds,
-            "resolution": (src.transform[0], -src.transform[4]),
+            "resolution": (round(src.transform[0], 2), round(-src.transform[4], 2)),
             "nodata": src.nodata,
         }
 
