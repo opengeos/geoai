@@ -1152,7 +1152,7 @@ Areas:
             image2_path,
             binary_path,
             prob_path,
-            os.path.join(output_dir, "split_comparison.png"),
+            output_path=os.path.join(output_dir, "split_comparison.png"),
         )
 
         scores_path = instance_path.replace(".tif", "_scores.tif")
