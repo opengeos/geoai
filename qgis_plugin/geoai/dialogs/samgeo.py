@@ -2061,6 +2061,14 @@ class SamGeoDockWidget(QDockWidget):
 
                     min_area = self.min_area_spin.value()
 
+                    # Determine output format from file extension
+                    if output_path.endswith(".gpkg"):
+                        vec_format = "gpkg"
+                    elif output_path.endswith(".shp"):
+                        vec_format = "shapefile"
+                    else:
+                        vec_format = "geojson"
+
                     # Check vector processing mode: 0 = Simple, 1 = Regularize, 2 = Smooth
                     vector_mode = self.vector_mode_combo.currentIndex()
 
@@ -2071,6 +2079,7 @@ class SamGeoDockWidget(QDockWidget):
                             output_path=output_path,
                             min_area=min_area if min_area > 0 else 0,
                             simplify_tolerance=None,
+                            output_format=vec_format,
                         )
                     elif vector_mode == 2:
                         # Use smooth_vector for natural features
@@ -2199,6 +2208,14 @@ class SamGeoDockWidget(QDockWidget):
 
                     min_area = self.min_area_spin.value()
 
+                    # Determine output format from file extension
+                    if output_path.endswith(".gpkg"):
+                        vec_format = "gpkg"
+                    elif output_path.endswith(".shp"):
+                        vec_format = "shapefile"
+                    else:
+                        vec_format = "geojson"
+
                     # Check vector processing mode: 0 = Simple, 1 = Regularize, 2 = Smooth
                     vector_mode = self.vector_mode_combo.currentIndex()
 
@@ -2209,6 +2226,7 @@ class SamGeoDockWidget(QDockWidget):
                             output_path=output_path,
                             min_area=min_area if min_area > 0 else 0,
                             simplify_tolerance=None,
+                            output_format=vec_format,
                         )
                     elif vector_mode == 2:
                         # Use smooth_vector for natural features
