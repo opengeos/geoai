@@ -476,9 +476,7 @@ def view_vector(
 
             if raster_bands is not None:
                 show_kwargs["indexes"] = raster_bands
-                n_display = (
-                    1 if isinstance(raster_bands, int) else len(raster_bands)
-                )
+                n_display = 1 if isinstance(raster_bands, int) else len(raster_bands)
             else:
                 n_display = src.count
 
