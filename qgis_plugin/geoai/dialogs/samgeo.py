@@ -141,6 +141,28 @@ class SamGeoModelLoadWorker(QThread):
             self.error.emit(str(e))
 
 
+class SamGeoOperationWorker(QThread):
+    """Generic worker thread for blocking SamGeo operations.
+
+    Runs an arbitrary callable in a background thread so the Qt event loop
+    (and the spinning progress bar) remains responsive on the main thread.
+    """
+
+    finished = pyqtSignal(object)  # result returned by the callable
+    error = pyqtSignal(str)  # error message on exception
+
+    def __init__(self, func):
+        super().__init__()
+        self._func = func
+
+    def run(self):
+        try:
+            result = self._func()
+            self.finished.emit(result)
+        except Exception as exc:
+            self.error.emit(str(exc))
+
+
 class SamGeoDockWidget(QDockWidget):
     """Dock widget for SamGeo segmentation operations."""
 
@@ -1288,6 +1310,41 @@ class SamGeoDockWidget(QDockWidget):
         self.load_model_btn.setEnabled(True)
         self.show_error(f"Failed to load model: {error_message}")
 
+    # ------------------------------------------------------------------
+    # Generic threaded-operation helper
+    # ------------------------------------------------------------------
+
+    def _run_with_progress(self, func, on_done, on_error=None):
+        """Run *func* in a background thread while the progress bar spins.
+
+        The progress bar must already be visible and set to indeterminate
+        range (0, 0) before calling this method.  When *func* finishes
+        (successfully or with an exception) the progress bar is hidden and
+        *on_done(result)* or *on_error(message)* is called on the main thread.
+        """
+
+        def _on_finished(result):
+            self.progress_bar.setVisible(False)
+            try:
+                on_done(result)
+            except Exception as exc:
+                if on_error:
+                    on_error(str(exc))
+                else:
+                    self.show_error(str(exc))
+
+        def _on_error(msg):
+            self.progress_bar.setVisible(False)
+            if on_error:
+                on_error(msg)
+            else:
+                self.show_error(msg)
+
+        self._operation_worker = SamGeoOperationWorker(func)
+        self._operation_worker.finished.connect(_on_finished)
+        self._operation_worker.error.connect(_on_error)
+        self._operation_worker.start()
+
     def set_image_from_layer(self):
         """Set the image from the selected QGIS layer."""
         if self.sam is None:
@@ -1312,15 +1369,16 @@ class SamGeoDockWidget(QDockWidget):
         temp_export_path = None
 
         if is_gpkg:
-            # Export GeoPackage raster to a temporary file
+            # GeoPackage export uses QGIS internals — keep on main thread.
+            # It is brief; processEvents() keeps the UI alive during it.
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)
             self.image_status.setText("Exporting GeoPackage raster...")
             QCoreApplication.processEvents()
 
             temp_export_path = self._export_geopackage_raster(layer)
+            self.progress_bar.setVisible(False)
             if temp_export_path is None:
-                self.progress_bar.setVisible(False)
                 self.image_status.setText("Image: Failed to export")
                 self.image_status.setStyleSheet("color: red;")
                 self.show_error(
@@ -1336,19 +1394,20 @@ class SamGeoDockWidget(QDockWidget):
                 return
             image_path = source
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            self.image_status.setText("Setting image...")
-            QCoreApplication.processEvents()
+        # Run the (potentially slow) model embedding step in a background thread
+        # so the spinning progress bar remains animated.
+        bands = self._get_bands()
 
-            # Get bands if custom bands are enabled
-            bands = self._get_bands()
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.image_status.setText("Setting image...")
+
+        def _work():
             self.sam.set_image(image_path, bands=bands)
+
+        def _done(_):
             self.current_layer = layer
             self.current_image_path = image_path
-
-            # Build status message
             status_msg = f"Image: {layer.name()}"
             if is_gpkg:
                 status_msg += " (from GeoPackage)"
@@ -1356,7 +1415,6 @@ class SamGeoDockWidget(QDockWidget):
                 status_msg += f" (Bands: {bands})"
             self.image_status.setText(status_msg)
             self.image_status.setStyleSheet("color: green;")
-
             log_msg = f"Image set from layer: {layer.name()}"
             if is_gpkg:
                 log_msg += f" (exported from GeoPackage to {image_path})"
@@ -1364,30 +1422,26 @@ class SamGeoDockWidget(QDockWidget):
                 log_msg += f" with bands {bands}"
             self.log_message(log_msg)
 
-        except Exception as e:
+        def _error(msg):
             self.image_status.setText("Image: Failed to set")
             self.image_status.setStyleSheet("color: red;")
-            # Clean up temp file if export succeeded but set_image failed
             if temp_export_path and os.path.exists(temp_export_path):
                 try:
                     os.remove(temp_export_path)
-                    # Keep internal temp file tracking consistent, if present
                     if hasattr(self, "_temp_files"):
                         try:
                             self._temp_files.remove(temp_export_path)
                         except ValueError:
-                            # It was not tracked; ignore
                             pass
                 except Exception as cleanup_error:
-                    # Log cleanup failure but do not mask the original error
                     self.log_message(
-                        f"Failed to clean up temporary export file '{temp_export_path}': {cleanup_error}",
+                        f"Failed to clean up temporary export file "
+                        f"'{temp_export_path}': {cleanup_error}",
                         level=Qgis.Warning,
                     )
-            self.show_error(f"Failed to set image: {str(e)}")
+            self.show_error(f"Failed to set image: {msg}")
 
-        finally:
-            self.progress_bar.setVisible(False)
+        self._run_with_progress(_work, _done, _error)
 
     def set_image_from_file(self):
         """Set the image from the file path."""
@@ -1400,30 +1454,25 @@ class SamGeoDockWidget(QDockWidget):
             self.show_error("Please select a valid image file.")
             return
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            self.image_status.setText("Setting image...")
-            QCoreApplication.processEvents()
+        bands = self._get_bands()
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.image_status.setText("Setting image...")
 
-            # Get bands if custom bands are enabled
-            bands = self._get_bands()
+        def _work():
             self.sam.set_image(file_path, bands=bands)
 
-            # Optionally add the layer to the map
+        def _done(_):
             layer = QgsRasterLayer(file_path, os.path.basename(file_path))
             if layer.isValid():
                 QgsProject.instance().addMapLayer(layer)
                 self.current_layer = layer
                 self.current_image_path = file_path
-
-                # Build status message
                 status_msg = f"Image: {os.path.basename(file_path)}"
                 if bands:
                     status_msg += f" (Bands: {bands})"
                 self.image_status.setText(status_msg)
                 self.image_status.setStyleSheet("color: green;")
-
                 log_msg = f"Image set from file: {file_path}"
                 if bands:
                     log_msg += f" with bands {bands}"
@@ -1438,13 +1487,12 @@ class SamGeoDockWidget(QDockWidget):
                     "Failed to add image layer: The raster layer is invalid."
                 )
 
-        except Exception as e:
+        def _error(msg):
             self.image_status.setText("Image: Failed to set")
             self.image_status.setStyleSheet("color: red;")
-            self.show_error(f"Failed to set image: {str(e)}")
+            self.show_error(f"Failed to set image: {msg}")
 
-        finally:
-            self.progress_bar.setVisible(False)
+        self._run_with_progress(_work, _done, _error)
 
     def segment_by_text(self):
         """Segment the image using text prompt."""
@@ -1461,28 +1509,26 @@ class SamGeoDockWidget(QDockWidget):
             self.show_error("Please enter a text prompt.")
             return
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            self.text_status_label.setText("Processing...")
-            self.text_status_label.setStyleSheet("color: orange;")
-            QCoreApplication.processEvents()
+        min_size = self.min_size_spin.value()
+        max_size = (
+            self.max_size_spin.value() if self.max_size_spin.value() > 0 else None
+        )
 
-            min_size = self.min_size_spin.value()
-            max_size = (
-                self.max_size_spin.value() if self.max_size_spin.value() > 0 else None
-            )
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.text_status_label.setText("Processing...")
+        self.text_status_label.setStyleSheet("color: orange;")
 
+        def _work():
             self.sam.generate_masks(prompt, min_size=min_size, max_size=max_size)
 
+        def _done(_):
             num_masks = len(self.sam.masks) if self.sam.masks else 0
             self.results_text.setText(
                 f"Text Segmentation Results:\n"
                 f"Prompt: {prompt}\n"
                 f"Objects found: {num_masks}\n"
             )
-
-            # Update status label
             if num_masks > 0:
                 if self.auto_show_check.isChecked():
                     self.text_status_label.setText(f"Found {num_masks} object(s).")
@@ -1496,20 +1542,16 @@ class SamGeoDockWidget(QDockWidget):
                     "No objects found. Try a different prompt."
                 )
                 self.text_status_label.setStyleSheet("color: orange;")
-
             self.log_message(f"Text segmentation complete. Found {num_masks} objects.")
-
-            # Auto-show results if enabled
             if num_masks > 0:
                 self._auto_show_results()
 
-        except Exception as e:
+        def _error(msg):
             self.text_status_label.setText("Segmentation failed!")
             self.text_status_label.setStyleSheet("color: red;")
-            self.show_error(f"Segmentation failed: {str(e)}")
+            self.show_error(f"Segmentation failed: {msg}")
 
-        finally:
-            self.progress_bar.setVisible(False)
+        self._run_with_progress(_work, _done, _error)
 
     def start_point_tool(self, foreground=True):
         """Start the point prompt tool."""
@@ -1646,23 +1688,23 @@ class SamGeoDockWidget(QDockWidget):
             self.show_error("Please add at least one point.")
             return
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            self.point_status_label.setText("Processing...")
-            self.point_status_label.setStyleSheet("color: orange;")
-            QCoreApplication.processEvents()
+        import numpy as np
 
-            import numpy as np
+        point_coords = np.array(self.point_coords)
+        point_labels = np.array(self.point_labels)
 
-            point_coords = np.array(self.point_coords)
-            point_labels = np.array(self.point_labels)
+        # Use multimask_output=False when there are multiple points or
+        # background points, as it gives better results for non-ambiguous prompts
+        has_background = 0 in point_labels
+        use_multimask = len(point_coords) == 1 and not has_background
+        num_points = len(self.point_coords)
 
-            # Use multimask_output=False when there are multiple points or
-            # background points, as it gives better results for non-ambiguous prompts
-            has_background = 0 in point_labels
-            use_multimask = len(point_coords) == 1 and not has_background
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.point_status_label.setText("Processing...")
+        self.point_status_label.setStyleSheet("color: orange;")
 
+        def _work():
             # Use appropriate method based on model type
             # point_crs=None because coordinates are already in pixel space
             # (transformed from canvas CRS to layer CRS in add_point())
@@ -1691,14 +1733,13 @@ class SamGeoDockWidget(QDockWidget):
                         point_crs=None,
                     )
 
+        def _done(_):
             num_masks = len(self.sam.masks) if self.sam.masks else 0
             self.results_text.setText(
                 f"Point Segmentation Results:\n"
-                f"Points used: {len(self.point_coords)}\n"
+                f"Points used: {num_points}\n"
                 f"Objects found: {num_masks}\n"
             )
-
-            # Update status label
             if num_masks > 0:
                 if self.auto_show_check.isChecked():
                     self.point_status_label.setText(f"Found {num_masks} object(s).")
@@ -1712,26 +1753,21 @@ class SamGeoDockWidget(QDockWidget):
                     "No objects found. Try different points."
                 )
                 self.point_status_label.setStyleSheet("color: orange;")
-
             self.log_message(f"Point segmentation complete. Found {num_masks} objects.")
-
             # Deactivate tool
             self.add_fg_point_btn.setChecked(False)
             self.add_bg_point_btn.setChecked(False)
             if self.previous_tool:
                 self.canvas.setMapTool(self.previous_tool)
-
-            # Auto-show results if enabled
             if num_masks > 0:
                 self._auto_show_results()
 
-        except Exception as e:
+        def _error(msg):
             self.point_status_label.setText("Segmentation failed!")
             self.point_status_label.setStyleSheet("color: red;")
-            self.show_error(f"Segmentation failed: {str(e)}")
+            self.show_error(f"Segmentation failed: {msg}")
 
-        finally:
-            self.progress_bar.setVisible(False)
+        self._run_with_progress(_work, _done, _error)
 
     def start_box_tool(self):
         """Start the box prompt tool."""
@@ -1793,30 +1829,30 @@ class SamGeoDockWidget(QDockWidget):
             self.show_error("Please draw a box first.")
             return
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            self.box_status_label.setText("Processing...")
-            self.box_status_label.setStyleSheet("color: orange;")
-            QCoreApplication.processEvents()
+        box_coords = self.box_coords  # capture for closure
 
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.box_status_label.setText("Processing...")
+        self.box_status_label.setStyleSheet("color: orange;")
+
+        def _work():
             # Use appropriate method based on model type
             if self._sam_supports("generate_masks_by_boxes"):
-                self.sam.generate_masks_by_boxes(boxes=[self.box_coords])
+                self.sam.generate_masks_by_boxes(boxes=[box_coords])
             else:
                 # Fallback for older SamGeo versions
                 import numpy as np
 
-                self.sam.predict(box=np.array(self.box_coords))
+                self.sam.predict(box=np.array(box_coords))
 
+        def _done(_):
             num_masks = len(self.sam.masks) if self.sam.masks else 0
             self.results_text.setText(
                 f"Box Segmentation Results:\n"
-                f"Box: {self.box_coords}\n"
+                f"Box: {box_coords}\n"
                 f"Objects found: {num_masks}\n"
             )
-
-            # Update status label
             if num_masks > 0:
                 if self.auto_show_check.isChecked():
                     self.box_status_label.setText(f"Found {num_masks} object(s).")
@@ -1828,25 +1864,20 @@ class SamGeoDockWidget(QDockWidget):
             else:
                 self.box_status_label.setText("No objects found. Try a different box.")
                 self.box_status_label.setStyleSheet("color: orange;")
-
             self.log_message(f"Box segmentation complete. Found {num_masks} objects.")
-
             # Deactivate tool
             self.draw_box_btn.setChecked(False)
             if self.previous_tool:
                 self.canvas.setMapTool(self.previous_tool)
-
-            # Auto-show results if enabled
             if num_masks > 0:
                 self._auto_show_results()
 
-        except Exception as e:
+        def _error(msg):
             self.box_status_label.setText("Segmentation failed!")
             self.box_status_label.setStyleSheet("color: red;")
-            self.show_error(f"Segmentation failed: {str(e)}")
+            self.show_error(f"Segmentation failed: {msg}")
 
-        finally:
-            self.progress_bar.setVisible(False)
+        self._run_with_progress(_work, _done, _error)
 
     def segment_by_points_batch(self):
         """Segment using batch point prompts from interactive points or vector file/layer."""
@@ -1913,23 +1944,22 @@ class SamGeoDockWidget(QDockWidget):
         if not output_path:
             output_path = None  # Will only store in memory
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            self.batch_status_label.setText("Processing batch segmentation...")
-            self.batch_status_label.setStyleSheet("color: orange;")
-            QCoreApplication.processEvents()
+        # Get size filters
+        min_size = self.batch_min_size_spin.value()
+        max_size = (
+            self.batch_max_size_spin.value()
+            if self.batch_max_size_spin.value() > 0
+            else None
+        )
+        unique = self.batch_unique_check.isChecked()
+        add_to_map = self.add_to_map_check.isChecked()
 
-            # Get size filters
-            min_size = self.batch_min_size_spin.value()
-            max_size = (
-                self.batch_max_size_spin.value()
-                if self.batch_max_size_spin.value() > 0
-                else None
-            )
-            unique = self.batch_unique_check.isChecked()
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.batch_status_label.setText("Processing batch segmentation...")
+        self.batch_status_label.setStyleSheet("color: orange;")
 
-            # Run batch segmentation
+        def _work():
             self.sam.generate_masks_by_points_patch(
                 point_coords_batch=point_source,
                 point_crs=point_crs,
@@ -1939,9 +1969,8 @@ class SamGeoDockWidget(QDockWidget):
                 max_size=max_size,
             )
 
+        def _done(_):
             num_masks = len(self.sam.masks) if self.sam.masks else 0
-
-            # Update results
             result_text = (
                 f"Batch Point Segmentation Results:\n"
                 f"Source: {source_description}\n"
@@ -1949,10 +1978,7 @@ class SamGeoDockWidget(QDockWidget):
             )
             if output_path:
                 result_text += f"Output saved to: {output_path}\n"
-
             self.results_text.setText(result_text)
-
-            # Update status label
             if num_masks > 0:
                 if self.auto_show_check.isChecked():
                     self.batch_status_label.setText(f"Found {num_masks} object(s).")
@@ -1966,32 +1992,26 @@ class SamGeoDockWidget(QDockWidget):
                     "No objects found. Try different points."
                 )
                 self.batch_status_label.setStyleSheet("color: orange;")
-
             self.log_message(
                 f"Batch point segmentation complete. Found {num_masks} objects."
             )
-
             # Deactivate batch point tool if active
             self.batch_add_point_btn.setChecked(False)
-
             # Add output to map if saved and option is checked (for batch-specific output)
-            if output_path and self.add_to_map_check.isChecked():
+            if output_path and add_to_map:
                 layer = QgsRasterLayer(output_path, os.path.basename(output_path))
                 if layer.isValid():
                     QgsProject.instance().addMapLayer(layer)
                     self.results_text.append("Added result layer to map.")
-
-            # Auto-show results if enabled
             if num_masks > 0:
                 self._auto_show_results()
 
-        except Exception as e:
+        def _error(msg):
             self.batch_status_label.setText("Failed!")
             self.batch_status_label.setStyleSheet("color: red;")
-            self.show_error(f"Batch segmentation failed: {str(e)}")
+            self.show_error(f"Batch segmentation failed: {msg}")
 
-        finally:
-            self.progress_bar.setVisible(False)
+        self._run_with_progress(_work, _done, _error)
 
     def _auto_show_results(self):
         """Automatically save and show results based on Output tab settings.
@@ -2011,7 +2031,7 @@ class SamGeoDockWidget(QDockWidget):
         format_text = self.output_format_combo.currentText()
         output_path = self.output_path_edit.text().strip()
 
-        # Generate temp file path if not specified
+        # Generate temp file path if not specified (on main thread before worker starts)
         use_temp_file = False
         if not output_path:
             use_temp_file = True
@@ -2031,24 +2051,31 @@ class SamGeoDockWidget(QDockWidget):
                 temp_dir = tempfile.mkdtemp()
                 output_path = os.path.join(temp_dir, "masks.shp")
 
-        try:
-            unique = self.unique_check.isChecked()
+        # Capture UI values needed in worker
+        unique = self.unique_check.isChecked()
+        add_to_map = self.add_to_map_check.isChecked()
+        is_raster = "Raster" in format_text
+        min_area = self.min_area_spin.value()
+        vector_mode = self.vector_mode_combo.currentIndex()
+        smooth_iterations = (
+            self.smooth_iterations_spin.value() if vector_mode == 2 else 0
+        )
+        epsilon = self.epsilon_spin.value() if vector_mode == 1 else 0.0
+        layer_name = "samgeo_masks" if use_temp_file else os.path.basename(output_path)
 
-            if "Raster" in format_text:
-                # Save as raster
+        def _work():
+            if is_raster:
                 self.sam.save_masks(output=output_path, unique=unique)
-
-                if self.add_to_map_check.isChecked():
-                    layer_name = (
-                        "samgeo_masks"
-                        if use_temp_file
-                        else os.path.basename(output_path)
-                    )
-                    layer = QgsRasterLayer(output_path, layer_name)
-                    if layer.isValid():
-                        QgsProject.instance().addMapLayer(layer)
+                return ("raster", output_path, layer_name)
             else:
-                # Save as vector - first save as raster, then convert
+                # Determine output format from file extension
+                if output_path.endswith(".gpkg"):
+                    vec_format = "gpkg"
+                elif output_path.endswith(".shp"):
+                    vec_format = "shapefile"
+                else:
+                    vec_format = "geojson"
+
                 temp_raster = tempfile.NamedTemporaryFile(
                     suffix=".tif", delete=False
                 ).name
@@ -2059,51 +2086,37 @@ class SamGeoDockWidget(QDockWidget):
 
                     geoai = get_geoai()
 
-                    min_area = self.min_area_spin.value()
-
-                    # Check vector processing mode: 0 = Simple, 1 = Regularize, 2 = Smooth
-                    vector_mode = self.vector_mode_combo.currentIndex()
-
                     if vector_mode == 0:
                         # Simple mode - just convert raster to vector
-                        gdf = geoai.raster_to_vector(
+                        geoai.raster_to_vector(
                             temp_raster,
                             output_path=output_path,
                             min_area=min_area if min_area > 0 else 0,
                             simplify_tolerance=None,
+                            output_format=vec_format,
                         )
                     elif vector_mode == 2:
                         # Use smooth_vector for natural features
-                        smooth_iterations = self.smooth_iterations_spin.value()
-
-                        # First convert raster to vector (min_area=0 means no filtering)
                         gdf = geoai.raster_to_vector(
                             temp_raster,
                             min_area=min_area if min_area > 0 else 0,
                             simplify_tolerance=None,
                         )
-
-                        # Apply smoothing
-                        gdf = geoai.smooth_vector(
+                        geoai.smooth_vector(
                             gdf,
                             smooth_iterations=smooth_iterations,
                             output_path=output_path,
                         )
                     else:
                         # Use orthogonalize for regularization (buildings)
-                        epsilon = self.epsilon_spin.value()
-
                         gdf = geoai.orthogonalize(
                             temp_raster,
                             output_path,
                             epsilon=epsilon,
                         )
-
-                        # Apply min area filter if specified
                         if min_area > 0:
                             gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
                             gdf = gdf[gdf["area_m2"] >= min_area]
-                            # Determine driver based on output format
                             if output_path.endswith(".geojson"):
                                 driver = "GeoJSON"
                             elif output_path.endswith(".gpkg"):
@@ -2113,26 +2126,32 @@ class SamGeoDockWidget(QDockWidget):
                             else:
                                 driver = None
                             gdf.to_file(output_path, driver=driver)
-
-                    if self.add_to_map_check.isChecked():
-                        layer_name = (
-                            "samgeo_masks"
-                            if use_temp_file
-                            else os.path.basename(output_path)
-                        )
-                        layer = QgsVectorLayer(output_path, layer_name, "ogr")
-                        if layer.isValid():
-                            QgsProject.instance().addMapLayer(layer)
                 finally:
                     if os.path.exists(temp_raster):
                         os.remove(temp_raster)
+                return ("vector", output_path, layer_name)
 
-            self.results_text.append(f"\nAuto-saved to: {output_path}")
-            self.log_message(f"Auto-saved masks to: {output_path}")
+        def _done(result):
+            kind, out_path, lname = result
+            if add_to_map:
+                if kind == "raster":
+                    layer = QgsRasterLayer(out_path, lname)
+                    if layer.isValid():
+                        QgsProject.instance().addMapLayer(layer)
+                else:
+                    layer = QgsVectorLayer(out_path, lname, "ogr")
+                    if layer.isValid():
+                        QgsProject.instance().addMapLayer(layer)
+            self.results_text.append(f"\nAuto-saved to: {out_path}")
+            self.log_message(f"Auto-saved masks to: {out_path}")
 
-        except Exception as e:
-            self.log_message(f"Auto-show failed: {str(e)}", level=Qgis.Warning)
-            self.show_error(f"Auto-show failed: {str(e)}")
+        def _error(msg):
+            self.log_message(f"Auto-show failed: {msg}", level=Qgis.Warning)
+            self.show_error(f"Auto-show failed: {msg}")
+
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self._run_with_progress(_work, _done, _error)
 
     def save_masks(self):
         """Save the segmentation masks."""
@@ -2165,28 +2184,31 @@ class SamGeoDockWidget(QDockWidget):
                 temp_dir = tempfile.mkdtemp()
                 output_path = os.path.join(temp_dir, "masks.shp")
 
-        try:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)
-            QCoreApplication.processEvents()
+        # Capture UI values needed in worker
+        unique = self.unique_check.isChecked()
+        add_to_map = self.add_to_map_check.isChecked()
+        is_raster = "Raster" in format_text
+        min_area = self.min_area_spin.value()
+        vector_mode = self.vector_mode_combo.currentIndex()
+        smooth_iterations = (
+            self.smooth_iterations_spin.value() if vector_mode == 2 else 0
+        )
+        epsilon = self.epsilon_spin.value() if vector_mode == 1 else 0.0
+        layer_name = "samgeo_masks" if use_temp_file else os.path.basename(output_path)
 
-            unique = self.unique_check.isChecked()
-
-            if "Raster" in format_text:
-                # Save as raster
+        def _work():
+            if is_raster:
                 self.sam.save_masks(output=output_path, unique=unique)
-
-                if self.add_to_map_check.isChecked():
-                    layer_name = (
-                        "samgeo_masks"
-                        if use_temp_file
-                        else os.path.basename(output_path)
-                    )
-                    layer = QgsRasterLayer(output_path, layer_name)
-                    if layer.isValid():
-                        QgsProject.instance().addMapLayer(layer)
+                return ("raster", output_path, layer_name)
             else:
-                # Save as vector - first save as raster, then convert
+                # Determine output format from file extension
+                if output_path.endswith(".gpkg"):
+                    vec_format = "gpkg"
+                elif output_path.endswith(".shp"):
+                    vec_format = "shapefile"
+                else:
+                    vec_format = "geojson"
+
                 temp_raster = tempfile.NamedTemporaryFile(
                     suffix=".tif", delete=False
                 ).name
@@ -2197,51 +2219,37 @@ class SamGeoDockWidget(QDockWidget):
 
                     geoai = get_geoai()
 
-                    min_area = self.min_area_spin.value()
-
-                    # Check vector processing mode: 0 = Simple, 1 = Regularize, 2 = Smooth
-                    vector_mode = self.vector_mode_combo.currentIndex()
-
                     if vector_mode == 0:
                         # Simple mode - just convert raster to vector
-                        gdf = geoai.raster_to_vector(
+                        geoai.raster_to_vector(
                             temp_raster,
                             output_path=output_path,
                             min_area=min_area if min_area > 0 else 0,
                             simplify_tolerance=None,
+                            output_format=vec_format,
                         )
                     elif vector_mode == 2:
                         # Use smooth_vector for natural features
-                        smooth_iterations = self.smooth_iterations_spin.value()
-
-                        # First convert raster to vector (min_area=0 means no filtering)
                         gdf = geoai.raster_to_vector(
                             temp_raster,
                             min_area=min_area if min_area > 0 else 0,
                             simplify_tolerance=None,
                         )
-
-                        # Apply smoothing
-                        gdf = geoai.smooth_vector(
+                        geoai.smooth_vector(
                             gdf,
                             smooth_iterations=smooth_iterations,
                             output_path=output_path,
                         )
                     else:
                         # Use orthogonalize for regularization (buildings)
-                        epsilon = self.epsilon_spin.value()
-
                         gdf = geoai.orthogonalize(
                             temp_raster,
                             output_path,
                             epsilon=epsilon,
                         )
-
-                        # Apply min area filter if specified
                         if min_area > 0:
                             gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
                             gdf = gdf[gdf["area_m2"] >= min_area]
-                            # Determine driver based on output format
                             if output_path.endswith(".geojson"):
                                 driver = "GeoJSON"
                             elif output_path.endswith(".gpkg"):
@@ -2251,27 +2259,31 @@ class SamGeoDockWidget(QDockWidget):
                             else:
                                 driver = None
                             gdf.to_file(output_path, driver=driver)
-
-                    if self.add_to_map_check.isChecked():
-                        layer_name = (
-                            "samgeo_masks"
-                            if use_temp_file
-                            else os.path.basename(output_path)
-                        )
-                        layer = QgsVectorLayer(output_path, layer_name, "ogr")
-                        if layer.isValid():
-                            QgsProject.instance().addMapLayer(layer)
                 finally:
                     if os.path.exists(temp_raster):
                         os.remove(temp_raster)
-            self.results_text.append(f"\nSaved to: {output_path}")
-            self.log_message(f"Masks saved to: {output_path}")
+                return ("vector", output_path, layer_name)
 
-        except Exception as e:
-            self.show_error(f"Failed to save masks: {str(e)}")
+        def _done(result):
+            kind, out_path, lname = result
+            if add_to_map:
+                if kind == "raster":
+                    layer = QgsRasterLayer(out_path, lname)
+                    if layer.isValid():
+                        QgsProject.instance().addMapLayer(layer)
+                else:
+                    layer = QgsVectorLayer(out_path, lname, "ogr")
+                    if layer.isValid():
+                        QgsProject.instance().addMapLayer(layer)
+            self.results_text.append(f"\nSaved to: {out_path}")
+            self.log_message(f"Masks saved to: {out_path}")
 
-        finally:
-            self.progress_bar.setVisible(False)
+        def _error(msg):
+            self.show_error(f"Failed to save masks: {msg}")
+
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self._run_with_progress(_work, _done, _error)
 
     def browse_export_dir(self):
         """Open directory dialog for export output."""

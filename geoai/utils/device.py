@@ -3,8 +3,6 @@
 import os
 from typing import List, Union
 
-import torch
-
 __all__ = [
     "get_device",
     "empty_cache",
@@ -69,11 +67,13 @@ def temp_file_path(ext: str) -> str:
     return file_path
 
 
-def get_device() -> torch.device:
+def get_device():
     """
     Returns the best available device for deep learning in the order:
     CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU
     """
+    import torch
+
     if torch.cuda.is_available():
         return torch.device("cuda")
     elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
@@ -84,6 +84,8 @@ def get_device() -> torch.device:
 
 def empty_cache() -> None:
     """Empty the cache of the current device."""
+    import torch
+
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():

@@ -508,6 +508,7 @@ def raster_to_vector(
         attribute_name (str): Name of the attribute field for the class values.
         unique_attribute_value (bool): Whether to generate unique values for each shape within a class.
         output_format (str): Format for output file - 'geojson', 'shapefile', 'gpkg'.
+            Auto-detected from the file extension of output_path when possible.
         plot_result (bool): Whether to plot the resulting polygons overlaid on the raster.
 
     Returns:
@@ -522,48 +523,62 @@ def raster_to_vector(
         transform = src.transform
         crs = src.crs
 
-        # Create mask based on threshold and class values
-        if class_values is not None:
-            # Create a mask for each specified class value
-            masks = {val: (data == val) for val in class_values}
-        else:
-            # Create a mask for values above threshold
-            masks = {1: (data > threshold)}
-            class_values = [1]  # Default class
-
         # Check if CRS is geographic (area in sq degrees, not sq meters)
         is_geographic = crs is not None and crs.is_geographic
 
         # Initialize list to store features
         all_features = []
 
-        # Process each class value
-        for class_val in class_values:
-            mask = masks[class_val]
+        if class_values is not None:
+            # Create a mask for each specified class value and vectorize per class
+            masks = {val: (data == val) for val in class_values}
+            for class_val in class_values:
+                mask = masks[class_val]
+                shape_count = 1
+                for geom, value in features.shapes(
+                    mask.astype(np.uint8), mask=mask, transform=transform
+                ):
+                    geom = shape(geom)
+                    if not is_geographic and geom.area < min_area:
+                        continue
+                    if simplify_tolerance is not None:
+                        geom = geom.simplify(simplify_tolerance)
+                    if unique_attribute_value:
+                        all_features.append(
+                            {
+                                "geometry": geom,
+                                attribute_name: class_val * shape_count,
+                            }
+                        )
+                    else:
+                        all_features.append(
+                            {"geometry": geom, attribute_name: class_val}
+                        )
+                    shape_count += 1
+        else:
+            # No class_values specified: vectorize all pixels above threshold.
+            # Pass the raw data array (not a binary mask) so that adjacent regions
+            # with different pixel values (e.g. SAM unique-value masks) are kept as
+            # separate polygons rather than merged into one connected blob.
+            binary_mask = (data > threshold).astype(np.uint8)
             shape_count = 1
-            # Vectorize the mask
             for geom, value in features.shapes(
-                mask.astype(np.uint8), mask=mask, transform=transform
+                data.astype(np.int32), mask=binary_mask, transform=transform
             ):
-                # Convert to shapely geometry
+                class_val = int(value)
+                if class_val == 0:
+                    continue
                 geom = shape(geom)
-
-                # Skip small polygons (area check deferred for geographic CRS)
                 if not is_geographic and geom.area < min_area:
                     continue
-
-                # Simplify geometry if requested
                 if simplify_tolerance is not None:
                     geom = geom.simplify(simplify_tolerance)
-
-                # Add to features list with class value
                 if unique_attribute_value:
                     all_features.append(
                         {"geometry": geom, attribute_name: class_val * shape_count}
                     )
                 else:
                     all_features.append({"geometry": geom, attribute_name: class_val})
-
                 shape_count += 1
 
         # Create GeoDataFrame
@@ -582,6 +597,15 @@ def raster_to_vector(
 
         # Save to file if requested
         if output_path is not None:
+            # Auto-detect output_format from file extension when not explicitly set
+            ext = os.path.splitext(output_path)[1].lower()
+            if ext == ".gpkg":
+                output_format = "gpkg"
+            elif ext == ".shp":
+                output_format = "shapefile"
+            elif ext in (".geojson", ".json"):
+                output_format = "geojson"
+
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
