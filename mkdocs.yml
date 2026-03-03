@@ -78,6 +78,7 @@ plugins:
                   "examples/moondream_sliding_window.ipynb",
                   "examples/torchgeo_embeddings.ipynb",
                   "examples/image_recognition.ipynb",
+                  "examples/clip_classify_vector.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -189,6 +190,7 @@ nav:
           - examples/torchgeo_embeddings.ipynb
           - examples/google_satellite_embedding.ipynb
           - examples/building_detection_whu.ipynb
+          - examples/clip_classify_vector.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
