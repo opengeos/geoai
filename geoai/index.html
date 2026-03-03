@@ -2738,6 +2738,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/clip_classify_vector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clip classify vector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9577,10 +9605,7 @@ imagery with 12 spectral bands for agricultural field boundary detection.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/segment.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
@@ -9588,7 +9613,10 @@ imagery with 12 spectral bands for agricultural field boundary detection.</p>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
-<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">BoundingBox</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents a bounding box with coordinates.&quot;&quot;&quot;</span>
 
@@ -10178,7 +10206,9 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Device to run the model on ('cuda', 'cpu'). If None, will use CUDA if available.</p>
+                <p>Device to run the model on ('cuda', 'mps', 'cpu').
+If None, auto-selects the best available device
+(CUDA &gt; MPS &gt; CPU) via <code>get_device()</code>.</p>
               </div>
             </td>
             <td>
@@ -10260,7 +10290,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The device being used ('cuda' or 'cpu').</p>
+                <p>The device being used ('cuda', 'mps', or 'cpu').</p>
               </div>
             </td>
           </tr>
@@ -10298,10 +10328,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/segment.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 738</span>
-<span class="normal"> 739</span>
-<span class="normal"> 740</span>
-<span class="normal"> 741</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 741</span>
 <span class="normal"> 742</span>
 <span class="normal"> 743</span>
 <span class="normal"> 744</span>
@@ -10597,7 +10624,27 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 <span class="normal">1034</span>
 <span class="normal">1035</span>
 <span class="normal">1036</span>
-<span class="normal">1037</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CLIPSegmentation</span><span class="p">:</span>
+<span class="normal">1037</span>
+<span class="normal">1038</span>
+<span class="normal">1039</span>
+<span class="normal">1040</span>
+<span class="normal">1041</span>
+<span class="normal">1042</span>
+<span class="normal">1043</span>
+<span class="normal">1044</span>
+<span class="normal">1045</span>
+<span class="normal">1046</span>
+<span class="normal">1047</span>
+<span class="normal">1048</span>
+<span class="normal">1049</span>
+<span class="normal">1050</span>
+<span class="normal">1051</span>
+<span class="normal">1052</span>
+<span class="normal">1053</span>
+<span class="normal">1054</span>
+<span class="normal">1055</span>
+<span class="normal">1056</span>
+<span class="normal">1057</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CLIPSegmentation</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class for segmenting high-resolution satellite imagery using text prompts with CLIP-based models.</span>
 
@@ -10606,14 +10653,16 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
 <span class="sd">    Args:</span>
 <span class="sd">        model_name (str): Name of the CLIP-Seg model to use. Defaults to &quot;CIDAS/clipseg-rd64-refined&quot;.</span>
-<span class="sd">        device (str): Device to run the model on (&#39;cuda&#39;, &#39;cpu&#39;). If None, will use CUDA if available.</span>
+<span class="sd">        device (str): Device to run the model on (&#39;cuda&#39;, &#39;mps&#39;, &#39;cpu&#39;).</span>
+<span class="sd">            If None, auto-selects the best available device</span>
+<span class="sd">            (CUDA &gt; MPS &gt; CPU) via ``get_device()``.</span>
 <span class="sd">        tile_size (int): Size of tiles to process the image in chunks. Defaults to 352.</span>
 <span class="sd">        overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 16.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        processor (CLIPSegProcessor): The processor for the CLIP-Seg model.</span>
 <span class="sd">        model (CLIPSegForImageSegmentation): The CLIP-Seg model for segmentation.</span>
-<span class="sd">        device (str): The device being used (&#39;cuda&#39; or &#39;cpu&#39;).</span>
+<span class="sd">        device (str): The device being used (&#39;cuda&#39;, &#39;mps&#39;, or &#39;cpu&#39;).</span>
 <span class="sd">        tile_size (int): Size of tiles for processing.</span>
 <span class="sd">        overlap (int): Overlap between tiles.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -10630,18 +10679,20 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
 <span class="sd">        Args:</span>
 <span class="sd">            model_name (str): Name of the CLIP-Seg model to use. Defaults to &quot;CIDAS/clipseg-rd64-refined&quot;.</span>
-<span class="sd">            device (str): Device to run the model on (&#39;cuda&#39;, &#39;cpu&#39;). If None, will use CUDA if available.</span>
+<span class="sd">            device (str): Device to run the model on (&#39;cuda&#39;, &#39;mps&#39;, &#39;cpu&#39;).</span>
+<span class="sd">                If None, auto-selects the best available device</span>
+<span class="sd">                (CUDA &gt; MPS &gt; CPU) via ``get_device()``.</span>
 <span class="sd">            tile_size (int): Size of tiles to process the image in chunks. Defaults to 512.</span>
 <span class="sd">            overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 32.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">=</span> <span class="n">tile_size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="o">=</span> <span class="n">overlap</span>
 
-        <span class="c1"># Set device</span>
-        <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+        <span class="c1"># Lazy import to avoid pulling in geoai.utils (which eagerly</span>
+        <span class="c1"># imports leafmap) at module-collection time.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.utils.device</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_device</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">device</span> <span class="ow">or</span> <span class="n">get_device</span><span class="p">())</span>
 
         <span class="c1"># Load model and processor</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">processor</span> <span class="o">=</span> <span class="n">CLIPSegProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
@@ -10649,7 +10700,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
             <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
         <span class="p">)</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model loaded on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;CLIPSeg model loaded on </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -10721,39 +10772,50 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
                         <span class="c1"># Process the tile</span>
                         <span class="k">try</span><span class="p">:</span>
-                            <span class="c1"># Convert to RGB if necessary (handling different satellite bands)</span>
-                            <span class="k">if</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
-                                <span class="c1"># Use first three bands for RGB representation</span>
+                            <span class="c1"># Convert to RGB format</span>
+                            <span class="n">bands</span> <span class="o">=</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="n">bands</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
                                 <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-                                <span class="c1"># Normalize data to 0-255 range if needed</span>
-                                <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                                    <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
-                                        <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                        <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                        <span class="o">*</span> <span class="mi">255</span>
-                                    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
-                            <span class="k">elif</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-                                <span class="c1"># Create RGB from grayscale</span>
+                            <span class="k">elif</span> <span class="n">bands</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
                                 <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
                                     <span class="n">tile_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span>
                                 <span class="p">)</span>
-                                <span class="c1"># Normalize if needed</span>
-                                <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                                    <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
-                                        <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                        <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                        <span class="o">*</span> <span class="mi">255</span>
-                                    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
                             <span class="k">else</span><span class="p">:</span>
-                                <span class="c1"># Already 3-channel, assume RGB</span>
-                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-                                <span class="c1"># Normalize if needed</span>
-                                <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                                    <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
-                                        <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                        <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                        <span class="o">*</span> <span class="mi">255</span>
-                                    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                                <span class="c1"># 2-band: replicate first band into 3 channels</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                                    <span class="n">tile_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span>
+                                <span class="p">)</span>
+
+                            <span class="c1"># Normalize to uint8 if needed</span>
+                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
+                                <span class="c1"># Already uint8 — skip normalization</span>
+                                <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                                    <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                                    <span class="k">continue</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="c1"># Float / other dtypes: per-channel normalization</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+                                <span class="n">result_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">rgb_tile</span><span class="p">)</span>
+                                <span class="n">all_zero</span> <span class="o">=</span> <span class="kc">True</span>
+                                <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+                                    <span class="n">cmin</span> <span class="o">=</span> <span class="n">rgb_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+                                    <span class="n">cmax</span> <span class="o">=</span> <span class="n">rgb_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+                                    <span class="k">if</span> <span class="n">cmax</span> <span class="o">&gt;</span> <span class="n">cmin</span><span class="p">:</span>
+                                        <span class="n">result_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                                            <span class="p">(</span><span class="n">rgb_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">-</span> <span class="n">cmin</span><span class="p">)</span>
+                                            <span class="o">/</span> <span class="p">(</span><span class="n">cmax</span> <span class="o">-</span> <span class="n">cmin</span><span class="p">)</span>
+                                            <span class="o">*</span> <span class="mf">255.0</span>
+                                        <span class="p">)</span>
+                                        <span class="n">all_zero</span> <span class="o">=</span> <span class="kc">False</span>
+                                    <span class="k">elif</span> <span class="n">cmax</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                        <span class="n">result_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">=</span> <span class="mf">128.0</span>
+                                        <span class="n">all_zero</span> <span class="o">=</span> <span class="kc">False</span>
+                                    <span class="k">else</span><span class="p">:</span>
+                                        <span class="n">result_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                                <span class="k">if</span> <span class="n">all_zero</span><span class="p">:</span>
+                                    <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                                    <span class="k">continue</span>
+                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">result_tile</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
 
                             <span class="c1"># Convert to PIL Image</span>
                             <span class="n">pil_image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">fromarray</span><span class="p">(</span><span class="n">rgb_tile</span><span class="p">)</span>
@@ -10834,7 +10896,9 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
                             <span class="p">]</span>
 
                         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing tile at (</span><span class="si">{</span><span class="n">x</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">y</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                <span class="s2">&quot;Error processing tile at (</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2">): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                            <span class="p">)</span>
                             <span class="c1"># Continue with next tile</span>
 
                         <span class="c1"># Update progress bar</span>
@@ -10852,7 +10916,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
                 <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Binary Segmentation&quot;</span><span class="p">)</span>
                 <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Probability Scores&quot;</span><span class="p">)</span>
 
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Segmentation saved to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Segmentation saved to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">output_path</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
@@ -10963,7 +11027,9 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Device to run the model on ('cuda', 'cpu'). If None, will use CUDA if available.</p>
+                <p>Device to run the model on ('cuda', 'mps', 'cpu').
+If None, auto-selects the best available device
+(CUDA &gt; MPS &gt; CPU) via <code>get_device()</code>.</p>
               </div>
             </td>
             <td>
@@ -11008,12 +11074,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">759</span>
-<span class="normal">760</span>
-<span class="normal">761</span>
-<span class="normal">762</span>
-<span class="normal">763</span>
-<span class="normal">764</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">764</span>
 <span class="normal">765</span>
 <span class="normal">766</span>
 <span class="normal">767</span>
@@ -11039,7 +11100,14 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 <span class="normal">787</span>
 <span class="normal">788</span>
 <span class="normal">789</span>
-<span class="normal">790</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">790</span>
+<span class="normal">791</span>
+<span class="normal">792</span>
+<span class="normal">793</span>
+<span class="normal">794</span>
+<span class="normal">795</span>
+<span class="normal">796</span>
+<span class="normal">797</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;CIDAS/clipseg-rd64-refined&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -11051,18 +11119,20 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
 <span class="sd">    Args:</span>
 <span class="sd">        model_name (str): Name of the CLIP-Seg model to use. Defaults to &quot;CIDAS/clipseg-rd64-refined&quot;.</span>
-<span class="sd">        device (str): Device to run the model on (&#39;cuda&#39;, &#39;cpu&#39;). If None, will use CUDA if available.</span>
+<span class="sd">        device (str): Device to run the model on (&#39;cuda&#39;, &#39;mps&#39;, &#39;cpu&#39;).</span>
+<span class="sd">            If None, auto-selects the best available device</span>
+<span class="sd">            (CUDA &gt; MPS &gt; CPU) via ``get_device()``.</span>
 <span class="sd">        tile_size (int): Size of tiles to process the image in chunks. Defaults to 512.</span>
 <span class="sd">        overlap (int): Overlap between tiles to avoid edge artifacts. Defaults to 32.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">tile_size</span> <span class="o">=</span> <span class="n">tile_size</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">overlap</span> <span class="o">=</span> <span class="n">overlap</span>
 
-    <span class="c1"># Set device</span>
-    <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda&quot;</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;cpu&quot;</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+    <span class="c1"># Lazy import to avoid pulling in geoai.utils (which eagerly</span>
+    <span class="c1"># imports leafmap) at module-collection time.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.utils.device</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_device</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">device</span> <span class="ow">or</span> <span class="n">get_device</span><span class="p">())</span>
 
     <span class="c1"># Load model and processor</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">processor</span> <span class="o">=</span> <span class="n">CLIPSegProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
@@ -11070,7 +11140,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
         <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
     <span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model loaded on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;CLIPSeg model loaded on </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -11214,209 +11284,222 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">792</span>
-<span class="normal">793</span>
-<span class="normal">794</span>
-<span class="normal">795</span>
-<span class="normal">796</span>
-<span class="normal">797</span>
-<span class="normal">798</span>
-<span class="normal">799</span>
-<span class="normal">800</span>
-<span class="normal">801</span>
-<span class="normal">802</span>
-<span class="normal">803</span>
-<span class="normal">804</span>
-<span class="normal">805</span>
-<span class="normal">806</span>
-<span class="normal">807</span>
-<span class="normal">808</span>
-<span class="normal">809</span>
-<span class="normal">810</span>
-<span class="normal">811</span>
-<span class="normal">812</span>
-<span class="normal">813</span>
-<span class="normal">814</span>
-<span class="normal">815</span>
-<span class="normal">816</span>
-<span class="normal">817</span>
-<span class="normal">818</span>
-<span class="normal">819</span>
-<span class="normal">820</span>
-<span class="normal">821</span>
-<span class="normal">822</span>
-<span class="normal">823</span>
-<span class="normal">824</span>
-<span class="normal">825</span>
-<span class="normal">826</span>
-<span class="normal">827</span>
-<span class="normal">828</span>
-<span class="normal">829</span>
-<span class="normal">830</span>
-<span class="normal">831</span>
-<span class="normal">832</span>
-<span class="normal">833</span>
-<span class="normal">834</span>
-<span class="normal">835</span>
-<span class="normal">836</span>
-<span class="normal">837</span>
-<span class="normal">838</span>
-<span class="normal">839</span>
-<span class="normal">840</span>
-<span class="normal">841</span>
-<span class="normal">842</span>
-<span class="normal">843</span>
-<span class="normal">844</span>
-<span class="normal">845</span>
-<span class="normal">846</span>
-<span class="normal">847</span>
-<span class="normal">848</span>
-<span class="normal">849</span>
-<span class="normal">850</span>
-<span class="normal">851</span>
-<span class="normal">852</span>
-<span class="normal">853</span>
-<span class="normal">854</span>
-<span class="normal">855</span>
-<span class="normal">856</span>
-<span class="normal">857</span>
-<span class="normal">858</span>
-<span class="normal">859</span>
-<span class="normal">860</span>
-<span class="normal">861</span>
-<span class="normal">862</span>
-<span class="normal">863</span>
-<span class="normal">864</span>
-<span class="normal">865</span>
-<span class="normal">866</span>
-<span class="normal">867</span>
-<span class="normal">868</span>
-<span class="normal">869</span>
-<span class="normal">870</span>
-<span class="normal">871</span>
-<span class="normal">872</span>
-<span class="normal">873</span>
-<span class="normal">874</span>
-<span class="normal">875</span>
-<span class="normal">876</span>
-<span class="normal">877</span>
-<span class="normal">878</span>
-<span class="normal">879</span>
-<span class="normal">880</span>
-<span class="normal">881</span>
-<span class="normal">882</span>
-<span class="normal">883</span>
-<span class="normal">884</span>
-<span class="normal">885</span>
-<span class="normal">886</span>
-<span class="normal">887</span>
-<span class="normal">888</span>
-<span class="normal">889</span>
-<span class="normal">890</span>
-<span class="normal">891</span>
-<span class="normal">892</span>
-<span class="normal">893</span>
-<span class="normal">894</span>
-<span class="normal">895</span>
-<span class="normal">896</span>
-<span class="normal">897</span>
-<span class="normal">898</span>
-<span class="normal">899</span>
-<span class="normal">900</span>
-<span class="normal">901</span>
-<span class="normal">902</span>
-<span class="normal">903</span>
-<span class="normal">904</span>
-<span class="normal">905</span>
-<span class="normal">906</span>
-<span class="normal">907</span>
-<span class="normal">908</span>
-<span class="normal">909</span>
-<span class="normal">910</span>
-<span class="normal">911</span>
-<span class="normal">912</span>
-<span class="normal">913</span>
-<span class="normal">914</span>
-<span class="normal">915</span>
-<span class="normal">916</span>
-<span class="normal">917</span>
-<span class="normal">918</span>
-<span class="normal">919</span>
-<span class="normal">920</span>
-<span class="normal">921</span>
-<span class="normal">922</span>
-<span class="normal">923</span>
-<span class="normal">924</span>
-<span class="normal">925</span>
-<span class="normal">926</span>
-<span class="normal">927</span>
-<span class="normal">928</span>
-<span class="normal">929</span>
-<span class="normal">930</span>
-<span class="normal">931</span>
-<span class="normal">932</span>
-<span class="normal">933</span>
-<span class="normal">934</span>
-<span class="normal">935</span>
-<span class="normal">936</span>
-<span class="normal">937</span>
-<span class="normal">938</span>
-<span class="normal">939</span>
-<span class="normal">940</span>
-<span class="normal">941</span>
-<span class="normal">942</span>
-<span class="normal">943</span>
-<span class="normal">944</span>
-<span class="normal">945</span>
-<span class="normal">946</span>
-<span class="normal">947</span>
-<span class="normal">948</span>
-<span class="normal">949</span>
-<span class="normal">950</span>
-<span class="normal">951</span>
-<span class="normal">952</span>
-<span class="normal">953</span>
-<span class="normal">954</span>
-<span class="normal">955</span>
-<span class="normal">956</span>
-<span class="normal">957</span>
-<span class="normal">958</span>
-<span class="normal">959</span>
-<span class="normal">960</span>
-<span class="normal">961</span>
-<span class="normal">962</span>
-<span class="normal">963</span>
-<span class="normal">964</span>
-<span class="normal">965</span>
-<span class="normal">966</span>
-<span class="normal">967</span>
-<span class="normal">968</span>
-<span class="normal">969</span>
-<span class="normal">970</span>
-<span class="normal">971</span>
-<span class="normal">972</span>
-<span class="normal">973</span>
-<span class="normal">974</span>
-<span class="normal">975</span>
-<span class="normal">976</span>
-<span class="normal">977</span>
-<span class="normal">978</span>
-<span class="normal">979</span>
-<span class="normal">980</span>
-<span class="normal">981</span>
-<span class="normal">982</span>
-<span class="normal">983</span>
-<span class="normal">984</span>
-<span class="normal">985</span>
-<span class="normal">986</span>
-<span class="normal">987</span>
-<span class="normal">988</span>
-<span class="normal">989</span>
-<span class="normal">990</span>
-<span class="normal">991</span>
-<span class="normal">992</span>
-<span class="normal">993</span>
-<span class="normal">994</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 799</span>
+<span class="normal"> 800</span>
+<span class="normal"> 801</span>
+<span class="normal"> 802</span>
+<span class="normal"> 803</span>
+<span class="normal"> 804</span>
+<span class="normal"> 805</span>
+<span class="normal"> 806</span>
+<span class="normal"> 807</span>
+<span class="normal"> 808</span>
+<span class="normal"> 809</span>
+<span class="normal"> 810</span>
+<span class="normal"> 811</span>
+<span class="normal"> 812</span>
+<span class="normal"> 813</span>
+<span class="normal"> 814</span>
+<span class="normal"> 815</span>
+<span class="normal"> 816</span>
+<span class="normal"> 817</span>
+<span class="normal"> 818</span>
+<span class="normal"> 819</span>
+<span class="normal"> 820</span>
+<span class="normal"> 821</span>
+<span class="normal"> 822</span>
+<span class="normal"> 823</span>
+<span class="normal"> 824</span>
+<span class="normal"> 825</span>
+<span class="normal"> 826</span>
+<span class="normal"> 827</span>
+<span class="normal"> 828</span>
+<span class="normal"> 829</span>
+<span class="normal"> 830</span>
+<span class="normal"> 831</span>
+<span class="normal"> 832</span>
+<span class="normal"> 833</span>
+<span class="normal"> 834</span>
+<span class="normal"> 835</span>
+<span class="normal"> 836</span>
+<span class="normal"> 837</span>
+<span class="normal"> 838</span>
+<span class="normal"> 839</span>
+<span class="normal"> 840</span>
+<span class="normal"> 841</span>
+<span class="normal"> 842</span>
+<span class="normal"> 843</span>
+<span class="normal"> 844</span>
+<span class="normal"> 845</span>
+<span class="normal"> 846</span>
+<span class="normal"> 847</span>
+<span class="normal"> 848</span>
+<span class="normal"> 849</span>
+<span class="normal"> 850</span>
+<span class="normal"> 851</span>
+<span class="normal"> 852</span>
+<span class="normal"> 853</span>
+<span class="normal"> 854</span>
+<span class="normal"> 855</span>
+<span class="normal"> 856</span>
+<span class="normal"> 857</span>
+<span class="normal"> 858</span>
+<span class="normal"> 859</span>
+<span class="normal"> 860</span>
+<span class="normal"> 861</span>
+<span class="normal"> 862</span>
+<span class="normal"> 863</span>
+<span class="normal"> 864</span>
+<span class="normal"> 865</span>
+<span class="normal"> 866</span>
+<span class="normal"> 867</span>
+<span class="normal"> 868</span>
+<span class="normal"> 869</span>
+<span class="normal"> 870</span>
+<span class="normal"> 871</span>
+<span class="normal"> 872</span>
+<span class="normal"> 873</span>
+<span class="normal"> 874</span>
+<span class="normal"> 875</span>
+<span class="normal"> 876</span>
+<span class="normal"> 877</span>
+<span class="normal"> 878</span>
+<span class="normal"> 879</span>
+<span class="normal"> 880</span>
+<span class="normal"> 881</span>
+<span class="normal"> 882</span>
+<span class="normal"> 883</span>
+<span class="normal"> 884</span>
+<span class="normal"> 885</span>
+<span class="normal"> 886</span>
+<span class="normal"> 887</span>
+<span class="normal"> 888</span>
+<span class="normal"> 889</span>
+<span class="normal"> 890</span>
+<span class="normal"> 891</span>
+<span class="normal"> 892</span>
+<span class="normal"> 893</span>
+<span class="normal"> 894</span>
+<span class="normal"> 895</span>
+<span class="normal"> 896</span>
+<span class="normal"> 897</span>
+<span class="normal"> 898</span>
+<span class="normal"> 899</span>
+<span class="normal"> 900</span>
+<span class="normal"> 901</span>
+<span class="normal"> 902</span>
+<span class="normal"> 903</span>
+<span class="normal"> 904</span>
+<span class="normal"> 905</span>
+<span class="normal"> 906</span>
+<span class="normal"> 907</span>
+<span class="normal"> 908</span>
+<span class="normal"> 909</span>
+<span class="normal"> 910</span>
+<span class="normal"> 911</span>
+<span class="normal"> 912</span>
+<span class="normal"> 913</span>
+<span class="normal"> 914</span>
+<span class="normal"> 915</span>
+<span class="normal"> 916</span>
+<span class="normal"> 917</span>
+<span class="normal"> 918</span>
+<span class="normal"> 919</span>
+<span class="normal"> 920</span>
+<span class="normal"> 921</span>
+<span class="normal"> 922</span>
+<span class="normal"> 923</span>
+<span class="normal"> 924</span>
+<span class="normal"> 925</span>
+<span class="normal"> 926</span>
+<span class="normal"> 927</span>
+<span class="normal"> 928</span>
+<span class="normal"> 929</span>
+<span class="normal"> 930</span>
+<span class="normal"> 931</span>
+<span class="normal"> 932</span>
+<span class="normal"> 933</span>
+<span class="normal"> 934</span>
+<span class="normal"> 935</span>
+<span class="normal"> 936</span>
+<span class="normal"> 937</span>
+<span class="normal"> 938</span>
+<span class="normal"> 939</span>
+<span class="normal"> 940</span>
+<span class="normal"> 941</span>
+<span class="normal"> 942</span>
+<span class="normal"> 943</span>
+<span class="normal"> 944</span>
+<span class="normal"> 945</span>
+<span class="normal"> 946</span>
+<span class="normal"> 947</span>
+<span class="normal"> 948</span>
+<span class="normal"> 949</span>
+<span class="normal"> 950</span>
+<span class="normal"> 951</span>
+<span class="normal"> 952</span>
+<span class="normal"> 953</span>
+<span class="normal"> 954</span>
+<span class="normal"> 955</span>
+<span class="normal"> 956</span>
+<span class="normal"> 957</span>
+<span class="normal"> 958</span>
+<span class="normal"> 959</span>
+<span class="normal"> 960</span>
+<span class="normal"> 961</span>
+<span class="normal"> 962</span>
+<span class="normal"> 963</span>
+<span class="normal"> 964</span>
+<span class="normal"> 965</span>
+<span class="normal"> 966</span>
+<span class="normal"> 967</span>
+<span class="normal"> 968</span>
+<span class="normal"> 969</span>
+<span class="normal"> 970</span>
+<span class="normal"> 971</span>
+<span class="normal"> 972</span>
+<span class="normal"> 973</span>
+<span class="normal"> 974</span>
+<span class="normal"> 975</span>
+<span class="normal"> 976</span>
+<span class="normal"> 977</span>
+<span class="normal"> 978</span>
+<span class="normal"> 979</span>
+<span class="normal"> 980</span>
+<span class="normal"> 981</span>
+<span class="normal"> 982</span>
+<span class="normal"> 983</span>
+<span class="normal"> 984</span>
+<span class="normal"> 985</span>
+<span class="normal"> 986</span>
+<span class="normal"> 987</span>
+<span class="normal"> 988</span>
+<span class="normal"> 989</span>
+<span class="normal"> 990</span>
+<span class="normal"> 991</span>
+<span class="normal"> 992</span>
+<span class="normal"> 993</span>
+<span class="normal"> 994</span>
+<span class="normal"> 995</span>
+<span class="normal"> 996</span>
+<span class="normal"> 997</span>
+<span class="normal"> 998</span>
+<span class="normal"> 999</span>
+<span class="normal">1000</span>
+<span class="normal">1001</span>
+<span class="normal">1002</span>
+<span class="normal">1003</span>
+<span class="normal">1004</span>
+<span class="normal">1005</span>
+<span class="normal">1006</span>
+<span class="normal">1007</span>
+<span class="normal">1008</span>
+<span class="normal">1009</span>
+<span class="normal">1010</span>
+<span class="normal">1011</span>
+<span class="normal">1012</span>
+<span class="normal">1013</span>
+<span class="normal">1014</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -11486,39 +11569,50 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
                     <span class="c1"># Process the tile</span>
                     <span class="k">try</span><span class="p">:</span>
-                        <span class="c1"># Convert to RGB if necessary (handling different satellite bands)</span>
-                        <span class="k">if</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
-                            <span class="c1"># Use first three bands for RGB representation</span>
+                        <span class="c1"># Convert to RGB format</span>
+                        <span class="n">bands</span> <span class="o">=</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="n">bands</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
                             <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-                            <span class="c1"># Normalize data to 0-255 range if needed</span>
-                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
-                                    <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                    <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                    <span class="o">*</span> <span class="mi">255</span>
-                                <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
-                        <span class="k">elif</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-                            <span class="c1"># Create RGB from grayscale</span>
+                        <span class="k">elif</span> <span class="n">bands</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
                             <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
                                 <span class="n">tile_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span>
                             <span class="p">)</span>
-                            <span class="c1"># Normalize if needed</span>
-                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
-                                    <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                    <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                    <span class="o">*</span> <span class="mi">255</span>
-                                <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
                         <span class="k">else</span><span class="p">:</span>
-                            <span class="c1"># Already 3-channel, assume RGB</span>
-                            <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">tile_data</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-                            <span class="c1"># Normalize if needed</span>
-                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                                <span class="n">rgb_tile</span> <span class="o">=</span> <span class="p">(</span>
-                                    <span class="p">(</span><span class="n">rgb_tile</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                    <span class="o">/</span> <span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
-                                    <span class="o">*</span> <span class="mi">255</span>
-                                <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                            <span class="c1"># 2-band: replicate first band into 3 channels</span>
+                            <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+                                <span class="n">tile_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span>
+                            <span class="p">)</span>
+
+                        <span class="c1"># Normalize to uint8 if needed</span>
+                        <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
+                            <span class="c1"># Already uint8 — skip normalization</span>
+                            <span class="k">if</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                                <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                                <span class="k">continue</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="c1"># Float / other dtypes: per-channel normalization</span>
+                            <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">rgb_tile</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+                            <span class="n">result_tile</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">rgb_tile</span><span class="p">)</span>
+                            <span class="n">all_zero</span> <span class="o">=</span> <span class="kc">True</span>
+                            <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rgb_tile</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+                                <span class="n">cmin</span> <span class="o">=</span> <span class="n">rgb_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+                                <span class="n">cmax</span> <span class="o">=</span> <span class="n">rgb_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+                                <span class="k">if</span> <span class="n">cmax</span> <span class="o">&gt;</span> <span class="n">cmin</span><span class="p">:</span>
+                                    <span class="n">result_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                                        <span class="p">(</span><span class="n">rgb_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">-</span> <span class="n">cmin</span><span class="p">)</span>
+                                        <span class="o">/</span> <span class="p">(</span><span class="n">cmax</span> <span class="o">-</span> <span class="n">cmin</span><span class="p">)</span>
+                                        <span class="o">*</span> <span class="mf">255.0</span>
+                                    <span class="p">)</span>
+                                    <span class="n">all_zero</span> <span class="o">=</span> <span class="kc">False</span>
+                                <span class="k">elif</span> <span class="n">cmax</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                                    <span class="n">result_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">=</span> <span class="mf">128.0</span>
+                                    <span class="n">all_zero</span> <span class="o">=</span> <span class="kc">False</span>
+                                <span class="k">else</span><span class="p">:</span>
+                                    <span class="n">result_tile</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">ch</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                            <span class="k">if</span> <span class="n">all_zero</span><span class="p">:</span>
+                                <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                                <span class="k">continue</span>
+                            <span class="n">rgb_tile</span> <span class="o">=</span> <span class="n">result_tile</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
 
                         <span class="c1"># Convert to PIL Image</span>
                         <span class="n">pil_image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">fromarray</span><span class="p">(</span><span class="n">rgb_tile</span><span class="p">)</span>
@@ -11599,7 +11693,9 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
                         <span class="p">]</span>
 
                     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing tile at (</span><span class="si">{</span><span class="n">x</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">y</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s2">&quot;Error processing tile at (</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2">): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                        <span class="p">)</span>
                         <span class="c1"># Continue with next tile</span>
 
                     <span class="c1"># Update progress bar</span>
@@ -11617,7 +11713,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
             <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Binary Segmentation&quot;</span><span class="p">)</span>
             <span class="n">dst</span><span class="o">.</span><span class="n">set_band_description</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Probability Scores&quot;</span><span class="p">)</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Segmentation saved to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Segmentation saved to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">output_path</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -11775,27 +11871,7 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 996</span>
-<span class="normal"> 997</span>
-<span class="normal"> 998</span>
-<span class="normal"> 999</span>
-<span class="normal">1000</span>
-<span class="normal">1001</span>
-<span class="normal">1002</span>
-<span class="normal">1003</span>
-<span class="normal">1004</span>
-<span class="normal">1005</span>
-<span class="normal">1006</span>
-<span class="normal">1007</span>
-<span class="normal">1008</span>
-<span class="normal">1009</span>
-<span class="normal">1010</span>
-<span class="normal">1011</span>
-<span class="normal">1012</span>
-<span class="normal">1013</span>
-<span class="normal">1014</span>
-<span class="normal">1015</span>
-<span class="normal">1016</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1016</span>
 <span class="normal">1017</span>
 <span class="normal">1018</span>
 <span class="normal">1019</span>
@@ -11816,7 +11892,27 @@ It can process large GeoTIFF files by tiling them and handles proper georeferenc
 <span class="normal">1034</span>
 <span class="normal">1035</span>
 <span class="normal">1036</span>
-<span class="normal">1037</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
+<span class="normal">1037</span>
+<span class="normal">1038</span>
+<span class="normal">1039</span>
+<span class="normal">1040</span>
+<span class="normal">1041</span>
+<span class="normal">1042</span>
+<span class="normal">1043</span>
+<span class="normal">1044</span>
+<span class="normal">1045</span>
+<span class="normal">1046</span>
+<span class="normal">1047</span>
+<span class="normal">1048</span>
+<span class="normal">1049</span>
+<span class="normal">1050</span>
+<span class="normal">1051</span>
+<span class="normal">1052</span>
+<span class="normal">1053</span>
+<span class="normal">1054</span>
+<span class="normal">1055</span>
+<span class="normal">1056</span>
+<span class="normal">1057</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image_batch</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -13542,10 +13638,7 @@ proper coverage of the entire raster including edges.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/segment.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
@@ -13562,7 +13655,10 @@ proper coverage of the entire raster including edges.</p>
 <span class="normal">63</span>
 <span class="normal">64</span>
 <span class="normal">65</span>
-<span class="normal">66</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">DetectionResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents a detection result with score, label, bounding box, and optional mask.&quot;&quot;&quot;</span>
 
@@ -14273,10 +14369,7 @@ and handles proper georeferencing in the outputs.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/segment.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 72</span>
 <span class="normal"> 73</span>
 <span class="normal"> 74</span>
 <span class="normal"> 75</span>
@@ -14939,7 +15032,10 @@ and handles proper georeferencing in the outputs.</p>
 <span class="normal">732</span>
 <span class="normal">733</span>
 <span class="normal">734</span>
-<span class="normal">735</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GroundedSAM</span><span class="p">:</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GroundedSAM</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class for segmenting remote sensing imagery using text prompts with Grounding DINO + SAM.</span>
 
@@ -15749,10 +15845,7 @@ and handles proper georeferencing in the outputs.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
@@ -15784,7 +15877,10 @@ and handles proper georeferencing in the outputs.</p>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">detector_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;IDEA-Research/grounding-dino-tiny&quot;</span><span class="p">,</span>
     <span class="n">segmenter_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;facebook/sam-vit-base&quot;</span><span class="p">,</span>
@@ -16040,10 +16136,7 @@ and handles proper georeferencing in the outputs.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">428</span>
 <span class="normal">429</span>
 <span class="normal">430</span>
 <span class="normal">431</span>
@@ -16350,7 +16443,10 @@ and handles proper georeferencing in the outputs.</p>
 <span class="normal">732</span>
 <span class="normal">733</span>
 <span class="normal">734</span>
-<span class="normal">735</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">segment_image</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
