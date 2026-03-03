@@ -26,18 +26,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-
-def _get_device() -> torch.device:
-    """Return the best available device (CUDA > MPS > CPU).
-
-    Avoids importing ``geoai.utils`` at module level, which pulls in
-    heavy optional dependencies (leafmap, etc.).
-    """
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+__all__ = [
+    "DINOv3Segmenter",
+    "DINOv3SegmentationDataset",
+    "train_dinov3_segmentation",
+    "dinov3_segment_geotiff",
+]
 
 try:
     import lightning.pytorch as pl
@@ -673,6 +667,13 @@ def train_dinov3_segmentation(
             "PyTorch Lightning is required. Install it with: pip install lightning"
         )
 
+    output_dir = os.path.abspath(output_dir)
+    parent_dir = os.path.dirname(output_dir)
+    if parent_dir and not os.path.isdir(parent_dir):
+        raise FileNotFoundError(
+            f"Parent directory of output_dir does not exist: {parent_dir}"
+        )
+
     os.makedirs(output_dir, exist_ok=True)
     model_dir = os.path.join(output_dir, "models")
     os.makedirs(model_dir, exist_ok=True)
@@ -815,7 +816,9 @@ def dinov3_segment_geotiff(
         )
 
     if device is None:
-        dev = _get_device()
+        from .utils.device import get_device
+
+        dev = get_device()
     else:
         dev = torch.device(device)
 

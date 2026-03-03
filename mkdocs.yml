@@ -166,6 +166,7 @@ nav:
           - examples/DINOv3.ipynb
           - examples/DINOv3_visualization.ipynb
           - examples/DINOv3_wetlands.ipynb
+          - examples/dinov3_finetune_segmentation.ipynb
           - examples/AlphaEarth.ipynb
           - examples/AI_agents.ipynb
           - examples/STAC_agents.ipynb

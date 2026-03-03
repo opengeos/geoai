@@ -394,8 +394,6 @@ _LAZY_SYMBOL_MAP = {
     # --- geoai.dinov3_finetune ---
     "DINOv3Segmenter": ("dinov3_finetune", None),
     "DINOv3SegmentationDataset": ("dinov3_finetune", None),
-    "DPTSegmentationHead": ("dinov3_finetune", None),
-    "LoRALinear": ("dinov3_finetune", None),
     "train_dinov3_segmentation": ("dinov3_finetune", None),
     "dinov3_segment_geotiff": ("dinov3_finetune", None),
 }
