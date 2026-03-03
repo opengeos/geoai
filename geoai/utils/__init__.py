@@ -15,7 +15,19 @@ This package is organized into focused submodules:
 
 All public functions are re-exported here for backward compatibility,
 so ``from geoai.utils import <function>`` continues to work.
+
+Submodules that require PyTorch (``metrics``, ``models``, ``training``,
+``visualization``) are loaded lazily on first access so that importing
+``geoai.utils`` does not require torch to be available — which allows the
+library to load inside environments where torch DLLs cannot be initialized
+(e.g. the QGIS process on Windows).
 """
+
+import importlib
+
+# ---------------------------------------------------------------------------
+# Eager imports — submodules with no PyTorch dependency
+# ---------------------------------------------------------------------------
 
 from .conversion import (
     bbox_to_xy,
@@ -42,15 +54,6 @@ from .geometry import (
     regularization,
     regularize,
 )
-from .metrics import (
-    calc_f1_score,
-    calc_iou,
-    calc_segmentation_metrics,
-)
-from .models import (
-    inspect_pth_file,
-    try_common_architectures,
-)
 from .raster import (
     batch_vector_to_raster,
     calc_stats,
@@ -70,14 +73,6 @@ from .raster import (
     vector_to_raster,
     write_colormap,
 )
-from .training import (
-    export_flipnslide_tiles,
-    export_geotiff_tiles,
-    export_geotiff_tiles_batch,
-    export_training_data,
-    flipnslide_augmentation,
-    get_default_augmentation_transforms,
-)
 from .vector import (
     add_geometric_properties,
     analyze_vector_attributes,
@@ -92,21 +87,55 @@ from .vector import (
     vector_to_geojson,
     visualize_vector_by_attribute,
 )
-from .visualization import (
-    create_overview_image,
-    create_split_map,
-    display_image_with_vector,
-    display_training_tiles,
-    plot_batch,
-    plot_images,
-    plot_masks,
-    plot_performance_metrics,
-    plot_prediction_comparison,
-    view_image,
-    view_raster,
-    view_vector,
-    view_vector_interactive,
-)
+
+# ---------------------------------------------------------------------------
+# Lazy imports — submodules that import torch at the top level.
+# These are resolved on first attribute access via __getattr__ so that
+# importing geoai.utils never forces torch to load.
+# ---------------------------------------------------------------------------
+
+_LAZY_IMPORTS: dict = {
+    # .metrics
+    "calc_f1_score": "metrics",
+    "calc_iou": "metrics",
+    "calc_segmentation_metrics": "metrics",
+    # .models
+    "inspect_pth_file": "models",
+    "try_common_architectures": "models",
+    # .training
+    "export_flipnslide_tiles": "training",
+    "export_geotiff_tiles": "training",
+    "export_geotiff_tiles_batch": "training",
+    "export_training_data": "training",
+    "flipnslide_augmentation": "training",
+    "get_default_augmentation_transforms": "training",
+    # .visualization
+    "create_overview_image": "visualization",
+    "create_split_map": "visualization",
+    "display_image_with_vector": "visualization",
+    "display_training_tiles": "visualization",
+    "plot_batch": "visualization",
+    "plot_images": "visualization",
+    "plot_masks": "visualization",
+    "plot_performance_metrics": "visualization",
+    "plot_prediction_comparison": "visualization",
+    "view_image": "visualization",
+    "view_raster": "visualization",
+    "view_vector": "visualization",
+    "view_vector_interactive": "visualization",
+}
+
+
+def __getattr__(name: str):
+    if name in _LAZY_IMPORTS:
+        submod_name = _LAZY_IMPORTS[name]
+        mod = importlib.import_module(f".{submod_name}", package=__name__)
+        val = getattr(mod, name)
+        # Cache in module globals so subsequent accesses don't call __getattr__
+        globals()[name] = val
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "view_raster",
