@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 # Layer indices for extracting multi-scale features from DINOv3 ViTs.
 # Keyed by number of transformer blocks.
 _EXTRACTION_LAYERS: Dict[int, List[int]] = {
-    12: [2, 5, 8, 11],   # ViT-S, ViT-B
+    12: [2, 5, 8, 11],  # ViT-S, ViT-B
     24: [5, 11, 17, 23],  # ViT-L
     32: [7, 15, 23, 31],  # ViT-H / 7B
     40: [9, 19, 29, 39],  # ViT-g
@@ -210,9 +210,7 @@ class DPTSegmentationHead(nn.Module):
             Tensor of shape ``(B, num_classes, H, W)``.
         """
         refined = []
-        for feat, proj, ref in zip(
-            multi_scale_features, self.projects, self.refine
-        ):
+        for feat, proj, ref in zip(multi_scale_features, self.projects, self.refine):
             refined.append(ref(proj(feat)))
 
         # Upsample all to the spatial size of the largest (first) feature map.
@@ -220,13 +218,17 @@ class DPTSegmentationHead(nn.Module):
         upsampled = [refined[0]]
         for r in refined[1:]:
             upsampled.append(
-                F.interpolate(r, size=(target_h, target_w), mode="bilinear", align_corners=False)
+                F.interpolate(
+                    r, size=(target_h, target_w), mode="bilinear", align_corners=False
+                )
             )
 
         fused = self.fuse(torch.cat(upsampled, dim=1))
         logits = self.head(fused)
         # Final interpolation to input resolution.
-        logits = F.interpolate(logits, size=target_size, mode="bilinear", align_corners=False)
+        logits = F.interpolate(
+            logits, size=target_size, mode="bilinear", align_corners=False
+        )
         return logits
 
 
@@ -337,7 +339,10 @@ class DINOv3Segmenter(_LightningBase):
         dinov3_location = os.getenv("DINOV3_LOCATION", "facebookresearch/dinov3")
         source = "local" if dinov3_location != "facebookresearch/dinov3" else "github"
 
-        if dinov3_location != "facebookresearch/dinov3" and dinov3_location not in sys.path:
+        if (
+            dinov3_location != "facebookresearch/dinov3"
+            and dinov3_location not in sys.path
+        ):
             sys.path.append(dinov3_location)
 
         model = torch.hub.load(
@@ -397,7 +402,9 @@ class DINOv3Segmenter(_LightningBase):
         multi_scale = self._extract_multi_scale(x)
         return self.decoder(multi_scale, target_size)
 
-    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def training_step(
+        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
         x, y = batch
         logits = self(x)
         loss = self.loss_fn(logits, y)
@@ -407,7 +414,9 @@ class DINOv3Segmenter(_LightningBase):
         self.log("train_iou", iou, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
-    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def validation_step(
+        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
         x, y = batch
         logits = self(x)
         loss = self.loss_fn(logits, y)
@@ -417,7 +426,9 @@ class DINOv3Segmenter(_LightningBase):
         self.log("val_iou", iou, on_epoch=True, prog_bar=True)
         return loss
 
-    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def test_step(
+        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
         x, y = batch
         logits = self(x)
         loss = self.loss_fn(logits, y)
@@ -565,7 +576,9 @@ class DINOv3SegmentationDataset(Dataset):
             img_pil = img_pil.resize(
                 (self.target_size, self.target_size), PILImage.BILINEAR
             )
-            image = np.transpose(np.array(img_pil).astype(np.float32) / 255.0, (2, 0, 1))
+            image = np.transpose(
+                np.array(img_pil).astype(np.float32) / 255.0, (2, 0, 1)
+            )
 
             mask_pil = PILImage.fromarray(mask.astype(np.uint8))
             mask_pil = mask_pil.resize(
@@ -579,7 +592,9 @@ class DINOv3SegmentationDataset(Dataset):
         pad_w = (self.patch_size - w % self.patch_size) % self.patch_size
         if pad_h > 0 or pad_w > 0:
             image = np.pad(image, ((0, 0), (0, pad_h), (0, pad_w)), mode="reflect")
-            mask = np.pad(mask, ((0, pad_h), (0, pad_w)), mode="constant", constant_values=255)
+            mask = np.pad(
+                mask, ((0, pad_h), (0, pad_w)), mode="constant", constant_values=255
+            )
 
         image = torch.from_numpy(image)
         mask = torch.from_numpy(mask)
@@ -880,9 +895,7 @@ def dinov3_segment_geotiff(
 
             h, w = img.shape[1], img.shape[2]
             if h < padded_h or w < padded_w:
-                padded = np.zeros(
-                    (num_channels, padded_h, padded_w), dtype=np.float32
-                )
+                padded = np.zeros((num_channels, padded_h, padded_w), dtype=np.float32)
                 padded[:, :h, :w] = img
                 img = padded
             return img, h, w
@@ -915,8 +928,10 @@ def dinov3_segment_geotiff(
                     col_end = min(col_start + window_size, width)
 
                     win = Window(
-                        col_start, row_start,
-                        col_end - col_start, row_end - row_start,
+                        col_start,
+                        row_start,
+                        col_end - col_start,
+                        row_end - row_start,
                     )
                     raw = src.read(window=win).astype(np.float32)
                     img, h, w = _prepare_window(raw)

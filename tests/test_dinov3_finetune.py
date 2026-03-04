@@ -10,7 +10,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-
 # Detect whether Lightning is available so we can skip tests that
 # instantiate DINOv3Segmenter (which requires Lightning at runtime).
 try:
@@ -471,9 +470,7 @@ class TestDINOv3Segmenter(unittest.TestCase):
             return [torch.randn(B, embed_dim, H_p, W_p) for _ in range(num_features)]
 
         backbone.get_intermediate_layers = mock_intermediate
-        backbone.parameters.return_value = iter(
-            [torch.nn.Parameter(torch.randn(2, 2))]
-        )
+        backbone.parameters.return_value = iter([torch.nn.Parameter(torch.randn(2, 2))])
         backbone.named_modules.return_value = []
         return backbone
 
