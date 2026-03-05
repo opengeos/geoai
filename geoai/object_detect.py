@@ -689,11 +689,14 @@ def detections_to_geodataframe(
         label = det["label"]
         score = det["score"]
 
-        # Convert pixel coordinates to geographic coordinates
-        x_min, y_max = transform * (bx[0], bx[1])
-        x_max, y_min = transform * (bx[2], bx[3])
-
-        geom = shapely_box(x_min, y_min, x_max, y_max)
+        # Convert pixel coordinates to geographic coordinates (robust to rotation/shear)
+        c0, r0, c1, r1 = bx  # (xmin, ymin, xmax, ymax) in pixel coords
+        xs, ys = [], []
+        for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
+            x, y = transform * (c, r)
+            xs.append(x); ys.append(y)
+        
+        geom = shapely_box(min(xs), min(ys), max(xs), max(ys))
         area_pixels = det["mask"].sum() if "mask" in det else 0
 
         name = "unknown"
