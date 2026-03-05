@@ -694,8 +694,9 @@ def detections_to_geodataframe(
         xs, ys = [], []
         for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
             x, y = transform * (c, r)
-            xs.append(x); ys.append(y)
-        
+            xs.append(x)
+            ys.append(y)
+
         geom = shapely_box(min(xs), min(ys), max(xs), max(ys))
         area_pixels = det["mask"].sum() if "mask" in det else 0
 
