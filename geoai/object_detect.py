@@ -695,7 +695,7 @@ def detections_to_geodataframe(
         for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
             x, y = transform * (c, r)
             pts.append((x, y))
-        
+
         geom = Polygon(pts)
         area_pixels = det["mask"].sum() if "mask" in det else 0
 
