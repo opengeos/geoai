@@ -672,7 +672,7 @@ def detections_to_geodataframe(
     """
     import geopandas as gpd
     import rasterio
-    from shapely.geometry import box as shapely_box
+    from shapely.geometry import Polygon
 
     if len(detections) == 0:
         return gpd.GeoDataFrame(
@@ -691,13 +691,12 @@ def detections_to_geodataframe(
 
         # Convert pixel coordinates to geographic coordinates (robust to rotation/shear)
         c0, r0, c1, r1 = bx  # (xmin, ymin, xmax, ymax) in pixel coords
-        xs, ys = [], []
+        pts = []
         for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
             x, y = transform * (c, r)
-            xs.append(x)
-            ys.append(y)
-
-        geom = shapely_box(min(xs), min(ys), max(xs), max(ys))
+            pts.append((x, y))
+        
+        geom = Polygon(pts)
         area_pixels = det["mask"].sum() if "mask" in det else 0
 
         name = "unknown"
