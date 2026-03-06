@@ -212,6 +212,7 @@ nav:
           - embeddings module: embeddings.md
           - extract module: extract.md
           - hf module: hf.md
+          - inference module: inference.md
           - landcover_train module: landcover_train.md
           - landcover_utils module: landcover_utils.md
           - object_detect module: object_detect.md
