@@ -187,6 +187,7 @@ nav:
           - examples/prithvi.ipynb
           - examples/train_timm_regressor.ipynb
           - examples/canopy_height.ipynb
+          - examples/smooth_inference.ipynb
           - examples/tessera.ipynb
           - examples/torchgeo_embeddings.ipynb
           - examples/google_satellite_embedding.ipynb
@@ -212,6 +213,7 @@ nav:
           - embeddings module: embeddings.md
           - extract module: extract.md
           - hf module: hf.md
+          - inference module: inference.md
           - landcover_train module: landcover_train.md
           - landcover_utils module: landcover_utils.md
           - object_detect module: object_detect.md
