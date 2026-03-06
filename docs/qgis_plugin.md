@@ -17,7 +17,7 @@ A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](
 
 ### Installation Tutorial
 
-You can follow this [video tutorial](https://youtu.be/L90id_ESQME) to install the GeoAI QGIS Plugin on Linux,Windows:
+You can follow this [video tutorial](https://youtu.be/L90id_ESQME) to install the GeoAI QGIS Plugin on Linux and Windows:
 
 [![installation](https://github.com/user-attachments/assets/3cda92c0-4de9-4cad-81c8-ddb3c790be91)](https://youtu.be/L90id_ESQME)
 
@@ -478,7 +478,7 @@ Steps:
         - **Raster**: GeoTIFF (rasterizes bounding boxes onto the source raster)
     - Click "Save Results" to export
     - To export training data for model fine-tuning:
-        - Select, **PASCAL_VOC**, **COCO** or **YOLO** format
+        - Select **PASCAL_VOC**, **COCO**, or **YOLO** format
         - Choose an output directory
         - Click "Export Training Data"
 

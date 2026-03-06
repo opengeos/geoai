@@ -1,3 +1,3 @@
-# Prithvi FM
+# prithvi module
 
 ::: geoai.prithvi

@@ -56,14 +56,13 @@ Ready to contribute? Here's how to set up geoai for local development.
     $ git clone git@github.com:your_name_here/geoai.git
     ```
 
-3.  Install your local copy into a virtualenv. Assuming you have
-    virtualenvwrapper installed, this is how you set up your fork for
-    local development:
+3.  Install your local copy into a virtual environment:
 
     ```shell
-    $ mkvirtualenv geoai
     $ cd geoai/
-    $ python setup.py develop
+    $ python -m venv venv
+    $ source venv/bin/activate  # On Windows: venv\Scripts\activate
+    $ pip install -e .
     ```
 
 4.  Create a branch for local development:
@@ -97,7 +96,7 @@ Before you submit a pull request, check that it meets these guidelines:
 1.  The pull request should include tests.
 2.  If the pull request adds functionality, the docs should be updated.
     Put your new functionality into a function with a docstring, and add
-    the feature to the list in README.rst.
+    the feature to the list in README.md.
 3.  The pull request should work for Python 3.10 or above. Check <https://github.com/opengeos/geoai/pulls> and make sure that the tests pass for all
     supported Python versions.
 

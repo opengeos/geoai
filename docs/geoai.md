@@ -1,4 +1,3 @@
-
 # geoai module
 
 ::: geoai.geoai
