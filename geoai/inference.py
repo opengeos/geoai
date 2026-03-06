@@ -354,6 +354,7 @@ def predict_geotiff(
     with rasterio.open(input_raster) as src:
         height = src.height
         width = src.width
+        profile = src.profile.copy()
 
         if input_bands is None:
             input_bands = list(range(1, src.count + 1))
@@ -431,6 +432,20 @@ def predict_geotiff(
 
             preds = preds.cpu().numpy()
 
+            # Validate model output shape on first batch
+            if batch_start == 0:
+                pred_channels = preds.shape[1] if preds.ndim == 4 else 1
+                if pred_channels != num_classes:
+                    raise ValueError(
+                        f"Model output has {pred_channels} channels but "
+                        f"num_classes={num_classes}. Set num_classes to "
+                        f"match the model output."
+                    )
+
+            # Handle models that return (B, H, W) instead of (B, 1, H, W)
+            if preds.ndim == 3:
+                preds = preds[:, np.newaxis, :, :]
+
             # Accumulate with blending
             for i, (row_start, col_start, row_end, col_end) in enumerate(
                 batch_tiles
@@ -451,15 +466,13 @@ def predict_geotiff(
                 ] += weight_crop[np.newaxis, :, :]
 
     # ---- normalize by weights ----
-    valid = weight_sum > 0
-    output_array = np.full(
-        (num_classes, height, width), output_nodata, dtype=np.float32
-    )
-    # Broadcast valid mask (1, H, W) across num_classes channels
-    valid_broadcast = np.broadcast_to(valid, output_array.shape)
-    output_array[valid_broadcast] = (
-        output_sum[valid_broadcast] / weight_sum[np.broadcast_to(valid, output_sum.shape)]
-    )
+    # valid mask is (1, H, W); NumPy broadcasts it against (num_classes, H, W)
+    valid = weight_sum > 0  # (1, H, W)
+    output_array = np.where(
+        valid,
+        output_sum / (weight_sum + 1e-8),
+        output_nodata,
+    ).astype(np.float32)
 
     # ---- postprocess ----
     if postprocess_fn is not None:
@@ -469,9 +482,6 @@ def predict_geotiff(
     output_dir = os.path.dirname(os.path.abspath(output_raster))
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-
-    with rasterio.open(input_raster) as src:
-        profile = src.profile.copy()
 
     out_count = output_array.shape[0] if output_array.ndim == 3 else 1
     profile.update(

@@ -353,6 +353,46 @@ class TestD4Transforms(unittest.TestCase):
         torch.testing.assert_close(result[0], t)
 
 
+class TestNormalization(unittest.TestCase):
+    """Tests for weight normalization with multi-class output."""
+
+    def test_multiclass_normalization(self):
+        """Test that np.where broadcasting works for num_classes > 1."""
+        from geoai.inference import create_weight_mask
+
+        num_classes = 3
+        height, width = 64, 64
+        tile_size = 32
+        overlap = 8
+
+        weight_mask = create_weight_mask(tile_size, overlap, mode="spline")
+
+        output_sum = np.random.rand(num_classes, height, width).astype(np.float64)
+        weight_sum = np.random.rand(1, height, width).astype(np.float64) + 0.1
+
+        valid = weight_sum > 0
+        # This is the exact code from predict_geotiff — must not raise
+        output_array = np.where(
+            valid,
+            output_sum / (weight_sum + 1e-8),
+            -9999.0,
+        ).astype(np.float32)
+
+        self.assertEqual(output_array.shape, (num_classes, height, width))
+        self.assertTrue(np.all(np.isfinite(output_array)))
+
+    def test_zero_weight_gets_nodata(self):
+        """Test that pixels with zero weight receive nodata value."""
+        nodata = -9999.0
+        output_sum = np.zeros((1, 4, 4), dtype=np.float64)
+        weight_sum = np.zeros((1, 4, 4), dtype=np.float64)
+
+        valid = weight_sum > 0
+        result = np.where(valid, output_sum / (weight_sum + 1e-8), nodata)
+
+        np.testing.assert_array_equal(result, np.full((1, 4, 4), nodata))
+
+
 class TestLazyImport(unittest.TestCase):
     """Tests for lazy import registration in geoai.__init__."""
 
