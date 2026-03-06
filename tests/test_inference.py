@@ -342,9 +342,7 @@ class TestD4Transforms(unittest.TestCase):
         fwd = d4_forward(t)
         inv = d4_inverse(fwd)
         for i, tensor in enumerate(inv):
-            torch.testing.assert_close(
-                tensor, t, msg=f"Transform {i} roundtrip failed"
-            )
+            torch.testing.assert_close(tensor, t, msg=f"Transform {i} roundtrip failed")
 
     def test_d4_tta_forward_shape(self):
         """Test that d4_tta_forward returns correct output shape."""

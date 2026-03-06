@@ -360,7 +360,9 @@ def predict_geotiff(
     stride = tile_size - overlap
 
     # ---- compute weight mask once ----
-    weight_mask = create_weight_mask(tile_size, overlap, mode=blend_mode, power=blend_power)
+    weight_mask = create_weight_mask(
+        tile_size, overlap, mode=blend_mode, power=blend_power
+    )
 
     model.to(device)
     model.eval()
@@ -375,9 +377,7 @@ def predict_geotiff(
 
         if verbose:
             print(f"Input raster: {width}x{height}, {len(input_bands)} bands")
-            print(
-                f"Tile size: {tile_size}, overlap: {overlap}, stride: {stride}"
-            )
+            print(f"Tile size: {tile_size}, overlap: {overlap}, stride: {stride}")
 
         # ---- allocate output accumulators ----
         output_sum = np.zeros((num_classes, height, width), dtype=np.float64)
@@ -419,9 +419,7 @@ def predict_geotiff(
                 batch_actual_sizes.append((actual_h, actual_w))
 
                 window = Window(col_start, row_start, actual_w, actual_h)
-                tile_data = src.read(input_bands, window=window).astype(
-                    np.float32
-                )
+                tile_data = src.read(input_bands, window=window).astype(np.float32)
 
                 # Pad undersized edge tiles
                 if actual_h != tile_size or actual_w != tile_size:
@@ -461,9 +459,7 @@ def predict_geotiff(
                 preds = preds[:, np.newaxis, :, :]
 
             # Accumulate with blending
-            for i, (row_start, col_start, row_end, col_end) in enumerate(
-                batch_tiles
-            ):
+            for i, (row_start, col_start, row_end, col_end) in enumerate(batch_tiles):
                 actual_h, actual_w = batch_actual_sizes[i]
                 pred = preds[i]  # (num_classes, tile_size, tile_size)
 
@@ -472,12 +468,12 @@ def predict_geotiff(
                 weight_crop = weight_mask[:actual_h, :actual_w]
 
                 # Accumulate weighted prediction and weights
-                output_sum[
-                    :, row_start:row_end, col_start:col_end
-                ] += (pred_crop * weight_crop[np.newaxis, :, :])
-                weight_sum[
-                    :, row_start:row_end, col_start:col_end
-                ] += weight_crop[np.newaxis, :, :]
+                output_sum[:, row_start:row_end, col_start:col_end] += (
+                    pred_crop * weight_crop[np.newaxis, :, :]
+                )
+                weight_sum[:, row_start:row_end, col_start:col_end] += weight_crop[
+                    np.newaxis, :, :
+                ]
 
     # ---- normalize by weights ----
     # valid mask is (1, H, W); NumPy broadcasts it against (num_classes, H, W)
@@ -508,9 +504,7 @@ def predict_geotiff(
     with rasterio.open(output_raster, "w", **profile) as dst:
         if output_array.ndim == 3:
             for band_idx in range(out_count):
-                dst.write(
-                    output_array[band_idx].astype(output_dtype), band_idx + 1
-                )
+                dst.write(output_array[band_idx].astype(output_dtype), band_idx + 1)
         else:
             dst.write(output_array.astype(output_dtype), 1)
 
