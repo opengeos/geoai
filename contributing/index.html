@@ -4295,14 +4295,14 @@ in docstrings, or even on the web in blog posts, articles, and such.</p>
 </code></pre></div></td></tr></table></div>
 </li>
 <li>
-<p>Install your local copy into a virtualenv. Assuming you have
-    virtualenvwrapper installed, this is how you set up your fork for
-    local development:</p>
+<p>Install your local copy into a virtual environment:</p>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
 <span class="normal">2</span>
-<span class="normal">3</span></pre></div></td><td class="code"><div><pre><span></span><code>$<span class="w"> </span>mkvirtualenv<span class="w"> </span>geoai
-$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>geoai/
-$<span class="w"> </span>python<span class="w"> </span>setup.py<span class="w"> </span>develop
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>geoai/
+$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
+$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>venv/bin/activate<span class="w">  </span><span class="c1"># On Windows: venv\Scripts\activate</span>
+$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </code></pre></div></td></tr></table></div>
 </li>
 <li>
@@ -4335,7 +4335,7 @@ $<span class="w"> </span>git<span class="w"> </span>push<span class="w"> </span>
 <li>The pull request should include tests.</li>
 <li>If the pull request adds functionality, the docs should be updated.
     Put your new functionality into a function with a docstring, and add
-    the feature to the list in README.rst.</li>
+    the feature to the list in README.md.</li>
 <li>The pull request should work for Python 3.10 or above. Check <a href="https://github.com/opengeos/geoai/pulls">https://github.com/opengeos/geoai/pulls</a> and make sure that the tests pass for all
     supported Python versions.</li>
 </ol>
@@ -4363,7 +4363,7 @@ $<span class="w"> </span>git<span class="w"> </span>push<span class="w"> </span>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 8, 2026 14:58:52 UTC"><span class="timeago" datetime="2026-01-08T14:58:52+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 8, 2026 14:58:52 UTC">2026-01-08</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 6, 2026 11:55:30 UTC"><span class="timeago" datetime="2026-03-06T11:55:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 6, 2026 11:55:30 UTC">2026-03-06</span>
   </span>
 
     
