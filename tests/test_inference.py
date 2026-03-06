@@ -240,6 +240,31 @@ class TestCreateWeightMask(unittest.TestCase):
             mask = create_weight_mask(128, 32, mode=mode)
             self.assertTrue(np.all(mask >= 0), f"Negative values for mode={mode}")
 
+    def test_large_overlap_no_corruption(self):
+        """Test that overlap > tile_size/2 does not corrupt the ramp."""
+        from geoai.inference import create_weight_mask
+
+        for mode in ["linear", "cosine"]:
+            mask = create_weight_mask(64, 40, mode=mode)
+            row = mask[32, :]
+            # Values must stay in [0, 1]
+            self.assertTrue(np.all(row >= 0.0), f"{mode}: negative weights")
+            self.assertTrue(np.all(row <= 1.0), f"{mode}: weights exceed 1.0")
+            # Must be symmetric
+            np.testing.assert_array_almost_equal(
+                row, row[::-1], err_msg=f"{mode}: not symmetric with large overlap"
+            )
+            # Must be monotone increasing then decreasing (unimodal)
+            half = len(row) // 2
+            self.assertTrue(
+                np.all(np.diff(row[:half]) >= -1e-6),
+                f"{mode}: not monotone increasing with large overlap",
+            )
+            self.assertTrue(
+                np.all(np.diff(row[half:]) <= 1e-6),
+                f"{mode}: not monotone decreasing with large overlap",
+            )
+
 
 class TestPredictGeotiffValidation(unittest.TestCase):
     """Tests for predict_geotiff input validation."""

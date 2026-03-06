@@ -50,21 +50,33 @@ class BlendMode(str, Enum):
     SPLINE = "spline"
 
 
-def _spline_window_1d(window_size: int, power: int = 2) -> np.ndarray:
-    """Create a 1D spline window using a triangular base.
+def _spline_window_1d(window_size: int, overlap: int, power: int = 2) -> np.ndarray:
+    """Create a 1D spline window that tapers only in the overlap zones.
+
+    The window is 1.0 in the non-overlapping centre and smoothly tapers
+    to 0 at the edges using a raised half-cosine shaped by *power*.
 
     Args:
         window_size: Length of the window in pixels.
-        power: Exponent applied to the triangular window. Higher values
-            concentrate weight toward the center.
+        overlap: Number of pixels in the overlap zone at each edge.
+        power: Exponent applied to the taper. Higher values produce
+            steeper roll-off near the edges.
 
     Returns:
         numpy.ndarray: 1D float64 array of shape ``(window_size,)``.
     """
-    from scipy.signal.windows import triang
+    if overlap <= 0:
+        return np.ones(window_size, dtype=np.float64)
 
-    window = triang(window_size)
-    return window ** power
+    window = np.ones(window_size, dtype=np.float64)
+    # Left taper: 0 .. overlap  ->  ramp from 0 to 1
+    ramp = np.linspace(0.0, 1.0, overlap, endpoint=False)
+    # Apply half-cosine shaping then power for smoothness
+    ramp = (0.5 * (1.0 - np.cos(np.pi * ramp))) ** power
+    window[:overlap] = ramp
+    # Right taper: mirror of left
+    window[-overlap:] = ramp[::-1]
+    return window
 
 
 def create_weight_mask(
@@ -108,21 +120,23 @@ def create_weight_mask(
         return np.ones((tile_size, tile_size), dtype=np.float32)
 
     if mode == BlendMode.LINEAR:
-        ramp = np.ones(tile_size, dtype=np.float32)
-        ramp[:overlap] = np.linspace(0, 1, overlap)
-        ramp[-overlap:] = np.linspace(1, 0, overlap)
+        # Compute per-pixel distance from nearest edge, capped at overlap.
+        # np.minimum avoids write-order corruption when overlap > tile_size // 2.
+        left = np.arange(tile_size, dtype=np.float32)
+        right = np.arange(tile_size - 1, -1, -1, dtype=np.float32)
+        ramp = np.minimum(np.minimum(left, right), overlap) / overlap
         return np.outer(ramp, ramp)
 
     if mode == BlendMode.COSINE:
-        ramp = np.linspace(0.0, 1.0, overlap, dtype=np.float32)
-        ramp = 0.5 * (1.0 - np.cos(np.pi * ramp))
-        w = np.ones(tile_size, dtype=np.float32)
-        w[:overlap] = ramp
-        w[-overlap:] = ramp[::-1]
+        # Same edge-distance approach, then apply raised-cosine taper.
+        left = np.arange(tile_size, dtype=np.float32)
+        right = np.arange(tile_size - 1, -1, -1, dtype=np.float32)
+        dist = np.minimum(np.minimum(left, right), overlap) / overlap
+        w = (0.5 * (1.0 - np.cos(np.pi * dist))).astype(np.float32)
         return np.outer(w, w)
 
     if mode == BlendMode.SPLINE:
-        w1d = _spline_window_1d(tile_size, power=power).astype(np.float32)
+        w1d = _spline_window_1d(tile_size, overlap, power=power).astype(np.float32)
         return np.outer(w1d, w1d)
 
     raise ValueError(f"Unknown blend mode: {mode!r}")
