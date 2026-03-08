@@ -642,6 +642,8 @@ def train_timm_segmentation_model(
     device: Optional[str] = None,
     use_timm_model: bool = False,
     timm_model_name: Optional[str] = None,
+    train_transforms: Optional[Callable] = None,
+    val_transforms: Optional[Callable] = None,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -684,6 +686,15 @@ def train_timm_segmentation_model(
         device (str, optional): Device to use. Auto-detected if None.
         use_timm_model (bool): Load complete segmentation model from timm/HF Hub.
         timm_model_name (str, optional): Model name from HF Hub (e.g., 'hf-hub:nvidia/mit-b0').
+        train_transforms (callable, optional): Custom transforms for training data.
+            Should be a callable that accepts (image, mask) tensors and returns
+            transformed (image, mask). Both image and mask should be torch.Tensor
+            objects. The image tensor is in CHW format (channels, height, width),
+            and the mask tensor in HW format (height, width). If None, no
+            augmentation is applied. Defaults to None.
+        val_transforms (callable, optional): Custom transforms for validation data.
+            Same signature as train_transforms. If None, no augmentation is
+            applied. Defaults to None.
         **kwargs: Additional arguments for training.
 
     Returns:
@@ -757,12 +768,14 @@ def train_timm_segmentation_model(
         image_paths=train_images,
         mask_paths=train_labels,
         num_channels=num_channels,
+        transform=train_transforms,
     )
 
     val_dataset = SegmentationDataset(
         image_paths=val_images,
         mask_paths=val_labels,
         num_channels=num_channels,
+        transform=val_transforms,
     )
 
     # Train model
