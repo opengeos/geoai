@@ -266,6 +266,117 @@ class TestCreateWeightMask(unittest.TestCase):
             )
 
 
+class TestSplineWindowFixes(unittest.TestCase):
+    """Tests for spline window edge cases and fixes."""
+
+    def test_spline_taper_reaches_one(self):
+        """Test that the spline taper smoothly reaches 1.0 at the boundary."""
+        from geoai.inference import _spline_window_1d
+
+        for overlap in [4, 8, 16, 64]:
+            w = _spline_window_1d(128, overlap)
+            # The last taper value (at index overlap-1) should be exactly 1.0
+            self.assertAlmostEqual(
+                w[overlap - 1],
+                1.0,
+                places=10,
+                msg=f"Taper should reach 1.0 at boundary for overlap={overlap}",
+            )
+            # Centre should be 1.0
+            self.assertAlmostEqual(w[64], 1.0)
+
+    def test_spline_taper_continuity(self):
+        """Test no discontinuity between taper end and centre region."""
+        from geoai.inference import _spline_window_1d
+
+        w = _spline_window_1d(128, 32)
+        # The jump between the last taper pixel and the first centre pixel
+        # should be zero (both are 1.0).
+        self.assertAlmostEqual(
+            abs(w[31] - w[32]),
+            0.0,
+            places=10,
+            msg="No discontinuity at taper-centre boundary",
+        )
+
+    def test_spline_large_overlap_raises(self):
+        """Test that spline mode raises for overlap > tile_size // 2."""
+        from geoai.inference import create_weight_mask
+
+        with self.assertRaises(ValueError, msg="Should reject overlap > tile_size//2"):
+            create_weight_mask(64, 40, mode="spline")
+
+    def test_spline_half_overlap_ok(self):
+        """Test that spline mode works at exactly tile_size // 2."""
+        from geoai.inference import create_weight_mask
+
+        mask = create_weight_mask(64, 32, mode="spline")
+        self.assertEqual(mask.shape, (64, 64))
+        self.assertTrue(np.all(mask >= 0))
+        self.assertTrue(np.all(mask <= 1.0 + 1e-7))
+
+    def test_spline_monotone_increasing_left_half(self):
+        """Test that spline 1D window is monotone non-decreasing in left half."""
+        from geoai.inference import _spline_window_1d
+
+        w = _spline_window_1d(128, 32)
+        half = len(w) // 2
+        self.assertTrue(
+            np.all(np.diff(w[:half]) >= -1e-10),
+            "Spline window should be monotone non-decreasing in left half",
+        )
+
+
+class TestNodataValidation(unittest.TestCase):
+    """Tests for output_nodata / output_dtype compatibility."""
+
+    def test_nodata_incompatible_with_uint8_raises(self):
+        """Test that nodata=-9999 with uint8 raises ValueError."""
+        from geoai.inference import predict_geotiff
+
+        with self.assertRaises(ValueError, msg="Should reject nodata=-9999 for uint8"):
+            predict_geotiff(
+                model=MagicMock(),
+                input_raster=__file__,
+                output_raster="/tmp/out.tif",
+                output_dtype="uint8",
+                output_nodata=-9999.0,
+            )
+
+    def test_nodata_compatible_with_uint8_ok(self):
+        """Test that nodata=255 with uint8 passes validation (fails later on missing raster)."""
+        from geoai.inference import predict_geotiff
+
+        # Should NOT raise ValueError for nodata, but will fail at rasterio open
+        # since __file__ is not a GeoTIFF. We just check that the nodata
+        # validation itself passes.
+        with self.assertRaises(Exception) as ctx:
+            predict_geotiff(
+                model=MagicMock(),
+                input_raster=__file__,
+                output_raster="/tmp/out.tif",
+                output_dtype="uint8",
+                output_nodata=255,
+            )
+        # The error should NOT be about nodata validation
+        self.assertNotIn("output_nodata", str(ctx.exception))
+
+    def test_nodata_float32_default_ok(self):
+        """Test that default nodata=-9999 with float32 passes validation."""
+        from geoai.inference import predict_geotiff
+
+        # Should fail at rasterio, not at nodata validation
+        with self.assertRaises(Exception) as ctx:
+            predict_geotiff(
+                model=MagicMock(),
+                input_raster=__file__,
+                output_raster="/tmp/out.tif",
+                output_dtype="float32",
+                output_nodata=-9999.0,
+            )
+        self.assertNotIn("output_nodata", str(ctx.exception))
+
+
 class TestPredictGeotiffValidation(unittest.TestCase):
     """Tests for predict_geotiff input validation."""
 

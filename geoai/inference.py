@@ -38,10 +38,12 @@ class BlendMode(str, Enum):
     """Blending strategy for overlapping tile predictions.
 
     Attributes:
-        NONE: No blending; last-write-wins.
+        NONE: Uniform averaging -- all pixels are weighted equally (1.0),
+            so overlapping tiles are simply averaged without tapering.
         LINEAR: Linear ramp from 0 at edges to 1 at center.
         COSINE: Raised-cosine (Hann) taper in the overlap region.
-        SPLINE: Spline (triangular-based) window for smooth transitions.
+        SPLINE: Powered raised-cosine taper for smooth transitions in
+            the overlap zones. Requires ``overlap <= tile_size // 2``.
     """
 
     NONE = "none"
@@ -70,7 +72,9 @@ def _spline_window_1d(window_size: int, overlap: int, power: int = 2) -> np.ndar
 
     window = np.ones(window_size, dtype=np.float64)
     # Left taper: 0 .. overlap  ->  ramp from 0 to 1
-    ramp = np.linspace(0.0, 1.0, overlap, endpoint=False)
+    # Use endpoint=True so the taper reaches exactly 1.0, avoiding a
+    # discontinuity at the boundary with the flat centre region.
+    ramp = np.linspace(0.0, 1.0, overlap + 1, endpoint=True)[1:]
     # Apply half-cosine shaping then power for smoothness
     ramp = (0.5 * (1.0 - np.cos(np.pi * ramp))) ** power
     window[:overlap] = ramp
@@ -136,6 +140,12 @@ def create_weight_mask(
         return np.outer(w, w)
 
     if mode == BlendMode.SPLINE:
+        if overlap > tile_size // 2:
+            raise ValueError(
+                f"For spline blending, overlap must be <= tile_size // 2 "
+                f"({tile_size // 2}), got {overlap}. Use 'linear' or "
+                f"'cosine' blending for larger overlaps."
+            )
         w1d = _spline_window_1d(tile_size, overlap, power=power).astype(np.float32)
         return np.outer(w1d, w1d)
 
@@ -350,6 +360,18 @@ def predict_geotiff(
         raise ValueError(
             f"overlap must be >= 0 and < tile_size ({tile_size}), got {overlap}"
         )
+
+    # Validate output_nodata fits the chosen output_dtype
+    out_dt = np.dtype(output_dtype)
+    if np.issubdtype(out_dt, np.integer):
+        info = np.iinfo(out_dt)
+        if not (info.min <= output_nodata <= info.max):
+            raise ValueError(
+                f"output_nodata={output_nodata} is outside the valid range "
+                f"[{info.min}, {info.max}] for output_dtype='{output_dtype}'. "
+                f"Choose a nodata value that fits the dtype (e.g., 0 or 255 "
+                f"for uint8)."
+            )
 
     if device is None:
         device = get_device()
