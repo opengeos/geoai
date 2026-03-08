@@ -51,6 +51,110 @@ from qgis.core import (
 
 from qgis.PyQt.QtCore import QThread, pyqtSignal
 
+# ---------------------------------------------------------------------------
+# Lightweight DataFrame-like wrappers for when pandas is unavailable
+# ---------------------------------------------------------------------------
+
+
+class _ColumnSeries:
+    """Lightweight series for a single column of data."""
+
+    def __init__(self, values):
+        self._values = values
+
+    def min(self):
+        """Return the minimum value."""
+        return min(self._values) if self._values else None
+
+    def max(self):
+        """Return the maximum value."""
+        return max(self._values) if self._values else None
+
+    def unique(self):
+        """Return unique values preserving order."""
+        return list(dict.fromkeys(self._values))
+
+    def value_counts(self):
+        """Return a Counter mapping values to their counts."""
+        from collections import Counter
+
+        return Counter(self._values)
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __ge__(self, other):
+        return [v >= other for v in self._values]
+
+
+class _RecordRow:
+    """Single row with attribute access and an ``index`` property."""
+
+    def __init__(self, data):
+        self._data = data
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        try:
+            return self._data[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    @property
+    def index(self):
+        """Return column names for this row."""
+        return list(self._data.keys())
+
+    def __contains__(self, key):
+        return key in self._data
+
+
+class _RecordsFrame:
+    """Minimal DataFrame-like wrapper over a list of dicts.
+
+    Provides the subset of the pandas DataFrame API used by the DeepForest
+    panel so that subprocess predictions can be displayed even when pandas is
+    not installed in the host QGIS environment.
+    """
+
+    def __init__(self, records, columns=None):
+        self._records = list(records)
+        self.columns = (
+            list(columns)
+            if columns
+            else (list(self._records[0].keys()) if self._records else [])
+        )
+
+    @property
+    def empty(self):
+        """Return True when the frame contains no rows."""
+        return len(self._records) == 0
+
+    def __len__(self):
+        return len(self._records)
+
+    def __getattr__(self, name):
+        if name.startswith("_") or name in ("columns", "empty"):
+            raise AttributeError(name)
+        if name in self.columns:
+            return _ColumnSeries([r.get(name) for r in self._records])
+        raise AttributeError(name)
+
+    def __getitem__(self, key):
+        if isinstance(key, list):
+            filtered = [r for r, keep in zip(self._records, key) if keep]
+            return _RecordsFrame(filtered, self.columns)
+        raise KeyError(key)
+
+    def iterrows(self):
+        """Yield ``(index, row)`` pairs."""
+        for i, rec in enumerate(self._records):
+            yield i, _RecordRow(rec)
+
+
+# ---------------------------------------------------------------------------
+
 
 def _use_deepforest_subprocess() -> bool:
     """Use subprocess DeepForest on Windows to avoid QGIS/PyTorch DLL conflicts."""
@@ -183,11 +287,11 @@ class DeepForestPredictWorker(QThread):
                 )
                 pred_mode = payload.get("pred_mode", "single")
                 preds_payload = payload.get("predictions") or {}
+                records = preds_payload.get("records") or []
+                columns = preds_payload.get("columns") or []
                 try:
                     import pandas as pd
 
-                    records = preds_payload.get("records") or []
-                    columns = preds_payload.get("columns") or []
                     if records:
                         result = pd.DataFrame.from_records(records)
                         # Preserve stable column order from worker when possible.
@@ -198,11 +302,9 @@ class DeepForestPredictWorker(QThread):
                     else:
                         result = pd.DataFrame(columns=columns)
                 except Exception:
-                    self.error.emit(
-                        "DeepForest subprocess returned predictions, but pandas "
-                        "is unavailable in QGIS to deserialize them."
-                    )
-                    return
+                    # Fallback: use lightweight wrapper when pandas is
+                    # unavailable so predictions can still be displayed.
+                    result = _RecordsFrame(records, columns)
 
                 self.finished.emit(result, pred_mode)
                 return
