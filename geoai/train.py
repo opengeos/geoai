@@ -1413,7 +1413,7 @@ def inference_on_geotiff(
     num_channels: int = 3,
     device: Optional[torch.device] = None,
     **kwargs: Any,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[str, float]:
     """
     Perform inference on a large GeoTIFF using a sliding window approach with improved blending.
 
