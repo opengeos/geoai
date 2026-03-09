@@ -795,23 +795,29 @@ def display_training_tiles(
     num_tiles=6,
     figsize=(18, 6),
     cmap="gray",
+    show_axes=True,
     save_path=None,
 ):
     """
     Display image and mask tile pairs from training data output.
 
     Args:
-        output_dir (str): Path to output directory containing 'images' and 'masks' subdirectories
-        num_tiles (int): Number of tile pairs to display (default: 6)
-        figsize (tuple): Figure size as (width, height) in inches (default: (18, 6))
-        cmap (str): Colormap for mask display (default: 'gray')
-        save_path (str, optional): If provided, save figure to this path instead of displaying
+        output_dir (str): Path to output directory containing 'images' and 'masks' subdirectories.
+        num_tiles (int): Number of tile pairs to display (default: 6).
+        figsize (tuple): Figure size as (width, height) in inches (default: (18, 6)).
+        cmap (str): Colormap for mask display (default: 'gray').
+        show_axes (bool): Whether to show row/column pixel labels on the
+            axes. When True, axes display pixel-based row and column
+            indices instead of CRS coordinates. Defaults to True.
+        save_path (str, optional): If provided, save figure to this path instead of displaying.
 
     Returns:
-        tuple: (fig, axes) matplotlib figure and axes objects
+        tuple: (fig, axes) matplotlib figure and axes objects.
 
     Example:
         >>> fig, axes = display_training_tiles('output/tiles', num_tiles=6)
+        >>> # Show with row/col pixel labels
+        >>> fig, axes = display_training_tiles('output/tiles', show_axes=True)
         >>> # Or save to file
         >>> display_training_tiles('output/tiles', num_tiles=4, save_path='tiles_preview.png')
     """
@@ -841,13 +847,27 @@ def display_training_tiles(
         # Load and display image tile
         image_path = os.path.join(output_dir, "images", tile_name)
         with rasterio.open(image_path) as src:
-            show(src, ax=axes[0, idx], title=f"Image {idx+1}")
+            if show_axes:
+                data = src.read()
+                if data.shape[0] >= 3:
+                    axes[0, idx].imshow(data[:3].transpose(1, 2, 0))
+                else:
+                    axes[0, idx].imshow(data[0])
+            else:
+                show(src, ax=axes[0, idx])
+        axes[0, idx].set_title(f"Image {idx+1}")
+        if not show_axes:
+            axes[0, idx].set_axis_off()
 
         # Load and display mask tile
         mask_path = os.path.join(output_dir, "masks", tile_name)
         if os.path.exists(mask_path):
             with rasterio.open(mask_path) as src:
-                show(src, ax=axes[1, idx], title=f"Mask {idx+1}", cmap=cmap)
+                if show_axes:
+                    data = src.read(1)
+                    axes[1, idx].imshow(data, cmap=cmap)
+                else:
+                    show(src, ax=axes[1, idx], cmap=cmap)
         else:
             axes[1, idx].text(
                 0.5,
@@ -857,7 +877,9 @@ def display_training_tiles(
                 va="center",
                 transform=axes[1, idx].transAxes,
             )
-            axes[1, idx].set_title(f"Mask {idx+1}")
+        axes[1, idx].set_title(f"Mask {idx+1}")
+        if not show_axes:
+            axes[1, idx].set_axis_off()
 
     plt.tight_layout()
 
