@@ -1,0 +1,3 @@
+# inference module
+
+::: geoai.inference

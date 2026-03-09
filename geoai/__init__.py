@@ -165,6 +165,13 @@ _LAZY_SYMBOL_MAP = {
     "get_model_input_channels": ("hf", None),
     "image_segmentation": ("hf", None),
     "mask_generation": ("hf", None),
+    # --- geoai.inference ---
+    "BlendMode": ("inference", None),
+    "create_weight_mask": ("inference", None),
+    "predict_geotiff": ("inference", None),
+    "d4_forward": ("inference", None),
+    "d4_inverse": ("inference", None),
+    "d4_tta_forward": ("inference", None),
     # --- geoai.segment ---
     "BoundingBox": ("segment", None),
     "DetectionResult": ("segment", None),
@@ -408,6 +415,7 @@ _LAZY_SUBMODULES = {
     "download",
     "extract",
     "hf",
+    "inference",
     "segment",
     "train",
     "agents",
