@@ -1446,6 +1446,7 @@ def export_geotiff_tiles(
                     os.path.join(out_folder, "overview.png"),
                     tile_size,
                     stride,
+                    in_class_data=in_class_data,
                 )
             except Exception as e:
                 print(f"Failed to create overview image: {e}")
