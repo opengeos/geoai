@@ -69,6 +69,10 @@
          <lastmod>2026-03-09</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/inference/</loc>
+         <lastmod>2026-03-09</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/installation/</loc>
          <lastmod>2026-03-09</lastmod>
     </url>
@@ -374,6 +378,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/ship_detection/</loc>
+         <lastmod>2026-03-09</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/smooth_inference/</loc>
          <lastmod>2026-03-09</lastmod>
     </url>
     <url>
