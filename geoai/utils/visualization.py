@@ -16,7 +16,9 @@ from typing import (
 # Third-Party Libraries
 import geopandas as gpd
 import leafmap
+import matplotlib.patheffects
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 import rasterio
@@ -962,7 +964,13 @@ def display_image_with_vector(
 
 
 def create_overview_image(
-    src, tile_coordinates, output_path, tile_size, stride, geojson_path=None
+    src,
+    tile_coordinates,
+    output_path,
+    tile_size,
+    stride,
+    geojson_path=None,
+    in_class_data=None,
 ) -> str:
     """Create an overview image showing all tiles and their status, with optional GeoJSON export.
 
@@ -973,6 +981,8 @@ def create_overview_image(
         tile_size (int): The size of each tile in pixels.
         stride (int): The stride between tiles in pixels. Controls overlap between adjacent tiles.
         geojson_path (str, optional): If provided, exports the tile rectangles as GeoJSON to this path.
+        in_class_data (str, optional): Path to classification data (vector or raster).
+            If provided, shows the mask/label overlay instead of the raw satellite image.
 
     Returns:
         str: Path to the saved overview image.
@@ -984,30 +994,103 @@ def create_overview_image(
     overview_width = src.width // overview_scale
     overview_height = src.height // overview_scale
 
-    # Read downsampled image
-    overview_data = src.read(
-        out_shape=(src.count, overview_height, overview_width),
-        resampling=rasterio.enums.Resampling.average,
-    )
+    # Try to load mask data if class data is provided
+    mask_data = None
+    if in_class_data is not None:
+        try:
+            from rasterio.transform import Affine
 
-    # Create RGB image for display
-    if overview_data.shape[0] >= 3:
-        rgb = np.moveaxis(overview_data[:3], 0, -1)
+            file_ext = os.path.splitext(in_class_data)[1].lower()
+            if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
+                # Raster class data: read at overview scale
+                with rasterio.open(in_class_data) as class_src:
+                    mask_data = class_src.read(
+                        1,
+                        out_shape=(overview_height, overview_width),
+                        resampling=rasterio.enums.Resampling.nearest,
+                    )
+            else:
+                # Vector class data: rasterize at overview scale
+                import rasterio.features
+
+                gdf = gpd.read_file(in_class_data)
+                if gdf.crs != src.crs:
+                    gdf = gdf.to_crs(src.crs)
+
+                # Compute overview transform
+                overview_transform = Affine(
+                    src.transform.a * overview_scale,
+                    src.transform.b,
+                    src.transform.c,
+                    src.transform.d,
+                    src.transform.e * overview_scale,
+                    src.transform.f,
+                )
+
+                shapes = [(geom, 1) for geom in gdf.geometry if geom is not None]
+                if shapes:
+                    mask_data = rasterio.features.rasterize(
+                        shapes,
+                        out_shape=(overview_height, overview_width),
+                        transform=overview_transform,
+                        fill=0,
+                        dtype=np.uint8,
+                    )
+        except Exception:
+            mask_data = None
+
+    if mask_data is not None:
+        # Create colored mask image on dark background
+        unique_vals = np.unique(mask_data)
+        unique_vals = unique_vals[unique_vals > 0]
+
+        # Use a colormap for class values
+        cmap = plt.cm.get_cmap("tab10", max(len(unique_vals), 1))
+        rgb = np.zeros((overview_height, overview_width, 3), dtype=np.float64)
+
+        for i, val in enumerate(unique_vals):
+            color = cmap(i % 10)[:3]
+            mask = mask_data == val
+            for c in range(3):
+                rgb[mask, c] = color[c]
     else:
-        # For single band, create grayscale RGB
-        rgb = np.stack([overview_data[0], overview_data[0], overview_data[0]], axis=-1)
+        # Read downsampled image
+        overview_data = src.read(
+            out_shape=(src.count, overview_height, overview_width),
+            resampling=rasterio.enums.Resampling.average,
+        )
 
-    # Normalize for display
-    for i in range(rgb.shape[-1]):
-        band = rgb[..., i]
-        non_zero = band[band > 0]
-        if len(non_zero) > 0:
-            p2, p98 = np.percentile(non_zero, (2, 98))
-            rgb[..., i] = np.clip((band - p2) / (p98 - p2), 0, 1)
+        # Create RGB image for display
+        if overview_data.shape[0] >= 3:
+            rgb = np.moveaxis(overview_data[:3], 0, -1)
+        else:
+            # For single band, create grayscale RGB
+            rgb = np.stack(
+                [overview_data[0], overview_data[0], overview_data[0]], axis=-1
+            )
 
-    # Create figure
-    plt.figure(figsize=(12, 12))
-    plt.imshow(rgb)
+        # Normalize for display
+        for i in range(rgb.shape[-1]):
+            band = rgb[..., i]
+            non_zero = band[band > 0]
+            if len(non_zero) > 0:
+                p2, p98 = np.percentile(non_zero, (2, 98))
+                rgb[..., i] = np.clip((band - p2) / (p98 - p2), 0, 1)
+
+        # Apply gamma correction to brighten dark imagery
+        rgb = np.clip(np.power(rgb, 0.7), 0, 1)
+
+    # Create figure with aspect-ratio-aware sizing
+    max_fig_dim = 12
+    aspect = overview_width / overview_height
+    if aspect >= 1:
+        fig_width = max_fig_dim
+        fig_height = max_fig_dim / aspect
+    else:
+        fig_height = max_fig_dim
+        fig_width = max_fig_dim * aspect
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.imshow(rgb)
 
     # If GeoJSON export is requested, prepare GeoJSON structures
     if geojson_path:
@@ -1023,23 +1106,39 @@ def create_overview_image(
         width = int(tile_size / overview_scale)
         height = int(tile_size / overview_scale)
 
-        # Draw rectangle
-        color = "lime" if tile["has_features"] else "red"
+        # Draw rectangle with semi-transparent fill
+        if tile["has_features"]:
+            edgecolor = "lime"
+            facecolor = (0.0, 1.0, 0.0, 0.15)
+        else:
+            edgecolor = "red"
+            facecolor = (1.0, 0.0, 0.0, 0.25)
+
         rect = plt.Rectangle(
-            (x_min, y_min), width, height, fill=False, edgecolor=color, linewidth=0.5
+            (x_min, y_min),
+            width,
+            height,
+            fill=True,
+            facecolor=facecolor,
+            edgecolor=edgecolor,
+            linewidth=1.5,
         )
-        plt.gca().add_patch(rect)
+        ax.add_patch(rect)
 
         # Add tile number if not too crowded
         if width > 20 and height > 20:
-            plt.text(
+            ax.text(
                 x_min + width / 2,
                 y_min + height / 2,
                 str(tile["index"]),
                 color="white",
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=10,
+                fontweight="bold",
+                path_effects=[
+                    matplotlib.patheffects.withStroke(linewidth=2, foreground="black")
+                ],
             )
 
         # Add to GeoJSON features if exporting
@@ -1079,11 +1178,35 @@ def create_overview_image(
 
             features.append(feature)
 
-    plt.title("Tile Overview (Green = Contains Features, Red = Empty)")
-    plt.axis("off")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    ax.set_title("Tile Overview", fontsize=14, fontweight="bold", pad=10)
+    ax.axis("off")
+
+    # Add legend
+    legend_handles = [
+        Patch(
+            facecolor=(0.0, 1.0, 0.0, 0.3),
+            edgecolor="lime",
+            linewidth=1.5,
+            label="Contains features",
+        ),
+        Patch(
+            facecolor=(1.0, 0.0, 0.0, 0.4),
+            edgecolor="red",
+            linewidth=1.5,
+            label="Empty",
+        ),
+    ]
+    ax.legend(
+        handles=legend_handles,
+        loc="upper right",
+        fontsize=10,
+        framealpha=0.8,
+        edgecolor="gray",
+    )
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
 
     print(f"Overview image saved to {output_path}")
 
