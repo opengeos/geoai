@@ -20,10 +20,18 @@ def mock_model():
 @pytest.fixture
 def mock_deps(mock_model, tmp_path):
     """Patch torch.load and inference_on_geotiff to isolate input parsing."""
+    real_exists = os.path.exists
+
+    def _exists(path):
+        if path == "dummy":
+            return True
+        return real_exists(path)
+
     with (
         patch("geoai.train.torch.load", return_value={}),
         patch("geoai.train.inference_on_geotiff") as mock_infer,
         patch("geoai.train.get_device", return_value="cpu"),
+        patch("geoai.train.os.path.exists", side_effect=_exists),
     ):
         yield mock_infer, tmp_path
 
