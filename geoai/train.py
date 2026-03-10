@@ -2433,8 +2433,10 @@ def object_detection_batch(
     Perform object detection on a GeoTIFF using a pre-trained Mask R-CNN model.
 
     Args:
-        input_paths (str or list): Path(s) to input GeoTIFF file(s). If a directory is provided,
-            all .tif files in that directory will be processed.
+        input_paths (str or list): Path(s) to input GeoTIFF file(s). Can be a
+            single file path (.tif or .tiff, case-insensitive), a directory
+            path (all .tif and .tiff files will be processed), or a list of
+            file paths.
         output_dir (str): Directory to save output mask GeoTIFF files.
         model_path (str): Path to trained model weights.
         filenames (list, optional): List of output filenames. If None, defaults to
@@ -2499,7 +2501,10 @@ def object_detection_batch(
 
     if filenames is None:
         filenames = [
-            os.path.join(output_dir, os.path.basename(f).replace(".tif", "_mask.tif"))
+            os.path.join(
+                output_dir,
+                os.path.splitext(os.path.basename(f))[0] + "_mask.tif",
+            )
             for f in files
         ]
     else:
