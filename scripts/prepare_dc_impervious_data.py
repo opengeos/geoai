@@ -25,7 +25,6 @@ import rasterio
 from rasterio.mask import mask
 from shapely.geometry import box
 
-
 # ── Configuration ──────────────────────────────────────────────────────────
 # Target area: a ~2.5 km² region in central DC (National Mall area)
 # Covers mix of buildings, roads, parking lots, and green spaces
@@ -219,4 +218,6 @@ if __name__ == "__main__":
     print(f"  Vector: {os.path.abspath(vector_path)}")
     print(f"\nNext steps:")
     print(f"  1. Test the notebook: docs/examples/impervious_surface_mapping.ipynb")
-    print(f"  2. Update download URLs to point to local files (or upload to HuggingFace)")
+    print(
+        f"  2. Update download URLs to point to local files (or upload to HuggingFace)"
+    )
