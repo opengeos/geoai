@@ -2485,10 +2485,14 @@ def object_detection_batch(
     model.to(device)
     model.eval()
 
-    if isinstance(input_paths, str) and (not input_paths.endswith(".tif")):
-        files = glob.glob(os.path.join(input_paths, "*.tif"))
-        files.sort()
-    elif isinstance(input_paths, str):
+    if isinstance(input_paths, list):
+        files = input_paths
+    elif isinstance(input_paths, str) and not input_paths.lower().endswith((".tif", ".tiff")):
+        files = sorted(
+            glob.glob(os.path.join(input_paths, "*.tif")) +
+            glob.glob(os.path.join(input_paths, "*.tiff"))
+        )
+    else:
         files = [input_paths]
 
     if filenames is None:
