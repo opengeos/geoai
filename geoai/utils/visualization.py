@@ -797,19 +797,30 @@ def display_training_tiles(
     cmap="gray",
     show_axes=True,
     save_path=None,
+    image_subdir=None,
+    mask_subdir=None,
 ):
     """
     Display image and mask tile pairs from training data output.
 
     Args:
-        output_dir (str): Path to output directory containing 'images' and 'masks' subdirectories.
+        output_dir (str): Path to output directory containing image and mask
+            subdirectories.
         num_tiles (int): Number of tile pairs to display (default: 6).
-        figsize (tuple): Figure size as (width, height) in inches (default: (18, 6)).
+        figsize (tuple): Figure size as (width, height) in inches
+            (default: (18, 6)).
         cmap (str): Colormap for mask display (default: 'gray').
         show_axes (bool): Whether to show row/column pixel labels on the
             axes. When True, axes display pixel-based row and column
             indices instead of CRS coordinates. Defaults to True.
-        save_path (str, optional): If provided, save figure to this path instead of displaying.
+        save_path (str, optional): If provided, save figure to this path
+            instead of displaying.
+        image_subdir (str, optional): Name of the subdirectory containing
+            image tiles. If None, auto-detects by looking for 'images' or
+            'image' subdirectories. Defaults to None.
+        mask_subdir (str, optional): Name of the subdirectory containing
+            mask/label tiles. If None, auto-detects by looking for 'masks',
+            'mask', 'labels', or 'label' subdirectories. Defaults to None.
 
     Returns:
         tuple: (fig, axes) matplotlib figure and axes objects.
@@ -818,13 +829,41 @@ def display_training_tiles(
         >>> fig, axes = display_training_tiles('output/tiles', num_tiles=6)
         >>> # Show with row/col pixel labels
         >>> fig, axes = display_training_tiles('output/tiles', show_axes=True)
+        >>> # Use custom subdirectory names
+        >>> fig, axes = display_training_tiles('output/tiles', mask_subdir='labels')
         >>> # Or save to file
         >>> display_training_tiles('output/tiles', num_tiles=4, save_path='tiles_preview.png')
     """
     import matplotlib.pyplot as plt
 
+    # Auto-detect image subdirectory
+    if image_subdir is None:
+        for candidate in ["images", "image"]:
+            if os.path.isdir(os.path.join(output_dir, candidate)):
+                image_subdir = candidate
+                break
+        if image_subdir is None:
+            raise ValueError(
+                f"Could not find image subdirectory in {output_dir}. "
+                "Looked for 'images', 'image'. "
+                "Specify image_subdir explicitly."
+            )
+
+    # Auto-detect mask subdirectory
+    if mask_subdir is None:
+        for candidate in ["masks", "mask", "labels", "label"]:
+            if os.path.isdir(os.path.join(output_dir, candidate)):
+                mask_subdir = candidate
+                break
+        if mask_subdir is None:
+            raise ValueError(
+                f"Could not find mask subdirectory in {output_dir}. "
+                "Looked for 'masks', 'mask', 'labels', 'label'. "
+                "Specify mask_subdir explicitly."
+            )
+
     # Get list of image tiles
-    images_dir = os.path.join(output_dir, "images")
+    images_dir = os.path.join(output_dir, image_subdir)
     if not os.path.exists(images_dir):
         raise ValueError(f"Images directory not found: {images_dir}")
 
@@ -843,9 +882,13 @@ def display_training_tiles(
     if num_tiles == 1:
         axes = axes.reshape(2, 1)
 
+    masks_dir = os.path.join(output_dir, mask_subdir)
+    if not os.path.exists(masks_dir) or not os.path.isdir(masks_dir):
+        raise ValueError(f"Mask directory not found: {masks_dir}")
+
     for idx, tile_name in enumerate(image_tiles):
         # Load and display image tile
-        image_path = os.path.join(output_dir, "images", tile_name)
+        image_path = os.path.join(images_dir, tile_name)
         with rasterio.open(image_path) as src:
             if show_axes:
                 data = src.read()
@@ -860,7 +903,7 @@ def display_training_tiles(
             axes[0, idx].set_axis_off()
 
         # Load and display mask tile
-        mask_path = os.path.join(output_dir, "masks", tile_name)
+        mask_path = os.path.join(masks_dir, tile_name)
         if os.path.exists(mask_path):
             with rasterio.open(mask_path) as src:
                 if show_axes:
