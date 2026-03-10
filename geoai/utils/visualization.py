@@ -883,6 +883,8 @@ def display_training_tiles(
         axes = axes.reshape(2, 1)
 
     masks_dir = os.path.join(output_dir, mask_subdir)
+    if not os.path.exists(masks_dir) or not os.path.isdir(masks_dir):
+        raise ValueError(f"Mask directory not found: {masks_dir}")
 
     for idx, tile_name in enumerate(image_tiles):
         # Load and display image tile
