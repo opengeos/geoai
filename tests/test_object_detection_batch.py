@@ -44,7 +44,9 @@ class TestInputParsing:
         )
 
         assert mock_infer.call_count == 2
-        called_paths = [call.kwargs["geotiff_path"] for call in mock_infer.call_args_list]
+        called_paths = [
+            call.kwargs["geotiff_path"] for call in mock_infer.call_args_list
+        ]
         assert called_paths == input_files
 
     def test_tiff_single_file(self, mock_deps, mock_model):
@@ -107,7 +109,9 @@ class TestInputParsing:
             )
 
         assert mock_infer.call_count == 3
-        called_paths = [call.kwargs["geotiff_path"] for call in mock_infer.call_args_list]
+        called_paths = [
+            call.kwargs["geotiff_path"] for call in mock_infer.call_args_list
+        ]
         assert called_paths == ["/data/a.tif", "/data/b.tiff", "/data/c.tif"]
 
 
