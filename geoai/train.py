@@ -2487,10 +2487,12 @@ def object_detection_batch(
 
     if isinstance(input_paths, list):
         files = input_paths
-    elif isinstance(input_paths, str) and not input_paths.lower().endswith((".tif", ".tiff")):
+    elif isinstance(input_paths, str) and not input_paths.lower().endswith(
+        (".tif", ".tiff")
+    ):
         files = sorted(
-            glob.glob(os.path.join(input_paths, "*.tif")) +
-            glob.glob(os.path.join(input_paths, "*.tiff"))
+            glob.glob(os.path.join(input_paths, "*.tif"))
+            + glob.glob(os.path.join(input_paths, "*.tiff"))
         )
     else:
         files = [input_paths]
