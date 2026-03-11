@@ -826,13 +826,17 @@ def timm_semantic_segmentation(
     quiet: bool = False,
     use_timm_model: bool = False,
     timm_model_name: Optional[str] = None,
+    probability_path: Optional[str] = None,
+    probability_threshold: Optional[float] = None,
+    save_class_probabilities: bool = False,
     **kwargs: Any,
 ) -> None:
     """
     Perform semantic segmentation on a raster using a trained timm model.
 
     This function performs inference on a GeoTIFF using a sliding window approach
-    and saves the result as a georeferenced raster.
+    and saves the result as a georeferenced raster. Overlapping windows are blended
+    using edge-distance weighted averaging of class probabilities.
 
     Args:
         input_path (str): Path to input GeoTIFF file.
@@ -849,13 +853,33 @@ def timm_semantic_segmentation(
         quiet (bool): If True, suppress progress messages.
         use_timm_model (bool): If True, model was trained with timm model from HF Hub.
         timm_model_name (str, optional): Model name from HF Hub used during training.
+        probability_path (str, optional): Path to save probability map. If provided,
+            the normalized class probabilities will be saved as a multi-band raster.
+        probability_threshold (float, optional): Probability threshold for binary
+            classification. Only valid when num_classes=2. Pixels with class 1
+            probability >= threshold are classified as 1, otherwise 0.
+        save_class_probabilities (bool): If True and probability_path is provided,
+            save individual per-class probability files in addition to the
+            multi-band probability raster.
         **kwargs: Additional arguments.
     """
+    import os
+
     import rasterio
     from rasterio.windows import Window
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Validate probability_threshold
+    if probability_threshold is not None:
+        if not (0 <= probability_threshold <= 1):
+            raise ValueError("probability_threshold must be between 0 and 1")
+        if num_classes != 2:
+            raise ValueError(
+                "probability_threshold is only supported for binary "
+                "classification (num_classes=2)"
+            )
 
     # Load model
     if model_path.endswith(".ckpt"):
@@ -918,9 +942,9 @@ def timm_semantic_segmentation(
         if not quiet:
             print(f"Processing {n_rows} x {n_cols} = {n_rows * n_cols} windows")
 
-        # Initialize output array (use int32 to avoid overflow during accumulation)
-        output = np.zeros((height, width), dtype=np.int32)
-        count = np.zeros((height, width), dtype=np.int32)
+        # Initialize probability accumulators for proper overlap blending
+        prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
+        count_accumulator = np.zeros((height, width), dtype=np.float32)
 
         # Process windows
         with torch.no_grad():
@@ -963,26 +987,132 @@ def timm_semantic_segmentation(
                     # Predict
                     img_tensor = torch.from_numpy(img).unsqueeze(0).to(device)
                     logits = model(img_tensor)
-                    pred = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy()
 
-                    # Crop to actual size
-                    pred = pred[:h, :w]
+                    # Apply softmax to get class probabilities
+                    probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
 
-                    # Add to output
-                    output[row_start:row_end, col_start:col_end] += pred
-                    count[row_start:row_end, col_start:col_end] += 1
+                    # Crop to actual size [C, h, w]
+                    probs = probs[:, :h, :w]
 
-        # Average overlapping predictions
-        output = (output / np.maximum(count, 1)).astype(np.uint8)
+                    # Create edge-distance weight matrix for blending
+                    y_grid, x_grid = np.mgrid[0:h, 0:w]
+                    dist_from_left = x_grid
+                    dist_from_right = w - x_grid - 1
+                    dist_from_top = y_grid
+                    dist_from_bottom = h - y_grid - 1
+
+                    edge_distance = np.minimum.reduce(
+                        [
+                            dist_from_left,
+                            dist_from_right,
+                            dist_from_top,
+                            dist_from_bottom,
+                        ]
+                    )
+                    edge_distance = np.minimum(edge_distance, overlap / 2)
+
+                    # Avoid zero weights - use minimum weight of 0.1
+                    weight = np.maximum(edge_distance / max(overlap / 2, 1), 0.1)
+
+                    # For non-overlapping windows, use uniform weight
+                    if overlap == 0:
+                        weight = np.ones_like(weight)
+
+                    # Accumulate weighted probabilities for each class
+                    y_slice = slice(row_start, row_end)
+                    x_slice = slice(col_start, col_end)
+
+                    for class_idx in range(num_classes):
+                        prob_accumulator[class_idx, y_slice, x_slice] += (
+                            probs[class_idx] * weight
+                        )
+
+                    # Update weight accumulator
+                    count_accumulator[y_slice, x_slice] += weight
+
+        # Calculate final mask from accumulated probabilities
+        output = np.zeros((height, width), dtype=np.uint8)
+        valid_pixels = count_accumulator > 0
+
+        if np.any(valid_pixels):
+            # Normalize accumulated probabilities by weights
+            normalized_probs = np.zeros_like(prob_accumulator)
+            for class_idx in range(num_classes):
+                normalized_probs[class_idx, valid_pixels] = (
+                    prob_accumulator[class_idx, valid_pixels]
+                    / count_accumulator[valid_pixels]
+                )
+
+            # Apply threshold for binary classification or use argmax
+            if probability_threshold is not None and num_classes == 2:
+                output[valid_pixels] = (
+                    normalized_probs[1, valid_pixels] >= probability_threshold
+                ).astype(np.uint8)
+                if not quiet:
+                    print(f"Using probability threshold: {probability_threshold}")
+            else:
+                output[valid_pixels] = np.argmax(
+                    normalized_probs[:, valid_pixels], axis=0
+                ).astype(np.uint8)
 
     # Save output
     meta.update({"count": 1, "dtype": "uint8", "compress": "lzw"})
+
+    out_dir = os.path.abspath(os.path.dirname(output_path))
+    os.makedirs(out_dir, exist_ok=True)
 
     with rasterio.open(output_path, "w", **meta) as dst:
         dst.write(output, 1)
 
     if not quiet:
         print(f"Segmentation saved to {output_path}")
+
+    # Save probability map if requested
+    if probability_path is not None:
+        prob_dir = os.path.abspath(os.path.dirname(probability_path))
+        os.makedirs(prob_dir, exist_ok=True)
+
+        # Prepare probability output metadata
+        prob_meta = meta.copy()
+        prob_meta.update({"count": num_classes, "dtype": "float32"})
+
+        # Save normalized probabilities as multi-band raster
+        with rasterio.open(probability_path, "w", **prob_meta) as dst:
+            for class_idx in range(num_classes):
+                prob_band = np.zeros((height, width), dtype=np.float32)
+                prob_band[valid_pixels] = (
+                    prob_accumulator[class_idx, valid_pixels]
+                    / count_accumulator[valid_pixels]
+                )
+                dst.write(prob_band, class_idx + 1)
+
+        if not quiet:
+            print(f"Saved probability map to {probability_path}")
+
+        # Save individual class probabilities if requested
+        if save_class_probabilities:
+            single_band_meta = meta.copy()
+            single_band_meta.update({"count": 1, "dtype": "float32"})
+
+            prob_base = os.path.splitext(probability_path)[0]
+            prob_ext = os.path.splitext(probability_path)[1]
+
+            for class_idx in range(num_classes):
+                class_prob_path = f"{prob_base}_class_{class_idx}{prob_ext}"
+
+                prob_band = np.zeros((height, width), dtype=np.float32)
+                prob_band[valid_pixels] = (
+                    prob_accumulator[class_idx, valid_pixels]
+                    / count_accumulator[valid_pixels]
+                )
+
+                with rasterio.open(class_prob_path, "w", **single_band_meta) as dst:
+                    dst.write(prob_band, 1)
+
+                if not quiet:
+                    print(
+                        f"Saved class {class_idx} probability " f"to {class_prob_path}"
+                    )
 
 
 def push_timm_model_to_hub(
@@ -1123,6 +1253,9 @@ def timm_segmentation_from_hub(
     device: Optional[str] = None,
     quiet: bool = False,
     token: Optional[str] = None,
+    probability_path: Optional[str] = None,
+    probability_threshold: Optional[float] = None,
+    save_class_probabilities: bool = False,
     **kwargs: Any,
 ) -> None:
     """Perform semantic segmentation using a model from HuggingFace Hub.
@@ -1143,6 +1276,15 @@ def timm_segmentation_from_hub(
         quiet (bool): If True, suppress progress messages. Defaults to False.
         token (str, optional): HuggingFace API token. If None, uses
             logged-in token.
+        probability_path (str, optional): Path to save probability map. If
+            provided, the normalized class probabilities will be saved as a
+            multi-band raster.
+        probability_threshold (float, optional): Probability threshold for
+            binary classification. Only valid when num_classes=2. Pixels with
+            class 1 probability >= threshold are classified as 1, otherwise 0.
+        save_class_probabilities (bool): If True and probability_path is
+            provided, save individual per-class probability files in addition
+            to the multi-band probability raster.
         **kwargs: Additional arguments passed to timm_semantic_segmentation.
     """
     try:
@@ -1191,6 +1333,9 @@ def timm_segmentation_from_hub(
         quiet=quiet,
         use_timm_model=use_timm_model,
         timm_model_name=timm_model_name,
+        probability_path=probability_path,
+        probability_threshold=probability_threshold,
+        save_class_probabilities=save_class_probabilities,
         **kwargs,
     )
 
