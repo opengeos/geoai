@@ -863,8 +863,6 @@ def timm_semantic_segmentation(
             multi-band probability raster.
         **kwargs: Additional arguments.
     """
-    import os
-
     import rasterio
     from rasterio.windows import Window
 
@@ -1011,12 +1009,12 @@ def timm_semantic_segmentation(
                     )
                     edge_distance = np.minimum(edge_distance, overlap / 2)
 
-                    # Avoid zero weights - use minimum weight of 0.1
-                    weight = np.maximum(edge_distance / max(overlap / 2, 1), 0.1)
-
                     # For non-overlapping windows, use uniform weight
                     if overlap == 0:
-                        weight = np.ones_like(weight)
+                        weight = np.ones((h, w), dtype=np.float32)
+                    else:
+                        # Avoid zero weights - use minimum weight of 0.1
+                        weight = np.maximum(edge_distance / (overlap / 2), 0.1)
 
                     # Accumulate weighted probabilities for each class
                     y_slice = slice(row_start, row_end)
@@ -1034,9 +1032,9 @@ def timm_semantic_segmentation(
         output = np.zeros((height, width), dtype=np.uint8)
         valid_pixels = count_accumulator > 0
 
+        # Normalize accumulated probabilities by weights
+        normalized_probs = np.zeros_like(prob_accumulator)
         if np.any(valid_pixels):
-            # Normalize accumulated probabilities by weights
-            normalized_probs = np.zeros_like(prob_accumulator)
             for class_idx in range(num_classes):
                 normalized_probs[class_idx, valid_pixels] = (
                     prob_accumulator[class_idx, valid_pixels]
@@ -1079,12 +1077,7 @@ def timm_semantic_segmentation(
         # Save normalized probabilities as multi-band raster
         with rasterio.open(probability_path, "w", **prob_meta) as dst:
             for class_idx in range(num_classes):
-                prob_band = np.zeros((height, width), dtype=np.float32)
-                prob_band[valid_pixels] = (
-                    prob_accumulator[class_idx, valid_pixels]
-                    / count_accumulator[valid_pixels]
-                )
-                dst.write(prob_band, class_idx + 1)
+                dst.write(normalized_probs[class_idx], class_idx + 1)
 
         if not quiet:
             print(f"Saved probability map to {probability_path}")
@@ -1100,14 +1093,8 @@ def timm_semantic_segmentation(
             for class_idx in range(num_classes):
                 class_prob_path = f"{prob_base}_class_{class_idx}{prob_ext}"
 
-                prob_band = np.zeros((height, width), dtype=np.float32)
-                prob_band[valid_pixels] = (
-                    prob_accumulator[class_idx, valid_pixels]
-                    / count_accumulator[valid_pixels]
-                )
-
                 with rasterio.open(class_prob_path, "w", **single_band_meta) as dst:
-                    dst.write(prob_band, 1)
+                    dst.write(normalized_probs[class_idx], 1)
 
                 if not quiet:
                     print(
