@@ -79,6 +79,7 @@ plugins:
                   "examples/torchgeo_embeddings.ipynb",
                   "examples/image_recognition.ipynb",
                   "examples/clip_classify_vector.ipynb",
+                  "examples/impervious_surface_mapping.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -193,6 +194,7 @@ nav:
           - examples/google_satellite_embedding.ipynb
           - examples/building_detection_whu.ipynb
           - examples/clip_classify_vector.ipynb
+          - examples/impervious_surface_mapping.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
