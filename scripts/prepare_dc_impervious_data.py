@@ -20,7 +20,6 @@ import os
 import urllib.request
 
 import geopandas as gpd
-import numpy as np
 import rasterio
 from rasterio.mask import mask
 from shapely.geometry import box
@@ -84,7 +83,6 @@ def download_naip():
 
     with rasterio.open(href) as src:
         # Clip to our target bbox
-        bbox_geom = box(*BBOX)
         # Reproject bbox to raster CRS if needed
         from pyproj import Transformer
 
@@ -132,7 +130,7 @@ def download_impervious_surfaces():
         f"&returnCountOnly=true&f=json"
     )
     count_url = DC_GIS_BASE + count_params
-    with urllib.request.urlopen(count_url) as resp:
+    with urllib.request.urlopen(count_url, timeout=60) as resp:
         count_data = json.loads(resp.read())
     total = count_data.get("count", 0)
     print(f"Total features in bbox: {total}")
