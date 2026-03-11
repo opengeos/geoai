@@ -5870,6 +5870,7 @@ print(f"Saved {len(gdf_filtered)} building footprints to whu_buildings_final.geo
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="advanced-custom-inference-parameters">Advanced: Custom inference parameters<a class="anchor-link" href="#advanced-custom-inference-parameters">¶</a></h2><p>You can customize the inference by adjusting the window size, overlap, and batch size. Larger windows capture more context but require more memory. More overlap produces smoother predictions at boundaries but increases processing time.</p>
+<p>You can also save probability maps using <code>probability_path</code>, control the classification threshold with <code>probability_threshold</code>, and save per-class probability files with <code>save_class_probabilities</code>.</p>
 </div>
 </div>
 </div>
@@ -5892,7 +5893,7 @@ print(f"Saved {len(gdf_filtered)} building footprints to whu_buildings_final.geo
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># # Example with custom parameters</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># # Example with custom parameters and probability output</span>
 <span class="c1"># geoai.timm_segmentation_from_hub(</span>
 <span class="c1">#     input_path=raster_path,</span>
 <span class="c1">#     output_path="whu_building_prediction_custom.tif",</span>
@@ -5900,9 +5901,12 @@ print(f"Saved {len(gdf_filtered)} building footprints to whu_buildings_final.geo
 <span class="c1">#     window_size=512,</span>
 <span class="c1">#     overlap=384,  # More overlap for smoother results</span>
 <span class="c1">#     batch_size=2,  # Reduce if running out of GPU memory</span>
+<span class="c1">#     probability_path="whu_building_probability.tif",  # Save probability map</span>
+<span class="c1">#     probability_threshold=0.5,  # Threshold for binary classification</span>
+<span class="c1">#     save_class_probabilities=True,  # Save per-class probability files</span>
 <span class="c1"># )</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-15"># # Example with custom parameters
+<div class="clipboard-copy-txt" id="cell-15"># # Example with custom parameters and probability output
 # geoai.timm_segmentation_from_hub(
 #     input_path=raster_path,
 #     output_path="whu_building_prediction_custom.tif",
@@ -5910,6 +5914,9 @@ print(f"Saved {len(gdf_filtered)} building footprints to whu_buildings_final.geo
 #     window_size=512,
 #     overlap=384,  # More overlap for smoother results
 #     batch_size=2,  # Reduce if running out of GPU memory
+#     probability_path="whu_building_probability.tif",  # Save probability map
+#     probability_threshold=0.5,  # Threshold for binary classification
+#     save_class_probabilities=True,  # Save per-class probability files
 # )</div>
 </div>
 </div>
@@ -6005,7 +6012,7 @@ print(f"Saved {len(gdf_filtered)} building footprints to whu_buildings_final.geo
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="February 22, 2026 19:22:58 UTC"><span class="timeago" datetime="2026-02-22T19:22:58+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="February 22, 2026 19:22:58 UTC">2026-02-22</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 11, 2026 15:46:50 UTC"><span class="timeago" datetime="2026-03-11T15:46:50+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 11, 2026 15:46:50 UTC">2026-03-11</span>
   </span>
 
     

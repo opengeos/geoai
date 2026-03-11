@@ -1890,6 +1890,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Run water detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-save-probability-maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional: Save probability maps
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4383,6 +4400,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Run water detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-save-probability-maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional: Save probability maps
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5542,7 +5576,7 @@ geoai.timm_segmentation_from_hub(
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="visualize-raster-mask">Visualize raster mask<a class="anchor-link" href="#visualize-raster-mask">¶</a></h2><p>View the predicted water mask overlaid on the input imagery.</p>
+<h3 id="optional-save-probability-maps">Optional: Save probability maps<a class="anchor-link" href="#optional-save-probability-maps">¶</a></h3><p>You can also save probability maps by specifying <code>probability_path</code>, control the classification threshold with <code>probability_threshold</code>, and save per-class probability files with <code>save_class_probabilities</code>:</p>
 </div>
 </div>
 </div>
@@ -5565,6 +5599,66 @@ geoai.timm_segmentation_from_hub(
 </div>
 </clipboard-copy>
 </div>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># # Example with probability output</span>
+<span class="c1"># geoai.timm_segmentation_from_hub(</span>
+<span class="c1">#     input_path=image_path,</span>
+<span class="c1">#     output_path="s2_water_prediction_prob.tif",</span>
+<span class="c1">#     repo_id="giswqs/s2-water-unetplusplus-efficientnet-b4",</span>
+<span class="c1">#     window_size=512,</span>
+<span class="c1">#     overlap=256,</span>
+<span class="c1">#     batch_size=4,</span>
+<span class="c1">#     probability_path="s2_water_probability.tif",  # Save probability map</span>
+<span class="c1">#     probability_threshold=0.5,  # Threshold for binary classification</span>
+<span class="c1">#     save_class_probabilities=True,  # Save per-class probability files</span>
+<span class="c1"># )</span>
+</pre></div>
+<div class="clipboard-copy-txt" id="cell-7"># # Example with probability output
+# geoai.timm_segmentation_from_hub(
+#     input_path=image_path,
+#     output_path="s2_water_prediction_prob.tif",
+#     repo_id="giswqs/s2-water-unetplusplus-efficientnet-b4",
+#     window_size=512,
+#     overlap=256,
+#     batch_size=4,
+#     probability_path="s2_water_probability.tif",  # Save probability map
+#     probability_threshold=0.5,  # Threshold for binary classification
+#     save_class_probabilities=True,  # Save per-class probability files
+# )</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="visualize-raster-mask">Visualize raster mask<a class="anchor-link" href="#visualize-raster-mask">¶</a></h2><p>View the predicted water mask overlaid on the input imagery.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="CodeMirror cm-s-jupyter">
+<div class="zeroclipboard-container">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-8">
+<div>
+<span class="notice" hidden="">Copied!</span>
+<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
+<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+</clipboard-copy>
+</div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="n">geoai</span><span class="o">.</span><span class="n">view_raster</span><span class="p">(</span>
     <span class="n">output_path</span><span class="p">,</span>
     <span class="n">nodata</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
@@ -5573,7 +5667,7 @@ geoai.timm_segmentation_from_hub(
     <span class="n">backend</span><span class="o">=</span><span class="s2">"ipyleaflet"</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-7">geoai.view_raster(
+<div class="clipboard-copy-txt" id="cell-8">geoai.view_raster(
     output_path,
     nodata=0,
     basemap=image_path,
@@ -5605,7 +5699,7 @@ geoai.timm_segmentation_from_hub(
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-8">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-9">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5629,7 +5723,7 @@ geoai.timm_segmentation_from_hub(
     <span class="n">divider</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-8">save_path = "s2_water_comparison.png"
+<div class="clipboard-copy-txt" id="cell-9">save_path = "s2_water_comparison.png"
 
 fig = geoai.plot_prediction_comparison(
     original_image=image_path,
@@ -5667,7 +5761,7 @@ fig = geoai.plot_prediction_comparison(
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-9">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-10">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5685,7 +5779,7 @@ fig = geoai.plot_prediction_comparison(
     <span class="n">simplify_tolerance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-9">output_vector_path = "s2_water_polygons.geojson"
+<div class="clipboard-copy-txt" id="cell-10">output_vector_path = "s2_water_polygons.geojson"
 gdf = geoai.raster_to_vector(
     raster_path=output_path,
     output_path=output_vector_path,
@@ -5717,7 +5811,7 @@ gdf = geoai.raster_to_vector(
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-10">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-11">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5734,7 +5828,7 @@ gdf = geoai.raster_to_vector(
     <span class="n">output_path</span><span class="o">=</span><span class="n">smoothed_path</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-10">smoothed_path = "s2_water_smoothed.geojson"
+<div class="clipboard-copy-txt" id="cell-11">smoothed_path = "s2_water_smoothed.geojson"
 gdf = geoai.smooth_vector(
     gdf,
     smooth_iterations=3,
@@ -5765,7 +5859,7 @@ gdf = geoai.smooth_vector(
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-11">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-12">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5778,7 +5872,7 @@ gdf = geoai.smooth_vector(
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="n">gdf_props</span> <span class="o">=</span> <span class="n">geoai</span><span class="o">.</span><span class="n">add_geometric_properties</span><span class="p">(</span><span class="n">gdf</span><span class="p">,</span> <span class="n">area_unit</span><span class="o">=</span><span class="s2">"m2"</span><span class="p">,</span> <span class="n">length_unit</span><span class="o">=</span><span class="s2">"m"</span><span class="p">)</span>
 <span class="n">gdf_props</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-11">gdf_props = geoai.add_geometric_properties(gdf, area_unit="m2", length_unit="m")
+<div class="clipboard-copy-txt" id="cell-12">gdf_props = geoai.add_geometric_properties(gdf, area_unit="m2", length_unit="m")
 gdf_props.head()</div>
 </div>
 </div>
@@ -5805,7 +5899,7 @@ gdf_props.head()</div>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-12">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-13">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5819,7 +5913,7 @@ gdf_props.head()</div>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Water bodies detected: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gdf_filtered</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Removed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gdf_props</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="n">gdf_filtered</span><span class="p">)</span><span class="si">}</span><span class="s2"> small artifacts"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-12">gdf_filtered = gdf_props[gdf_props["area_m2"] &gt; 100]
+<div class="clipboard-copy-txt" id="cell-13">gdf_filtered = gdf_props[gdf_props["area_m2"] &gt; 100]
 print(f"Water bodies detected: {len(gdf_filtered)}")
 print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
 </div>
@@ -5847,7 +5941,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-13">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-14">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5863,7 +5957,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
     <span class="n">tiles</span><span class="o">=</span><span class="n">image_path</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-13">geoai.view_vector_interactive(
+<div class="clipboard-copy-txt" id="cell-14">geoai.view_vector_interactive(
     gdf_filtered,
     column="area_m2",
     tiles=image_path,
@@ -5893,7 +5987,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-14">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-15">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5910,7 +6004,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
     <span class="n">basemap</span><span class="o">=</span><span class="n">image_path</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-14">geoai.create_split_map(
+<div class="clipboard-copy-txt" id="cell-15">geoai.create_split_map(
     left_layer=gdf_filtered,
     right_layer=image_path,
     left_args={"style": {"color": "blue", "fillOpacity": 0.3}},
@@ -5941,7 +6035,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-15">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-16">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5953,7 +6047,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">gdf_filtered</span><span class="p">[</span><span class="s2">"area_m2"</span><span class="p">]</span><span class="o">.</span><span class="n">describe</span><span class="p">())</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-15">print(gdf_filtered["area_m2"].describe())</div>
+<div class="clipboard-copy-txt" id="cell-16">print(gdf_filtered["area_m2"].describe())</div>
 </div>
 </div>
 </div>
@@ -5968,7 +6062,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-16">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-17">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -5986,7 +6080,7 @@ print(f"Removed {len(gdf_props) - len(gdf_filtered)} small artifacts")</div>
 <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">"Distribution of Water Body Areas"</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-16">gdf_filtered["area_m2"].hist(bins=50)
+<div class="clipboard-copy-txt" id="cell-17">gdf_filtered["area_m2"].hist(bins=50)
 import matplotlib.pyplot as plt
 
 plt.xlabel("Area (m\u00b2)")
@@ -6018,7 +6112,7 @@ plt.show()</div>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-17">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-18">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -6031,7 +6125,7 @@ plt.show()</div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="n">gdf_filtered</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"s2_water_bodies_final.geojson"</span><span class="p">,</span> <span class="n">driver</span><span class="o">=</span><span class="s2">"GeoJSON"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Saved </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gdf_filtered</span><span class="p">)</span><span class="si">}</span><span class="s2"> water body polygons to s2_water_bodies_final.geojson"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-17">gdf_filtered.to_file("s2_water_bodies_final.geojson", driver="GeoJSON")
+<div class="clipboard-copy-txt" id="cell-18">gdf_filtered.to_file("s2_water_bodies_final.geojson", driver="GeoJSON")
 print(f"Saved {len(gdf_filtered)} water body polygons to s2_water_bodies_final.geojson")</div>
 </div>
 </div>
@@ -6126,7 +6220,7 @@ print(f"Saved {len(gdf_filtered)} water body polygons to s2_water_bodies_final.g
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="February 22, 2026 22:02:32 UTC"><span class="timeago" datetime="2026-02-22T22:02:32+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="February 22, 2026 22:02:32 UTC">2026-02-22</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 11, 2026 15:46:50 UTC"><span class="timeago" datetime="2026-03-11T15:46:50+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 11, 2026 15:46:50 UTC">2026-03-11</span>
   </span>
 
     
