@@ -150,6 +150,9 @@ class TestTimmSegmentSignatures(unittest.TestCase):
         self.assertIn("num_classes", sig.parameters)
         self.assertIn("window_size", sig.parameters)
         self.assertIn("overlap", sig.parameters)
+        self.assertIn("probability_path", sig.parameters)
+        self.assertIn("probability_threshold", sig.parameters)
+        self.assertIn("save_class_probabilities", sig.parameters)
 
     def test_push_timm_model_to_hub_params(self):
         """Test push_timm_model_to_hub has expected parameters."""
@@ -178,6 +181,9 @@ class TestTimmSegmentSignatures(unittest.TestCase):
         self.assertIn("overlap", sig.parameters)
         self.assertIn("device", sig.parameters)
         self.assertIn("token", sig.parameters)
+        self.assertIn("probability_path", sig.parameters)
+        self.assertIn("probability_threshold", sig.parameters)
+        self.assertIn("save_class_probabilities", sig.parameters)
 
     def test_train_timm_segmentation_model_params(self):
         """Test train_timm_segmentation_model has expected parameters."""
