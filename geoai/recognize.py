@@ -743,6 +743,7 @@ def plot_training_history(
     ax.set_title("Training & Validation Loss")
     ax.legend()
     ax.grid(True, alpha=0.3)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     # Accuracy
     ax = axes[1]
@@ -757,6 +758,7 @@ def plot_training_history(
     ax.set_title("Training & Validation Accuracy")
     ax.legend()
     ax.grid(True, alpha=0.3)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     plt.tight_layout()
     return fig
