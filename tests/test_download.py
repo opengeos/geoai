@@ -2,6 +2,7 @@
 
 """Tests for `geoai.download` module."""
 
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -125,6 +126,104 @@ class TestDownloadModule(unittest.TestCase):
             except Exception:
                 # Implementation may differ; verify no crash
                 pass
+
+
+class TestDownloadFileUnzip(unittest.TestCase):
+    """Tests for download_file ZIP extraction behavior."""
+
+    def _make_zip(self, tmp_dir, members):
+        """Create a zip file with the given member paths and return its path."""
+        import zipfile
+
+        zip_path = os.path.join(tmp_dir, "archive.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            for name in members:
+                zf.writestr(name, f"content of {name}")
+        return zip_path
+
+    def test_single_top_level_folder_no_extra_nesting(self):
+        """Single top-level folder in zip should not create a wrapper dir."""
+        import tempfile
+
+        from geoai.utils.download import download_file
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = self._make_zip(
+                tmp_dir,
+                ["data/a.txt", "data/sub/b.txt"],
+            )
+            result = download_file("http://fake", output_path=zip_path, unzip=True)
+            self.assertEqual(result, os.path.join(tmp_dir, "data"))
+            self.assertTrue(os.path.isdir(result))
+            self.assertTrue(os.path.isfile(os.path.join(result, "a.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(result, "sub", "b.txt")))
+
+    def test_multiple_top_level_entries_creates_wrapper(self):
+        """Multiple top-level entries should extract into a wrapper dir."""
+        import tempfile
+
+        from geoai.utils.download import download_file
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = self._make_zip(
+                tmp_dir,
+                ["a.txt", "b.txt"],
+            )
+            result = download_file("http://fake", output_path=zip_path, unzip=True)
+            # Should create wrapper dir named after zip stem
+            expected = os.path.join(tmp_dir, "archive")
+            self.assertEqual(result, expected)
+            self.assertTrue(os.path.isdir(result))
+            self.assertTrue(os.path.isfile(os.path.join(result, "a.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(result, "b.txt")))
+
+    def test_single_top_level_file_creates_wrapper(self):
+        """A single top-level file (not folder) should still use wrapper dir."""
+        import tempfile
+
+        from geoai.utils.download import download_file
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = self._make_zip(tmp_dir, ["readme.txt"])
+            result = download_file("http://fake", output_path=zip_path, unzip=True)
+            expected = os.path.join(tmp_dir, "archive")
+            self.assertEqual(result, expected)
+            self.assertTrue(os.path.isfile(os.path.join(result, "readme.txt")))
+
+    def test_overwrite_false_skips_existing(self):
+        """When extract dir exists and overwrite=False, skip extraction."""
+        import tempfile
+
+        from geoai.utils.download import download_file
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = self._make_zip(
+                tmp_dir,
+                ["data/a.txt"],
+            )
+            # Pre-create the target dir
+            target = os.path.join(tmp_dir, "data")
+            os.makedirs(target, exist_ok=True)
+            result = download_file(
+                "http://fake", output_path=zip_path, unzip=True, overwrite=False
+            )
+            self.assertEqual(result, target)
+            # a.txt should NOT exist because extraction was skipped
+            self.assertFalse(os.path.isfile(os.path.join(target, "a.txt")))
+
+    def test_zip_slip_raises_error(self):
+        """Zip members with path traversal should raise ValueError."""
+        import tempfile
+        import zipfile
+
+        from geoai.utils.download import download_file
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = os.path.join(tmp_dir, "evil.zip")
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.writestr("../escape.txt", "malicious")
+            with self.assertRaises(ValueError):
+                download_file("http://fake", output_path=zip_path, unzip=True)
 
 
 if __name__ == "__main__":

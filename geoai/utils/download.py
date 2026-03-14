@@ -62,22 +62,39 @@ def download_file(
     # If the file is a ZIP archive and unzip is True
     if unzip and zipfile.is_zipfile(output_path):
         extract_dir = os.path.splitext(output_path)[0]
+        with zipfile.ZipFile(output_path, "r") as zip_ref:
+            # Determine if zip contains a single top-level directory
+            names = zip_ref.namelist()
+            top_levels = {name.split("/")[0] for name in names}
+            single_top_dir = None
+            if len(top_levels) == 1:
+                top = top_levels.pop()
+                # Verify it is a directory (all entries are under top/)
+                if all(name.startswith(top + "/") for name in names):
+                    single_top_dir = top
+
+            if single_top_dir:
+                parent_dir = os.path.dirname(extract_dir) or "."
+                extract_dir = os.path.join(parent_dir, single_top_dir)
+            # else: extract_dir stays as the zip stem
+
         if not os.path.exists(extract_dir) or overwrite:
             with zipfile.ZipFile(output_path, "r") as zip_ref:
-                # Check if zip contains a single top-level folder
-                top_levels = set()
-                for name in zip_ref.namelist():
-                    top = name.split("/")[0]
-                    top_levels.add(top)
-                if len(top_levels) == 1:
-                    # Single folder inside zip, extract to parent dir directly
-                    parent_dir = os.path.dirname(extract_dir)
-                    if not parent_dir:
-                        parent_dir = "."
-                    zip_ref.extractall(parent_dir)
-                    extract_dir = os.path.join(parent_dir, top_levels.pop())
-                else:
-                    zip_ref.extractall(extract_dir)
+                dest = (
+                    (os.path.dirname(extract_dir) or ".")
+                    if single_top_dir
+                    else extract_dir
+                )
+                # Validate paths to prevent Zip Slip
+                for member in zip_ref.namelist():
+                    member_path = os.path.realpath(os.path.join(dest, member))
+                    dest_real = os.path.realpath(dest)
+                    if not member_path.startswith(dest_real + os.sep):
+                        raise ValueError(
+                            f"Zip member {member!r} would extract outside "
+                            f"the target directory"
+                        )
+                zip_ref.extractall(dest)
             print(f"Extracted to: {extract_dir}")
         return extract_dir
 
