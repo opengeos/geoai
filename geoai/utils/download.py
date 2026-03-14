@@ -69,8 +69,12 @@ def download_file(
             single_top_dir = None
             if len(top_levels) == 1:
                 top = top_levels.pop()
-                # Verify it is a directory (all entries are under top/)
-                if all(name.startswith(top + "/") for name in names):
+                # Verify it is a real directory name (not ".." or absolute)
+                if (
+                    top not in ("", ".", "..")
+                    and not os.path.isabs(top)
+                    and all(name.startswith(top + "/") for name in names)
+                ):
                     single_top_dir = top
 
             if single_top_dir:
