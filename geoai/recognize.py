@@ -899,3 +899,182 @@ def plot_predictions(
 
     plt.tight_layout()
     return fig
+
+
+def push_classifier_to_hub(
+    model_path: str,
+    repo_id: str,
+    model_name: str = "resnet50",
+    num_classes: int = 10,
+    in_channels: int = 3,
+    class_names: Optional[List[str]] = None,
+    commit_message: Optional[str] = None,
+    private: bool = False,
+    token: Optional[str] = None,
+) -> str:
+    """Push a trained image classifier to Hugging Face Hub.
+
+    Uploads the model weights (``model.pth``) and a ``config.json`` file
+    containing the architecture name, number of classes, input channels, and
+    class name list to the specified Hub repository.  The repository is created
+    automatically if it does not already exist.
+
+    Args:
+        model_path (str): Path to the trained Lightning checkpoint (``.ckpt``).
+        repo_id (str): Hub repository in ``"username/repo-name"`` format.
+        model_name (str): timm architecture identifier used during training.
+            Defaults to ``"resnet50"``.
+        num_classes (int): Number of output classes. Defaults to 10.
+        in_channels (int): Number of input channels. Defaults to 3.
+        class_names (list of str, optional): Ordered list of class name strings.
+            Stored in ``config.json`` so downstream users do not need the
+            original dataset.
+        commit_message (str, optional): Commit message for the Hub upload.
+            Defaults to a descriptive string derived from ``model_name``.
+        private (bool): Whether to create a private repository. Defaults to
+            ``False``.
+        token (str, optional): Hugging Face API token with write access.  If
+            ``None``, the token stored by ``huggingface-cli login`` is used.
+
+    Returns:
+        str: URL of the uploaded repository on Hugging Face Hub.
+
+    Raises:
+        ImportError: If ``huggingface_hub`` is not installed.
+    """
+    try:
+        from huggingface_hub import HfApi, create_repo
+    except ImportError:
+        raise ImportError(
+            "huggingface_hub is required to push models. "
+            "Install it with: pip install huggingface-hub"
+        )
+
+    import json
+    import tempfile
+
+    from .timm_train import TimmClassifier
+
+    # Load Lightning checkpoint and extract the raw timm model
+    lightning_model = TimmClassifier.load_from_checkpoint(
+        model_path,
+        model_name=model_name,
+        num_classes=num_classes,
+        in_channels=in_channels,
+    )
+    model = lightning_model.model
+    model.eval()
+
+    # Build configuration dict
+    config: Dict[str, Any] = {
+        "model_name": model_name,
+        "num_classes": num_classes,
+        "in_channels": in_channels,
+        "class_names": class_names,
+        "model_type": "timm_classifier",
+    }
+
+    # Create Hub repository (no-op if it already exists)
+    api = HfApi(token=token)
+    create_repo(repo_id, private=private, token=token, exist_ok=True)
+
+    if commit_message is None:
+        commit_message = f"Upload {model_name} image classifier"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Save model weights
+        model_save_path = os.path.join(tmpdir, "model.pth")
+        torch.save(model.state_dict(), model_save_path)
+
+        # Save config
+        config_path = os.path.join(tmpdir, "config.json")
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=2)
+
+        api.upload_folder(
+            folder_path=tmpdir,
+            repo_id=repo_id,
+            commit_message=commit_message,
+            token=token,
+        )
+
+    url = f"https://huggingface.co/{repo_id}"
+    print(f"Model successfully pushed to: {url}")
+    return url
+
+
+def predict_images_from_hub(
+    image_paths: List[str],
+    repo_id: str,
+    image_size: int = 224,
+    device: Optional[str] = None,
+    token: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Run inference using a classifier downloaded from Hugging Face Hub.
+
+    Downloads ``model.pth`` and ``config.json`` from the specified Hub
+    repository, reconstructs the timm model, and calls
+    :func:`predict_images` internally.
+
+    Args:
+        image_paths (list of str): Paths to image files to classify.
+        repo_id (str): Hub repository in ``"username/repo-name"`` format.
+        image_size (int): Image size used during training. Defaults to 224.
+        device (str, optional): ``"cuda"`` or ``"cpu"``.  Auto-detected if
+            ``None``.
+        token (str, optional): Hugging Face API token for private repositories.
+            If ``None``, the token stored by ``huggingface-cli login`` is used.
+
+    Returns:
+        dict: Result dictionary from :func:`predict_images`, augmented with a
+        ``"class_names"`` key containing the class list loaded from the Hub
+        config.
+
+    Raises:
+        ImportError: If ``huggingface_hub`` is not installed.
+    """
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        raise ImportError(
+            "huggingface_hub is required. Install it with: pip install huggingface-hub"
+        )
+
+    import json
+
+    try:
+        import timm
+    except ImportError:
+        raise ImportError("timm is required. Install it with: pip install timm")
+
+    print(f"Downloading model from {repo_id}...")
+    model_path = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
+    config_path = hf_hub_download(repo_id=repo_id, filename="config.json", token=token)
+
+    with open(config_path) as f:
+        config = json.load(f)
+
+    model_name = config.get("model_name", "resnet50")
+    num_classes = config.get("num_classes", 10)
+    in_channels = config.get("in_channels", 3)
+    class_names = config.get("class_names", None)
+
+    # Reconstruct model and load weights
+    model = timm.create_model(
+        model_name,
+        pretrained=False,
+        num_classes=num_classes,
+        in_chans=in_channels,
+    )
+    model.load_state_dict(torch.load(model_path, map_location="cpu"))
+
+    result = predict_images(
+        model=model,
+        image_paths=image_paths,
+        class_names=class_names,
+        image_size=image_size,
+        in_channels=in_channels,
+        device=device,
+    )
+    result["class_names"] = class_names
+    return result
