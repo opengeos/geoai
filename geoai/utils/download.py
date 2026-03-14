@@ -64,7 +64,20 @@ def download_file(
         extract_dir = os.path.splitext(output_path)[0]
         if not os.path.exists(extract_dir) or overwrite:
             with zipfile.ZipFile(output_path, "r") as zip_ref:
-                zip_ref.extractall(extract_dir)
+                # Check if zip contains a single top-level folder
+                top_levels = set()
+                for name in zip_ref.namelist():
+                    top = name.split("/")[0]
+                    top_levels.add(top)
+                if len(top_levels) == 1:
+                    # Single folder inside zip, extract to parent dir directly
+                    parent_dir = os.path.dirname(extract_dir)
+                    if not parent_dir:
+                        parent_dir = "."
+                    zip_ref.extractall(parent_dir)
+                    extract_dir = os.path.join(parent_dir, top_levels.pop())
+                else:
+                    zip_ref.extractall(extract_dir)
             print(f"Extracted to: {extract_dir}")
         return extract_dir
 
