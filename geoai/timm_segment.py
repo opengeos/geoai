@@ -926,7 +926,20 @@ def timm_semantic_segmentation(
                     f"Error: {str(e)}"
                 )
 
-        model.load_state_dict(torch.load(model_path, map_location=device))
+        checkpoint = torch.load(model_path, map_location=device)
+        # Extract state_dict from common checkpoint wrapper formats
+        if isinstance(checkpoint, dict):
+            for key in ("state_dict", "model_state_dict", "model"):
+                if key in checkpoint:
+                    checkpoint = checkpoint[key]
+                    break
+        state_dict = checkpoint
+        # Remove 'module.' prefix if present (from DataParallel training)
+        if any(key.startswith("module.") for key in state_dict.keys()):
+            state_dict = {
+                key.replace("module.", ""): value for key, value in state_dict.items()
+            }
+        model.load_state_dict(state_dict)
 
     model.eval()
     model = model.to(device)
@@ -1185,7 +1198,20 @@ def push_timm_model_to_hub(
                 classes=num_classes,
             )
 
-        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        checkpoint = torch.load(model_path, map_location="cpu")
+        # Extract state_dict from common checkpoint wrapper formats
+        if isinstance(checkpoint, dict):
+            for key in ("state_dict", "model_state_dict", "model"):
+                if key in checkpoint:
+                    checkpoint = checkpoint[key]
+                    break
+        state_dict = checkpoint
+        # Remove 'module.' prefix if present (from DataParallel training)
+        if any(key.startswith("module.") for key in state_dict.keys()):
+            state_dict = {
+                key.replace("module.", ""): value for key, value in state_dict.items()
+            }
+        model.load_state_dict(state_dict)
 
     # Create repository if it doesn't exist
     api = HfApi(token=token)
