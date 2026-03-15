@@ -1122,6 +1122,8 @@ def plot_detection_training_history(
         print("No plottable metrics found in training history.")
         return
 
+    from matplotlib.ticker import MaxNLocator
+
     fig, axes = plt.subplots(1, len(panels), figsize=figsize)
     if len(panels) == 1:
         axes = [axes]
@@ -1135,6 +1137,7 @@ def plot_detection_training_history(
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Loss")
         ax.set_title("Training & Validation Loss")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.legend()
         panel_idx += 1
 
@@ -1144,6 +1147,7 @@ def plot_detection_training_history(
         ax.set_xlabel("Epoch")
         ax.set_ylabel("IoU")
         ax.set_title("Validation IoU")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.legend()
         panel_idx += 1
 
@@ -1153,6 +1157,7 @@ def plot_detection_training_history(
         ax.set_xlabel("Epoch")
         ax.set_ylabel("LR")
         ax.set_title("Learning Rate Schedule")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.legend()
         panel_idx += 1
 
