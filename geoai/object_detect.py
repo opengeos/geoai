@@ -6,7 +6,9 @@ support for the NWPU-VHR-10 remote sensing benchmark.
 """
 
 import json
+import math
 import os
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -14,11 +16,13 @@ import numpy as np
 import torch
 
 from .train import (
+    DETECTION_MODELS,
     COCODetectionDataset,
     collate_fn,
     evaluate_coco_metrics,
-    get_instance_segmentation_model,
+    get_detection_model,
     get_transform,
+    model_has_masks,
     multiclass_detection_inference_on_geotiff,
     train_MaskRCNN_model,
 )
@@ -393,6 +397,7 @@ def train_multiclass_detector(
     images_dir: str,
     annotations_path: str,
     output_dir: str,
+    model_name: str = "fasterrcnn_resnet50_fpn_v2",
     class_names: Optional[List[str]] = None,
     num_channels: int = 3,
     batch_size: int = 4,
@@ -408,13 +413,19 @@ def train_multiclass_detector(
 ) -> str:
     """Train a multi-class object detection model using COCO-format annotations.
 
-    This is a convenience wrapper around train_MaskRCNN_model that
-    automatically sets up the COCODetectionDataset with proper class mapping.
+    Supports multiple torchvision detection architectures including
+    Faster R-CNN, RetinaNet, FCOS, and Mask R-CNN.
 
     Args:
         images_dir (str): Directory containing training images.
         annotations_path (str): Path to COCO-format annotations JSON file.
         output_dir (str): Directory for model outputs.
+        model_name (str): Detection model architecture. One of
+            ``"fasterrcnn_resnet50_fpn_v2"`` (default),
+            ``"fasterrcnn_mobilenet_v3_large_fpn"``,
+            ``"retinanet_resnet50_fpn_v2"``,
+            ``"fcos_resnet50_fpn"``, or
+            ``"maskrcnn_resnet50_fpn"``.
         class_names (list, optional): List of class names including background.
             If None, extracted from annotations.
         num_channels (int): Number of image channels. Defaults to 3.
@@ -445,14 +456,15 @@ def train_multiclass_detector(
         ]
 
     if verbose:
-        print(f"Training multi-class detector with {num_classes} classes")
+        print(f"Training {model_name} with {num_classes} classes")
         print(f"  Classes: {class_names[1:]}")
 
-    # Save class names to output directory for later use
+    # Save class names and model info to output directory for later use
     os.makedirs(os.path.abspath(output_dir), exist_ok=True)
     class_info = {
         "class_names": class_names,
         "num_classes": num_classes,
+        "model_name": model_name,
     }
     with open(os.path.join(output_dir, "class_info.json"), "w") as f:
         json.dump(class_info, f, indent=2)
@@ -474,6 +486,7 @@ def train_multiclass_detector(
         device=device,
         num_workers=num_workers,
         verbose=verbose,
+        model_name=model_name,
     )
 
     return os.path.join(output_dir, "best_model.pth")
@@ -483,6 +496,7 @@ def multiclass_detection(
     input_path: str,
     output_path: str,
     model_path: Optional[str] = None,
+    model_name: Optional[str] = None,
     num_classes: int = 11,
     class_names: Optional[List[str]] = None,
     window_size: int = 512,
@@ -497,7 +511,7 @@ def multiclass_detection(
 ) -> Tuple[str, float, List[Dict]]:
     """Perform multi-class object detection on a GeoTIFF or image.
 
-    Loads a trained Mask R-CNN model and runs inference using a sliding
+    Loads a trained detection model and runs inference using a sliding
     window approach. Outputs a 2-band raster with class labels and
     instance IDs.
 
@@ -510,13 +524,14 @@ def multiclass_detection(
         output_path (str): Path to save output raster.
         model_path (str, optional): Path to trained model weights (.pth file).
             If None, downloads the pretrained NWPU-VHR-10 model from
-            HuggingFace Hub. If the path does not exist locally, it is
-            treated as a filename to download from ``repo_id``.
+            HuggingFace Hub.
+        model_name (str, optional): Detection model architecture name. If
+            None, auto-detected from ``class_info.json`` sidecar or
+            checkpoint keys. Falls back to ``"maskrcnn_resnet50_fpn"``
+            for backward compatibility.
         num_classes (int): Number of classes including background. Defaults
             to 11 (NWPU-VHR-10).
         class_names (list, optional): List of class names (index 0 = background).
-            If None and using the pretrained model, defaults to NWPU-VHR-10
-            class names.
         window_size (int): Sliding window size. Defaults to 512.
         overlap (int): Window overlap in pixels. Defaults to 256.
         confidence_threshold (float): Minimum detection score. Defaults to 0.5.
@@ -525,27 +540,12 @@ def multiclass_detection(
         num_channels (int): Number of input image channels. Defaults to 3.
         device (torch.device, optional): Compute device.
         repo_id (str, optional): HuggingFace Hub repository ID for
-            downloading the model. Defaults to "giswqs/nwpu-vhr10-maskrcnn".
+            downloading the model. Defaults to ``"giswqs/nwpu-vhr10-maskrcnn"``.
         **kwargs: Additional keyword arguments.
 
     Returns:
         Tuple of (output_path, inference_time, detections_list) where each
         detection is a dict with mask, score, box, and label.
-
-    Example:
-        >>> import geoai
-        >>> # Use pretrained model (auto-downloads from HuggingFace)
-        >>> result_path, time, dets = geoai.multiclass_detection(
-        ...     input_path="image.tif",
-        ...     output_path="detections.tif",
-        ... )
-        >>> # Use a custom trained model
-        >>> result_path, time, dets = geoai.multiclass_detection(
-        ...     input_path="image.tif",
-        ...     output_path="detections.tif",
-        ...     model_path="my_model.pth",
-        ...     num_classes=5,
-        ... )
     """
     import rasterio
 
@@ -562,6 +562,8 @@ def multiclass_detection(
         if class_names is None:
             class_names = NWPU_VHR10_CLASSES
         num_classes = len(NWPU_VHR10_CLASSES)
+        if model_name is None:
+            model_name = "maskrcnn_resnet50_fpn"
 
     # Convert non-GeoTIFF images to temporary GeoTIFF for processing
     temp_tif = None
@@ -599,7 +601,7 @@ def multiclass_detection(
 
         model_path = hf_hub_download(repo_id=hf_repo, filename=model_path)
 
-    # Try to load class_info.json sidecar for num_classes / class_names
+    # Try to load class_info.json sidecar
     class_info_path = os.path.join(os.path.dirname(model_path), "class_info.json")
     if not use_pretrained and os.path.exists(class_info_path):
         with open(class_info_path, "r") as f:
@@ -607,24 +609,55 @@ def multiclass_detection(
         num_classes = class_info.get("num_classes", num_classes)
         if class_names is None:
             class_names = class_info.get("class_names", class_names)
+        if model_name is None:
+            model_name = class_info.get("model_name", None)
 
-    # Infer num_classes from checkpoint if still using default
+    # Load checkpoint
     state_dict = torch.load(model_path, map_location=device)
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()
         }
 
-    # The box predictor's cls_score weight shape is [num_classes, hidden_dim]
-    cls_key = "roi_heads.box_predictor.cls_score.weight"
-    if not use_pretrained and cls_key in state_dict:
-        inferred = state_dict[cls_key].shape[0]
-        if inferred != num_classes:
-            num_classes = inferred
+    # Auto-detect model_name from checkpoint keys if not set
+    if model_name is None:
+        if "roi_heads.mask_predictor.conv5_mask.weight" in state_dict:
+            model_name = "maskrcnn_resnet50_fpn"
+        elif "roi_heads.box_predictor.cls_score.weight" in state_dict:
+            model_name = "fasterrcnn_resnet50_fpn_v2"
+        elif "head.classification_head.cls_logits.weight" in state_dict:
+            # Distinguish FCOS (anchor-free) from RetinaNet (anchor-based)
+            # by checking for anchor_generator keys
+            if any(k.startswith("anchor_generator.") for k in state_dict):
+                model_name = "retinanet_resnet50_fpn_v2"
+            else:
+                model_name = "fcos_resnet50_fpn"
+        else:
+            model_name = "maskrcnn_resnet50_fpn"
+
+    # Infer num_classes from checkpoint
+    if not use_pretrained:
+        rcnn_cls_key = "roi_heads.box_predictor.cls_score.weight"
+        retina_cls_key = "head.classification_head.cls_logits.weight"
+        if rcnn_cls_key in state_dict:
+            inferred = state_dict[rcnn_cls_key].shape[0]
+            if inferred != num_classes:
+                num_classes = inferred
+        elif retina_cls_key in state_dict:
+            # For RetinaNet/FCOS: out_channels = num_anchors * num_classes
+            # num_anchors is 9 for RetinaNet, 1 for FCOS
+            out_channels = state_dict[retina_cls_key].shape[0]
+            num_anchors = 9 if model_name == "retinanet_resnet50_fpn_v2" else 1
+            inferred = out_channels // num_anchors
+            if inferred != num_classes:
+                num_classes = inferred
 
     # Load model
-    model = get_instance_segmentation_model(
-        num_classes=num_classes, num_channels=num_channels, pretrained=False
+    model = get_detection_model(
+        model_name=model_name,
+        num_classes=num_classes,
+        num_channels=num_channels,
+        pretrained=False,
     )
     model.load_state_dict(state_dict)
 
@@ -835,6 +868,7 @@ def visualize_multiclass_detections(
 
 def evaluate_multiclass_detector(
     model_path: Optional[str] = None,
+    model_name: Optional[str] = None,
     images_dir: str = "",
     annotations_path: str = "",
     num_classes: int = 11,
@@ -857,6 +891,9 @@ def evaluate_multiclass_detector(
     Args:
         model_path (str, optional): Path to trained model weights.
             If None, downloads the pretrained NWPU-VHR-10 model.
+        model_name (str, optional): Detection model architecture name.
+            If None, auto-detected from sidecar or defaults to
+            ``"maskrcnn_resnet50_fpn"``.
         images_dir (str): Directory containing evaluation images.
         annotations_path (str): Path to COCO-format annotations JSON.
         num_classes (int): Number of classes including background.
@@ -867,7 +904,7 @@ def evaluate_multiclass_detector(
         device (torch.device, optional): Compute device.
         num_workers (int, optional): Number of data loading workers.
         repo_id (str, optional): HuggingFace Hub repository ID for
-            downloading the model. Defaults to "giswqs/nwpu-vhr10-maskrcnn".
+            downloading the model. Defaults to ``"giswqs/nwpu-vhr10-maskrcnn"``.
         verbose (bool): Whether to print results. Defaults to True.
 
     Returns:
@@ -889,10 +926,25 @@ def evaluate_multiclass_detector(
         num_classes = len(NWPU_VHR10_CLASSES)
         if class_names is None:
             class_names = NWPU_VHR10_CLASSES[1:]  # Exclude background
+        if model_name is None:
+            model_name = "maskrcnn_resnet50_fpn"
+
+    # Try to read model_name from sidecar
+    if model_name is None:
+        class_info_path = os.path.join(os.path.dirname(model_path), "class_info.json")
+        if os.path.exists(class_info_path):
+            with open(class_info_path, "r") as f:
+                class_info = json.load(f)
+            model_name = class_info.get("model_name", None)
+    if model_name is None:
+        model_name = "maskrcnn_resnet50_fpn"
 
     # Load model
-    model = get_instance_segmentation_model(
-        num_classes=num_classes, num_channels=num_channels, pretrained=False
+    model = get_detection_model(
+        model_name=model_name,
+        num_classes=num_classes,
+        num_channels=num_channels,
+        pretrained=False,
     )
 
     if not os.path.exists(model_path):
@@ -915,6 +967,7 @@ def evaluate_multiclass_detector(
         images_dir=images_dir,
         transforms=get_transform(train=False),
         num_channels=num_channels,
+        compute_masks=model_has_masks(model_name),
     )
 
     if num_workers is None:
@@ -938,3 +991,512 @@ def evaluate_multiclass_detector(
     )
 
     return results
+
+
+def visualize_coco_annotations(
+    annotations_path: str,
+    images_dir: str,
+    num_samples: int = 4,
+    random: bool = False,
+    seed: Optional[int] = None,
+    figsize: Tuple[int, int] = (14, 14),
+    cols: int = 2,
+    output_path: Optional[str] = None,
+) -> None:
+    """Visualize sample images with their COCO-format bounding box annotations.
+
+    Loads a COCO JSON annotation file and displays a grid of sample images
+    with colored bounding boxes and class labels overlaid.
+
+    Args:
+        annotations_path (str): Path to COCO-format annotations JSON file.
+        images_dir (str): Directory containing the images referenced in the
+            annotations file.
+        num_samples (int): Number of sample images to display. Defaults to 4.
+        random (bool): Whether to select images randomly instead of taking
+            the first ``num_samples``. Defaults to False.
+        seed (int, optional): Random seed for reproducibility when
+            ``random=True``.
+        figsize (tuple): Figure size (width, height). Defaults to (14, 14).
+        cols (int): Number of columns in the grid layout. Defaults to 2.
+        output_path (str, optional): Path to save the figure. If None,
+            displays interactively.
+    """
+    import random as random_module
+
+    from PIL import Image as PILImage
+
+    with open(annotations_path, "r") as f:
+        coco_data = json.load(f)
+
+    all_images = coco_data["images"]
+    if random:
+        rng = random_module.Random(seed)
+        sample_images = rng.sample(all_images, min(num_samples, len(all_images)))
+    else:
+        sample_images = all_images[:num_samples]
+    categories = {cat["id"]: cat["name"] for cat in coco_data["categories"]}
+    cmap = plt.cm.get_cmap("tab10", 10)
+
+    rows = math.ceil(num_samples / cols)
+    fig, axes = plt.subplots(rows, cols, figsize=figsize)
+    if num_samples == 1:
+        axes = [axes]
+    else:
+        axes = axes.flatten()
+
+    for ax_idx, img_info in enumerate(sample_images):
+        img_path = os.path.join(images_dir, img_info["file_name"])
+        img = PILImage.open(img_path)
+        axes[ax_idx].imshow(img)
+        axes[ax_idx].set_title(img_info["file_name"], fontsize=10)
+        axes[ax_idx].axis("off")
+
+        img_anns = [
+            ann for ann in coco_data["annotations"] if ann["image_id"] == img_info["id"]
+        ]
+        for ann in img_anns:
+            x, y, w, h = ann["bbox"]
+            cat_id = ann["category_id"]
+            color = cmap(cat_id % 10)
+            rect = plt.Rectangle(
+                (x, y), w, h, linewidth=2, edgecolor=color, facecolor="none"
+            )
+            axes[ax_idx].add_patch(rect)
+            axes[ax_idx].text(
+                x,
+                y - 3,
+                categories.get(cat_id, str(cat_id)),
+                color="white",
+                fontsize=7,
+                bbox=dict(boxstyle="round,pad=0.2", facecolor=color, alpha=0.7),
+            )
+
+    # Hide unused axes
+    for ax_idx in range(num_samples, len(axes)):
+        axes[ax_idx].axis("off")
+
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_detection_training_history(
+    history_path: str,
+    figsize: Tuple[int, int] = (15, 4),
+    output_path: Optional[str] = None,
+) -> None:
+    """Plot training metrics from a detection model training history file.
+
+    Loads a ``training_history.pth`` file saved during
+    :func:`train_multiclass_detector` and plots up to three subplots:
+    training/validation loss, validation IoU, and learning rate schedule.
+    Subplots are skipped if the corresponding keys are missing.
+
+    Args:
+        history_path (str): Path to the ``training_history.pth`` file.
+        figsize (tuple): Figure size (width, height). Defaults to (15, 4).
+        output_path (str, optional): Path to save the figure. If None,
+            displays interactively.
+    """
+    if not os.path.exists(history_path):
+        print(f"Training history not found: {history_path}")
+        return
+
+    history = torch.load(history_path, weights_only=True)
+    epochs = history.get("epochs", [])
+
+    panels = []
+    if "train_loss" in history:
+        panels.append("loss")
+    if "val_iou" in history:
+        panels.append("iou")
+    if "lr" in history:
+        panels.append("lr")
+
+    if not panels:
+        print("No plottable metrics found in training history.")
+        return
+
+    from matplotlib.ticker import MaxNLocator
+
+    fig, axes = plt.subplots(1, len(panels), figsize=figsize)
+    if len(panels) == 1:
+        axes = [axes]
+
+    panel_idx = 0
+    if "loss" in panels:
+        ax = axes[panel_idx]
+        ax.plot(epochs, history["train_loss"], label="Train Loss")
+        if "val_loss" in history:
+            ax.plot(epochs, history["val_loss"], label="Val Loss")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("Loss")
+        ax.set_title("Training & Validation Loss")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.legend()
+        panel_idx += 1
+
+    if "iou" in panels:
+        ax = axes[panel_idx]
+        ax.plot(epochs, history["val_iou"], label="Val IoU", color="green")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("IoU")
+        ax.set_title("Validation IoU")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.legend()
+        panel_idx += 1
+
+    if "lr" in panels:
+        ax = axes[panel_idx]
+        ax.plot(epochs, history["lr"], label="Learning Rate", color="orange")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("LR")
+        ax.set_title("Learning Rate Schedule")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.legend()
+        panel_idx += 1
+
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+        plt.close()
+    else:
+        plt.show()
+
+
+def batch_multiclass_detection(
+    image_paths: List[str],
+    output_dir: str,
+    model_path: Optional[str] = None,
+    model_name: Optional[str] = None,
+    num_classes: int = 11,
+    class_names: Optional[List[str]] = None,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    nms_threshold: float = 0.3,
+    batch_size: int = 4,
+    num_channels: int = 3,
+    device: Optional[torch.device] = None,
+    visualize: bool = True,
+    cols: int = 2,
+    figsize: Tuple[int, int] = (16, 16),
+    cleanup: bool = True,
+    output_path: Optional[str] = None,
+    repo_id: Optional[str] = None,
+    **kwargs: Any,
+) -> List[Tuple[str, float, List[Dict]]]:
+    """Run multi-class object detection on multiple images.
+
+    Iterates over a list of image paths, calls :func:`multiclass_detection`
+    for each, and optionally displays a grid of results with colored
+    bounding boxes.
+
+    Args:
+        image_paths (list of str): Paths to input images.
+        output_dir (str): Directory for intermediate detection output files.
+        model_path (str, optional): Path to trained model weights. If None,
+            downloads the pretrained NWPU-VHR-10 model.
+        model_name (str, optional): Detection model architecture name. If
+            None, auto-detected from checkpoint.
+        num_classes (int): Number of classes including background. Defaults
+            to 11.
+        class_names (list, optional): List of class names (index 0 =
+            background).
+        window_size (int): Sliding window size. Defaults to 512.
+        overlap (int): Window overlap in pixels. Defaults to 256.
+        confidence_threshold (float): Minimum detection score. Defaults to
+            0.5.
+        nms_threshold (float): IoU threshold for NMS. Defaults to 0.3.
+        batch_size (int): Inference batch size. Defaults to 4.
+        num_channels (int): Number of input image channels. Defaults to 3.
+        device (torch.device, optional): Compute device.
+        visualize (bool): Whether to display a grid of results. Defaults to
+            True.
+        cols (int): Number of columns in the visualization grid. Defaults
+            to 2.
+        figsize (tuple): Figure size for the visualization grid. Defaults to
+            (16, 16).
+        cleanup (bool): Whether to remove intermediate output files after
+            visualization. Defaults to True.
+        output_path (str, optional): Path to save the visualization figure.
+            If None, displays interactively.
+        repo_id (str, optional): HuggingFace Hub repository ID for
+            downloading the model.
+        **kwargs: Additional keyword arguments passed to
+            :func:`multiclass_detection`.
+
+    Returns:
+        list of tuple: Each tuple contains (result_path, inference_time,
+        detections_list) from :func:`multiclass_detection`.
+    """
+    from PIL import Image as PILImage
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    results = []
+    for idx, img_path in enumerate(image_paths):
+        basename = os.path.splitext(os.path.basename(img_path))[0]
+        out_path = os.path.join(output_dir, f"{basename}_detection.tif")
+
+        result = multiclass_detection(
+            input_path=img_path,
+            output_path=out_path,
+            model_path=model_path,
+            model_name=model_name,
+            num_classes=num_classes,
+            class_names=class_names,
+            window_size=window_size,
+            overlap=overlap,
+            confidence_threshold=confidence_threshold,
+            nms_threshold=nms_threshold,
+            batch_size=batch_size,
+            num_channels=num_channels,
+            device=device,
+            repo_id=repo_id,
+            **kwargs,
+        )
+        results.append(result)
+
+    if visualize:
+        cmap = plt.cm.get_cmap("tab10", 10)
+        n = len(image_paths)
+        rows = math.ceil(n / cols)
+        fig, axes = plt.subplots(rows, cols, figsize=figsize)
+        if n == 1:
+            axes = [axes]
+        else:
+            axes = axes.flatten()
+
+        for idx, (img_path, (_, _, dets)) in enumerate(zip(image_paths, results)):
+            img = PILImage.open(img_path)
+            axes[idx].imshow(img)
+            axes[idx].set_title(
+                f"{os.path.basename(img_path)} ({len(dets)} detections)",
+                fontsize=10,
+            )
+            axes[idx].axis("off")
+
+            for det in dets:
+                box = det["box"]
+                label = det["label"]
+                score = det["score"]
+                color = cmap(label % 10)
+                rect = plt.Rectangle(
+                    (box[0], box[1]),
+                    box[2] - box[0],
+                    box[3] - box[1],
+                    linewidth=2,
+                    edgecolor=color,
+                    facecolor="none",
+                )
+                axes[idx].add_patch(rect)
+                name = (
+                    class_names[label]
+                    if class_names and label < len(class_names)
+                    else str(label)
+                )
+                axes[idx].text(
+                    box[0],
+                    box[1] - 3,
+                    f"{name}: {score:.2f}",
+                    color="white",
+                    fontsize=7,
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor=color, alpha=0.7),
+                )
+
+        for ax_idx in range(n, len(axes)):
+            axes[ax_idx].axis("off")
+
+        plt.tight_layout()
+
+        if output_path:
+            plt.savefig(output_path, dpi=150, bbox_inches="tight")
+            plt.close()
+        else:
+            plt.show()
+
+    if cleanup:
+        for result_path, _, _ in results:
+            if os.path.exists(result_path):
+                os.remove(result_path)
+
+    return results
+
+
+def push_detector_to_hub(
+    model_path: str,
+    repo_id: str,
+    model_name: str = "fasterrcnn_resnet50_fpn_v2",
+    num_classes: int = 11,
+    num_channels: int = 3,
+    class_names: Optional[List[str]] = None,
+    commit_message: Optional[str] = None,
+    private: bool = False,
+    token: Optional[str] = None,
+) -> Optional[str]:
+    """Push a trained detection model to Hugging Face Hub.
+
+    Uploads the model weights (``model.pth``) and a ``config.json`` file
+    containing model metadata to the specified Hub repository. The
+    repository is created automatically if it does not already exist.
+
+    Args:
+        model_path (str): Path to the trained model weights (``.pth`` file).
+        repo_id (str): Hub repository in ``"username/repo-name"`` format.
+        model_name (str): Detection model architecture name. Stored in
+            ``config.json`` so the model can be reconstructed on download.
+            Defaults to ``"fasterrcnn_resnet50_fpn_v2"``.
+        num_classes (int): Number of classes including background. Defaults
+            to 11.
+        num_channels (int): Number of input image channels. Defaults to 3.
+        class_names (list of str, optional): Ordered list of class name
+            strings (index 0 should be ``"background"``). Stored in
+            ``config.json`` so downstream users do not need the original
+            dataset.
+        commit_message (str, optional): Commit message for the Hub upload.
+            Defaults to a descriptive string including ``model_name``.
+        private (bool): Whether to create a private repository. Defaults to
+            False.
+        token (str, optional): Hugging Face API token with write access. If
+            None, the token stored by ``huggingface-cli login`` is used.
+
+    Returns:
+        str: URL of the uploaded repository on Hugging Face Hub, or None
+        if ``huggingface_hub`` is not installed.
+    """
+    try:
+        from huggingface_hub import HfApi, create_repo
+    except ImportError:
+        print(
+            "huggingface_hub is required to push models. "
+            "Install it with: pip install huggingface-hub"
+        )
+        return None
+
+    # Load state dict
+    state_dict = torch.load(model_path, map_location="cpu")
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {
+            key.replace("module.", ""): value for key, value in state_dict.items()
+        }
+
+    # Build configuration dict
+    config: Dict[str, Any] = {
+        "model_type": "detection",
+        "model_name": model_name,
+        "num_classes": num_classes,
+        "num_channels": num_channels,
+        "class_names": class_names,
+    }
+
+    # Create Hub repository (no-op if it already exists)
+    api = HfApi(token=token)
+    create_repo(repo_id, private=private, token=token, exist_ok=True)
+
+    if commit_message is None:
+        commit_message = f"Upload {model_name} object detection model"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        model_save_path = os.path.join(tmpdir, "model.pth")
+        torch.save(state_dict, model_save_path)
+
+        config_path = os.path.join(tmpdir, "config.json")
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=2)
+
+        api.upload_folder(
+            folder_path=tmpdir,
+            repo_id=repo_id,
+            commit_message=commit_message,
+            token=token,
+        )
+
+    url = f"https://huggingface.co/{repo_id}"
+    print(f"Model successfully pushed to: {url}")
+    return url
+
+
+def predict_detector_from_hub(
+    input_path: str,
+    output_path: str,
+    repo_id: str,
+    window_size: int = 512,
+    overlap: int = 256,
+    confidence_threshold: float = 0.5,
+    nms_threshold: float = 0.3,
+    batch_size: int = 4,
+    device: Optional[torch.device] = None,
+    token: Optional[str] = None,
+    **kwargs: Any,
+) -> Optional[Tuple[str, float, List[Dict]]]:
+    """Run object detection using a model downloaded from Hugging Face Hub.
+
+    Downloads ``model.pth`` and ``config.json`` from the specified Hub
+    repository and delegates to :func:`multiclass_detection` for inference.
+
+    Args:
+        input_path (str): Path to input image (GeoTIFF, JPEG, PNG, etc.).
+        output_path (str): Path to save output raster.
+        repo_id (str): Hub repository in ``"username/repo-name"`` format.
+        window_size (int): Sliding window size. Defaults to 512.
+        overlap (int): Window overlap in pixels. Defaults to 256.
+        confidence_threshold (float): Minimum detection score. Defaults to
+            0.5.
+        nms_threshold (float): IoU threshold for NMS. Defaults to 0.3.
+        batch_size (int): Inference batch size. Defaults to 4.
+        device (torch.device, optional): Compute device.
+        token (str, optional): Hugging Face API token for private
+            repositories. If None, the token stored by
+            ``huggingface-cli login`` is used.
+        **kwargs: Additional keyword arguments passed to
+            :func:`multiclass_detection`.
+
+    Returns:
+        Tuple of (output_path, inference_time, detections_list) where each
+        detection is a dict with mask, score, box, and label, or None
+        if ``huggingface_hub`` is not installed.
+    """
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        print(
+            "huggingface_hub is required. "
+            "Install it with: pip install huggingface-hub"
+        )
+        return None
+
+    print(f"Downloading model from {repo_id}...")
+    model_file = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
+    config_file = hf_hub_download(repo_id=repo_id, filename="config.json", token=token)
+
+    with open(config_file) as f:
+        config = json.load(f)
+
+    num_classes = config.get("num_classes", 11)
+    num_channels = config.get("num_channels", 3)
+    class_names = config.get("class_names", None)
+    detected_model_name = config.get("model_name", "maskrcnn_resnet50_fpn")
+
+    return multiclass_detection(
+        input_path=input_path,
+        output_path=output_path,
+        model_path=model_file,
+        model_name=detected_model_name,
+        num_classes=num_classes,
+        class_names=class_names,
+        window_size=window_size,
+        overlap=overlap,
+        confidence_threshold=confidence_threshold,
+        nms_threshold=nms_threshold,
+        batch_size=batch_size,
+        num_channels=num_channels,
+        device=device,
+        **kwargs,
+    )

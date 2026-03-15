@@ -195,6 +195,9 @@ _LAZY_SYMBOL_MAP = {
     "train_instance_segmentation_model": ("train", None),
     "train_MaskRCNN_model": ("train", None),
     "train_segmentation_model": ("train", None),
+    "DETECTION_MODELS": ("train", None),
+    "get_detection_model": ("train", None),
+    "model_has_masks": ("train", None),
     # --- geoai.utils ---
     "orthogonalize": ("utils", None),
     "regularization": ("utils", None),
@@ -392,6 +395,11 @@ _LAZY_SYMBOL_MAP = {
     "detections_to_geodataframe": ("object_detect", None),
     "visualize_multiclass_detections": ("object_detect", None),
     "evaluate_multiclass_detector": ("object_detect", None),
+    "visualize_coco_annotations": ("object_detect", None),
+    "plot_detection_training_history": ("object_detect", None),
+    "batch_multiclass_detection": ("object_detect", None),
+    "push_detector_to_hub": ("object_detect", None),
+    "predict_detector_from_hub": ("object_detect", None),
     # --- geoai.water ---
     "segment_water": ("water", None),
     "BAND_ORDER_PRESETS": ("water", None),
