@@ -634,6 +634,7 @@ def train_timm_segmentation_model(
     seed: int = 42,
     num_workers: int = 4,
     freeze_encoder: bool = False,
+    class_weights: Optional[List[float]] = None,
     monitor_metric: str = "val_iou",
     mode: str = "max",
     patience: int = 10,
@@ -678,6 +679,8 @@ def train_timm_segmentation_model(
         seed (int): Random seed for reproducibility.
         num_workers (int): Number of data loading workers.
         freeze_encoder (bool): Freeze encoder during training.
+        class_weights (list of float, optional): Weights for each class in the
+            loss function. Useful for imbalanced datasets. Defaults to None.
         monitor_metric (str): Metric to monitor ('val_loss' or 'val_iou').
         mode (str): 'min' for loss, 'max' for metrics.
         patience (int): Early stopping patience.
@@ -795,6 +798,7 @@ def train_timm_segmentation_model(
         weight_decay=weight_decay,
         num_workers=num_workers,
         freeze_encoder=freeze_encoder,
+        class_weights=class_weights,
         accelerator="auto" if device is None else device,
         monitor_metric=monitor_metric,
         mode=mode,
