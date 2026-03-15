@@ -7006,7 +7006,7 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
       <tbody>
           <tr class="doc-section-item">
 <td><code>dict</code></td>            <td>
-                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7016,7 +7016,7 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
           </tr>
           <tr class="doc-section-item">
 <td></td>            <td>
-                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7026,7 +7026,7 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
           </tr>
           <tr class="doc-section-item">
 <td></td>            <td>
-                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7038,32 +7038,10 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
     </table>
 
 
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="ImportError">ImportError</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If <code>huggingface_hub</code> is not installed.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1008</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1007</span>
+<span class="normal">1008</span>
 <span class="normal">1009</span>
 <span class="normal">1010</span>
 <span class="normal">1011</span>
@@ -7136,14 +7114,13 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
 <span class="normal">1078</span>
 <span class="normal">1079</span>
 <span class="normal">1080</span>
-<span class="normal">1081</span>
-<span class="normal">1082</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_images_from_hub</span><span class="p">(</span>
+<span class="normal">1081</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_images_from_hub</span><span class="p">(</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">image_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">224</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Run inference using a classifier downloaded from Hugging Face Hub.</span>
 
 <span class="sd">    Downloads ``model.pth`` and ``config.json`` from the specified Hub</span>
@@ -7164,22 +7141,22 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
 <span class="sd">        ``&quot;class_names&quot;`` key containing the class list loaded from the Hub</span>
 <span class="sd">        config.</span>
 
-<span class="sd">    Raises:</span>
-<span class="sd">        ImportError: If ``huggingface_hub`` is not installed.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">hf_hub_download</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+        <span class="nb">print</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required. Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
 
     <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">timm</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;timm is required. Install it with: pip install timm&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;timm is required. Install it with: pip install timm&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading model from </span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
     <span class="n">model_path</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span><span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;model.pth&quot;</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span>
@@ -7412,34 +7389,21 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>str</code></td>            <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>URL of the uploaded repository on Hugging Face Hub.</p>
+                <p>URL of the uploaded repository on Hugging Face Hub, or None</p>
               </div>
             </td>
           </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
           <tr class="doc-section-item">
-            <td>
-                  <code><span title="ImportError">ImportError</span></code>
+<td></td>            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>huggingface_hub</code> is not installed.</p>
+                <p>if <code>huggingface_hub</code> is not installed.</p>
               </div>
             </td>
           </tr>
@@ -7547,8 +7511,7 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
 <span class="normal">1001</span>
 <span class="normal">1002</span>
 <span class="normal">1003</span>
-<span class="normal">1004</span>
-<span class="normal">1005</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_classifier_to_hub</span><span class="p">(</span>
+<span class="normal">1004</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_classifier_to_hub</span><span class="p">(</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
@@ -7558,7 +7521,7 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
     <span class="n">commit_message</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">private</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Push a trained image classifier to Hugging Face Hub.</span>
 
 <span class="sd">    Uploads the model weights (``model.pth``) and a ``config.json`` file</span>
@@ -7584,18 +7547,17 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
 <span class="sd">            ``None``, the token stored by ``huggingface-cli login`` is used.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        str: URL of the uploaded repository on Hugging Face Hub.</span>
-
-<span class="sd">    Raises:</span>
-<span class="sd">        ImportError: If ``huggingface_hub`` is not installed.</span>
+<span class="sd">        str: URL of the uploaded repository on Hugging Face Hub, or None</span>
+<span class="sd">        if ``huggingface_hub`` is not installed.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">HfApi</span><span class="p">,</span> <span class="n">create_repo</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+        <span class="nb">print</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required to push models. &quot;</span>
             <span class="s2">&quot;Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
 
     <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>

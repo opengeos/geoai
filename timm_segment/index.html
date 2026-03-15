@@ -6288,11 +6288,21 @@ Only used if use_timm_model=True.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>str</code></td>            <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>URL of the uploaded model on HF Hub.</p>
+                <p>URL of the uploaded model on HF Hub, or None if</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+<td></td>            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>huggingface_hub</code> is not installed.</p>
               </div>
             </td>
           </tr>
@@ -6427,7 +6437,9 @@ Only used if use_timm_model=True.</p>
 <span class="normal">1227</span>
 <span class="normal">1228</span>
 <span class="normal">1229</span>
-<span class="normal">1230</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_timm_model_to_hub</span><span class="p">(</span>
+<span class="normal">1230</span>
+<span class="normal">1231</span>
+<span class="normal">1232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_timm_model_to_hub</span><span class="p">(</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">encoder_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
@@ -6440,7 +6452,7 @@ Only used if use_timm_model=True.</p>
     <span class="n">private</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Push a trained timm segmentation model to Hugging Face Hub.</span>
 
@@ -6459,15 +6471,17 @@ Only used if use_timm_model=True.</p>
 <span class="sd">        **kwargs: Additional arguments for push_to_hub.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        str: URL of the uploaded model on HF Hub.</span>
+<span class="sd">        str: URL of the uploaded model on HF Hub, or None if</span>
+<span class="sd">        ``huggingface_hub`` is not installed.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">HfApi</span><span class="p">,</span> <span class="n">create_repo</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+        <span class="nb">print</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required to push models. &quot;</span>
             <span class="s2">&quot;Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
 
     <span class="c1"># Load model</span>
     <span class="k">if</span> <span class="n">model_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.ckpt&quot;</span><span class="p">):</span>
@@ -6809,9 +6823,7 @@ to the multi-band probability raster.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1233</span>
-<span class="normal">1234</span>
-<span class="normal">1235</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1235</span>
 <span class="normal">1236</span>
 <span class="normal">1237</span>
 <span class="normal">1238</span>
@@ -6906,7 +6918,10 @@ to the multi-band probability raster.</p>
 <span class="normal">1327</span>
 <span class="normal">1328</span>
 <span class="normal">1329</span>
-<span class="normal">1330</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_segmentation_from_hub</span><span class="p">(</span>
+<span class="normal">1330</span>
+<span class="normal">1331</span>
+<span class="normal">1332</span>
+<span class="normal">1333</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_segmentation_from_hub</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -6953,9 +6968,10 @@ to the multi-band probability raster.</p>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">hf_hub_download</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+        <span class="nb">print</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required. Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
 
     <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 
