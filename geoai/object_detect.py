@@ -1132,11 +1132,14 @@ def plot_detection_training_history(
     if "loss" in panels:
         ax = axes[panel_idx]
         ax.plot(epochs, history["train_loss"], label="Train Loss")
-        if "val_loss" in history:
+        has_val_loss = "val_loss" in history and any(
+            math.isfinite(v) for v in history["val_loss"]
+        )
+        if has_val_loss:
             ax.plot(epochs, history["val_loss"], label="Val Loss")
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Loss")
-        ax.set_title("Training & Validation Loss")
+        ax.set_title("Training & Validation Loss" if has_val_loss else "Training Loss")
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.legend()
         panel_idx += 1
