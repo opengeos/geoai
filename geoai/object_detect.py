@@ -1399,31 +1399,35 @@ def push_detector_to_hub(
         "class_names": class_names,
     }
 
-    # Create Hub repository (no-op if it already exists)
-    api = HfApi(token=token)
-    create_repo(repo_id, private=private, token=token, exist_ok=True)
+    try:
+        # Create Hub repository (no-op if it already exists)
+        api = HfApi(token=token)
+        create_repo(repo_id, private=private, token=token, exist_ok=True)
 
-    if commit_message is None:
-        commit_message = f"Upload {model_name} object detection model"
+        if commit_message is None:
+            commit_message = f"Upload {model_name} object detection model"
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        model_save_path = os.path.join(tmpdir, "model.pth")
-        torch.save(state_dict, model_save_path)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_save_path = os.path.join(tmpdir, "model.pth")
+            torch.save(state_dict, model_save_path)
 
-        config_path = os.path.join(tmpdir, "config.json")
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=2)
+            config_path = os.path.join(tmpdir, "config.json")
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=2)
 
-        api.upload_folder(
-            folder_path=tmpdir,
-            repo_id=repo_id,
-            commit_message=commit_message,
-            token=token,
-        )
+            api.upload_folder(
+                folder_path=tmpdir,
+                repo_id=repo_id,
+                commit_message=commit_message,
+                token=token,
+            )
 
-    url = f"https://huggingface.co/{repo_id}"
-    print(f"Model successfully pushed to: {url}")
-    return url
+        url = f"https://huggingface.co/{repo_id}"
+        print(f"Model successfully pushed to: {url}")
+        return url
+    except Exception as e:
+        print(f"Failed to push model to Hub: {e}")
+        return None
 
 
 def predict_detector_from_hub(
@@ -1475,9 +1479,17 @@ def predict_detector_from_hub(
         )
         return None
 
-    print(f"Downloading model from {repo_id}...")
-    model_file = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
-    config_file = hf_hub_download(repo_id=repo_id, filename="config.json", token=token)
+    try:
+        print(f"Downloading model from {repo_id}...")
+        model_file = hf_hub_download(
+            repo_id=repo_id, filename="model.pth", token=token
+        )
+        config_file = hf_hub_download(
+            repo_id=repo_id, filename="config.json", token=token
+        )
+    except Exception as e:
+        print(f"Failed to download model from Hub: {e}")
+        return None
 
     with open(config_file) as f:
         config = json.load(f)
