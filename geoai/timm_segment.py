@@ -926,7 +926,14 @@ def timm_semantic_segmentation(
                     f"Error: {str(e)}"
                 )
 
-        state_dict = torch.load(model_path, map_location=device)
+        checkpoint = torch.load(model_path, map_location=device)
+        # Extract state_dict from common checkpoint wrapper formats
+        if isinstance(checkpoint, dict):
+            for key in ("state_dict", "model_state_dict", "model"):
+                if key in checkpoint:
+                    checkpoint = checkpoint[key]
+                    break
+        state_dict = checkpoint
         # Remove 'module.' prefix if present (from DataParallel training)
         if any(key.startswith("module.") for key in state_dict.keys()):
             state_dict = {
@@ -1191,7 +1198,14 @@ def push_timm_model_to_hub(
                 classes=num_classes,
             )
 
-        state_dict = torch.load(model_path, map_location="cpu")
+        checkpoint = torch.load(model_path, map_location="cpu")
+        # Extract state_dict from common checkpoint wrapper formats
+        if isinstance(checkpoint, dict):
+            for key in ("state_dict", "model_state_dict", "model"):
+                if key in checkpoint:
+                    checkpoint = checkpoint[key]
+                    break
+        state_dict = checkpoint
         # Remove 'module.' prefix if present (from DataParallel training)
         if any(key.startswith("module.") for key in state_dict.keys()):
             state_dict = {
