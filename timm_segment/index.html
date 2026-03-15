@@ -6312,11 +6312,7 @@ Only used if use_timm_model=True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1105</span>
-<span class="normal">1106</span>
-<span class="normal">1107</span>
-<span class="normal">1108</span>
-<span class="normal">1109</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1109</span>
 <span class="normal">1110</span>
 <span class="normal">1111</span>
 <span class="normal">1112</span>
@@ -6439,7 +6435,11 @@ Only used if use_timm_model=True.</p>
 <span class="normal">1229</span>
 <span class="normal">1230</span>
 <span class="normal">1231</span>
-<span class="normal">1232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_timm_model_to_hub</span><span class="p">(</span>
+<span class="normal">1232</span>
+<span class="normal">1233</span>
+<span class="normal">1234</span>
+<span class="normal">1235</span>
+<span class="normal">1236</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_timm_model_to_hub</span><span class="p">(</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">encoder_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
@@ -6823,11 +6823,7 @@ to the multi-band probability raster.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1235</span>
-<span class="normal">1236</span>
-<span class="normal">1237</span>
-<span class="normal">1238</span>
-<span class="normal">1239</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1239</span>
 <span class="normal">1240</span>
 <span class="normal">1241</span>
 <span class="normal">1242</span>
@@ -6921,7 +6917,11 @@ to the multi-band probability raster.</p>
 <span class="normal">1330</span>
 <span class="normal">1331</span>
 <span class="normal">1332</span>
-<span class="normal">1333</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_segmentation_from_hub</span><span class="p">(</span>
+<span class="normal">1333</span>
+<span class="normal">1334</span>
+<span class="normal">1335</span>
+<span class="normal">1336</span>
+<span class="normal">1337</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_segmentation_from_hub</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -7353,11 +7353,7 @@ multi-band probability raster.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 814</span>
-<span class="normal"> 815</span>
-<span class="normal"> 816</span>
-<span class="normal"> 817</span>
-<span class="normal"> 818</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 818</span>
 <span class="normal"> 819</span>
 <span class="normal"> 820</span>
 <span class="normal"> 821</span>
@@ -7641,7 +7637,11 @@ multi-band probability raster.</p>
 <span class="normal">1099</span>
 <span class="normal">1100</span>
 <span class="normal">1101</span>
-<span class="normal">1102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_semantic_segmentation</span><span class="p">(</span>
+<span class="normal">1102</span>
+<span class="normal">1103</span>
+<span class="normal">1104</span>
+<span class="normal">1105</span>
+<span class="normal">1106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_semantic_segmentation</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -8833,7 +8833,7 @@ multi-band probability raster.</p>
 
 
 <h2 id="geoai.timm_segment.train_timm_segmentation_model" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">train_timm_segmentation_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">input_format</span><span class="o">=</span><span class="s1">&#39;directory&#39;</span><span class="p">,</span> <span class="n">encoder_name</span><span class="o">=</span><span class="s1">&#39;resnet50&#39;</span><span class="p">,</span> <span class="n">architecture</span><span class="o">=</span><span class="s1">&#39;unet&#39;</span><span class="p">,</span> <span class="n">encoder_weights</span><span class="o">=</span><span class="s1">&#39;imagenet&#39;</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">freeze_encoder</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">monitor_metric</span><span class="o">=</span><span class="s1">&#39;val_iou&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;max&#39;</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">save_top_k</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_timm_model</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">timm_model_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">train_transforms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">val_transforms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">train_timm_segmentation_model</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">labels_dir</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">,</span> <span class="n">input_format</span><span class="o">=</span><span class="s1">&#39;directory&#39;</span><span class="p">,</span> <span class="n">encoder_name</span><span class="o">=</span><span class="s1">&#39;resnet50&#39;</span><span class="p">,</span> <span class="n">architecture</span><span class="o">=</span><span class="s1">&#39;unet&#39;</span><span class="p">,</span> <span class="n">encoder_weights</span><span class="o">=</span><span class="s1">&#39;imagenet&#39;</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">num_epochs</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span> <span class="n">val_split</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">freeze_encoder</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">class_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">monitor_metric</span><span class="o">=</span><span class="s1">&#39;val_iou&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;max&#39;</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">save_top_k</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_timm_model</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">timm_model_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">train_transforms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">val_transforms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#geoai.timm_segment.train_timm_segmentation_model" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -9134,6 +9134,23 @@ or not used (for 'yolo' format - labels are in images_dir/labels/).</p>
             </td>
             <td>
                   <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>class_weights</code>
+            </td>
+            <td>
+                  <code>list of float</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weights for each class in the
+loss function. Useful for imbalanced datasets. Defaults to None.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -9540,7 +9557,11 @@ applied. Defaults to None.</p>
 <span class="normal">808</span>
 <span class="normal">809</span>
 <span class="normal">810</span>
-<span class="normal">811</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_timm_segmentation_model</span><span class="p">(</span>
+<span class="normal">811</span>
+<span class="normal">812</span>
+<span class="normal">813</span>
+<span class="normal">814</span>
+<span class="normal">815</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_timm_segmentation_model</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -9558,6 +9579,7 @@ applied. Defaults to None.</p>
     <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
     <span class="n">freeze_encoder</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">class_weights</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">monitor_metric</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;val_iou&quot;</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;max&quot;</span><span class="p">,</span>
     <span class="n">patience</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
@@ -9602,6 +9624,8 @@ applied. Defaults to None.</p>
 <span class="sd">        seed (int): Random seed for reproducibility.</span>
 <span class="sd">        num_workers (int): Number of data loading workers.</span>
 <span class="sd">        freeze_encoder (bool): Freeze encoder during training.</span>
+<span class="sd">        class_weights (list of float, optional): Weights for each class in the</span>
+<span class="sd">            loss function. Useful for imbalanced datasets. Defaults to None.</span>
 <span class="sd">        monitor_metric (str): Metric to monitor (&#39;val_loss&#39; or &#39;val_iou&#39;).</span>
 <span class="sd">        mode (str): &#39;min&#39; for loss, &#39;max&#39; for metrics.</span>
 <span class="sd">        patience (int): Early stopping patience.</span>
@@ -9719,6 +9743,7 @@ applied. Defaults to None.</p>
         <span class="n">weight_decay</span><span class="o">=</span><span class="n">weight_decay</span><span class="p">,</span>
         <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
         <span class="n">freeze_encoder</span><span class="o">=</span><span class="n">freeze_encoder</span><span class="p">,</span>
+        <span class="n">class_weights</span><span class="o">=</span><span class="n">class_weights</span><span class="p">,</span>
         <span class="n">accelerator</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span> <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">device</span><span class="p">,</span>
         <span class="n">monitor_metric</span><span class="o">=</span><span class="n">monitor_metric</span><span class="p">,</span>
         <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span>
