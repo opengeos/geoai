@@ -913,7 +913,7 @@ def push_classifier_to_hub(
     commit_message: Optional[str] = None,
     private: bool = False,
     token: Optional[str] = None,
-) -> str:
+) -> Optional[str]:
     """Push a trained image classifier to Hugging Face Hub.
 
     Uploads the model weights (``model.pth``) and a ``config.json`` file
@@ -1010,7 +1010,7 @@ def predict_images_from_hub(
     image_size: int = 224,
     device: Optional[str] = None,
     token: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """Run inference using a classifier downloaded from Hugging Face Hub.
 
     Downloads ``model.pth`` and ``config.json`` from the specified Hub

@@ -1115,7 +1115,7 @@ def push_timm_model_to_hub(
     private: bool = False,
     token: Optional[str] = None,
     **kwargs: Any,
-) -> str:
+) -> Optional[str]:
     """
     Push a trained timm segmentation model to Hugging Face Hub.
 

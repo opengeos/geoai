@@ -166,6 +166,9 @@ def _adjust_backbone_channels(
     if num_channels == 3:
         return
 
+    if num_channels < 3:
+        raise ValueError(f"num_channels must be at least 3, got {num_channels}")
+
     # Locate first conv layer based on architecture
     if "mobilenet" in model_name:
         original_layer = model.backbone.body["0"][0]

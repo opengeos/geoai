@@ -626,16 +626,31 @@ def multiclass_detection(
         elif "roi_heads.box_predictor.cls_score.weight" in state_dict:
             model_name = "fasterrcnn_resnet50_fpn_v2"
         elif "head.classification_head.cls_logits.weight" in state_dict:
-            model_name = "retinanet_resnet50_fpn_v2"
+            # Distinguish FCOS (anchor-free) from RetinaNet (anchor-based)
+            # by checking for anchor_generator keys
+            if any(k.startswith("anchor_generator.") for k in state_dict):
+                model_name = "retinanet_resnet50_fpn_v2"
+            else:
+                model_name = "fcos_resnet50_fpn"
         else:
             model_name = "maskrcnn_resnet50_fpn"
 
     # Infer num_classes from checkpoint
-    cls_key = "roi_heads.box_predictor.cls_score.weight"
-    if not use_pretrained and cls_key in state_dict:
-        inferred = state_dict[cls_key].shape[0]
-        if inferred != num_classes:
-            num_classes = inferred
+    if not use_pretrained:
+        rcnn_cls_key = "roi_heads.box_predictor.cls_score.weight"
+        retina_cls_key = "head.classification_head.cls_logits.weight"
+        if rcnn_cls_key in state_dict:
+            inferred = state_dict[rcnn_cls_key].shape[0]
+            if inferred != num_classes:
+                num_classes = inferred
+        elif retina_cls_key in state_dict:
+            # For RetinaNet/FCOS: out_channels = num_anchors * num_classes
+            # num_anchors is 9 for RetinaNet, 1 for FCOS
+            out_channels = state_dict[retina_cls_key].shape[0]
+            num_anchors = 9 if model_name == "retinanet_resnet50_fpn_v2" else 1
+            inferred = out_channels // num_anchors
+            if inferred != num_classes:
+                num_classes = inferred
 
     # Load model
     model = get_detection_model(
@@ -1075,7 +1090,7 @@ def plot_detection_training_history(
     figsize: Tuple[int, int] = (15, 4),
     output_path: Optional[str] = None,
 ) -> None:
-    """Plot training metrics from a Mask R-CNN training history file.
+    """Plot training metrics from a detection model training history file.
 
     Loads a ``training_history.pth`` file saved during
     :func:`train_multiclass_detector` and plots up to three subplots:
@@ -1183,6 +1198,8 @@ def batch_multiclass_detection(
         output_dir (str): Directory for intermediate detection output files.
         model_path (str, optional): Path to trained model weights. If None,
             downloads the pretrained NWPU-VHR-10 model.
+        model_name (str, optional): Detection model architecture name. If
+            None, auto-detected from checkpoint.
         num_classes (int): Number of classes including background. Defaults
             to 11.
         class_names (list, optional): List of class names (index 0 =
@@ -1318,7 +1335,7 @@ def push_detector_to_hub(
     commit_message: Optional[str] = None,
     private: bool = False,
     token: Optional[str] = None,
-) -> str:
+) -> Optional[str]:
     """Push a trained detection model to Hugging Face Hub.
 
     Uploads the model weights (``model.pth``) and a ``config.json`` file
@@ -1413,7 +1430,7 @@ def predict_detector_from_hub(
     device: Optional[torch.device] = None,
     token: Optional[str] = None,
     **kwargs: Any,
-) -> Tuple[str, float, List[Dict]]:
+) -> Optional[Tuple[str, float, List[Dict]]]:
     """Run object detection using a model downloaded from Hugging Face Hub.
 
     Downloads ``model.pth`` and ``config.json`` from the specified Hub
