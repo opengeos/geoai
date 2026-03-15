@@ -939,18 +939,17 @@ def push_classifier_to_hub(
             ``None``, the token stored by ``huggingface-cli login`` is used.
 
     Returns:
-        str: URL of the uploaded repository on Hugging Face Hub.
-
-    Raises:
-        ImportError: If ``huggingface_hub`` is not installed.
+        str: URL of the uploaded repository on Hugging Face Hub, or None
+        if ``huggingface_hub`` is not installed.
     """
     try:
         from huggingface_hub import HfApi, create_repo
     except ImportError:
-        raise ImportError(
+        print(
             "huggingface_hub is required to push models. "
             "Install it with: pip install huggingface-hub"
         )
+        return None
 
     import json
     import tempfile
@@ -1032,22 +1031,22 @@ def predict_images_from_hub(
         ``"class_names"`` key containing the class list loaded from the Hub
         config.
 
-    Raises:
-        ImportError: If ``huggingface_hub`` is not installed.
     """
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
-        raise ImportError(
+        print(
             "huggingface_hub is required. Install it with: pip install huggingface-hub"
         )
+        return None
 
     import json
 
     try:
         import timm
     except ImportError:
-        raise ImportError("timm is required. Install it with: pip install timm")
+        print("timm is required. Install it with: pip install timm")
+        return None
 
     print(f"Downloading model from {repo_id}...")
     model_path = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)

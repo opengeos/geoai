@@ -18,7 +18,13 @@ from rasterio.windows import Window
 from skimage import measure
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
-from torchvision.models.detection import maskrcnn_resnet50_fpn
+from torchvision.models.detection import (
+    fasterrcnn_mobilenet_v3_large_fpn,
+    fasterrcnn_resnet50_fpn_v2,
+    fcos_resnet50_fpn,
+    maskrcnn_resnet50_fpn,
+    retinanet_resnet50_fpn_v2,
+)
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from tqdm import tqdm
@@ -124,6 +130,170 @@ def parse_yolo_annotations(
                 label_files.append(label_path)
 
     return sorted(image_files), sorted(label_files)
+
+
+DETECTION_MODELS = {
+    "fasterrcnn_resnet50_fpn_v2",
+    "fasterrcnn_mobilenet_v3_large_fpn",
+    "retinanet_resnet50_fpn_v2",
+    "fcos_resnet50_fpn",
+    "maskrcnn_resnet50_fpn",
+}
+
+
+def model_has_masks(model_name: str) -> bool:
+    """Check whether a detection model produces instance masks.
+
+    Args:
+        model_name (str): Name of the detection model.
+
+    Returns:
+        bool: True if the model outputs instance masks (Mask R-CNN).
+    """
+    return model_name == "maskrcnn_resnet50_fpn"
+
+
+def _adjust_backbone_channels(
+    model: torch.nn.Module, model_name: str, num_channels: int
+) -> None:
+    """Modify the backbone's first conv layer to accept a different number of input channels.
+
+    Args:
+        model: The detection model.
+        model_name: Name used to locate the first conv layer.
+        num_channels: Desired number of input channels.
+    """
+    if num_channels == 3:
+        return
+
+    # Locate first conv layer based on architecture
+    if "mobilenet" in model_name:
+        original_layer = model.backbone.body["0"][0]
+        parent = model.backbone.body["0"]
+        attr = 0
+    else:
+        # ResNet-based (fasterrcnn_resnet50, retinanet, fcos, maskrcnn)
+        original_layer = model.backbone.body.conv1
+        parent = model.backbone.body
+        attr = "conv1"
+
+    new_layer = torch.nn.Conv2d(
+        num_channels,
+        original_layer.out_channels,
+        kernel_size=original_layer.kernel_size,
+        stride=original_layer.stride,
+        padding=original_layer.padding,
+        bias=original_layer.bias is not None,
+    )
+
+    with torch.no_grad():
+        min_ch = min(3, num_channels)
+        new_layer.weight[:, :min_ch, :, :] = original_layer.weight[:, :min_ch, :, :]
+        if num_channels > 3:
+            mean_weight = original_layer.weight.mean(dim=1, keepdim=True)
+            for i in range(3, num_channels):
+                new_layer.weight[:, i : i + 1, :, :] = mean_weight
+        if original_layer.bias is not None:
+            new_layer.bias = original_layer.bias
+
+    if isinstance(attr, int):
+        parent[attr] = new_layer
+    else:
+        setattr(parent, attr, new_layer)
+
+    # Also update transform normalization stats
+    transform = model.transform
+    rgb_mean = [0.485, 0.456, 0.406]
+    rgb_std = [0.229, 0.224, 0.225]
+    mean_of_means = sum(rgb_mean) / len(rgb_mean)
+    mean_of_stds = sum(rgb_std) / len(rgb_std)
+    transform.image_mean = rgb_mean + [mean_of_means] * (num_channels - 3)
+    transform.image_std = rgb_std + [mean_of_stds] * (num_channels - 3)
+
+
+def get_detection_model(
+    model_name: str = "fasterrcnn_resnet50_fpn_v2",
+    num_classes: int = 2,
+    num_channels: int = 3,
+    pretrained: bool = True,
+) -> torch.nn.Module:
+    """Create a detection model from the supported torchvision architectures.
+
+    Supports Faster R-CNN (ResNet-50 v2, MobileNet v3), RetinaNet, FCOS,
+    and Mask R-CNN. The classification head is replaced to match
+    ``num_classes`` and the backbone is adjusted for ``num_channels``.
+
+    Args:
+        model_name (str): One of the names in :data:`DETECTION_MODELS`.
+            Defaults to ``"fasterrcnn_resnet50_fpn_v2"``.
+        num_classes (int): Number of output classes including background.
+        num_channels (int): Number of input image channels.
+        pretrained (bool): Whether to load pretrained weights.
+
+    Returns:
+        torch.nn.Module: The detection model with adjusted heads.
+
+    Raises:
+        ValueError: If ``model_name`` is not in :data:`DETECTION_MODELS`.
+    """
+    if model_name not in DETECTION_MODELS:
+        raise ValueError(
+            f"Unknown model '{model_name}'. " f"Supported: {sorted(DETECTION_MODELS)}"
+        )
+
+    # Mask R-CNN: delegate to existing function
+    if model_name == "maskrcnn_resnet50_fpn":
+        return get_instance_segmentation_model(num_classes, num_channels, pretrained)
+
+    # Build model constructors
+    constructors = {
+        "fasterrcnn_resnet50_fpn_v2": (
+            fasterrcnn_resnet50_fpn_v2,
+            "FasterRCNN_ResNet50_FPN_V2_Weights",
+        ),
+        "fasterrcnn_mobilenet_v3_large_fpn": (
+            fasterrcnn_mobilenet_v3_large_fpn,
+            "FasterRCNN_MobileNet_V3_Large_FPN_Weights",
+        ),
+        "retinanet_resnet50_fpn_v2": (
+            retinanet_resnet50_fpn_v2,
+            "RetinaNet_ResNet50_FPN_V2_Weights",
+        ),
+        "fcos_resnet50_fpn": (
+            fcos_resnet50_fpn,
+            "FCOS_ResNet50_FPN_Weights",
+        ),
+    }
+
+    constructor, weights_name = constructors[model_name]
+    weights = (
+        getattr(torchvision.models.detection, weights_name).DEFAULT
+        if pretrained
+        else None
+    )
+    model = constructor(weights=weights)
+
+    # Replace classification head for the target num_classes
+    if model_name.startswith("fasterrcnn"):
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    elif model_name in ("retinanet_resnet50_fpn_v2", "fcos_resnet50_fpn"):
+        # Replace cls_logits layer preserving spatial kernel and anchor count
+        old_cls = model.head.classification_head.cls_logits
+        num_anchors = old_cls.out_channels // model.head.classification_head.num_classes
+        model.head.classification_head.num_classes = num_classes
+        model.head.classification_head.cls_logits = torch.nn.Conv2d(
+            old_cls.in_channels,
+            num_anchors * num_classes,
+            kernel_size=old_cls.kernel_size,
+            stride=old_cls.stride,
+            padding=old_cls.padding,
+        )
+
+    # Adjust backbone for non-RGB input
+    _adjust_backbone_channels(model, model_name, num_channels)
+
+    return model
 
 
 def get_instance_segmentation_model(
@@ -395,6 +565,7 @@ class COCODetectionDataset(Dataset):
         transforms: Optional[Callable] = None,
         num_channels: Optional[int] = None,
         min_area: int = 10,
+        compute_masks: bool = True,
     ) -> None:
         """Initialize COCO detection dataset.
 
@@ -408,12 +579,16 @@ class COCODetectionDataset(Dataset):
             transforms (callable, optional): Transforms to apply.
             num_channels (int, optional): Number of channels. Auto-detected if None.
             min_area (int): Minimum instance area in pixels. Defaults to 10.
+            compute_masks (bool): Whether to decode instance segmentation
+                masks. Set to False for bbox-only detection models to speed
+                up data loading. Defaults to True.
         """
         import json
 
         self.images_dir = images_dir
         self.transforms = transforms
         self.min_area = min_area
+        self.compute_masks = compute_masks
 
         # Load COCO annotations
         with open(coco_json_path, "r") as f:
@@ -592,45 +767,56 @@ class COCODetectionDataset(Dataset):
         labels = []
 
         for ann in anns:
-            # Decode segmentation mask
-            seg = ann.get("segmentation")
-            if seg is None:
-                continue
+            if self.compute_masks:
+                # Decode segmentation mask
+                seg = ann.get("segmentation")
+                if seg is None:
+                    continue
 
-            if isinstance(seg, dict):
-                # RLE format
-                mask = self._rle_to_mask(seg, height, width)
-            elif isinstance(seg, list) and len(seg) > 0:
-                # Polygon format
-                mask = self._polygon_to_mask(seg, height, width)
+                if isinstance(seg, dict):
+                    mask = self._rle_to_mask(seg, height, width)
+                elif isinstance(seg, list) and len(seg) > 0:
+                    mask = self._polygon_to_mask(seg, height, width)
+                else:
+                    continue
+
+                # Filter by area
+                area_val = mask.sum()
+                if area_val < self.min_area:
+                    continue
+
+                # Get bounding box from annotation or compute from mask
+                if "bbox" in ann:
+                    x, y, w, h = ann["bbox"]
+                    xmin, ymin = float(x), float(y)
+                    xmax, ymax = float(x + w), float(y + h)
+                else:
+                    pos = np.where(mask)
+                    if len(pos[0]) == 0:
+                        continue
+                    ymin, ymax = int(np.min(pos[0])), int(np.max(pos[0]))
+                    xmin, xmax = int(np.min(pos[1])), int(np.max(pos[1]))
+
+                if xmax <= xmin or ymax <= ymin:
+                    continue
+
+                boxes.append([xmin, ymin, xmax, ymax])
+                masks.append(mask)
+                labels.append(self.category_mapping.get(ann["category_id"], 1))
             else:
-                continue
-
-            # Filter by area
-            area = mask.sum()
-            if area < self.min_area:
-                continue
-
-            # Get bounding box from annotation or compute from mask
-            if "bbox" in ann:
+                # Bbox-only mode: skip expensive mask decoding
+                if "bbox" not in ann:
+                    continue
                 x, y, w, h = ann["bbox"]
-                # Keep as floats to avoid systematic box shrinking from truncation
+                if w < 1 or h < 1:
+                    continue
+                area_val = ann.get("area", w * h)
+                if area_val < self.min_area:
+                    continue
                 xmin, ymin = float(x), float(y)
                 xmax, ymax = float(x + w), float(y + h)
-            else:
-                pos = np.where(mask)
-                if len(pos[0]) == 0:
-                    continue
-                ymin, ymax = int(np.min(pos[0])), int(np.max(pos[0]))
-                xmin, xmax = int(np.min(pos[1])), int(np.max(pos[1]))
-
-            # Skip invalid boxes
-            if xmax <= xmin or ymax <= ymin:
-                continue
-
-            boxes.append([xmin, ymin, xmax, ymax])
-            masks.append(mask)
-            labels.append(self.category_mapping.get(ann["category_id"], 1))
+                boxes.append([xmin, ymin, xmax, ymax])
+                labels.append(self.category_mapping.get(ann["category_id"], 1))
 
         # Use the actual COCO image id (not the dataset index)
         coco_image_id = info["id"]
@@ -640,24 +826,25 @@ class COCODetectionDataset(Dataset):
             target = {
                 "boxes": torch.zeros((0, 4), dtype=torch.float32),
                 "labels": torch.zeros((0,), dtype=torch.int64),
-                "masks": torch.zeros((0, height, width), dtype=torch.uint8),
                 "image_id": torch.tensor([coco_image_id]),
                 "area": torch.zeros((0,), dtype=torch.float32),
                 "iscrowd": torch.zeros((0,), dtype=torch.int64),
             }
+            if self.compute_masks:
+                target["masks"] = torch.zeros((0, height, width), dtype=torch.uint8)
         else:
             boxes_t = torch.as_tensor(boxes, dtype=torch.float32)
             labels_t = torch.as_tensor(labels, dtype=torch.int64)
-            masks_t = torch.as_tensor(np.array(masks), dtype=torch.uint8)
             area = (boxes_t[:, 3] - boxes_t[:, 1]) * (boxes_t[:, 2] - boxes_t[:, 0])
             target = {
                 "boxes": boxes_t,
                 "labels": labels_t,
-                "masks": masks_t,
                 "image_id": torch.tensor([coco_image_id]),
                 "area": area,
                 "iscrowd": torch.zeros_like(labels_t),
             }
+            if self.compute_masks:
+                target["masks"] = torch.as_tensor(np.array(masks), dtype=torch.uint8)
 
         if self.transforms is not None:
             image, target = self.transforms(image, target)
@@ -737,6 +924,35 @@ class RandomHorizontalFlip:
         return image, target
 
 
+class RandomVerticalFlip:
+    """Random vertical flip transform for detection data."""
+
+    def __init__(self, prob: float = 0.5) -> None:
+        """Initialize random vertical flip.
+
+        Args:
+            prob (float): Probability of applying the flip.
+        """
+        self.prob = prob
+
+    def __call__(
+        self, image: torch.Tensor, target: Dict[str, torch.Tensor]
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        if random.random() < self.prob:
+            image = torch.flip(image, dims=[1])  # Flip along height dimension
+
+            if "masks" in target and len(target["masks"]) > 0:
+                target["masks"] = torch.flip(target["masks"], dims=[1])
+
+            if "boxes" in target and len(target["boxes"]) > 0:
+                boxes = target["boxes"]
+                height = image.shape[1]
+                boxes[:, 1], boxes[:, 3] = height - boxes[:, 3], height - boxes[:, 1]
+                target["boxes"] = boxes
+
+        return image, target
+
+
 def get_transform(train: bool) -> torchvision.transforms.Compose:
     """
     Get transforms for data augmentation.
@@ -752,6 +968,7 @@ def get_transform(train: bool) -> torchvision.transforms.Compose:
 
     if train:
         transforms.append(RandomHorizontalFlip(0.5))
+        transforms.append(RandomVerticalFlip(0.5))
 
     return Compose(transforms)
 
@@ -832,7 +1049,10 @@ def train_one_epoch(
 
 
 def evaluate(
-    model: torch.nn.Module, data_loader: DataLoader, device: torch.device
+    model: torch.nn.Module,
+    data_loader: DataLoader,
+    device: torch.device,
+    use_mask_iou: bool = True,
 ) -> Dict[str, float]:
     """
     Evaluate the model on the validation set.
@@ -841,6 +1061,9 @@ def evaluate(
         model (torch.nn.Module): The model to evaluate.
         data_loader (torch.utils.data.DataLoader): DataLoader for validation data.
         device (torch.device): Device to evaluate on.
+        use_mask_iou (bool): If True, compute IoU from instance masks
+            (requires Mask R-CNN). If False, compute IoU from bounding
+            boxes. Defaults to True.
 
     Returns:
         dict: Evaluation metrics including loss and IoU.
@@ -857,18 +1080,14 @@ def evaluate(
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-            # During evaluation, Mask R-CNN directly returns predictions, not losses
-            # So we'll only get loss when we provide targets explicitly
+            # During evaluation, detection models return predictions, not losses
             if len(targets) > 0:
                 try:
-                    # Try to get loss dict (this works in some implementations)
                     loss_dict = model(images, targets)
                     if isinstance(loss_dict, dict):
                         losses = sum(loss for loss in loss_dict.values())
                         total_loss += losses.item()
-                except Exception as e:
-                    print(f"Warning: Could not compute loss during evaluation: {e}")
-                    # If we can't compute loss, we'll just focus on IoU
+                except Exception:
                     pass
 
             # Get predictions
@@ -876,31 +1095,43 @@ def evaluate(
 
             # Calculate IoU for each image
             for i, output in enumerate(outputs):
-                if len(output["masks"]) == 0 or len(targets[i]["masks"]) == 0:
-                    continue
+                if use_mask_iou:
+                    # Mask-based IoU (Mask R-CNN)
+                    if (
+                        "masks" not in output
+                        or len(output["masks"]) == 0
+                        or "masks" not in targets[i]
+                        or len(targets[i]["masks"]) == 0
+                    ):
+                        continue
 
-                # Convert predicted masks to binary (threshold at 0.5)
-                pred_masks = (output["masks"].squeeze(1) > 0.5).float()
+                    pred_masks = (output["masks"].squeeze(1) > 0.5).float()
+                    pred_combined = (
+                        torch.max(pred_masks, dim=0)[0]
+                        if pred_masks.shape[0] > 0
+                        else torch.zeros_like(targets[i]["masks"][0])
+                    )
+                    target_combined = (
+                        torch.max(targets[i]["masks"], dim=0)[0]
+                        if targets[i]["masks"].shape[0] > 0
+                        else torch.zeros_like(pred_combined)
+                    )
 
-                # Combine all instance masks into a single binary mask
-                pred_combined = (
-                    torch.max(pred_masks, dim=0)[0]
-                    if pred_masks.shape[0] > 0
-                    else torch.zeros_like(targets[i]["masks"][0])
-                )
-                target_combined = (
-                    torch.max(targets[i]["masks"], dim=0)[0]
-                    if targets[i]["masks"].shape[0] > 0
-                    else torch.zeros_like(pred_combined)
-                )
+                    intersection = (pred_combined * target_combined).sum().item()
+                    union = ((pred_combined + target_combined) > 0).sum().item()
+                    if union > 0:
+                        iou_scores.append(intersection / union)
+                else:
+                    # Box-based IoU (Faster R-CNN, RetinaNet, FCOS)
+                    pred_boxes = output["boxes"]
+                    target_boxes = targets[i]["boxes"]
+                    if len(pred_boxes) == 0 or len(target_boxes) == 0:
+                        continue
 
-                # Calculate IoU
-                intersection = (pred_combined * target_combined).sum().item()
-                union = ((pred_combined + target_combined) > 0).sum().item()
-
-                if union > 0:
-                    iou = intersection / union
-                    iou_scores.append(iou)
+                    iou_matrix = torchvision.ops.box_iou(pred_boxes, target_boxes)
+                    # Best IoU for each ground truth box
+                    best_ious = iou_matrix.max(dim=0)[0]
+                    iou_scores.append(best_ious.mean().item())
 
     # Calculate metrics
     avg_loss = total_loss / len(data_loader) if total_loss > 0 else float("inf")
@@ -1023,6 +1254,7 @@ def train_MaskRCNN_model(
     device: Optional[torch.device] = None,
     num_workers: Optional[int] = None,
     verbose: bool = True,
+    model_name: str = "maskrcnn_resnet50_fpn",
 ) -> torch.nn.Module:
     """Train and evaluate Mask R-CNN model for instance segmentation.
 
@@ -1105,12 +1337,14 @@ def train_MaskRCNN_model(
             print(f"Loading COCO detection annotations from {labels_dir}")
 
         # Create a full dataset to determine image IDs, then split
+        _needs_masks = model_has_masks(model_name)
         full_dataset = COCODetectionDataset(
             coco_json_path=labels_dir,
             images_dir=images_dir,
             transforms=None,
             num_channels=num_channels,
             min_area=10,
+            compute_masks=_needs_masks,
         )
 
         # Auto-detect num_classes from annotations when not explicitly set.
@@ -1150,6 +1384,7 @@ def train_MaskRCNN_model(
             transforms=get_transform(train=True),
             num_channels=num_channels,
             min_area=10,
+            compute_masks=_needs_masks,
         )
         val_dataset = COCODetectionDataset(
             coco_json_path=labels_dir,
@@ -1159,6 +1394,7 @@ def train_MaskRCNN_model(
             transforms=get_transform(train=False),
             num_channels=num_channels,
             min_area=10,
+            compute_masks=_needs_masks,
         )
 
     elif input_format.lower() == "coco":
@@ -1263,8 +1499,11 @@ def train_MaskRCNN_model(
 
     # Initialize model
     if model is None:
-        model = get_instance_segmentation_model(
-            num_classes=num_classes, num_channels=num_channels, pretrained=pretrained
+        model = get_detection_model(
+            model_name=model_name,
+            num_classes=num_classes,
+            num_channels=num_channels,
+            pretrained=pretrained,
         )
     model.to(device)
 
@@ -1338,7 +1577,9 @@ def train_MaskRCNN_model(
         lr_scheduler.step()
 
         # Evaluate
-        eval_metrics = evaluate(model, val_loader, device)
+        eval_metrics = evaluate(
+            model, val_loader, device, use_mask_iou=model_has_masks(model_name)
+        )
 
         # Record training history
         training_history["train_loss"].append(train_loss)
@@ -1971,16 +2212,29 @@ def multiclass_detection_inference_on_geotiff(
 
                         if len(output["scores"]) > 0:
                             keep = output["scores"] > confidence_threshold
-                            masks = output["masks"][keep].squeeze(1)
                             scores = output["scores"][keep]
                             boxes = output["boxes"][keep]
                             det_labels = output["labels"][keep]
+                            has_masks = "masks" in output
+                            if has_masks:
+                                masks = output["masks"][keep].squeeze(1)
 
-                            for k in range(len(masks)):
-                                mask = masks[k].cpu().numpy() > 0.5
+                            for k in range(len(scores)):
                                 score = scores[k].cpu().item()
                                 box = boxes[k].cpu().numpy()
                                 label = det_labels[k].cpu().item()
+
+                                if has_masks:
+                                    mask = masks[k].cpu().numpy() > 0.5
+                                else:
+                                    # Create box-shaped mask for
+                                    # bbox-only models
+                                    mask = np.zeros((h, w), dtype=bool)
+                                    bx = box.astype(int)
+                                    mask[
+                                        max(0, bx[1]) : min(h, bx[3]),
+                                        max(0, bx[0]) : min(w, bx[2]),
+                                    ] = True
 
                                 global_box = [
                                     box[0] + x_pos,
@@ -1989,8 +2243,6 @@ def multiclass_detection_inference_on_geotiff(
                                     box[3] + y_pos,
                                 ]
 
-                                # Store compact mask (window-sized) with
-                                # offset to avoid full-image allocation
                                 all_detections.append(
                                     {
                                         "mask": mask,

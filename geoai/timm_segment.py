@@ -1134,15 +1134,17 @@ def push_timm_model_to_hub(
         **kwargs: Additional arguments for push_to_hub.
 
     Returns:
-        str: URL of the uploaded model on HF Hub.
+        str: URL of the uploaded model on HF Hub, or None if
+        ``huggingface_hub`` is not installed.
     """
     try:
         from huggingface_hub import HfApi, create_repo
     except ImportError:
-        raise ImportError(
+        print(
             "huggingface_hub is required to push models. "
             "Install it with: pip install huggingface-hub"
         )
+        return None
 
     # Load model
     if model_path.endswith(".ckpt"):
@@ -1277,9 +1279,10 @@ def timm_segmentation_from_hub(
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
-        raise ImportError(
+        print(
             "huggingface_hub is required. Install it with: pip install huggingface-hub"
         )
+        return None
 
     import json
 
