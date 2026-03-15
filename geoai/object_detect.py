@@ -1481,9 +1481,7 @@ def predict_detector_from_hub(
 
     try:
         print(f"Downloading model from {repo_id}...")
-        model_file = hf_hub_download(
-            repo_id=repo_id, filename="model.pth", token=token
-        )
+        model_file = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
         config_file = hf_hub_download(
             repo_id=repo_id, filename="config.json", token=token
         )
