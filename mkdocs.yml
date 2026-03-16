@@ -195,6 +195,7 @@ nav:
           - examples/building_detection_whu.ipynb
           - examples/clip_classify_vector.ipynb
           - examples/impervious_surface_mapping.ipynb
+          - examples/field_boundary_detection.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -209,6 +210,7 @@ nav:
           - cli module: cli.md
           - detectron2 module: detectron2.md
           - DINOv3 module: dinov3.md
+          - ftw module: ftw.md
           - geo_agents module: geo_agents.md
           - geoai module: geoai.md
           - download module: download.md

@@ -57,6 +57,7 @@ from .geometry import (
 from .raster import (
     batch_vector_to_raster,
     calc_stats,
+    clean_instance_mask,
     clip_raster_by_bbox,
     get_raster_info,
     get_raster_info_gdal,

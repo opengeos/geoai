@@ -1704,3 +1704,155 @@ def stack_bands(
         os.remove(temp_vrt)
 
     return output_file
+
+
+def clean_instance_mask(
+    input_path: str,
+    output_path: Optional[str] = None,
+    min_area: int = 50,
+    fill_holes: bool = True,
+    max_hole_area: int = 100,
+    smooth: bool = True,
+    smooth_sigma: float = 1.5,
+    band: int = 1,
+) -> str:
+    """Clean an instance segmentation mask raster.
+
+    Removes small instances, fills holes within instances, and optionally
+    smooths instance boundaries using Gaussian contour smoothing.  Unlike
+    ``clean_raster`` (which is designed for semantic/classification masks),
+    this function preserves the unique identity of each instance.
+
+    The smoothing works by applying a Gaussian blur to each instance's
+    binary mask and re-thresholding at 0.5, which effectively rounds
+    jagged staircase edges into smooth curves.
+
+    Args:
+        input_path: Path to the input GeoTIFF instance mask where each
+            non-zero pixel value is a unique instance ID.
+        output_path: Path to save the cleaned GeoTIFF.  If None, a
+            ``_cleaned`` suffix is appended to the input filename.
+        min_area: Minimum area in pixels for an instance to be kept.
+            Instances smaller than this are set to 0 (background).
+            Defaults to 50.
+        fill_holes: Whether to fill holes (background pixels fully
+            enclosed within an instance) with the surrounding instance
+            ID.  Defaults to True.
+        max_hole_area: Maximum hole size in pixels to fill.  Holes
+            larger than this are left as background.  Only used when
+            ``fill_holes=True``.  Defaults to 100.
+        smooth: Whether to smooth jagged instance boundaries using
+            Gaussian blur and re-thresholding.  Defaults to True.
+        smooth_sigma: Standard deviation for the Gaussian blur used
+            in boundary smoothing.  Larger values produce smoother
+            boundaries but may shrink small instances.  Defaults to 1.5.
+        band: Band index to read (1-indexed).  Defaults to 1.
+
+    Returns:
+        Path to the cleaned output GeoTIFF.
+
+    Example:
+        >>> import geoai
+        >>> geoai.clean_instance_mask(
+        ...     "prediction.tif",
+        ...     "prediction_cleaned.tif",
+        ...     min_area=100,
+        ...     smooth_sigma=2.0,
+        ... )
+    """
+    from scipy import ndimage
+
+    if output_path is None:
+        name, ext = os.path.splitext(input_path)
+        output_path = f"{name}_cleaned{ext}"
+
+    with rasterio.open(input_path) as src:
+        mask = src.read(band)
+        profile = src.profile.copy()
+        nodata_val = src.nodata
+
+    # Work on a copy
+    cleaned = mask.copy()
+
+    # Treat nodata as background
+    if nodata_val is not None:
+        cleaned[cleaned == nodata_val] = 0
+
+    unique_ids = np.unique(cleaned)
+    unique_ids = unique_ids[unique_ids != 0]
+
+    # Remove small instances
+    for uid in unique_ids:
+        instance = cleaned == uid
+        if instance.sum() < min_area:
+            cleaned[instance] = 0
+
+    # Re-scan after removal
+    unique_ids = np.unique(cleaned)
+    unique_ids = unique_ids[unique_ids != 0]
+
+    # Smooth boundaries using Gaussian blur + re-threshold per instance.
+    # This rounds jagged staircase edges into smooth curves.
+    if smooth and smooth_sigma > 0:
+        # Process instances from largest to smallest so that larger
+        # instances get priority when smoothed boundaries overlap.
+        areas = {uid: (cleaned == uid).sum() for uid in unique_ids}
+        sorted_ids = sorted(unique_ids, key=lambda u: areas[u], reverse=True)
+
+        result = np.zeros_like(cleaned)
+        for uid in sorted_ids:
+            binary = (cleaned == uid).astype(np.float64)
+            blurred = ndimage.gaussian_filter(binary, sigma=smooth_sigma)
+            smoothed = blurred >= 0.5
+            # Only write to pixels not already claimed by a larger instance
+            result[smoothed & (result == 0)] = uid
+
+        cleaned = result
+
+    # Fill holes: find small background regions that don't touch the
+    # image border and assign them to the most common neighboring instance.
+    # This handles both holes inside a single instance and gaps between
+    # adjacent instances.  Runs after smoothing so that any gaps introduced
+    # by the smooth step are also filled.
+    if fill_holes:
+        background = cleaned == 0
+        labeled_bg, n_bg = ndimage.label(background)
+        for i in range(1, n_bg + 1):
+            region = labeled_bg == i
+            area = region.sum()
+            if area > max_hole_area:
+                continue
+            # Skip regions that touch the image border (real background)
+            if (
+                region[0, :].any()
+                or region[-1, :].any()
+                or region[:, 0].any()
+                or region[:, -1].any()
+            ):
+                continue
+            # Find the most common neighboring instance ID
+            dilated = ndimage.binary_dilation(region, iterations=1)
+            border_pixels = dilated & ~region
+            neighbor_ids = cleaned[border_pixels]
+            neighbor_ids = neighbor_ids[neighbor_ids > 0]
+            if len(neighbor_ids) > 0:
+                # Assign to the most frequent neighbor
+                fill_id = np.bincount(neighbor_ids).argmax()
+                cleaned[region] = fill_id
+
+    # Restore nodata — but only for values that are distinct from
+    # background (0).  When nodata==0, background pixels and nodata
+    # pixels are the same, so there is nothing extra to restore.
+    if nodata_val is not None and nodata_val != 0:
+        cleaned[mask == nodata_val] = nodata_val
+
+    profile.update(dtype=cleaned.dtype, count=1, compress="lzw")
+
+    output_dir = os.path.dirname(os.path.abspath(output_path))
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    with rasterio.open(output_path, "w", **profile) as dst:
+        dst.write(cleaned, 1)
+
+    return output_path

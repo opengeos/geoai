@@ -199,6 +199,7 @@ _LAZY_SYMBOL_MAP = {
     "get_detection_model": ("train", None),
     "model_has_masks": ("train", None),
     # --- geoai.utils ---
+    "clean_instance_mask": ("utils", None),
     "orthogonalize": ("utils", None),
     "regularization": ("utils", None),
     "hybrid_regularization": ("utils", None),
@@ -385,6 +386,11 @@ _LAZY_SYMBOL_MAP = {
     "embedding_to_geotiff": ("embeddings", None),
     "download_google_satellite_embedding": ("embeddings", None),
     "EMBEDDING_DATASETS": ("embeddings", None),
+    # --- geoai.ftw ---
+    "FTW_COUNTRIES": ("ftw", None),
+    "download_ftw": ("ftw", None),
+    "prepare_ftw": ("ftw", None),
+    "display_ftw_samples": ("ftw", None),
     # --- geoai.object_detect ---
     "NWPU_VHR10_CLASSES": ("object_detect", None),
     "download_nwpu_vhr10": ("object_detect", None),

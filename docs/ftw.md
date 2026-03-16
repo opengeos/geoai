@@ -1,0 +1,3 @@
+# ftw module
+
+::: geoai.ftw

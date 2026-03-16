@@ -402,6 +402,7 @@ class ObjectDetectionDataset(Dataset):
         label_paths: List[str],
         transforms: Optional[Callable] = None,
         num_channels: Optional[int] = None,
+        instance_labels: bool = False,
     ) -> None:
         """
         Initialize dataset.
@@ -412,10 +413,16 @@ class ObjectDetectionDataset(Dataset):
             transforms (callable, optional): Transformations to apply to images and masks.
             num_channels (int, optional): Number of channels to use from images. If None,
                 auto-detected from the first image.
+            instance_labels (bool): If True, treat label mask pixel values as
+                pre-assigned instance IDs instead of running connected-component
+                labeling.  Use this when label masks already encode unique
+                integers per object (e.g., Fields of The World dataset).
+                Defaults to False.
         """
         self.image_paths = image_paths
         self.label_paths = label_paths
         self.transforms = transforms
+        self.instance_labels = instance_labels
 
         # Auto-detect the number of channels if not specified
         if num_channels is None:
@@ -456,19 +463,27 @@ class ObjectDetectionDataset(Dataset):
         # Load label mask
         with rasterio.open(self.label_paths[idx]) as src:
             label_mask = src.read(1)
+
+        if self.instance_labels:
+            # Use pre-assigned instance IDs directly (e.g., FTW dataset)
+            unique_ids = np.unique(label_mask)
+            unique_ids = unique_ids[unique_ids > 0]  # Remove background
+            num_instances = len(unique_ids)
+            labeled_mask = label_mask
+        else:
+            # Find instances using connected components on binary mask
             binary_mask = (label_mask > 0).astype(np.uint8)
+            labeled_mask, num_instances = measure.label(
+                binary_mask, return_num=True, connectivity=2
+            )
+            unique_ids = range(1, num_instances + 1)
 
-        # Find all building instances using connected components
-        labeled_mask, num_instances = measure.label(
-            binary_mask, return_num=True, connectivity=2
-        )
-
-        # Create list to hold masks for each building instance
+        # Create list to hold masks for each object instance
         masks = []
         boxes = []
         labels = []
 
-        for i in range(1, num_instances + 1):
+        for i in unique_ids:
             # Create mask for this instance
             instance_mask = (labeled_mask == i).astype(np.uint8)
 
@@ -494,8 +509,8 @@ class ObjectDetectionDataset(Dataset):
             # Add small padding to ensure the mask is within the box
             xmin = max(0, xmin - 1)
             ymin = max(0, ymin - 1)
-            xmax = min(binary_mask.shape[1] - 1, xmax + 1)
-            ymax = min(binary_mask.shape[0] - 1, ymax + 1)
+            xmax = min(label_mask.shape[1] - 1, xmax + 1)
+            ymax = min(label_mask.shape[0] - 1, ymax + 1)
 
             boxes.append([xmin, ymin, xmax, ymax])
             masks.append(instance_mask)
@@ -508,7 +523,7 @@ class ObjectDetectionDataset(Dataset):
                 "boxes": torch.zeros((0, 4), dtype=torch.float32),
                 "labels": torch.zeros((0), dtype=torch.int64),
                 "masks": torch.zeros(
-                    (0, binary_mask.shape[0], binary_mask.shape[1]), dtype=torch.uint8
+                    (0, label_mask.shape[0], label_mask.shape[1]), dtype=torch.uint8
                 ),
                 "image_id": torch.tensor([idx]),
                 "area": torch.zeros((0), dtype=torch.float32),
@@ -1017,6 +1032,7 @@ def train_one_epoch(
     """
     model.train()
     total_loss = 0
+    num_batches = 0
 
     start_time = time.time()
 
@@ -1029,13 +1045,20 @@ def train_one_epoch(
         loss_dict = model(images, targets)
         losses = sum(loss for loss in loss_dict.values())
 
+        # Skip batches with NaN/Inf loss to prevent gradient corruption
+        if not torch.isfinite(losses):
+            optimizer.zero_grad()
+            continue
+
         # Backward pass
         optimizer.zero_grad()
         losses.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         # Track loss
         total_loss += losses.item()
+        num_batches += 1
 
         # Print progress
         if i % print_freq == 0:
@@ -1046,8 +1069,8 @@ def train_one_epoch(
                 )
             start_time = time.time()
 
-    # Calculate average loss
-    avg_loss = total_loss / len(data_loader)
+    # Calculate average loss (only over non-skipped batches)
+    avg_loss = total_loss / max(num_batches, 1)
     return avg_loss
 
 
@@ -1075,6 +1098,7 @@ def evaluate(
 
     # Initialize metrics
     total_loss = 0
+    num_loss_batches = 0
     iou_scores = []
 
     with torch.no_grad():
@@ -1083,17 +1107,34 @@ def evaluate(
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-            # During evaluation, detection models return predictions, not losses
+            # Mask R-CNN only returns losses in train mode.  We
+            # temporarily enable training-mode forward while keeping
+            # BatchNorm and Dropout frozen so running stats and
+            # stochastic layers are not affected by validation data.
             if len(targets) > 0:
                 try:
+                    # Freeze BN/Dropout before switching to train mode
+                    for mod in model.modules():
+                        if isinstance(mod, (torch.nn.BatchNorm2d, torch.nn.Dropout)):
+                            mod.eval()
+                    model.train()
                     loss_dict = model(images, targets)
+                    model.eval()
                     if isinstance(loss_dict, dict):
                         losses = sum(loss for loss in loss_dict.values())
-                        total_loss += losses.item()
-                except Exception:
-                    pass
+                        if torch.isfinite(losses):
+                            total_loss += losses.item()
+                            num_loss_batches += 1
+                except (RuntimeError, ValueError) as e:
+                    import warnings
 
-            # Get predictions
+                    warnings.warn(
+                        f"Could not compute val loss for a batch: {e}",
+                        stacklevel=2,
+                    )
+                    model.eval()
+
+            # Get predictions (model must be in eval mode)
             outputs = model(images)
 
             # Calculate IoU for each image
@@ -1137,7 +1178,7 @@ def evaluate(
                     iou_scores.append(best_ious.mean().item())
 
     # Calculate metrics
-    avg_loss = total_loss / len(data_loader) if total_loss > 0 else float("inf")
+    avg_loss = total_loss / num_loss_batches if num_loss_batches > 0 else float("inf")
     avg_iou = sum(iou_scores) / len(iou_scores) if iou_scores else 0
 
     return {"loss": avg_loss, "IoU": avg_iou}
@@ -1258,6 +1299,7 @@ def train_MaskRCNN_model(
     num_workers: Optional[int] = None,
     verbose: bool = True,
     model_name: str = "maskrcnn_resnet50_fpn",
+    instance_labels: bool = False,
 ) -> torch.nn.Module:
     """Train and evaluate Mask R-CNN model for instance segmentation.
 
@@ -1304,8 +1346,15 @@ def train_MaskRCNN_model(
             will try to load optimizer and scheduler states as well. Defaults to False.
         print_freq (int): Frequency of printing training progress. Defaults to 10.
         device (torch.device): Device to train on. If None, uses CUDA if available.
-        num_workers (int): Number of workers for data loading. If None, uses 0 on macOS and Windows, 8 otherwise.
+        num_workers (int): Number of workers for data loading. If None, uses 0 on
+            macOS and Windows, 8 otherwise.
         verbose (bool): If True, prints detailed training progress. Defaults to True.
+        model_name (str): Name of the model architecture. Defaults to
+            "maskrcnn_resnet50_fpn".
+        instance_labels (bool): If True, treat label mask pixel values as
+            pre-assigned instance IDs instead of running connected-component
+            labeling. Use this when label masks already encode unique integers
+            per object (e.g., Fields of The World dataset). Defaults to False.
     Returns:
         None: Model weights are saved to output_dir.
 
@@ -1471,10 +1520,16 @@ def train_MaskRCNN_model(
 
         # Create datasets
         train_dataset = ObjectDetectionDataset(
-            train_imgs, train_labels, transforms=get_transform(train=True)
+            train_imgs,
+            train_labels,
+            transforms=get_transform(train=True),
+            instance_labels=instance_labels,
         )
         val_dataset = ObjectDetectionDataset(
-            val_imgs, val_labels, transforms=get_transform(train=False)
+            val_imgs,
+            val_labels,
+            transforms=get_transform(train=False),
+            instance_labels=instance_labels,
         )
 
     # Create data loaders
@@ -5170,6 +5225,7 @@ def train_instance_segmentation_model(
     visualize: bool = False,
     device: Optional[torch.device] = None,
     verbose: bool = True,
+    instance_labels: bool = False,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -5199,6 +5255,10 @@ def train_instance_segmentation_model(
         visualize (bool): Whether to generate visualizations. Defaults to False.
         device (torch.device): Device to train on. If None, uses CUDA if available.
         verbose (bool): If True, prints detailed training progress. Defaults to True.
+        instance_labels (bool): If True, treat label mask pixel values as
+            pre-assigned instance IDs instead of running connected-component
+            labeling. Use this when label masks already encode unique integers
+            per object (e.g., Fields of The World dataset). Defaults to False.
         **kwargs: Additional arguments passed to train_MaskRCNN_model.
 
     Returns:
@@ -5224,6 +5284,7 @@ def train_instance_segmentation_model(
         visualize=visualize,
         device=device,
         verbose=verbose,
+        instance_labels=instance_labels,
         **kwargs,
     )
 

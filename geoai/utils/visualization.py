@@ -687,9 +687,42 @@ def view_vector_interactive(
     if "column" in kwargs:
         if "legend_position" not in kwargs:
             kwargs["legend_position"] = "bottomleft"
-        if "cmap" not in kwargs:
-            kwargs["cmap"] = "viridis"
-        m.add_data(vector_data, layer_name=layer_name, opacity=opacity, **kwargs)
+        col = kwargs["column"]
+        is_categorical = col in vector_data.columns and (
+            pd.api.types.is_object_dtype(vector_data[col])
+            or pd.api.types.is_string_dtype(vector_data[col])
+            or isinstance(vector_data[col].dtype, pd.CategoricalDtype)
+        )
+        if is_categorical:
+            # For categorical columns, use gdf.explore() directly with
+            # categorical=True.  leafmap's add_data applies numeric
+            # classification schemes that don't work with string columns.
+            # We also build a ListedColormap with exactly N colors so
+            # geopandas picks the first N distinct colors instead of
+            # sampling at even intervals across a larger palette.
+            from matplotlib.colors import ListedColormap
+
+            kwargs["categorical"] = True
+            kwargs.pop("legend_position", None)
+            cmap_name = kwargs.pop("cmap", "Set1")
+            cmap_src = plt.colormaps.get_cmap(cmap_name)
+            n_cats = vector_data[col].nunique()
+            cat_colors = [cmap_src(i % cmap_src.N) for i in range(n_cats)]
+            kwargs["cmap"] = ListedColormap(cat_colors)
+            vector_data.explore(
+                m=m,
+                name=layer_name,
+                style_kwds={"opacity": opacity, "fillOpacity": opacity},
+                **kwargs,
+            )
+            # Zoom to data extent (gdf.explore on an existing map
+            # does not auto-fit bounds)
+            bounds = vector_data.total_bounds  # [minx, miny, maxx, maxy]
+            m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+        else:
+            if "cmap" not in kwargs:
+                kwargs["cmap"] = "viridis"
+            m.add_data(vector_data, layer_name=layer_name, opacity=opacity, **kwargs)
 
     else:
         m.add_gdf(vector_data, layer_name=layer_name, opacity=opacity, **kwargs)
@@ -1416,9 +1449,14 @@ def plot_performance_metrics(
 
     # Create plots
     if n_plots > 0:
+        from matplotlib.ticker import MaxNLocator
+
         fig, axes = plt.subplots(1, n_plots, figsize=figsize)
         if n_plots == 1:
             axes = [axes]
+
+        # Use epoch numbers as x-axis values
+        epochs = df_data.get("epoch", list(range(1, n_epochs + 1)))
 
         for idx, (metric_name, key1, key2, labels) in enumerate(available_metrics):
             ax = axes[idx]
@@ -1426,17 +1464,22 @@ def plot_performance_metrics(
             if metric_name == "Loss":
                 # Special handling for loss (has both train and val)
                 if key1 in history:
-                    ax.plot(history[key1], label=labels[0])
+                    ax.plot(epochs, history[key1], label=labels[0])
                 if key2 and key2 in history:
-                    ax.plot(history[key2], label=labels[1])
+                    # Filter out non-finite values so the line still renders
+                    vals = history[key2]
+                    finite = [(e, v) for e, v in zip(epochs, vals) if np.isfinite(v)]
+                    if finite:
+                        ax.plot(*zip(*finite), label=labels[1])
             else:
                 # Single metric plots
                 if key1 in history:
-                    ax.plot(history[key1], label=labels[0])
+                    ax.plot(epochs, history[key1], label=labels[0])
 
             ax.set_title(metric_name)
             ax.set_xlabel("Epoch")
             ax.set_ylabel(metric_name)
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
             ax.legend()
             ax.grid(True)
 
