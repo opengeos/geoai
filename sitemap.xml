@@ -57,6 +57,10 @@
          <lastmod>2026-03-16</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/ftw/</loc>
+         <lastmod>2026-03-16</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/geo_agents/</loc>
          <lastmod>2026-03-16</lastmod>
     </url>
@@ -290,6 +294,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/export_training_data_formats/</loc>
+         <lastmod>2026-03-16</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/field_boundary_detection/</loc>
          <lastmod>2026-03-16</lastmod>
     </url>
     <url>
