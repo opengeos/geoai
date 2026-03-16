@@ -16168,7 +16168,22 @@ geoai.clean_instance_mask(
 <span class="normal">1855</span>
 <span class="normal">1856</span>
 <span class="normal">1857</span>
-<span class="normal">1858</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">clean_instance_mask</span><span class="p">(</span>
+<span class="normal">1858</span>
+<span class="normal">1859</span>
+<span class="normal">1860</span>
+<span class="normal">1861</span>
+<span class="normal">1862</span>
+<span class="normal">1863</span>
+<span class="normal">1864</span>
+<span class="normal">1865</span>
+<span class="normal">1866</span>
+<span class="normal">1867</span>
+<span class="normal">1868</span>
+<span class="normal">1869</span>
+<span class="normal">1870</span>
+<span class="normal">1871</span>
+<span class="normal">1872</span>
+<span class="normal">1873</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">clean_instance_mask</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">min_area</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
@@ -16301,6 +16316,21 @@ geoai.clean_instance_mask(
                 <span class="c1"># Assign to the most frequent neighbor</span>
                 <span class="n">fill_id</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">neighbor_ids</span><span class="p">)</span><span class="o">.</span><span class="n">argmax</span><span class="p">()</span>
                 <span class="n">cleaned</span><span class="p">[</span><span class="n">region</span><span class="p">]</span> <span class="o">=</span> <span class="n">fill_id</span>
+
+    <span class="c1"># Second pass: remove small fragments that smoothing may have created.</span>
+    <span class="c1"># Smoothing can detach small pieces from an instance that share the</span>
+    <span class="c1"># same ID but are spatially disconnected.  Use connected-component</span>
+    <span class="c1"># labeling per instance to remove any individual fragment smaller</span>
+    <span class="c1"># than min_area.</span>
+    <span class="k">for</span> <span class="n">uid</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">cleaned</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">uid</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">cleaned</span> <span class="o">==</span> <span class="n">uid</span>
+        <span class="n">labeled_parts</span><span class="p">,</span> <span class="n">n_parts</span> <span class="o">=</span> <span class="n">ndimage</span><span class="o">.</span><span class="n">label</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">part_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_parts</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">part</span> <span class="o">=</span> <span class="n">labeled_parts</span> <span class="o">==</span> <span class="n">part_id</span>
+            <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">min_area</span><span class="p">:</span>
+                <span class="n">cleaned</span><span class="p">[</span><span class="n">part</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
 
     <span class="c1"># Restore nodata — but only for values that are distinct from</span>
     <span class="c1"># background (0).  When nodata==0, background pixels and nodata</span>
