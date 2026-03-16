@@ -1358,6 +1358,3 @@ def timm_segmentation_from_hub(
         save_class_probabilities=save_class_probabilities,
         **kwargs,
     )
-
-    if not quiet:
-        print(f"Segmentation saved to {output_path}")
