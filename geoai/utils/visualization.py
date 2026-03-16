@@ -689,7 +689,8 @@ def view_vector_interactive(
             kwargs["legend_position"] = "bottomleft"
         col = kwargs["column"]
         is_categorical = col in vector_data.columns and (
-            vector_data[col].dtype == "object"
+            pd.api.types.is_object_dtype(vector_data[col])
+            or pd.api.types.is_string_dtype(vector_data[col])
             or isinstance(vector_data[col].dtype, pd.CategoricalDtype)
         )
         if is_categorical:

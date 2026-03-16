@@ -3,7 +3,7 @@
 The Fields of The World (FTW) dataset is a large-scale benchmark for
 agricultural field boundary instance segmentation. It contains Sentinel-2
 imagery (4 bands: Red, Green, Blue, NIR at 10 m resolution) paired with
-instance segmentation masks across 24 countries.
+instance segmentation masks across 25 countries.
 
 Reference:
     Kerner et al., "Fields of The World: A Machine Learning Benchmark Dataset
@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-# All 24 countries available in the FTW dataset
+# All 25 countries available in the FTW dataset
 FTW_COUNTRIES = [
     "austria",
     "belgium",
@@ -108,6 +108,10 @@ def download_ftw(
         if os.path.exists(country_dir) and not overwrite:
             print(f"FTW {country} already exists at {country_dir}, skipping.")
             continue
+
+        # Remove existing directory when overwriting
+        if os.path.exists(country_dir) and overwrite:
+            shutil.rmtree(country_dir)
 
         url = FTW_BASE_URL.format(country=country)
         zip_path = os.path.join(output_dir, f"{country}.zip")

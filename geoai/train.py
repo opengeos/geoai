@@ -1032,6 +1032,7 @@ def train_one_epoch(
     """
     model.train()
     total_loss = 0
+    num_batches = 0
 
     start_time = time.time()
 
@@ -1057,6 +1058,7 @@ def train_one_epoch(
 
         # Track loss
         total_loss += losses.item()
+        num_batches += 1
 
         # Print progress
         if i % print_freq == 0:
@@ -1067,8 +1069,8 @@ def train_one_epoch(
                 )
             start_time = time.time()
 
-    # Calculate average loss
-    avg_loss = total_loss / len(data_loader)
+    # Calculate average loss (only over non-skipped batches)
+    avg_loss = total_loss / max(num_batches, 1)
     return avg_loss
 
 
@@ -1105,10 +1107,16 @@ def evaluate(
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-            # Mask R-CNN only returns losses in train mode, so temporarily
-            # switch to train mode for loss computation, then back to eval.
+            # Mask R-CNN only returns losses in train mode.  We
+            # temporarily enable training-mode forward while keeping
+            # BatchNorm and Dropout frozen so running stats and
+            # stochastic layers are not affected by validation data.
             if len(targets) > 0:
                 try:
+                    # Freeze BN/Dropout before switching to train mode
+                    for mod in model.modules():
+                        if isinstance(mod, (torch.nn.BatchNorm2d, torch.nn.Dropout)):
+                            mod.eval()
                     model.train()
                     loss_dict = model(images, targets)
                     model.eval()
@@ -1117,7 +1125,13 @@ def evaluate(
                         if torch.isfinite(losses):
                             total_loss += losses.item()
                             num_loss_batches += 1
-                except Exception:
+                except (RuntimeError, ValueError) as e:
+                    import warnings
+
+                    warnings.warn(
+                        f"Could not compute val loss for a batch: {e}",
+                        stacklevel=2,
+                    )
                     model.eval()
 
             # Get predictions (model must be in eval mode)
