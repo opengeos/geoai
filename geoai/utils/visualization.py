@@ -62,6 +62,7 @@ def view_raster(
     opacity: Optional[float] = 1.0,
     array_args: Optional[Dict] = None,
     client_args: Optional[Dict] = {"cors_all": False},
+    legend_args: Optional[Dict] = None,
     basemap: Optional[str] = "OpenStreetMap",
     basemap_args: Optional[Dict] = None,
     backend: Optional[str] = "folium",
@@ -85,6 +86,7 @@ def view_raster(
         opacity (Optional[float], optional): The opacity of the layer. Defaults to 1.0.
         array_args (Optional[Dict], optional): Additional arguments for array processing. Defaults to {}.
         client_args (Optional[Dict], optional): Additional arguments for the client. Defaults to {"cors_all": False}.
+        legend_args (Optional[Dict], optional): Additional arguments for the legend. Defaults to None.
         basemap (Optional[str], optional): The basemap to use. Defaults to "OpenStreetMap".
         basemap_args (Optional[Dict], optional): Additional arguments for the basemap. Defaults to None.
         backend (Optional[str], optional): The backend to use. Defaults to "folium".
@@ -174,6 +176,8 @@ def view_raster(
             client_args=client_args,
             **kwargs,
         )
+    if isinstance(legend_args, dict):
+        m.add_legend(**legend_args)
     return m
 
 
