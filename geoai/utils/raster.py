@@ -1840,6 +1840,21 @@ def clean_instance_mask(
                 fill_id = np.bincount(neighbor_ids).argmax()
                 cleaned[region] = fill_id
 
+    # Second pass: remove small fragments that smoothing may have created.
+    # Smoothing can detach small pieces from an instance that share the
+    # same ID but are spatially disconnected.  Use connected-component
+    # labeling per instance to remove any individual fragment smaller
+    # than min_area.
+    for uid in np.unique(cleaned):
+        if uid == 0:
+            continue
+        instance = cleaned == uid
+        labeled_parts, n_parts = ndimage.label(instance)
+        for part_id in range(1, n_parts + 1):
+            part = labeled_parts == part_id
+            if part.sum() < min_area:
+                cleaned[part] = 0
+
     # Restore nodata — but only for values that are distinct from
     # background (0).  When nodata==0, background pixels and nodata
     # pixels are the same, so there is nothing extra to restore.
