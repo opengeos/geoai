@@ -334,6 +334,11 @@ _LAZY_SYMBOL_MAP = {
     "clean_raster_batch": ("tools", None),
     "compare_masks": ("tools", None),
     "super_resolution": ("tools", None),
+    "predict_cloud_mask": ("tools", None),
+    "predict_cloud_mask_from_raster": ("tools", None),
+    "predict_cloud_mask_batch": ("tools", None),
+    "calculate_cloud_statistics": ("tools", None),
+    "create_cloud_free_mask": ("tools", None),
     # --- geoai.onnx ---
     "ONNXGeoModel": ("onnx", None),
     "export_to_onnx": ("onnx", None),
