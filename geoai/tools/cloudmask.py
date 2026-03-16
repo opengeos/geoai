@@ -9,7 +9,7 @@ Supports Sentinel-2, Landsat 8, PlanetScope, and Maxar imagery at 10-50m resolut
 """
 
 import os
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any, Union
 import numpy as np
 
 try:
@@ -52,12 +52,12 @@ def check_omnicloudmask_available():
 def predict_cloud_mask(
     image: np.ndarray,
     batch_size: int = 1,
-    inference_device: str = None,
+    inference_device: Optional[str] = None,
     inference_dtype: str = "fp32",
     patch_size: int = 1000,
     export_confidence: bool = False,
-    model_version: int = None,
-) -> np.ndarray:
+    model_version: Optional[int] = None,
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
     Predict cloud mask from a numpy array using OmniCloudMask.
 
@@ -78,11 +78,13 @@ def predict_cloud_mask(
             'bf16' recommended for speed on compatible hardware. Defaults to 'fp32'.
         patch_size (int): Size of patches for processing large images. Defaults to 1000.
         export_confidence (bool): If True, also returns confidence map. Defaults to False.
-        model_version (int): Model version to use (1, 2, or 3). Defaults to None, which will use the latest version.
+        model_version (int, optional): Model version to use (1, 2, or 3).
+            Defaults to None, which will use the latest version.
 
     Returns:
-        np.ndarray: Cloud mask array with shape (height, width) containing class predictions.
-            If export_confidence=True, returns tuple of (mask, confidence).
+        Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]: Cloud mask array with
+            shape (height, width) containing class predictions. If
+            export_confidence=True, returns a tuple of (mask, confidence).
 
     Raises:
         ImportError: If omnicloudmask is not installed.
@@ -141,11 +143,11 @@ def predict_cloud_mask_from_raster(
     green_band: int = 2,
     nir_band: int = 3,
     batch_size: int = 1,
-    inference_device: str = None,
+    inference_device: Optional[str] = None,
     inference_dtype: str = "fp32",
     patch_size: int = 1000,
     export_confidence: bool = False,
-    model_version: int = None,
+    model_version: Optional[int] = None,
 ) -> None:
     """
     Predict cloud mask from a GeoTIFF file and save the result.
@@ -160,12 +162,13 @@ def predict_cloud_mask_from_raster(
         green_band (int): Band index for Green (1-indexed). Defaults to 2.
         nir_band (int): Band index for NIR (1-indexed). Defaults to 3.
         batch_size (int): Patches per inference batch. Defaults to 1.
-        inference_device (str): Device ('cpu', 'cuda', 'mps').
+        inference_device (str, optional): Device ('cpu', 'cuda', 'mps').
             Defaults to None, which will use the device with the most available memory.
         inference_dtype (str): Dtype ('fp32', 'fp16', 'bf16'). Defaults to 'fp32'.
         patch_size (int): Patch size for large images. Defaults to 1000.
         export_confidence (bool): Export confidence map. Defaults to False.
-        model_version (str): Model version ('1.0', '2.0', '3.0'). Defaults to None, which will use the latest version.
+        model_version (int, optional): Model version (1, 2, or 3).
+            Defaults to None, which will use the latest version.
 
     Returns:
         None: Writes cloud mask to output_path.
