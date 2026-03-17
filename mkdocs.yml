@@ -231,7 +231,6 @@ nav:
           - sam module: sam.md
           - segment module: segment.md
           - segmentation module: segmentation.md
-          - sr module: sr.md
           - tessera module: tessera.md
           - timm_regress module: timm_regress.md
           - timm_segment module: timm_segment.md
@@ -239,3 +238,8 @@ nav:
           - train module: train.md
           - utils module: utils.md
           - water module: water.md
+          - tools:
+                - sr module: sr.md
+                - cloudmask module: cloudmask.md
+                - multiclean module: multiclean.md
+                - timeseries module: timeseries.md
