@@ -8,7 +8,6 @@ import pytest
 
 from geoai.object_detect import detections_to_geodataframe
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -244,9 +243,7 @@ class TestMaskGeometry:
                 "instance_id": 1,
             }
         ]
-        gdf = detections_to_geodataframe(
-            det, mock_geotiff, use_mask_geometry=True
-        )
+        gdf = detections_to_geodataframe(det, mock_geotiff, use_mask_geometry=True)
         geom = gdf.iloc[0].geometry
         assert geom.is_valid
         # Two disconnected components should produce MultiPolygon
