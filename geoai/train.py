@@ -1939,22 +1939,26 @@ def instance_segmentation_inference_on_geotiff(
     **kwargs: Any,
 ) -> Tuple[str, float, List[Dict]]:
     """
-    Perform instance segmentation inference on a large GeoTIFF using a sliding window approach.
+    Perform instance segmentation inference on a large GeoTIFF using a
+    sliding window approach.
 
     This function collects all detections first, then applies class-aware
     non-maximum suppression to handle overlapping detections from different
-    windows, preventing artifacts. The output preserves class labels and
-    instance IDs in a 2-band raster, and returns a list of detection dicts
-    with full instance attributes.
+    windows, preventing artifacts. Three single-band rasters are saved:
+    an instance ID raster, a class label raster, and a confidence score
+    raster. The output file paths are derived from ``output_path`` by
+    appending ``_class`` and ``_score`` suffixes.
 
     Args:
         model (torch.nn.Module): Trained model for inference.
         geotiff_path (str): Path to input GeoTIFF file.
-        output_path (str): Path to save output instance mask GeoTIFF
-            (2-band: class labels + instance IDs).
+        output_path (str): Path to save the instance ID raster. Class and
+            score rasters are saved alongside with ``_class`` and ``_score``
+            suffixes.
         window_size (int): Size of sliding window for inference.
         overlap (int): Overlap between adjacent windows.
-        confidence_threshold (float): Confidence threshold for predictions (0-1).
+        confidence_threshold (float): Confidence threshold for predictions
+            (0-1).
         nms_threshold (float): IoU threshold for non-maximum suppression.
             Defaults to 0.3.
         batch_size (int): Batch size for inference.
@@ -1964,8 +1968,9 @@ def instance_segmentation_inference_on_geotiff(
         **kwargs: Additional arguments.
 
     Returns:
-        tuple: Tuple of (output_path, inference_time, detections_list) where
-            each detection is a dict with keys: mask (np.ndarray), score
+        tuple: Tuple of (output_paths_dict, inference_time, detections_list).
+            output_paths_dict has keys: instance, class_label, score.
+            Each detection is a dict with keys: mask (np.ndarray), score
             (float), box (list), label (int), instance_id (int).
     """
     if device is None:
@@ -1982,9 +1987,10 @@ def instance_segmentation_inference_on_geotiff(
         height = src.height
         width = src.width
 
-        # Update metadata for output raster (2-band: class + instance)
-        out_meta = meta.copy()
-        out_meta.update({"count": 2, "dtype": "uint32"})
+        # Derive sibling file paths for class and score rasters
+        base, ext = os.path.splitext(output_path)
+        class_path = f"{base}_class{ext}"
+        score_path = f"{base}_score{ext}"
 
         # Store all detections globally for NMS
         all_detections = []
@@ -2145,6 +2151,7 @@ def instance_segmentation_inference_on_geotiff(
             # Create final output masks
             class_mask = np.zeros((height, width), dtype=np.uint8)
             instance_mask = np.zeros((height, width), dtype=np.uint32)
+            score_mask = np.zeros((height, width), dtype=np.float32)
 
             # Sort by score (highest first) for consistent ordering
             final_detections.sort(key=lambda x: x["score"], reverse=True)
@@ -2164,10 +2171,12 @@ def instance_segmentation_inference_on_geotiff(
                 available_pixels = (instance_mask == 0) & full_mask
                 class_mask[available_pixels] = detection["label"]
                 instance_mask[available_pixels] = instance_id
+                score_mask[available_pixels] = detection["score"]
         else:
             # No detections found
             class_mask = np.zeros((height, width), dtype=np.uint8)
             instance_mask = np.zeros((height, width), dtype=np.uint32)
+            score_mask = np.zeros((height, width), dtype=np.float32)
             final_detections = []
 
         # Record time
@@ -2175,14 +2184,34 @@ def instance_segmentation_inference_on_geotiff(
         print(f"Instance segmentation completed in {inference_time:.2f} seconds")
         print(f"Final instances: {len(final_detections)}")
 
-        # Save output (2-band: class labels + instance IDs)
-        with rasterio.open(output_path, "w", **out_meta) as dst:
-            dst.write(class_mask.astype(np.uint32), 1)
-            dst.write(instance_mask, 2)
+        # Save instance raster (uint32)
+        inst_meta = meta.copy()
+        inst_meta.update({"count": 1, "dtype": "uint32"})
+        with rasterio.open(output_path, "w", **inst_meta) as dst:
+            dst.write(instance_mask, 1)
 
-        print(f"Saved instance segmentation to {output_path}")
+        # Save class raster (uint8)
+        cls_meta = meta.copy()
+        cls_meta.update({"count": 1, "dtype": "uint8"})
+        with rasterio.open(class_path, "w", **cls_meta) as dst:
+            dst.write(class_mask, 1)
 
-        return output_path, inference_time, final_detections
+        # Save score raster (float32)
+        score_meta = meta.copy()
+        score_meta.update({"count": 1, "dtype": "float32"})
+        with rasterio.open(score_path, "w", **score_meta) as dst:
+            dst.write(score_mask, 1)
+
+        output_paths = {
+            "instance": output_path,
+            "class_label": class_path,
+            "score": score_path,
+        }
+        print(f"Saved instance raster to {output_path}")
+        print(f"Saved class raster to {class_path}")
+        print(f"Saved score raster to {score_path}")
+
+        return output_paths, inference_time, final_detections
 
 
 def multiclass_detection_inference_on_geotiff(
@@ -5325,21 +5354,29 @@ def instance_segmentation(
     batch_size: int = 4,
     num_channels: int = 3,
     num_classes: int = 2,
+    class_names: Optional[List[str]] = None,
+    vectorize: bool = False,
+    vector_path: Optional[str] = None,
+    use_mask_geometry: bool = True,
+    simplify_tolerance: float = 0.0,
     device: Optional[torch.device] = None,
     **kwargs: Any,
-) -> Tuple[str, float, List[Dict]]:
+) -> Dict[str, Any]:
     """
-    Perform instance segmentation on a GeoTIFF using a pre-trained Mask R-CNN model.
+    Perform instance segmentation on a GeoTIFF using a pre-trained Mask
+    R-CNN model.
 
-    This is a wrapper function that loads a model and runs
-    instance_segmentation_inference_on_geotiff.
+    Saves three raster files (instance IDs, class labels, confidence scores)
+    and optionally a vector file with polygon geometries and attributes.
 
     Args:
         input_path (str): Path to input GeoTIFF file.
-        output_path (str): Path to save output mask GeoTIFF
-            (2-band: class labels + instance IDs).
+        output_path (str): Path to save the instance ID raster. Class and
+            score rasters are saved alongside with ``_class`` and ``_score``
+            suffixes.
         model_path (str): Path to trained model weights.
-        window_size (int): Size of sliding window for inference. Defaults to 512.
+        window_size (int): Size of sliding window for inference. Defaults
+            to 512.
         overlap (int): Overlap between adjacent windows. Defaults to 256.
         confidence_threshold (float): Confidence threshold for predictions
             (0-1). Defaults to 0.5.
@@ -5350,16 +5387,39 @@ def instance_segmentation(
             Defaults to 3.
         num_classes (int): Number of classes (including background).
             Defaults to 2.
+        class_names (list, optional): List of class names where index 0 is
+            the background class. Used for the vector output class_name
+            attribute.
+        vectorize (bool): If True, convert detections to a vector file with
+            polygon geometries and attributes (geometry, class_id,
+            class_name, score, instance_id, area_pixels). Defaults to False.
+        vector_path (str, optional): Path to save the vector output. If None
+            and vectorize is True, derives the path from output_path with a
+            ``.gpkg`` extension.
+        use_mask_geometry (bool): If True, use the instance mask polygons as
+            geometry. If False, use bounding box rectangles. Only used when
+            vectorize is True. Defaults to True.
+        simplify_tolerance (float): Tolerance for polygon simplification in
+            georeferenced units. Only used when vectorize is True and
+            use_mask_geometry is True. Defaults to 0.0.
         device (torch.device): Device to run inference on. If None, uses
             CUDA if available.
         **kwargs: Additional arguments passed to
             instance_segmentation_inference_on_geotiff.
 
     Returns:
-        tuple: Tuple of (output_path, inference_time, detections_list) where
-            each detection is a dict with keys: mask, score, box, label,
-            instance_id.
+        dict: Dictionary with keys:
+            - instance (str): Path to the instance ID raster.
+            - class_label (str): Path to the class label raster.
+            - score (str): Path to the confidence score raster.
+            - vector (str or None): Path to the vector file, if vectorize
+              is True.
+            - inference_time (float): Inference time in seconds.
+            - detections (list): List of detection dicts with keys: mask,
+              score, box, label, instance_id.
     """
+    from .object_detect import detections_to_geodataframe
+
     # Create model with the specified number of classes
     model = get_instance_segmentation_model(
         num_classes=num_classes, num_channels=num_channels, pretrained=True
@@ -5381,20 +5441,50 @@ def instance_segmentation(
     model.load_state_dict(state_dict)
     model.to(device)
 
-    # Use the proper instance segmentation inference function
-    return instance_segmentation_inference_on_geotiff(
-        model=model,
-        geotiff_path=input_path,
-        output_path=output_path,
-        window_size=window_size,
-        overlap=overlap,
-        confidence_threshold=confidence_threshold,
-        nms_threshold=nms_threshold,
-        batch_size=batch_size,
-        num_channels=num_channels,
-        device=device,
-        **kwargs,
+    # Run inference
+    output_paths, inference_time, detections = (
+        instance_segmentation_inference_on_geotiff(
+            model=model,
+            geotiff_path=input_path,
+            output_path=output_path,
+            window_size=window_size,
+            overlap=overlap,
+            confidence_threshold=confidence_threshold,
+            nms_threshold=nms_threshold,
+            batch_size=batch_size,
+            num_channels=num_channels,
+            device=device,
+            **kwargs,
+        )
     )
+
+    result = {
+        "instance": output_paths["instance"],
+        "class_label": output_paths["class_label"],
+        "score": output_paths["score"],
+        "vector": None,
+        "inference_time": inference_time,
+        "detections": detections,
+    }
+
+    # Optionally create vector output
+    if vectorize and len(detections) > 0:
+        if vector_path is None:
+            base, _ = os.path.splitext(output_path)
+            vector_path = f"{base}.gpkg"
+
+        gdf = detections_to_geodataframe(
+            detections=detections,
+            geotiff_path=input_path,
+            class_names=class_names,
+            use_mask_geometry=use_mask_geometry,
+            simplify_tolerance=simplify_tolerance,
+        )
+        gdf.to_file(vector_path, driver="GPKG")
+        result["vector"] = vector_path
+        print(f"Saved vector output to {vector_path}")
+
+    return result
 
 
 def instance_segmentation_batch(
