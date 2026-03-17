@@ -1689,7 +1689,27 @@ class ChangeStarDetection:
         # Get the model constructor function
         func_name = CHANGESTAR_MODELS[self.model_name]
         model_fn = getattr(changen2, func_name)
-        self.model = model_fn()
+
+        # Workaround for upstream bug in ever's import_config: when given an
+        # absolute path without a .py extension, it splits on dots, which
+        # breaks paths containing "python3.12" (split into "python3/12").
+        # Fix by appending .py so import_config takes the direct-path branch.
+        import ever as er
+
+        _original_import_config = er.config.import_config
+
+        def _patched_import_config(config_name_or_path, prefix="configs"):
+            if os.path.isabs(config_name_or_path) and not config_name_or_path.endswith(
+                (".py", ".pkl")
+            ):
+                config_name_or_path = config_name_or_path + ".py"
+            return _original_import_config(config_name_or_path, prefix)
+
+        er.config.import_config = _patched_import_config
+        try:
+            self.model = model_fn()
+        finally:
+            er.config.import_config = _original_import_config
         self.model.eval()
 
         # Set device
@@ -2305,31 +2325,35 @@ class ChangeStarDetection:
 
         img1, img2, _, _, _ = self._read_and_align_images(image1_path, image2_path)
 
-        fig, axes = plt.subplots(1, 5, figsize=figsize)
-
-        axes[0].imshow(img1)
-        axes[0].set_title(title1)
-        axes[0].axis("off")
-
-        axes[1].imshow(img2)
-        axes[1].set_title(title2)
-        axes[1].axis("off")
-
-        axes[2].imshow(result["change_map"], cmap="gray")
-        axes[2].set_title("Change Map")
-        axes[2].axis("off")
-
         num_classes = result.get("num_semantic_classes", 1)
         sem_cmap = "gray" if num_classes == 1 else "tab10"
         sem_label = "Buildings" if num_classes == 1 else "Semantic"
 
-        axes[3].imshow(result["t1_semantic"], cmap=sem_cmap)
-        axes[3].set_title(f"T1 {sem_label}")
-        axes[3].axis("off")
+        fig, axes = plt.subplots(2, 3, figsize=figsize)
 
-        axes[4].imshow(result["t2_semantic"], cmap=sem_cmap)
-        axes[4].set_title(f"T2 {sem_label}")
-        axes[4].axis("off")
+        # Row 1: T1 image, T2 image, empty
+        axes[0, 0].imshow(img1)
+        axes[0, 0].set_title(title1)
+        axes[0, 0].axis("off")
+
+        axes[0, 1].imshow(img2)
+        axes[0, 1].set_title(title2)
+        axes[0, 1].axis("off")
+
+        axes[0, 2].axis("off")
+
+        # Row 2: T1 semantic, T2 semantic, Change Map
+        axes[1, 0].imshow(result["t1_semantic"], cmap=sem_cmap)
+        axes[1, 0].set_title(f"T1 {sem_label}")
+        axes[1, 0].axis("off")
+
+        axes[1, 1].imshow(result["t2_semantic"], cmap=sem_cmap)
+        axes[1, 1].set_title(f"T2 {sem_label}")
+        axes[1, 1].axis("off")
+
+        axes[1, 2].imshow(result["change_map"], cmap="gray")
+        axes[1, 2].set_title("Change Map")
+        axes[1, 2].axis("off")
 
         plt.tight_layout()
         return fig
