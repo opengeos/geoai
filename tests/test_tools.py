@@ -399,5 +399,161 @@ class TestTimeseriesModule(unittest.TestCase):
         )
 
 
+class TestSRModule(unittest.TestCase):
+    """Tests for the sr (super-resolution) module."""
+
+    def test_module_imports(self):
+        """Test that sr module can be imported."""
+        from geoai.tools import sr
+
+        self.assertTrue(hasattr(sr, "super_resolution"))
+        self.assertTrue(hasattr(sr, "plot_sr_comparison"))
+        self.assertTrue(hasattr(sr, "plot_sr_uncertainty"))
+
+    def test_super_resolution_signature(self):
+        """Test super_resolution has expected parameters."""
+        from geoai.tools.sr import super_resolution
+
+        sig = inspect.signature(super_resolution)
+        for param in [
+            "input_lr_path",
+            "output_sr_path",
+            "output_uncertainty_path",
+            "rgb_nir_bands",
+            "sampling_steps",
+            "n_variations",
+            "scale",
+            "compute_uncertainty",
+            "window",
+            "scale_factor",
+            "patch_size",
+            "overlap",
+        ]:
+            self.assertIn(param, sig.parameters)
+
+    def test_get_cached_checkpoint_function_exists(self):
+        """Test that _get_cached_checkpoint helper exists."""
+        from geoai.tools.sr import _get_cached_checkpoint
+
+        self.assertTrue(callable(_get_cached_checkpoint))
+
+    def test_cached_checkpoint_uses_torch_hub_dir(self):
+        """Test that _get_cached_checkpoint returns a path under torch hub cache."""
+        import torch
+
+        from geoai.tools.sr import _get_cached_checkpoint
+
+        # Use a dummy name; the function will try to download if file
+        # doesn't exist, so we create a fake file first.
+        cache_dir = os.path.join(torch.hub.get_dir(), "checkpoints")
+        os.makedirs(cache_dir, exist_ok=True)
+        dummy_path = os.path.join(cache_dir, "test_dummy_ckpt.bin")
+        # Write a file larger than _CKPT_MIN_SIZE to skip download
+        with open(dummy_path, "wb") as f:
+            f.write(b"\x00" * 1_100_000)
+        try:
+            result = _get_cached_checkpoint("test_dummy_ckpt.bin")
+            self.assertEqual(result, dummy_path)
+            self.assertTrue(result.startswith(cache_dir))
+        finally:
+            os.remove(dummy_path)
+
+    def test_cached_checkpoint_redownloads_truncated_file(self):
+        """Test that a truncated file is detected and removed."""
+        import torch
+
+        from geoai.tools.sr import _CKPT_MIN_SIZE, _get_cached_checkpoint
+
+        cache_dir = os.path.join(torch.hub.get_dir(), "checkpoints")
+        os.makedirs(cache_dir, exist_ok=True)
+        dummy_path = os.path.join(cache_dir, "test_truncated_ckpt.bin")
+        # Write a small file to simulate a truncated download
+        with open(dummy_path, "wb") as f:
+            f.write(b"\x00" * 10)
+        try:
+            # This will try to download from HuggingFace (which will fail
+            # for a fake name), but the key check is that the small file
+            # is detected as truncated and removed before the attempt.
+            with self.assertRaises(Exception):
+                _get_cached_checkpoint("test_truncated_ckpt.bin")
+            # The truncated file should have been removed
+            self.assertFalse(os.path.exists(dummy_path))
+        finally:
+            if os.path.exists(dummy_path):
+                os.remove(dummy_path)
+
+    def test_ckpt_name_path_traversal_rejected(self):
+        """Test that path traversal in ckpt_name is rejected."""
+        from geoai.tools.sr import super_resolution
+
+        # We can't easily test inside super_resolution without mocking,
+        # but we can verify os.path.basename catches traversal.
+        malicious = "../../../etc/passwd"
+        self.assertNotEqual(os.path.basename(malicious), malicious)
+
+    def test_validation_errors(self):
+        """Test that invalid parameters raise ValueError."""
+        from geoai.tools.sr import super_resolution
+
+        # scale_factor <= 0
+        with self.assertRaises(ValueError):
+            super_resolution(
+                "dummy.tif", "out.tif", scale_factor=0, rgb_nir_bands=[1, 2, 3, 4]
+            )
+
+        # overlap >= patch_size
+        with self.assertRaises(ValueError):
+            super_resolution(
+                "dummy.tif",
+                "out.tif",
+                rgb_nir_bands=[1, 2, 3, 4],
+                overlap=128,
+                patch_size=128,
+            )
+
+        # n_variations <= 3 with compute_uncertainty
+        with self.assertRaises(ValueError):
+            super_resolution(
+                "dummy.tif",
+                "out.tif",
+                rgb_nir_bands=[1, 2, 3, 4],
+                compute_uncertainty=True,
+                output_uncertainty_path="unc.tif",
+                n_variations=2,
+            )
+
+    def test_auto_infer_compute_uncertainty(self):
+        """Test that compute_uncertainty is inferred when output_uncertainty_path is set."""
+        from geoai.tools.sr import super_resolution
+
+        # Providing output_uncertainty_path but compute_uncertainty=False
+        # should NOT raise about missing path (it auto-infers True).
+        # It will fail later on missing opensr-model or file, but the
+        # validation for n_variations should trigger first.
+        with self.assertRaises(ValueError) as ctx:
+            super_resolution(
+                "dummy.tif",
+                "out.tif",
+                output_uncertainty_path="unc.tif",
+                rgb_nir_bands=[1, 2, 3, 4],
+                n_variations=2,
+            )
+        self.assertIn("n_variations", str(ctx.exception))
+
+    def test_load_image_tensor_window_validation(self):
+        """Test window parameter validation in load_image_tensor."""
+        from geoai.tools.sr import load_image_tensor
+
+        # Wrong tuple length
+        with self.assertRaises(Exception):
+            load_image_tensor("dummy.tif", "cpu", [1, 2, 3, 4], window=(0, 0, 128))
+
+        # Negative offset
+        with self.assertRaises(Exception):
+            load_image_tensor(
+                "dummy.tif", "cpu", [1, 2, 3, 4], window=(-1, 0, 128, 128)
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

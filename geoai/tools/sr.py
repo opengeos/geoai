@@ -27,6 +27,43 @@ except ImportError:
     OPENSR_MODEL_AVAILABLE = False
 
 
+_CKPT_MIN_SIZE = 1_000_000  # 1 MB; real checkpoint is ~1.1 GB
+
+
+def _get_cached_checkpoint(ckpt_name: str) -> str:
+    """Return the path to a cached OpenSR checkpoint, downloading it if
+    necessary.
+
+    The checkpoint is stored in the standard torch hub cache directory
+    (``~/.cache/torch/hub/checkpoints/`` by default). If the file exists
+    but is smaller than ``_CKPT_MIN_SIZE`` bytes (e.g. a truncated
+    download), it is deleted and re-downloaded.
+
+    Args:
+        ckpt_name (str): Plain filename of the checkpoint
+            (e.g. ``"opensr-ldsrs2_v1_0_0.ckpt"``).
+
+    Returns:
+        str: Absolute path to the cached checkpoint file.
+    """
+    cache_dir = os.path.join(torch.hub.get_dir(), "checkpoints")
+    os.makedirs(cache_dir, exist_ok=True)
+    ckpt_path = os.path.join(cache_dir, ckpt_name)
+
+    needs_download = not os.path.isfile(ckpt_path) or (
+        os.path.getsize(ckpt_path) < _CKPT_MIN_SIZE
+    )
+    if needs_download:
+        if os.path.exists(ckpt_path):
+            os.remove(ckpt_path)
+        hf_url = (
+            "https://huggingface.co/simon-donike/RS-SR-LTDF/resolve/main/" + ckpt_name
+        )
+        print("Downloading pretrained weights to:", ckpt_path)
+        torch.hub.download_url_to_file(hf_url, ckpt_path)
+    return ckpt_path
+
+
 def super_resolution(
     input_lr_path: str,
     output_sr_path: str,
@@ -143,9 +180,17 @@ def super_resolution(
         raise
     config = OmegaConf.load(StringIO(response.text))
 
-    # Initialize latent diffusion model and load pretrained weights
+    # Initialize latent diffusion model and load pretrained weights.
+    # Download checkpoint to the torch hub cache directory instead of cwd.
     model = opensr_model.SRLatentDiffusion(config, device=device)
-    model.load_pretrained(config.ckpt_version)
+    ckpt_name = os.path.basename(config.ckpt_version)
+    if not ckpt_name or ckpt_name != config.ckpt_version:
+        raise ValueError(
+            f"Invalid checkpoint name in config: {config.ckpt_version!r}. "
+            "Expected a plain filename without path separators."
+        )
+    ckpt_path = _get_cached_checkpoint(ckpt_name)
+    model.load_pretrained(ckpt_path)
 
     # Load only the specified RGB+NIR bands
     lr_tensor, profile = load_image_tensor(
