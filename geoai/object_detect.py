@@ -687,29 +687,48 @@ def detections_to_geodataframe(
     detections: List[Dict],
     geotiff_path: str,
     class_names: Optional[List[str]] = None,
+    use_mask_geometry: bool = False,
+    simplify_tolerance: float = 0.0,
 ) -> Any:
     """Convert detections to a GeoDataFrame with geospatial coordinates.
 
-    Converts pixel-space bounding boxes to geospatial coordinates using the
-    CRS and transform from the source GeoTIFF.
+    Converts pixel-space detections to geospatial coordinates using the
+    CRS and transform from the source GeoTIFF. By default, bounding box
+    rectangles are used as geometry. When ``use_mask_geometry=True``, the
+    actual instance mask is vectorized into polygon geometry instead.
 
     Args:
         detections (list): List of detection dicts, each with keys:
-            mask, score, box (in pixel coords), label.
+            mask (np.ndarray), score (float), box (list of pixel coords),
+            and optionally label (int) and instance_id (int).
         geotiff_path (str): Path to the source GeoTIFF (for CRS and transform).
         class_names (list, optional): List of class names (index 0 = background).
+        use_mask_geometry (bool): If True, convert instance masks to polygon
+            geometries using rasterio.features.shapes instead of using
+            bounding boxes. Defaults to False.
+        simplify_tolerance (float): Tolerance for polygon simplification
+            in georeferenced units. Only used when use_mask_geometry=True.
+            Set to 0 to disable simplification. Defaults to 0.0.
 
     Returns:
         geopandas.GeoDataFrame: GeoDataFrame with columns: geometry, class_id,
-        class_name, score, area_pixels.
+        class_name, score, instance_id, area_pixels.
     """
     import geopandas as gpd
+    import numpy as np
     import rasterio
     from shapely.geometry import Polygon
 
     if len(detections) == 0:
         return gpd.GeoDataFrame(
-            columns=["geometry", "class_id", "class_name", "score", "area_pixels"]
+            columns=[
+                "geometry",
+                "class_id",
+                "class_name",
+                "score",
+                "instance_id",
+                "area_pixels",
+            ]
         )
 
     with rasterio.open(geotiff_path) as src:
@@ -717,20 +736,56 @@ def detections_to_geodataframe(
         crs = src.crs
 
     records = []
-    for det in detections:
+    for idx, det in enumerate(detections):
         bx = det["box"]
-        label = det["label"]
+        label = det.get("label", 1)
         score = det["score"]
+        instance_id = det.get("instance_id", idx + 1)
+        area_pixels = int(det["mask"].sum()) if "mask" in det else 0
 
-        # Convert pixel coordinates to geographic coordinates (robust to rotation/shear)
-        c0, r0, c1, r1 = bx  # (xmin, ymin, xmax, ymax) in pixel coords
-        pts = []
-        for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
-            x, y = transform * (c, r)
-            pts.append((x, y))
+        geom = None
 
-        geom = Polygon(pts)
-        area_pixels = det["mask"].sum() if "mask" in det else 0
+        if use_mask_geometry and "mask" in det:
+            from rasterio.features import shapes as rasterio_shapes
+            from shapely.geometry import shape
+
+            mask = det["mask"]
+            # Crop to bounding box region for performance
+            rows = np.any(mask, axis=1)
+            cols = np.any(mask, axis=0)
+            if rows.any() and cols.any():
+                rmin, rmax = np.where(rows)[0][[0, -1]]
+                cmin, cmax = np.where(cols)[0][[0, -1]]
+                cropped = mask[rmin : rmax + 1, cmin : cmax + 1].astype(np.uint8)
+
+                # Build a window transform offset to the crop origin
+                from rasterio.transform import Affine
+
+                crop_transform = transform * Affine.translation(cmin, rmin)
+
+                best_geom = None
+                best_area = 0
+                for geom_dict, value in rasterio_shapes(
+                    cropped, mask=cropped, transform=crop_transform
+                ):
+                    if value == 1:
+                        candidate = shape(geom_dict)
+                        if candidate.is_valid and candidate.area > best_area:
+                            best_geom = candidate
+                            best_area = candidate.area
+                if best_geom is not None:
+                    if simplify_tolerance > 0:
+                        best_geom = best_geom.simplify(simplify_tolerance)
+                    geom = best_geom
+
+        # Fallback to bounding box geometry
+        if geom is None:
+            c0, r0, c1, r1 = bx  # (xmin, ymin, xmax, ymax) in pixel coords
+            pts = []
+            for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
+                x, y = transform * (c, r)
+                pts.append((x, y))
+            geom = Polygon(pts)
 
         name = "unknown"
         if class_names and label < len(class_names):
@@ -744,7 +799,8 @@ def detections_to_geodataframe(
                 "class_id": label,
                 "class_name": name,
                 "score": score,
-                "area_pixels": int(area_pixels),
+                "instance_id": instance_id,
+                "area_pixels": area_pixels,
             }
         )
 

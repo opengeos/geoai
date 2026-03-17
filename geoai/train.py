@@ -1932,31 +1932,41 @@ def instance_segmentation_inference_on_geotiff(
     window_size: int = 512,
     overlap: int = 256,
     confidence_threshold: float = 0.5,
+    nms_threshold: float = 0.3,
     batch_size: int = 4,
     num_channels: int = 3,
     device: Optional[torch.device] = None,
     **kwargs: Any,
-) -> Tuple[str, float]:
+) -> Tuple[str, float, List[Dict]]:
     """
     Perform instance segmentation inference on a large GeoTIFF using a sliding window approach.
 
-    This function collects all detections first, then applies non-maximum suppression
-    to handle overlapping detections from different windows, preventing artifacts.
+    This function collects all detections first, then applies class-aware
+    non-maximum suppression to handle overlapping detections from different
+    windows, preventing artifacts. The output preserves class labels and
+    instance IDs in a 2-band raster, and returns a list of detection dicts
+    with full instance attributes.
 
     Args:
         model (torch.nn.Module): Trained model for inference.
         geotiff_path (str): Path to input GeoTIFF file.
-        output_path (str): Path to save output instance mask GeoTIFF.
+        output_path (str): Path to save output instance mask GeoTIFF
+            (2-band: class labels + instance IDs).
         window_size (int): Size of sliding window for inference.
         overlap (int): Overlap between adjacent windows.
         confidence_threshold (float): Confidence threshold for predictions (0-1).
+        nms_threshold (float): IoU threshold for non-maximum suppression.
+            Defaults to 0.3.
         batch_size (int): Batch size for inference.
         num_channels (int): Number of channels to use from the input image.
-        device (torch.device, optional): Device to run inference on. If None, uses CUDA if available.
+        device (torch.device, optional): Device to run inference on.
+            If None, uses CUDA if available.
         **kwargs: Additional arguments.
 
     Returns:
-        tuple: Tuple containing output path and inference time in seconds.
+        tuple: Tuple of (output_path, inference_time, detections_list) where
+            each detection is a dict with keys: mask (np.ndarray), score
+            (float), box (list), label (int), instance_id (int).
     """
     if device is None:
         device = get_device()
@@ -1972,11 +1982,9 @@ def instance_segmentation_inference_on_geotiff(
         height = src.height
         width = src.width
 
-        # Update metadata for output raster
+        # Update metadata for output raster (2-band: class + instance)
         out_meta = meta.copy()
-        out_meta.update(
-            {"count": 1, "dtype": "uint16"}  # uint16 to support many instances
-        )
+        out_meta.update({"count": 2, "dtype": "uint32"})
 
         # Store all detections globally for NMS
         all_detections = []
@@ -2070,12 +2078,14 @@ def instance_segmentation_inference_on_geotiff(
                             masks = output["masks"][keep].squeeze(1)
                             scores = output["scores"][keep]
                             boxes = output["boxes"][keep]
+                            det_labels = output["labels"][keep]
 
                             # Convert to global coordinates and store
                             for k in range(len(masks)):
                                 mask = masks[k].cpu().numpy() > 0.5
                                 score = scores[k].cpu().item()
                                 box = boxes[k].cpu().numpy()
+                                label = det_labels[k].cpu().item()
 
                                 # Convert box to global coordinates
                                 global_box = [
@@ -2085,15 +2095,15 @@ def instance_segmentation_inference_on_geotiff(
                                     box[3] + y_pos,
                                 ]
 
-                                # Create global mask
-                                global_mask = np.zeros((height, width), dtype=bool)
-                                global_mask[y_pos : y_pos + h, x_pos : x_pos + w] = mask
-
+                                # Store compact mask with offset
+                                # (avoids full-image arrays before NMS)
                                 all_detections.append(
                                     {
-                                        "mask": global_mask,
+                                        "mask": mask,
+                                        "mask_offset": (y_pos, x_pos, h, w),
                                         "score": score,
                                         "box": global_box,
+                                        "label": label,
                                     }
                                 )
 
@@ -2110,7 +2120,7 @@ def instance_segmentation_inference_on_geotiff(
 
         print(f"Collected {len(all_detections)} detections before NMS")
 
-        # Apply Non-Maximum Suppression to handle overlapping detections
+        # Apply class-aware Non-Maximum Suppression
         if len(all_detections) > 0:
             # Convert to tensors for NMS
             boxes = torch.tensor(
@@ -2119,45 +2129,60 @@ def instance_segmentation_inference_on_geotiff(
             scores = torch.tensor(
                 [det["score"] for det in all_detections], dtype=torch.float32
             )
+            det_labels = torch.tensor(
+                [det["label"] for det in all_detections], dtype=torch.int64
+            )
 
-            # Apply NMS with IoU threshold
-            nms_threshold = 0.3  # IoU threshold for NMS
-            keep_indices = torchvision.ops.nms(boxes, scores, nms_threshold)
+            # Apply class-aware NMS
+            keep_indices = torchvision.ops.batched_nms(
+                boxes, scores, det_labels, nms_threshold
+            )
 
             # Keep only the selected detections
             final_detections = [all_detections[i] for i in keep_indices]
             print(f"After NMS: {len(final_detections)} detections")
 
-            # Create final instance mask
-            instance_mask = np.zeros((height, width), dtype=np.uint16)
+            # Create final output masks
+            class_mask = np.zeros((height, width), dtype=np.uint8)
+            instance_mask = np.zeros((height, width), dtype=np.uint32)
 
             # Sort by score (highest first) for consistent ordering
             final_detections.sort(key=lambda x: x["score"], reverse=True)
 
-            # Assign unique IDs to each detection
+            # Expand compact masks and assign IDs
             for instance_id, detection in enumerate(final_detections, 1):
-                mask = detection["mask"]
+                compact_mask = detection["mask"]
+                y_pos, x_pos, h, w = detection["mask_offset"]
+                full_mask = np.zeros((height, width), dtype=bool)
+                full_mask[y_pos : y_pos + h, x_pos : x_pos + w] = compact_mask
+                # Replace compact mask with full mask for downstream use
+                detection["mask"] = full_mask
+                del detection["mask_offset"]
+                detection["instance_id"] = instance_id
+
                 # Only assign to pixels that are not already assigned
-                available_pixels = (instance_mask == 0) & mask
+                available_pixels = (instance_mask == 0) & full_mask
+                class_mask[available_pixels] = detection["label"]
                 instance_mask[available_pixels] = instance_id
         else:
             # No detections found
-            instance_mask = np.zeros((height, width), dtype=np.uint16)
+            class_mask = np.zeros((height, width), dtype=np.uint8)
+            instance_mask = np.zeros((height, width), dtype=np.uint32)
+            final_detections = []
 
         # Record time
         inference_time = time.time() - start_time
         print(f"Instance segmentation completed in {inference_time:.2f} seconds")
-        print(
-            f"Final instances: {len(final_detections) if len(all_detections) > 0 else 0}"
-        )
+        print(f"Final instances: {len(final_detections)}")
 
-        # Save output
+        # Save output (2-band: class labels + instance IDs)
         with rasterio.open(output_path, "w", **out_meta) as dst:
-            dst.write(instance_mask, 1)
+            dst.write(class_mask.astype(np.uint32), 1)
+            dst.write(instance_mask, 2)
 
         print(f"Saved instance segmentation to {output_path}")
 
-        return output_path, inference_time
+        return output_path, inference_time, final_detections
 
 
 def multiclass_detection_inference_on_geotiff(
@@ -5296,32 +5321,44 @@ def instance_segmentation(
     window_size: int = 512,
     overlap: int = 256,
     confidence_threshold: float = 0.5,
+    nms_threshold: float = 0.3,
     batch_size: int = 4,
     num_channels: int = 3,
     num_classes: int = 2,
     device: Optional[torch.device] = None,
     **kwargs: Any,
-) -> None:
+) -> Tuple[str, float, List[Dict]]:
     """
     Perform instance segmentation on a GeoTIFF using a pre-trained Mask R-CNN model.
 
-    This is a wrapper function for object_detection with clearer naming.
+    This is a wrapper function that loads a model and runs
+    instance_segmentation_inference_on_geotiff.
 
     Args:
         input_path (str): Path to input GeoTIFF file.
-        output_path (str): Path to save output mask GeoTIFF.
+        output_path (str): Path to save output mask GeoTIFF
+            (2-band: class labels + instance IDs).
         model_path (str): Path to trained model weights.
         window_size (int): Size of sliding window for inference. Defaults to 512.
         overlap (int): Overlap between adjacent windows. Defaults to 256.
-        confidence_threshold (float): Confidence threshold for predictions (0-1). Defaults to 0.5.
+        confidence_threshold (float): Confidence threshold for predictions
+            (0-1). Defaults to 0.5.
+        nms_threshold (float): IoU threshold for non-maximum suppression.
+            Defaults to 0.3.
         batch_size (int): Batch size for inference. Defaults to 4.
-        num_channels (int): Number of channels in the input image and model. Defaults to 3.
-        num_classes (int): Number of classes (including background). Defaults to 2.
-        device (torch.device): Device to run inference on. If None, uses CUDA if available.
-        **kwargs: Additional arguments passed to object_detection.
+        num_channels (int): Number of channels in the input image and model.
+            Defaults to 3.
+        num_classes (int): Number of classes (including background).
+            Defaults to 2.
+        device (torch.device): Device to run inference on. If None, uses
+            CUDA if available.
+        **kwargs: Additional arguments passed to
+            instance_segmentation_inference_on_geotiff.
 
     Returns:
-        None: Output mask is saved to output_path.
+        tuple: Tuple of (output_path, inference_time, detections_list) where
+            each detection is a dict with keys: mask, score, box, label,
+            instance_id.
     """
     # Create model with the specified number of classes
     model = get_instance_segmentation_model(
@@ -5352,6 +5389,7 @@ def instance_segmentation(
         window_size=window_size,
         overlap=overlap,
         confidence_threshold=confidence_threshold,
+        nms_threshold=nms_threshold,
         batch_size=batch_size,
         num_channels=num_channels,
         device=device,
@@ -5366,6 +5404,7 @@ def instance_segmentation_batch(
     window_size: int = 512,
     overlap: int = 256,
     confidence_threshold: float = 0.5,
+    nms_threshold: float = 0.3,
     batch_size: int = 4,
     num_channels: int = 3,
     num_classes: int = 2,
@@ -5373,9 +5412,8 @@ def instance_segmentation_batch(
     **kwargs: Any,
 ) -> None:
     """
-    Perform instance segmentation on multiple GeoTIFF files using a pre-trained Mask R-CNN model.
-
-    This is a wrapper function for object_detection_batch with clearer naming.
+    Perform instance segmentation on multiple GeoTIFF files using a pre-trained
+    Mask R-CNN model.
 
     Args:
         input_dir (str): Directory containing input GeoTIFF files.
@@ -5383,12 +5421,19 @@ def instance_segmentation_batch(
         model_path (str): Path to trained model weights.
         window_size (int): Size of sliding window for inference. Defaults to 512.
         overlap (int): Overlap between adjacent windows. Defaults to 256.
-        confidence_threshold (float): Confidence threshold for predictions (0-1). Defaults to 0.5.
+        confidence_threshold (float): Confidence threshold for predictions
+            (0-1). Defaults to 0.5.
+        nms_threshold (float): IoU threshold for non-maximum suppression.
+            Defaults to 0.3.
         batch_size (int): Batch size for inference. Defaults to 4.
-        num_channels (int): Number of channels in the input image and model. Defaults to 3.
-        num_classes (int): Number of classes (including background). Defaults to 2.
-        device (torch.device): Device to run inference on. If None, uses CUDA if available.
-        **kwargs: Additional arguments passed to object_detection_batch.
+        num_channels (int): Number of channels in the input image and model.
+            Defaults to 3.
+        num_classes (int): Number of classes (including background).
+            Defaults to 2.
+        device (torch.device): Device to run inference on. If None, uses
+            CUDA if available.
+        **kwargs: Additional arguments passed to
+            instance_segmentation_inference_on_geotiff.
 
     Returns:
         None: Output masks are saved to output_dir.
@@ -5446,6 +5491,7 @@ def instance_segmentation_batch(
                 window_size=window_size,
                 overlap=overlap,
                 confidence_threshold=confidence_threshold,
+                nms_threshold=nms_threshold,
                 batch_size=batch_size,
                 num_channels=num_channels,
                 device=device,
