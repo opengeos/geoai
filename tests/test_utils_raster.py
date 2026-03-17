@@ -220,5 +220,102 @@ class TestBoxesToVector(unittest.TestCase):
         self.assertEqual(len(gdf), 1)
 
 
+class TestCleanInstanceMask(unittest.TestCase):
+    """Tests for the clean_instance_mask function."""
+
+    def _make_instance_tif(self, mask, path):
+        """Write a uint16 single-band GeoTIFF from a 2-D numpy array."""
+        import rasterio
+        from rasterio.transform import from_bounds
+
+        h, w = mask.shape
+        transform = from_bounds(0, 0, w, h, w, h)
+        profile = {
+            "driver": "GTiff",
+            "dtype": "uint16",
+            "width": w,
+            "height": h,
+            "count": 1,
+            "crs": "EPSG:4326",
+            "transform": transform,
+            "nodata": 0,
+        }
+        with rasterio.open(path, "w", **profile) as dst:
+            dst.write(mask.astype(np.uint16), 1)
+
+    def test_removes_small_instances(self):
+        """Instances with total area < min_area are removed."""
+        import tempfile
+
+        mask = np.zeros((100, 100), dtype=np.uint16)
+        mask[10:20, 10:20] = 1  # 100 px
+        mask[50:52, 50:52] = 2  # 4 px  (small)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            in_path = f"{tmp}/in.tif"
+            out_path = f"{tmp}/out.tif"
+            self._make_instance_tif(mask, in_path)
+            utils.clean_instance_mask(
+                in_path, out_path, min_area=10, smooth=False, fill_holes=False
+            )
+            import rasterio
+
+            with rasterio.open(out_path) as src:
+                result = src.read(1)
+            self.assertTrue((result == 1).any(), "Large instance should remain")
+            self.assertFalse((result == 2).any(), "Small instance should be removed")
+
+    def test_removes_disconnected_fragments(self):
+        """Fragments of an instance smaller than min_area are removed."""
+        import tempfile
+
+        mask = np.zeros((100, 100), dtype=np.uint16)
+        mask[10:30, 10:30] = 1  # 400 px main body
+        mask[80:82, 80:82] = 1  # 4 px fragment (same ID, disconnected)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            in_path = f"{tmp}/in.tif"
+            out_path = f"{tmp}/out.tif"
+            self._make_instance_tif(mask, in_path)
+            utils.clean_instance_mask(
+                in_path, out_path, min_area=10, smooth=False, fill_holes=False
+            )
+            import rasterio
+
+            with rasterio.open(out_path) as src:
+                result = src.read(1)
+            # Main body preserved
+            self.assertTrue((result[10:30, 10:30] == 1).all())
+            # Fragment removed
+            self.assertTrue((result[80:82, 80:82] == 0).all())
+
+    def test_fills_holes(self):
+        """Small background holes between instances are filled."""
+        import tempfile
+
+        mask = np.zeros((100, 100), dtype=np.uint16)
+        mask[10:50, 10:50] = 1  # large instance
+        mask[25:27, 25:27] = 0  # 4 px hole inside instance 1
+
+        with tempfile.TemporaryDirectory() as tmp:
+            in_path = f"{tmp}/in.tif"
+            out_path = f"{tmp}/out.tif"
+            self._make_instance_tif(mask, in_path)
+            utils.clean_instance_mask(
+                in_path,
+                out_path,
+                min_area=2,
+                fill_holes=True,
+                max_hole_area=100,
+                smooth=False,
+            )
+            import rasterio
+
+            with rasterio.open(out_path) as src:
+                result = src.read(1)
+            # Hole should be filled
+            self.assertTrue((result[25:27, 25:27] > 0).all(), "Hole should be filled")
+
+
 if __name__ == "__main__":
     unittest.main()
