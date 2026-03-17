@@ -1937,7 +1937,7 @@ def instance_segmentation_inference_on_geotiff(
     num_channels: int = 3,
     device: Optional[torch.device] = None,
     **kwargs: Any,
-) -> Tuple[str, float, List[Dict]]:
+) -> Tuple[Dict[str, str], float, List[Dict]]:
     """
     Perform instance segmentation inference on a large GeoTIFF using a
     sliding window approach.
@@ -1945,9 +1945,13 @@ def instance_segmentation_inference_on_geotiff(
     This function collects all detections first, then applies class-aware
     non-maximum suppression to handle overlapping detections from different
     windows, preventing artifacts. Three single-band rasters are saved:
-    an instance ID raster, a class label raster, and a confidence score
-    raster. The output file paths are derived from ``output_path`` by
-    appending ``_class`` and ``_score`` suffixes.
+
+    - Instance ID raster at ``output_path``.
+    - Class label raster at ``output_path`` with a ``_class`` suffix.
+    - Confidence score raster at ``output_path`` with a ``_score`` suffix.
+
+    Detections are returned with compact window-sized masks and their
+    offsets to avoid materializing full-image arrays per instance.
 
     Args:
         model (torch.nn.Module): Trained model for inference.
@@ -1969,9 +1973,11 @@ def instance_segmentation_inference_on_geotiff(
 
     Returns:
         tuple: Tuple of (output_paths_dict, inference_time, detections_list).
-            output_paths_dict has keys: instance, class_label, score.
-            Each detection is a dict with keys: mask (np.ndarray), score
-            (float), box (list), label (int), instance_id (int).
+            output_paths_dict has keys: ``instance``, ``class_label``,
+            ``score``. Each detection is a dict with keys: ``mask``
+            (np.ndarray, window-sized), ``mask_offset`` (tuple of
+            y, x, h, w), ``score`` (float), ``box`` (list in global
+            pixel coords), ``label`` (int), ``instance_id`` (int).
     """
     if device is None:
         device = get_device()
@@ -2144,37 +2150,45 @@ def instance_segmentation_inference_on_geotiff(
                 boxes, scores, det_labels, nms_threshold
             )
 
+            # Convert to plain int list for reliable Python list indexing
+            keep_indices = keep_indices.cpu().tolist()
+
             # Keep only the selected detections
             final_detections = [all_detections[i] for i in keep_indices]
             print(f"After NMS: {len(final_detections)} detections")
 
             # Create final output masks
-            class_mask = np.zeros((height, width), dtype=np.uint8)
+            class_mask = np.zeros((height, width), dtype=np.uint16)
             instance_mask = np.zeros((height, width), dtype=np.uint32)
             score_mask = np.zeros((height, width), dtype=np.float32)
 
             # Sort by score (highest first) for consistent ordering
             final_detections.sort(key=lambda x: x["score"], reverse=True)
 
-            # Expand compact masks and assign IDs
+            # Write raster bands from compact masks using window slices
+            # (avoids allocating full-image arrays per detection)
             for instance_id, detection in enumerate(final_detections, 1):
-                compact_mask = detection["mask"]
                 y_pos, x_pos, h, w = detection["mask_offset"]
-                full_mask = np.zeros((height, width), dtype=bool)
-                full_mask[y_pos : y_pos + h, x_pos : x_pos + w] = compact_mask
-                # Replace compact mask with full mask for downstream use
-                detection["mask"] = full_mask
-                del detection["mask_offset"]
                 detection["instance_id"] = instance_id
 
-                # Only assign to pixels that are not already assigned
-                available_pixels = (instance_mask == 0) & full_mask
-                class_mask[available_pixels] = detection["label"]
-                instance_mask[available_pixels] = instance_id
-                score_mask[available_pixels] = detection["score"]
+                # Crop mask to actual window dimensions (may differ at edges)
+                compact_mask = detection["mask"][:h, :w]
+
+                # Write directly into raster arrays using window slice
+                region_inst = instance_mask[y_pos : y_pos + h, x_pos : x_pos + w]
+                available = (region_inst == 0) & compact_mask
+                class_mask[y_pos : y_pos + h, x_pos : x_pos + w][available] = detection[
+                    "label"
+                ]
+                instance_mask[y_pos : y_pos + h, x_pos : x_pos + w][
+                    available
+                ] = instance_id
+                score_mask[y_pos : y_pos + h, x_pos : x_pos + w][available] = detection[
+                    "score"
+                ]
         else:
             # No detections found
-            class_mask = np.zeros((height, width), dtype=np.uint8)
+            class_mask = np.zeros((height, width), dtype=np.uint16)
             instance_mask = np.zeros((height, width), dtype=np.uint32)
             score_mask = np.zeros((height, width), dtype=np.float32)
             final_detections = []
@@ -2190,9 +2204,9 @@ def instance_segmentation_inference_on_geotiff(
         with rasterio.open(output_path, "w", **inst_meta) as dst:
             dst.write(instance_mask, 1)
 
-        # Save class raster (uint8)
+        # Save class raster (uint16)
         cls_meta = meta.copy()
-        cls_meta.update({"count": 1, "dtype": "uint8"})
+        cls_meta.update({"count": 1, "dtype": "uint16"})
         with rasterio.open(class_path, "w", **cls_meta) as dst:
             dst.write(class_mask, 1)
 
@@ -5415,7 +5429,8 @@ def instance_segmentation(
             - vector (str or None): Path to the vector file, if vectorize
               is True.
             - inference_time (float): Inference time in seconds.
-            - detections (list): List of detection dicts with keys: mask,
+            - detections (list): List of detection dicts with keys: mask
+              (window-sized np.ndarray), mask_offset (tuple of y, x, h, w),
               score, box, label, instance_id.
     """
     from .object_detect import detections_to_geodataframe

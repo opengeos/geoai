@@ -700,7 +700,8 @@ def detections_to_geodataframe(
     Args:
         detections (list): List of detection dicts, each with keys:
             mask (np.ndarray), score (float), box (list of pixel coords),
-            and optionally label (int) and instance_id (int).
+            and optionally label (int), instance_id (int), and
+            mask_offset (tuple of y, x, h, w) for compact masks.
         geotiff_path (str): Path to the source GeoTIFF (for CRS and transform).
         class_names (list, optional): List of class names (index 0 = background).
         use_mask_geometry (bool): If True, convert instance masks to polygon
@@ -747,36 +748,46 @@ def detections_to_geodataframe(
 
         if use_mask_geometry and "mask" in det:
             from rasterio.features import shapes as rasterio_shapes
+            from rasterio.transform import Affine
             from shapely.geometry import shape
+            from shapely.ops import unary_union
 
             mask = det["mask"]
-            # Crop to bounding box region for performance
-            rows = np.any(mask, axis=1)
-            cols = np.any(mask, axis=0)
-            if rows.any() and cols.any():
-                rmin, rmax = np.where(rows)[0][[0, -1]]
-                cmin, cmax = np.where(cols)[0][[0, -1]]
-                cropped = mask[rmin : rmax + 1, cmin : cmax + 1].astype(np.uint8)
 
-                # Build a window transform offset to the crop origin
-                from rasterio.transform import Affine
+            # Determine crop region from mask_offset (compact) or bbox
+            if "mask_offset" in det:
+                y_off, x_off, h, w = det["mask_offset"]
+                cropped = mask[:h, :w].astype(np.uint8)
+            else:
+                # Use pixel bbox to crop (avoids full-image scan)
+                c0, r0, c1, r1 = bx
+                r0i = max(0, int(r0))
+                c0i = max(0, int(c0))
+                r1i = min(mask.shape[0], int(np.ceil(r1)))
+                c1i = min(mask.shape[1], int(np.ceil(c1)))
+                cropped = mask[r0i:r1i, c0i:c1i].astype(np.uint8)
+                y_off, x_off = r0i, c0i
 
-                crop_transform = transform * Affine.translation(cmin, rmin)
+            if cropped.any():
+                crop_transform = transform * Affine.translation(x_off, y_off)
 
-                best_geom = None
-                best_area = 0
+                # Collect all polygon components and union them
+                parts = []
                 for geom_dict, value in rasterio_shapes(
                     cropped, mask=cropped, transform=crop_transform
                 ):
                     if value == 1:
                         candidate = shape(geom_dict)
-                        if candidate.is_valid and candidate.area > best_area:
-                            best_geom = candidate
-                            best_area = candidate.area
-                if best_geom is not None:
+                        if candidate.is_valid and not candidate.is_empty:
+                            parts.append(candidate)
+                if parts:
+                    merged = unary_union(parts) if len(parts) > 1 else parts[0]
                     if simplify_tolerance > 0:
-                        best_geom = best_geom.simplify(simplify_tolerance)
-                    geom = best_geom
+                        simplified = merged.simplify(
+                            simplify_tolerance, preserve_topology=True
+                        )
+                        merged = simplified if simplified.is_valid else merged
+                    geom = merged
 
         # Fallback to bounding box geometry
         if geom is None:
