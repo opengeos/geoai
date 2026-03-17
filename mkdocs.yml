@@ -196,6 +196,7 @@ nav:
           - examples/clip_classify_vector.ipynb
           - examples/impervious_surface_mapping.ipynb
           - examples/field_boundary_detection.ipynb
+          - examples/super_resolution.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -230,6 +231,7 @@ nav:
           - sam module: sam.md
           - segment module: segment.md
           - segmentation module: segmentation.md
+          - sr module: sr.md
           - tessera module: tessera.md
           - timm_regress module: timm_regress.md
           - timm_segment module: timm_segment.md

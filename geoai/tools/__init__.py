@@ -68,9 +68,9 @@ except (ImportError, OSError):
 # Super Resolution integration (optional dependency)
 
 try:
-    from .sr import super_resolution
+    from .sr import super_resolution, plot_sr_comparison, plot_sr_uncertainty
 
-    __all__.extend(["super_resolution"])
+    __all__.extend(["super_resolution", "plot_sr_comparison", "plot_sr_uncertainty"])
 except (ImportError, OSError):
     # Super resolution not installed or torch DLL load failure
     pass
