@@ -1,6 +1,7 @@
 """Change detection module for remote sensing imagery using torchange."""
 
 import os
+import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -1598,6 +1599,8 @@ def download_checkpoint(
 
 
 # Available ChangeStar model variants
+_import_config_lock = threading.Lock()
+
 CHANGESTAR_MODELS = {
     "s0_s1c1_vitb": "s0_init_s1c1_changestar_vitb_1x256",
     "s0_s1c5_vitb": "s0_init_s1c5_changestar_vitb_1x256",
@@ -1699,17 +1702,20 @@ class ChangeStarDetection:
         _original_import_config = er.config.import_config
 
         def _patched_import_config(config_name_or_path, prefix="configs"):
-            if os.path.isabs(config_name_or_path) and not config_name_or_path.endswith(
-                (".py", ".pkl")
+            if (
+                os.path.isabs(config_name_or_path)
+                and not config_name_or_path.endswith((".py", ".pkl"))
+                and os.path.isfile(config_name_or_path + ".py")
             ):
                 config_name_or_path = config_name_or_path + ".py"
             return _original_import_config(config_name_or_path, prefix)
 
-        er.config.import_config = _patched_import_config
-        try:
-            self.model = model_fn()
-        finally:
-            er.config.import_config = _original_import_config
+        with _import_config_lock:
+            er.config.import_config = _patched_import_config
+            try:
+                self.model = model_fn()
+            finally:
+                er.config.import_config = _original_import_config
         self.model.eval()
 
         # Set device
@@ -2331,7 +2337,7 @@ class ChangeStarDetection:
 
         fig, axes = plt.subplots(2, 3, figsize=figsize)
 
-        # Row 1: T1 image, T2 image, empty
+        # Row 1: T1 image, T2 image
         axes[0, 0].imshow(img1)
         axes[0, 0].set_title(title1)
         axes[0, 0].axis("off")
@@ -2340,7 +2346,7 @@ class ChangeStarDetection:
         axes[0, 1].set_title(title2)
         axes[0, 1].axis("off")
 
-        axes[0, 2].axis("off")
+        fig.delaxes(axes[0, 2])
 
         # Row 2: T1 semantic, T2 semantic, Change Map
         axes[1, 0].imshow(result["t1_semantic"], cmap=sem_cmap)
