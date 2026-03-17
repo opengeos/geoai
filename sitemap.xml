@@ -33,6 +33,10 @@
          <lastmod>2026-03-17</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/cloudmask/</loc>
+         <lastmod>2026-03-17</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/contributing/</loc>
          <lastmod>2026-03-17</lastmod>
     </url>
@@ -101,6 +105,10 @@
          <lastmod>2026-03-17</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/multiclean/</loc>
+         <lastmod>2026-03-17</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/object_detect/</loc>
          <lastmod>2026-03-17</lastmod>
     </url>
@@ -133,7 +141,15 @@
          <lastmod>2026-03-17</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/sr/</loc>
+         <lastmod>2026-03-17</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/tessera/</loc>
+         <lastmod>2026-03-17</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/timeseries/</loc>
          <lastmod>2026-03-17</lastmod>
     </url>
     <url>
@@ -402,6 +418,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/solar_panel_detection/</loc>
+         <lastmod>2026-03-17</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/super_resolution/</loc>
          <lastmod>2026-03-17</lastmod>
     </url>
     <url>
