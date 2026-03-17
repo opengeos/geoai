@@ -105,6 +105,8 @@ def super_resolution(
                 rgb_nir_bands
             )
         )
+    if output_uncertainty_path is not None and not compute_uncertainty:
+        compute_uncertainty = True
     if compute_uncertainty and output_uncertainty_path is None:
         raise ValueError(
             "output_uncertainty_path must be provided when compute_uncertainty is True."
@@ -113,6 +115,13 @@ def super_resolution(
         raise ValueError(
             "n_variations must be greater than 3 to compute uncertainty. "
             f"Received: {n_variations}"
+        )
+    if scale_factor <= 0:
+        raise ValueError(f"scale_factor must be positive. Received: {scale_factor}")
+    if patch_size <= 0 or overlap < 0 or overlap >= patch_size:
+        raise ValueError(
+            f"Requires patch_size > 0 and 0 <= overlap < patch_size. "
+            f"Received patch_size={patch_size}, overlap={overlap}."
         )
     if not OPENSR_MODEL_AVAILABLE:
         raise ImportError(
@@ -279,7 +288,18 @@ def load_image_tensor(
 
         rio_window = None
         if window is not None:
+            if len(window) != 4:
+                raise ValueError(
+                    f"window must be a 4-tuple (row_off, col_off, height, width). "
+                    f"Received {len(window)} elements."
+                )
             row_off, col_off, win_h, win_w = window
+            if row_off < 0 or col_off < 0 or win_h <= 0 or win_w <= 0:
+                raise ValueError(
+                    f"Window offsets must be >= 0 and dimensions must be > 0. "
+                    f"Received row_off={row_off}, col_off={col_off}, "
+                    f"height={win_h}, width={win_w}."
+                )
             if row_off + win_h > src.height or col_off + win_w > src.width:
                 raise ValueError(
                     f"Window (row_off={row_off}, col_off={col_off}, "
@@ -507,8 +527,7 @@ def plot_sr_comparison(
     """Plot a side-by-side comparison of low-resolution and super-resolution
     images.
 
-    Displays RGB composites of the LR input and SR output with a zoomed-in
-    detail inset for each.
+    Displays RGB composites of the LR input and SR output.
 
     Args:
         lr_path (str): Path to the low-resolution GeoTIFF.
@@ -537,6 +556,8 @@ def plot_sr_comparison(
         lr_res = abs(lr_src.transform.a)
         # Read only the region matching the SR output extent
         lr_window = lr_src.window(*sr_bounds)
+        lr_window = lr_window.round_offsets().round_lengths()
+        lr_window = lr_window.intersection(Window(0, 0, lr_src.width, lr_src.height))
         lr = lr_src.read(bands, window=lr_window).astype(np.float32)
 
     def _stretch(img, vmax=None):
