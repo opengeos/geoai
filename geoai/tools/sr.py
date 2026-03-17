@@ -143,9 +143,20 @@ def super_resolution(
         raise
     config = OmegaConf.load(StringIO(response.text))
 
-    # Initialize latent diffusion model and load pretrained weights
+    # Initialize latent diffusion model and load pretrained weights.
+    # Download checkpoint to the torch hub cache directory instead of cwd.
     model = opensr_model.SRLatentDiffusion(config, device=device)
-    model.load_pretrained(config.ckpt_version)
+    ckpt_name = config.ckpt_version
+    cache_dir = os.path.join(torch.hub.get_dir(), "checkpoints")
+    os.makedirs(cache_dir, exist_ok=True)
+    ckpt_path = os.path.join(cache_dir, ckpt_name)
+    if not os.path.exists(ckpt_path):
+        hf_url = (
+            "https://huggingface.co/simon-donike/RS-SR-LTDF/resolve/main/" + ckpt_name
+        )
+        print("Downloading pretrained weights to:", ckpt_path)
+        torch.hub.download_url_to_file(hf_url, ckpt_path)
+    model.load_pretrained(ckpt_path)
 
     # Load only the specified RGB+NIR bands
     lr_tensor, profile = load_image_tensor(
