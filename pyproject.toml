@@ -36,11 +36,13 @@ exclude = ["docs*"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "smoothify"]
+extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "smoothify", "geodeep"]
 building = ["buildingregulariser"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
 onnx = ["onnx", "onnxruntime"]
 sr = ["opensr-model"]
+geodeep = ["geodeep"]
+geodeep-gpu = ["geodeep", "onnxruntime-gpu"]
 
 [tool.distutils.bdist_wheel]
 universal = true

@@ -369,6 +369,15 @@ _LAZY_SYMBOL_MAP = {
     "CanopyHeightEstimation": ("canopy", None),
     "canopy_height_estimation": ("canopy", None),
     "list_canopy_models": ("canopy", None),
+    # --- geoai.geodeep ---
+    "GeoDeep": ("geodeep", None),
+    "geodeep_detect": ("geodeep", None),
+    "geodeep_segment": ("geodeep", None),
+    "geodeep_detect_batch": ("geodeep", None),
+    "geodeep_segment_batch": ("geodeep", None),
+    "list_geodeep_models": ("geodeep", None),
+    "check_geodeep_available": ("geodeep", None),
+    "GEODEEP_MODELS": ("geodeep", None),
     # --- geoai.tessera ---
     "tessera_download": ("tessera", None),
     "tessera_fetch_embeddings": ("tessera", None),
