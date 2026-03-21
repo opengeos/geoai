@@ -39,10 +39,10 @@ dependencies = {file = ["requirements.txt"]}
 extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "smoothify", "geodeep"]
 building = ["buildingregulariser"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
-onnx = ["onnx", "onnxruntime<1.24"]
+onnx = ["onnx", "onnxruntime"]
 sr = ["opensr-model"]
 geodeep = ["geodeep"]
-geodeep-gpu = ["geodeep", "onnxruntime-gpu<1.24"]
+geodeep-gpu = ["geodeep", "onnxruntime-gpu"]
 
 [tool.uv]
 # geodeep hard-depends on onnxruntime (CPU), which shadows onnxruntime-gpu
