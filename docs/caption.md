@@ -1,0 +1,3 @@
+# caption module
+
+::: geoai.caption

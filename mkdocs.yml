@@ -206,6 +206,7 @@ nav:
     - API Reference:
           - auto module: auto.md
           - canopy module: canopy.md
+          - caption module: caption.md
           - change_detection module: change_detection.md
           - classify module: classify.md
           - cli module: cli.md
