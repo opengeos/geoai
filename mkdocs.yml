@@ -199,6 +199,7 @@ nav:
           - examples/field_boundary_detection.ipynb
           - examples/super_resolution.ipynb
           - examples/geodeep_detection.ipynb
+          - examples/image_captioning.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb
@@ -208,6 +209,7 @@ nav:
     - API Reference:
           - auto module: auto.md
           - canopy module: canopy.md
+          - caption module: caption.md
           - change_detection module: change_detection.md
           - classify module: classify.md
           - cli module: cli.md

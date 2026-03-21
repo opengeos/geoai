@@ -127,7 +127,7 @@ class MapTools:
             visible: Whether the layer is initially visible (default: True).
             bands: Optional list of band indices to display.
             nodata: No data value (default: 0).
-            titiler_endpoint: TiTiler endpoint URL (default: "https://giswqs-titiler-endpoint.hf.space").
+            titiler_endpoint: TiTiler endpoint URL (default: "https://titiler.opengeos.org").
 
         Returns:
             Confirmation message with COG URL.
