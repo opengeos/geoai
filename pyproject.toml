@@ -36,11 +36,22 @@ exclude = ["docs*"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "smoothify"]
+extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "smoothify", "geodeep"]
 building = ["buildingregulariser"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
-onnx = ["onnx", "onnxruntime"]
+onnx = ["onnx", "onnxruntime<1.24"]
 sr = ["opensr-model"]
+geodeep = ["geodeep"]
+geodeep-gpu = ["geodeep", "onnxruntime-gpu<1.24"]
+
+[tool.uv]
+# geodeep hard-depends on onnxruntime (CPU), which shadows onnxruntime-gpu
+# when both are installed. This override prevents the CPU-only onnxruntime
+# from being installed, letting onnxruntime-gpu (which provides the same
+# Python module with CUDA support) be used instead.
+# See: https://github.com/uav4geo/GeoDeep/issues/7
+override-dependencies = ["onnxruntime ; sys_platform == 'never'"]
+
 
 [tool.distutils.bdist_wheel]
 universal = true
