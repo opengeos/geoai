@@ -132,7 +132,8 @@ class TestEnsureSpacyModel(unittest.TestCase):
         from geoai.caption import ensure_spacy_model
 
         with patch("geoai.caption.download") as mock_download:
-            ensure_spacy_model("en_core_web_sm")
+            with patch("geoai.caption.importlib.import_module"):
+                ensure_spacy_model("en_core_web_sm")
             mock_download.assert_not_called()
 
     def test_missing_model_auto_download_false_raises(self):
@@ -248,6 +249,18 @@ class TestLoadImage(unittest.TestCase):
             self.assertIn("timeout", call_kwargs)
 
 
+def _spacy_available():
+    """Check if en_core_web_sm is installed."""
+    try:
+        import spacy
+
+        spacy.load("en_core_web_sm")
+        return True
+    except OSError:
+        return False
+
+
+@unittest.skipUnless(_spacy_available(), "en_core_web_sm not installed")
 class TestExtractFeatures(unittest.TestCase):
     """Tests for feature extraction logic with a mocked captioner."""
 
