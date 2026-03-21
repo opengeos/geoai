@@ -197,6 +197,7 @@ nav:
           - examples/impervious_surface_mapping.ipynb
           - examples/field_boundary_detection.ipynb
           - examples/super_resolution.ipynb
+          - examples/image_captioning.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
           - workshops/AWS_2025.ipynb

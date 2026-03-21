@@ -4,23 +4,30 @@ This module provides functionality to generate captions for images using the BLI
 model and extract relevant features from the captions using spaCy NLP.
 """
 
-from transformers import BlipProcessor, BlipForConditionalGeneration
-from transformers.utils import logging as hf_logging
-from PIL import Image
-import torch
-import spacy
 import importlib
-from spacy.cli import download
-import requests
+import logging
 from io import BytesIO
-from typing import List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Tuple, Union
+
+import requests
+import spacy
+import torch
+from PIL import Image
+from spacy.cli import download
+from transformers import BlipForConditionalGeneration, BlipProcessor
+from transformers.utils import logging as hf_logging
+
 from .utils import get_device
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------
 # 0. Config
 # ---------------------------------------------------------------------
 
 AERIAL_FEATURES_URL = "https://data.source.coop/opengeos/geoai/aerial_features.json"
+
+_REQUEST_TIMEOUT = 30  # seconds for HTTP requests
 
 hf_logging.set_verbosity_error()  # silence HF load reports
 
@@ -33,20 +40,34 @@ DEFAULT_BLIP_MODEL = "Salesforce/blip-image-captioning-base"
 # ---------------------------------------------------------------------
 
 
-def ensure_spacy_model(model_name: str = DEFAULT_SPACY_MODEL) -> None:
+def ensure_spacy_model(
+    model_name: str = DEFAULT_SPACY_MODEL, auto_download: bool = True
+) -> None:
     """Download spaCy model only if it's missing.
 
     Args:
         model_name: Name of the spaCy model to ensure is installed.
             Defaults to "en_core_web_sm".
+        auto_download: Whether to automatically download the model if
+            missing. If False, raises RuntimeError when the model is
+            not found. Defaults to True.
+
+    Raises:
+        RuntimeError: If the model is not found and auto_download is
+            False, or if the download fails.
     """
     try:
         importlib.import_module(model_name)
     except ImportError:
-        print(f"↓ Model '{model_name}' not found. Installing...")
+        if not auto_download:
+            raise RuntimeError(
+                f"spaCy model '{model_name}' is not installed. "
+                f"Install it with: python -m spacy download {model_name}"
+            )
+        logger.info("spaCy model '%s' not found. Installing...", model_name)
         try:
             download(model_name)
-            print(f"✓ Model '{model_name}' installed.")
+            logger.info("spaCy model '%s' installed.", model_name)
         except Exception as e:
             raise RuntimeError(
                 f"Failed to download spaCy model '{model_name}'. "
@@ -56,21 +77,33 @@ def ensure_spacy_model(model_name: str = DEFAULT_SPACY_MODEL) -> None:
 
 
 # ---------------------------------------------------------------------
-# 2. Load aerial feature vocabulary from Hugging Face
+# 2. Load aerial feature vocabulary (lazy-loaded on first use)
 # ---------------------------------------------------------------------
+
+_aerial_vocab_cache: Optional[List[str]] = None
 
 
 def load_aerial_feature_vocab(url: str = AERIAL_FEATURES_URL) -> List[str]:
     """Load the nested aerial_features.json and flatten to a list of feature keys.
 
+    Results are cached after the first successful call.
+
     Args:
         url: URL to the aerial features JSON file. Defaults to the
-            Hugging Face hosted version.
+            hosted version on Source Cooperative.
 
     Returns:
         Sorted list of feature keys extracted from the JSON file.
+
+    Raises:
+        requests.ConnectionError: If the download fails due to network issues.
+        requests.HTTPError: If the server returns an error response.
     """
-    resp = requests.get(url)
+    global _aerial_vocab_cache
+    if _aerial_vocab_cache is not None:
+        return _aerial_vocab_cache
+
+    resp = requests.get(url, timeout=_REQUEST_TIMEOUT)
     resp.raise_for_status()
     data = resp.json()
 
@@ -85,23 +118,23 @@ def load_aerial_feature_vocab(url: str = AERIAL_FEATURES_URL) -> List[str]:
                 if isinstance(sublist, list):
                     features.update(sublist)
 
-    return sorted(features)
+    _aerial_vocab_cache = sorted(features)
+    return _aerial_vocab_cache
 
 
-RAW_FEATURES = load_aerial_feature_vocab()
+def _get_aerial_feature_maps() -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str]]:
+    """Build and return the aerial feature lookup maps (lazy).
 
-# Canonical mapping: phrase ("parking lot") -> key ("parking_lot")
-FEATURE_PHRASE_TO_CANON = {feat.replace("_", " "): feat for feat in RAW_FEATURES}
+    Returns:
+        A tuple of (feature_phrase_to_canon, single_word_features,
+        multiword_features) dictionaries.
+    """
+    raw = load_aerial_feature_vocab()
+    phrase_to_canon = {feat.replace("_", " "): feat for feat in raw}
+    single = {p: c for p, c in phrase_to_canon.items() if " " not in p}
+    multi = {p: c for p, c in phrase_to_canon.items() if " " in p}
+    return phrase_to_canon, single, multi
 
-# Split into single- and multi-word phrases for matching
-SINGLE_WORD_FEATURES = {
-    phrase: canon
-    for phrase, canon in FEATURE_PHRASE_TO_CANON.items()
-    if " " not in phrase
-}
-MULTIWORD_FEATURES = {
-    phrase: canon for phrase, canon in FEATURE_PHRASE_TO_CANON.items() if " " in phrase
-}
 
 # ---------------------------------------------------------------------
 # 3. Large-scale features to ignore (lemmas)
@@ -159,7 +192,7 @@ def load_image(source: Union[str, Image.Image]) -> Image.Image:
 
     if isinstance(source, str):
         if source.startswith("http://") or source.startswith("https://"):
-            resp = requests.get(source, stream=True)
+            resp = requests.get(source, stream=True, timeout=_REQUEST_TIMEOUT)
             resp.raise_for_status()
             return Image.open(BytesIO(resp.content)).convert("RGB")
         else:
@@ -210,6 +243,7 @@ class ImageCaptioner:
         blip_model_name: str = DEFAULT_BLIP_MODEL,
         spacy_model_name: str = DEFAULT_SPACY_MODEL,
         device: Optional[str] = None,
+        auto_download: bool = True,
     ):
         """Initialize the ImageCaptioner with specified models.
 
@@ -220,13 +254,15 @@ class ImageCaptioner:
                 Defaults to "en_core_web_sm".
             device: Device to run the model on ('cuda', 'mps', 'cpu').
                 If None, automatically detects the best available device.
+            auto_download: Whether to automatically download the spaCy
+                model if missing. Defaults to True.
         """
         self.blip_model_name = blip_model_name
         self.spacy_model_name = spacy_model_name
         self.device = device if device else get_device()
 
         # Load spaCy model
-        ensure_spacy_model(spacy_model_name)
+        ensure_spacy_model(spacy_model_name, auto_download=auto_download)
         self.nlp = spacy.load(spacy_model_name)
 
         # Load BLIP model
@@ -326,8 +362,7 @@ class ImageCaptioner:
 
         # Build maps for matching
         if use_default_vocab:
-            single_map = SINGLE_WORD_FEATURES
-            multi_map = MULTIWORD_FEATURES
+            _, single_map, multi_map = _get_aerial_feature_maps()
         elif user_include_list:
             norm = [f.lower().replace("_", " ") for f in user_include_list]
             single_map = {
