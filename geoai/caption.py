@@ -20,7 +20,7 @@ from .utils import get_device
 # 0. Config
 # ---------------------------------------------------------------------
 
-AERIAL_FEATURES_URL = "https://huggingface.co/datasets/giswqs/geospatial/resolve/main/aerial_features.json"
+AERIAL_FEATURES_URL = "https://data.source.coop/opengeos/geoai/aerial_features.json"
 
 hf_logging.set_verbosity_error()  # silence HF load reports
 
