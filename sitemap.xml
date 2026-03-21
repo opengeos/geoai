@@ -77,6 +77,10 @@
          <lastmod>2026-03-21</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/geodeep/</loc>
+         <lastmod>2026-03-21</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/hf/</loc>
          <lastmod>2026-03-21</lastmod>
     </url>
@@ -322,6 +326,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/flipnslide_augmentation/</loc>
+         <lastmod>2026-03-21</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/geodeep_detection/</loc>
          <lastmod>2026-03-21</lastmod>
     </url>
     <url>
