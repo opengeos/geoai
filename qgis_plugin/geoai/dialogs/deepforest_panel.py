@@ -476,8 +476,7 @@ class DeepForestDockWidget(QDockWidget):
         # Header with link to DeepForest repo
         header_label = QLabel(
             "<b>Tree Segmentation</b> — "
-            '<a href="https://github.com/weecology/DeepForest">GitHub</a> · '
-            '<a href="https://deepforest.readthedocs.io">Docs</a>'
+            '<a href="https://github.com/weecology/DeepForest">DeepForest</a>'
         )
         header_label.setOpenExternalLinks(True)
         main_layout.addWidget(header_label)
