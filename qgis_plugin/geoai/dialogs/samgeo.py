@@ -173,7 +173,7 @@ class SamGeoDockWidget(QDockWidget):
             iface: The QGIS interface instance.
             parent: Parent widget.
         """
-        super().__init__("SamGeo Segmentation", parent)
+        super().__init__("Segment Anything", parent)
         self.iface = iface
         self.canvas = iface.mapCanvas()
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -2375,12 +2375,12 @@ class SamGeoDockWidget(QDockWidget):
 
     def show_error(self, message):
         """Show an error message."""
-        QMessageBox.critical(self, "SamGeo Error", message)
+        QMessageBox.critical(self, "Segment Anything Error", message)
         self.log_message(message, level=Qgis.Critical)
 
     def log_message(self, message, level=Qgis.Info):
         """Log a message to QGIS."""
-        QgsMessageLog.logMessage(message, "GeoAI - SamGeo", level)
+        QgsMessageLog.logMessage(message, "GeoAI - Segment Anything", level)
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""

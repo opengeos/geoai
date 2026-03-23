@@ -103,32 +103,70 @@ class GeoAIPlugin:
         icon_base = os.path.join(self.plugin_dir, "icons")
 
         # Icon paths with SVG support
+        deepforest_icon = os.path.join(icon_base, "deepforest.svg")
+        if not os.path.exists(deepforest_icon):
+            deepforest_icon = ":/images/themes/default/mIconPointLayer.svg"
+
+        water_icon = os.path.join(icon_base, "water.svg")
+        if not os.path.exists(water_icon):
+            water_icon = ":/images/themes/default/mIconPolygonLayer.svg"
+
         moondream_icon = os.path.join(icon_base, "moondream.svg")
         if not os.path.exists(moondream_icon):
             moondream_icon = ":/images/themes/default/mIconRaster.svg"
-
-        segment_icon = os.path.join(icon_base, "segment.svg")
-        if not os.path.exists(segment_icon):
-            segment_icon = ":/images/themes/default/mActionAddRasterLayer.svg"
 
         samgeo_icon = os.path.join(icon_base, "samgeo.png")
         if not os.path.exists(samgeo_icon):
             samgeo_icon = ":/images/themes/default/mIconPolygonLayer.svg"
 
-        deepforest_icon = os.path.join(icon_base, "deepforest.svg")
-        if not os.path.exists(deepforest_icon):
-            deepforest_icon = ":/images/themes/default/mIconPointLayer.svg"
+        segment_icon = os.path.join(icon_base, "segment.svg")
+        if not os.path.exists(segment_icon):
+            segment_icon = ":/images/themes/default/mActionAddRasterLayer.svg"
+
+        instance_seg_icon = os.path.join(icon_base, "instance_segmentation.svg")
+        if not os.path.exists(instance_seg_icon):
+            instance_seg_icon = ":/images/themes/default/mIconPolygonLayer.svg"
 
         about_icon = os.path.join(icon_base, "about.svg")
         if not os.path.exists(about_icon):
             about_icon = ":/images/themes/default/mActionHelpContents.svg"
 
-        # Add Moondream action (checkable for dock toggle)
+        # Add Tree Segmentation action (checkable for dock toggle)
+        self.deepforest_action = self.add_action(
+            deepforest_icon,
+            "Tree Segmentation",
+            self.toggle_deepforest_dock,
+            status_tip="Toggle Tree Segmentation panel (tree crown detection and forest analysis)",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add Water Segmentation action (checkable for dock toggle)
+        self.water_segmentation_action = self.add_action(
+            water_icon,
+            "Water Segmentation",
+            self.toggle_water_segmentation_dock,
+            status_tip="Toggle Water Segmentation panel (OmniWaterMask water body detection)",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add Moondream VLM action (checkable for dock toggle)
         self.moondream_action = self.add_action(
             moondream_icon,
             "Moondream VLM",
             self.toggle_moondream_dock,
             status_tip="Toggle Moondream Vision-Language Model panel",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add Segment Anything action (checkable for dock toggle)
+        self.samgeo_action = self.add_action(
+            samgeo_icon,
+            "Segment Anything",
+            self.toggle_samgeo_dock,
+            status_tip="Toggle Segment Anything panel (supports SAM1, SAM2, and SAM3 models)",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
@@ -144,49 +182,11 @@ class GeoAIPlugin:
         )
 
         # Add Instance Segmentation action (checkable for dock toggle)
-        instance_seg_icon = os.path.join(icon_base, "instance_segmentation.svg")
-        if not os.path.exists(instance_seg_icon):
-            instance_seg_icon = ":/images/themes/default/mIconPolygonLayer.svg"
-
         self.instance_segmentation_action = self.add_action(
             instance_seg_icon,
             "Instance Segmentation",
             self.toggle_instance_segmentation_dock,
             status_tip="Toggle Instance Segmentation panel (Mask R-CNN training & inference)",
-            checkable=True,
-            parent=self.iface.mainWindow(),
-        )
-
-        # Add SamGeo action (checkable for dock toggle)
-        self.samgeo_action = self.add_action(
-            samgeo_icon,
-            "SamGeo",
-            self.toggle_samgeo_dock,
-            status_tip="Toggle SamGeo Segmentation panel (supports SAM1, SAM2, and SAM3 models)",
-            checkable=True,
-            parent=self.iface.mainWindow(),
-        )
-
-        # Add DeepForest action (checkable for dock toggle)
-        self.deepforest_action = self.add_action(
-            deepforest_icon,
-            "DeepForest",
-            self.toggle_deepforest_dock,
-            status_tip="Toggle DeepForest Tree Detection panel (tree crown detection and forest analysis)",
-            checkable=True,
-            parent=self.iface.mainWindow(),
-        )
-
-        # Add Water Segmentation action (checkable for dock toggle)
-        water_icon = os.path.join(icon_base, "water.svg")
-        if not os.path.exists(water_icon):
-            water_icon = ":/images/themes/default/mIconPolygonLayer.svg"
-
-        self.water_segmentation_action = self.add_action(
-            water_icon,
-            "Water Segmentation",
-            self.toggle_water_segmentation_dock,
-            status_tip="Toggle Water Segmentation panel (OmniWaterMask water body detection)",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
@@ -535,7 +535,7 @@ class GeoAIPlugin:
                 QMessageBox.critical(
                     self.iface.mainWindow(),
                     "Error",
-                    f"Failed to create SamGeo panel:\n{str(e)}",
+                    f"Failed to create Segment Anything panel:\n{str(e)}",
                 )
                 self.samgeo_action.setChecked(False)
                 return
@@ -576,7 +576,7 @@ class GeoAIPlugin:
                 QMessageBox.critical(
                     self.iface.mainWindow(),
                     "Error",
-                    f"Failed to create DeepForest panel:\n{str(e)}",
+                    f"Failed to create Tree Segmentation panel:\n{str(e)}",
                 )
                 self.deepforest_action.setChecked(False)
                 return
@@ -802,7 +802,7 @@ class GeoAIPlugin:
                         # Delete the sam object
                         self._samgeo_dock.sam = None
                         del sam_obj
-                        cleared_items.append("SamGeo model")
+                        cleared_items.append("Segment Anything model")
 
                         # Update UI status
                         if hasattr(self._samgeo_dock, "model_status"):
@@ -861,7 +861,7 @@ class GeoAIPlugin:
                         # Delete the deepforest object
                         self._deepforest_dock.deepforest = None
                         del deepforest_obj
-                        cleared_items.append("DeepForest model")
+                        cleared_items.append("Tree Segmentation model")
 
                         # Update UI status
                         if hasattr(self._deepforest_dock, "model_status"):
@@ -1006,8 +1006,8 @@ class GeoAIPlugin:
 <li><b>Moondream Vision-Language Model:</b> AI-powered image captioning, querying, object detection, and point localization</li>
 <li><b>Semantic Segmentation:</b> Train and run inference with deep learning models (U-Net, DeepLabV3+, FPN, etc.)</li>
 <li><b>Instance Segmentation:</b> Train and run Mask R-CNN models for instance-level object detection and segmentation</li>
-<li><b>SamGeo:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
-<li><b>DeepForest:</b> Tree crown detection and forest analysis using pretrained deep learning models</li>
+<li><b>Segment Anything:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
+<li><b>Tree Segmentation:</b> Tree crown detection and forest analysis using pretrained DeepForest models</li>
 <li><b>Water Segmentation:</b> Water body detection from satellite/aerial imagery using OmniWaterMask</li>
 </ul>
 

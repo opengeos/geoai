@@ -439,7 +439,7 @@ class DeepForestDockWidget(QDockWidget):
             iface: The QGIS interface instance.
             parent: Parent widget.
         """
-        super().__init__("DeepForest Tree Detection", parent)
+        super().__init__("Tree Segmentation", parent)
         self.iface = iface
         self.canvas = iface.mapCanvas()
         self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -475,9 +475,8 @@ class DeepForestDockWidget(QDockWidget):
 
         # Header with link to DeepForest repo
         header_label = QLabel(
-            "<b>DeepForest</b> — "
-            '<a href="https://github.com/weecology/DeepForest">GitHub</a> · '
-            '<a href="https://deepforest.readthedocs.io">Docs</a>'
+            "<b>Tree Segmentation</b> — "
+            '<a href="https://github.com/weecology/DeepForest">DeepForest</a>'
         )
         header_label.setOpenExternalLinks(True)
         main_layout.addWidget(header_label)
@@ -1326,7 +1325,7 @@ class DeepForestDockWidget(QDockWidget):
             self.predict_status_label.setStyleSheet("color: green;")
 
             mode = self.mode_combo.currentText()
-            summary = f"DeepForest Prediction Results:\n"
+            summary = f"Tree Segmentation Prediction Results:\n"
             summary += f"Mode: {mode}\n"
             summary += f"Image: {os.path.basename(self.current_image_path)}\n"
             summary += f"Detections: {num_detections}\n"
@@ -1890,12 +1889,12 @@ class DeepForestDockWidget(QDockWidget):
 
     def show_error(self, message):
         """Show an error message."""
-        QMessageBox.critical(self, "DeepForest Error", message)
+        QMessageBox.critical(self, "Tree Segmentation Error", message)
         self.log_message(message, level=Qgis.Critical)
 
     def log_message(self, message, level=Qgis.Info):
         """Log a message to QGIS."""
-        QgsMessageLog.logMessage(message, "GeoAI - DeepForest", level)
+        QgsMessageLog.logMessage(message, "GeoAI - Tree Segmentation", level)
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
