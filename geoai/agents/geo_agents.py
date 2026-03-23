@@ -240,6 +240,48 @@ def create_gemini_model(
     return GeminiModel(client_args=client_args, model_id=model_id, **kwargs)
 
 
+def create_minimax_model(
+    model_id: str = "MiniMax-M2.7",
+    api_key: str = None,
+    client_args: dict = None,
+    **kwargs: Any,
+) -> OpenAIModel:
+    """Create a MiniMax model via OpenAI-compatible API.
+
+    MiniMax provides large language models including MiniMax-M2.7 and
+    MiniMax-M2.5-highspeed, accessible through an OpenAI-compatible
+    chat completions endpoint at https://api.minimax.io/v1.
+
+    Args:
+        model_id: MiniMax model ID. Defaults to "MiniMax-M2.7".
+            For a complete list of supported models,
+            see https://platform.minimaxi.com/document/models.
+        api_key: MiniMax API key.
+        client_args: Client arguments for the MiniMax model.
+        **kwargs: Additional keyword arguments for the MiniMax model.
+
+    Returns:
+        OpenAIModel: An OpenAI-compatible model configured for MiniMax.
+    """
+
+    if api_key is None:
+        try:
+            api_key = os.getenv("MINIMAX_API_KEY", None)
+            if api_key is None:
+                raise ValueError("MINIMAX_API_KEY is not set")
+        except Exception:
+            raise ValueError("MINIMAX_API_KEY is not set")
+
+    if client_args is None:
+        client_args = kwargs.get("client_args", {})
+    if "api_key" not in client_args and api_key is not None:
+        client_args["api_key"] = api_key
+    if "base_url" not in client_args:
+        client_args["base_url"] = "https://api.minimax.io/v1"
+
+    return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
+
+
 class GeoAgent(Agent):
     """Geospatial AI agent with interactive mapping capabilities."""
 
@@ -271,6 +313,11 @@ class GeoAgent(Agent):
             # treat ANY "llama..." model id as Ollama
             self._model_factory = lambda m=model: create_ollama_model(
                 host="http://localhost:11434", model_id=m, **model_args
+            )
+        elif isinstance(model, str) and model.lower().startswith("minimax"):
+            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            self._model_factory = lambda m=model: create_minimax_model(
+                model_id=m, **model_args
             )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
@@ -695,7 +742,11 @@ class STACAgent(Agent):
             self._model_factory = lambda m=model: create_ollama_model(
                 host="http://localhost:11434", model_id=m, **model_args
             )
-
+        elif isinstance(model, str) and model.lower().startswith("minimax"):
+            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            self._model_factory = lambda m=model: create_minimax_model(
+                model_id=m, **model_args
+            )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
             model_id = model.config["model_id"]
@@ -1336,6 +1387,11 @@ class CatalogAgent(Agent):
             # treat ANY "llama..." model id as Ollama
             self._model_factory = lambda m=model: create_ollama_model(
                 host="http://localhost:11434", model_id=m, **model_args
+            )
+        elif isinstance(model, str) and model.lower().startswith("minimax"):
+            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            self._model_factory = lambda m=model: create_minimax_model(
+                model_id=m, **model_args
             )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances

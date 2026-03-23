@@ -9,6 +9,7 @@ from .geo_agents import (
     create_openai_model,
     create_gemini_model,
     create_bedrock_model,
+    create_minimax_model,
 )
 from .map_tools import MapTools
 from .stac_tools import STACTools
