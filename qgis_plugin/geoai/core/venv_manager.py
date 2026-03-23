@@ -1178,9 +1178,11 @@ def _fix_proj_data(site_packages: str) -> None:
             break
 
     if proj_data_dir:
-        # Configure pyproj via its internal API so pyogrio/rasterio can
-        # auto-detect their own bundled PROJ data (they fail when
-        # PROJ_DATA points to a foreign copy).
+        # Configure pyproj via its internal API instead of setting
+        # PROJ_DATA/PROJ_LIB env vars.  Setting those env vars globally
+        # causes pyogrio to fail ("Could not correctly detect PROJ data
+        # files"); any temporary clearing needed for pyogrio writes is
+        # handled by safe_to_file() in proj_utils.py.
         try:
             import pyproj.datadir
 
@@ -1194,12 +1196,6 @@ def _fix_proj_data(site_packages: str) -> None:
                 f"Set PROJ_DATA={proj_data_dir} " f"(pyproj API unavailable: {exc})",
                 Qgis.Info,
             )
-            return
-
-        # Clear PROJ_DATA/PROJ_LIB so pyogrio and rasterio can use their
-        # own bundled PROJ data files via auto-detection.
-        os.environ.pop("PROJ_DATA", None)
-        os.environ.pop("PROJ_LIB", None)
     else:
         _log("No venv proj.db found; PROJ_DATA unchanged", Qgis.Warning)
 

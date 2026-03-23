@@ -2125,7 +2125,7 @@ class SamGeoDockWidget(QDockWidget):
                                 driver = "ESRI Shapefile"
                             else:
                                 driver = None
-                            from geoai.core.proj_utils import safe_to_file
+                            from ..core.proj_utils import safe_to_file
 
                             safe_to_file(gdf, output_path, driver=driver)
                 finally:
@@ -2260,7 +2260,7 @@ class SamGeoDockWidget(QDockWidget):
                                 driver = "ESRI Shapefile"
                             else:
                                 driver = None
-                            from geoai.core.proj_utils import safe_to_file
+                            from ..core.proj_utils import safe_to_file
 
                             safe_to_file(gdf, output_path, driver=driver)
                 finally:

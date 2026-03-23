@@ -12,7 +12,10 @@ pyogrio can auto-detect its own bundled PROJ data.
 """
 
 import os
+import threading
 from contextlib import contextmanager
+
+_proj_env_lock = threading.Lock()
 
 
 @contextmanager
@@ -22,17 +25,21 @@ def clean_proj_env():
     Use around ``gdf.to_file()`` calls to prevent pyogrio PROJ data
     detection errors.  The original values are restored on exit.
 
+    A module-level lock serializes access so concurrent worker threads
+    do not observe partially-modified environment state.
+
     Yields:
         None
     """
-    saved = {}
-    for var in ("PROJ_DATA", "PROJ_LIB"):
-        if var in os.environ:
-            saved[var] = os.environ.pop(var)
-    try:
-        yield
-    finally:
-        os.environ.update(saved)
+    with _proj_env_lock:
+        saved = {}
+        for var in ("PROJ_DATA", "PROJ_LIB"):
+            if var in os.environ:
+                saved[var] = os.environ.pop(var)
+        try:
+            yield
+        finally:
+            os.environ.update(saved)
 
 
 def safe_to_file(gdf, output_path, **kwargs):

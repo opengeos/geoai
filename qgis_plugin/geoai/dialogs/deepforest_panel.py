@@ -1562,7 +1562,7 @@ class DeepForestDockWidget(QDockWidget):
         else:  # Shapefile
             driver = "ESRI Shapefile"
 
-        from geoai.core.proj_utils import safe_to_file
+        from ..core.proj_utils import safe_to_file
 
         safe_to_file(gdf, output_path, driver=driver)
 
