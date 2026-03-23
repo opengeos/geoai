@@ -535,7 +535,7 @@ class GeoAIPlugin:
                 QMessageBox.critical(
                     self.iface.mainWindow(),
                     "Error",
-                    f"Failed to create SamGeo panel:\n{str(e)}",
+                    f"Failed to create Segment Anything panel:\n{str(e)}",
                 )
                 self.samgeo_action.setChecked(False)
                 return
@@ -576,7 +576,7 @@ class GeoAIPlugin:
                 QMessageBox.critical(
                     self.iface.mainWindow(),
                     "Error",
-                    f"Failed to create DeepForest panel:\n{str(e)}",
+                    f"Failed to create Tree Segmentation panel:\n{str(e)}",
                 )
                 self.deepforest_action.setChecked(False)
                 return
@@ -802,7 +802,7 @@ class GeoAIPlugin:
                         # Delete the sam object
                         self._samgeo_dock.sam = None
                         del sam_obj
-                        cleared_items.append("SamGeo model")
+                        cleared_items.append("Segment Anything model")
 
                         # Update UI status
                         if hasattr(self._samgeo_dock, "model_status"):
@@ -861,7 +861,7 @@ class GeoAIPlugin:
                         # Delete the deepforest object
                         self._deepforest_dock.deepforest = None
                         del deepforest_obj
-                        cleared_items.append("DeepForest model")
+                        cleared_items.append("Tree Segmentation model")
 
                         # Update UI status
                         if hasattr(self._deepforest_dock, "model_status"):
@@ -1006,8 +1006,8 @@ class GeoAIPlugin:
 <li><b>Moondream Vision-Language Model:</b> AI-powered image captioning, querying, object detection, and point localization</li>
 <li><b>Semantic Segmentation:</b> Train and run inference with deep learning models (U-Net, DeepLabV3+, FPN, etc.)</li>
 <li><b>Instance Segmentation:</b> Train and run Mask R-CNN models for instance-level object detection and segmentation</li>
-<li><b>SamGeo:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
-<li><b>DeepForest:</b> Tree crown detection and forest analysis using pretrained deep learning models</li>
+<li><b>Segment Anything:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
+<li><b>Tree Segmentation:</b> Tree crown detection and forest analysis using pretrained DeepForest models</li>
 <li><b>Water Segmentation:</b> Water body detection from satellite/aerial imagery using OmniWaterMask</li>
 </ul>
 
