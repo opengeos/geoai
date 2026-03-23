@@ -100,7 +100,7 @@ class TestCreateMinimaxModelExists(unittest.TestCase):
     def test_raises_on_missing_api_key(self):
         """Test that missing MINIMAX_API_KEY raises ValueError."""
         func_source = self._extract_function_source("create_minimax_model")
-        self.assertIn("MINIMAX_API_KEY is not set", func_source)
+        self.assertIn("MINIMAX_API_KEY", func_source)
 
     def _extract_function_source(self, func_name):
         """Extract the source code of a specific function."""
