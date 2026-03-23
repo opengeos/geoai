@@ -4,7 +4,7 @@
 [![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.09605/status.svg)](https://doi.org/10.21105/joss.09605)
 
-A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, semantic segmentation, instance segmentation, SamGeo, DeepForest, water segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
+A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Tree Segmentation, Water Segmentation, Moondream VLM, Segment Anything, Semantic Segmentation, Instance Segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
 
 ## Quick Start
 
@@ -38,34 +38,7 @@ Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video 
 
 Each tool lives inside a dockable panel that can be attached to either side of the QGIS interface, so you can keep layers, maps, and models visible simultaneously.
 
-### Moondream Vision-Language Model Panel
-
-- **Caption**: Generate descriptions of geospatial imagery (short, normal, or long)
-- **Query**: Ask questions about images using natural language
-- **Detect**: Detect and locate objects with bounding boxes
-- **Point**: Locate specific objects with point markers
-
-### Semantic Segmentation Panel (Combined Training & Inference)
-
-- **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
-- **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
-- **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.
-
-### Instance Segmentation Panel (Mask R-CNN)
-
-- **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data with instance-level masks in PASCAL_VOC format, with configurable tile size, stride, and buffer radius
-- **Tab 2 - Train Models**: Train Mask R-CNN instance segmentation models with configurable number of channels, classes, batch size, epochs, learning rate, and validation split
-- **Tab 3 - Run Inference**: Apply trained Mask R-CNN models to new imagery and vectorize results with optional smoothing
-
-### SamGeo Panel (Segment Anything Model)
-
-- **Model Tab**: Load SAM3 with configurable backend and device settings
-- **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road")
-- **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
-- **Batch Tab**: Process multiple points interactively or from vector files/layers
-- **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)
-
-### DeepForest Panel (Object Detection)
+### Tree Segmentation Panel (DeepForest)
 
 - **Model Tab**: Load pretrained [DeepForest](https://deepforest.readthedocs.io) models from Hugging Face for tree crown, bird, livestock, nest, and dead tree detection
 - **Predict Tab**: Run predictions on single images or large geospatial tiles with configurable patch size, overlap, IoU threshold, and score filtering
@@ -78,6 +51,33 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 - **Patch-based Inference**: Sliding window inference with configurable patch size, overlap, and batch size
 - **OSM Integration**: Optional OpenStreetMap data for refinement (water features, buildings, roads)
 - **Output Options**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional smoothing and minimum polygon size filtering
+
+### Moondream Vision-Language Model Panel
+
+- **Caption**: Generate descriptions of geospatial imagery (short, normal, or long)
+- **Query**: Ask questions about images using natural language
+- **Detect**: Detect and locate objects with bounding boxes
+- **Point**: Locate specific objects with point markers
+
+### Segment Anything Panel (SamGeo)
+
+- **Model Tab**: Load SAM3 with configurable backend and device settings
+- **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road")
+- **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
+- **Batch Tab**: Process multiple points interactively or from vector files/layers
+- **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)
+
+### Semantic Segmentation Panel (Combined Training & Inference)
+
+- **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
+- **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
+- **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.
+
+### Instance Segmentation Panel (Mask R-CNN)
+
+- **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data with instance-level masks in PASCAL_VOC format, with configurable tile size, stride, and buffer radius
+- **Tab 2 - Train Models**: Train Mask R-CNN instance segmentation models with configurable number of channels, classes, batch size, epochs, learning rate, and validation split
+- **Tab 3 - Run Inference**: Apply trained Mask R-CNN models to new imagery and vectorize results with optional smoothing
 
 ### GPU Memory Management
 
@@ -344,6 +344,83 @@ QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`. After
 
 ## Usage
 
+### Tree Segmentation Panel (DeepForest)
+
+The Tree Segmentation panel provides object detection in remote sensing imagery using pretrained deep learning models from the [DeepForest](https://deepforest.readthedocs.io) library.
+
+#### Supported Pretrained Models
+
+| Model                | Hugging Face ID                       | Description                                  |
+| -------------------- | ------------------------------------- | -------------------------------------------- |
+| Tree Crown Detection | `weecology/deepforest-tree`           | Detect individual tree crowns in RGB imagery |
+| Bird Detection       | `weecology/deepforest-bird`           | Detect birds in aerial/satellite imagery     |
+| Livestock Detection  | `weecology/deepforest-livestock`      | Detect livestock in aerial imagery           |
+| Nest Detection       | `weecology/everglades-nest-detection` | Detect bird nests in Everglades imagery      |
+| Dead Tree Detection  | `weecology/cropmodel-deadtrees`       | Detect dead trees in forest imagery          |
+
+Steps:
+
+1. Click the **Tree Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Tree Segmentation`)
+2. In the **Model** tab:
+    - Select a pretrained model from the dropdown (e.g., Tree Crown Detection)
+    - Configure device (auto, cuda, cpu)
+    - Click "Load Model" to download and initialize the model
+    - Select a raster layer or browse for an image file and click "Set Image from Layer" or "Set Image from File"
+
+    ![](https://github.com/user-attachments/assets/a4b0c1d2-85e0-442d-9574-919f4bc59c67)
+
+3. In the **Predict** tab:
+    - Choose prediction mode:
+        - **Single Image**: Predict on the entire image at once (best for small images)
+        - **Large Tile**: Split large geospatial tiles into overlapping patches for prediction
+    - For Large Tile mode, configure:
+        - **Patch Size**: Size of each prediction window (default 400px; experiment with 400-800 for 0.1m data)
+        - **Patch Overlap**: Overlap between adjacent patches (default 0.25)
+        - **IoU Threshold**: Overlap threshold for suppressing duplicate detections (default 0.15)
+        - **Dataloader Strategy**: Memory management strategy (single, batch, or window)
+    - Set the **Score Threshold** to filter low-confidence detections (default 0.3)
+    - Click "Run Prediction"
+
+    ![](https://github.com/user-attachments/assets/200782fe-290d-4882-9b8d-4dcaeafad1b0)
+
+    ![](https://github.com/user-attachments/assets/3523f9d7-a8d4-4b9e-839b-6616730dd452)
+
+4. In the **Output** tab:
+    - Select output format:
+        - **Vector**: GeoPackage, Shapefile, or GeoJSON (saves bounding boxes as polygons with score and label attributes)
+        - **Raster**: GeoTIFF (rasterizes bounding boxes onto the source raster)
+    - Click "Save Results" to export
+    - To export training data for model fine-tuning:
+        - Select **PASCAL_VOC**, **COCO**, or **YOLO** format
+        - Choose an output directory
+        - Click "Export Training Data"
+
+    ![](https://github.com/user-attachments/assets/4a0ef60a-fb1f-4084-a65c-34b886c9ef01)
+
+### Water Segmentation Panel (OmniWaterMask)
+
+Steps:
+
+1. Click the **Water Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Water Segmentation`)
+2. Select a raster layer or browse for an image file
+3. Configure band ordering to match your imagery (e.g., RGBN for 4-band imagery)
+4. Configure inference parameters:
+    - **Patch Size**: Size of the sliding window for inference (default 512)
+    - **Overlap Size**: Overlap between adjacent patches (default 256)
+    - **Batch Size**: Number of patches to process in parallel
+    - **Device**: auto, cuda, cpu, or mps
+    - **Precision**: Inference precision (float32, float16, bfloat16)
+5. Optionally enable OSM integration:
+    - **Use OSM Water**: Incorporate OpenStreetMap water features
+    - **Use OSM Buildings**: Use building footprints to refine results
+    - **Use OSM Roads**: Use road data to refine results
+6. Configure output options:
+    - **Output Raster**: Path for the water mask GeoTIFF
+    - **Output Vector**: Path for vectorized water polygons (GeoPackage or Shapefile)
+    - **Min Size**: Minimum polygon area in pixels to filter small artifacts
+    - **Smooth**: Enable polygon smoothing with configurable iterations
+7. Click "Run" to start water segmentation
+
 ### Moondream Vision-Language Model
 
 Sample dataset: [parking_lot.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif)
@@ -363,30 +440,7 @@ Steps:
 
     ![moondream](https://github.com/user-attachments/assets/bb800a04-b7c4-4fdd-a628-a48842d7eac5)
 
-### Segmentation Panel (Create Data, Train, Inference)
-
-Sample datasets:
-
-- [naip_rgb_train.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_rgb_train.tif)
-- [naip_test.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test.tif)
-- [naip_train_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.geojson)
-
-Steps:
-
-1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to pixi project.
-2. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
-3. Use the tabs at the top of the panel to switch between:
-    - **Create Training Data**: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.
-    - **Train Model**: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.
-    - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.
-
-    ![data](https://github.com/user-attachments/assets/121fcfa8-6f9b-4413-9419-af666698c053)
-
-    ![train](https://github.com/user-attachments/assets/dfeefb86-ebf7-467c-a5ff-794cde80a7cb)
-
-    ![inference](https://github.com/user-attachments/assets/f0945c01-0fcb-4607-9226-4a3b2bcb05e1)
-
-### SamGeo Panel (Segment Anything Model)
+### Segment Anything Panel (SamGeo)
 
 Sample dataset:
 
@@ -397,7 +451,7 @@ Sample dataset:
 
 Steps:
 
-1. Click the **SamGeo** button in the GeoAI toolbar (or `GeoAI` menu → `SamGeo`)
+1. Click the **Segment Anything** button in the GeoAI toolbar (or `GeoAI` menu → `Segment Anything`)
 2. In the **Model** tab:
     - Select the SAM model version (SamGeo3/SAM3, SamGeo2/SAM2, or SamGeo/SAM1)
     - Configure backend (meta or transformers) and device (auto, cuda, cpu)
@@ -431,58 +485,28 @@ Steps:
 
     ![](https://github.com/user-attachments/assets/5c80cc57-3870-4a20-bb74-73e394ef22a6)
 
-### DeepForest Panel (Object Detection)
+### Semantic Segmentation Panel (Create Data, Train, Inference)
 
-The DeepForest panel provides object detection in remote sensing imagery using pretrained deep learning models from the [DeepForest](https://deepforest.readthedocs.io) library.
+Sample datasets:
 
-#### Supported Pretrained Models
-
-| Model                | Hugging Face ID                       | Description                                  |
-| -------------------- | ------------------------------------- | -------------------------------------------- |
-| Tree Crown Detection | `weecology/deepforest-tree`           | Detect individual tree crowns in RGB imagery |
-| Bird Detection       | `weecology/deepforest-bird`           | Detect birds in aerial/satellite imagery     |
-| Livestock Detection  | `weecology/deepforest-livestock`      | Detect livestock in aerial imagery           |
-| Nest Detection       | `weecology/everglades-nest-detection` | Detect bird nests in Everglades imagery      |
-| Dead Tree Detection  | `weecology/cropmodel-deadtrees`       | Detect dead trees in forest imagery          |
+- [naip_rgb_train.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_rgb_train.tif)
+- [naip_test.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test.tif)
+- [naip_train_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.geojson)
 
 Steps:
 
-1. Click the **DeepForest** button in the GeoAI toolbar (or `GeoAI` menu → `DeepForest`)
-2. In the **Model** tab:
-    - Select a pretrained model from the dropdown (e.g., Tree Crown Detection)
-    - Configure device (auto, cuda, cpu)
-    - Click "Load Model" to download and initialize the model
-    - Select a raster layer or browse for an image file and click "Set Image from Layer" or "Set Image from File"
+1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to pixi project.
+2. Click the **Semantic Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Semantic Segmentation`)
+3. Use the tabs at the top of the panel to switch between:
+    - **Create Training Data**: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.
+    - **Train Model**: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.
+    - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.
 
-    ![](https://github.com/user-attachments/assets/a4b0c1d2-85e0-442d-9574-919f4bc59c67)
+    ![data](https://github.com/user-attachments/assets/121fcfa8-6f9b-4413-9419-af666698c053)
 
-3. In the **Predict** tab:
-    - Choose prediction mode:
-        - **Single Image**: Predict on the entire image at once (best for small images)
-        - **Large Tile**: Split large geospatial tiles into overlapping patches for prediction
-    - For Large Tile mode, configure:
-        - **Patch Size**: Size of each prediction window (default 400px; experiment with 400–800 for 0.1m data)
-        - **Patch Overlap**: Overlap between adjacent patches (default 0.25)
-        - **IoU Threshold**: Overlap threshold for suppressing duplicate detections (default 0.15)
-        - **Dataloader Strategy**: Memory management strategy (single, batch, or window)
-    - Set the **Score Threshold** to filter low-confidence detections (default 0.3)
-    - Click "Run Prediction"
+    ![train](https://github.com/user-attachments/assets/dfeefb86-ebf7-467c-a5ff-794cde80a7cb)
 
-    ![](https://github.com/user-attachments/assets/200782fe-290d-4882-9b8d-4dcaeafad1b0)
-
-    ![](https://github.com/user-attachments/assets/3523f9d7-a8d4-4b9e-839b-6616730dd452)
-
-4. In the **Output** tab:
-    - Select output format:
-        - **Vector**: GeoPackage, Shapefile, or GeoJSON (saves bounding boxes as polygons with score and label attributes)
-        - **Raster**: GeoTIFF (rasterizes bounding boxes onto the source raster)
-    - Click "Save Results" to export
-    - To export training data for model fine-tuning:
-        - Select **PASCAL_VOC**, **COCO**, or **YOLO** format
-        - Choose an output directory
-        - Click "Export Training Data"
-
-    ![](https://github.com/user-attachments/assets/4a0ef60a-fb1f-4084-a65c-34b886c9ef01)
+    ![inference](https://github.com/user-attachments/assets/f0945c01-0fcb-4607-9226-4a3b2bcb05e1)
 
 ### Instance Segmentation Panel (Mask R-CNN)
 
@@ -494,33 +518,9 @@ Steps:
     - **Train Model**: Select the images and labels directories, configure model parameters (number of channels, number of classes, batch size, epochs, learning rate, validation split), and start Mask R-CNN training.
     - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results with smoothing.
 
-### Water Segmentation Panel (OmniWaterMask)
-
-Steps:
-
-1. Click the **Water Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Water Segmentation`)
-2. Select a raster layer or browse for an image file
-3. Configure band ordering to match your imagery (e.g., RGBN for 4-band imagery)
-4. Configure inference parameters:
-    - **Patch Size**: Size of the sliding window for inference (default 512)
-    - **Overlap Size**: Overlap between adjacent patches (default 256)
-    - **Batch Size**: Number of patches to process in parallel
-    - **Device**: auto, cuda, cpu, or mps
-    - **Precision**: Inference precision (float32, float16, bfloat16)
-5. Optionally enable OSM integration:
-    - **Use OSM Water**: Incorporate OpenStreetMap water features
-    - **Use OSM Buildings**: Use building footprints to refine results
-    - **Use OSM Roads**: Use road data to refine results
-6. Configure output options:
-    - **Output Raster**: Path for the water mask GeoTIFF
-    - **Output Vector**: Path for vectorized water polygons (GeoPackage or Shapefile)
-    - **Min Size**: Minimum polygon area in pixels to filter small artifacts
-    - **Smooth**: Enable polygon smoothing with configurable iterations
-7. Click "Run" to start water segmentation
-
 ### Clear GPU Memory
 
-Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.
+Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loaded models and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.
 
 ![](https://github.com/user-attachments/assets/76c9dd8a-581c-4975-9ecb-4bfe301447bd)
 
@@ -554,7 +554,7 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 - MobileNetV2
 - VGG (16, 19)
 
-## Supported SAM Models (SamGeo)
+## Supported SAM Models (Segment Anything)
 
 - **SamGeo3 (SAM3)**: Latest version with text prompts, point prompts, and box prompts
 - **SamGeo2 (SAM2)**: Improved version with better performance
