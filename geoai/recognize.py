@@ -7,8 +7,11 @@ and reuses :class:`~geoai.timm_train.TimmClassifier` for training.
 """
 
 import glob
+import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -319,15 +322,15 @@ def load_image_dataset(
                     break
 
             if has_images and root != data_dir:
-                print(f"Auto-detected nested dataset at: {root}")
+                logger.info(f"Auto-detected nested dataset at: {root}")
                 return load_image_dataset(root, extensions)
 
         raise ValueError(f"No images found in {data_dir} with extensions {extensions}")
 
-    print(f"Found {len(image_paths)} images in {len(class_names)} classes")
+    logger.info(f"Found {len(image_paths)} images in {len(class_names)} classes")
     for name in class_names:
         count = labels.count(class_to_idx[name])
-        print(f"  {name}: {count}")
+        logger.info(f"  {name}: {count}")
 
     return {
         "image_paths": image_paths,
@@ -436,8 +439,8 @@ def train_image_classifier(
         stratify=train_val_labels,
     )
 
-    print(
-        f"\nSplit: {len(train_paths)} train, {len(val_paths)} val, {len(test_paths)} test"
+    logger.info(
+        f"Split: {len(train_paths)} train, {len(val_paths)} val, {len(test_paths)} test"
     )
 
     # Create datasets
@@ -514,7 +517,7 @@ def train_image_classifier(
     )
 
     # Train
-    print(f"\nTraining {model_name} for up to {num_epochs} epochs...")
+    logger.info(f"Training {model_name} for up to {num_epochs} epochs...")
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
     # Test
@@ -525,11 +528,11 @@ def train_image_classifier(
         num_workers=num_workers,
         pin_memory=True,
     )
-    print("\nEvaluating on test set...")
+    logger.info("Evaluating on test set...")
     trainer.test(model, dataloaders=test_loader)
 
     best_path = checkpoint_callback.best_model_path
-    print(f"\nBest checkpoint: {best_path}")
+    logger.info(f"Best checkpoint: {best_path}")
 
     return {
         "model": model,
@@ -686,8 +689,8 @@ def evaluate_classifier(
         else:
             per_class_acc[name] = 0.0
 
-    print(f"\nOverall accuracy: {acc:.4f}")
-    print(f"\n{report}")
+    logger.info(f"Overall accuracy: {acc:.4f}")
+    logger.info(f"\n{report}")
 
     return {
         "accuracy": acc,
@@ -945,7 +948,7 @@ def push_classifier_to_hub(
     try:
         from huggingface_hub import HfApi, create_repo
     except ImportError:
-        print(
+        logger.error(
             "huggingface_hub is required to push models. "
             "Install it with: pip install huggingface-hub"
         )
@@ -1000,7 +1003,7 @@ def push_classifier_to_hub(
         )
 
     url = f"https://huggingface.co/{repo_id}"
-    print(f"Model successfully pushed to: {url}")
+    logger.info(f"Model successfully pushed to: {url}")
     return url
 
 
@@ -1035,7 +1038,7 @@ def predict_images_from_hub(
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
-        print(
+        logger.error(
             "huggingface_hub is required. Install it with: pip install huggingface-hub"
         )
         return None
@@ -1045,10 +1048,10 @@ def predict_images_from_hub(
     try:
         import timm
     except ImportError:
-        print("timm is required. Install it with: pip install timm")
+        logger.error("timm is required. Install it with: pip install timm")
         return None
 
-    print(f"Downloading model from {repo_id}...")
+    logger.info("Downloading model from %s...", repo_id)
     model_path = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
     config_path = hf_hub_download(repo_id=repo_id, filename="config.json", token=token)
 

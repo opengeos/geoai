@@ -1,11 +1,14 @@
 """File download utilities."""
 
+import logging
 import os
 from typing import Optional
 
 import requests
 
 __all__ = ["download_file", "download_model_from_hf"]
+
+logger = logging.getLogger(__name__)
 
 
 def download_file(
@@ -37,7 +40,7 @@ def download_file(
         output_path = os.path.basename(url)
 
     if os.path.exists(output_path) and not overwrite:
-        print(f"File already exists: {output_path}")
+        logger.info("File already exists: %s", output_path)
     else:
         # Download the file with a progress bar
         response = requests.get(url, stream=True, timeout=50)
@@ -99,7 +102,7 @@ def download_file(
                             f"the target directory"
                         )
                 zip_ref.extractall(dest)
-            print(f"Extracted to: {extract_dir}")
+            logger.info("Extracted to: %s", extract_dir)
         return extract_dir
 
     return output_path
@@ -122,18 +125,20 @@ def download_model_from_hf(model_path: str, repo_id: Optional[str] = None) -> st
 
         # Define the repository ID and model filename
         if repo_id is None:
-            print(
+            logger.info(
                 "Repo is not specified, using default Hugging Face repo_id: giswqs/geoai"
             )
             repo_id = "giswqs/geoai"
 
         # Download the model
         model_path = hf_hub_download(repo_id=repo_id, filename=model_path)
-        print(f"Model downloaded to: {model_path}")
+        logger.info("Model downloaded to: %s", model_path)
 
         return model_path
 
     except Exception as e:
-        print(f"Error downloading model from Hugging Face: {e}")
-        print("Please specify a local model path or ensure internet connectivity.")
+        logger.error("Error downloading model from Hugging Face: %s", e)
+        logger.info(
+            "Please specify a local model path or ensure internet connectivity."
+        )
         raise

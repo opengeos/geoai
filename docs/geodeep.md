@@ -157,6 +157,9 @@ gd = GeoDeep("/path/to/custom_model.onnx")
 detections = gd.detect("image.tif")
 ```
 
+!!! example "Related Examples"
+    - [GeoDeep Detection](examples/geodeep_detection.ipynb)
+
 ## API Reference
 
 ::: geoai.geodeep

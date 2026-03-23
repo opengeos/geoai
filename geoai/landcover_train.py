@@ -18,11 +18,14 @@ Author: ValHab Project
 Date: November 2025
 """
 
+import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+logger = logging.getLogger(__name__)
 
 
 class FocalLoss(nn.Module):
@@ -492,7 +495,7 @@ def compute_class_weights(
         if f.lower().endswith(label_extensions)
     ]
 
-    print(f"Computing class weights from {len(label_files)} label files...")
+    logger.info("Computing class weights from %d label files...", len(label_files))
 
     for label_file in label_files:
         try:
@@ -505,7 +508,7 @@ def compute_class_weights(
                     class_counts[class_id] += int(count)
                     total_pixels += int(count)
         except Exception as e:
-            print(f"Warning: Could not read {label_file}: {e}")
+            logger.warning("Could not read %s: %s", label_file, e)
             continue
 
     if total_pixels == 0:
@@ -537,46 +540,56 @@ def compute_class_weights(
 
     # Apply custom multipliers if provided
     if custom_multipliers:
-        print(f"\nApplying custom multipliers: {custom_multipliers}")
+        logger.info("Applying custom multipliers: %s", custom_multipliers)
         for class_id, multiplier in custom_multipliers.items():
             if class_id < 0 or class_id >= num_classes:
-                print(f"Warning: Invalid class_id {class_id}, skipping")
+                logger.warning("Invalid class_id %d, skipping", class_id)
                 continue
 
             original_weight = weights[class_id].item()
             weights[class_id] = weights[class_id] * multiplier
-            print(
-                f"  Class {class_id}: {original_weight:.4f} × {multiplier} = {weights[class_id].item():.4f}"
+            logger.info(
+                "  Class %d: %.4f x %s = %.4f",
+                class_id,
+                original_weight,
+                multiplier,
+                weights[class_id].item(),
             )
     else:
-        print("\nNo custom multipliers provided, using computed weights as-is")
+        logger.info("No custom multipliers provided, using computed weights as-is")
 
     # Apply maximum weight cap to prevent extreme values
     weights_capped = False
-    print(f"\nApplying maximum weight cap of {max_weight}...")
+    logger.info("Applying maximum weight cap of %s...", max_weight)
     for class_id in range(num_classes):
         if weights[class_id] > max_weight:
-            print(
-                f"  Class {class_id}: {weights[class_id].item():.4f} → {max_weight} (capped)"
+            logger.info(
+                "  Class %d: %.4f -> %s (capped)",
+                class_id,
+                weights[class_id].item(),
+                max_weight,
             )
             weights[class_id] = max_weight
             weights_capped = True
 
     if not weights_capped:
-        print("  No weights exceeded the cap")
+        logger.info("  No weights exceeded the cap")
 
-    print(f"\nClass pixel counts: {dict(class_counts)}")
-    print(f"\nFinal class weights:")
+    logger.info("Class pixel counts: %s", dict(class_counts))
+    logger.info("Final class weights:")
     for class_id in range(num_classes):
         pixel_count = class_counts.get(class_id, 0)
         percent = (pixel_count / total_pixels * 100) if total_pixels > 0 else 0
-        print(
-            f"  Class {class_id}: weight={weights[class_id].item():.4f}, "
-            f"pixels={pixel_count:,} ({percent:.2f}%)"
+        logger.info(
+            "  Class %d: weight=%.4f, pixels=%s (%.2f%%)",
+            class_id,
+            weights[class_id].item(),
+            f"{pixel_count:,}",
+            percent,
         )
 
     if isinstance(ignore_index, int) and 0 <= ignore_index < num_classes:
-        print(f"\nNote: Class {ignore_index} (ignore_index) has weight 0.0")
+        logger.info("Note: Class %d (ignore_index) has weight 0.0", ignore_index)
 
     return weights
 
@@ -711,9 +724,9 @@ def train_segmentation_landcover(
     class_weights_tensor = None
     if use_class_weights:
         if verbose:
-            print("\n" + "=" * 60)
-            print("COMPUTING CLASS WEIGHTS")
-            print("=" * 60)
+            logger.info("=" * 60)
+            logger.info("COMPUTING CLASS WEIGHTS")
+            logger.info("=" * 60)
 
         class_weights_tensor = compute_class_weights(
             labels_dir=labels_dir,
@@ -725,7 +738,7 @@ def train_segmentation_landcover(
         )
 
         if verbose:
-            print("=" * 60 + "\n")
+            logger.info("=" * 60)
 
     # Create custom loss function using landcover-specific implementation
     # This ensures ignore_index and class_weights are properly used
@@ -753,11 +766,13 @@ def train_segmentation_landcover(
     )
 
     if verbose:
-        print(
-            f"Created {loss_function} loss function with ignore_index={ignore_idx_for_loss}"
+        logger.info(
+            "Created %s loss function with ignore_index=%s",
+            loss_function,
+            ignore_idx_for_loss,
         )
         if use_class_weights:
-            print(f"Class weights applied: {class_weights_tensor}")
+            logger.info("Class weights applied: %s", class_weights_tensor)
 
     # ==========================================================================
     # ALL MODES: Use custom training loop with landcover_iou for model selection
@@ -772,23 +787,28 @@ def train_segmentation_landcover(
             "boundary_weighted": f"BOUNDARY-WEIGHTED IoU (wIoU, α={boundary_alpha})",
             "sparse_labels": f"SPARSE LABELS IoU (bg={background_class} ignored)",
         }
-        print("\n" + "=" * 60)
-        print(
-            f"CUSTOM TRAINING LOOP: {mode_descriptions.get(validation_iou_mode, validation_iou_mode)}"
+        logger.info("=" * 60)
+        logger.info(
+            "CUSTOM TRAINING LOOP: %s",
+            mode_descriptions.get(validation_iou_mode, validation_iou_mode),
         )
-        print("=" * 60)
+        logger.info("=" * 60)
         if validation_iou_mode == "sparse_labels":
-            print(
-                f"Background class: {background_class} (predictions here NOT penalized)"
+            logger.info(
+                "Background class: %d (predictions here NOT penalized)",
+                background_class,
             )
         elif validation_iou_mode == "boundary_weighted":
-            print(
-                f"Boundary alpha: {boundary_alpha} (higher = more focus on boundaries)"
+            logger.info(
+                "Boundary alpha: %s (higher = more focus on boundaries)",
+                boundary_alpha,
             )
         elif validation_iou_mode == "perclass_frequency":
-            print("Classes weighted by pixel frequency in dataset")
-        print(f"Using {validation_iou_mode} IoU for model selection during training")
-        print("=" * 60 + "\n")
+            logger.info("Classes weighted by pixel frequency in dataset")
+        logger.info(
+            "Using %s IoU for model selection during training", validation_iou_mode
+        )
+        logger.info("=" * 60)
 
     model = _train_with_custom_iou(
         images_dir=images_dir,
@@ -971,7 +991,7 @@ def _train_with_custom_iou(
 
     # Ensure matching files
     if len(image_files) != len(label_files):
-        print("Warning: Number of image files and label files don't match!")
+        logger.warning("Number of image files and label files don't match!")
         basenames = [os.path.basename(f) for f in image_files]
         label_files = [
             os.path.join(labels_dir, os.path.basename(f))
@@ -983,9 +1003,11 @@ def _train_with_custom_iou(
             for f, b in zip(image_files, basenames)
             if os.path.exists(os.path.join(labels_dir, b))
         ]
-        print(f"Using {len(image_files)} matching files")
+        logger.info("Using %d matching files", len(image_files))
 
-    print(f"Found {len(image_files)} image files and {len(label_files)} label files")
+    logger.info(
+        "Found %d image files and %d label files", len(image_files), len(label_files)
+    )
 
     if len(image_files) == 0:
         raise FileNotFoundError("No matching image and label files found")
@@ -995,7 +1017,11 @@ def _train_with_custom_iou(
         image_files, label_files, test_size=val_split, random_state=seed
     )
 
-    print(f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images")
+    logger.info(
+        "Training on %d images, validating on %d images",
+        len(train_imgs),
+        len(val_imgs),
+    )
 
     # Simple dataset class for sparse labels training
     class SparseLabelsDataset(Dataset):
@@ -1090,10 +1116,10 @@ def _train_with_custom_iou(
     )
 
     # Test data loader
-    print("Testing data loader...")
+    logger.info("Testing data loader...")
     try:
         next(iter(train_loader))
-        print("Data loader test passed.")
+        logger.info("Data loader test passed.")
     except RuntimeError as e:
         if "stack expects each tensor to be equal size" in str(e):
             raise RuntimeError(
@@ -1133,23 +1159,25 @@ def _train_with_custom_iou(
 
     # Enable multi-GPU training if available
     if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs for training")
+        logger.info("Using %d GPUs for training", torch.cuda.device_count())
         model = torch.nn.DataParallel(model)
 
     # ===== PERFORMANCE OPTIMIZATIONS =====
     # Enable cuDNN auto-tuner for optimal conv algorithms (fixed input size)
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
-        print("cuDNN benchmark mode enabled")
+        logger.info("cuDNN benchmark mode enabled")
 
     # Setup mixed precision training (AMP) for ~2x speedup
     use_amp = torch.cuda.is_available()
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
     if use_amp:
-        print("Mixed precision training (AMP) enabled")
+        logger.info("Mixed precision training (AMP) enabled")
 
-    print(f"Starting training with {architecture} + {encoder_name}")
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    logger.info("Starting training with %s + %s", architecture, encoder_name)
+    logger.info(
+        "Model parameters: %s", f"{sum(p.numel() for p in model.parameters()):,}"
+    )
 
     # Setup optimizer and scheduler
     optimizer = torch.optim.Adam(
@@ -1168,7 +1196,7 @@ def _train_with_custom_iou(
 
     # Load checkpoint if provided
     if checkpoint_path is not None and os.path.exists(checkpoint_path):
-        print(f"Loading checkpoint from {checkpoint_path}")
+        logger.info("Loading checkpoint from %s", checkpoint_path)
         checkpoint = torch.load(checkpoint_path, map_location=device)
         if isinstance(checkpoint, dict):
             if "model_state_dict" in checkpoint:
@@ -1177,8 +1205,10 @@ def _train_with_custom_iou(
                     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
                     start_epoch = checkpoint.get("epoch", 0) + 1
                     best_iou = checkpoint.get("best_iou", 0.0)
-                    print(
-                        f"Resuming from epoch {start_epoch}, best IoU: {best_iou:.4f}"
+                    logger.info(
+                        "Resuming from epoch %d, best IoU: %.4f",
+                        start_epoch,
+                        best_iou,
                     )
         else:
             model.load_state_dict(checkpoint)
@@ -1191,8 +1221,9 @@ def _train_with_custom_iou(
         "boundary_weighted": f"BOUNDARY-WEIGHTED (wIoU, α={boundary_alpha})",
         "sparse_labels": f"SPARSE LABELS (bg={background_class} ignored)",
     }
-    print(
-        f"\nStarting training with {mode_labels.get(validation_iou_mode, validation_iou_mode)} IoU..."
+    logger.info(
+        "Starting training with %s IoU...",
+        mode_labels.get(validation_iou_mode, validation_iou_mode),
     )
 
     for epoch in range(start_epoch, num_epochs):
@@ -1223,8 +1254,12 @@ def _train_with_custom_iou(
             num_batches += 1
 
             if verbose and batch_idx % print_freq == 0:
-                print(
-                    f"  Epoch {epoch+1} [{batch_idx}/{len(train_loader)}] Loss: {loss.item():.4f}"
+                logger.debug(
+                    "  Epoch %d [%d/%d] Loss: %.4f",
+                    epoch + 1,
+                    batch_idx,
+                    len(train_loader),
+                    loss.item(),
                 )
 
         train_loss = epoch_loss / num_batches
@@ -1325,11 +1360,13 @@ def _train_with_custom_iou(
         lr_scheduler.step(val_iou)
 
         # Print metrics
-        print(
-            f"Epoch {epoch+1}/{num_epochs}: "
-            f"Train Loss: {train_loss:.4f}, "
-            f"Val Loss: {val_loss:.4f}, "
-            f"{iou_display}"
+        logger.info(
+            "Epoch %d/%d: Train Loss: %.4f, Val Loss: %.4f, %s",
+            epoch + 1,
+            num_epochs,
+            train_loss,
+            val_loss,
+            iou_display,
         )
 
         # Call training callback if provided
@@ -1348,12 +1385,12 @@ def _train_with_custom_iou(
                     is_best=is_best,
                 )
             except Exception as e:
-                print(f"Warning: Training callback error: {e}")
+                logger.warning("Training callback error: %s", e)
 
         # Save best model based on validation IoU
         if val_iou > best_iou:
             best_iou = val_iou
-            print(f"New best model! {iou_display}")
+            logger.info("New best model! %s", iou_display)
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
 
         # Save checkpoint every 10 epochs if not save_best_only
@@ -1387,8 +1424,8 @@ def _train_with_custom_iou(
     }
     iou_label = mode_labels.get(validation_iou_mode, validation_iou_mode)
 
-    print(f"\nTraining complete! Best {iou_label}: {best_iou:.4f}")
-    print(f"Best model saved to: {os.path.join(output_dir, 'best_model.pth')}")
+    logger.info("Training complete! Best %s: %.4f", iou_label, best_iou)
+    logger.info("Best model saved to: %s", os.path.join(output_dir, "best_model.pth"))
 
     # Plot training curves if requested
     if plot_curves:
@@ -1419,17 +1456,18 @@ def _train_with_custom_iou(
             plot_filename = f"training_curves_{validation_iou_mode}.png"
             plt.savefig(os.path.join(output_dir, plot_filename), dpi=150)
             plt.show()
-            print(
-                f"Training curves saved to: {os.path.join(output_dir, plot_filename)}"
+            logger.info(
+                "Training curves saved to: %s",
+                os.path.join(output_dir, plot_filename),
             )
         except Exception as e:
-            print(f"Warning: Could not plot training curves: {e}")
+            logger.warning("Could not plot training curves: %s", e)
 
     # Load best model weights
     best_model_path = os.path.join(output_dir, "best_model.pth")
     if os.path.exists(best_model_path):
         model.load_state_dict(torch.load(best_model_path, map_location=device))
-        print(f"Loaded best model ({iou_label}: {best_iou:.4f})")
+        logger.info("Loaded best model (%s: %.4f)", iou_label, best_iou)
 
     return model
 
@@ -1522,12 +1560,14 @@ def evaluate_sparse_iou(
         )
 
     if verbose:
-        print(f"\n{'='*60}")
-        print("SPARSE LABELS IoU EVALUATION")
-        print(f"{'='*60}")
-        print(f"Evaluating {len(image_files)} image-label pairs")
-        print(f"Background class: {background_class} (predictions here NOT penalized)")
-        print(f"Number of classes: {num_classes}")
+        logger.info("=" * 60)
+        logger.info("SPARSE LABELS IoU EVALUATION")
+        logger.info("=" * 60)
+        logger.info("Evaluating %d image-label pairs", len(image_files))
+        logger.info(
+            "Background class: %d (predictions here NOT penalized)", background_class
+        )
+        logger.info("Number of classes: %d", num_classes)
 
     # Accumulate predictions and targets
     all_preds = []
@@ -1560,7 +1600,7 @@ def evaluate_sparse_iou(
             all_targets.append(label_tensor)
 
             if verbose and (i + 1) % 50 == 0:
-                print(f"   Processed {i + 1}/{len(image_files)} tiles...")
+                logger.info("   Processed %d/%d tiles...", i + 1, len(image_files))
 
     # Concatenate all predictions and targets
     all_preds = torch.cat(all_preds, dim=0)
@@ -1615,22 +1655,28 @@ def evaluate_sparse_iou(
     }
 
     if verbose:
-        print("\nSPARSE LABELS IoU RESULTS:")
-        print(f"   (Predictions in background areas NOT counted as false positives)")
-        print(f"\n   {'Class':<8} {'IoU':>8} {'Recall':>8} {'Precision':>10}")
-        print(f"   {'-'*36}")
+        logger.info("SPARSE LABELS IoU RESULTS:")
+        logger.info(
+            "   (Predictions in background areas NOT counted as false positives)"
+        )
+        logger.info("   %-8s %8s %8s %10s", "Class", "IoU", "Recall", "Precision")
+        logger.info("   %s", "-" * 36)
         for cls in sorted(per_class_iou_dict.keys()):
             iou = per_class_iou_dict.get(cls, 0.0)
             recall = per_class_recall_dict.get(cls, 0.0)
             precision = per_class_precision_dict.get(cls, 0.0)
-            print(f"   {cls:<8} {iou:>8.4f} {recall:>8.4f} {precision:>10.4f}")
+            logger.info("   %-8s %8.4f %8.4f %10.4f", cls, iou, recall, precision)
 
-        print(f"   {'-'*36}")
-        print(
-            f"   {'MEAN':<8} {mean_iou:>8.4f} {mean_recall:>8.4f} {mean_precision:>10.4f}"
+        logger.info("   %s", "-" * 36)
+        logger.info(
+            "   %-8s %8.4f %8.4f %10.4f",
+            "MEAN",
+            mean_iou,
+            mean_recall,
+            mean_precision,
         )
-        print("\nSparse IoU evaluation complete!")
-        print(f"{'='*60}\n")
+        logger.info("Sparse IoU evaluation complete!")
+        logger.info("=" * 60)
 
     return results
 

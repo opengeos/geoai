@@ -168,7 +168,7 @@ class AutoGeoImageProcessor:
                 processor = AutoImageProcessor.from_pretrained(
                     pretrained_model_name_or_path, **kwargs
                 )
-            except Exception:
+            except (OSError, ValueError, KeyError):
                 logger.debug(
                     "AutoImageProcessor failed for %s, falling back to AutoProcessor",
                     pretrained_model_name_or_path,
@@ -616,7 +616,7 @@ class AutoGeoModel:
                 device=device,
                 use_full_processor=needs_full_processor,
             )
-        except Exception:
+        except (OSError, ValueError, KeyError):
             logger.debug(
                 "Failed to create AutoGeoImageProcessor for %s, "
                 "proceeding without processor",
@@ -634,7 +634,7 @@ class AutoGeoModel:
             overlap=overlap,
         )
 
-        print(f"Model loaded on {device}")
+        logger.info("Model loaded on %s", device)
         return instance
 
     @classmethod
@@ -668,7 +668,7 @@ class AutoGeoModel:
                 )
             else:
                 return AutoModel.from_pretrained(model_name_or_path, **kwargs)
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             logger.debug(
                 "Task-specific model loading failed for %s, "
                 "falling back to AutoModel",
@@ -771,7 +771,7 @@ class AutoGeoModel:
                                 "width": src.width,
                                 "height": src.height,
                             }
-                    except Exception:
+                    except (OSError, ValueError):
                         logger.debug(
                             "Failed to load %s as GeoTIFF, falling back to PIL",
                             source,
@@ -929,7 +929,7 @@ class AutoGeoModel:
         mask_output = np.zeros((height, width), dtype=np.float32)
         count_output = np.zeros((height, width), dtype=np.float32)
 
-        print(f"Processing {total_tiles} tiles ({n_tiles_x}x{n_tiles_y})")
+        logger.info("Processing %d tiles (%dx%d)", total_tiles, n_tiles_x, n_tiles_y)
 
         with tqdm(total=total_tiles, desc="Processing tiles") as pbar:
             for y in range(n_tiles_y):
@@ -973,7 +973,7 @@ class AutoGeoModel:
                             mask_output[y_start:y_end, x_start:x_end] += tile_mask
                             count_output[y_start:y_end, x_start:x_end] += 1
 
-                    except Exception as e:
+                    except (RuntimeError, ValueError, IndexError) as e:
                         logger.warning("Error processing tile (%d, %d): %s", x, y, e)
 
                     pbar.update(1)
@@ -1038,7 +1038,7 @@ class AutoGeoModel:
                                     data[i] = 0
                             data = data.astype(np.uint8)
                         pil_image = Image.fromarray(data.transpose(1, 2, 0))
-                except Exception:
+                except (OSError, ValueError):
                     logger.debug(
                         "Failed to load source as GeoTIFF, falling back to PIL"
                     )
@@ -1144,7 +1144,7 @@ class AutoGeoModel:
                         result["labels"] = [
                             f"object_{i}" for i in range(len(r["boxes"]))
                         ]
-            except Exception as e:
+            except (RuntimeError, AttributeError, KeyError) as e:
                 # Fallback for models without grounded post-processing
                 logger.warning("Using fallback detection processing: %s", e)
                 if hasattr(outputs, "pred_boxes"):
@@ -1302,7 +1302,7 @@ class AutoGeoModel:
             GeoDataFrame with polygon geometries, or None if no valid polygons.
         """
         if metadata is None or metadata.get("crs") is None:
-            print("Warning: No CRS information available for vectorization")
+            logger.warning("No CRS information available for vectorization")
             return None
 
         # Ensure binary mask
@@ -1316,7 +1316,7 @@ class AutoGeoModel:
         crs = metadata.get("crs")
 
         if transform is None:
-            print("Warning: No transform available for vectorization")
+            logger.warning("No transform available for vectorization")
             return None
 
         # Extract shapes using rasterio
@@ -1346,7 +1346,7 @@ class AutoGeoModel:
                         polygons.append(poly)
                         values.append(value)
 
-        except Exception as e:
+        except (ValueError, TypeError, RuntimeError) as e:
             logger.warning("Error during vectorization: %s", e)
             return None
 
@@ -1723,7 +1723,7 @@ def _load_image_for_display(
                             img[..., i] = 0
                     img = img.astype(np.uint8)
                 return img, metadata
-        except Exception:
+        except (OSError, ValueError):
             logger.debug("Failed to load %s as GeoTIFF with rasterio", source)
 
         # Try as regular image

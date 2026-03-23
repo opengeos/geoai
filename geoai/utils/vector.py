@@ -1,8 +1,11 @@
 """Vector I/O and processing utilities."""
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import geopandas as gpd
 import leafmap
@@ -96,22 +99,22 @@ def print_vector_info(
         info = get_vector_info(vector_path)
 
         # Print basic information
-        print(f"===== VECTOR INFORMATION: {vector_path} =====")
-        print(f"Driver: {info['driver']}")
-        print(f"Feature count: {info['feature_count']}")
-        print(f"Geometry types: {info['geometry_type']}")
-        print(f"Coordinate Reference System: {info['crs']}")
-        print(f"Bounds: {info['bounds']}")
-        print(f"Number of attributes: {info['attribute_count']}")
-        print(f"Attribute names: {', '.join(info['attribute_names'])}")
+        logger.info(f"===== VECTOR INFORMATION: {vector_path} =====")
+        logger.info(f"Driver: {info['driver']}")
+        logger.info(f"Feature count: {info['feature_count']}")
+        logger.info(f"Geometry types: {info['geometry_type']}")
+        logger.info(f"Coordinate Reference System: {info['crs']}")
+        logger.info(f"Bounds: {info['bounds']}")
+        logger.info(f"Number of attributes: {info['attribute_count']}")
+        logger.info(f"Attribute names: {', '.join(info['attribute_names'])}")
 
         # Print attribute statistics
         if info["attribute_stats"]:
-            print("\n----- Attribute Statistics -----")
+            logger.info("----- Attribute Statistics -----")
             for attr, stats in info["attribute_stats"].items():
-                print(f"Attribute: {attr}")
+                logger.info(f"Attribute: {attr}")
                 for stat_name, stat_value in stats.items():
-                    print(
+                    logger.info(
                         f"  {stat_name}: {stat_value:.4f}"
                         if isinstance(stat_value, float)
                         else f"  {stat_name}: {stat_value}"
@@ -135,8 +138,8 @@ def print_vector_info(
             #     print("\n----- Sample of attribute table (first 5 rows) -----")
             #     print(gdf.head().to_string())
 
-    except Exception as e:
-        print(f"Error reading vector data: {str(e)}")
+    except (OSError, ValueError) as e:
+        logger.error(f"Error reading vector data: {str(e)}")
 
 
 # Alternative implementation using OGR directly
@@ -158,7 +161,7 @@ def get_vector_info_ogr(vector_path: str) -> Optional[Dict[str, Any]]:
     # Open the dataset
     ds = ogr.Open(vector_path)
     if ds is None:
-        print(f"Error: Could not open {vector_path}")
+        logger.error(f"Could not open {vector_path}")
         return None
 
     # Basic dataset information
@@ -220,7 +223,7 @@ def analyze_vector_attributes(
 
         # Check if attribute exists
         if attribute_name not in gdf.columns:
-            print(f"Attribute '{attribute_name}' not found in the dataset")
+            logger.warning(f"Attribute '{attribute_name}' not found in the dataset")
             return None
 
         # Get the attribute series
@@ -276,8 +279,8 @@ def analyze_vector_attributes(
 
         return analysis
 
-    except Exception as e:
-        print(f"Error analyzing attribute: {str(e)}")
+    except (OSError, ValueError, KeyError) as e:
+        logger.error(f"Error analyzing attribute: {str(e)}")
         return None
 
 
@@ -304,7 +307,7 @@ def visualize_vector_by_attribute(
 
         # Check if attribute exists
         if attribute_name not in gdf.columns:
-            print(f"Attribute '{attribute_name}' not found in the dataset")
+            logger.warning(f"Attribute '{attribute_name}' not found in the dataset")
             return False
 
         # Create the plot
@@ -329,8 +332,8 @@ def visualize_vector_by_attribute(
         plt.tight_layout()
         plt.show()
 
-    except Exception as e:
-        print(f"Error visualizing data: {str(e)}")
+    except (OSError, ValueError, KeyError) as e:
+        logger.error(f"Error visualizing data: {str(e)}")
 
 
 def export_tiles_to_geojson(
@@ -434,7 +437,7 @@ def export_tiles_to_geojson(
     with open(output_path, "w") as f:
         json.dump(geojson_collection, f)
 
-    print(f"GeoJSON saved to {output_path}")
+    logger.info(f"GeoJSON saved to {output_path}")
     return output_path
 
 
@@ -743,7 +746,7 @@ def add_geometric_properties(
 
                 return major_length, minor_length, eccentricity, orientation, elongation
 
-            except Exception as e:
+            except (ValueError, TypeError, ZeroDivisionError) as e:
                 # For debugging
                 # print(f"Error calculating axes: {e}")
                 return None, None, None, None, None
@@ -850,7 +853,7 @@ def add_geometric_properties(
 
 def vector_to_geojson(
     filename: str, output: Optional[str] = None, **kwargs: Any
-) -> str:
+) -> Optional[Union[Dict, str]]:
     """Converts a vector file to a geojson file.
 
     Args:
@@ -873,7 +876,7 @@ def vector_to_geojson(
 
 def geojson_to_coords(
     geojson: str, src_crs: str = "epsg:4326", dst_crs: str = "epsg:4326"
-) -> list:
+) -> List[List[float]]:
     """Converts a geojson file or a dictionary of feature collection to a list of centroid coordinates.
 
     Args:
@@ -912,7 +915,7 @@ def boxes_to_vector(
     dst_crs: str = "EPSG:4326",
     output: Optional[str] = None,
     **kwargs: Any,
-) -> gpd.GeoDataFrame:
+) -> Optional[gpd.GeoDataFrame]:
     """
     Convert a list of bounding box coordinates to vector data.
 

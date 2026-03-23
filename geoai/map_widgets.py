@@ -1,5 +1,6 @@
 """Interactive widget for GeoAI."""
 
+import logging
 import os
 import string
 import random
@@ -7,6 +8,8 @@ import tempfile
 from typing import Any, Optional
 
 import ipywidgets as widgets
+
+logger = logging.getLogger(__name__)
 
 from .utils import dict_to_image, dict_to_rioxarray
 
@@ -187,7 +190,7 @@ class DINOv3GUI(widgets.VBox):
                             )
                 except Exception as e:
                     with output:
-                        print(e)
+                        logger.error("%s", e)
 
             host_map.on_interaction(handle_map_interaction)
             host_map.default_style = {"cursor": "crosshair"}

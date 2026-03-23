@@ -2,6 +2,7 @@
 
 # Standard Library
 import json
+import logging
 import os
 from collections.abc import Iterable
 from typing import (
@@ -12,6 +13,8 @@ from typing import (
     Tuple,
     Union,
 )
+
+logger = logging.getLogger(__name__)
 
 # Third-Party Libraries
 import geopandas as gpd
@@ -551,7 +554,7 @@ def view_vector(
             }
             ctx.add_basemap(ax, crs=gdf.crs, source=basemap_options[basemap_type])
         except Exception as e:
-            print(f"Could not add basemap: {e}")
+            logger.debug(f"Could not add basemap: {e}")
 
     # Set title if provided
     if title:
@@ -967,7 +970,7 @@ def display_training_tiles(
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
-        print(f"Figure saved to: {save_path}")
+        logger.info(f"Figure saved to: {save_path}")
     else:
         plt.show()
 
@@ -1058,7 +1061,7 @@ def display_image_with_vector(
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
-        print(f"Figure saved to: {save_path}")
+        logger.info(f"Figure saved to: {save_path}")
     else:
         plt.show()
 
@@ -1310,7 +1313,7 @@ def create_overview_image(
     fig.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-    print(f"Overview image saved to {output_path}")
+    logger.info(f"Overview image saved to {output_path}")
 
     # Export GeoJSON if requested
     if geojson_path:
@@ -1332,7 +1335,7 @@ def create_overview_image(
         with open(geojson_path, "w") as f:
             json.dump(geojson_collection, f)
 
-        print(f"GeoJSON saved to {geojson_path}")
+        logger.info(f"GeoJSON saved to {geojson_path}")
 
     return output_path
 
@@ -1445,7 +1448,7 @@ def plot_performance_metrics(
     if csv_path:
         df.to_csv(csv_path, index=False)
         if verbose:
-            print(f"Metrics exported to: {csv_path}")
+            logger.info(f"Metrics exported to: {csv_path}")
 
     # Create plots
     if n_plots > 0:
@@ -1496,28 +1499,28 @@ def plot_performance_metrics(
 
     # Print summary statistics
     if verbose:
-        print("\n=== Performance Metrics Summary ===")
+        logger.info("=== Performance Metrics Summary ===")
         if val_iou_key in history:
-            print(
+            logger.info(
                 f"IoU     - Best: {max(history[val_iou_key]):.4f} | Final: {history[val_iou_key][-1]:.4f}"
             )
         if val_f1_key in history:
-            print(
+            logger.info(
                 f"F1      - Best: {max(history[val_f1_key]):.4f} | Final: {history[val_f1_key][-1]:.4f}"
             )
         if val_precision_key in history:
-            print(
+            logger.info(
                 f"Precision - Best: {max(history[val_precision_key]):.4f} | Final: {history[val_precision_key][-1]:.4f}"
             )
         if val_recall_key in history:
-            print(
+            logger.info(
                 f"Recall  - Best: {max(history[val_recall_key]):.4f} | Final: {history[val_recall_key][-1]:.4f}"
             )
         if val_loss_key in history:
-            print(
+            logger.info(
                 f"Val Loss - Best: {min(history[val_loss_key]):.4f} | Final: {history[val_loss_key][-1]:.4f}"
             )
-        print("===================================\n")
+        logger.info("===================================\n")
 
     return df
 
@@ -1648,7 +1651,7 @@ def plot_prediction_comparison(
 
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
-        print(f"Plot saved to: {save_path}")
+        logger.info(f"Plot saved to: {save_path}")
 
     if show_plot:
         plt.show()

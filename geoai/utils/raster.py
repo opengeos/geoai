@@ -1,6 +1,7 @@
 """Raster I/O and processing utilities."""
 
 # Standard Library
+import logging
 import os
 import subprocess
 import warnings
@@ -28,7 +29,11 @@ from rasterio.windows import Window
 from shapely.geometry import Polygon, box, shape
 from tqdm import tqdm
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
+    "RasterMetadata",
+    "read_raster_metadata",
     "calc_stats",
     "get_raster_info",
     "get_raster_stats",
@@ -47,6 +52,60 @@ __all__ = [
     "get_raster_resolution",
     "stack_bands",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Rasterio boilerplate helper
+# ---------------------------------------------------------------------------
+
+from typing import NamedTuple
+
+
+class RasterMetadata(NamedTuple):
+    """Commonly-needed raster metadata returned by :func:`read_raster_metadata`.
+
+    This avoids repeating the ``with rasterio.open(...) as src:`` boilerplate
+    every time you need CRS, transform, bounds, shape, or nodata.
+    """
+
+    crs: Any
+    transform: Any
+    bounds: Any
+    width: int
+    height: int
+    count: int
+    dtype: str
+    nodata: Optional[float]
+    driver: str
+
+
+def read_raster_metadata(raster_path: str) -> RasterMetadata:
+    """Read common metadata from a raster file without loading pixel data.
+
+    This is a thin wrapper around ``rasterio.open()`` that extracts the
+    fields most frequently needed (CRS, transform, bounds, shape, dtype,
+    nodata) and returns them as a lightweight :class:`RasterMetadata`
+    named-tuple.  Use it to eliminate repeated ``with rasterio.open(…)``
+    blocks that only inspect metadata.
+
+    Args:
+        raster_path: Path to the raster file.
+
+    Returns:
+        A :class:`RasterMetadata` named-tuple with the raster's metadata.
+    """
+    with rasterio.open(raster_path) as src:
+        return RasterMetadata(
+            crs=src.crs,
+            transform=src.transform,
+            bounds=src.bounds,
+            width=src.width,
+            height=src.height,
+            count=src.count,
+            dtype=src.dtypes[0],
+            nodata=src.nodata,
+            driver=src.driver,
+        )
 
 
 def calc_stats(dataset, divide_by: float = 1.0) -> Tuple[np.ndarray, np.ndarray]:
@@ -188,24 +247,26 @@ def print_raster_info(
         info = get_raster_info(raster_path)
 
         # Print basic information
-        print(f"===== RASTER INFORMATION: {raster_path} =====")
-        print(f"Driver: {info['driver']}")
-        print(f"Dimensions: {info['width']} x {info['height']} pixels")
-        print(f"Number of bands: {info['count']}")
-        print(f"Data type: {info['dtype']}")
-        print(f"Coordinate Reference System: {info['crs']}")
-        print(f"Georeferenced Bounds: {info['bounds']}")
-        print(f"Pixel Resolution: {info['resolution'][0]}, {info['resolution'][1]}")
-        print(f"NoData Value: {info['nodata']}")
+        logger.info("===== RASTER INFORMATION: %s =====", raster_path)
+        logger.info("Driver: %s", info["driver"])
+        logger.info("Dimensions: %s x %s pixels", info["width"], info["height"])
+        logger.info("Number of bands: %s", info["count"])
+        logger.info("Data type: %s", info["dtype"])
+        logger.info("Coordinate Reference System: %s", info["crs"])
+        logger.info("Georeferenced Bounds: %s", info["bounds"])
+        logger.info(
+            "Pixel Resolution: %s, %s", info["resolution"][0], info["resolution"][1]
+        )
+        logger.info("NoData Value: %s", info["nodata"])
 
         # Print band statistics
-        print("\n----- Band Statistics -----")
+        logger.info("----- Band Statistics -----")
         for band_stat in info["band_stats"]:
-            print(f"Band {band_stat['band']}:")
-            print(f"  Min: {band_stat['min']:.2f}")
-            print(f"  Max: {band_stat['max']:.2f}")
-            print(f"  Mean: {band_stat['mean']:.2f}")
-            print(f"  Std Dev: {band_stat['std']:.2f}")
+            logger.info("Band %s:", band_stat["band"])
+            logger.info("  Min: %.2f", band_stat["min"])
+            logger.info("  Max: %.2f", band_stat["max"])
+            logger.info("  Mean: %.2f", band_stat["mean"])
+            logger.info("  Std Dev: %.2f", band_stat["std"])
 
         # Show a preview if requested
         if show_preview:
@@ -228,8 +289,8 @@ def print_raster_info(
                     plt.colorbar(label="Pixel Value")
                 plt.show()
 
-    except Exception as e:
-        print(f"Error reading raster: {str(e)}")
+    except (OSError, ValueError) as e:
+        logger.error("Error reading raster: %s", str(e))
 
 
 def get_raster_info_gdal(raster_path: str) -> Optional[Dict[str, Any]]:
@@ -248,7 +309,7 @@ def get_raster_info_gdal(raster_path: str) -> Optional[Dict[str, Any]]:
     # Open the dataset
     ds = gdal.Open(raster_path)
     if ds is None:
-        print(f"Error: Could not open {raster_path}")
+        logger.error("Could not open %s", raster_path)
         return None
 
     # Get basic information
@@ -379,7 +440,7 @@ def clip_raster_by_bbox(
                     minx, miny, maxx, maxy = transform_bounds(
                         bbox_crs, src_crs, minx, miny, maxx, maxy
                     )
-                except Exception as e:
+                except (ValueError, RuntimeError) as e:
                     raise ValueError(
                         f"Failed to transform bbox from {bbox_crs} to {src_crs}: {str(e)}"
                     )
@@ -585,7 +646,7 @@ def raster_to_vector(
         if all_features:
             gdf = gpd.GeoDataFrame(all_features, crs=crs)
         else:
-            print("Warning: No features were extracted from the raster.")
+            logger.warning("No features were extracted from the raster.")
             # Return empty GeoDataFrame with correct CRS
             gdf = gpd.GeoDataFrame([], geometry=[], crs=crs)
 
@@ -619,7 +680,7 @@ def raster_to_vector(
             else:
                 raise ValueError(f"Unsupported output format: {output_format}")
 
-            print(f"Vectorized data saved to {output_path}")
+            logger.info("Vectorized data saved to %s", output_path)
 
         # Plot result if requested
         if plot_result:
@@ -689,10 +750,10 @@ def raster_to_vector_batch(
     raster_files = glob.glob(os.path.join(input_dir, pattern))
 
     if not raster_files:
-        print(f"No files matching pattern '{pattern}' found in {input_dir}")
+        logger.warning("No files matching pattern '%s' found in %s", pattern, input_dir)
         return None
 
-    print(f"Found {len(raster_files)} raster files to process")
+    logger.info("Found %d raster files to process", len(raster_files))
 
     # Process each raster file
     gdfs = []
@@ -757,7 +818,7 @@ def raster_to_vector_batch(
             merged_file = os.path.join(output_dir, f"{merge_filename}.gpkg")
             merged_gdf.to_file(merged_file, driver="GPKG")
 
-        print(f"Merged vector data saved to {merged_file}")
+        logger.info("Merged vector data saved to %s", merged_file)
         return merged_gdf
 
     return None
@@ -881,7 +942,7 @@ def vector_to_raster(
 
     # Reproject vector data if its CRS doesn't match the output CRS
     if gdf.crs != crs:
-        print(f"Reprojecting vector data from {gdf.crs} to {crs}")
+        logger.info("Reprojecting vector data from %s to %s", gdf.crs, crs)
         gdf = gdf.to_crs(crs)
 
     # Create empty raster filled with fill_value
@@ -936,7 +997,7 @@ def vector_to_raster(
         with rasterio.open(output_path, "w", **metadata) as dst:
             dst.write(raster_data, 1)
 
-        print(f"Rasterized data saved to {output_path}")
+        logger.info("Rasterized data saved to %s", output_path)
 
     # Plot result if requested
     if plot_result:
@@ -1080,7 +1141,7 @@ def masks_to_vector(
     min_object_area: int = 100,
     max_object_area: Optional[int] = None,
     nms_iou_threshold: float = 0.5,
-) -> Any:
+) -> gpd.GeoDataFrame:
     """
     Convert a building mask GeoTIFF to vector polygons and save as a vector dataset.
 
@@ -1102,11 +1163,11 @@ def masks_to_vector(
     # if output_path is None:
     #     output_path = os.path.splitext(mask_path)[0] + ".geojson"
 
-    print(f"Converting mask to GeoJSON with parameters:")
-    print(f"- Mask threshold: {mask_threshold}")
-    print(f"- Min building area: {min_object_area}")
-    print(f"- Simplify tolerance: {simplify_tolerance}")
-    print(f"- NMS IoU threshold: {nms_iou_threshold}")
+    logger.info("Converting mask to GeoJSON with parameters:")
+    logger.info("- Mask threshold: %s", mask_threshold)
+    logger.info("- Min building area: %s", min_object_area)
+    logger.info("- Simplify tolerance: %s", simplify_tolerance)
+    logger.info("- NMS IoU threshold: %s", nms_iou_threshold)
 
     # Open the mask raster
     with rasterio.open(mask_path) as src:
@@ -1116,8 +1177,8 @@ def masks_to_vector(
         crs = src.crs
 
         # Print mask statistics
-        print(f"Mask dimensions: {mask_data.shape}")
-        print(f"Mask value range: {mask_data.min()} to {mask_data.max()}")
+        logger.info("Mask dimensions: %s", mask_data.shape)
+        logger.info("Mask value range: %s to %s", mask_data.min(), mask_data.max())
 
         # Prepare for connected component analysis
         # Binarize the mask based on threshold
@@ -1132,7 +1193,9 @@ def masks_to_vector(
             binary_mask, connectivity=8
         )
 
-        print(f"Found {num_labels-1} potential buildings")  # Subtract 1 for background
+        logger.info(
+            "Found %d potential buildings", num_labels - 1
+        )  # Subtract 1 for background
 
         # Create list to store polygons and confidence values
         all_polygons = []
@@ -1190,14 +1253,14 @@ def masks_to_vector(
                             # This is a proxy since we don't have model confidence scores
                             normalized_size = min(1.0, area / 1000)  # Cap at 1.0
                             all_confidences.append(normalized_size)
-                    except Exception as e:
-                        print(f"Error creating polygon: {e}")
+                    except (ValueError, TypeError) as e:
+                        logger.error("Error creating polygon: %s", e)
 
-        print(f"Created {len(all_polygons)} valid polygons")
+        logger.info("Created %d valid polygons", len(all_polygons))
 
         # Create GeoDataFrame
         if not all_polygons:
-            print("No valid polygons found")
+            logger.warning("No valid polygons found")
             return None
 
         gdf = gpd.GeoDataFrame(
@@ -1257,7 +1320,7 @@ def masks_to_vector(
                         if iou > iou_threshold:
                             keep = False
                             break
-                    except Exception:
+                    except (ValueError, TypeError):
                         # Skip on topology exceptions
                         continue
 
@@ -1269,12 +1332,12 @@ def masks_to_vector(
         # Apply non-maximum suppression to remove overlapping polygons
         gdf = filter_overlapping_polygons(gdf, nms_iou_threshold=nms_iou_threshold)
 
-        print(f"Final building count after filtering: {len(gdf)}")
+        logger.info("Final building count after filtering: %d", len(gdf))
 
         # Save to file
         if output_path is not None:
             gdf.to_file(output_path)
-            print(f"Saved {len(gdf)} building footprints to {output_path}")
+            logger.info("Saved %d building footprints to %s", len(gdf), output_path)
 
         return gdf
 
@@ -1350,14 +1413,14 @@ def read_vector(
                 layers = fiona.listlayers(source)
             if layers:
                 return gpd.read_file(source, layer=layers[0], **kwargs)
-        except Exception:
+        except (OSError, ValueError):
             # If listing layers fails, we'll fall through to the generic read attempt
             pass
 
     # For other formats or when layer listing fails, attempt to read using GeoPandas
     try:
         return gpd.read_file(source, **kwargs)
-    except Exception as e:
+    except (OSError, ValueError) as e:
         raise ValueError(f"Could not read from source '{source}': {str(e)}")
 
 
@@ -1427,7 +1490,7 @@ def read_raster(
 
     except RasterioIOError as e:
         raise ValueError(f"Could not read raster from source '{source}': {str(e)}")
-    except Exception as e:
+    except (OSError, ValueError, TypeError) as e:
         raise ValueError(f"Error reading raster data: {str(e)}")
 
 
@@ -1466,13 +1529,13 @@ def mosaic_geotiffs(
     tif_files = glob.glob(os.path.join(input_dir, "*.tif"))
 
     if not tif_files:
-        print("No GeoTIFF files found in the specified directory.")
+        logger.warning("No GeoTIFF files found in the specified directory.")
         return False
 
     # Analyze the first input file to determine compression and nodata settings
     ds = gdal.Open(tif_files[0])
     if ds is None:
-        print(f"Unable to open {tif_files[0]}")
+        logger.error("Unable to open %s", tif_files[0])
         return False
 
     # Get driver metadata from the first file
@@ -1526,7 +1589,7 @@ def mosaic_geotiffs(
 
     # Apply mask if provided
     if mask_file and os.path.exists(mask_file):
-        print(f"Clipping mosaic to mask: {mask_file}")
+        logger.info("Clipping mosaic to mask: %s", mask_file)
 
         # Create a temporary clipped file
         clipped_mosaic = output_file + ".clipped.tif"
@@ -1534,7 +1597,7 @@ def mosaic_geotiffs(
         # Open mask file
         mask_ds = gdal.Open(mask_file)
         if mask_ds is None:
-            print(f"Unable to open mask file: {mask_file}")
+            logger.error("Unable to open mask file: %s", mask_file)
             # Continue without clipping
         else:
             # Get mask extent
@@ -1592,7 +1655,7 @@ def mosaic_geotiffs(
     if os.path.exists(temp_mosaic):
         os.remove(temp_mosaic)
 
-    print(f"Cloud Optimized GeoTIFF mosaic created successfully: {output_file}")
+    logger.info("Cloud Optimized GeoTIFF mosaic created successfully: %s", output_file)
     return True
 
 
@@ -1600,7 +1663,7 @@ def write_colormap(
     image: Union[str, np.ndarray],
     colormap: Union[str, Dict],
     output: Optional[str] = None,
-) -> Optional[str]:
+) -> None:
     """Write a colormap to an image.
 
     Args:
@@ -1663,7 +1726,7 @@ def stack_bands(
         input_files = leafmap.find_files(input_files, ".tif")
 
     if os.path.exists(output_file) and not overwrite:
-        print(f"Output file already exists: {output_file}")
+        logger.info("Output file already exists: %s", output_file)
         return output_file
 
     # Infer resolution if not provided

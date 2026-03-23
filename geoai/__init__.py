@@ -12,8 +12,11 @@ __version__ = "0.35.0"
 
 
 import importlib
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def set_proj_lib_path(verbose=False):
@@ -58,7 +61,7 @@ def set_proj_lib_path(verbose=False):
                 if os.path.exists(os.path.join(proj_path, "proj.db")):
                     os.environ["PROJ_LIB"] = proj_path
                     if verbose:
-                        print(f"PROJ_LIB set to: {proj_path}")
+                        logger.debug("PROJ_LIB set to: %s", proj_path)
                     proj_set = True
                     break
 
@@ -72,7 +75,7 @@ def set_proj_lib_path(verbose=False):
                 ) or os.path.exists(os.path.join(gdal_path, "gcs.csv")):
                     os.environ["GDAL_DATA"] = gdal_path
                     if verbose:
-                        print(f"GDAL_DATA set to: {gdal_path}")
+                        logger.debug("GDAL_DATA set to: %s", gdal_path)
                     gdal_set = True
                     break
 
@@ -83,13 +86,13 @@ def set_proj_lib_path(verbose=False):
                 if not gdal_set and "header.dxf" in files:
                     os.environ["GDAL_DATA"] = root
                     if verbose:
-                        print(f"GDAL_DATA set to: {root} (deep search)")
+                        logger.debug("GDAL_DATA set to: %s (deep search)", root)
                     gdal_set = True
 
                 if not proj_set and "proj.db" in files:
                     os.environ["PROJ_LIB"] = root
                     if verbose:
-                        print(f"PROJ_LIB set to: {root} (deep search)")
+                        logger.debug("PROJ_LIB set to: %s (deep search)", root)
                     proj_set = True
 
                 if proj_set and gdal_set:
@@ -98,8 +101,8 @@ def set_proj_lib_path(verbose=False):
         set_gdal_config("PROJ_LIB", os.environ["PROJ_LIB"])
         set_gdal_config("GDAL_DATA", os.environ["GDAL_DATA"])
 
-    except Exception as e:
-        print(f"Error setting projection library paths: {e}")
+    except (KeyError, OSError) as e:
+        logger.error("Error setting projection library paths: %s", e)
         return
 
 
@@ -266,6 +269,8 @@ _LAZY_SYMBOL_MAP = {
     "get_device": ("utils", None),
     "plot_prediction_comparison": ("utils", None),
     "get_raster_resolution": ("utils", None),
+    "RasterMetadata": ("utils", None),
+    "read_raster_metadata": ("utils", None),
     "stack_bands": ("utils", None),
     "empty_cache": ("utils", None),
     "smooth_vector": ("utils", None),

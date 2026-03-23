@@ -9,10 +9,13 @@ Supported models:
 - moondream3-preview: https://huggingface.co/moondream/moondream3-preview
 """
 
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
+
+logger = logging.getLogger(__name__)
 import numpy as np
 import rasterio
 import torch
@@ -135,7 +138,7 @@ class MoondreamGeo:
 
             load_kwargs.update(kwargs)
 
-            print(f"Loading {self.model_name}...")
+            logger.info("Loading %s...", self.model_name)
 
             # Try to load with potential transformers 5.0 compatibility fix
             try:
@@ -170,10 +173,10 @@ class MoondreamGeo:
 
             # Compile model if requested (recommended for moondream3)
             if compile_model and hasattr(model, "compile"):
-                print("Compiling model for faster inference...")
+                logger.info("Compiling model for faster inference...")
                 model.compile()
 
-            print(f"Using device: {self.device}")
+            logger.info("Using device: %s", self.device)
             return model
 
         except Exception as e:
@@ -737,7 +740,7 @@ class MoondreamGeo:
         else:
             gdf.to_file(output_path)
 
-        print(f"Saved {len(gdf)} features to {output_path}")
+        logger.info("Saved %d features to %s", len(gdf), output_path)
 
     def create_detection_mask(
         self,
@@ -816,7 +819,7 @@ class MoondreamGeo:
         with rasterio.open(output_path, "w", **profile) as dst:
             dst.write(mask, 1)
 
-        print(f"Saved mask to {output_path}")
+        logger.info("Saved mask to %s", output_path)
 
     def show_gui(
         self,
@@ -1069,10 +1072,15 @@ class MoondreamGeo:
 
                     all_detections.append(detection)
 
-            except Exception as e:
+            except (RuntimeError, ValueError, KeyError) as e:
                 if show_progress:
-                    print(
-                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    logger.warning(
+                        "Failed to process window (%d,%d)-(%d,%d): %s",
+                        x_start,
+                        y_start,
+                        x_end,
+                        y_end,
+                        e,
                     )
 
         # Apply NMS to merge overlapping detections
@@ -1178,10 +1186,15 @@ class MoondreamGeo:
 
                     all_points.append(point)
 
-            except Exception as e:
+            except (RuntimeError, ValueError, KeyError) as e:
                 if show_progress:
-                    print(
-                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    logger.warning(
+                        "Failed to process window (%d,%d)-(%d,%d): %s",
+                        x_start,
+                        y_start,
+                        x_end,
+                        y_end,
+                        e,
                     )
 
         result = {"points": all_points}
@@ -1279,10 +1292,15 @@ class MoondreamGeo:
                         "answer": result.get("answer", ""),
                     }
                 )
-            except Exception as e:
+            except (RuntimeError, ValueError, KeyError) as e:
                 if show_progress:
-                    print(
-                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    logger.warning(
+                        "Failed to process window (%d,%d)-(%d,%d): %s",
+                        x_start,
+                        y_start,
+                        x_end,
+                        y_end,
+                        e,
                     )
 
         # Combine answers
@@ -1305,7 +1323,7 @@ class MoondreamGeo:
             try:
                 summary_result = self.model.query(question=summary_prompt)
                 combined_answer = summary_result.get("answer", "")
-            except Exception:
+            except (RuntimeError, ValueError):
                 # Fall back to concatenation if summarization fails
                 combined_answer = " ".join([ta["answer"] for ta in tile_answers])
         else:
@@ -1390,10 +1408,15 @@ class MoondreamGeo:
                         "caption": result.get("caption", ""),
                     }
                 )
-            except Exception as e:
+            except (RuntimeError, ValueError, KeyError) as e:
                 if show_progress:
-                    print(
-                        f"Warning: Failed to process window ({x_start},{y_start})-({x_end},{y_end}): {e}"
+                    logger.warning(
+                        "Failed to process window (%d,%d)-(%d,%d): %s",
+                        x_start,
+                        y_start,
+                        x_end,
+                        y_end,
+                        e,
                     )
 
         # Combine captions
@@ -1411,7 +1434,7 @@ class MoondreamGeo:
             try:
                 summary_result = self.model.query(question=summary_prompt)
                 combined_caption = summary_result.get("answer", "")
-            except Exception:
+            except (RuntimeError, ValueError):
                 # Fall back to concatenation if summarization fails
                 combined_caption = " ".join([tc["caption"] for tc in tile_captions])
         else:
