@@ -4789,6 +4789,13 @@
 
 
 <h1 id="onnx-module">onnx module<a class="headerlink" href="#onnx-module" title="Permanent link">&para;</a></h1>
+<p>Provides ONNX export and inference capabilities for geospatial models. This module enables converting trained PyTorch models to the ONNX format for optimized inference, supporting deployment across different hardware platforms and runtime environments without requiring the original training framework.</p>
+<div class="admonition example">
+<p class="admonition-title">Related Examples</p>
+<ul>
+<li><a href="../examples/onnx/">ONNX Export and Inference</a></li>
+</ul>
+</div>
 
 
 <div class="doc doc-object doc-module">
@@ -4972,10 +4979,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/onnx.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 316</span>
-<span class="normal"> 317</span>
-<span class="normal"> 318</span>
-<span class="normal"> 319</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 319</span>
 <span class="normal"> 320</span>
 <span class="normal"> 321</span>
 <span class="normal"> 322</span>
@@ -5717,7 +5721,10 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 <span class="normal">1058</span>
 <span class="normal">1059</span>
 <span class="normal">1060</span>
-<span class="normal">1061</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ONNXGeoModel</span><span class="p">:</span>
+<span class="normal">1061</span>
+<span class="normal">1062</span>
+<span class="normal">1063</span>
+<span class="normal">1064</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ONNXGeoModel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;ONNX Runtime model for geospatial inference with GeoTIFF support.</span>
 
 <span class="sd">    This class mirrors the :class:`~geoai.auto.AutoGeoModel` API but uses</span>
@@ -5816,10 +5823,10 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                     <span class="bp">self</span><span class="o">.</span><span class="n">_model_width</span> <span class="o">=</span> <span class="n">w</span>
 
         <span class="n">active</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_providers</span><span class="p">()</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ONNX model loaded from </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Execution providers: </span><span class="si">{</span><span class="n">active</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;ONNX model loaded from </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">model_path</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Execution providers: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">active</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">task</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Task: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">task</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Task: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">task</span><span class="p">)</span>
 
     <span class="c1"># ------------------------------------------------------------------</span>
     <span class="c1"># Image I/O helpers (mirrors AutoGeoImageProcessor)</span>
@@ -6152,7 +6159,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
         <span class="n">mask_output</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
         <span class="n">count_output</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2"> tiles (</span><span class="si">{</span><span class="n">n_x</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">n_y</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Processing </span><span class="si">%d</span><span class="s2"> tiles (</span><span class="si">%d</span><span class="s2">x</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="n">n_x</span><span class="p">,</span> <span class="n">n_y</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">total</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing tiles&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">iy</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_y</span><span class="p">):</span>
@@ -6189,8 +6196,8 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 
                             <span class="n">mask_output</span><span class="p">[</span><span class="n">y_start</span><span class="p">:</span><span class="n">y_end</span><span class="p">,</span> <span class="n">x_start</span><span class="p">:</span><span class="n">x_end</span><span class="p">]</span> <span class="o">+=</span> <span class="n">tile_mask</span>
                             <span class="n">count_output</span><span class="p">[</span><span class="n">y_start</span><span class="p">:</span><span class="n">y_end</span><span class="p">,</span> <span class="n">x_start</span><span class="p">:</span><span class="n">x_end</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing tile (</span><span class="si">{</span><span class="n">ix</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">iy</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error processing tile (</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2">): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">ix</span><span class="p">,</span> <span class="n">iy</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
 
                     <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
@@ -6322,7 +6329,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 <span class="sd">            polygons are found.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">metadata</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No CRS information available for vectorization&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No CRS information available for vectorization&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">if</span> <span class="n">mask</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">in</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">):</span>
@@ -6333,7 +6340,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
         <span class="n">transform</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transform&quot;</span><span class="p">)</span>
         <span class="n">crs</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">transform</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No transform available for vectorization&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No transform available for vectorization&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">polygons</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="p">[]</span>
@@ -6356,8 +6363,8 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                     <span class="k">if</span> <span class="n">poly</span><span class="o">.</span><span class="n">is_valid</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">poly</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
                         <span class="n">polygons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span>
                         <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during vectorization: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error during vectorization: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">polygons</span><span class="p">:</span>
@@ -6645,10 +6652,7 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">338</span>
 <span class="normal">339</span>
 <span class="normal">340</span>
 <span class="normal">341</span>
@@ -6728,7 +6732,10 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 <span class="normal">415</span>
 <span class="normal">416</span>
 <span class="normal">417</span>
-<span class="normal">418</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">task</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6808,10 +6815,10 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_model_width</span> <span class="o">=</span> <span class="n">w</span>
 
     <span class="n">active</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_providers</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ONNX model loaded from </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Execution providers: </span><span class="si">{</span><span class="n">active</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;ONNX model loaded from </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">model_path</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Execution providers: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">active</span><span class="p">)</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">task</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Task: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">task</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Task: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">task</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6924,10 +6931,7 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">427</span>
 <span class="normal">428</span>
 <span class="normal">429</span>
 <span class="normal">430</span>
@@ -6980,7 +6984,10 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 <span class="normal">477</span>
 <span class="normal">478</span>
 <span class="normal">479</span>
-<span class="normal">480</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">load_geotiff</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;rasterio.DatasetReader&quot;</span><span class="p">],</span>
     <span class="n">window</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Window</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7149,10 +7156,7 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">485</span>
 <span class="normal">486</span>
 <span class="normal">487</span>
 <span class="normal">488</span>
@@ -7191,7 +7195,10 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 <span class="normal">521</span>
 <span class="normal">522</span>
 <span class="normal">523</span>
-<span class="normal">524</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">load_image</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="s2">&quot;Image.Image&quot;</span><span class="p">],</span>
     <span class="n">window</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Window</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7404,10 +7411,7 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">897</span>
-<span class="normal">898</span>
-<span class="normal">899</span>
-<span class="normal">900</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">900</span>
 <span class="normal">901</span>
 <span class="normal">902</span>
 <span class="normal">903</span>
@@ -7472,7 +7476,10 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 <span class="normal">962</span>
 <span class="normal">963</span>
 <span class="normal">964</span>
-<span class="normal">965</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">965</span>
+<span class="normal">966</span>
+<span class="normal">967</span>
+<span class="normal">968</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mask_to_vector</span><span class="p">(</span>
     <span class="n">mask</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
@@ -7496,7 +7503,7 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
 <span class="sd">        polygons are found.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">metadata</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No CRS information available for vectorization&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No CRS information available for vectorization&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">if</span> <span class="n">mask</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">in</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">):</span>
@@ -7507,7 +7514,7 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
     <span class="n">transform</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transform&quot;</span><span class="p">)</span>
     <span class="n">crs</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">transform</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No transform available for vectorization&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No transform available for vectorization&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="n">polygons</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="p">[]</span>
@@ -7530,8 +7537,8 @@ constructor looks for <code>&lt;model_path&gt;.json</code>.</p>
                 <span class="k">if</span> <span class="n">poly</span><span class="o">.</span><span class="n">is_valid</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">poly</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
                     <span class="n">polygons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span>
                     <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during vectorization: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error during vectorization: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">polygons</span><span class="p">:</span>
@@ -7820,10 +7827,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">596</span>
-<span class="normal">597</span>
-<span class="normal">598</span>
-<span class="normal">599</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">599</span>
 <span class="normal">600</span>
 <span class="normal">601</span>
 <span class="normal">602</span>
@@ -7922,7 +7926,10 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 <span class="normal">695</span>
 <span class="normal">696</span>
 <span class="normal">697</span>
-<span class="normal">698</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+<span class="normal">698</span>
+<span class="normal">699</span>
+<span class="normal">700</span>
+<span class="normal">701</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="s2">&quot;Image.Image&quot;</span><span class="p">],</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8137,10 +8144,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1026</span>
-<span class="normal">1027</span>
-<span class="normal">1028</span>
-<span class="normal">1029</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1029</span>
 <span class="normal">1030</span>
 <span class="normal">1031</span>
 <span class="normal">1032</span>
@@ -8166,7 +8170,10 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 <span class="normal">1052</span>
 <span class="normal">1053</span>
 <span class="normal">1054</span>
-<span class="normal">1055</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">1055</span>
+<span class="normal">1056</span>
+<span class="normal">1057</span>
+<span class="normal">1058</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">save_vector</span><span class="p">(</span>
     <span class="n">gdf</span><span class="p">:</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -8497,10 +8504,7 @@ batch size and spatial dimensions are dynamic.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
@@ -8704,7 +8708,10 @@ batch size and spatial dimensions are dynamic.</p>
 <span class="normal">305</span>
 <span class="normal">306</span>
 <span class="normal">307</span>
-<span class="normal">308</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_to_onnx</span><span class="p">(</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_to_onnx</span><span class="p">(</span>
     <span class="n">model_name_or_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">task</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8824,7 +8831,7 @@ batch size and spatial dimensions are dynamic.</p>
                 <span class="n">input_width</span> <span class="o">=</span> <span class="n">size</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;width&quot;</span><span class="p">,</span> <span class="n">input_width</span><span class="p">)</span>
             <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">size</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
                 <span class="n">input_height</span><span class="p">,</span> <span class="n">input_width</span> <span class="o">=</span> <span class="n">size</span>
-    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
         <span class="k">pass</span>  <span class="c1"># processor introspection is optional; fall back to defaults</span>
 
     <span class="c1"># ------------------------------------------------------------------</span>
@@ -8882,7 +8889,7 @@ batch size and spatial dimensions are dynamic.</p>
                 <span class="n">onnx</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">onnx_model_simplified</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
             <span class="k">pass</span>  <span class="c1"># onnxsim is optional</span>
-        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
             <span class="k">pass</span>  <span class="c1"># simplification can fail for some models; keep original</span>
 
     <span class="c1"># ------------------------------------------------------------------</span>
@@ -8909,8 +8916,8 @@ batch size and spatial dimensions are dynamic.</p>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">meta_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
         <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">meta</span><span class="p">,</span> <span class="n">fh</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ONNX model exported to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Metadata saved to </span><span class="si">{</span><span class="n">meta_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;ONNX model exported to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Metadata saved to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">meta_path</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -9058,10 +9065,7 @@ print(result["class"], result["label"])</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1128</span>
-<span class="normal">1129</span>
-<span class="normal">1130</span>
-<span class="normal">1131</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1131</span>
 <span class="normal">1132</span>
 <span class="normal">1133</span>
 <span class="normal">1134</span>
@@ -9085,7 +9089,10 @@ print(result["class"], result["label"])</p>
 <span class="normal">1152</span>
 <span class="normal">1153</span>
 <span class="normal">1154</span>
-<span class="normal">1155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">onnx_image_classification</span><span class="p">(</span>
+<span class="normal">1155</span>
+<span class="normal">1156</span>
+<span class="normal">1157</span>
+<span class="normal">1158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">onnx_image_classification</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">providers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9366,10 +9373,7 @@ print(result["class"], result["label"])</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/onnx.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1069</span>
-<span class="normal">1070</span>
-<span class="normal">1071</span>
-<span class="normal">1072</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1072</span>
 <span class="normal">1073</span>
 <span class="normal">1074</span>
 <span class="normal">1075</span>
@@ -9422,7 +9426,10 @@ print(result["class"], result["label"])</p>
 <span class="normal">1122</span>
 <span class="normal">1123</span>
 <span class="normal">1124</span>
-<span class="normal">1125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">onnx_semantic_segmentation</span><span class="p">(</span>
+<span class="normal">1125</span>
+<span class="normal">1126</span>
+<span class="normal">1127</span>
+<span class="normal">1128</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">onnx_semantic_segmentation</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -9514,7 +9521,7 @@ print(result["class"], result["label"])</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="February 3, 2026 19:43:23 UTC"><span class="timeago" datetime="2026-02-03T19:43:23+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="February 3, 2026 19:43:23 UTC">2026-02-03</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 23, 2026 04:06:44 UTC"><span class="timeago" datetime="2026-03-23T04:06:44+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 23, 2026 04:06:44 UTC">2026-03-23</span>
   </span>
 
     

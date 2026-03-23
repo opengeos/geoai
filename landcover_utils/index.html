@@ -4997,10 +4997,7 @@ parameter counts non-zero pixels as "features".</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 38</span>
-<span class="normal"> 39</span>
-<span class="normal"> 40</span>
-<span class="normal"> 41</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 41</span>
 <span class="normal"> 42</span>
 <span class="normal"> 43</span>
 <span class="normal"> 44</span>
@@ -5350,7 +5347,14 @@ parameter counts non-zero pixels as "features".</p>
 <span class="normal">388</span>
 <span class="normal">389</span>
 <span class="normal">390</span>
-<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_landcover_tiles</span><span class="p">(</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_landcover_tiles</span><span class="p">(</span>
     <span class="n">in_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">out_folder</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">in_class_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5498,13 +5502,15 @@ parameter counts non-zero pixels as "features".</p>
                         <span class="c1"># Verify CRS match</span>
                         <span class="k">if</span> <span class="n">class_src</span><span class="o">.</span><span class="n">crs</span> <span class="o">!=</span> <span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="p">:</span>
                             <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-                                <span class="nb">print</span><span class="p">(</span>
-                                    <span class="sa">f</span><span class="s2">&quot;Warning: CRS mismatch between image (</span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">) and mask (</span><span class="si">{</span><span class="n">class_src</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">)&quot;</span>
+                                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                    <span class="sa">f</span><span class="s2">&quot;CRS mismatch between image (</span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">) and mask (</span><span class="si">{</span><span class="n">class_src</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">)&quot;</span>
                                 <span class="p">)</span>
                     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                         <span class="n">is_class_data_raster</span> <span class="o">=</span> <span class="kc">False</span>
                         <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not open as raster, trying vector: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;Could not open as raster, trying vector: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="p">)</span>
 
                 <span class="c1"># If not raster or raster open failed, try vector</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">is_class_data_raster</span><span class="p">:</span>
@@ -5513,7 +5519,9 @@ parameter counts non-zero pixels as "features".</p>
                     <span class="c1"># Reproject if needed</span>
                     <span class="k">if</span> <span class="n">gdf</span><span class="o">.</span><span class="n">crs</span> <span class="o">!=</span> <span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="p">:</span>
                         <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reprojecting mask from </span><span class="si">{</span><span class="n">gdf</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;Reprojecting mask from </span><span class="si">{</span><span class="n">gdf</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="p">)</span>
                         <span class="n">gdf</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">to_crs</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="p">)</span>
 
                     <span class="c1"># Apply buffer if requested</span>
@@ -5540,7 +5548,7 @@ parameter counts non-zero pixels as "features".</p>
                 <span class="c1"># Reproject if needed</span>
                 <span class="k">if</span> <span class="n">gdf</span><span class="o">.</span><span class="n">crs</span> <span class="o">!=</span> <span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="p">:</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reprojecting mask from </span><span class="si">{</span><span class="n">gdf</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Reprojecting mask from </span><span class="si">%s</span><span class="s2"> to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">gdf</span><span class="o">.</span><span class="n">crs</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="p">)</span>
                     <span class="n">gdf</span> <span class="o">=</span> <span class="n">gdf</span><span class="o">.</span><span class="n">to_crs</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">crs</span><span class="p">)</span>
 
                 <span class="c1"># Apply buffer if requested</span>
@@ -5688,20 +5696,20 @@ parameter counts non-zero pixels as "features".</p>
 
     <span class="c1"># Print summary</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;TILE EXPORT SUMMARY&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tiles exported: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;tiles_exported&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">tile_positions</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;TILE EXPORT SUMMARY&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tiles exported: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;tiles_exported&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">tile_positions</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">skip_empty_tiles</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tiles skipped (empty): </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;tiles_skipped_empty&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tiles skipped (empty): </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;tiles_skipped_empty&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">min_feature_ratio</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">False</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Tiles skipped (low feature ratio &lt; </span><span class="si">{</span><span class="n">min_feature_ratio</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;tiles_skipped_ratio&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
             <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Output directories:&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Images: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;output_dirs&#39;</span><span class="p">][</span><span class="s1">&#39;images&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Labels: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;output_dirs&#39;</span><span class="p">][</span><span class="s1">&#39;labels&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Output directories:&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Images: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;output_dirs&#39;</span><span class="p">][</span><span class="s1">&#39;images&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Labels: </span><span class="si">{</span><span class="n">stats</span><span class="p">[</span><span class="s1">&#39;output_dirs&#39;</span><span class="p">][</span><span class="s1">&#39;labels&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">stats</span>
 </code></pre></div></td></tr></table></div>
@@ -6042,14 +6050,7 @@ but may have different spatial dimensions (height and width).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">694</span>
-<span class="normal">695</span>
-<span class="normal">696</span>
-<span class="normal">697</span>
-<span class="normal">698</span>
-<span class="normal">699</span>
-<span class="normal">700</span>
-<span class="normal">701</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">701</span>
 <span class="normal">702</span>
 <span class="normal">703</span>
 <span class="normal">704</span>
@@ -6211,7 +6212,14 @@ but may have different spatial dimensions (height and width).</p>
 <span class="normal">860</span>
 <span class="normal">861</span>
 <span class="normal">862</span>
-<span class="normal">863</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_radiometric</span><span class="p">(</span>
+<span class="normal">863</span>
+<span class="normal">864</span>
+<span class="normal">865</span>
+<span class="normal">866</span>
+<span class="normal">867</span>
+<span class="normal">868</span>
+<span class="normal">869</span>
+<span class="normal">870</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_radiometric</span><span class="p">(</span>
     <span class="n">subject_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
     <span class="n">reference_image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

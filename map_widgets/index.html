@@ -4671,10 +4671,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/map_widgets.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 27</span>
-<span class="normal"> 28</span>
-<span class="normal"> 29</span>
-<span class="normal"> 30</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
 <span class="normal"> 31</span>
 <span class="normal"> 32</span>
 <span class="normal"> 33</span>
@@ -4837,7 +4834,10 @@
 <span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DINOv3GUI</span><span class="p">(</span><span class="n">widgets</span><span class="o">.</span><span class="n">VBox</span><span class="p">):</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DINOv3GUI</span><span class="p">(</span><span class="n">widgets</span><span class="o">.</span><span class="n">VBox</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Interactive widget for DINOv3.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -5000,7 +5000,7 @@
                             <span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                     <span class="k">with</span> <span class="n">output</span><span class="p">:</span>
-                        <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
 
             <span class="n">host_map</span><span class="o">.</span><span class="n">on_interaction</span><span class="p">(</span><span class="n">handle_map_interaction</span><span class="p">)</span>
             <span class="n">host_map</span><span class="o">.</span><span class="n">default_style</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;cursor&quot;</span><span class="p">:</span> <span class="s2">&quot;crosshair&quot;</span><span class="p">}</span>
@@ -5176,10 +5176,7 @@ gui = DINOv3GUI(raster, processor, features, host_map=m)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/map_widgets.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
-<span class="normal"> 31</span>
-<span class="normal"> 32</span>
-<span class="normal"> 33</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 33</span>
 <span class="normal"> 34</span>
 <span class="normal"> 35</span>
 <span class="normal"> 36</span>
@@ -5339,7 +5336,10 @@ gui = DINOv3GUI(raster, processor, features, host_map=m)</p>
 <span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">processor</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -5499,7 +5499,7 @@ gui = DINOv3GUI(raster, processor, features, host_map=m)</p>
                         <span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="k">with</span> <span class="n">output</span><span class="p">:</span>
-                    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
 
         <span class="n">host_map</span><span class="o">.</span><span class="n">on_interaction</span><span class="p">(</span><span class="n">handle_map_interaction</span><span class="p">)</span>
         <span class="n">host_map</span><span class="o">.</span><span class="n">default_style</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;cursor&quot;</span><span class="p">:</span> <span class="s2">&quot;crosshair&quot;</span><span class="p">}</span>
@@ -5674,10 +5674,7 @@ m</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/map_widgets.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
@@ -6208,7 +6205,10 @@ m</p>
 <span class="normal">727</span>
 <span class="normal">728</span>
 <span class="normal">729</span>
-<span class="normal">730</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">moondream_gui</span><span class="p">(</span>
+<span class="normal">730</span>
+<span class="normal">731</span>
+<span class="normal">732</span>
+<span class="normal">733</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">moondream_gui</span><span class="p">(</span>
     <span class="n">moondream</span><span class="p">,</span>
     <span class="n">basemap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;SATELLITE&quot;</span><span class="p">,</span>
     <span class="n">out_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6819,17 +6819,17 @@ m</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/map_widgets.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span>
-<span class="normal">17</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
 <span class="normal">21</span>
 <span class="normal">22</span>
 <span class="normal">23</span>
-<span class="normal">24</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">random_string</span><span class="p">(</span><span class="n">string_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">6</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">random_string</span><span class="p">(</span><span class="n">string_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">6</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate a random string of fixed length.</span>
 
 <span class="sd">    Args:</span>

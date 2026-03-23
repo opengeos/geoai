@@ -5232,10 +5232,7 @@ downloading the model.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1243</span>
-<span class="normal">1244</span>
-<span class="normal">1245</span>
-<span class="normal">1246</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1246</span>
 <span class="normal">1247</span>
 <span class="normal">1248</span>
 <span class="normal">1249</span>
@@ -5389,7 +5386,10 @@ downloading the model.</p>
 <span class="normal">1397</span>
 <span class="normal">1398</span>
 <span class="normal">1399</span>
-<span class="normal">1400</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">batch_multiclass_detection</span><span class="p">(</span>
+<span class="normal">1400</span>
+<span class="normal">1401</span>
+<span class="normal">1402</span>
+<span class="normal">1403</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">batch_multiclass_detection</span><span class="p">(</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5708,10 +5708,7 @@ Set to 0 to disable simplification. Defaults to 0.0.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">686</span>
-<span class="normal">687</span>
-<span class="normal">688</span>
-<span class="normal">689</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">689</span>
 <span class="normal">690</span>
 <span class="normal">691</span>
 <span class="normal">692</span>
@@ -5841,7 +5838,10 @@ Set to 0 to disable simplification. Defaults to 0.0.</p>
 <span class="normal">816</span>
 <span class="normal">817</span>
 <span class="normal">818</span>
-<span class="normal">819</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detections_to_geodataframe</span><span class="p">(</span>
+<span class="normal">819</span>
+<span class="normal">820</span>
+<span class="normal">821</span>
+<span class="normal">822</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detections_to_geodataframe</span><span class="p">(</span>
     <span class="n">detections</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">],</span>
     <span class="n">geotiff_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">class_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6073,10 +6073,7 @@ dataset directory. Defaults to "NWPU-VHR-10".</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
@@ -6095,7 +6092,10 @@ dataset directory. Defaults to "NWPU-VHR-10".</p>
 <span class="normal">70</span>
 <span class="normal">71</span>
 <span class="normal">72</span>
-<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_nwpu_vhr10</span><span class="p">(</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_nwpu_vhr10</span><span class="p">(</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;NWPU-VHR-10&quot;</span><span class="p">,</span>
     <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -6236,10 +6236,7 @@ print(model_path)  # local cache path</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 79</span>
 <span class="normal"> 80</span>
 <span class="normal"> 81</span>
 <span class="normal"> 82</span>
@@ -6268,7 +6265,10 @@ print(model_path)  # local cache path</p>
 <span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
-<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_nwpu_vhr10_model</span><span class="p">(</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_nwpu_vhr10_model</span><span class="p">(</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">NWPU_VHR10_HF_REPO</span><span class="p">,</span>
     <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">NWPU_VHR10_HF_FILENAME</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -6299,7 +6299,7 @@ print(model_path)  # local cache path</p>
     <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">hf_hub_download</span>
 
     <span class="n">model_path</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span><span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="n">filename</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model downloaded to: </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model downloaded to: </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">model_path</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6562,10 +6562,7 @@ downloading the model. Defaults to <code>"giswqs/nwpu-vhr10-maskrcnn"</code>.</p
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 936</span>
-<span class="normal"> 937</span>
-<span class="normal"> 938</span>
-<span class="normal"> 939</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 939</span>
 <span class="normal"> 940</span>
 <span class="normal"> 941</span>
 <span class="normal"> 942</span>
@@ -6686,7 +6683,10 @@ downloading the model. Defaults to <code>"giswqs/nwpu-vhr10-maskrcnn"</code>.</p
 <span class="normal">1057</span>
 <span class="normal">1058</span>
 <span class="normal">1059</span>
-<span class="normal">1060</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_multiclass_detector</span><span class="p">(</span>
+<span class="normal">1060</span>
+<span class="normal">1061</span>
+<span class="normal">1062</span>
+<span class="normal">1063</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_multiclass_detector</span><span class="p">(</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
@@ -7134,10 +7134,7 @@ downloading the model. Defaults to <code>"giswqs/nwpu-vhr10-maskrcnn"</code>.</p
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">498</span>
 <span class="normal">499</span>
 <span class="normal">500</span>
 <span class="normal">501</span>
@@ -7322,7 +7319,10 @@ downloading the model. Defaults to <code>"giswqs/nwpu-vhr10-maskrcnn"</code>.</p
 <span class="normal">680</span>
 <span class="normal">681</span>
 <span class="normal">682</span>
-<span class="normal">683</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">multiclass_detection</span><span class="p">(</span>
+<span class="normal">683</span>
+<span class="normal">684</span>
+<span class="normal">685</span>
+<span class="normal">686</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">multiclass_detection</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7601,10 +7601,7 @@ displays interactively.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1155</span>
-<span class="normal">1156</span>
-<span class="normal">1157</span>
-<span class="normal">1158</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1158</span>
 <span class="normal">1159</span>
 <span class="normal">1160</span>
 <span class="normal">1161</span>
@@ -7686,7 +7683,10 @@ displays interactively.</p>
 <span class="normal">1237</span>
 <span class="normal">1238</span>
 <span class="normal">1239</span>
-<span class="normal">1240</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_detection_training_history</span><span class="p">(</span>
+<span class="normal">1240</span>
+<span class="normal">1241</span>
+<span class="normal">1242</span>
+<span class="normal">1243</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_detection_training_history</span><span class="p">(</span>
     <span class="n">history_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7705,7 +7705,7 @@ displays interactively.</p>
 <span class="sd">            displays interactively.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">history_path</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training history not found: </span><span class="si">{</span><span class="n">history_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training history not found: </span><span class="si">{</span><span class="n">history_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span>
 
     <span class="n">history</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">history_path</span><span class="p">,</span> <span class="n">weights_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -7720,7 +7720,7 @@ displays interactively.</p>
         <span class="n">panels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;lr&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">panels</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No plottable metrics found in training history.&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No plottable metrics found in training history.&quot;</span><span class="p">)</span>
         <span class="k">return</span>
 
     <span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.ticker</span><span class="w"> </span><span class="kn">import</span> <span class="n">MaxNLocator</span>
@@ -8034,10 +8034,7 @@ repositories. If None, the token stored by
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1500</span>
-<span class="normal">1501</span>
-<span class="normal">1502</span>
-<span class="normal">1503</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1503</span>
 <span class="normal">1504</span>
 <span class="normal">1505</span>
 <span class="normal">1506</span>
@@ -8116,7 +8113,10 @@ repositories. If None, the token stored by
 <span class="normal">1579</span>
 <span class="normal">1580</span>
 <span class="normal">1581</span>
-<span class="normal">1582</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_detector_from_hub</span><span class="p">(</span>
+<span class="normal">1582</span>
+<span class="normal">1583</span>
+<span class="normal">1584</span>
+<span class="normal">1585</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_detector_from_hub</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -8159,20 +8159,20 @@ repositories. If None, the token stored by
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">hf_hub_download</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required. &quot;</span>
             <span class="s2">&quot;Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">try</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading model from </span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading model from </span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
         <span class="n">model_file</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span><span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;model.pth&quot;</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span>
         <span class="n">config_file</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span>
             <span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;config.json&quot;</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span>
         <span class="p">)</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to download model from Hub: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to download model from Hub: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -8338,10 +8338,7 @@ If None, creates files alongside the original data.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">238</span>
 <span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
@@ -8496,7 +8493,10 @@ If None, creates files alongside the original data.</p>
 <span class="normal">390</span>
 <span class="normal">391</span>
 <span class="normal">392</span>
-<span class="normal">393</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_nwpu_vhr10</span><span class="p">(</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_nwpu_vhr10</span><span class="p">(</span>
     <span class="n">data_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">val_split</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">,</span>
@@ -8568,12 +8568,12 @@ If None, creates files alongside the original data.</p>
     <span class="c1"># Check if COCO JSON already exists</span>
     <span class="n">annotations_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;annotations.json&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">annotations_path</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using existing COCO annotations: </span><span class="si">{</span><span class="n">annotations_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using existing COCO annotations: </span><span class="si">{</span><span class="n">annotations_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">gt_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Convert text annotations to COCO JSON</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Converting NWPU-VHR-10 text annotations to COCO JSON format...&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Converting NWPU-VHR-10 text annotations to COCO JSON format...&quot;</span><span class="p">)</span>
         <span class="n">_convert_nwpu_to_coco</span><span class="p">(</span><span class="n">images_dir</span><span class="p">,</span> <span class="n">gt_dir</span><span class="p">,</span> <span class="n">annotations_path</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;COCO annotations saved to: </span><span class="si">{</span><span class="n">annotations_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;COCO annotations saved to: </span><span class="si">{</span><span class="n">annotations_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Look for existing JSON annotations</span>
         <span class="k">for</span> <span class="n">candidate_ann</span> <span class="ow">in</span> <span class="p">[</span>
@@ -8637,13 +8637,13 @@ If None, creates files alongside the original data.</p>
 
     <span class="n">class_names</span> <span class="o">=</span> <span class="n">NWPU_VHR10_CLASSES</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dataset prepared:&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Images directory: </span><span class="si">{</span><span class="n">images_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Total annotated images: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_ids</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Total annotations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">coco_data</span><span class="p">[</span><span class="s1">&#39;annotations&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Training images: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">train_ids</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Validation images: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">val_ids</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Classes: </span><span class="si">{</span><span class="n">class_names</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dataset prepared:&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Images directory: </span><span class="si">{</span><span class="n">images_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Total annotated images: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_ids</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Total annotations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">coco_data</span><span class="p">[</span><span class="s1">&#39;annotations&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Training images: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">train_ids</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Validation images: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">val_ids</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Classes: </span><span class="si">{</span><span class="n">class_names</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">&quot;images_dir&quot;</span><span class="p">:</span> <span class="n">images_dir</span><span class="p">,</span>
@@ -8881,10 +8881,7 @@ None, the token stored by <code>huggingface-cli login</code> is used.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1403</span>
-<span class="normal">1404</span>
-<span class="normal">1405</span>
-<span class="normal">1406</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1406</span>
 <span class="normal">1407</span>
 <span class="normal">1408</span>
 <span class="normal">1409</span>
@@ -8975,7 +8972,10 @@ None, the token stored by <code>huggingface-cli login</code> is used.</p>
 <span class="normal">1494</span>
 <span class="normal">1495</span>
 <span class="normal">1496</span>
-<span class="normal">1497</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_detector_to_hub</span><span class="p">(</span>
+<span class="normal">1497</span>
+<span class="normal">1498</span>
+<span class="normal">1499</span>
+<span class="normal">1500</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_detector_to_hub</span><span class="p">(</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;fasterrcnn_resnet50_fpn_v2&quot;</span><span class="p">,</span>
@@ -9019,7 +9019,7 @@ None, the token stored by <code>huggingface-cli login</code> is used.</p>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">HfApi</span><span class="p">,</span> <span class="n">create_repo</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required to push models. &quot;</span>
             <span class="s2">&quot;Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
@@ -9065,10 +9065,10 @@ None, the token stored by <code>huggingface-cli login</code> is used.</p>
             <span class="p">)</span>
 
         <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;https://huggingface.co/</span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">&quot;</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model successfully pushed to: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model successfully pushed to: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">url</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to push model to Hub: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to push model to Hub: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -9394,10 +9394,7 @@ If None, extracted from annotations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">399</span>
 <span class="normal">400</span>
 <span class="normal">401</span>
 <span class="normal">402</span>
@@ -9490,7 +9487,10 @@ If None, extracted from annotations.</p>
 <span class="normal">489</span>
 <span class="normal">490</span>
 <span class="normal">491</span>
-<span class="normal">492</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_multiclass_detector</span><span class="p">(</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_multiclass_detector</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">annotations_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -9553,8 +9553,8 @@ If None, extracted from annotations.</p>
         <span class="p">]</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">num_classes</span><span class="si">}</span><span class="s2"> classes&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Classes: </span><span class="si">{</span><span class="n">class_names</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">num_classes</span><span class="si">}</span><span class="s2"> classes&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Classes: </span><span class="si">{</span><span class="n">class_names</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Save class names and model info to output directory for later use</span>
     <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">output_dir</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -9758,10 +9758,7 @@ displays interactively.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1063</span>
-<span class="normal">1064</span>
-<span class="normal">1065</span>
-<span class="normal">1066</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1066</span>
 <span class="normal">1067</span>
 <span class="normal">1068</span>
 <span class="normal">1069</span>
@@ -9847,7 +9844,10 @@ displays interactively.</p>
 <span class="normal">1149</span>
 <span class="normal">1150</span>
 <span class="normal">1151</span>
-<span class="normal">1152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_coco_annotations</span><span class="p">(</span>
+<span class="normal">1152</span>
+<span class="normal">1153</span>
+<span class="normal">1154</span>
+<span class="normal">1155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_coco_annotations</span><span class="p">(</span>
     <span class="n">annotations_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
@@ -10087,10 +10087,7 @@ displays interactively.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/object_detect.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">822</span>
-<span class="normal">823</span>
-<span class="normal">824</span>
-<span class="normal">825</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">825</span>
 <span class="normal">826</span>
 <span class="normal">827</span>
 <span class="normal">828</span>
@@ -10198,7 +10195,10 @@ displays interactively.</p>
 <span class="normal">930</span>
 <span class="normal">931</span>
 <span class="normal">932</span>
-<span class="normal">933</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_multiclass_detections</span><span class="p">(</span>
+<span class="normal">933</span>
+<span class="normal">934</span>
+<span class="normal">935</span>
+<span class="normal">936</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_multiclass_detections</span><span class="p">(</span>
     <span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">detections</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">],</span>
     <span class="n">class_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

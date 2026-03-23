@@ -4947,10 +4947,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">373</span>
 <span class="normal">374</span>
 <span class="normal">375</span>
 <span class="normal">376</span>
@@ -5015,7 +5012,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">435</span>
 <span class="normal">436</span>
 <span class="normal">437</span>
-<span class="normal">438</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">batch_detectron2_segment</span><span class="p">(</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">batch_detectron2_segment</span><span class="p">(</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
     <span class="n">model_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml&quot;</span><span class="p">,</span>
@@ -5077,10 +5077,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
             <span class="n">result</span><span class="p">[</span><span class="s2">&quot;image_path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">image_path</span>
             <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_paths</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">image_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Processed </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">image_paths</span><span class="p">),</span> <span class="n">image_path</span><span class="p">)</span>
 
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing </span><span class="si">{</span><span class="n">image_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error processing </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">image_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
             <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;image_path&quot;</span><span class="p">:</span> <span class="n">image_path</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)})</span>
 
     <span class="k">return</span> <span class="n">results</span>
@@ -5106,12 +5106,12 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
 <span class="normal">47</span>
-<span class="normal">48</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_detectron2</span><span class="p">():</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_detectron2</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if detectron2 is available.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">HAS_DETECTRON2</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
@@ -5193,10 +5193,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
 <span class="normal">213</span>
@@ -5212,7 +5209,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">223</span>
 <span class="normal">224</span>
 <span class="normal">225</span>
-<span class="normal">226</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_instance_mask</span><span class="p">(</span><span class="n">masks</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_instance_mask</span><span class="p">(</span><span class="n">masks</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Create an instance mask from individual binary masks.</span>
 
@@ -5324,10 +5324,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">232</span>
 <span class="normal">233</span>
 <span class="normal">234</span>
 <span class="normal">235</span>
@@ -5346,7 +5343,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">248</span>
 <span class="normal">249</span>
 <span class="normal">250</span>
-<span class="normal">251</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_probability_mask</span><span class="p">(</span><span class="n">masks</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">scores</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_probability_mask</span><span class="p">(</span><span class="n">masks</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">scores</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Create a probability mask from individual binary masks and their confidence scores.</span>
 
@@ -5589,10 +5589,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span>
 <span class="normal">115</span>
@@ -5684,7 +5681,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">201</span>
 <span class="normal">202</span>
 <span class="normal">203</span>
-<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detectron2_segment</span><span class="p">(</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detectron2_segment</span><span class="p">(</span>
     <span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
     <span class="n">model_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml&quot;</span><span class="p">,</span>
@@ -5755,7 +5755,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
             <span class="n">transform</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">transform</span>
             <span class="n">crs</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">crs</span>
             <span class="n">height</span><span class="p">,</span> <span class="n">width</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">height</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">width</span>
-    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
         <span class="c1"># If not a GeoTIFF, create a simple transform</span>
         <span class="n">height</span><span class="p">,</span> <span class="n">width</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
         <span class="n">transform</span> <span class="o">=</span> <span class="n">from_bounds</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
@@ -5872,10 +5872,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">444</span>
 <span class="normal">445</span>
 <span class="normal">446</span>
 <span class="normal">447</span>
@@ -5902,7 +5899,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">468</span>
 <span class="normal">469</span>
 <span class="normal">470</span>
-<span class="normal">471</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_class_id_name_mapping</span><span class="p">(</span><span class="n">config_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">lazy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_class_id_name_mapping</span><span class="p">(</span><span class="n">config_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">lazy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Get class ID to name mapping from a Detectron2 model config.</span>
 
@@ -5978,10 +5978,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">359</span>
 <span class="normal">360</span>
 <span class="normal">361</span>
 <span class="normal">362</span>
@@ -5989,7 +5986,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
-<span class="normal">367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_detectron2_models</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_detectron2_models</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Get a list of available Detectron2 models for instance segmentation.</span>
 
@@ -6141,10 +6141,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 51</span>
-<span class="normal"> 52</span>
-<span class="normal"> 53</span>
-<span class="normal"> 54</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 54</span>
 <span class="normal"> 55</span>
 <span class="normal"> 56</span>
 <span class="normal"> 57</span>
@@ -6196,7 +6193,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
-<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_detectron2_model</span><span class="p">(</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_detectron2_model</span><span class="p">(</span>
     <span class="n">model_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml&quot;</span><span class="p">,</span>
     <span class="n">model_weights</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">score_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
@@ -6369,10 +6369,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">257</span>
 <span class="normal">258</span>
 <span class="normal">259</span>
 <span class="normal">260</span>
@@ -6413,7 +6410,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
-<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_geotiff_mask</span><span class="p">(</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_geotiff_mask</span><span class="p">(</span>
     <span class="n">mask</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">transform</span><span class="p">:</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">transform</span><span class="o">.</span><span class="n">Affine</span><span class="p">,</span>
@@ -6598,10 +6598,7 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/detectron2.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">304</span>
 <span class="normal">305</span>
 <span class="normal">306</span>
 <span class="normal">307</span>
@@ -6650,7 +6647,10 @@ See https://github.com/facebookresearch/detectron2 for more details.</p>
 <span class="normal">350</span>
 <span class="normal">351</span>
 <span class="normal">352</span>
-<span class="normal">353</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_detectron2_results</span><span class="p">(</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_detectron2_results</span><span class="p">(</span>
     <span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">results</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

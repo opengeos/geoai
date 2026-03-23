@@ -4657,6 +4657,13 @@
 
 
 <h1 id="canopy-module">canopy module<a class="headerlink" href="#canopy-module" title="Permanent link">&para;</a></h1>
+<p>Provides canopy height estimation from satellite imagery using deep learning models. This module supports predicting tree canopy heights at scale, enabling forestry analysis, carbon stock estimation, and urban tree cover assessment from remote sensing data.</p>
+<div class="admonition example">
+<p class="admonition-title">Related Examples</p>
+<ul>
+<li><a href="../examples/canopy_height/">Canopy Height Estimation</a></li>
+</ul>
+</div>
 
 
 <div class="doc doc-object doc-module">
@@ -4779,11 +4786,7 @@ estimator.predict("input.tif", output_path="canopy_height.tif")</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/canopy.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 938</span>
-<span class="normal"> 939</span>
-<span class="normal"> 940</span>
-<span class="normal"> 941</span>
-<span class="normal"> 942</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 942</span>
 <span class="normal"> 943</span>
 <span class="normal"> 944</span>
 <span class="normal"> 945</span>
@@ -5195,7 +5198,11 @@ estimator.predict("input.tif", output_path="canopy_height.tif")</p>
 <span class="normal">1351</span>
 <span class="normal">1352</span>
 <span class="normal">1353</span>
-<span class="normal">1354</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CanopyHeightEstimation</span><span class="p">:</span>
+<span class="normal">1354</span>
+<span class="normal">1355</span>
+<span class="normal">1356</span>
+<span class="normal">1357</span>
+<span class="normal">1358</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CanopyHeightEstimation</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Estimate canopy height from RGB imagery using Meta&#39;s HighResCanopyHeight model.</span>
 
 <span class="sd">    This class provides canopy height estimation from RGB aerial or satellite</span>
@@ -5268,10 +5275,10 @@ estimator.predict("input.tif", output_path="canopy_height.tif")</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">checkpoint_path</span>
 
         <span class="c1"># Load model</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2"> model on </span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loading </span><span class="si">%s</span><span class="s2"> model on </span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">_load_model</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Model loaded successfully.&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Model loaded successfully.&quot;</span><span class="p">)</span>
 
         <span class="c1"># Image normalization (from Meta&#39;s inference.py)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_norm_mean</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.420</span><span class="p">,</span> <span class="mf">0.411</span><span class="p">,</span> <span class="mf">0.296</span><span class="p">]</span>
@@ -5467,7 +5474,7 @@ estimator.predict("input.tif", output_path="canopy_height.tif")</p>
 
             <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">out_profile</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
                 <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Canopy height map saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Canopy height map saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">result</span>
 
@@ -5609,7 +5616,7 @@ estimator.predict("input.tif", output_path="canopy_height.tif")</p>
 
         <span class="k">if</span> <span class="n">output_path</span><span class="p">:</span>
             <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Figure saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Figure saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">fig</span>
 </code></pre></div></td></tr></table></div>
@@ -5735,11 +5742,7 @@ Defaults to ~/.cache/geoai/canopy/.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/canopy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 959</span>
-<span class="normal"> 960</span>
-<span class="normal"> 961</span>
-<span class="normal"> 962</span>
-<span class="normal"> 963</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 963</span>
 <span class="normal"> 964</span>
 <span class="normal"> 965</span>
 <span class="normal"> 966</span>
@@ -5794,7 +5797,11 @@ Defaults to ~/.cache/geoai/canopy/.</p>
 <span class="normal">1015</span>
 <span class="normal">1016</span>
 <span class="normal">1017</span>
-<span class="normal">1018</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1018</span>
+<span class="normal">1019</span>
+<span class="normal">1020</span>
+<span class="normal">1021</span>
+<span class="normal">1022</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;compressed_SSLhuge&quot;</span><span class="p">,</span>
     <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5846,10 +5853,10 @@ Defaults to ~/.cache/geoai/canopy/.</p>
     <span class="bp">self</span><span class="o">.</span><span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">checkpoint_path</span>
 
     <span class="c1"># Load model</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2"> model on </span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loading </span><span class="si">%s</span><span class="s2"> model on </span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">_load_model</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Model loaded successfully.&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Model loaded successfully.&quot;</span><span class="p">)</span>
 
     <span class="c1"># Image normalization (from Meta&#39;s inference.py)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_norm_mean</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.420</span><span class="p">,</span> <span class="mf">0.411</span><span class="p">,</span> <span class="mf">0.296</span><span class="p">]</span>
@@ -6083,11 +6090,7 @@ heights = estimator.predict("aerial_image.tif",
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/canopy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1061</span>
-<span class="normal">1062</span>
-<span class="normal">1063</span>
-<span class="normal">1064</span>
-<span class="normal">1065</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1065</span>
 <span class="normal">1066</span>
 <span class="normal">1067</span>
 <span class="normal">1068</span>
@@ -6234,7 +6237,11 @@ heights = estimator.predict("aerial_image.tif",
 <span class="normal">1209</span>
 <span class="normal">1210</span>
 <span class="normal">1211</span>
-<span class="normal">1212</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+<span class="normal">1212</span>
+<span class="normal">1213</span>
+<span class="normal">1214</span>
+<span class="normal">1215</span>
+<span class="normal">1216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6383,7 +6390,7 @@ heights = estimator.predict("aerial_image.tif",
 
         <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">out_profile</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Canopy height map saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Canopy height map saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">result</span>
 </code></pre></div></td></tr></table></div>
@@ -6605,11 +6612,7 @@ fig = estimator.visualize("input.tif", heights)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/canopy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1252</span>
-<span class="normal">1253</span>
-<span class="normal">1254</span>
-<span class="normal">1255</span>
-<span class="normal">1256</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1256</span>
 <span class="normal">1257</span>
 <span class="normal">1258</span>
 <span class="normal">1259</span>
@@ -6707,7 +6710,11 @@ fig = estimator.visualize("input.tif", heights)</p>
 <span class="normal">1351</span>
 <span class="normal">1352</span>
 <span class="normal">1353</span>
-<span class="normal">1354</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize</span><span class="p">(</span>
+<span class="normal">1354</span>
+<span class="normal">1355</span>
+<span class="normal">1356</span>
+<span class="normal">1357</span>
+<span class="normal">1358</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">height_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6807,7 +6814,7 @@ fig = estimator.visualize("input.tif", heights)</p>
 
     <span class="k">if</span> <span class="n">output_path</span><span class="p">:</span>
         <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Figure saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Figure saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">fig</span>
 </code></pre></div></td></tr></table></div>
@@ -7056,11 +7063,7 @@ Higher values give smoother results.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/canopy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1357</span>
-<span class="normal">1358</span>
-<span class="normal">1359</span>
-<span class="normal">1360</span>
-<span class="normal">1361</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1361</span>
 <span class="normal">1362</span>
 <span class="normal">1363</span>
 <span class="normal">1364</span>
@@ -7109,7 +7112,11 @@ Higher values give smoother results.</p>
 <span class="normal">1407</span>
 <span class="normal">1408</span>
 <span class="normal">1409</span>
-<span class="normal">1410</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">canopy_height_estimation</span><span class="p">(</span>
+<span class="normal">1410</span>
+<span class="normal">1411</span>
+<span class="normal">1412</span>
+<span class="normal">1413</span>
+<span class="normal">1414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">canopy_height_estimation</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;compressed_SSLhuge&quot;</span><span class="p">,</span>
@@ -7221,18 +7228,18 @@ for name, desc in models.items():
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/canopy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1413</span>
-<span class="normal">1414</span>
-<span class="normal">1415</span>
-<span class="normal">1416</span>
-<span class="normal">1417</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1417</span>
 <span class="normal">1418</span>
 <span class="normal">1419</span>
 <span class="normal">1420</span>
 <span class="normal">1421</span>
 <span class="normal">1422</span>
 <span class="normal">1423</span>
-<span class="normal">1424</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">list_canopy_models</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="normal">1424</span>
+<span class="normal">1425</span>
+<span class="normal">1426</span>
+<span class="normal">1427</span>
+<span class="normal">1428</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">list_canopy_models</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;List available canopy height estimation model variants.</span>
 
 <span class="sd">    Returns:</span>
@@ -7279,7 +7286,7 @@ for name, desc in models.items():
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="February 4, 2026 05:23:36 UTC"><span class="timeago" datetime="2026-02-04T05:23:36+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="February 4, 2026 05:23:36 UTC">2026-02-04</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 23, 2026 04:06:44 UTC"><span class="timeago" datetime="2026-03-23T04:06:44+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 23, 2026 04:06:44 UTC">2026-03-23</span>
   </span>
 
     

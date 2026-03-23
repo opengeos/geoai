@@ -5135,10 +5135,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1300</span>
-<span class="normal">1301</span>
-<span class="normal">1302</span>
-<span class="normal">1303</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1303</span>
 <span class="normal">1304</span>
 <span class="normal">1305</span>
 <span class="normal">1306</span>
@@ -5367,7 +5364,10 @@
 <span class="normal">1529</span>
 <span class="normal">1530</span>
 <span class="normal">1531</span>
-<span class="normal">1532</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CatalogAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">1532</span>
+<span class="normal">1533</span>
+<span class="normal">1534</span>
+<span class="normal">1535</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CatalogAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AI agent for searching data catalogs with natural language queries.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -5596,7 +5596,7 @@
         <span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">result_json</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Search error: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Search error: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">])</span>
             <span class="k">return</span> <span class="p">[]</span>
 
         <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;datasets&quot;</span><span class="p">,</span> <span class="p">[])</span>
@@ -5744,10 +5744,7 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1303</span>
-<span class="normal">1304</span>
-<span class="normal">1305</span>
-<span class="normal">1306</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1306</span>
 <span class="normal">1307</span>
 <span class="normal">1308</span>
 <span class="normal">1309</span>
@@ -5919,7 +5916,10 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 <span class="normal">1475</span>
 <span class="normal">1476</span>
 <span class="normal">1477</span>
-<span class="normal">1478</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1478</span>
+<span class="normal">1479</span>
+<span class="normal">1480</span>
+<span class="normal">1481</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -6171,10 +6171,7 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1480</span>
-<span class="normal">1481</span>
-<span class="normal">1482</span>
-<span class="normal">1483</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1483</span>
 <span class="normal">1484</span>
 <span class="normal">1485</span>
 <span class="normal">1486</span>
@@ -6182,7 +6179,10 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 <span class="normal">1488</span>
 <span class="normal">1489</span>
 <span class="normal">1490</span>
-<span class="normal">1491</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1491</span>
+<span class="normal">1492</span>
+<span class="normal">1493</span>
+<span class="normal">1494</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -6333,10 +6333,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1493</span>
-<span class="normal">1494</span>
-<span class="normal">1495</span>
-<span class="normal">1496</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1496</span>
 <span class="normal">1497</span>
 <span class="normal">1498</span>
 <span class="normal">1499</span>
@@ -6372,7 +6369,10 @@ for ds in datasets:
 <span class="normal">1529</span>
 <span class="normal">1530</span>
 <span class="normal">1531</span>
-<span class="normal">1532</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_datasets</span><span class="p">(</span>
+<span class="normal">1532</span>
+<span class="normal">1533</span>
+<span class="normal">1534</span>
+<span class="normal">1535</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_datasets</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">keywords</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dataset_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6408,7 +6408,7 @@ for ds in datasets:
     <span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">result_json</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Search error: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Search error: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">])</span>
         <span class="k">return</span> <span class="p">[]</span>
 
     <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;datasets&quot;</span><span class="p">,</span> <span class="p">[])</span>
@@ -6454,10 +6454,7 @@ for ds in datasets:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">243</span>
 <span class="normal">244</span>
 <span class="normal">245</span>
 <span class="normal">246</span>
@@ -6871,7 +6868,10 @@ for ds in datasets:
 <span class="normal">654</span>
 <span class="normal">655</span>
 <span class="normal">656</span>
-<span class="normal">657</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GeoAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span>
+<span class="normal">660</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GeoAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Geospatial AI agent with interactive mapping capabilities.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -7400,10 +7400,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">246</span>
 <span class="normal">247</span>
 <span class="normal">248</span>
 <span class="normal">249</span>
@@ -7530,7 +7527,10 @@ for ds in datasets:
 <span class="normal">370</span>
 <span class="normal">371</span>
 <span class="normal">372</span>
-<span class="normal">373</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -7737,10 +7737,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">378</span>
 <span class="normal">379</span>
 <span class="normal">380</span>
 <span class="normal">381</span>
@@ -7748,7 +7745,10 @@ for ds in datasets:
 <span class="normal">383</span>
 <span class="normal">384</span>
 <span class="normal">385</span>
-<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -7813,10 +7813,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">391</span>
 <span class="normal">392</span>
 <span class="normal">393</span>
 <span class="normal">394</span>
@@ -8082,7 +8079,10 @@ for ds in datasets:
 <span class="normal">654</span>
 <span class="normal">655</span>
 <span class="normal">656</span>
-<span class="normal">657</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span>
+<span class="normal">660</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display an interactive UI with map and chat interface.</span>
 
 <span class="sd">    Args:</span>
@@ -8394,10 +8394,7 @@ for ds in datasets:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">68</span>
 <span class="normal">69</span>
 <span class="normal">70</span>
 <span class="normal">71</span>
@@ -8416,7 +8413,10 @@ for ds in datasets:
 <span class="normal">84</span>
 <span class="normal">85</span>
 <span class="normal">86</span>
-<span class="normal">87</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OllamaModel</span><span class="p">(</span><span class="n">_OllamaModel</span><span class="p">):</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OllamaModel</span><span class="p">(</span><span class="n">_OllamaModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Fixed OllamaModel that ensures proper model_id handling.&quot;&quot;&quot;</span>
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -8475,10 +8475,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
 <span class="normal">74</span>
@@ -8494,7 +8491,10 @@ for ds in datasets:
 <span class="normal">84</span>
 <span class="normal">85</span>
 <span class="normal">86</span>
-<span class="normal">87</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Override stream to ensure model_id is passed as string.&quot;&quot;&quot;</span>
     <span class="c1"># Patch the ollama client to handle model object correctly</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">ollama</span>
@@ -8556,10 +8556,7 @@ for ds in datasets:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 660</span>
-<span class="normal"> 661</span>
-<span class="normal"> 662</span>
-<span class="normal"> 663</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 663</span>
 <span class="normal"> 664</span>
 <span class="normal"> 665</span>
 <span class="normal"> 666</span>
@@ -9193,7 +9190,10 @@ for ds in datasets:
 <span class="normal">1294</span>
 <span class="normal">1295</span>
 <span class="normal">1296</span>
-<span class="normal">1297</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">STACAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">1297</span>
+<span class="normal">1298</span>
+<span class="normal">1299</span>
+<span class="normal">1300</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">STACAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AI agent for searching and interacting with STAC catalogs.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -9451,14 +9451,14 @@ for ds in datasets:
         <span class="n">search_payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_search_items_payload</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">search_payload</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">search_payload</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Search error: </span><span class="si">{</span><span class="n">search_payload</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Search error: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">search_payload</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">])</span>
                 <span class="k">return</span> <span class="kc">None</span>
 
             <span class="n">items</span> <span class="o">=</span> <span class="n">search_payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;items&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
             <span class="k">if</span> <span class="n">items</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No items found in search results&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No items found in search results&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="c1"># Fallback: try to parse the final text response</span>
@@ -9468,17 +9468,17 @@ for ds in datasets:
             <span class="n">item_data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">item_data</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Search error: </span><span class="si">{</span><span class="n">item_data</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Search error: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">item_data</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">])</span>
                 <span class="k">return</span> <span class="kc">None</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">item_data</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;collection&quot;</span><span class="p">]):</span>
-                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Response missing required fields (id, collection)&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Response missing required fields (id, collection)&quot;</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
 
             <span class="k">return</span> <span class="n">item_data</span>
 
         <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Could not extract item data from agent response&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not extract item data from agent response&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_visualize_stac_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -9544,7 +9544,7 @@ for ds in datasets:
             <span class="p">)</span>
             <span class="k">return</span> <span class="n">assets</span>  <span class="c1"># Return the assets that were visualized</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not visualize item on map: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not visualize item on map: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -9974,10 +9974,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">663</span>
-<span class="normal">664</span>
-<span class="normal">665</span>
-<span class="normal">666</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">666</span>
 <span class="normal">667</span>
 <span class="normal">668</span>
 <span class="normal">669</span>
@@ -10107,7 +10104,10 @@ for ds in datasets:
 <span class="normal">793</span>
 <span class="normal">794</span>
 <span class="normal">795</span>
-<span class="normal">796</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">796</span>
+<span class="normal">797</span>
+<span class="normal">798</span>
+<span class="normal">799</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -10317,10 +10317,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">854</span>
-<span class="normal">855</span>
-<span class="normal">856</span>
-<span class="normal">857</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">857</span>
 <span class="normal">858</span>
 <span class="normal">859</span>
 <span class="normal">860</span>
@@ -10340,7 +10337,10 @@ for ds in datasets:
 <span class="normal">874</span>
 <span class="normal">875</span>
 <span class="normal">876</span>
-<span class="normal">877</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">877</span>
+<span class="normal">878</span>
+<span class="normal">879</span>
+<span class="normal">880</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -10479,10 +10479,7 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">879</span>
-<span class="normal">880</span>
-<span class="normal">881</span>
-<span class="normal">882</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">882</span>
 <span class="normal">883</span>
 <span class="normal">884</span>
 <span class="normal">885</span>
@@ -10546,7 +10543,10 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 <span class="normal">943</span>
 <span class="normal">944</span>
 <span class="normal">945</span>
-<span class="normal">946</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_and_get_first_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="normal">946</span>
+<span class="normal">947</span>
+<span class="normal">948</span>
+<span class="normal">949</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_and_get_first_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Search for imagery and return the first item as a structured dict.</span>
 
 <span class="sd">    This method sends a search query to the agent, extracts the search results</span>
@@ -10585,14 +10585,14 @@ print(item['assets'][0]['key'])    # or 'title'</p>
     <span class="n">search_payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_search_items_payload</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">search_payload</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">search_payload</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Search error: </span><span class="si">{</span><span class="n">search_payload</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Search error: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">search_payload</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">])</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">items</span> <span class="o">=</span> <span class="n">search_payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;items&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
         <span class="k">if</span> <span class="n">items</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No items found in search results&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No items found in search results&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="c1"># Fallback: try to parse the final text response</span>
@@ -10602,17 +10602,17 @@ print(item['assets'][0]['key'])    # or 'title'</p>
         <span class="n">item_data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">item_data</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Search error: </span><span class="si">{</span><span class="n">item_data</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Search error: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">item_data</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">])</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">item_data</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;collection&quot;</span><span class="p">]):</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Response missing required fields (id, collection)&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Response missing required fields (id, collection)&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">return</span> <span class="n">item_data</span>
 
     <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Could not extract item data from agent response&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not extract item data from agent response&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -10667,10 +10667,7 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1014</span>
-<span class="normal">1015</span>
-<span class="normal">1016</span>
-<span class="normal">1017</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1017</span>
 <span class="normal">1018</span>
 <span class="normal">1019</span>
 <span class="normal">1020</span>
@@ -10950,7 +10947,10 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 <span class="normal">1294</span>
 <span class="normal">1295</span>
 <span class="normal">1296</span>
-<span class="normal">1297</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">1297</span>
+<span class="normal">1298</span>
+<span class="normal">1299</span>
+<span class="normal">1300</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display an interactive UI with map and chat interface for STAC searches.</span>
 
 <span class="sd">    Args:</span>
@@ -11276,10 +11276,7 @@ real-time feedback without overwhelming the user.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
@@ -11311,7 +11308,10 @@ real-time feedback without overwhelming the user.</p>
 <span class="normal">59</span>
 <span class="normal">60</span>
 <span class="normal">61</span>
-<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UICallbackHandler</span><span class="p">:</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UICallbackHandler</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Callback handler that updates UI status widget with agent progress.</span>
 
 <span class="sd">    This handler intercepts tool calls and progress events to provide</span>
@@ -11409,10 +11409,7 @@ real-time feedback without overwhelming the user.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
@@ -11428,7 +11425,10 @@ real-time feedback without overwhelming the user.</p>
 <span class="normal">59</span>
 <span class="normal">60</span>
 <span class="normal">61</span>
-<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle callback events from the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -11500,14 +11500,14 @@ real-time feedback without overwhelming the user.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
 <span class="normal">40</span>
-<span class="normal">41</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">status_widget</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">status_widget</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialize the callback handler.</span>
 
 <span class="sd">    Args:</span>
@@ -11627,10 +11627,7 @@ see https://docs.claude.com/en/docs/about-claude/models/overview.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
@@ -11657,7 +11654,10 @@ see https://docs.claude.com/en/docs/about-claude/models/overview.</p>
 <span class="normal">173</span>
 <span class="normal">174</span>
 <span class="normal">175</span>
-<span class="normal">176</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_anthropic_model</span><span class="p">(</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_anthropic_model</span><span class="p">(</span>
     <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;claude-sonnet-4-20250514&quot;</span><span class="p">,</span>
     <span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">client_args</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -11806,10 +11806,7 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">182</span>
 <span class="normal">183</span>
 <span class="normal">184</span>
 <span class="normal">185</span>
@@ -11830,7 +11827,10 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
-<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_bedrock_model</span><span class="p">(</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_bedrock_model</span><span class="p">(</span>
     <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;anthropic.claude-sonnet-4-20250514-v1:0&quot;</span><span class="p">,</span>
     <span class="n">region_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">boto_session</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">boto3</span><span class="o">.</span><span class="n">Session</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -11979,10 +11979,7 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">209</span>
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
@@ -12010,7 +12007,10 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 <span class="normal">234</span>
 <span class="normal">235</span>
 <span class="normal">236</span>
-<span class="normal">237</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_gemini_model</span><span class="p">(</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_gemini_model</span><span class="p">(</span>
     <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;gemini-2.5-flash&quot;</span><span class="p">,</span>
     <span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">client_args</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -12166,10 +12166,7 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 93</span>
 <span class="normal"> 94</span>
 <span class="normal"> 95</span>
 <span class="normal"> 96</span>
@@ -12185,7 +12182,10 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
-<span class="normal">109</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_ollama_model</span><span class="p">(</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_ollama_model</span><span class="p">(</span>
     <span class="n">host</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span>
     <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
     <span class="n">client_args</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -12329,10 +12329,7 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">115</span>
 <span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
@@ -12360,7 +12357,10 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 <span class="normal">140</span>
 <span class="normal">141</span>
 <span class="normal">142</span>
-<span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_openai_model</span><span class="p">(</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_openai_model</span><span class="p">(</span>
     <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;gpt-4o-mini&quot;</span><span class="p">,</span>
     <span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">client_args</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

@@ -4815,10 +4815,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">269</span>
 <span class="normal">270</span>
 <span class="normal">271</span>
 <span class="normal">272</span>
@@ -4885,7 +4882,10 @@
 <span class="normal">333</span>
 <span class="normal">334</span>
 <span class="normal">335</span>
-<span class="normal">336</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SegmentationDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SegmentationDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Dataset for semantic segmentation with remote sensing imagery.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -5067,10 +5067,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
 <span class="normal">275</span>
 <span class="normal">276</span>
 <span class="normal">277</span>
@@ -5089,7 +5086,10 @@
 <span class="normal">290</span>
 <span class="normal">291</span>
 <span class="normal">292</span>
-<span class="normal">293</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">mask_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
@@ -5155,10 +5155,7 @@ or pure timm models from Hugging Face Hub.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 36</span>
-<span class="normal"> 37</span>
-<span class="normal"> 38</span>
-<span class="normal"> 39</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 39</span>
 <span class="normal"> 40</span>
 <span class="normal"> 41</span>
 <span class="normal"> 42</span>
@@ -5382,7 +5379,10 @@ or pure timm models from Hugging Face Hub.</p>
 <span class="normal">260</span>
 <span class="normal">261</span>
 <span class="normal">262</span>
-<span class="normal">263</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TimmSegmentationModel</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">LightningModule</span><span class="p">):</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TimmSegmentationModel</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">LightningModule</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    PyTorch Lightning module for semantic segmentation using timm encoders with SMP decoders,</span>
 <span class="sd">    or pure timm models from Hugging Face Hub.</span>
@@ -5447,7 +5447,7 @@ or pure timm models from Hugging Face Hub.</p>
                     <span class="n">num_classes</span><span class="o">=</span><span class="n">num_classes</span><span class="p">,</span>
                     <span class="n">in_chans</span><span class="o">=</span><span class="n">in_channels</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded timm model: </span><span class="si">{</span><span class="n">timm_model_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded timm model: </span><span class="si">{</span><span class="n">timm_model_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;Failed to load timm model &#39;</span><span class="si">{</span><span class="n">timm_model_name</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
@@ -5870,10 +5870,7 @@ Only used if use_timm_model=True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 42</span>
-<span class="normal"> 43</span>
-<span class="normal"> 44</span>
-<span class="normal"> 45</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 45</span>
 <span class="normal"> 46</span>
 <span class="normal"> 47</span>
 <span class="normal"> 48</span>
@@ -5987,7 +5984,10 @@ Only used if use_timm_model=True.</p>
 <span class="normal">156</span>
 <span class="normal">157</span>
 <span class="normal">158</span>
-<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">encoder_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
     <span class="n">architecture</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unet&quot;</span><span class="p">,</span>
@@ -6046,7 +6046,7 @@ Only used if use_timm_model=True.</p>
                 <span class="n">num_classes</span><span class="o">=</span><span class="n">num_classes</span><span class="p">,</span>
                 <span class="n">in_chans</span><span class="o">=</span><span class="n">in_channels</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded timm model: </span><span class="si">{</span><span class="n">timm_model_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded timm model: </span><span class="si">{</span><span class="n">timm_model_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Failed to load timm model &#39;</span><span class="si">{</span><span class="n">timm_model_name</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
@@ -6280,10 +6280,7 @@ Only used if use_timm_model=True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">550</span>
-<span class="normal">551</span>
-<span class="normal">552</span>
-<span class="normal">553</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">553</span>
 <span class="normal">554</span>
 <span class="normal">555</span>
 <span class="normal">556</span>
@@ -6346,7 +6343,10 @@ Only used if use_timm_model=True.</p>
 <span class="normal">613</span>
 <span class="normal">614</span>
 <span class="normal">615</span>
-<span class="normal">616</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_segmentation</span><span class="p">(</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_segmentation</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TimmSegmentationModel</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">],</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
@@ -6675,10 +6675,7 @@ Only used if use_timm_model=True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1122</span>
-<span class="normal">1123</span>
-<span class="normal">1124</span>
-<span class="normal">1125</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1125</span>
 <span class="normal">1126</span>
 <span class="normal">1127</span>
 <span class="normal">1128</span>
@@ -6815,7 +6812,10 @@ Only used if use_timm_model=True.</p>
 <span class="normal">1259</span>
 <span class="normal">1260</span>
 <span class="normal">1261</span>
-<span class="normal">1262</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_timm_model_to_hub</span><span class="p">(</span>
+<span class="normal">1262</span>
+<span class="normal">1263</span>
+<span class="normal">1264</span>
+<span class="normal">1265</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_timm_model_to_hub</span><span class="p">(</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">encoder_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
@@ -6853,7 +6853,7 @@ Only used if use_timm_model=True.</p>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">HfApi</span><span class="p">,</span> <span class="n">create_repo</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required to push models. &quot;</span>
             <span class="s2">&quot;Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
@@ -6914,7 +6914,7 @@ Only used if use_timm_model=True.</p>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">create_repo</span><span class="p">(</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">private</span><span class="o">=</span><span class="n">private</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Repository creation note: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Repository creation note: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Save model configuration</span>
     <span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
@@ -6954,7 +6954,7 @@ Only used if use_timm_model=True.</p>
         <span class="p">)</span>
 
     <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;https://huggingface.co/</span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model successfully pushed to: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model successfully pushed to: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">url</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7212,10 +7212,7 @@ to the multi-band probability raster.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1265</span>
-<span class="normal">1266</span>
-<span class="normal">1267</span>
-<span class="normal">1268</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1268</span>
 <span class="normal">1269</span>
 <span class="normal">1270</span>
 <span class="normal">1271</span>
@@ -7307,7 +7304,10 @@ to the multi-band probability raster.</p>
 <span class="normal">1357</span>
 <span class="normal">1358</span>
 <span class="normal">1359</span>
-<span class="normal">1360</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_segmentation_from_hub</span><span class="p">(</span>
+<span class="normal">1360</span>
+<span class="normal">1361</span>
+<span class="normal">1362</span>
+<span class="normal">1363</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_segmentation_from_hub</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -7354,7 +7354,7 @@ to the multi-band probability raster.</p>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">hf_hub_download</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required. Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
@@ -7363,7 +7363,7 @@ to the multi-band probability raster.</p>
 
     <span class="c1"># Download model and config from HuggingFace Hub</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading model from </span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading model from </span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
 
     <span class="n">model_path</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span><span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;model.pth&quot;</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span>
     <span class="n">config_path</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span><span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;config.json&quot;</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span>
@@ -7373,7 +7373,7 @@ to the multi-band probability raster.</p>
         <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model config: </span><span class="si">{</span><span class="n">config</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model config: </span><span class="si">{</span><span class="n">config</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="n">encoder_name</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;encoder_name&quot;</span><span class="p">,</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">)</span>
     <span class="n">architecture</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;architecture&quot;</span><span class="p">,</span> <span class="s2">&quot;unet&quot;</span><span class="p">)</span>
@@ -7736,10 +7736,7 @@ multi-band probability raster.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 818</span>
-<span class="normal"> 819</span>
-<span class="normal"> 820</span>
-<span class="normal"> 821</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 821</span>
 <span class="normal"> 822</span>
 <span class="normal"> 823</span>
 <span class="normal"> 824</span>
@@ -8037,7 +8034,10 @@ multi-band probability raster.</p>
 <span class="normal">1116</span>
 <span class="normal">1117</span>
 <span class="normal">1118</span>
-<span class="normal">1119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_semantic_segmentation</span><span class="p">(</span>
+<span class="normal">1119</span>
+<span class="normal">1120</span>
+<span class="normal">1121</span>
+<span class="normal">1122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">timm_semantic_segmentation</span><span class="p">(</span>
     <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -8177,7 +8177,7 @@ multi-band probability raster.</p>
         <span class="n">n_cols</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">((</span><span class="n">width</span> <span class="o">-</span> <span class="n">overlap</span><span class="p">)</span> <span class="o">/</span> <span class="n">stride</span><span class="p">))</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="n">n_rows</span><span class="si">}</span><span class="s2"> x </span><span class="si">{</span><span class="n">n_cols</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">n_rows</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">n_cols</span><span class="si">}</span><span class="s2"> windows&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="n">n_rows</span><span class="si">}</span><span class="s2"> x </span><span class="si">{</span><span class="n">n_cols</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">n_rows</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">n_cols</span><span class="si">}</span><span class="s2"> windows&quot;</span><span class="p">)</span>
 
         <span class="c1"># Initialize probability accumulators for proper overlap blending</span>
         <span class="n">prob_accumulator</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_classes</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
@@ -8286,7 +8286,7 @@ multi-band probability raster.</p>
                     <span class="n">normalized_probs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">valid_pixels</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">probability_threshold</span>
                 <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using probability threshold: </span><span class="si">{</span><span class="n">probability_threshold</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using probability threshold: </span><span class="si">{</span><span class="n">probability_threshold</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">output</span><span class="p">[</span><span class="n">valid_pixels</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span>
                     <span class="n">normalized_probs</span><span class="p">[:,</span> <span class="n">valid_pixels</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span>
@@ -8302,7 +8302,7 @@ multi-band probability raster.</p>
         <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Segmentation saved to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Segmentation saved to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Save probability map if requested</span>
     <span class="k">if</span> <span class="n">probability_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -8319,7 +8319,7 @@ multi-band probability raster.</p>
                 <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">normalized_probs</span><span class="p">[</span><span class="n">class_idx</span><span class="p">],</span> <span class="n">class_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved probability map to </span><span class="si">{</span><span class="n">probability_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved probability map to </span><span class="si">{</span><span class="n">probability_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="c1"># Save individual class probabilities if requested</span>
         <span class="k">if</span> <span class="n">save_class_probabilities</span><span class="p">:</span>
@@ -8336,8 +8336,8 @@ multi-band probability raster.</p>
                     <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">normalized_probs</span><span class="p">[</span><span class="n">class_idx</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
 
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
-                    <span class="nb">print</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Saved class </span><span class="si">{</span><span class="n">class_idx</span><span class="si">}</span><span class="s2"> probability &quot;</span> <span class="sa">f</span><span class="s2">&quot;to </span><span class="si">{</span><span class="n">class_prob_path</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Saved class </span><span class="si">{</span><span class="n">class_idx</span><span class="si">}</span><span class="s2"> probability to </span><span class="si">{</span><span class="n">class_prob_path</span><span class="si">}</span><span class="s2">&quot;</span>
                     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8815,10 +8815,7 @@ multi-band probability raster.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">342</span>
 <span class="normal">343</span>
 <span class="normal">344</span>
 <span class="normal">345</span>
@@ -9023,7 +9020,10 @@ multi-band probability raster.</p>
 <span class="normal">544</span>
 <span class="normal">545</span>
 <span class="normal">546</span>
-<span class="normal">547</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_timm_segmentation</span><span class="p">(</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_timm_segmentation</span><span class="p">(</span>
     <span class="n">train_dataset</span><span class="p">:</span> <span class="n">Dataset</span><span class="p">,</span>
     <span class="n">val_dataset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dataset</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">test_dataset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dataset</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9173,7 +9173,7 @@ multi-band probability raster.</p>
     <span class="p">)</span>
 
     <span class="c1"># Train model</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training </span><span class="si">{</span><span class="n">encoder_name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">architecture</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">num_epochs</span><span class="si">}</span><span class="s2"> epochs...&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training </span><span class="si">{</span><span class="n">encoder_name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">architecture</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">num_epochs</span><span class="si">}</span><span class="s2"> epochs...&quot;</span><span class="p">)</span>
     <span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
         <span class="n">model</span><span class="p">,</span>
         <span class="n">train_dataloaders</span><span class="o">=</span><span class="n">train_loader</span><span class="p">,</span>
@@ -9190,10 +9190,10 @@ multi-band probability raster.</p>
             <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
             <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Testing model on test set...&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Testing model on test set...&quot;</span><span class="p">)</span>
         <span class="n">trainer</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dataloaders</span><span class="o">=</span><span class="n">test_loader</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Best model saved at: </span><span class="si">{</span><span class="n">checkpoint_callback</span><span class="o">.</span><span class="n">best_model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best model saved at: </span><span class="si">{</span><span class="n">checkpoint_callback</span><span class="o">.</span><span class="n">best_model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Save training history in compatible format</span>
     <span class="n">metrics</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">logged_metrics</span>
@@ -9229,7 +9229,7 @@ multi-band probability raster.</p>
     <span class="c1"># Save history</span>
     <span class="n">history_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">model_dir</span><span class="p">,</span> <span class="s2">&quot;training_history.pth&quot;</span><span class="p">)</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">history</span><span class="p">,</span> <span class="n">history_path</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training history saved to: </span><span class="si">{</span><span class="n">history_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training history saved to: </span><span class="si">{</span><span class="n">history_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">model</span>
 </code></pre></div></td></tr></table></div>
@@ -9774,10 +9774,7 @@ applied. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_segment.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
-<span class="normal">622</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">622</span>
 <span class="normal">623</span>
 <span class="normal">624</span>
 <span class="normal">625</span>
@@ -9970,7 +9967,10 @@ applied. Defaults to None.</p>
 <span class="normal">812</span>
 <span class="normal">813</span>
 <span class="normal">814</span>
-<span class="normal">815</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_timm_segmentation_model</span><span class="p">(</span>
+<span class="normal">815</span>
+<span class="normal">816</span>
+<span class="normal">817</span>
+<span class="normal">818</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_timm_segmentation_model</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -10074,7 +10074,7 @@ applied. Defaults to None.</p>
     <span class="k">if</span> <span class="n">input_format</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;coco&quot;</span><span class="p">:</span>
         <span class="c1"># Parse COCO format annotations</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading COCO format annotations from </span><span class="si">{</span><span class="n">labels_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading COCO format annotations from </span><span class="si">{</span><span class="n">labels_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="c1"># For COCO format, labels_dir is path to instances.json</span>
         <span class="c1"># Labels are typically in a &quot;labels&quot; directory parallel to &quot;annotations&quot;</span>
         <span class="n">coco_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">labels_dir</span><span class="p">))</span>  <span class="c1"># Go up two levels</span>
@@ -10085,7 +10085,7 @@ applied. Defaults to None.</p>
     <span class="k">elif</span> <span class="n">input_format</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;yolo&quot;</span><span class="p">:</span>
         <span class="c1"># Parse YOLO format annotations</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading YOLO format data from </span><span class="si">{</span><span class="n">images_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading YOLO format data from </span><span class="si">{</span><span class="n">images_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="n">image_paths</span><span class="p">,</span> <span class="n">label_paths</span> <span class="o">=</span> <span class="n">parse_yolo_annotations</span><span class="p">(</span><span class="n">images_dir</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Default: directory format</span>
@@ -10109,7 +10109,7 @@ applied. Defaults to None.</p>
         <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> image-label pairs&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> image-label pairs&quot;</span><span class="p">)</span>
 
     <span class="c1"># Split into train and validation</span>
     <span class="n">train_images</span><span class="p">,</span> <span class="n">val_images</span><span class="p">,</span> <span class="n">train_labels</span><span class="p">,</span> <span class="n">val_labels</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
@@ -10117,8 +10117,8 @@ applied. Defaults to None.</p>
     <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training samples: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">train_images</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validation samples: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">val_images</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training samples: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">train_images</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Validation samples: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">val_images</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Create datasets</span>
     <span class="n">train_dataset</span> <span class="o">=</span> <span class="n">SegmentationDataset</span><span class="p">(</span>
@@ -10164,7 +10164,7 @@ applied. Defaults to None.</p>
     <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Training completed. Model saved to </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training completed. Model saved to </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">model</span><span class="o">.</span><span class="n">model</span>  <span class="c1"># Return the underlying model</span>
 </code></pre></div></td></tr></table></div>

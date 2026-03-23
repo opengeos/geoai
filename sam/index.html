@@ -4824,10 +4824,7 @@ https://huggingface.co/docs/transformers/main/en/model_doc/sam for details.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/sam.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 24</span>
-<span class="normal"> 25</span>
-<span class="normal"> 26</span>
-<span class="normal"> 27</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 27</span>
 <span class="normal"> 28</span>
 <span class="normal"> 29</span>
 <span class="normal"> 30</span>
@@ -5640,7 +5637,10 @@ https://huggingface.co/docs/transformers/main/en/model_doc/sam for details.</p>
 <span class="normal">837</span>
 <span class="normal">838</span>
 <span class="normal">839</span>
-<span class="normal">840</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamGeo</span><span class="p">:</span>
+<span class="normal">840</span>
+<span class="normal">841</span>
+<span class="normal">842</span>
+<span class="normal">843</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamGeo</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The main class for segmenting geospatial data with the Segment Anything Model (SAM). See</span>
 <span class="sd">    https://huggingface.co/docs/transformers/main/en/model_doc/sam for details.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -6068,7 +6068,7 @@ https://huggingface.co/docs/transformers/main/en/model_doc/sam for details.</p>
         <span class="n">anns</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">masks</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Please run generate() first.&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Please run generate() first.&quot;</span><span class="p">)</span>
             <span class="k">return</span>
 
         <span class="k">if</span> <span class="n">anns</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">anns</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -6282,7 +6282,7 @@ https://huggingface.co/docs/transformers/main/en/model_doc/sam for details.</p>
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">point_labels</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
                     <span class="n">point_labels</span> <span class="o">=</span> <span class="n">point_labels</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">point_coords</span><span class="p">)</span>
                 <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_of_bounds</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Removing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">out_of_bounds</span><span class="p">)</span><span class="si">}</span><span class="s2"> out-of-bound points.&quot;</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Removing </span><span class="si">%d</span><span class="s2"> out-of-bound points.&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_of_bounds</span><span class="p">))</span>
                     <span class="n">point_labels_new</span> <span class="o">=</span> <span class="p">[]</span>
                     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">point_labels</span><span class="p">):</span>
                         <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">out_of_bounds</span><span class="p">:</span>
@@ -6430,7 +6430,7 @@ https://huggingface.co/docs/transformers/main/en/model_doc/sam for details.</p>
         <span class="n">masks</span> <span class="o">=</span> <span class="n">masks</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">boxes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">boxes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>  <span class="c1"># No &quot;object&quot; instances found</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No objects found in the image.&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No objects found in the image.&quot;</span><span class="p">)</span>
             <span class="k">return</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Create an empty image to store the mask overlays</span>
@@ -6587,76 +6587,76 @@ representing the CUDA device index. Defaults to None, which will use 'cuda' if a
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span>
-<span class="normal">98</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 32</span>
+<span class="normal"> 33</span>
+<span class="normal"> 34</span>
+<span class="normal"> 35</span>
+<span class="normal"> 36</span>
+<span class="normal"> 37</span>
+<span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;facebook/sam-vit-huge&quot;</span><span class="p">,</span>
     <span class="n">automatic</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -6949,10 +6949,7 @@ The unique value increases from 1 to the number of objects. The larger the numbe
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
@@ -7040,7 +7037,10 @@ The unique value increases from 1 to the number of objects. The larger the numbe
 <span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
-<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
     <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7371,10 +7371,7 @@ The unique value increases from 1 to the number of objects. The larger the numbe
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">196</span>
 <span class="normal">197</span>
 <span class="normal">198</span>
 <span class="normal">199</span>
@@ -7456,7 +7453,10 @@ The unique value increases from 1 to the number of objects. The larger the numbe
 <span class="normal">275</span>
 <span class="normal">276</span>
 <span class="normal">277</span>
-<span class="normal">278</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_batch</span><span class="p">(</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_batch</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]],</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7768,10 +7768,7 @@ which will save the mask with the highest score.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">576</span>
-<span class="normal">577</span>
-<span class="normal">578</span>
-<span class="normal">579</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">579</span>
 <span class="normal">580</span>
 <span class="normal">581</span>
 <span class="normal">582</span>
@@ -7920,7 +7917,10 @@ which will save the mask with the highest score.</p>
 <span class="normal">725</span>
 <span class="normal">726</span>
 <span class="normal">727</span>
-<span class="normal">728</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+<span class="normal">728</span>
+<span class="normal">729</span>
+<span class="normal">730</span>
+<span class="normal">731</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">point_coords</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">point_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -8010,7 +8010,7 @@ which will save the mask with the highest score.</p>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">point_labels</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
                 <span class="n">point_labels</span> <span class="o">=</span> <span class="n">point_labels</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">point_coords</span><span class="p">)</span>
             <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_of_bounds</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Removing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">out_of_bounds</span><span class="p">)</span><span class="si">}</span><span class="s2"> out-of-bound points.&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Removing </span><span class="si">%d</span><span class="s2"> out-of-bound points.&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_of_bounds</span><span class="p">))</span>
                 <span class="n">point_labels_new</span> <span class="o">=</span> <span class="p">[]</span>
                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">point_labels</span><span class="p">):</span>
                     <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">out_of_bounds</span><span class="p">:</span>
@@ -8263,10 +8263,7 @@ You can use this parameter to scale the mask to a larger range, for example [0, 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">280</span>
-<span class="normal">281</span>
-<span class="normal">282</span>
-<span class="normal">283</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
 <span class="normal">286</span>
@@ -8369,7 +8366,10 @@ You can use this parameter to scale the mask to a larger range, for example [0, 
 <span class="normal">383</span>
 <span class="normal">384</span>
 <span class="normal">385</span>
-<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_masks</span><span class="p">(</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_masks</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">foreground</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -8651,10 +8651,7 @@ The higher this value, the smaller the number of vertices in the resulting geome
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">538</span>
 <span class="normal">539</span>
 <span class="normal">540</span>
 <span class="normal">541</span>
@@ -8690,7 +8687,10 @@ The higher this value, the smaller the number of vertices in the resulting geome
 <span class="normal">571</span>
 <span class="normal">572</span>
 <span class="normal">573</span>
-<span class="normal">574</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_prediction</span><span class="p">(</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_prediction</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8822,10 +8822,7 @@ The higher this value, the smaller the number of vertices in the resulting geome
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">510</span>
 <span class="normal">511</span>
 <span class="normal">512</span>
 <span class="normal">513</span>
@@ -8848,7 +8845,10 @@ The higher this value, the smaller the number of vertices in the resulting geome
 <span class="normal">530</span>
 <span class="normal">531</span>
 <span class="normal">532</span>
-<span class="normal">533</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Set the input image as a numpy array.</span>
 
@@ -9031,10 +9031,7 @@ The higher this value, the smaller the number of vertices in the resulting geome
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">426</span>
 <span class="normal">427</span>
 <span class="normal">428</span>
 <span class="normal">429</span>
@@ -9113,7 +9110,10 @@ The higher this value, the smaller the number of vertices in the resulting geome
 <span class="normal">502</span>
 <span class="normal">503</span>
 <span class="normal">504</span>
-<span class="normal">505</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_anns</span><span class="p">(</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_anns</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
     <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;off&quot;</span><span class="p">,</span>
@@ -9142,7 +9142,7 @@ The higher this value, the smaller the number of vertices in the resulting geome
     <span class="n">anns</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">masks</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Please run generate() first.&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Please run generate() first.&quot;</span><span class="p">)</span>
         <span class="k">return</span>
 
     <span class="k">if</span> <span class="n">anns</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">anns</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -9336,10 +9336,7 @@ The higher this value, the smaller the number of vertices in the resulting geome
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">391</span>
 <span class="normal">392</span>
 <span class="normal">393</span>
 <span class="normal">394</span>
@@ -9369,7 +9366,10 @@ The higher this value, the smaller the number of vertices in the resulting geome
 <span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
-<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_masks</span><span class="p">(</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_masks</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
     <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;binary_r&quot;</span><span class="p">,</span>
@@ -9568,10 +9568,7 @@ Defaults to 255.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/sam.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">768</span>
-<span class="normal">769</span>
-<span class="normal">770</span>
-<span class="normal">771</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">771</span>
 <span class="normal">772</span>
 <span class="normal">773</span>
 <span class="normal">774</span>
@@ -9640,7 +9637,10 @@ Defaults to 255.</p>
 <span class="normal">837</span>
 <span class="normal">838</span>
 <span class="normal">839</span>
-<span class="normal">840</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_numpy</span><span class="p">(</span>
+<span class="normal">840</span>
+<span class="normal">841</span>
+<span class="normal">842</span>
+<span class="normal">843</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_numpy</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9686,7 +9686,7 @@ Defaults to 255.</p>
     <span class="n">masks</span> <span class="o">=</span> <span class="n">masks</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">boxes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">boxes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>  <span class="c1"># No &quot;object&quot; instances found</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No objects found in the image.&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No objects found in the image.&quot;</span><span class="p">)</span>
         <span class="k">return</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Create an empty image to store the mask overlays</span>

@@ -4819,13 +4819,7 @@ geoai.display_ftw_samples("ftw_data", country="luxembourg", num_samples=6)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/ftw.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">340</span>
 <span class="normal">341</span>
 <span class="normal">342</span>
 <span class="normal">343</span>
@@ -4929,7 +4923,13 @@ geoai.display_ftw_samples("ftw_data", country="luxembourg", num_samples=6)</p>
 <span class="normal">441</span>
 <span class="normal">442</span>
 <span class="normal">443</span>
-<span class="normal">444</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">display_ftw_samples</span><span class="p">(</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">display_ftw_samples</span><span class="p">(</span>
     <span class="n">data_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">country</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;luxembourg&quot;</span><span class="p">,</span>
     <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
@@ -5002,7 +5002,7 @@ geoai.display_ftw_samples("ftw_data", country="luxembourg", num_samples=6)</p>
     <span class="n">num_samples</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">aois</span><span class="p">))</span>
 
     <span class="k">if</span> <span class="n">num_samples</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No samples found for split=&#39;</span><span class="si">{</span><span class="n">split</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No samples found for split=&#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="n">split</span><span class="p">)</span>
         <span class="k">return</span>
 
     <span class="k">if</span> <span class="n">figsize</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -5195,10 +5195,7 @@ geoai.download_ftw(countries=["luxembourg"], output_dir="ftw_data")
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/ftw.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
 <span class="normal"> 58</span>
 <span class="normal"> 59</span>
 <span class="normal"> 60</span>
@@ -5290,7 +5287,10 @@ geoai.download_ftw(countries=["luxembourg"], output_dir="ftw_data")
 <span class="normal">146</span>
 <span class="normal">147</span>
 <span class="normal">148</span>
-<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_ftw</span><span class="p">(</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_ftw</span><span class="p">(</span>
     <span class="n">countries</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ftw_data&quot;</span><span class="p">,</span>
     <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -5345,7 +5345,7 @@ geoai.download_ftw(countries=["luxembourg"], output_dir="ftw_data")
         <span class="n">country_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">country</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">country_dir</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FTW </span><span class="si">{</span><span class="n">country</span><span class="si">}</span><span class="s2"> already exists at </span><span class="si">{</span><span class="n">country_dir</span><span class="si">}</span><span class="s2">, skipping.&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;FTW </span><span class="si">%s</span><span class="s2"> already exists at </span><span class="si">%s</span><span class="s2">, skipping.&quot;</span><span class="p">,</span> <span class="n">country</span><span class="p">,</span> <span class="n">country_dir</span><span class="p">)</span>
             <span class="k">continue</span>
 
         <span class="c1"># Remove existing directory when overwriting</span>
@@ -5356,7 +5356,7 @@ geoai.download_ftw(countries=["luxembourg"], output_dir="ftw_data")
         <span class="n">zip_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">country</span><span class="si">}</span><span class="s2">.zip&quot;</span><span class="p">)</span>
 
         <span class="c1"># Download the zip file</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading FTW </span><span class="si">{</span><span class="n">country</span><span class="si">}</span><span class="s2"> dataset...&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Downloading FTW </span><span class="si">%s</span><span class="s2"> dataset...&quot;</span><span class="p">,</span> <span class="n">country</span><span class="p">)</span>
         <span class="n">download_file</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="n">zip_path</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">unzip</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
         <span class="c1"># Extract into a temporary directory, then move to country_dir</span>
@@ -5367,7 +5367,7 @@ geoai.download_ftw(countries=["luxembourg"], output_dir="ftw_data")
             <span class="n">tmp_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_tmp_</span><span class="si">{</span><span class="n">country</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">tmp_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracting </span><span class="si">{</span><span class="n">zip_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Extracting </span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">zip_path</span><span class="p">)</span>
             <span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">zip_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">zf</span><span class="p">:</span>
                 <span class="n">zf</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">tmp_dir</span><span class="p">)</span>
 
@@ -5383,7 +5383,7 @@ geoai.download_ftw(countries=["luxembourg"], output_dir="ftw_data")
                 <span class="c1"># Flat structure — rename the temp dir</span>
                 <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">tmp_dir</span><span class="p">,</span> <span class="n">country_dir</span><span class="p">)</span>
 
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracted to </span><span class="si">{</span><span class="n">country_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Extracted to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">country_dir</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_dir</span>
 </code></pre></div></td></tr></table></div>
@@ -5615,10 +5615,7 @@ print(result["images_dir"], result["num_train"])</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/ftw.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">155</span>
 <span class="normal">156</span>
 <span class="normal">157</span>
 <span class="normal">158</span>
@@ -5768,7 +5765,13 @@ print(result["images_dir"], result["num_train"])</p>
 <span class="normal">302</span>
 <span class="normal">303</span>
 <span class="normal">304</span>
-<span class="normal">305</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_ftw</span><span class="p">(</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_ftw</span><span class="p">(</span>
     <span class="n">data_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">country</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;luxembourg&quot;</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5875,12 +5878,15 @@ print(result["images_dir"], result["num_train"])</p>
     <span class="n">all_train_aois</span> <span class="o">=</span> <span class="n">train_aois</span> <span class="o">+</span> <span class="n">val_aois</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FTW </span><span class="si">{</span><span class="n">country</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">chips_df</span><span class="p">)</span><span class="si">}</span><span class="s2"> total chips&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;  Train: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">train_aois</span><span class="p">)</span><span class="si">}</span><span class="s2">, Val: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">val_aois</span><span class="p">)</span><span class="si">}</span><span class="s2">, Test: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">test_aois</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;FTW </span><span class="si">%s</span><span class="s2">: </span><span class="si">%d</span><span class="s2"> total chips&quot;</span><span class="p">,</span> <span class="n">country</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">chips_df</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;  Train: </span><span class="si">%d</span><span class="s2">, Val: </span><span class="si">%d</span><span class="s2">, Test: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">train_aois</span><span class="p">),</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">val_aois</span><span class="p">),</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">test_aois</span><span class="p">),</span>
         <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_train_aois</span><span class="p">)</span><span class="si">}</span><span class="s2"> chips for training&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Preparing training data...&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;  Using </span><span class="si">%d</span><span class="s2"> chips for training&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_train_aois</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Preparing training data...&quot;</span><span class="p">)</span>
 
     <span class="c1"># Process training chips</span>
     <span class="n">prepared_train</span> <span class="o">=</span> <span class="mi">0</span>
@@ -5899,7 +5905,7 @@ print(result["images_dir"], result["num_train"])</p>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
         <span class="n">skipped</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_train_aois</span><span class="p">)</span> <span class="o">-</span> <span class="n">prepared_train</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prepared </span><span class="si">{</span><span class="n">prepared_train</span><span class="si">}</span><span class="s2"> training chips (skipped </span><span class="si">{</span><span class="n">skipped</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Prepared </span><span class="si">%d</span><span class="s2"> training chips (skipped </span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">prepared_train</span><span class="p">,</span> <span class="n">skipped</span><span class="p">)</span>
 
     <span class="c1"># Process test chips</span>
     <span class="n">prepared_test</span> <span class="o">=</span> <span class="mi">0</span>
@@ -5913,7 +5919,7 @@ print(result["images_dir"], result["num_train"])</p>
                 <span class="n">prepared_test</span> <span class="o">+=</span> <span class="mi">1</span>
 
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prepared </span><span class="si">{</span><span class="n">prepared_test</span><span class="si">}</span><span class="s2"> test chips&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Prepared </span><span class="si">%d</span><span class="s2"> test chips&quot;</span><span class="p">,</span> <span class="n">prepared_test</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">&quot;images_dir&quot;</span><span class="p">:</span> <span class="n">images_dir</span><span class="p">,</span>

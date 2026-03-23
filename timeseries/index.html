@@ -5061,10 +5061,7 @@ calculate_spectral_index_timeseries(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">774</span>
-<span class="normal">775</span>
-<span class="normal">776</span>
-<span class="normal">777</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">777</span>
 <span class="normal">778</span>
 <span class="normal">779</span>
 <span class="normal">780</span>
@@ -5239,7 +5236,10 @@ calculate_spectral_index_timeseries(
 <span class="normal">949</span>
 <span class="normal">950</span>
 <span class="normal">951</span>
-<span class="normal">952</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calculate_spectral_index_timeseries</span><span class="p">(</span>
+<span class="normal">952</span>
+<span class="normal">953</span>
+<span class="normal">954</span>
+<span class="normal">955</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calculate_spectral_index_timeseries</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">index_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;NDVI&quot;</span><span class="p">,</span>
@@ -5329,7 +5329,7 @@ calculate_spectral_index_timeseries(
             <span class="n">nodata</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">nodata</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Computing </span><span class="si">{</span><span class="n">index_upper</span><span class="si">}</span><span class="s2"> time-series for </span><span class="si">{</span><span class="n">num_scenes</span><span class="si">}</span><span class="s2"> scenes, &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">height</span><span class="si">}</span><span class="s2"> pixels&quot;</span>
         <span class="p">)</span>
@@ -5350,7 +5350,7 @@ calculate_spectral_index_timeseries(
 
     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">input_paths</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Processing </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">num_scenes</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Processing </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">num_scenes</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
             <span class="c1"># Read required bands</span>
@@ -5415,7 +5415,7 @@ calculate_spectral_index_timeseries(
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">index_stack</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">index_upper</span><span class="si">}</span><span class="s2"> time-series saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">index_upper</span><span class="si">}</span><span class="s2"> time-series saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_path</span>
 </code></pre></div></td></tr></table></div>
@@ -5646,10 +5646,7 @@ calculate_temporal_statistics(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1131</span>
-<span class="normal">1132</span>
-<span class="normal">1133</span>
-<span class="normal">1134</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1134</span>
 <span class="normal">1135</span>
 <span class="normal">1136</span>
 <span class="normal">1137</span>
@@ -5788,7 +5785,10 @@ calculate_temporal_statistics(
 <span class="normal">1270</span>
 <span class="normal">1271</span>
 <span class="normal">1272</span>
-<span class="normal">1273</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calculate_temporal_statistics</span><span class="p">(</span>
+<span class="normal">1273</span>
+<span class="normal">1274</span>
+<span class="normal">1275</span>
+<span class="normal">1276</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calculate_temporal_statistics</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">statistics</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5864,7 +5864,7 @@ calculate_temporal_statistics(
     <span class="n">num_output_bands</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bands</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">statistics</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Computing temporal statistics for </span><span class="si">{</span><span class="n">num_scenes</span><span class="si">}</span><span class="s2"> scenes, &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bands</span><span class="p">)</span><span class="si">}</span><span class="s2"> band(s), </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">statistics</span><span class="p">)</span><span class="si">}</span><span class="s2"> statistic(s)&quot;</span>
         <span class="p">)</span>
@@ -5874,7 +5874,7 @@ calculate_temporal_statistics(
 
     <span class="k">for</span> <span class="n">band_idx</span> <span class="ow">in</span> <span class="n">bands</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Reading band </span><span class="si">{</span><span class="n">band_idx</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Reading band </span><span class="si">{</span><span class="n">band_idx</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
 
         <span class="c1"># Read all scenes for this band</span>
         <span class="n">stack</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">num_scenes</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
@@ -5889,7 +5889,7 @@ calculate_temporal_statistics(
         <span class="c1"># Compute each requested statistic</span>
         <span class="k">for</span> <span class="n">stat</span> <span class="ow">in</span> <span class="n">statistics</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Computing </span><span class="si">{</span><span class="n">stat</span><span class="si">}</span><span class="s2"> for band </span><span class="si">{</span><span class="n">band_idx</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Computing </span><span class="si">{</span><span class="n">stat</span><span class="si">}</span><span class="s2"> for band </span><span class="si">{</span><span class="n">band_idx</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">stat</span> <span class="o">==</span> <span class="s2">&quot;mean&quot;</span><span class="p">:</span>
                 <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">stack</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
@@ -5928,7 +5928,7 @@ calculate_temporal_statistics(
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Temporal statistics saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Temporal statistics saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_path</span>
 </code></pre></div></td></tr></table></div>
@@ -5976,17 +5976,17 @@ calculate_temporal_statistics(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">70</span>
 <span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
 <span class="normal">74</span>
 <span class="normal">75</span>
 <span class="normal">76</span>
-<span class="normal">77</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_rasterio_available</span><span class="p">():</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_rasterio_available</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if rasterio is installed.</span>
 
 <span class="sd">    Raises:</span>
@@ -6404,10 +6404,7 @@ create_cloud_free_composite(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">598</span>
-<span class="normal">599</span>
-<span class="normal">600</span>
-<span class="normal">601</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">601</span>
 <span class="normal">602</span>
 <span class="normal">603</span>
 <span class="normal">604</span>
@@ -6577,7 +6574,10 @@ create_cloud_free_composite(
 <span class="normal">768</span>
 <span class="normal">769</span>
 <span class="normal">770</span>
-<span class="normal">771</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_cloud_free_composite</span><span class="p">(</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span>
+<span class="normal">774</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_cloud_free_composite</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">red_band</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
@@ -6673,11 +6673,11 @@ create_cloud_free_composite(
 
     <span class="k">try</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generating cloud masks for </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">input_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> scenes...&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generating cloud masks for </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">input_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> scenes...&quot;</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">input_paths</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;  Cloud masking </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">input_paths</span><span class="p">)</span><span class="si">}</span><span class="s2">: &quot;</span>
                     <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
@@ -6728,7 +6728,7 @@ create_cloud_free_composite(
             <span class="n">cloud_mask_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mask_path</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Creating cloud-free composite...&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Creating cloud-free composite...&quot;</span><span class="p">)</span>
 
         <span class="c1"># Create composite using clear-sky masks</span>
         <span class="c1"># The clear mask has 1 = usable, so cloud_clear_value=1</span>
@@ -7040,10 +7040,7 @@ create_temporal_composite(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
 <span class="normal">372</span>
 <span class="normal">373</span>
 <span class="normal">374</span>
@@ -7227,7 +7224,10 @@ create_temporal_composite(
 <span class="normal">552</span>
 <span class="normal">553</span>
 <span class="normal">554</span>
-<span class="normal">555</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_temporal_composite</span><span class="p">(</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_temporal_composite</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;median&quot;</span><span class="p">,</span>
@@ -7331,7 +7331,7 @@ create_temporal_composite(
             <span class="n">nodata</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">nodata</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Creating </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> composite from </span><span class="si">{</span><span class="n">num_scenes</span><span class="si">}</span><span class="s2"> scenes, &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">num_bands</span><span class="si">}</span><span class="s2"> bands, </span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">height</span><span class="si">}</span><span class="s2"> pixels&quot;</span>
         <span class="p">)</span>
@@ -7341,7 +7341,7 @@ create_temporal_composite(
 
     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">input_paths</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Reading </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">num_scenes</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Reading </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">num_scenes</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">band_idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bands</span><span class="p">):</span>
                 <span class="n">stack</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">band_idx</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
@@ -7370,7 +7370,7 @@ create_temporal_composite(
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
         <span class="n">total_pixels</span> <span class="o">=</span> <span class="n">num_scenes</span> <span class="o">*</span> <span class="n">height</span> <span class="o">*</span> <span class="n">width</span>
         <span class="n">valid_pixels</span> <span class="o">=</span> <span class="n">valid</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;  Valid observations: </span><span class="si">{</span><span class="n">valid_pixels</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_pixels</span><span class="si">}</span><span class="s2"> &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">valid_pixels</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">total_pixels</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%)&quot;</span>
         <span class="p">)</span>
@@ -7412,7 +7412,7 @@ create_temporal_composite(
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">composite</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Composite saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Composite saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_path</span>
 </code></pre></div></td></tr></table></div>
@@ -7707,10 +7707,7 @@ detect_change(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 955</span>
-<span class="normal"> 956</span>
-<span class="normal"> 957</span>
-<span class="normal"> 958</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 958</span>
 <span class="normal"> 959</span>
 <span class="normal"> 960</span>
 <span class="normal"> 961</span>
@@ -7880,7 +7877,10 @@ detect_change(
 <span class="normal">1125</span>
 <span class="normal">1126</span>
 <span class="normal">1127</span>
-<span class="normal">1128</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detect_change</span><span class="p">(</span>
+<span class="normal">1128</span>
+<span class="normal">1129</span>
+<span class="normal">1130</span>
+<span class="normal">1131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">detect_change</span><span class="p">(</span>
     <span class="n">image1_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">image2_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -7961,7 +7961,7 @@ detect_change(
         <span class="n">bands</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Detecting changes (</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">) between &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">image1_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> and &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">image2_path</span><span class="p">)</span><span class="si">}</span><span class="s2">, bands=</span><span class="si">{</span><span class="n">bands</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -8050,8 +8050,8 @@ detect_change(
             <span class="n">changed_pixels</span> <span class="o">=</span> <span class="p">(</span><span class="n">output_data</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
             <span class="n">total_valid</span> <span class="o">=</span> <span class="p">(</span><span class="o">~</span><span class="n">nodata_mask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
             <span class="n">pct</span> <span class="o">=</span> <span class="n">changed_pixels</span> <span class="o">/</span> <span class="n">total_valid</span> <span class="o">*</span> <span class="mi">100</span> <span class="k">if</span> <span class="n">total_valid</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Changed pixels: </span><span class="si">{</span><span class="n">changed_pixels</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">pct</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%)&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Change map saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Changed pixels: </span><span class="si">{</span><span class="n">changed_pixels</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">pct</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%)&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Change map saved to: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_path</span>
 </code></pre></div></td></tr></table></div>
@@ -8216,10 +8216,7 @@ print(dates[0].strftime('%Y-%m-%d'))
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 83</span>
 <span class="normal"> 84</span>
 <span class="normal"> 85</span>
 <span class="normal"> 86</span>
@@ -8306,7 +8303,10 @@ print(dates[0].strftime('%Y-%m-%d'))
 <span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
-<span class="normal">170</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_dates_from_filenames</span><span class="p">(</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_dates_from_filenames</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">date_pattern</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">date_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;%Y%m</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
@@ -8580,10 +8580,7 @@ print([os.path.basename(f) for f in sorted_files])
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span>
 <span class="normal">179</span>
@@ -8651,7 +8648,10 @@ print([os.path.basename(f) for f in sorted_files])
 <span class="normal">241</span>
 <span class="normal">242</span>
 <span class="normal">243</span>
-<span class="normal">244</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sort_by_date</span><span class="p">(</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sort_by_date</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">dates</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">date_pattern</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8900,10 +8900,7 @@ print(f"Stack: {info['num_files']} files, "
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/tools/timeseries.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">250</span>
 <span class="normal">251</span>
 <span class="normal">252</span>
 <span class="normal">253</span>
@@ -9018,7 +9015,10 @@ print(f"Stack: {info['num_files']} files, "
 <span class="normal">362</span>
 <span class="normal">363</span>
 <span class="normal">364</span>
-<span class="normal">365</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_temporal_stack</span><span class="p">(</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_temporal_stack</span><span class="p">(</span>
     <span class="n">input_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-6</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>

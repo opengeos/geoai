@@ -4579,6 +4579,13 @@
 
 
 <h1 id="classify-module">classify module<a class="headerlink" href="#classify-module" title="Permanent link">&para;</a></h1>
+<p>Provides image classification workflows for geospatial imagery. This module supports training and applying classification models to categorize land cover types, land use patterns, and other thematic classes from satellite and aerial imagery.</p>
+<div class="admonition example">
+<p class="admonition-title">Related Examples</p>
+<ul>
+<li><a href="../examples/train_landcover_classification/">Train Land Cover Classification</a></li>
+</ul>
+</div>
 
 
 <div class="doc doc-object doc-module">
@@ -4800,10 +4807,7 @@ attention to edge handling:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/classify.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">587</span>
-<span class="normal">588</span>
-<span class="normal">589</span>
-<span class="normal">590</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">590</span>
 <span class="normal">591</span>
 <span class="normal">592</span>
 <span class="normal">593</span>
@@ -5039,7 +5043,13 @@ attention to edge handling:
 <span class="normal">823</span>
 <span class="normal">824</span>
 <span class="normal">825</span>
-<span class="normal">826</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_image</span><span class="p">(</span>
+<span class="normal">826</span>
+<span class="normal">827</span>
+<span class="normal">828</span>
+<span class="normal">829</span>
+<span class="normal">830</span>
+<span class="normal">831</span>
+<span class="normal">832</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_image</span><span class="p">(</span>
     <span class="n">image_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5103,7 +5113,7 @@ attention to edge handling:
         <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span>
 
     <span class="c1"># Load the model</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading model from </span><span class="si">{</span><span class="n">model_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loading model from </span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">model_path</span><span class="p">)</span>
     <span class="n">task</span> <span class="o">=</span> <span class="n">SemanticSegmentationTask</span><span class="o">.</span><span class="n">load_from_checkpoint</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
     <span class="n">task</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
     <span class="n">task</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
@@ -5154,8 +5164,11 @@ attention to edge handling:
                 <span class="n">tile_positions</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y_end</span><span class="p">,</span> <span class="n">x_end</span><span class="p">))</span>
 
         <span class="c1"># Print information about the tiling</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">tile_positions</span><span class="p">)</span><span class="si">}</span><span class="s2"> patches covering an image of size </span><span class="si">{</span><span class="n">height</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2">...&quot;</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Processing </span><span class="si">%s</span><span class="s2"> patches covering an image of size </span><span class="si">%s</span><span class="s2">x</span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">tile_positions</span><span class="p">),</span>
+            <span class="n">height</span><span class="p">,</span>
+            <span class="n">width</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="n">start_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span>
 
@@ -5267,7 +5280,7 @@ attention to edge handling:
         <span class="n">profile</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="s2">&quot;uint8&quot;</span><span class="p">,</span> <span class="s2">&quot;nodata&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
 
         <span class="c1"># Save the result</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving classified image to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Saving classified image to </span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
         <span class="k">with</span> <span class="n">rasterio</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">profile</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">output_image</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:])</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">colormap</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
@@ -5275,8 +5288,8 @@ attention to edge handling:
 
         <span class="c1"># Calculate timing</span>
         <span class="n">total_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total processing time: </span><span class="si">{</span><span class="n">total_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully saved classified image to </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Total processing time: </span><span class="si">%.2f</span><span class="s2"> seconds&quot;</span><span class="p">,</span> <span class="n">total_time</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Successfully saved classified image to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_path</span>
 </code></pre></div></td></tr></table></div>
@@ -5475,13 +5488,7 @@ is a directory. Defaults to ".tif".</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/classify.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">829</span>
-<span class="normal">830</span>
-<span class="normal">831</span>
-<span class="normal">832</span>
-<span class="normal">833</span>
-<span class="normal">834</span>
-<span class="normal">835</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">835</span>
 <span class="normal">836</span>
 <span class="normal">837</span>
 <span class="normal">838</span>
@@ -5579,7 +5586,20 @@ is a directory. Defaults to ".tif".</p>
 <span class="normal">930</span>
 <span class="normal">931</span>
 <span class="normal">932</span>
-<span class="normal">933</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_images</span><span class="p">(</span>
+<span class="normal">933</span>
+<span class="normal">934</span>
+<span class="normal">935</span>
+<span class="normal">936</span>
+<span class="normal">937</span>
+<span class="normal">938</span>
+<span class="normal">939</span>
+<span class="normal">940</span>
+<span class="normal">941</span>
+<span class="normal">942</span>
+<span class="normal">943</span>
+<span class="normal">944</span>
+<span class="normal">945</span>
+<span class="normal">946</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classify_images</span><span class="p">(</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5630,10 +5650,16 @@ is a directory. Defaults to ".tif".</p>
 
         <span class="c1"># Check if any images were found</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">image_path_list</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No files with extension &#39;</span><span class="si">{</span><span class="n">file_extension</span><span class="si">}</span><span class="s2">&#39; found in </span><span class="si">{</span><span class="n">image_paths</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;No files with extension &#39;</span><span class="si">%s</span><span class="s2">&#39; found in </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">file_extension</span><span class="p">,</span>
+                <span class="n">image_paths</span><span class="p">,</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="p">[]</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_path_list</span><span class="p">)</span><span class="si">}</span><span class="s2"> images in directory </span><span class="si">{</span><span class="n">image_paths</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Found </span><span class="si">%s</span><span class="s2"> images in directory </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">image_path_list</span><span class="p">),</span> <span class="n">image_paths</span>
+        <span class="p">)</span>
 
     <span class="c1"># Process list input</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">image_paths</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
@@ -5677,11 +5703,12 @@ is a directory. Defaults to ".tif".</p>
                 <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">classified_image_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">classified_image_path</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing </span><span class="si">{</span><span class="n">image_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error processing </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">image_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
 
-    <span class="nb">print</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;Classification complete. Processed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">classified_image_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> images successfully.&quot;</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Classification complete. Processed </span><span class="si">%s</span><span class="s2"> images successfully.&quot;</span><span class="p">,</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">classified_image_paths</span><span class="p">),</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">classified_image_paths</span>
 </code></pre></div></td></tr></table></div>
@@ -6358,7 +6385,7 @@ Defaults to 1.</p>
       <tbody>
           <tr class="doc-section-item">
 <td><code>object</code></td>            <td>
-                  <code><span title="typing.Any">Any</span></code>
+                  <code><span title="SemanticSegmentationTask">SemanticSegmentationTask</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6372,10 +6399,7 @@ Defaults to 1.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/classify.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  9</span>
-<span class="normal"> 10</span>
-<span class="normal"> 11</span>
-<span class="normal"> 12</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 12</span>
 <span class="normal"> 13</span>
 <span class="normal"> 14</span>
 <span class="normal"> 15</span>
@@ -6706,7 +6730,10 @@ Defaults to 1.</p>
 <span class="normal">340</span>
 <span class="normal">341</span>
 <span class="normal">342</span>
-<span class="normal">343</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_classifier</span><span class="p">(</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_classifier</span><span class="p">(</span>
     <span class="n">image_root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">label_root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output&quot;</span><span class="p">,</span>
@@ -6745,7 +6772,7 @@ Defaults to 1.</p>
     <span class="n">checkpoint_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">every_n_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SemanticSegmentationTask&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Train a semantic segmentation model on geospatial imagery.</span>
 
 <span class="sd">    This function sets up datasets, model, trainer, and executes the training process</span>
@@ -7022,20 +7049,20 @@ Defaults to 1.</p>
         <span class="n">checkpoint_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">test_dir</span><span class="p">,</span> <span class="s2">&quot;last.ckpt&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">checkpoint_file</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Resuming training from previous checkpoint...&quot;</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Resuming training from previous checkpoint...&quot;</span><span class="p">)</span>
         <span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">task</span><span class="p">,</span> <span class="n">datamodule</span><span class="o">=</span><span class="n">datamodule</span><span class="p">,</span> <span class="n">ckpt_path</span><span class="o">=</span><span class="n">checkpoint_file</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Starting training from scratch...&quot;</span><span class="p">)</span>
+        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting training from scratch...&quot;</span><span class="p">)</span>
         <span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
             <span class="n">model</span><span class="o">=</span><span class="n">task</span><span class="p">,</span>
             <span class="n">datamodule</span><span class="o">=</span><span class="n">datamodule</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="n">training_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The time taken to train was: </span><span class="si">{</span><span class="n">training_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;The time taken to train was: </span><span class="si">%.2f</span><span class="s2"> seconds&quot;</span><span class="p">,</span> <span class="n">training_time</span><span class="p">)</span>
 
     <span class="n">best_model_path</span> <span class="o">=</span> <span class="n">checkpoint_callback</span><span class="o">.</span><span class="n">best_model_path</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best model saved at: </span><span class="si">{</span><span class="n">best_model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Best model saved at: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">best_model_path</span><span class="p">)</span>
 
     <span class="c1"># Test the model</span>
     <span class="n">trainer</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">task</span><span class="p">,</span> <span class="n">datamodule</span><span class="o">=</span><span class="n">datamodule</span><span class="p">)</span>
@@ -7076,7 +7103,7 @@ Defaults to 1.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 23, 2025 16:35:02 UTC"><span class="timeago" datetime="2025-03-23T16:35:02+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 23, 2025 16:35:02 UTC">2025-03-23</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 23, 2026 04:06:44 UTC"><span class="timeago" datetime="2026-03-23T04:06:44+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 23, 2026 04:06:44 UTC">2026-03-23</span>
   </span>
 
     

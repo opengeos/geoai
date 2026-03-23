@@ -5121,6 +5121,13 @@
 
 
 <h1 id="auto-module">auto module<a class="headerlink" href="#auto-module" title="Permanent link">&para;</a></h1>
+<p>Provides auto-segmentation capabilities using HuggingFace foundation models. This module enables automatic image segmentation on geospatial imagery without requiring manual prompts or training data, leveraging pre-trained models for zero-shot and few-shot segmentation tasks.</p>
+<div class="admonition example">
+<p class="admonition-title">Related Examples</p>
+<ul>
+<li><a href="../examples/AutoModel/">AutoModel</a></li>
+</ul>
+</div>
 
 
 <div class="doc doc-object doc-module">
@@ -5747,7 +5754,7 @@ inputs = processor(data)</p>
                 <span class="n">processor</span> <span class="o">=</span> <span class="n">AutoImageProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
                     <span class="n">pretrained_model_name_or_path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
                 <span class="p">)</span>
-            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                     <span class="s2">&quot;AutoImageProcessor failed for </span><span class="si">%s</span><span class="s2">, falling back to AutoProcessor&quot;</span><span class="p">,</span>
                     <span class="n">pretrained_model_name_or_path</span><span class="p">,</span>
@@ -6652,7 +6659,7 @@ processor = AutoGeoImageProcessor.from_pretrained(
             <span class="n">processor</span> <span class="o">=</span> <span class="n">AutoImageProcessor</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
                 <span class="n">pretrained_model_name_or_path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
             <span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                 <span class="s2">&quot;AutoImageProcessor failed for </span><span class="si">%s</span><span class="s2">, falling back to AutoProcessor&quot;</span><span class="p">,</span>
                 <span class="n">pretrained_model_name_or_path</span><span class="p">,</span>
@@ -8904,7 +8911,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                 <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
                 <span class="n">use_full_processor</span><span class="o">=</span><span class="n">needs_full_processor</span><span class="p">,</span>
             <span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                 <span class="s2">&quot;Failed to create AutoGeoImageProcessor for </span><span class="si">%s</span><span class="s2">, &quot;</span>
                 <span class="s2">&quot;proceeding without processor&quot;</span><span class="p">,</span>
@@ -8922,7 +8929,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
             <span class="n">overlap</span><span class="o">=</span><span class="n">overlap</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model loaded on </span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Model loaded on </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">instance</span>
 
     <span class="nd">@classmethod</span>
@@ -8956,7 +8963,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">AutoModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name_or_path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                 <span class="s2">&quot;Task-specific model loading failed for </span><span class="si">%s</span><span class="s2">, &quot;</span>
                 <span class="s2">&quot;falling back to AutoModel&quot;</span><span class="p">,</span>
@@ -9059,7 +9066,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                                 <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="n">src</span><span class="o">.</span><span class="n">width</span><span class="p">,</span>
                                 <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="n">src</span><span class="o">.</span><span class="n">height</span><span class="p">,</span>
                             <span class="p">}</span>
-                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
                         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                             <span class="s2">&quot;Failed to load </span><span class="si">%s</span><span class="s2"> as GeoTIFF, falling back to PIL&quot;</span><span class="p">,</span>
                             <span class="n">source</span><span class="p">,</span>
@@ -9217,7 +9224,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
         <span class="n">mask_output</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
         <span class="n">count_output</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="n">total_tiles</span><span class="si">}</span><span class="s2"> tiles (</span><span class="si">{</span><span class="n">n_tiles_x</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">n_tiles_y</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Processing </span><span class="si">%d</span><span class="s2"> tiles (</span><span class="si">%d</span><span class="s2">x</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">total_tiles</span><span class="p">,</span> <span class="n">n_tiles_x</span><span class="p">,</span> <span class="n">n_tiles_y</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">total_tiles</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing tiles&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_tiles_y</span><span class="p">):</span>
@@ -9261,7 +9268,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                             <span class="n">mask_output</span><span class="p">[</span><span class="n">y_start</span><span class="p">:</span><span class="n">y_end</span><span class="p">,</span> <span class="n">x_start</span><span class="p">:</span><span class="n">x_end</span><span class="p">]</span> <span class="o">+=</span> <span class="n">tile_mask</span>
                             <span class="n">count_output</span><span class="p">[</span><span class="n">y_start</span><span class="p">:</span><span class="n">y_end</span><span class="p">,</span> <span class="n">x_start</span><span class="p">:</span><span class="n">x_end</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
 
-                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Error processing tile (</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2">): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
 
                     <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
@@ -9326,7 +9333,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                                     <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
                             <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
                         <span class="n">pil_image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">fromarray</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
-                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                         <span class="s2">&quot;Failed to load source as GeoTIFF, falling back to PIL&quot;</span>
                     <span class="p">)</span>
@@ -9432,7 +9439,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                         <span class="n">result</span><span class="p">[</span><span class="s2">&quot;labels&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
                             <span class="sa">f</span><span class="s2">&quot;object_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">&quot;boxes&quot;</span><span class="p">]))</span>
                         <span class="p">]</span>
-            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="c1"># Fallback for models without grounded post-processing</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Using fallback detection processing: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
                 <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">outputs</span><span class="p">,</span> <span class="s2">&quot;pred_boxes&quot;</span><span class="p">):</span>
@@ -9590,7 +9597,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
 <span class="sd">            GeoDataFrame with polygon geometries, or None if no valid polygons.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">metadata</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No CRS information available for vectorization&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No CRS information available for vectorization&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="c1"># Ensure binary mask</span>
@@ -9604,7 +9611,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
         <span class="n">crs</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">transform</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No transform available for vectorization&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No transform available for vectorization&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="c1"># Extract shapes using rasterio</span>
@@ -9634,7 +9641,7 @@ result = model.predict("input.tif", output_path="output.tif")</p>
                         <span class="n">polygons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span>
                         <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Error during vectorization: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
@@ -10321,7 +10328,7 @@ model = AutoGeoModel.from_pretrained(
             <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
             <span class="n">use_full_processor</span><span class="o">=</span><span class="n">needs_full_processor</span><span class="p">,</span>
         <span class="p">)</span>
-    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;Failed to create AutoGeoImageProcessor for </span><span class="si">%s</span><span class="s2">, &quot;</span>
             <span class="s2">&quot;proceeding without processor&quot;</span><span class="p">,</span>
@@ -10339,7 +10346,7 @@ model = AutoGeoModel.from_pretrained(
         <span class="n">overlap</span><span class="o">=</span><span class="n">overlap</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model loaded on </span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Model loaded on </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">instance</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -10600,7 +10607,7 @@ model = AutoGeoModel.from_pretrained(
 <span class="sd">        GeoDataFrame with polygon geometries, or None if no valid polygons.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">metadata</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No CRS information available for vectorization&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No CRS information available for vectorization&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="c1"># Ensure binary mask</span>
@@ -10614,7 +10621,7 @@ model = AutoGeoModel.from_pretrained(
     <span class="n">crs</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crs&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">transform</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: No transform available for vectorization&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No transform available for vectorization&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="c1"># Extract shapes using rasterio</span>
@@ -10644,7 +10651,7 @@ model = AutoGeoModel.from_pretrained(
                     <span class="n">polygons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span>
                     <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
-    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Error during vectorization: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
@@ -11247,7 +11254,7 @@ print(result["boxes"], result["labels"])</p>
                             <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="n">src</span><span class="o">.</span><span class="n">width</span><span class="p">,</span>
                             <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="n">src</span><span class="o">.</span><span class="n">height</span><span class="p">,</span>
                         <span class="p">}</span>
-                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                         <span class="s2">&quot;Failed to load </span><span class="si">%s</span><span class="s2"> as GeoTIFF, falling back to PIL&quot;</span><span class="p">,</span>
                         <span class="n">source</span><span class="p">,</span>
@@ -14514,7 +14521,7 @@ fig = show_segmentation("aerial.tif", result["mask"])</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 12, 2025 03:24:43 UTC"><span class="timeago" datetime="2025-12-12T03:24:43+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 12, 2025 03:24:43 UTC">2025-12-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 23, 2026 04:06:44 UTC"><span class="timeago" datetime="2026-03-23T04:06:44+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 23, 2026 04:06:44 UTC">2026-03-23</span>
   </span>
 
     

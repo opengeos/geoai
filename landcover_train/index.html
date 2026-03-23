@@ -4898,10 +4898,7 @@ Focal loss for dense object detection. ICCV.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
@@ -4955,7 +4952,10 @@ Focal loss for dense object detection. ICCV.</p>
 <span class="normal">82</span>
 <span class="normal">83</span>
 <span class="normal">84</span>
-<span class="normal">85</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FocalLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FocalLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Focal Loss for addressing class imbalance in segmentation.</span>
 
@@ -5112,10 +5112,7 @@ Focal loss for dense object detection. ICCV.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
 <span class="normal">59</span>
@@ -5144,7 +5141,10 @@ Focal loss for dense object detection. ICCV.</p>
 <span class="normal">82</span>
 <span class="normal">83</span>
 <span class="normal">84</span>
-<span class="normal">85</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">targets</span><span class="p">):</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">targets</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Forward pass of focal loss.</span>
 
@@ -5286,10 +5286,7 @@ handling, specifically designed for landcover classification tasks.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 91</span>
 <span class="normal"> 92</span>
 <span class="normal"> 93</span>
 <span class="normal"> 94</span>
@@ -5330,7 +5327,10 @@ handling, specifically designed for landcover classification tasks.</p>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LandcoverCrossEntropyLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LandcoverCrossEntropyLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Enhanced CrossEntropyLoss with optional ignore_index and class weights.</span>
 
@@ -5477,10 +5477,7 @@ handling, specifically designed for landcover classification tasks.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
@@ -5494,7 +5491,10 @@ handling, specifically designed for landcover classification tasks.</p>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Compute cross entropy loss.</span>
 
@@ -5683,10 +5683,7 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">454</span>
 <span class="normal">455</span>
 <span class="normal">456</span>
 <span class="normal">457</span>
@@ -5813,7 +5810,20 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
 <span class="normal">578</span>
 <span class="normal">579</span>
 <span class="normal">580</span>
-<span class="normal">581</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_class_weights</span><span class="p">(</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_class_weights</span><span class="p">(</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">ignore_index</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">100</span><span class="p">,</span>
@@ -5857,7 +5867,7 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
         <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">label_extensions</span><span class="p">)</span>
     <span class="p">]</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Computing class weights from </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">label_files</span><span class="p">)</span><span class="si">}</span><span class="s2"> label files...&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Computing class weights from </span><span class="si">%d</span><span class="s2"> label files...&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">label_files</span><span class="p">))</span>
 
     <span class="k">for</span> <span class="n">label_file</span> <span class="ow">in</span> <span class="n">label_files</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
@@ -5870,7 +5880,7 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
                     <span class="n">class_counts</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
                     <span class="n">total_pixels</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Could not read </span><span class="si">{</span><span class="n">label_file</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not read </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">label_file</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
             <span class="k">continue</span>
 
     <span class="k">if</span> <span class="n">total_pixels</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -5902,46 +5912,56 @@ Example: {1: 0.5, 7: 2.0} - reduce class 1 weight by half, double class 7 weight
 
     <span class="c1"># Apply custom multipliers if provided</span>
     <span class="k">if</span> <span class="n">custom_multipliers</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Applying custom multipliers: </span><span class="si">{</span><span class="n">custom_multipliers</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Applying custom multipliers: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">custom_multipliers</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">class_id</span><span class="p">,</span> <span class="n">multiplier</span> <span class="ow">in</span> <span class="n">custom_multipliers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">class_id</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">class_id</span> <span class="o">&gt;=</span> <span class="n">num_classes</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Invalid class_id </span><span class="si">{</span><span class="n">class_id</span><span class="si">}</span><span class="s2">, skipping&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Invalid class_id </span><span class="si">%d</span><span class="s2">, skipping&quot;</span><span class="p">,</span> <span class="n">class_id</span><span class="p">)</span>
                 <span class="k">continue</span>
 
             <span class="n">original_weight</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
             <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span> <span class="o">*</span> <span class="n">multiplier</span>
-            <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;  Class </span><span class="si">{</span><span class="n">class_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">original_weight</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> × </span><span class="si">{</span><span class="n">multiplier</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;  Class </span><span class="si">%d</span><span class="s2">: </span><span class="si">%.4f</span><span class="s2"> x </span><span class="si">%s</span><span class="s2"> = </span><span class="si">%.4f</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">class_id</span><span class="p">,</span>
+                <span class="n">original_weight</span><span class="p">,</span>
+                <span class="n">multiplier</span><span class="p">,</span>
+                <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
             <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">No custom multipliers provided, using computed weights as-is&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No custom multipliers provided, using computed weights as-is&quot;</span><span class="p">)</span>
 
     <span class="c1"># Apply maximum weight cap to prevent extreme values</span>
     <span class="n">weights_capped</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Applying maximum weight cap of </span><span class="si">{</span><span class="n">max_weight</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Applying maximum weight cap of </span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">max_weight</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">class_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_classes</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">max_weight</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;  Class </span><span class="si">{</span><span class="n">class_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> → </span><span class="si">{</span><span class="n">max_weight</span><span class="si">}</span><span class="s2"> (capped)&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;  Class </span><span class="si">%d</span><span class="s2">: </span><span class="si">%.4f</span><span class="s2"> -&gt; </span><span class="si">%s</span><span class="s2"> (capped)&quot;</span><span class="p">,</span>
+                <span class="n">class_id</span><span class="p">,</span>
+                <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
+                <span class="n">max_weight</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">max_weight</span>
             <span class="n">weights_capped</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">weights_capped</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  No weights exceeded the cap&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;  No weights exceeded the cap&quot;</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Class pixel counts: </span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="n">class_counts</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Final class weights:&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Class pixel counts: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">class_counts</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Final class weights:&quot;</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">class_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_classes</span><span class="p">):</span>
         <span class="n">pixel_count</span> <span class="o">=</span> <span class="n">class_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">class_id</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
         <span class="n">percent</span> <span class="o">=</span> <span class="p">(</span><span class="n">pixel_count</span> <span class="o">/</span> <span class="n">total_pixels</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span> <span class="k">if</span> <span class="n">total_pixels</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;  Class </span><span class="si">{</span><span class="n">class_id</span><span class="si">}</span><span class="s2">: weight=</span><span class="si">{</span><span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;pixels=</span><span class="si">{</span><span class="n">pixel_count</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">percent</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;  Class </span><span class="si">%d</span><span class="s2">: weight=</span><span class="si">%.4f</span><span class="s2">, pixels=</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%.2f%%</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="n">class_id</span><span class="p">,</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">class_id</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pixel_count</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">percent</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ignore_index</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">ignore_index</span> <span class="o">&lt;</span> <span class="n">num_classes</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Note: Class </span><span class="si">{</span><span class="n">ignore_index</span><span class="si">}</span><span class="s2"> (ignore_index) has weight 0.0&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Note: Class </span><span class="si">%d</span><span class="s2"> (ignore_index) has weight 0.0&quot;</span><span class="p">,</span> <span class="n">ignore_index</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">weights</span>
 </code></pre></div></td></tr></table></div>
@@ -6261,45 +6281,7 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1437</span>
-<span class="normal">1438</span>
-<span class="normal">1439</span>
-<span class="normal">1440</span>
-<span class="normal">1441</span>
-<span class="normal">1442</span>
-<span class="normal">1443</span>
-<span class="normal">1444</span>
-<span class="normal">1445</span>
-<span class="normal">1446</span>
-<span class="normal">1447</span>
-<span class="normal">1448</span>
-<span class="normal">1449</span>
-<span class="normal">1450</span>
-<span class="normal">1451</span>
-<span class="normal">1452</span>
-<span class="normal">1453</span>
-<span class="normal">1454</span>
-<span class="normal">1455</span>
-<span class="normal">1456</span>
-<span class="normal">1457</span>
-<span class="normal">1458</span>
-<span class="normal">1459</span>
-<span class="normal">1460</span>
-<span class="normal">1461</span>
-<span class="normal">1462</span>
-<span class="normal">1463</span>
-<span class="normal">1464</span>
-<span class="normal">1465</span>
-<span class="normal">1466</span>
-<span class="normal">1467</span>
-<span class="normal">1468</span>
-<span class="normal">1469</span>
-<span class="normal">1470</span>
-<span class="normal">1471</span>
-<span class="normal">1472</span>
-<span class="normal">1473</span>
-<span class="normal">1474</span>
-<span class="normal">1475</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1475</span>
 <span class="normal">1476</span>
 <span class="normal">1477</span>
 <span class="normal">1478</span>
@@ -6459,7 +6441,53 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 <span class="normal">1632</span>
 <span class="normal">1633</span>
 <span class="normal">1634</span>
-<span class="normal">1635</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_sparse_iou</span><span class="p">(</span>
+<span class="normal">1635</span>
+<span class="normal">1636</span>
+<span class="normal">1637</span>
+<span class="normal">1638</span>
+<span class="normal">1639</span>
+<span class="normal">1640</span>
+<span class="normal">1641</span>
+<span class="normal">1642</span>
+<span class="normal">1643</span>
+<span class="normal">1644</span>
+<span class="normal">1645</span>
+<span class="normal">1646</span>
+<span class="normal">1647</span>
+<span class="normal">1648</span>
+<span class="normal">1649</span>
+<span class="normal">1650</span>
+<span class="normal">1651</span>
+<span class="normal">1652</span>
+<span class="normal">1653</span>
+<span class="normal">1654</span>
+<span class="normal">1655</span>
+<span class="normal">1656</span>
+<span class="normal">1657</span>
+<span class="normal">1658</span>
+<span class="normal">1659</span>
+<span class="normal">1660</span>
+<span class="normal">1661</span>
+<span class="normal">1662</span>
+<span class="normal">1663</span>
+<span class="normal">1664</span>
+<span class="normal">1665</span>
+<span class="normal">1666</span>
+<span class="normal">1667</span>
+<span class="normal">1668</span>
+<span class="normal">1669</span>
+<span class="normal">1670</span>
+<span class="normal">1671</span>
+<span class="normal">1672</span>
+<span class="normal">1673</span>
+<span class="normal">1674</span>
+<span class="normal">1675</span>
+<span class="normal">1676</span>
+<span class="normal">1677</span>
+<span class="normal">1678</span>
+<span class="normal">1679</span>
+<span class="normal">1680</span>
+<span class="normal">1681</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_sparse_iou</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -6547,12 +6575,14 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
         <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;SPARSE LABELS IoU EVALUATION&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Evaluating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_files</span><span class="p">)</span><span class="si">}</span><span class="s2"> image-label pairs&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Background class: </span><span class="si">{</span><span class="n">background_class</span><span class="si">}</span><span class="s2"> (predictions here NOT penalized)&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of classes: </span><span class="si">{</span><span class="n">num_classes</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;SPARSE LABELS IoU EVALUATION&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Evaluating </span><span class="si">%d</span><span class="s2"> image-label pairs&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">image_files</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Background class: </span><span class="si">%d</span><span class="s2"> (predictions here NOT penalized)&quot;</span><span class="p">,</span> <span class="n">background_class</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Number of classes: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">num_classes</span><span class="p">)</span>
 
     <span class="c1"># Accumulate predictions and targets</span>
     <span class="n">all_preds</span> <span class="o">=</span> <span class="p">[]</span>
@@ -6585,7 +6615,7 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
             <span class="n">all_targets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label_tensor</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">verbose</span> <span class="ow">and</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="mi">50</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Processed </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_files</span><span class="p">)</span><span class="si">}</span><span class="s2"> tiles...&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;   Processed </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> tiles...&quot;</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">image_files</span><span class="p">))</span>
 
     <span class="c1"># Concatenate all predictions and targets</span>
     <span class="n">all_preds</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">all_preds</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
@@ -6640,22 +6670,28 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
     <span class="p">}</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">SPARSE LABELS IoU RESULTS:&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   (Predictions in background areas NOT counted as false positives)&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">   </span><span class="si">{</span><span class="s1">&#39;Class&#39;</span><span class="si">:</span><span class="s2">&lt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;IoU&#39;</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Recall&#39;</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Precision&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="s1">&#39;-&#39;</span><span class="o">*</span><span class="mi">36</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;SPARSE LABELS IoU RESULTS:&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;   (Predictions in background areas NOT counted as false positives)&quot;</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;   </span><span class="si">%-8s</span><span class="s2"> </span><span class="si">%8s</span><span class="s2"> </span><span class="si">%8s</span><span class="s2"> </span><span class="si">%10s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;Class&quot;</span><span class="p">,</span> <span class="s2">&quot;IoU&quot;</span><span class="p">,</span> <span class="s2">&quot;Recall&quot;</span><span class="p">,</span> <span class="s2">&quot;Precision&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;   </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">36</span><span class="p">)</span>
         <span class="k">for</span> <span class="bp">cls</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">per_class_iou_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
             <span class="n">iou</span> <span class="o">=</span> <span class="n">per_class_iou_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
             <span class="n">recall</span> <span class="o">=</span> <span class="n">per_class_recall_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
             <span class="n">precision</span> <span class="o">=</span> <span class="n">per_class_precision_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="bp">cls</span><span class="si">:</span><span class="s2">&lt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">iou</span><span class="si">:</span><span class="s2">&gt;8.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">recall</span><span class="si">:</span><span class="s2">&gt;8.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">precision</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;   </span><span class="si">%-8s</span><span class="s2"> </span><span class="si">%8.4f</span><span class="s2"> </span><span class="si">%8.4f</span><span class="s2"> </span><span class="si">%10.4f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">cls</span><span class="p">,</span> <span class="n">iou</span><span class="p">,</span> <span class="n">recall</span><span class="p">,</span> <span class="n">precision</span><span class="p">)</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="s1">&#39;-&#39;</span><span class="o">*</span><span class="mi">36</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;   </span><span class="si">{</span><span class="s1">&#39;MEAN&#39;</span><span class="si">:</span><span class="s2">&lt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mean_iou</span><span class="si">:</span><span class="s2">&gt;8.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mean_recall</span><span class="si">:</span><span class="s2">&gt;8.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mean_precision</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;   </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">36</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;   </span><span class="si">%-8s</span><span class="s2"> </span><span class="si">%8.4f</span><span class="s2"> </span><span class="si">%8.4f</span><span class="s2"> </span><span class="si">%10.4f</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;MEAN&quot;</span><span class="p">,</span>
+            <span class="n">mean_iou</span><span class="p">,</span>
+            <span class="n">mean_recall</span><span class="p">,</span>
+            <span class="n">mean_precision</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Sparse IoU evaluation complete!&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Sparse IoU evaluation complete!&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">results</span>
 </code></pre></div></td></tr></table></div>
@@ -6848,10 +6884,7 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">374</span>
 <span class="normal">375</span>
 <span class="normal">376</span>
 <span class="normal">377</span>
@@ -6925,7 +6958,10 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 <span class="normal">445</span>
 <span class="normal">446</span>
 <span class="normal">447</span>
-<span class="normal">448</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_landcover_loss_function</span><span class="p">(</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_landcover_loss_function</span><span class="p">(</span>
     <span class="n">loss_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;crossentropy&quot;</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
     <span class="n">ignore_index</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">100</span><span class="p">,</span>
@@ -7227,10 +7263,7 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
 <span class="normal">139</span>
 <span class="normal">140</span>
 <span class="normal">141</span>
@@ -7460,7 +7493,10 @@ print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")</p>
 <span class="normal">365</span>
 <span class="normal">366</span>
 <span class="normal">367</span>
-<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">landcover_iou</span><span class="p">(</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">landcover_iou</span><span class="p">(</span>
     <span class="n">pred</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="n">target</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -8399,20 +8435,7 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/landcover_train.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">584</span>
-<span class="normal">585</span>
-<span class="normal">586</span>
-<span class="normal">587</span>
-<span class="normal">588</span>
-<span class="normal">589</span>
-<span class="normal">590</span>
-<span class="normal">591</span>
-<span class="normal">592</span>
-<span class="normal">593</span>
-<span class="normal">594</span>
-<span class="normal">595</span>
-<span class="normal">596</span>
-<span class="normal">597</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">597</span>
 <span class="normal">598</span>
 <span class="normal">599</span>
 <span class="normal">600</span>
@@ -8644,7 +8667,27 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
 <span class="normal">826</span>
 <span class="normal">827</span>
 <span class="normal">828</span>
-<span class="normal">829</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_segmentation_landcover</span><span class="p">(</span>
+<span class="normal">829</span>
+<span class="normal">830</span>
+<span class="normal">831</span>
+<span class="normal">832</span>
+<span class="normal">833</span>
+<span class="normal">834</span>
+<span class="normal">835</span>
+<span class="normal">836</span>
+<span class="normal">837</span>
+<span class="normal">838</span>
+<span class="normal">839</span>
+<span class="normal">840</span>
+<span class="normal">841</span>
+<span class="normal">842</span>
+<span class="normal">843</span>
+<span class="normal">844</span>
+<span class="normal">845</span>
+<span class="normal">846</span>
+<span class="normal">847</span>
+<span class="normal">848</span>
+<span class="normal">849</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_segmentation_landcover</span><span class="p">(</span>
     <span class="n">images_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">labels_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -8774,9 +8817,9 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
     <span class="n">class_weights_tensor</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">use_class_weights</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;COMPUTING CLASS WEIGHTS&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;COMPUTING CLASS WEIGHTS&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
 
         <span class="n">class_weights_tensor</span> <span class="o">=</span> <span class="n">compute_class_weights</span><span class="p">(</span>
             <span class="n">labels_dir</span><span class="o">=</span><span class="n">labels_dir</span><span class="p">,</span>
@@ -8788,7 +8831,7 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
         <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
 
     <span class="c1"># Create custom loss function using landcover-specific implementation</span>
     <span class="c1"># This ensures ignore_index and class_weights are properly used</span>
@@ -8816,11 +8859,13 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
     <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="n">loss_function</span><span class="si">}</span><span class="s2"> loss function with ignore_index=</span><span class="si">{</span><span class="n">ignore_idx_for_loss</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Created </span><span class="si">%s</span><span class="s2"> loss function with ignore_index=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">loss_function</span><span class="p">,</span>
+            <span class="n">ignore_idx_for_loss</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="n">use_class_weights</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Class weights applied: </span><span class="si">{</span><span class="n">class_weights_tensor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Class weights applied: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">class_weights_tensor</span><span class="p">)</span>
 
     <span class="c1"># ==========================================================================</span>
     <span class="c1"># ALL MODES: Use custom training loop with landcover_iou for model selection</span>
@@ -8835,23 +8880,28 @@ Higher values = more focus on boundaries (0.01-100 range)</p>
             <span class="s2">&quot;boundary_weighted&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;BOUNDARY-WEIGHTED IoU (wIoU, α=</span><span class="si">{</span><span class="n">boundary_alpha</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">,</span>
             <span class="s2">&quot;sparse_labels&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;SPARSE LABELS IoU (bg=</span><span class="si">{</span><span class="n">background_class</span><span class="si">}</span><span class="s2"> ignored)&quot;</span><span class="p">,</span>
         <span class="p">}</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;CUSTOM TRAINING LOOP: </span><span class="si">{</span><span class="n">mode_descriptions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">validation_iou_mode</span><span class="p">,</span><span class="w"> </span><span class="n">validation_iou_mode</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;CUSTOM TRAINING LOOP: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">mode_descriptions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">validation_iou_mode</span><span class="p">,</span> <span class="n">validation_iou_mode</span><span class="p">),</span>
         <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">validation_iou_mode</span> <span class="o">==</span> <span class="s2">&quot;sparse_labels&quot;</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Background class: </span><span class="si">{</span><span class="n">background_class</span><span class="si">}</span><span class="s2"> (predictions here NOT penalized)&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Background class: </span><span class="si">%d</span><span class="s2"> (predictions here NOT penalized)&quot;</span><span class="p">,</span>
+                <span class="n">background_class</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">validation_iou_mode</span> <span class="o">==</span> <span class="s2">&quot;boundary_weighted&quot;</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Boundary alpha: </span><span class="si">{</span><span class="n">boundary_alpha</span><span class="si">}</span><span class="s2"> (higher = more focus on boundaries)&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Boundary alpha: </span><span class="si">%s</span><span class="s2"> (higher = more focus on boundaries)&quot;</span><span class="p">,</span>
+                <span class="n">boundary_alpha</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">validation_iou_mode</span> <span class="o">==</span> <span class="s2">&quot;perclass_frequency&quot;</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Classes weighted by pixel frequency in dataset&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="n">validation_iou_mode</span><span class="si">}</span><span class="s2"> IoU for model selection during training&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Classes weighted by pixel frequency in dataset&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Using </span><span class="si">%s</span><span class="s2"> IoU for model selection during training&quot;</span><span class="p">,</span> <span class="n">validation_iou_mode</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
 
     <span class="n">model</span> <span class="o">=</span> <span class="n">_train_with_custom_iou</span><span class="p">(</span>
         <span class="n">images_dir</span><span class="o">=</span><span class="n">images_dir</span><span class="p">,</span>

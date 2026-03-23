@@ -4832,10 +4832,7 @@ PIL for standard images (JPEG, PNG, BMP) and rasterio for GeoTIFFs
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/recognize.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 67</span>
 <span class="normal"> 68</span>
 <span class="normal"> 69</span>
 <span class="normal"> 70</span>
@@ -5002,7 +4999,10 @@ PIL for standard images (JPEG, PNG, BMP) and rasterio for GeoTIFFs
 <span class="normal">231</span>
 <span class="normal">232</span>
 <span class="normal">233</span>
-<span class="normal">234</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ImageDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ImageDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Dataset for image classification supporting both standard images and GeoTIFFs.</span>
 
 <span class="sd">    Automatically detects the file format and uses the appropriate loader:</span>
@@ -5304,10 +5304,7 @@ to match.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
 <span class="normal"> 78</span>
@@ -5335,7 +5332,10 @@ to match.</p>
 <span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
-<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">labels</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
@@ -5536,10 +5536,7 @@ to match.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">621</span>
 <span class="normal">622</span>
 <span class="normal">623</span>
 <span class="normal">624</span>
@@ -5615,7 +5612,10 @@ to match.</p>
 <span class="normal">694</span>
 <span class="normal">695</span>
 <span class="normal">696</span>
-<span class="normal">697</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_classifier</span><span class="p">(</span>
+<span class="normal">697</span>
+<span class="normal">698</span>
+<span class="normal">699</span>
+<span class="normal">700</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_classifier</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TimmClassifier</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">],</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">Dataset</span><span class="p">,</span>
     <span class="n">class_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
@@ -5686,8 +5686,8 @@ to match.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">per_class_acc</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Overall accuracy: </span><span class="si">{</span><span class="n">acc</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">report</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Overall accuracy: </span><span class="si">{</span><span class="n">acc</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">report</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="n">acc</span><span class="p">,</span>
@@ -5839,10 +5839,7 @@ Defaults to <code>["jpg", "jpeg", "png", "bmp", "tif", "tiff"]</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
 <span class="normal">243</span>
@@ -5939,7 +5936,10 @@ Defaults to <code>["jpg", "jpeg", "png", "bmp", "tif", "tiff"]</code>.</p>
 <span class="normal">334</span>
 <span class="normal">335</span>
 <span class="normal">336</span>
-<span class="normal">337</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_image_dataset</span><span class="p">(</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_image_dataset</span><span class="p">(</span>
     <span class="n">data_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">extensions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -6024,15 +6024,15 @@ Defaults to <code>["jpg", "jpeg", "png", "bmp", "tif", "tiff"]</code>.</p>
                     <span class="k">break</span>
 
             <span class="k">if</span> <span class="n">has_images</span> <span class="ow">and</span> <span class="n">root</span> <span class="o">!=</span> <span class="n">data_dir</span><span class="p">:</span>
-                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Auto-detected nested dataset at: </span><span class="si">{</span><span class="n">root</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Auto-detected nested dataset at: </span><span class="si">{</span><span class="n">root</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">load_image_dataset</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">extensions</span><span class="p">)</span>
 
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No images found in </span><span class="si">{</span><span class="n">data_dir</span><span class="si">}</span><span class="s2"> with extensions </span><span class="si">{</span><span class="n">extensions</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> images in </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">class_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> classes&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">image_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> images in </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">class_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> classes&quot;</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">class_names</span><span class="p">:</span>
         <span class="n">count</span> <span class="o">=</span> <span class="n">labels</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">class_to_idx</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">&quot;image_paths&quot;</span><span class="p">:</span> <span class="n">image_paths</span><span class="p">,</span>
@@ -6180,10 +6180,7 @@ Defaults to <code>["jpg", "jpeg", "png", "bmp", "tif", "tiff"]</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">767</span>
-<span class="normal">768</span>
-<span class="normal">769</span>
-<span class="normal">770</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">770</span>
 <span class="normal">771</span>
 <span class="normal">772</span>
 <span class="normal">773</span>
@@ -6245,7 +6242,10 @@ Defaults to <code>["jpg", "jpeg", "png", "bmp", "tif", "tiff"]</code>.</p>
 <span class="normal">829</span>
 <span class="normal">830</span>
 <span class="normal">831</span>
-<span class="normal">832</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_confusion_matrix</span><span class="p">(</span>
+<span class="normal">832</span>
+<span class="normal">833</span>
+<span class="normal">834</span>
+<span class="normal">835</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_confusion_matrix</span><span class="p">(</span>
     <span class="n">cm</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">class_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">figsize</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6523,10 +6523,7 @@ confidence values.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">835</span>
-<span class="normal">836</span>
-<span class="normal">837</span>
-<span class="normal">838</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">838</span>
 <span class="normal">839</span>
 <span class="normal">840</span>
 <span class="normal">841</span>
@@ -6591,7 +6588,10 @@ confidence values.</p>
 <span class="normal">900</span>
 <span class="normal">901</span>
 <span class="normal">902</span>
-<span class="normal">903</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_predictions</span><span class="p">(</span>
+<span class="normal">903</span>
+<span class="normal">904</span>
+<span class="normal">905</span>
+<span class="normal">906</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_predictions</span><span class="p">(</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">predictions</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">true_labels</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
@@ -6776,10 +6776,7 @@ function searches for <code>metrics.csv</code> inside this directory tree.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">700</span>
-<span class="normal">701</span>
-<span class="normal">702</span>
-<span class="normal">703</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">703</span>
 <span class="normal">704</span>
 <span class="normal">705</span>
 <span class="normal">706</span>
@@ -6840,7 +6837,10 @@ function searches for <code>metrics.csv</code> inside this directory tree.</p>
 <span class="normal">761</span>
 <span class="normal">762</span>
 <span class="normal">763</span>
-<span class="normal">764</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_training_history</span><span class="p">(</span>
+<span class="normal">764</span>
+<span class="normal">765</span>
+<span class="normal">766</span>
+<span class="normal">767</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_training_history</span><span class="p">(</span>
     <span class="n">log_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">figsize</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">plt</span><span class="o">.</span><span class="n">Figure</span><span class="p">:</span>
@@ -7097,10 +7097,7 @@ function searches for <code>metrics.csv</code> inside this directory tree.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">545</span>
-<span class="normal">546</span>
-<span class="normal">547</span>
-<span class="normal">548</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">548</span>
 <span class="normal">549</span>
 <span class="normal">550</span>
 <span class="normal">551</span>
@@ -7167,7 +7164,10 @@ function searches for <code>metrics.csv</code> inside this directory tree.</p>
 <span class="normal">612</span>
 <span class="normal">613</span>
 <span class="normal">614</span>
-<span class="normal">615</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_images</span><span class="p">(</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_images</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TimmClassifier</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">],</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">class_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7403,10 +7403,7 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1007</span>
-<span class="normal">1008</span>
-<span class="normal">1009</span>
-<span class="normal">1010</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1010</span>
 <span class="normal">1011</span>
 <span class="normal">1012</span>
 <span class="normal">1013</span>
@@ -7477,7 +7474,10 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
 <span class="normal">1078</span>
 <span class="normal">1079</span>
 <span class="normal">1080</span>
-<span class="normal">1081</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_images_from_hub</span><span class="p">(</span>
+<span class="normal">1081</span>
+<span class="normal">1082</span>
+<span class="normal">1083</span>
+<span class="normal">1084</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_images_from_hub</span><span class="p">(</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">image_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">224</span><span class="p">,</span>
@@ -7508,7 +7508,7 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">hf_hub_download</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required. Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
@@ -7518,10 +7518,10 @@ If <code>None</code>, the token stored by <code>huggingface-cli login</code> is 
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">timm</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;timm is required. Install it with: pip install timm&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;timm is required. Install it with: pip install timm&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloading model from </span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Downloading model from </span><span class="si">%s</span><span class="s2">...&quot;</span><span class="p">,</span> <span class="n">repo_id</span><span class="p">)</span>
     <span class="n">model_path</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span><span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;model.pth&quot;</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span>
     <span class="n">config_path</span> <span class="o">=</span> <span class="n">hf_hub_download</span><span class="p">(</span><span class="n">repo_id</span><span class="o">=</span><span class="n">repo_id</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;config.json&quot;</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span>
 
@@ -7776,10 +7776,7 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 906</span>
-<span class="normal"> 907</span>
-<span class="normal"> 908</span>
-<span class="normal"> 909</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 909</span>
 <span class="normal"> 910</span>
 <span class="normal"> 911</span>
 <span class="normal"> 912</span>
@@ -7874,7 +7871,10 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
 <span class="normal">1001</span>
 <span class="normal">1002</span>
 <span class="normal">1003</span>
-<span class="normal">1004</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_classifier_to_hub</span><span class="p">(</span>
+<span class="normal">1004</span>
+<span class="normal">1005</span>
+<span class="normal">1006</span>
+<span class="normal">1007</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_classifier_to_hub</span><span class="p">(</span>
     <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">repo_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
@@ -7916,7 +7916,7 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">huggingface_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">HfApi</span><span class="p">,</span> <span class="n">create_repo</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
             <span class="s2">&quot;huggingface_hub is required to push models. &quot;</span>
             <span class="s2">&quot;Install it with: pip install huggingface-hub&quot;</span>
         <span class="p">)</span>
@@ -7971,7 +7971,7 @@ Defaults to a descriptive string derived from <code>model_name</code>.</p>
         <span class="p">)</span>
 
     <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;https://huggingface.co/</span><span class="si">{</span><span class="n">repo_id</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model successfully pushed to: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model successfully pushed to: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">url</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8397,10 +8397,7 @@ by class and get back a trained model with evaluation results.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/recognize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">343</span>
 <span class="normal">344</span>
 <span class="normal">345</span>
 <span class="normal">346</span>
@@ -8599,7 +8596,10 @@ by class and get back a trained model with evaluation results.</p>
 <span class="normal">539</span>
 <span class="normal">540</span>
 <span class="normal">541</span>
-<span class="normal">542</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_image_classifier</span><span class="p">(</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_image_classifier</span><span class="p">(</span>
     <span class="n">data_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
     <span class="n">num_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
@@ -8698,8 +8698,8 @@ by class and get back a trained model with evaluation results.</p>
         <span class="n">stratify</span><span class="o">=</span><span class="n">train_val_labels</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Split: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">train_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> train, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">val_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> val, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">test_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> test&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Split: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">train_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> train, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">val_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> val, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">test_paths</span><span class="p">)</span><span class="si">}</span><span class="s2"> test&quot;</span>
     <span class="p">)</span>
 
     <span class="c1"># Create datasets</span>
@@ -8776,7 +8776,7 @@ by class and get back a trained model with evaluation results.</p>
     <span class="p">)</span>
 
     <span class="c1"># Train</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Training </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2"> for up to </span><span class="si">{</span><span class="n">num_epochs</span><span class="si">}</span><span class="s2"> epochs...&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2"> for up to </span><span class="si">{</span><span class="n">num_epochs</span><span class="si">}</span><span class="s2"> epochs...&quot;</span><span class="p">)</span>
     <span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">train_dataloaders</span><span class="o">=</span><span class="n">train_loader</span><span class="p">,</span> <span class="n">val_dataloaders</span><span class="o">=</span><span class="n">val_loader</span><span class="p">)</span>
 
     <span class="c1"># Test</span>
@@ -8787,11 +8787,11 @@ by class and get back a trained model with evaluation results.</p>
         <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
         <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Evaluating on test set...&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Evaluating on test set...&quot;</span><span class="p">)</span>
     <span class="n">trainer</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dataloaders</span><span class="o">=</span><span class="n">test_loader</span><span class="p">)</span>
 
     <span class="n">best_path</span> <span class="o">=</span> <span class="n">checkpoint_callback</span><span class="o">.</span><span class="n">best_model_path</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Best checkpoint: </span><span class="si">{</span><span class="n">best_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best checkpoint: </span><span class="si">{</span><span class="n">best_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">model</span><span class="p">,</span>

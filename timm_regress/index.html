@@ -4929,10 +4929,7 @@ pixel-wise regression models.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">317</span>
 <span class="normal">318</span>
 <span class="normal">319</span>
 <span class="normal">320</span>
@@ -5036,7 +5033,10 @@ pixel-wise regression models.</p>
 <span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
-<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PixelRegressionDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PixelRegressionDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Dataset for pixel-level regression from paired image and target rasters.</span>
 
@@ -5275,10 +5275,7 @@ target_nodata (float, optional): NoData value for targets.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">325</span>
 <span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
@@ -5314,7 +5311,10 @@ target_nodata (float, optional): NoData value for targets.</p>
 <span class="normal">358</span>
 <span class="normal">359</span>
 <span class="normal">360</span>
-<span class="normal">361</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">target_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
@@ -5398,10 +5398,7 @@ regression (single channel output with continuous values).</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
@@ -5587,7 +5584,10 @@ regression (single channel output with continuous values).</p>
 <span class="normal">308</span>
 <span class="normal">309</span>
 <span class="normal">310</span>
-<span class="normal">311</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PixelRegressionModel</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">LightningModule</span><span class="p">):</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PixelRegressionModel</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">LightningModule</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    PyTorch Lightning module for pixel-level regression using encoder-decoder architectures.</span>
 
@@ -5985,10 +5985,7 @@ regression (single channel output with continuous values).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">133</span>
 <span class="normal">134</span>
 <span class="normal">135</span>
 <span class="normal">136</span>
@@ -6071,7 +6068,10 @@ regression (single channel output with continuous values).</p>
 <span class="normal">213</span>
 <span class="normal">214</span>
 <span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">encoder_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;resnet50&quot;</span><span class="p">,</span>
     <span class="n">architecture</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unet&quot;</span><span class="p">,</span>
@@ -6387,10 +6387,7 @@ regression (single channel output with continuous values).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">427</span>
 <span class="normal">428</span>
 <span class="normal">429</span>
 <span class="normal">430</span>
@@ -6551,7 +6548,13 @@ regression (single channel output with continuous values).</p>
 <span class="normal">585</span>
 <span class="normal">586</span>
 <span class="normal">587</span>
-<span class="normal">588</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_regression_tiles</span><span class="p">(</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_regression_tiles</span><span class="p">(</span>
     <span class="n">input_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">target_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -6605,11 +6608,14 @@ regression (single channel output with continuous values).</p>
             <span class="n">n_tiles_y</span> <span class="o">=</span> <span class="p">(</span><span class="n">height</span> <span class="o">-</span> <span class="n">tile_size</span><span class="p">)</span> <span class="o">//</span> <span class="n">stride</span> <span class="o">+</span> <span class="mi">1</span>
             <span class="n">n_tiles_x</span> <span class="o">=</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="n">tile_size</span><span class="p">)</span> <span class="o">//</span> <span class="n">stride</span> <span class="o">+</span> <span class="mi">1</span>
 
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Input raster: </span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">height</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">src_input</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2"> bands&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Target raster: </span><span class="si">{</span><span class="n">src_target</span><span class="o">.</span><span class="n">width</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">src_target</span><span class="o">.</span><span class="n">height</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tile size: </span><span class="si">{</span><span class="n">tile_size</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">tile_size</span><span class="si">}</span><span class="s2">, stride: </span><span class="si">{</span><span class="n">stride</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Expected tiles: </span><span class="si">{</span><span class="n">n_tiles_y</span><span class="si">}</span><span class="s2"> x </span><span class="si">{</span><span class="n">n_tiles_x</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">n_tiles_y</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">n_tiles_x</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Input raster: </span><span class="si">%d</span><span class="s2">x</span><span class="si">%d</span><span class="s2">, </span><span class="si">%d</span><span class="s2"> bands&quot;</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">src_input</span><span class="o">.</span><span class="n">count</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Target raster: </span><span class="si">%d</span><span class="s2">x</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">src_target</span><span class="o">.</span><span class="n">width</span><span class="p">,</span> <span class="n">src_target</span><span class="o">.</span><span class="n">height</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Tile size: </span><span class="si">%d</span><span class="s2">x</span><span class="si">%d</span><span class="s2">, stride: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tile_size</span><span class="p">,</span> <span class="n">tile_size</span><span class="p">,</span> <span class="n">stride</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Expected tiles: </span><span class="si">%d</span><span class="s2"> x </span><span class="si">%d</span><span class="s2"> = </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">n_tiles_y</span><span class="p">,</span>
+                <span class="n">n_tiles_x</span><span class="p">,</span>
+                <span class="n">n_tiles_y</span> <span class="o">*</span> <span class="n">n_tiles_x</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="n">tile_idx</span> <span class="o">=</span> <span class="mi">0</span>
@@ -6711,9 +6717,9 @@ regression (single channel output with continuous values).</p>
                     <span class="n">valid_tiles</span> <span class="o">+=</span> <span class="mi">1</span>
                     <span class="n">tile_idx</span> <span class="o">+=</span> <span class="mi">1</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Created </span><span class="si">{</span><span class="n">valid_tiles</span><span class="si">}</span><span class="s2"> valid tiles out of </span><span class="si">{</span><span class="n">tile_idx</span><span class="si">}</span><span class="s2"> total&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipped due to nodata: </span><span class="si">{</span><span class="n">skipped_nodata</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Skipped due to target range: </span><span class="si">{</span><span class="n">skipped_range</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Created </span><span class="si">%d</span><span class="s2"> valid tiles out of </span><span class="si">%d</span><span class="s2"> total&quot;</span><span class="p">,</span> <span class="n">valid_tiles</span><span class="p">,</span> <span class="n">tile_idx</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Skipped due to nodata: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">skipped_nodata</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Skipped due to target range: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">skipped_range</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">image_paths</span><span class="p">,</span> <span class="n">target_paths</span>
 </code></pre></div></td></tr></table></div>
@@ -6840,19 +6846,7 @@ regression (single channel output with continuous values).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1036</span>
-<span class="normal">1037</span>
-<span class="normal">1038</span>
-<span class="normal">1039</span>
-<span class="normal">1040</span>
-<span class="normal">1041</span>
-<span class="normal">1042</span>
-<span class="normal">1043</span>
-<span class="normal">1044</span>
-<span class="normal">1045</span>
-<span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1048</span>
 <span class="normal">1049</span>
 <span class="normal">1050</span>
 <span class="normal">1051</span>
@@ -6890,7 +6884,19 @@ regression (single channel output with continuous values).</p>
 <span class="normal">1083</span>
 <span class="normal">1084</span>
 <span class="normal">1085</span>
-<span class="normal">1086</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_regression</span><span class="p">(</span>
+<span class="normal">1086</span>
+<span class="normal">1087</span>
+<span class="normal">1088</span>
+<span class="normal">1089</span>
+<span class="normal">1090</span>
+<span class="normal">1091</span>
+<span class="normal">1092</span>
+<span class="normal">1093</span>
+<span class="normal">1094</span>
+<span class="normal">1095</span>
+<span class="normal">1096</span>
+<span class="normal">1097</span>
+<span class="normal">1098</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_regression</span><span class="p">(</span>
     <span class="n">y_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">y_pred</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6931,14 +6937,14 @@ regression (single channel output with continuous values).</p>
     <span class="p">}</span>
 
     <span class="k">if</span> <span class="n">print_results</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Regression Evaluation Metrics&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MSE:  </span><span class="si">{</span><span class="n">mse</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;RMSE: </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MAE:  </span><span class="si">{</span><span class="n">mae</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;R²:   </span><span class="si">{</span><span class="n">r2</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Regression Evaluation Metrics&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;MSE:  </span><span class="si">%.6f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">mse</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;RMSE: </span><span class="si">%.6f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">rmse</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;MAE:  </span><span class="si">%.6f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">mae</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;R2:   </span><span class="si">%.4f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">r2</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">metrics</span>
 </code></pre></div></td></tr></table></div>
@@ -6963,12 +6969,12 @@ regression (single channel output with continuous values).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1660</span>
-<span class="normal">1661</span>
-<span class="normal">1662</span>
-<span class="normal">1663</span>
-<span class="normal">1664</span>
-<span class="normal">1665</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_timm_regression_model</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1672</span>
+<span class="normal">1673</span>
+<span class="normal">1674</span>
+<span class="normal">1675</span>
+<span class="normal">1676</span>
+<span class="normal">1677</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_timm_regression_model</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Deprecated: Use PixelRegressionModel instead.&quot;&quot;&quot;</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
         <span class="s2">&quot;get_timm_regression_model is deprecated. &quot;</span>
@@ -7177,19 +7183,7 @@ regression (single channel output with continuous values).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1089</span>
-<span class="normal">1090</span>
-<span class="normal">1091</span>
-<span class="normal">1092</span>
-<span class="normal">1093</span>
-<span class="normal">1094</span>
-<span class="normal">1095</span>
-<span class="normal">1096</span>
-<span class="normal">1097</span>
-<span class="normal">1098</span>
-<span class="normal">1099</span>
-<span class="normal">1100</span>
-<span class="normal">1101</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1101</span>
 <span class="normal">1102</span>
 <span class="normal">1103</span>
 <span class="normal">1104</span>
@@ -7277,7 +7271,19 @@ regression (single channel output with continuous values).</p>
 <span class="normal">1186</span>
 <span class="normal">1187</span>
 <span class="normal">1188</span>
-<span class="normal">1189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_regression_comparison</span><span class="p">(</span>
+<span class="normal">1189</span>
+<span class="normal">1190</span>
+<span class="normal">1191</span>
+<span class="normal">1192</span>
+<span class="normal">1193</span>
+<span class="normal">1194</span>
+<span class="normal">1195</span>
+<span class="normal">1196</span>
+<span class="normal">1197</span>
+<span class="normal">1198</span>
+<span class="normal">1199</span>
+<span class="normal">1200</span>
+<span class="normal">1201</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_regression_comparison</span><span class="p">(</span>
     <span class="n">true_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">pred_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Regression Results&quot;</span><span class="p">,</span>
@@ -7373,7 +7379,7 @@ regression (single channel output with continuous values).</p>
 
     <span class="k">if</span> <span class="n">save_path</span><span class="p">:</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Figure saved to: </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Figure saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">save_path</span><span class="p">)</span>
 
     <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
@@ -7511,19 +7517,7 @@ regression (single channel output with continuous values).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1573</span>
-<span class="normal">1574</span>
-<span class="normal">1575</span>
-<span class="normal">1576</span>
-<span class="normal">1577</span>
-<span class="normal">1578</span>
-<span class="normal">1579</span>
-<span class="normal">1580</span>
-<span class="normal">1581</span>
-<span class="normal">1582</span>
-<span class="normal">1583</span>
-<span class="normal">1584</span>
-<span class="normal">1585</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1585</span>
 <span class="normal">1586</span>
 <span class="normal">1587</span>
 <span class="normal">1588</span>
@@ -7587,7 +7581,19 @@ regression (single channel output with continuous values).</p>
 <span class="normal">1646</span>
 <span class="normal">1647</span>
 <span class="normal">1648</span>
-<span class="normal">1649</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_regression_results</span><span class="p">(</span>
+<span class="normal">1649</span>
+<span class="normal">1650</span>
+<span class="normal">1651</span>
+<span class="normal">1652</span>
+<span class="normal">1653</span>
+<span class="normal">1654</span>
+<span class="normal">1655</span>
+<span class="normal">1656</span>
+<span class="normal">1657</span>
+<span class="normal">1658</span>
+<span class="normal">1659</span>
+<span class="normal">1660</span>
+<span class="normal">1661</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_regression_results</span><span class="p">(</span>
     <span class="n">y_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">y_pred</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Regression Results&quot;</span><span class="p">,</span>
@@ -7659,7 +7665,7 @@ regression (single channel output with continuous values).</p>
 
     <span class="k">if</span> <span class="n">save_path</span><span class="p">:</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Figure saved to: </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Figure saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">save_path</span><span class="p">)</span>
 
     <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
@@ -7851,19 +7857,7 @@ regression (single channel output with continuous values).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1192</span>
-<span class="normal">1193</span>
-<span class="normal">1194</span>
-<span class="normal">1195</span>
-<span class="normal">1196</span>
-<span class="normal">1197</span>
-<span class="normal">1198</span>
-<span class="normal">1199</span>
-<span class="normal">1200</span>
-<span class="normal">1201</span>
-<span class="normal">1202</span>
-<span class="normal">1203</span>
-<span class="normal">1204</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1204</span>
 <span class="normal">1205</span>
 <span class="normal">1206</span>
 <span class="normal">1207</span>
@@ -7959,7 +7953,19 @@ regression (single channel output with continuous values).</p>
 <span class="normal">1297</span>
 <span class="normal">1298</span>
 <span class="normal">1299</span>
-<span class="normal">1300</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_scatter</span><span class="p">(</span>
+<span class="normal">1300</span>
+<span class="normal">1301</span>
+<span class="normal">1302</span>
+<span class="normal">1303</span>
+<span class="normal">1304</span>
+<span class="normal">1305</span>
+<span class="normal">1306</span>
+<span class="normal">1307</span>
+<span class="normal">1308</span>
+<span class="normal">1309</span>
+<span class="normal">1310</span>
+<span class="normal">1311</span>
+<span class="normal">1312</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_scatter</span><span class="p">(</span>
     <span class="n">true_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">pred_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">sample_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span>
@@ -8063,7 +8069,7 @@ regression (single channel output with continuous values).</p>
 
     <span class="k">if</span> <span class="n">save_path</span><span class="p">:</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Figure saved to: </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Figure saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">save_path</span><span class="p">)</span>
 
     <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
@@ -8218,19 +8224,7 @@ compress the y-axis (more than 10× the stable range).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1303</span>
-<span class="normal">1304</span>
-<span class="normal">1305</span>
-<span class="normal">1306</span>
-<span class="normal">1307</span>
-<span class="normal">1308</span>
-<span class="normal">1309</span>
-<span class="normal">1310</span>
-<span class="normal">1311</span>
-<span class="normal">1312</span>
-<span class="normal">1313</span>
-<span class="normal">1314</span>
-<span class="normal">1315</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1315</span>
 <span class="normal">1316</span>
 <span class="normal">1317</span>
 <span class="normal">1318</span>
@@ -8392,7 +8386,19 @@ compress the y-axis (more than 10× the stable range).</p>
 <span class="normal">1474</span>
 <span class="normal">1475</span>
 <span class="normal">1476</span>
-<span class="normal">1477</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_training_history</span><span class="p">(</span>
+<span class="normal">1477</span>
+<span class="normal">1478</span>
+<span class="normal">1479</span>
+<span class="normal">1480</span>
+<span class="normal">1481</span>
+<span class="normal">1482</span>
+<span class="normal">1483</span>
+<span class="normal">1484</span>
+<span class="normal">1485</span>
+<span class="normal">1486</span>
+<span class="normal">1487</span>
+<span class="normal">1488</span>
+<span class="normal">1489</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_training_history</span><span class="p">(</span>
     <span class="n">log_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">metrics</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">figsize</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8458,7 +8464,7 @@ compress the y-axis (more than 10× the stable range).</p>
 
     <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">csv_path</span><span class="p">)</span>
     <span class="n">_n_epochs</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;epoch&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> <span class="k">if</span> <span class="s2">&quot;epoch&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reading logs: </span><span class="si">{</span><span class="n">csv_path</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">_n_epochs</span><span class="si">}</span><span class="s2"> epochs)&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Reading logs: </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%d</span><span class="s2"> epochs)&quot;</span><span class="p">,</span> <span class="n">csv_path</span><span class="p">,</span> <span class="n">_n_epochs</span><span class="p">)</span>
 
     <span class="c1"># Group rows by epoch – Lightning logs multiple rows per epoch (one per</span>
     <span class="c1"># step plus validation).  Use ``last()`` with ``skipna`` so we keep the</span>
@@ -8562,7 +8568,7 @@ compress the y-axis (more than 10× the stable range).</p>
 
     <span class="k">if</span> <span class="n">save_path</span><span class="p">:</span>
         <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Figure saved to: </span><span class="si">{</span><span class="n">save_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Figure saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">save_path</span><span class="p">)</span>
 
     <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
@@ -8837,15 +8843,7 @@ Output dimensions match input dimensions exactly.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 796</span>
-<span class="normal"> 797</span>
-<span class="normal"> 798</span>
-<span class="normal"> 799</span>
-<span class="normal"> 800</span>
-<span class="normal"> 801</span>
-<span class="normal"> 802</span>
-<span class="normal"> 803</span>
-<span class="normal"> 804</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 804</span>
 <span class="normal"> 805</span>
 <span class="normal"> 806</span>
 <span class="normal"> 807</span>
@@ -9054,7 +9052,19 @@ Output dimensions match input dimensions exactly.</p>
 <span class="normal">1010</span>
 <span class="normal">1011</span>
 <span class="normal">1012</span>
-<span class="normal">1013</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_raster</span><span class="p">(</span>
+<span class="normal">1013</span>
+<span class="normal">1014</span>
+<span class="normal">1015</span>
+<span class="normal">1016</span>
+<span class="normal">1017</span>
+<span class="normal">1018</span>
+<span class="normal">1019</span>
+<span class="normal">1020</span>
+<span class="normal">1021</span>
+<span class="normal">1022</span>
+<span class="normal">1023</span>
+<span class="normal">1024</span>
+<span class="normal">1025</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_raster</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PixelRegressionModel</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">],</span>
     <span class="n">input_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">output_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -9110,8 +9120,10 @@ Output dimensions match input dimensions exactly.</p>
         <span class="k">if</span> <span class="n">input_bands</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">input_bands</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Input raster: </span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">height</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tile size: </span><span class="si">{</span><span class="n">tile_size</span><span class="si">}</span><span class="s2">, overlap: </span><span class="si">{</span><span class="n">overlap</span><span class="si">}</span><span class="s2">, stride: </span><span class="si">{</span><span class="n">stride</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Input raster: </span><span class="si">%d</span><span class="s2">x</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Tile size: </span><span class="si">%d</span><span class="s2">, overlap: </span><span class="si">%d</span><span class="s2">, stride: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">tile_size</span><span class="p">,</span> <span class="n">overlap</span><span class="p">,</span> <span class="n">stride</span>
+        <span class="p">)</span>
 
         <span class="c1"># Initialize output arrays</span>
         <span class="n">output_sum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
@@ -9170,7 +9182,7 @@ Output dimensions match input dimensions exactly.</p>
                 <span class="n">tiles</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">row_start</span><span class="p">,</span> <span class="n">col_start</span><span class="p">,</span> <span class="n">row_end</span><span class="p">,</span> <span class="n">col_end</span><span class="p">))</span>
                 <span class="n">positions</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">row_start</span><span class="p">,</span> <span class="n">col_start</span><span class="p">))</span>
 
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total tiles: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">tiles</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Total tiles: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">tiles</span><span class="p">))</span>
 
         <span class="c1"># Process in batches</span>
         <span class="k">for</span> <span class="n">batch_start</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span>
@@ -9266,10 +9278,12 @@ Output dimensions match input dimensions exactly.</p>
             <span class="n">dst</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">output_array</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="n">valid_data</span> <span class="o">=</span> <span class="n">output_array</span><span class="p">[</span><span class="o">~</span><span class="n">nodata_mask</span> <span class="o">&amp;</span> <span class="n">valid_weights</span><span class="p">]</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Output saved to: </span><span class="si">{</span><span class="n">output_raster</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output dimensions: </span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">height</span><span class="si">}</span><span class="s2"> (same as input)&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Output saved to: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">output_raster</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Output dimensions: </span><span class="si">%d</span><span class="s2">x</span><span class="si">%d</span><span class="s2"> (same as input)&quot;</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">valid_data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prediction range: [</span><span class="si">{</span><span class="n">valid_data</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">valid_data</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Prediction range: [</span><span class="si">%.4f</span><span class="s2">, </span><span class="si">%.4f</span><span class="s2">]&quot;</span><span class="p">,</span> <span class="n">valid_data</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">valid_data</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">output_raster</span>
 </code></pre></div></td></tr></table></div>
@@ -9294,12 +9308,12 @@ Output dimensions match input dimensions exactly.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1652</span>
-<span class="normal">1653</span>
-<span class="normal">1654</span>
-<span class="normal">1655</span>
-<span class="normal">1656</span>
-<span class="normal">1657</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_with_timm_regressor</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1664</span>
+<span class="normal">1665</span>
+<span class="normal">1666</span>
+<span class="normal">1667</span>
+<span class="normal">1668</span>
+<span class="normal">1669</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_with_timm_regressor</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Deprecated: Use predict_raster instead.&quot;&quot;&quot;</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
         <span class="s2">&quot;predict_with_timm_regressor is deprecated. &quot;</span>
@@ -9798,13 +9812,7 @@ and callback messages. Defaults to True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">591</span>
-<span class="normal">592</span>
-<span class="normal">593</span>
-<span class="normal">594</span>
-<span class="normal">595</span>
-<span class="normal">596</span>
-<span class="normal">597</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">597</span>
 <span class="normal">598</span>
 <span class="normal">599</span>
 <span class="normal">600</span>
@@ -10000,7 +10008,15 @@ and callback messages. Defaults to True.</p>
 <span class="normal">790</span>
 <span class="normal">791</span>
 <span class="normal">792</span>
-<span class="normal">793</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_pixel_regressor</span><span class="p">(</span>
+<span class="normal">793</span>
+<span class="normal">794</span>
+<span class="normal">795</span>
+<span class="normal">796</span>
+<span class="normal">797</span>
+<span class="normal">798</span>
+<span class="normal">799</span>
+<span class="normal">800</span>
+<span class="normal">801</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_pixel_regressor</span><span class="p">(</span>
     <span class="n">train_image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">train_target_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">val_image_paths</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10179,11 +10195,13 @@ and callback messages. Defaults to True.</p>
     <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Training </span><span class="si">{</span><span class="n">architecture</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">encoder_name</span><span class="si">}</span><span class="s2"> encoder&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot; for </span><span class="si">{</span><span class="n">num_epochs</span><span class="si">}</span><span class="s2"> epochs...&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Training </span><span class="si">%s</span><span class="s2"> with </span><span class="si">%s</span><span class="s2"> encoder for </span><span class="si">%d</span><span class="s2"> epochs...&quot;</span><span class="p">,</span>
+            <span class="n">architecture</span><span class="p">,</span>
+            <span class="n">encoder_name</span><span class="p">,</span>
+            <span class="n">num_epochs</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loss function: </span><span class="si">{</span><span class="n">loss_type</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loss function: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">loss_type</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
 
     <span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
         <span class="n">model</span><span class="p">,</span>
@@ -10195,12 +10213,12 @@ and callback messages. Defaults to True.</p>
     <span class="n">best_model_path</span> <span class="o">=</span> <span class="n">checkpoint_callback</span><span class="o">.</span><span class="n">best_model_path</span>
     <span class="k">if</span> <span class="n">best_model_path</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Best model saved at: </span><span class="si">{</span><span class="n">best_model_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Best model saved at: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">best_model_path</span><span class="p">)</span>
         <span class="n">model</span> <span class="o">=</span> <span class="n">PixelRegressionModel</span><span class="o">.</span><span class="n">load_from_checkpoint</span><span class="p">(</span><span class="n">best_model_path</span><span class="p">)</span>
         <span class="n">model</span><span class="o">.</span><span class="n">best_model_path</span> <span class="o">=</span> <span class="n">best_model_path</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Best model path not found; returning last epoch model.&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Best model path not found; returning last epoch model.&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">model</span>
 </code></pre></div></td></tr></table></div>
@@ -10390,19 +10408,7 @@ and callback messages. Defaults to True.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/timm_regress.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1480</span>
-<span class="normal">1481</span>
-<span class="normal">1482</span>
-<span class="normal">1483</span>
-<span class="normal">1484</span>
-<span class="normal">1485</span>
-<span class="normal">1486</span>
-<span class="normal">1487</span>
-<span class="normal">1488</span>
-<span class="normal">1489</span>
-<span class="normal">1490</span>
-<span class="normal">1491</span>
-<span class="normal">1492</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1492</span>
 <span class="normal">1493</span>
 <span class="normal">1494</span>
 <span class="normal">1495</span>
@@ -10469,7 +10475,19 @@ and callback messages. Defaults to True.</p>
 <span class="normal">1556</span>
 <span class="normal">1557</span>
 <span class="normal">1558</span>
-<span class="normal">1559</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_prediction</span><span class="p">(</span>
+<span class="normal">1559</span>
+<span class="normal">1560</span>
+<span class="normal">1561</span>
+<span class="normal">1562</span>
+<span class="normal">1563</span>
+<span class="normal">1564</span>
+<span class="normal">1565</span>
+<span class="normal">1566</span>
+<span class="normal">1567</span>
+<span class="normal">1568</span>
+<span class="normal">1569</span>
+<span class="normal">1570</span>
+<span class="normal">1571</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">visualize_prediction</span><span class="p">(</span>
     <span class="n">input_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">pred_raster</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">rgb_bands</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
