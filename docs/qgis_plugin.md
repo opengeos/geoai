@@ -358,6 +358,9 @@ The Tree Segmentation panel provides object detection in remote sensing imagery 
 | Nest Detection       | `weecology/everglades-nest-detection` | Detect bird nests in Everglades imagery      |
 | Dead Tree Detection  | `weecology/cropmodel-deadtrees`       | Detect dead trees in forest imagery          |
 
+Sample dataset:
+    - [OSBS-029.tif](https://data.source.coop/opengeos/geoai/OSBS-029.tif)
+
 Steps:
 
 1. Click the **Tree Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Tree Segmentation`)
@@ -399,6 +402,10 @@ Steps:
 
 ### Water Segmentation Panel (OmniWaterMask)
 
+The Water Segmentation panel provides water body segmentation using [OmniWaterMask](https://github.com/DPIRD-DMA/OmniWaterMask), a sensor-agnostic tool that combines deep learning, NDWI calculations, and OpenStreetMap reference data to detect water bodies in satellite and aerial imagery.
+
+Sample dataset: [S2A-L2A-20190318-N0211-R061-6Bands-S2.tif](https://data.source.coop/opengeos/geoai/S2A-L2A-20190318-N0211-R061-6Bands-S2.tif)
+
 Steps:
 
 1. Click the **Water Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Water Segmentation`)
@@ -423,7 +430,9 @@ Steps:
 
 ### Moondream Vision-Language Model
 
-Sample dataset: [parking_lot.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif)
+The Moondream Vision-Language Model panel provides image captioning, question-answering, object detection, and point localization using the [Moondream](https://huggingface.co/vikhyatk/moondream2) model.
+
+Sample dataset: [parking-lot.tif](https://data.source.coop/opengeos/geoai/parking-lot.tif)
 
 Steps:
 
@@ -442,12 +451,14 @@ Steps:
 
 ### Segment Anything Panel (SamGeo)
 
+The Segment Anything panel provides object segmentation using the [Segment Anything](https://github.com/facebookresearch/segment-anything) model.
+
 Sample dataset:
 
-- [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
-- [wa_building_image.tif](https://github.com/opengeos/datasets/releases/download/places/wa_building_image.tif)
-- [wa_building_centroids.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_centroids.geojson)
-- [wa_building_bboxes.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_bboxes.geojson)
+- [uc-berkeley.tif](https://data.source.coop/opengeos/geoai/uc-berkeley.tif)
+- [wa-building-image.tif](https://data.source.coop/opengeos/geoai/wa-building-image.tif)
+- [wa-building-centroids.geojson](https://data.source.coop/opengeos/geoai/wa-building-centroids.geojson)
+- [wa-building-bboxes.geojson](https://data.source.coop/opengeos/geoai/wa-building-bboxes.geojson)
 
 Steps:
 
@@ -489,9 +500,9 @@ Steps:
 
 Sample datasets:
 
-- [naip_rgb_train.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_rgb_train.tif)
-- [naip_test.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test.tif)
-- [naip_train_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.geojson)
+    - [naip-rgb-train.tif](https://data.source.coop/opengeos/geoai/naip-rgb-train.tif)
+    - [naip-test.tif](https://data.source.coop/opengeos/geoai/naip-test.tif)
+    - [naip-train-buildings.geojson](https://data.source.coop/opengeos/geoai/naip-train-buildings.geojson)
 
 Steps:
 
@@ -509,6 +520,10 @@ Steps:
     ![inference](https://github.com/user-attachments/assets/f0945c01-0fcb-4607-9226-4a3b2bcb05e1)
 
 ### Instance Segmentation Panel (Mask R-CNN)
+
+Sample datasets:
+
+- [field boundaries](https://data.source.coop/opengeos/geoai/field-boundaries.zip)
 
 Steps:
 
