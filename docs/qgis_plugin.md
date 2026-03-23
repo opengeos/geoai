@@ -500,9 +500,9 @@ Steps:
 
 Sample datasets:
 
-    - [naip-rgb-train.tif](https://data.source.coop/opengeos/geoai/naip-rgb-train.tif)
-    - [naip-test.tif](https://data.source.coop/opengeos/geoai/naip-test.tif)
-    - [naip-train-buildings.geojson](https://data.source.coop/opengeos/geoai/naip-train-buildings.geojson)
+- [naip-rgb-train.tif](https://data.source.coop/opengeos/geoai/naip-rgb-train.tif)
+- [naip-test.tif](https://data.source.coop/opengeos/geoai/naip-test.tif)
+- [naip-train-buildings.geojson](https://data.source.coop/opengeos/geoai/naip-train-buildings.geojson)
 
 Steps:
 
