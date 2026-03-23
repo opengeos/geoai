@@ -13,20 +13,22 @@ logger = logging.getLogger(__name__)
 __all__ = ["inspect_pth_file", "try_common_architectures"]
 
 
-def inspect_pth_file(pth_path: str) -> Dict[str, Any]:
+def inspect_pth_file(pth_path: str) -> None:
     """
     Inspect a PyTorch .pth model file to determine its architecture.
+
+    Logs detailed information about the model's layer structure,
+    architecture indicators, and output classes.
 
     Args:
         pth_path: Path to the .pth file to inspect
 
-    Returns:
-        Information about the model architecture
+    Raises:
+        FileNotFoundError: If *pth_path* does not exist.
     """
     # Check if file exists
     if not os.path.exists(pth_path):
-        logger.error("File %s not found", pth_path)
-        return
+        raise FileNotFoundError(f"Model file not found: {pth_path}")
 
     # Load the checkpoint
     try:

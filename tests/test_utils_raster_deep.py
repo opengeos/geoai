@@ -3,6 +3,7 @@
 """Deep tests for `geoai.utils.raster` module — tests actual computation, not just signatures."""
 
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -50,6 +51,7 @@ class TestGetRasterInfo(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmpdir)
         self.raster_path = os.path.join(self._tmpdir, "info_test.tif")
         self.data = _create_test_raster(self.raster_path, width=60, height=40, bands=4)
 
@@ -93,6 +95,7 @@ class TestGetRasterStats(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmpdir)
         self.raster_path = os.path.join(self._tmpdir, "stats_test.tif")
         _create_test_raster(self.raster_path, width=50, height=50, bands=2)
 
@@ -121,6 +124,7 @@ class TestGetRasterResolution(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmpdir)
         self.raster_path = os.path.join(self._tmpdir, "res_test.tif")
         _create_test_raster(self.raster_path, width=100, height=50, bands=1)
 
@@ -138,6 +142,7 @@ class TestClipRasterByBbox(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmpdir)
         self.input_path = os.path.join(self._tmpdir, "clip_input.tif")
         self.output_path = os.path.join(self._tmpdir, "clip_output.tif")
         _create_test_raster(self.input_path, width=100, height=100, bands=3)
@@ -169,6 +174,7 @@ class TestReadRaster(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmpdir)
         self.raster_path = os.path.join(self._tmpdir, "read_test.tif")
         self.data = _create_test_raster(self.raster_path, width=30, height=20, bands=3)
 
@@ -192,6 +198,7 @@ class TestRasterVectorConversion(unittest.TestCase):
 
     def setUp(self):
         self._tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self._tmpdir)
         self.raster_path = os.path.join(self._tmpdir, "convert_input.tif")
         # Create a simple binary raster with a clear shape
         data = np.zeros((1, 50, 50), dtype=np.uint8)

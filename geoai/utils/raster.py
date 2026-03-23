@@ -1261,7 +1261,9 @@ def masks_to_vector(
         # Create GeoDataFrame
         if not all_polygons:
             logger.warning("No valid polygons found")
-            return None
+            return gpd.GeoDataFrame(
+                {"geometry": [], "confidence": [], "class": []}, crs=crs
+            )
 
         gdf = gpd.GeoDataFrame(
             {
