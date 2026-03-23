@@ -21,7 +21,7 @@ _pyproject_path = os.path.join(os.path.dirname(__file__), os.pardir, "pyproject.
 
 def _read_source(path):
     """Read a source file and return its contents."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return f.read()
 
 
