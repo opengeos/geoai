@@ -7,6 +7,7 @@ GeoTIFF images using the latent diffusion models from the ESA OpenSR project:
     GitHub: https://github.com/ESAOpenSR/opensr-model.git
 """
 
+import logging
 import os
 from typing import List, Optional, Tuple
 
@@ -14,6 +15,8 @@ import numpy as np
 import rasterio
 import requests
 import torch
+
+logger = logging.getLogger(__name__)
 from io import StringIO
 from omegaconf import OmegaConf
 from rasterio.transform import Affine
@@ -59,7 +62,7 @@ def _get_cached_checkpoint(ckpt_name: str) -> str:
         hf_url = (
             "https://huggingface.co/simon-donike/RS-SR-LTDF/resolve/main/" + ckpt_name
         )
-        print("Downloading pretrained weights to:", ckpt_path)
+        logger.info("Downloading pretrained weights to: %s", ckpt_path)
         torch.hub.download_url_to_file(hf_url, ckpt_path)
     return ckpt_path
 
@@ -171,12 +174,12 @@ def super_resolution(
 
     # Download configuration YAML from GitHub
     config_url = "https://raw.githubusercontent.com/ESAOpenSR/opensr-model/refs/heads/main/opensr_model/configs/config_10m.yaml"
-    print("Downloading model configuration from:", config_url)
+    logger.info("Downloading model configuration from: %s", config_url)
     try:
         response = requests.get(config_url)
         response.raise_for_status()
     except requests.RequestException as e:
-        print(f"Error downloading model configuration: {e}")
+        logger.error("Error downloading model configuration: %s", e)
         raise
     config = OmegaConf.load(StringIO(response.text))
 
@@ -217,7 +220,7 @@ def super_resolution(
         sr_image = sr_tensor.squeeze(0).cpu().numpy().astype(np.float32)
 
     save_geotiff(sr_image, profile, output_sr_path, scale)
-    print("Saved super-resolution image to:", output_sr_path)
+    logger.info("Saved super-resolution image to: %s", output_sr_path)
 
     # Compute uncertainty map if requested
     uncertainty = None
@@ -240,7 +243,7 @@ def super_resolution(
             )
             uncertainty = unc_tensor.squeeze().cpu().numpy().astype(np.float32)
         save_geotiff(uncertainty, profile, output_uncertainty_path, scale)
-        print("Saved uncertainty map to:", output_uncertainty_path)
+        logger.info("Saved uncertainty map to: %s", output_uncertainty_path)
 
     return sr_image, uncertainty
 
@@ -508,11 +511,17 @@ def _process_patched(
     _, channels, h, w = lr_tensor.shape
     patches = _create_patches(lr_tensor, patch_size, overlap)
     total = len(patches)
-    print(f"Processing {total} patches ({patch_size}x{patch_size}, overlap={overlap})")
+    logger.info(
+        "Processing %d patches (%dx%d, overlap=%d)",
+        total,
+        patch_size,
+        patch_size,
+        overlap,
+    )
 
     sr_patches = []
     for i, (patch, r, c) in enumerate(patches):
-        print(f"  Patch {i + 1}/{total} at ({r}, {c})")
+        logger.debug("  Patch %d/%d at (%d, %d)", i + 1, total, r, c)
         sr_tensor = model.forward(patch, sampling_steps=sampling_steps)
         sr_patch = sr_tensor.squeeze(0).cpu().numpy().astype(np.float32)
         sr_patches.append((sr_patch, r, c))
@@ -546,11 +555,11 @@ def _process_patched_uncertainty(
     _, _, h, w = lr_tensor.shape
     patches = _create_patches(lr_tensor, patch_size, overlap)
     total = len(patches)
-    print(f"Computing uncertainty for {total} patches")
+    logger.info("Computing uncertainty for %d patches", total)
 
     unc_patches = []
     for i, (patch, r, c) in enumerate(patches):
-        print(f"  Uncertainty patch {i + 1}/{total} at ({r}, {c})")
+        logger.debug("  Uncertainty patch %d/%d at (%d, %d)", i + 1, total, r, c)
         unc_tensor = model.uncertainty_map(
             patch, n_variations=n_variations, sampling_steps=sampling_steps
         )

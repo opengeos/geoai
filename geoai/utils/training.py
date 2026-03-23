@@ -27,6 +27,8 @@ from shapely.geometry import box
 from torchvision.transforms import RandomRotation
 from tqdm import tqdm
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "get_default_augmentation_transforms",
     "export_geotiff_tiles",
@@ -372,7 +374,6 @@ def export_flipnslide_tiles(
         Both input raster and class data (if provided) must share the same CRS
         and spatial extent for proper alignment.
     """
-    import logging
     from collections import Counter
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
@@ -389,10 +390,10 @@ def export_flipnslide_tiles(
 
     with rasterio.open(in_raster) as src:
         if not quiet:
-            print(f"Input raster: {in_raster}")
-            print(f"  CRS: {src.crs}")
-            print(f"  Dimensions: {src.width} x {src.height}")
-            print(f"  Bands: {src.count}")
+            logger.info(f"Input raster: {in_raster}")
+            logger.info(f"  CRS: {src.crs}")
+            logger.info(f"  Dimensions: {src.width} x {src.height}")
+            logger.info(f"  Bands: {src.count}")
 
         image_data = src.read()
 
@@ -448,20 +449,20 @@ def export_flipnslide_tiles(
                         )
                     class_data = class_src.read()
                     if not quiet:
-                        print(f"  Class data (raster): {in_class_data}")
+                        logger.info(f"  Class data (raster): {in_class_data}")
             else:
                 # Handle vector class data
                 try:
                     gdf = gpd.read_file(in_class_data)
                     if not quiet:
-                        print(f"  Class data (vector): {in_class_data}")
-                        print(f"    Loaded {len(gdf)} features")
-                        print(f"    Vector CRS: {gdf.crs}")
+                        logger.info(f"  Class data (vector): {in_class_data}")
+                        logger.info(f"    Loaded {len(gdf)} features")
+                        logger.info(f"    Vector CRS: {gdf.crs}")
 
                     # Reproject to match raster CRS if needed
                     if gdf.crs != src.crs:
                         if not quiet:
-                            print(f"    Reprojecting from {gdf.crs} to {src.crs}")
+                            logger.info(f"    Reprojecting from {gdf.crs} to {src.crs}")
                         gdf = gdf.to_crs(src.crs)
 
                     # Rasterize vector data to match raster dimensions
@@ -509,9 +510,8 @@ def export_flipnslide_tiles(
             )
 
         if not quiet:
-            print(
-                f"\nGenerated {len(image_tiles)} tiles with "
-                f"Flip-n-Slide augmentation"
+            logger.info(
+                f"Generated {len(image_tiles)} tiles with " f"Flip-n-Slide augmentation"
             )
 
         # Determine cropped dimensions for geo-transform calculation
@@ -605,16 +605,706 @@ def export_flipnslide_tiles(
     }
 
     if not quiet:
-        print("\n--- Flip-n-Slide Export Summary ---")
-        print(f"  Total tiles : {stats['total_tiles']}")
-        print(f"  Tile size   : {tile_size}x{tile_size}")
-        print(f"  Augmentations: {dict(aug_counts)}")
+        logger.info("--- Flip-n-Slide Export Summary ---")
+        logger.info(f"  Total tiles : {stats['total_tiles']}")
+        logger.info(f"  Tile size   : {tile_size}x{tile_size}")
+        logger.info(f"  Augmentations: {dict(aug_counts)}")
         if has_labels:
-            print("  Exported both image and label tiles")
+            logger.info("  Exported both image and label tiles")
         else:
-            print("  Exported image tiles only")
+            logger.info("  Exported image tiles only")
 
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Private helpers for export_geotiff_tiles / export_training_data
+# ---------------------------------------------------------------------------
+
+
+def _detect_class_data_type(in_class_data, quiet=False):
+    """Detect whether classification data is raster or vector.
+
+    Args:
+        in_class_data: Path to the classification data file.
+        quiet: If True, suppress log messages.
+
+    Returns:
+        bool: True if the data is raster, False if vector or unknown.
+    """
+    if in_class_data is None or not isinstance(in_class_data, str):
+        return False
+
+    file_ext = Path(in_class_data).suffix.lower()
+    raster_exts = [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]
+
+    if file_ext in raster_exts:
+        try:
+            with rasterio.open(in_class_data) as src:
+                if not quiet:
+                    logger.info(f"Detected in_class_data as raster: {in_class_data}")
+                    logger.info(f"Raster CRS: {src.crs}")
+                    logger.info(f"Raster dimensions: {src.width} x {src.height}")
+                return True
+        except Exception:
+            if not quiet:
+                logger.info(
+                    f"Unable to open {in_class_data} as raster, trying as vector"
+                )
+            return False
+
+    return False
+
+
+def _load_class_data_raster(
+    class_raster_path, src_crs, quiet=False, metadata_format=None
+):
+    """Load raster classification data and build a class mapping.
+
+    Args:
+        class_raster_path: Path to the raster classification file.
+        src_crs: CRS of the source raster for comparison.
+        quiet: If True, suppress log messages.
+        metadata_format: Annotation format string (e.g. ``"COCO"``).
+
+    Returns:
+        Tuple[dict, list]: A tuple of ``(class_to_id, coco_categories)`` where
+        *coco_categories* is a list of category dicts (empty when *metadata_format*
+        is not ``"COCO"``).
+    """
+    coco_categories = []
+    with rasterio.open(class_raster_path) as class_src:
+        if class_src.crs != src_crs:
+            warnings.warn(
+                f"CRS mismatch: Class raster ({class_src.crs}) doesn't match "
+                f"input raster ({src_crs}). Results may be misaligned."
+            )
+
+        sample_data = class_src.read(
+            1,
+            out_shape=(
+                1,
+                min(class_src.height, 1000),
+                min(class_src.width, 1000),
+            ),
+        )
+        unique_classes = np.unique(sample_data)
+        unique_classes = unique_classes[unique_classes > 0]
+
+        if not quiet:
+            logger.info(
+                f"Found {len(unique_classes)} unique classes in raster: {unique_classes}"
+            )
+
+        class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
+
+        if metadata_format == "COCO":
+            for cls_val in unique_classes:
+                coco_categories.append(
+                    {
+                        "id": class_to_id[int(cls_val)],
+                        "name": str(int(cls_val)),
+                        "supercategory": "object",
+                    }
+                )
+
+    return class_to_id, coco_categories
+
+
+def _load_class_data_vector(
+    vector_path,
+    src_crs,
+    class_value_field="class",
+    buffer_radius=0,
+    quiet=False,
+    metadata_format=None,
+):
+    """Load vector classification data and build a class mapping.
+
+    Args:
+        vector_path: Path to the vector classification file.
+        src_crs: CRS of the source raster for reprojection.
+        class_value_field: Field containing class values.
+        buffer_radius: Buffer to apply around features (CRS units).
+        quiet: If True, suppress log messages.
+        metadata_format: Annotation format string (e.g. ``"COCO"``).
+
+    Returns:
+        Tuple[gpd.GeoDataFrame, dict, list]: A tuple of
+        ``(gdf, class_to_id, coco_categories)``.
+
+    Raises:
+        ValueError: If the vector data cannot be read.
+    """
+    coco_categories = []
+    try:
+        gdf = gpd.read_file(vector_path)
+        if not quiet:
+            logger.info(f"Loaded {len(gdf)} features from {vector_path}")
+            logger.info(f"Vector CRS: {gdf.crs}")
+
+        if gdf.crs != src_crs:
+            if not quiet:
+                logger.info(f"Reprojecting features from {gdf.crs} to {src_crs}")
+            gdf = gdf.to_crs(src_crs)
+
+        if buffer_radius > 0:
+            gdf["geometry"] = gdf.buffer(buffer_radius)
+            if not quiet:
+                logger.info(f"Applied buffer of {buffer_radius} units")
+
+        if class_value_field in gdf.columns:
+            unique_classes = gdf[class_value_field].unique()
+            if not quiet:
+                logger.info(
+                    f"Found {len(unique_classes)} unique classes: {unique_classes}"
+                )
+            class_to_id = {cls: i + 1 for i, cls in enumerate(unique_classes)}
+
+            if metadata_format == "COCO":
+                for cls_val in unique_classes:
+                    coco_categories.append(
+                        {
+                            "id": class_to_id[cls_val],
+                            "name": str(cls_val),
+                            "supercategory": "object",
+                        }
+                    )
+        else:
+            if not quiet:
+                logger.warning(
+                    f"'{class_value_field}' not found in vector data. "
+                    "Using default class ID 1."
+                )
+            class_to_id = {1: 1}
+
+            if metadata_format == "COCO":
+                coco_categories.append(
+                    {
+                        "id": 1,
+                        "name": "object",
+                        "supercategory": "object",
+                    }
+                )
+
+        return gdf, class_to_id, coco_categories
+    except Exception as e:
+        raise ValueError(f"Error processing vector data: {e}")
+
+
+def _compute_tile_window(x, y, stride_x, stride_y, tile_w, tile_h, src):
+    """Compute the pixel window and geospatial bounds for a tile.
+
+    Args:
+        x: Tile column index.
+        y: Tile row index.
+        stride_x: Horizontal stride in pixels.
+        stride_y: Vertical stride in pixels.
+        tile_w: Tile width in pixels.
+        tile_h: Tile height in pixels.
+        src: Open rasterio dataset.
+
+    Returns:
+        Tuple containing ``(window, window_transform, window_bounds,
+        minx, miny, maxx, maxy)``.
+    """
+    window_x = x * stride_x
+    window_y = y * stride_y
+
+    if window_x + tile_w > src.width:
+        window_x = src.width - tile_w
+    if window_y + tile_h > src.height:
+        window_y = src.height - tile_h
+
+    window = Window(window_x, window_y, tile_w, tile_h)
+    window_transform = src.window_transform(window)
+
+    minx = window_transform[2]
+    maxy = window_transform[5]
+    maxx = minx + tile_w * window_transform[0]
+    miny = maxy + tile_h * window_transform[4]
+
+    window_bounds = box(minx, miny, maxx, maxy)
+
+    return window, window_transform, window_bounds, minx, miny, maxx, maxy
+
+
+def _rasterize_label_from_raster(
+    class_raster_path, minx, miny, maxx, maxy, tile_size, class_to_id
+):
+    """Read and remap a label tile from a raster classification source.
+
+    Args:
+        class_raster_path: Path to the classification raster.
+        minx: Minimum x bound.
+        miny: Minimum y bound.
+        maxx: Maximum x bound.
+        maxy: Maximum y bound.
+        tile_size: Output tile size in pixels (square).
+        class_to_id: Mapping from original class values to new IDs.
+
+    Returns:
+        Tuple[np.ndarray, bool]: ``(label_mask, has_features)``.
+    """
+    with rasterio.open(class_raster_path) as class_src:
+        src_bounds = class_src.bounds
+        if (
+            minx > src_bounds.right
+            or maxx < src_bounds.left
+            or miny > src_bounds.top
+            or maxy < src_bounds.bottom
+        ):
+            return np.zeros((tile_size, tile_size), dtype=np.uint8), False
+
+        window_class = rasterio.windows.from_bounds(
+            minx, miny, maxx, maxy, class_src.transform
+        )
+        label_data = class_src.read(
+            1,
+            window=window_class,
+            boundless=True,
+            out_shape=(tile_size, tile_size),
+        )
+
+        if class_to_id:
+            remapped = np.zeros_like(label_data)
+            for orig_val, new_val in class_to_id.items():
+                remapped[label_data == orig_val] = new_val
+            label_mask = remapped
+        else:
+            label_mask = label_data
+
+        has_features = bool(np.any(label_mask > 0))
+        return label_mask, has_features
+
+
+def _rasterize_label_from_vector(
+    gdf,
+    window_bounds,
+    window_transform,
+    tile_size,
+    class_value_field,
+    class_to_id,
+    all_touched=True,
+):
+    """Rasterize vector features into a label mask for a single tile.
+
+    Args:
+        gdf: GeoDataFrame of class features.
+        window_bounds: Shapely geometry of the tile bounds.
+        window_transform: Affine transform of the tile window.
+        tile_size: Output tile size in pixels (square).
+        class_value_field: Field containing class values.
+        class_to_id: Mapping from class values to integer IDs.
+        all_touched: Whether to rasterize all touched pixels.
+
+    Returns:
+        Tuple[np.ndarray, bool, gpd.GeoDataFrame, int]: A tuple of
+        ``(label_mask, has_features, window_features, error_count)``.
+    """
+    label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
+    has_features = False
+    errors = 0
+
+    window_features = gdf[gdf.intersects(window_bounds)]
+    if len(window_features) == 0:
+        return label_mask, has_features, window_features, errors
+
+    for idx, feature in window_features.iterrows():
+        if class_value_field in feature:
+            class_val = feature[class_value_field]
+            class_id = class_to_id.get(class_val, 1)
+        else:
+            class_id = 1
+
+        geom = feature.geometry.intersection(window_bounds)
+        if not geom.is_empty:
+            try:
+                feature_mask = features.rasterize(
+                    [(geom, class_id)],
+                    out_shape=(tile_size, tile_size),
+                    transform=window_transform,
+                    fill=0,
+                    all_touched=all_touched,
+                )
+                label_mask = np.maximum(label_mask, feature_mask)
+                if np.any(feature_mask):
+                    has_features = True
+            except Exception as e:
+                logger.error(f"Error rasterizing feature {idx}: {e}")
+                errors += 1
+
+    return label_mask, has_features, window_features, errors
+
+
+def _create_pascal_voc_annotation(
+    window_features,
+    tile_index,
+    tile_size,
+    image_data,
+    src_crs,
+    window_transform,
+    window_bounds,
+    class_value_field,
+    ann_dir,
+    minx,
+    miny,
+    maxx,
+    maxy,
+):
+    """Create and save a PASCAL VOC XML annotation for a tile.
+
+    Args:
+        window_features: GeoDataFrame of features intersecting this tile.
+        tile_index: Numeric index for the tile filename.
+        tile_size: Tile dimension in pixels (square).
+        image_data: Image array ``(bands, h, w)``.
+        src_crs: CRS of the source raster.
+        window_transform: Affine transform for the tile window.
+        window_bounds: Shapely geometry of the tile bounds.
+        class_value_field: Field containing class values.
+        ann_dir: Directory to write XML annotation files.
+        minx: Tile minimum x coordinate.
+        miny: Tile minimum y coordinate.
+        maxx: Tile maximum x coordinate.
+        maxy: Tile maximum y coordinate.
+    """
+    root = ET.Element("annotation")
+    ET.SubElement(root, "folder").text = "images"
+    ET.SubElement(root, "filename").text = f"tile_{tile_index:06d}.tif"
+
+    size = ET.SubElement(root, "size")
+    ET.SubElement(size, "width").text = str(tile_size)
+    ET.SubElement(size, "height").text = str(tile_size)
+    ET.SubElement(size, "depth").text = str(image_data.shape[0])
+
+    geo = ET.SubElement(root, "georeference")
+    ET.SubElement(geo, "crs").text = str(src_crs)
+    ET.SubElement(geo, "transform").text = str(window_transform).replace("\n", "")
+    ET.SubElement(geo, "bounds").text = f"{minx}, {miny}, {maxx}, {maxy}"
+
+    for _, feature in window_features.iterrows():
+        if class_value_field in feature:
+            class_val = feature[class_value_field]
+        else:
+            class_val = "object"
+
+        geom = feature.geometry.intersection(window_bounds)
+        if not geom.is_empty:
+            minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+            col_min, row_min = ~window_transform * (minx_f, maxy_f)
+            col_max, row_max = ~window_transform * (maxx_f, miny_f)
+
+            xmin = max(0, min(tile_size, int(col_min)))
+            ymin = max(0, min(tile_size, int(row_min)))
+            xmax = max(0, min(tile_size, int(col_max)))
+            ymax = max(0, min(tile_size, int(row_max)))
+
+            if xmax > xmin and ymax > ymin:
+                obj = ET.SubElement(root, "object")
+                ET.SubElement(obj, "name").text = str(class_val)
+                ET.SubElement(obj, "difficult").text = "0"
+
+                bbox_el = ET.SubElement(obj, "bndbox")
+                ET.SubElement(bbox_el, "xmin").text = str(xmin)
+                ET.SubElement(bbox_el, "ymin").text = str(ymin)
+                ET.SubElement(bbox_el, "xmax").text = str(xmax)
+                ET.SubElement(bbox_el, "ymax").text = str(ymax)
+
+    tree = ET.ElementTree(root)
+    xml_path = os.path.join(ann_dir, f"tile_{tile_index:06d}.xml")
+    tree.write(xml_path)
+
+
+def _create_coco_annotation(
+    window_features,
+    tile_index,
+    tile_size,
+    src_crs,
+    window_transform,
+    window_bounds,
+    class_value_field,
+    class_to_id,
+    coco_annotations,
+    ann_id,
+):
+    """Append COCO image and annotation entries for a tile.
+
+    Args:
+        window_features: GeoDataFrame of features intersecting this tile.
+        tile_index: Numeric index for the tile filename.
+        tile_size: Tile dimension in pixels (square).
+        src_crs: CRS of the source raster.
+        window_transform: Affine transform for the tile window.
+        window_bounds: Shapely geometry of the tile bounds.
+        class_value_field: Field containing class values.
+        class_to_id: Mapping from class values to integer IDs.
+        coco_annotations: Mutable COCO annotations dict to update in-place.
+        ann_id: Current annotation ID counter.
+
+    Returns:
+        int: Updated annotation ID counter.
+    """
+    image_id = tile_index
+    coco_annotations["images"].append(
+        {
+            "id": image_id,
+            "file_name": f"tile_{tile_index:06d}.tif",
+            "width": tile_size,
+            "height": tile_size,
+            "crs": str(src_crs),
+            "transform": str(window_transform),
+        }
+    )
+
+    for _, feature in window_features.iterrows():
+        if class_value_field in feature:
+            class_val = feature[class_value_field]
+            category_id = class_to_id.get(class_val, 1)
+        else:
+            category_id = 1
+
+        geom = feature.geometry.intersection(window_bounds)
+        if not geom.is_empty:
+            minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+            col_min, row_min = ~window_transform * (minx_f, maxy_f)
+            col_max, row_max = ~window_transform * (maxx_f, miny_f)
+
+            xmin = max(0, min(tile_size, int(col_min)))
+            ymin = max(0, min(tile_size, int(row_min)))
+            xmax = max(0, min(tile_size, int(col_max)))
+            ymax = max(0, min(tile_size, int(row_max)))
+
+            if xmax - xmin < 1 or ymax - ymin < 1:
+                continue
+
+            width = xmax - xmin
+            height = ymax - ymin
+
+            ann_id += 1
+            coco_annotations["annotations"].append(
+                {
+                    "id": ann_id,
+                    "image_id": image_id,
+                    "category_id": category_id,
+                    "bbox": [xmin, ymin, width, height],
+                    "area": width * height,
+                    "iscrowd": 0,
+                }
+            )
+
+    return ann_id
+
+
+def _create_yolo_annotation(
+    window_features,
+    tile_index,
+    tile_size,
+    window_transform,
+    window_bounds,
+    class_value_field,
+    class_to_id,
+    label_dir,
+):
+    """Create and save a YOLO-format annotation for a tile.
+
+    Args:
+        window_features: GeoDataFrame of features intersecting this tile.
+        tile_index: Numeric index for the tile filename.
+        tile_size: Tile dimension in pixels (square).
+        window_transform: Affine transform for the tile window.
+        window_bounds: Shapely geometry of the tile bounds.
+        class_value_field: Field containing class values.
+        class_to_id: Mapping from class values to integer IDs.
+        label_dir: Directory to write YOLO annotation text files.
+    """
+    yolo_annotations = []
+
+    for _, feature in window_features.iterrows():
+        if class_value_field in feature:
+            class_val = feature[class_value_field]
+            class_id = class_to_id.get(class_val, 1) - 1
+        else:
+            class_id = 0
+
+        geom = feature.geometry.intersection(window_bounds)
+        if not geom.is_empty:
+            minx_f, miny_f, maxx_f, maxy_f = geom.bounds
+            col_min, row_min = ~window_transform * (minx_f, maxy_f)
+            col_max, row_max = ~window_transform * (maxx_f, miny_f)
+
+            xmin = max(0, min(tile_size, col_min))
+            ymin = max(0, min(tile_size, row_min))
+            xmax = max(0, min(tile_size, col_max))
+            ymax = max(0, min(tile_size, row_max))
+
+            if xmax - xmin < 1 or ymax - ymin < 1:
+                continue
+
+            x_center = ((xmin + xmax) / 2) / tile_size
+            y_center = ((ymin + ymax) / 2) / tile_size
+            width = (xmax - xmin) / tile_size
+            height = (ymax - ymin) / tile_size
+
+            yolo_annotations.append(
+                f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}"
+            )
+
+    if yolo_annotations:
+        yolo_path = os.path.join(label_dir, f"tile_{tile_index:06d}.txt")
+        with open(yolo_path, "w") as f:
+            f.write("\n".join(yolo_annotations))
+
+
+def _save_tile_geotiff(
+    image_data, tile_id, image_dir, tile_size, src_profile, window_transform
+):
+    """Save an image tile as a GeoTIFF.
+
+    Args:
+        image_data: Image array of shape ``(bands, h, w)``.
+        tile_id: Numeric tile ID for the filename.
+        image_dir: Directory to write the image tile.
+        tile_size: Tile dimension in pixels (square).
+        src_profile: Rasterio profile from the source raster.
+        window_transform: Affine transform for the tile window.
+
+    Returns:
+        bool: True if the tile was saved successfully, False otherwise.
+    """
+    image_path = os.path.join(image_dir, f"tile_{tile_id:06d}.tif")
+    profile = src_profile.copy()
+    profile.update(
+        {
+            "height": tile_size,
+            "width": tile_size,
+            "count": image_data.shape[0],
+            "transform": window_transform,
+        }
+    )
+    try:
+        with rasterio.open(image_path, "w", **profile) as dst:
+            dst.write(image_data)
+        return True
+    except Exception as e:
+        logger.error(f"ERROR saving image GeoTIFF: {e}")
+        return False
+
+
+def _save_label_geotiff(
+    label_mask, tile_id, label_dir, tile_size, src_crs, window_transform
+):
+    """Save a label mask tile as a GeoTIFF.
+
+    Args:
+        label_mask: Label mask array of shape ``(h, w)``.
+        tile_id: Numeric tile ID for the filename.
+        label_dir: Directory to write the label tile.
+        tile_size: Tile dimension in pixels (square).
+        src_crs: CRS of the source raster.
+        window_transform: Affine transform for the tile window.
+
+    Returns:
+        bool: True if the label was saved successfully, False otherwise.
+    """
+    label_profile = {
+        "driver": "GTiff",
+        "height": tile_size,
+        "width": tile_size,
+        "count": 1,
+        "dtype": "uint8",
+        "crs": src_crs,
+        "transform": window_transform,
+    }
+    label_path = os.path.join(label_dir, f"tile_{tile_id:06d}.tif")
+    try:
+        with rasterio.open(label_path, "w", **label_profile) as dst:
+            dst.write(label_mask.astype(np.uint8), 1)
+        return True
+    except Exception as e:
+        logger.error(f"ERROR saving label GeoTIFF: {e}")
+        return False
+
+
+def _log_export_summary(
+    stats,
+    out_folder,
+    max_tiles,
+    image_dir,
+    label_dir=None,
+    in_class_data=None,
+    start_index=0,
+):
+    """Log an export summary and verify georeference of sample tiles.
+
+    Args:
+        stats: Statistics dictionary with keys ``total_tiles``,
+            ``tiles_with_features``, ``feature_pixels``, ``errors``.
+        out_folder: Path to the output folder.
+        max_tiles: Maximum number of tiles processed.
+        image_dir: Path to the images directory.
+        label_dir: Path to the labels directory (or None).
+        in_class_data: Path to the classification data (or None).
+        start_index: Starting index used for filenames.
+    """
+    logger.info("------- Export Summary -------")
+    logger.info(f"Total tiles exported: {stats['total_tiles']}")
+    if in_class_data is not None:
+        logger.info(
+            f"Tiles with features: {stats['tiles_with_features']} "
+            f"({stats['tiles_with_features'] / max(1, stats['total_tiles']) * 100:.1f}%)"
+        )
+        if stats["tiles_with_features"] > 0:
+            logger.info(
+                f"Average feature pixels per tile: "
+                f"{stats['feature_pixels'] / stats['tiles_with_features']:.1f}"
+            )
+    if stats["errors"] > 0:
+        logger.info(f"Errors encountered: {stats['errors']}")
+    logger.info(f"Output saved to: {out_folder}")
+
+    if stats["total_tiles"] > 0:
+        logger.info("------- Georeference Verification -------")
+        # Try both naming conventions
+        sample_image = os.path.join(image_dir, f"tile_{start_index}.tif")
+        if not os.path.exists(sample_image):
+            sample_image = os.path.join(image_dir, f"tile_{start_index:06d}.tif")
+
+        if os.path.exists(sample_image):
+            try:
+                with rasterio.open(sample_image) as img:
+                    logger.info(f"Image CRS: {img.crs}")
+                    logger.info(f"Image transform: {img.transform}")
+                    logger.info(
+                        f"Image has georeference: "
+                        f"{img.crs is not None and img.transform is not None}"
+                    )
+                    logger.info(
+                        f"Image dimensions: {img.width}x{img.height}, "
+                        f"{img.count} bands, {img.dtypes[0]} type"
+                    )
+            except Exception as e:
+                logger.error(f"Error verifying image georeference: {e}")
+
+        if label_dir is not None and in_class_data is not None:
+            sample_label = os.path.join(label_dir, f"tile_{start_index}.tif")
+            if not os.path.exists(sample_label):
+                sample_label = os.path.join(label_dir, f"tile_{start_index:06d}.tif")
+            if os.path.exists(sample_label):
+                try:
+                    with rasterio.open(sample_label) as lbl:
+                        logger.info(f"Label CRS: {lbl.crs}")
+                        logger.info(f"Label transform: {lbl.transform}")
+                        logger.info(
+                            f"Label has georeference: "
+                            f"{lbl.crs is not None and lbl.transform is not None}"
+                        )
+                        logger.info(
+                            f"Label dimensions: {lbl.width}x{lbl.height}, "
+                            f"{lbl.count} bands, {lbl.dtypes[0]} type"
+                        )
+                except Exception as e:
+                    logger.error(f"Error verifying label georeference: {e}")
 
 
 def export_geotiff_tiles(
@@ -695,8 +1385,6 @@ def export_geotiff_tiles(
         ...                      tiling_strategy='flipnslide')
     """
 
-    import logging
-
     logging.getLogger("rasterio").setLevel(logging.ERROR)
 
     # Handle FlipnSlide tiling strategy
@@ -722,8 +1410,8 @@ def export_geotiff_tiles(
         )
 
         if not quiet:
-            print("Used Flip-n-Slide tiling strategy")
-            print(
+            logger.info("Used Flip-n-Slide tiling strategy")
+            logger.info(
                 f"Generated {stats['total_tiles']} tiles with spatial context preservation"
             )
 
@@ -740,7 +1428,7 @@ def export_geotiff_tiles(
                 tile_size=tile_size
             )
         if not quiet:
-            print(
+            logger.info(
                 f"Data augmentation enabled: generating {augmentation_count} augmented versions per tile"
             )
 
@@ -765,35 +1453,17 @@ def export_geotiff_tiles(
             ann_id = 0
 
     # Determine if class data is raster or vector (only if class data provided)
-    is_class_data_raster = False
-    if in_class_data is not None:
-        if isinstance(in_class_data, str):
-            file_ext = Path(in_class_data).suffix.lower()
-            # Common raster extensions
-            if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
-                try:
-                    with rasterio.open(in_class_data) as src:
-                        is_class_data_raster = True
-                        if not quiet:
-                            print(f"Detected in_class_data as raster: {in_class_data}")
-                            print(f"Raster CRS: {src.crs}")
-                            print(f"Raster dimensions: {src.width} x {src.height}")
-                except Exception:
-                    is_class_data_raster = False
-                    if not quiet:
-                        print(
-                            f"Unable to open {in_class_data} as raster, trying as vector"
-                        )
+    is_class_data_raster = _detect_class_data_type(in_class_data, quiet=quiet)
 
     # Open the input raster
     with rasterio.open(in_raster) as src:
         if not quiet:
-            print(f"\nRaster info for {in_raster}:")
-            print(f"  CRS: {src.crs}")
-            print(f"  Dimensions: {src.width} x {src.height}")
-            print(f"  Resolution: {src.res}")
-            print(f"  Bands: {src.count}")
-            print(f"  Bounds: {src.bounds}")
+            logger.info(f"Raster info for {in_raster}:")
+            logger.info(f"  CRS: {src.crs}")
+            logger.info(f"  Dimensions: {src.width} x {src.height}")
+            logger.info(f"  Resolution: {src.res}")
+            logger.info(f"  Bands: {src.count}")
+            logger.info(f"  Bounds: {src.bounds}")
 
         # Calculate number of tiles
         num_tiles_x = math.ceil((src.width - tile_size) / stride) + 1
@@ -805,109 +1475,29 @@ def export_geotiff_tiles(
 
         # Process classification data (only if class data provided)
         class_to_id = {}
+        gdf = None
 
         if in_class_data is not None and is_class_data_raster:
-            # Load raster class data
-            with rasterio.open(in_class_data) as class_src:
-                # Check if raster CRS matches
-                if class_src.crs != src.crs:
-                    warnings.warn(
-                        f"CRS mismatch: Class raster ({class_src.crs}) doesn't match input raster ({src.crs}). "
-                        f"Results may be misaligned."
-                    )
+            class_to_id, coco_categories = _load_class_data_raster(
+                in_class_data,
+                src.crs,
+                quiet=quiet,
+                metadata_format=metadata_format,
+            )
+            if metadata_format == "COCO":
+                coco_annotations["categories"].extend(coco_categories)
 
-                # Get unique values from raster
-                # Sample to avoid loading huge rasters
-                sample_data = class_src.read(
-                    1,
-                    out_shape=(
-                        1,
-                        min(class_src.height, 1000),
-                        min(class_src.width, 1000),
-                    ),
-                )
-
-                unique_classes = np.unique(sample_data)
-                unique_classes = unique_classes[
-                    unique_classes > 0
-                ]  # Remove 0 as it's typically background
-
-                if not quiet:
-                    print(
-                        f"Found {len(unique_classes)} unique classes in raster: {unique_classes}"
-                    )
-
-                # Create class mapping
-                class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
-
-                # Populate COCO categories
-                if metadata_format == "COCO":
-                    for cls_val in unique_classes:
-                        coco_annotations["categories"].append(
-                            {
-                                "id": class_to_id[int(cls_val)],
-                                "name": str(int(cls_val)),
-                                "supercategory": "object",
-                            }
-                        )
         elif in_class_data is not None:
-            # Load vector class data
-            try:
-                gdf = gpd.read_file(in_class_data)
-                if not quiet:
-                    print(f"Loaded {len(gdf)} features from {in_class_data}")
-                    print(f"Vector CRS: {gdf.crs}")
-
-                # Always reproject to match raster CRS
-                if gdf.crs != src.crs:
-                    if not quiet:
-                        print(f"Reprojecting features from {gdf.crs} to {src.crs}")
-                    gdf = gdf.to_crs(src.crs)
-
-                # Apply buffer if specified
-                if buffer_radius > 0:
-                    gdf["geometry"] = gdf.buffer(buffer_radius)
-                    if not quiet:
-                        print(f"Applied buffer of {buffer_radius} units")
-
-                # Check if class_value_field exists
-                if class_value_field in gdf.columns:
-                    unique_classes = gdf[class_value_field].unique()
-                    if not quiet:
-                        print(
-                            f"Found {len(unique_classes)} unique classes: {unique_classes}"
-                        )
-                    # Create class mapping
-                    class_to_id = {cls: i + 1 for i, cls in enumerate(unique_classes)}
-
-                    # Populate COCO categories
-                    if metadata_format == "COCO":
-                        for cls_val in unique_classes:
-                            coco_annotations["categories"].append(
-                                {
-                                    "id": class_to_id[cls_val],
-                                    "name": str(cls_val),
-                                    "supercategory": "object",
-                                }
-                            )
-                else:
-                    if not quiet:
-                        print(
-                            f"WARNING: '{class_value_field}' not found in vector data. Using default class ID 1."
-                        )
-                    class_to_id = {1: 1}  # Default mapping
-
-                    # Populate COCO categories with default
-                    if metadata_format == "COCO":
-                        coco_annotations["categories"].append(
-                            {
-                                "id": 1,
-                                "name": "object",
-                                "supercategory": "object",
-                            }
-                        )
-            except Exception as e:
-                raise ValueError(f"Error processing vector data: {e}")
+            gdf, class_to_id, coco_categories = _load_class_data_vector(
+                in_class_data,
+                src.crs,
+                class_value_field=class_value_field,
+                buffer_radius=buffer_radius,
+                quiet=quiet,
+                metadata_format=metadata_format,
+            )
+            if metadata_format == "COCO":
+                coco_annotations["categories"].extend(coco_categories)
 
         # Create progress bar
         pbar = tqdm(
@@ -932,32 +1522,21 @@ def export_geotiff_tiles(
                 if tile_index >= max_tiles:
                     break
 
-                # Calculate window coordinates
-                window_x = x * stride
-                window_y = y * stride
-
-                # Adjust for edge cases
-                if window_x + tile_size > src.width:
-                    window_x = src.width - tile_size
-                if window_y + tile_size > src.height:
-                    window_y = src.height - tile_size
-
-                # Define window
-                window = Window(window_x, window_y, tile_size, tile_size)
-
-                # Get window transform and bounds
-                window_transform = src.window_transform(window)
-
-                # Calculate window bounds
-                minx = window_transform[2]  # Upper left x
-                maxy = window_transform[5]  # Upper left y
-                maxx = minx + tile_size * window_transform[0]  # Add width
-                miny = maxy + tile_size * window_transform[4]  # Add height
-
-                window_bounds = box(minx, miny, maxx, maxy)
+                # Compute tile window and bounds
+                window, window_transform, window_bounds, minx, miny, maxx, maxy = (
+                    _compute_tile_window(
+                        x, y, stride, stride, tile_size, tile_size, src
+                    )
+                )
 
                 # Store tile coordinates for overview
                 if create_overview:
+                    window_x = x * stride
+                    window_y = y * stride
+                    if window_x + tile_size > src.width:
+                        window_x = src.width - tile_size
+                    if window_y + tile_size > src.height:
+                        window_y = src.height - tile_size
                     stats["tile_coordinates"].append(
                         {
                             "index": tile_index,
@@ -971,100 +1550,45 @@ def export_geotiff_tiles(
                 # Create label mask
                 label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
                 has_features = False
+                window_features = None
 
-                # Process classification data to create labels (only if class data provided)
+                # Process classification data to create labels
                 if in_class_data is not None and is_class_data_raster:
-                    # For raster class data
-                    with rasterio.open(in_class_data) as class_src:
-                        # Calculate window in class raster
-                        src_bounds = src.bounds
-                        class_bounds = class_src.bounds
+                    try:
+                        label_mask, has_features = _rasterize_label_from_raster(
+                            in_class_data,
+                            minx,
+                            miny,
+                            maxx,
+                            maxy,
+                            tile_size,
+                            class_to_id,
+                        )
+                        if has_features:
+                            stats["feature_pixels"] += np.count_nonzero(label_mask)
+                    except Exception as e:
+                        pbar.write(f"Error reading class raster window: {e}")
+                        stats["errors"] += 1
 
-                        # Check if windows overlap
-                        if (
-                            src_bounds.left > class_bounds.right
-                            or src_bounds.right < class_bounds.left
-                            or src_bounds.bottom > class_bounds.top
-                            or src_bounds.top < class_bounds.bottom
-                        ):
-                            warnings.warn(
-                                "Class raster and input raster do not overlap."
-                            )
-                        else:
-                            # Get corresponding window in class raster
-                            window_class = rasterio.windows.from_bounds(
-                                minx, miny, maxx, maxy, class_src.transform
-                            )
-
-                            # Read label data
-                            try:
-                                label_data = class_src.read(
-                                    1,
-                                    window=window_class,
-                                    boundless=True,
-                                    out_shape=(tile_size, tile_size),
-                                )
-
-                                # Remap class values if needed
-                                if class_to_id:
-                                    remapped_data = np.zeros_like(label_data)
-                                    for orig_val, new_val in class_to_id.items():
-                                        remapped_data[label_data == orig_val] = new_val
-                                    label_mask = remapped_data
-                                else:
-                                    label_mask = label_data
-
-                                # Check if we have any features
-                                if np.any(label_mask > 0):
-                                    has_features = True
-                                    stats["feature_pixels"] += np.count_nonzero(
-                                        label_mask
-                                    )
-                            except Exception as e:
-                                pbar.write(f"Error reading class raster window: {e}")
-                                stats["errors"] += 1
-                elif in_class_data is not None:
-                    # For vector class data
-                    # Find features that intersect with window
-                    window_features = gdf[gdf.intersects(window_bounds)]
-
-                    if len(window_features) > 0:
-                        for idx, feature in window_features.iterrows():
-                            # Get class value
-                            if class_value_field in feature:
-                                class_val = feature[class_value_field]
-                                class_id = class_to_id.get(class_val, 1)
-                            else:
-                                class_id = 1
-
-                            # Get geometry in window coordinates
-                            geom = feature.geometry.intersection(window_bounds)
-                            if not geom.is_empty:
-                                try:
-                                    # Rasterize feature
-                                    feature_mask = features.rasterize(
-                                        [(geom, class_id)],
-                                        out_shape=(tile_size, tile_size),
-                                        transform=window_transform,
-                                        fill=0,
-                                        all_touched=all_touched,
-                                    )
-
-                                    # Add to label mask
-                                    label_mask = np.maximum(label_mask, feature_mask)
-
-                                    # Check if the feature was actually rasterized
-                                    if np.any(feature_mask):
-                                        has_features = True
-                                        if create_overview and tile_index < len(
-                                            stats["tile_coordinates"]
-                                        ):
-                                            stats["tile_coordinates"][tile_index][
-                                                "has_features"
-                                            ] = True
-                                except Exception as e:
-                                    pbar.write(f"Error rasterizing feature {idx}: {e}")
-                                    stats["errors"] += 1
+                elif in_class_data is not None and gdf is not None:
+                    label_mask, has_features, window_features, errs = (
+                        _rasterize_label_from_vector(
+                            gdf,
+                            window_bounds,
+                            window_transform,
+                            tile_size,
+                            class_value_field,
+                            class_to_id,
+                            all_touched=all_touched,
+                        )
+                    )
+                    stats["errors"] += errs
+                    if (
+                        has_features
+                        and create_overview
+                        and tile_index < len(stats["tile_coordinates"])
+                    ):
+                        stats["tile_coordinates"][tile_index]["has_features"] = True
 
                 # Skip tile if no features and skip_empty_tiles is True (only when class data provided)
                 if in_class_data is not None and skip_empty_tiles and not has_features:
@@ -1208,183 +1732,52 @@ def export_geotiff_tiles(
                 if (
                     in_class_data is not None
                     and not is_class_data_raster
-                    and "gdf" in locals()
+                    and gdf is not None
+                    and window_features is not None
                     and len(window_features) > 0
                 ):
                     if metadata_format == "PASCAL_VOC":
-                        # Create XML annotation
-                        root = ET.Element("annotation")
-                        ET.SubElement(root, "folder").text = "images"
-                        ET.SubElement(root, "filename").text = (
-                            f"tile_{tile_index:06d}.tif"
+                        _create_pascal_voc_annotation(
+                            window_features,
+                            tile_index,
+                            tile_size,
+                            image_data,
+                            src.crs,
+                            window_transform,
+                            window_bounds,
+                            class_value_field,
+                            ann_dir,
+                            minx,
+                            miny,
+                            maxx,
+                            maxy,
                         )
-
-                        size = ET.SubElement(root, "size")
-                        ET.SubElement(size, "width").text = str(tile_size)
-                        ET.SubElement(size, "height").text = str(tile_size)
-                        ET.SubElement(size, "depth").text = str(image_data.shape[0])
-
-                        # Add georeference information
-                        geo = ET.SubElement(root, "georeference")
-                        ET.SubElement(geo, "crs").text = str(src.crs)
-                        ET.SubElement(geo, "transform").text = str(
-                            window_transform
-                        ).replace("\n", "")
-                        ET.SubElement(geo, "bounds").text = (
-                            f"{minx}, {miny}, {maxx}, {maxy}"
-                        )
-
-                        # Add objects
-                        for idx, feature in window_features.iterrows():
-                            # Get feature class
-                            if class_value_field in feature:
-                                class_val = feature[class_value_field]
-                            else:
-                                class_val = "object"
-
-                            # Get geometry bounds in pixel coordinates
-                            geom = feature.geometry.intersection(window_bounds)
-                            if not geom.is_empty:
-                                # Get bounds in world coordinates
-                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
-
-                                # Convert to pixel coordinates
-                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
-                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
-
-                                # Ensure coordinates are within tile bounds
-                                xmin = max(0, min(tile_size, int(col_min)))
-                                ymin = max(0, min(tile_size, int(row_min)))
-                                xmax = max(0, min(tile_size, int(col_max)))
-                                ymax = max(0, min(tile_size, int(row_max)))
-
-                                # Only add if the box has non-zero area
-                                if xmax > xmin and ymax > ymin:
-                                    obj = ET.SubElement(root, "object")
-                                    ET.SubElement(obj, "name").text = str(class_val)
-                                    ET.SubElement(obj, "difficult").text = "0"
-
-                                    bbox = ET.SubElement(obj, "bndbox")
-                                    ET.SubElement(bbox, "xmin").text = str(xmin)
-                                    ET.SubElement(bbox, "ymin").text = str(ymin)
-                                    ET.SubElement(bbox, "xmax").text = str(xmax)
-                                    ET.SubElement(bbox, "ymax").text = str(ymax)
-
-                        # Save XML
-                        tree = ET.ElementTree(root)
-                        xml_path = os.path.join(ann_dir, f"tile_{tile_index:06d}.xml")
-                        tree.write(xml_path)
 
                     elif metadata_format == "COCO":
-                        # Add image info
-                        image_id = tile_index
-                        coco_annotations["images"].append(
-                            {
-                                "id": image_id,
-                                "file_name": f"tile_{tile_index:06d}.tif",
-                                "width": tile_size,
-                                "height": tile_size,
-                                "crs": str(src.crs),
-                                "transform": str(window_transform),
-                            }
+                        ann_id = _create_coco_annotation(
+                            window_features,
+                            tile_index,
+                            tile_size,
+                            src.crs,
+                            window_transform,
+                            window_bounds,
+                            class_value_field,
+                            class_to_id,
+                            coco_annotations,
+                            ann_id,
                         )
 
-                        # Add annotations for each feature
-                        for _, feature in window_features.iterrows():
-                            # Get feature class
-                            if class_value_field in feature:
-                                class_val = feature[class_value_field]
-                                category_id = class_to_id.get(class_val, 1)
-                            else:
-                                category_id = 1
-
-                            # Get geometry bounds
-                            geom = feature.geometry.intersection(window_bounds)
-                            if not geom.is_empty:
-                                # Get bounds in world coordinates
-                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
-
-                                # Convert to pixel coordinates
-                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
-                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
-
-                                # Ensure coordinates are within tile bounds
-                                xmin = max(0, min(tile_size, int(col_min)))
-                                ymin = max(0, min(tile_size, int(row_min)))
-                                xmax = max(0, min(tile_size, int(col_max)))
-                                ymax = max(0, min(tile_size, int(row_max)))
-
-                                # Skip if box is too small
-                                if xmax - xmin < 1 or ymax - ymin < 1:
-                                    continue
-
-                                width = xmax - xmin
-                                height = ymax - ymin
-
-                                # Add annotation
-                                ann_id += 1
-                                coco_annotations["annotations"].append(
-                                    {
-                                        "id": ann_id,
-                                        "image_id": image_id,
-                                        "category_id": category_id,
-                                        "bbox": [xmin, ymin, width, height],
-                                        "area": width * height,
-                                        "iscrowd": 0,
-                                    }
-                                )
-
                     elif metadata_format == "YOLO":
-                        # Create YOLO format annotations
-                        yolo_annotations = []
-
-                        for _, feature in window_features.iterrows():
-                            # Get feature class
-                            if class_value_field in feature:
-                                class_val = feature[class_value_field]
-                                # YOLO uses 0-indexed class IDs
-                                class_id = class_to_id.get(class_val, 1) - 1
-                            else:
-                                class_id = 0
-
-                            # Get geometry bounds
-                            geom = feature.geometry.intersection(window_bounds)
-                            if not geom.is_empty:
-                                # Get bounds in world coordinates
-                                minx_f, miny_f, maxx_f, maxy_f = geom.bounds
-
-                                # Convert to pixel coordinates
-                                col_min, row_min = ~window_transform * (minx_f, maxy_f)
-                                col_max, row_max = ~window_transform * (maxx_f, miny_f)
-
-                                # Ensure coordinates are within tile bounds
-                                xmin = max(0, min(tile_size, col_min))
-                                ymin = max(0, min(tile_size, row_min))
-                                xmax = max(0, min(tile_size, col_max))
-                                ymax = max(0, min(tile_size, row_max))
-
-                                # Skip if box is too small
-                                if xmax - xmin < 1 or ymax - ymin < 1:
-                                    continue
-
-                                # Calculate normalized coordinates (YOLO format)
-                                x_center = ((xmin + xmax) / 2) / tile_size
-                                y_center = ((ymin + ymax) / 2) / tile_size
-                                width = (xmax - xmin) / tile_size
-                                height = (ymax - ymin) / tile_size
-
-                                # Add YOLO annotation line
-                                yolo_annotations.append(
-                                    f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}"
-                                )
-
-                        # Save YOLO annotations to text file
-                        if yolo_annotations:
-                            yolo_path = os.path.join(
-                                label_dir, f"tile_{tile_index:06d}.txt"
-                            )
-                            with open(yolo_path, "w") as f:
-                                f.write("\n".join(yolo_annotations))
+                        _create_yolo_annotation(
+                            window_features,
+                            tile_index,
+                            tile_size,
+                            window_transform,
+                            window_bounds,
+                            class_value_field,
+                            class_to_id,
+                            label_dir,
+                        )
 
                 # Update progress bar
                 pbar.update(1)
@@ -1408,14 +1801,14 @@ def export_geotiff_tiles(
                 with open(os.path.join(ann_dir, "instances.json"), "w") as f:
                     json.dump(coco_annotations, f, indent=2)
                 if not quiet:
-                    print(
+                    logger.info(
                         f"Saved COCO annotations: {len(coco_annotations['images'])} images, "
                         f"{len(coco_annotations['annotations'])} annotations, "
                         f"{len(coco_annotations['categories'])} categories"
                     )
             except Exception as e:
                 if not quiet:
-                    print(f"ERROR saving COCO annotations: {e}")
+                    logger.error(f"ERROR saving COCO annotations: {e}")
                 stats["errors"] += 1
 
         # Save YOLO classes file if applicable (only if class data provided)
@@ -1429,10 +1822,12 @@ def export_geotiff_tiles(
                     for class_val, _ in sorted_classes:
                         f.write(f"{class_val}\n")
                 if not quiet:
-                    print(f"Saved YOLO classes file with {len(class_to_id)} classes")
+                    logger.info(
+                        f"Saved YOLO classes file with {len(class_to_id)} classes"
+                    )
             except Exception as e:
                 if not quiet:
-                    print(f"ERROR saving YOLO classes file: {e}")
+                    logger.error(f"ERROR saving YOLO classes file: {e}")
                 stats["errors"] += 1
 
         # Create overview image if requested
@@ -1449,59 +1844,19 @@ def export_geotiff_tiles(
                     in_class_data=in_class_data,
                 )
             except Exception as e:
-                print(f"Failed to create overview image: {e}")
+                logger.warning(f"Failed to create overview image: {e}")
 
         # Report results
         if not quiet:
-            print("\n------- Export Summary -------")
-            print(f"Total tiles exported: {stats['total_tiles']}")
-            if in_class_data is not None:
-                print(
-                    f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
-                )
-                if stats["tiles_with_features"] > 0:
-                    print(
-                        f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
-                    )
-            if stats["errors"] > 0:
-                print(f"Errors encountered: {stats['errors']}")
-            print(f"Output saved to: {out_folder}")
-
-            # Verify georeference in a sample image and label
-            if stats["total_tiles"] > 0:
-                print("\n------- Georeference Verification -------")
-                sample_image = os.path.join(image_dir, f"tile_0.tif")
-
-                if os.path.exists(sample_image):
-                    try:
-                        with rasterio.open(sample_image) as img:
-                            print(f"Image CRS: {img.crs}")
-                            print(f"Image transform: {img.transform}")
-                            print(
-                                f"Image has georeference: {img.crs is not None and img.transform is not None}"
-                            )
-                            print(
-                                f"Image dimensions: {img.width}x{img.height}, {img.count} bands, {img.dtypes[0]} type"
-                            )
-                    except Exception as e:
-                        print(f"Error verifying image georeference: {e}")
-
-                # Only verify label if class data was provided
-                if in_class_data is not None:
-                    sample_label = os.path.join(label_dir, f"tile_0.tif")
-                    if os.path.exists(sample_label):
-                        try:
-                            with rasterio.open(sample_label) as lbl:
-                                print(f"Label CRS: {lbl.crs}")
-                                print(f"Label transform: {lbl.transform}")
-                                print(
-                                    f"Label has georeference: {lbl.crs is not None and lbl.transform is not None}"
-                                )
-                                print(
-                                    f"Label dimensions: {lbl.width}x{lbl.height}, {lbl.count} bands, {lbl.dtypes[0]} type"
-                                )
-                        except Exception as e:
-                            print(f"Error verifying label georeference: {e}")
+            _log_export_summary(
+                stats,
+                out_folder,
+                max_tiles,
+                image_dir,
+                label_dir=label_dir if in_class_data is not None else None,
+                in_class_data=in_class_data,
+                start_index=0,
+            )
 
         # Return statistics dictionary for further processing if needed
         return stats
@@ -1610,8 +1965,6 @@ def export_geotiff_tiles_batch(
         ... )
     """
 
-    import logging
-
     logging.getLogger("rasterio").setLevel(logging.ERROR)
 
     # Validate input parameters
@@ -1716,8 +2069,8 @@ def export_geotiff_tiles_batch(
         single_mask_gdf = gpd.read_file(masks_file)
 
         if not quiet:
-            print(f"Using single mask file: {masks_file}")
-            print(
+            logger.info(f"Using single mask file: {masks_file}")
+            logger.info(
                 f"Mask contains {len(single_mask_gdf)} features in CRS: {single_mask_gdf.crs}"
             )
 
@@ -1756,7 +2109,7 @@ def export_geotiff_tiles_batch(
                     image_mask_pairs.append((img_path, mask_dict[img_base], None))
                 else:
                     if not quiet:
-                        print(f"Warning: No mask found for image {img_base}")
+                        logger.warning(f"No mask found for image {img_base}")
 
             if not image_mask_pairs:
                 # Provide detailed error message with found files
@@ -1801,17 +2154,19 @@ def export_geotiff_tiles_batch(
 
     if not quiet:
         if not has_masks:
-            print(
+            logger.info(
                 f"Found {len(image_files)} image files to process (images only, no masks)"
             )
         elif use_single_mask_file:
-            print(f"Found {len(image_files)} image files to process")
-            print(f"Using single mask file: {masks_file}")
+            logger.info(f"Found {len(image_files)} image files to process")
+            logger.info(f"Using single mask file: {masks_file}")
         else:
-            print(f"Found {len(image_mask_pairs)} matching image-mask pairs to process")
-            print(f"Processing batch from {images_folder} and {masks_folder}")
-        print(f"Output folder: {output_folder}")
-        print("-" * 60)
+            logger.info(
+                f"Found {len(image_mask_pairs)} matching image-mask pairs to process"
+            )
+            logger.info(f"Processing batch from {images_folder} and {masks_folder}")
+        logger.info(f"Output folder: {output_folder}")
+        logger.info("-" * 60)
 
     # Global tile counter for unique naming
     global_tile_counter = 0
@@ -1831,17 +2186,17 @@ def export_geotiff_tiles_batch(
 
         try:
             if not quiet:
-                print(f"\nProcessing: {base_name}")
-                print(f"  Image: {os.path.basename(image_file)}")
+                logger.info(f"Processing: {base_name}")
+                logger.info(f"  Image: {os.path.basename(image_file)}")
                 if mask_file is not None:
                     if use_single_mask_file:
-                        print(
+                        logger.info(
                             f"  Mask: {os.path.basename(mask_file)} (spatially filtered)"
                         )
                     else:
-                        print(f"  Mask: {os.path.basename(mask_file)}")
+                        logger.info(f"  Mask: {os.path.basename(mask_file)}")
                 else:
-                    print(f"  Mask: None (images only)")
+                    logger.info(f"  Mask: None (images only)")
 
             # Process the image-mask pair
             tiles_generated = _process_image_mask_pair(
@@ -1908,7 +2263,7 @@ def export_geotiff_tiles_batch(
 
         except Exception as e:
             if not quiet:
-                print(f"ERROR processing {base_name}: {e}")
+                logger.error(f"ERROR processing {base_name}: {e}")
             batch_stats["failed_files"].append(
                 {"image": image_file, "mask": mask_file, "error": str(e)}
             )
@@ -1922,8 +2277,8 @@ def export_geotiff_tiles_batch(
         with open(coco_path, "w") as f:
             json.dump(coco_annotations, f, indent=2)
         if not quiet:
-            print(f"\nSaved COCO annotations: {coco_path}")
-            print(
+            logger.info(f"Saved COCO annotations: {coco_path}")
+            logger.info(
                 f"  Images: {len(coco_annotations['images'])}, "
                 f"Annotations: {len(coco_annotations['annotations'])}, "
                 f"Categories: {len(coco_annotations['categories'])}"
@@ -1938,43 +2293,45 @@ def export_geotiff_tiles_batch(
             for cls in sorted_classes:
                 f.write(f"{cls}\n")
         if not quiet:
-            print(f"\nSaved YOLO classes: {classes_path}")
-            print(f"  Total classes: {len(sorted_classes)}")
+            logger.info(f"Saved YOLO classes: {classes_path}")
+            logger.info(f"  Total classes: {len(sorted_classes)}")
 
-    # Print batch summary
+    # Log batch summary
     if not quiet:
-        print("\n" + "=" * 60)
-        print("BATCH PROCESSING SUMMARY")
-        print("=" * 60)
-        print(f"Total image pairs found: {batch_stats['total_image_pairs']}")
-        print(f"Successfully processed: {batch_stats['processed_pairs']}")
-        print(f"Failed to process: {len(batch_stats['failed_files'])}")
-        print(f"Total tiles generated: {batch_stats['total_tiles']}")
-        print(f"Tiles with features: {batch_stats['tiles_with_features']}")
+        logger.info("=" * 60)
+        logger.info("BATCH PROCESSING SUMMARY")
+        logger.info("=" * 60)
+        logger.info(f"Total image pairs found: {batch_stats['total_image_pairs']}")
+        logger.info(f"Successfully processed: {batch_stats['processed_pairs']}")
+        logger.info(f"Failed to process: {len(batch_stats['failed_files'])}")
+        logger.info(f"Total tiles generated: {batch_stats['total_tiles']}")
+        logger.info(f"Tiles with features: {batch_stats['tiles_with_features']}")
 
         if batch_stats["total_tiles"] > 0:
             feature_percentage = (
                 batch_stats["tiles_with_features"] / batch_stats["total_tiles"]
             ) * 100
-            print(f"Feature percentage: {feature_percentage:.1f}%")
+            logger.info(f"Feature percentage: {feature_percentage:.1f}%")
 
         if batch_stats["errors"] > 0:
-            print(f"Total errors: {batch_stats['errors']}")
+            logger.info(f"Total errors: {batch_stats['errors']}")
 
-        print(f"Output saved to: {output_folder}")
-        print(f"  Images: {output_images_dir}")
+        logger.info(f"Output saved to: {output_folder}")
+        logger.info(f"  Images: {output_images_dir}")
         if output_masks_dir is not None:
-            print(f"  Masks: {output_masks_dir}")
+            logger.info(f"  Masks: {output_masks_dir}")
             if metadata_format in ["PASCAL_VOC", "COCO"] and ann_dir is not None:
-                print(f"  Annotations: {ann_dir}")
+                logger.info(f"  Annotations: {ann_dir}")
             elif metadata_format == "YOLO":
-                print(f"  Labels: {os.path.join(output_folder, 'labels')}")
+                logger.info(f"  Labels: {os.path.join(output_folder, 'labels')}")
 
         # List failed files if any
         if batch_stats["failed_files"]:
-            print(f"\nFailed files:")
+            logger.warning(f"Failed files:")
             for failed in batch_stats["failed_files"]:
-                print(f"  - {os.path.basename(failed['image'])}: {failed['error']}")
+                logger.warning(
+                    f"  - {os.path.basename(failed['image'])}: {failed['error']}"
+                )
 
     return batch_stats
 
@@ -2012,16 +2369,7 @@ def _process_image_mask_pair(
     import warnings
 
     # Determine if mask data is raster or vector (only if mask_file is provided)
-    is_class_data_raster = False
-    if mask_file is not None and isinstance(mask_file, str):
-        file_ext = Path(mask_file).suffix.lower()
-        # Common raster extensions
-        if file_ext in [".tif", ".tiff", ".img", ".jp2", ".png", ".bmp", ".gif"]:
-            try:
-                with rasterio.open(mask_file) as src:
-                    is_class_data_raster = True
-            except Exception:
-                is_class_data_raster = False
+    is_class_data_raster = _detect_class_data_type(mask_file, quiet=True)
 
     # Track statistics
     stats = {
@@ -2051,32 +2399,11 @@ def _process_image_mask_pair(
         class_to_id = {}
 
         if mask_file is not None and is_class_data_raster:
-            # Load raster class data
-            with rasterio.open(mask_file) as class_src:
-                # Check if raster CRS matches
-                if class_src.crs != src.crs:
-                    warnings.warn(
-                        f"CRS mismatch: Class raster ({class_src.crs}) doesn't match input raster ({src.crs}). "
-                        f"Results may be misaligned."
-                    )
-
-                # Get unique values from raster
-                sample_data = class_src.read(
-                    1,
-                    out_shape=(
-                        1,
-                        min(class_src.height, 1000),
-                        min(class_src.width, 1000),
-                    ),
-                )
-
-                unique_classes = np.unique(sample_data)
-                unique_classes = unique_classes[
-                    unique_classes > 0
-                ]  # Remove 0 as it's typically background
-
-                # Create class mapping
-                class_to_id = {int(cls): i + 1 for i, cls in enumerate(unique_classes)}
+            class_to_id, _ = _load_class_data_raster(
+                mask_file,
+                src.crs,
+                quiet=True,
+            )
         elif mask_file is not None:
             # Load vector class data
             try:
@@ -2100,7 +2427,7 @@ def _process_image_mask_pair(
                     ].copy()
 
                     if not quiet and len(gdf) > 0:
-                        print(
+                        logger.info(
                             f"  Filtered to {len(gdf)} features intersecting image bounds"
                         )
                 else:
@@ -2129,105 +2456,47 @@ def _process_image_mask_pair(
         tile_index = 0
         for y in range(num_tiles_y):
             for x in range(num_tiles_x):
-                # Calculate window coordinates
-                window_x = x * stride
-                window_y = y * stride
-
-                # Adjust for edge cases
-                if window_x + tile_size > src.width:
-                    window_x = src.width - tile_size
-                if window_y + tile_size > src.height:
-                    window_y = src.height - tile_size
-
-                # Define window
-                window = Window(window_x, window_y, tile_size, tile_size)
-
-                # Get window transform and bounds
-                window_transform = src.window_transform(window)
-
-                # Calculate window bounds
-                minx = window_transform[2]  # Upper left x
-                maxy = window_transform[5]  # Upper left y
-                maxx = minx + tile_size * window_transform[0]  # Add width
-                miny = maxy + tile_size * window_transform[4]  # Add height
-
-                window_bounds = box(minx, miny, maxx, maxy)
+                # Compute tile window and bounds
+                window, window_transform, window_bounds, minx, miny, maxx, maxy = (
+                    _compute_tile_window(
+                        x, y, stride, stride, tile_size, tile_size, src
+                    )
+                )
 
                 # Create label mask (only if mask_file is provided)
                 label_mask = np.zeros((tile_size, tile_size), dtype=np.uint8)
                 has_features = False
 
-                # Process classification data to create labels (only if mask_file is provided)
+                # Process classification data to create labels
                 if mask_file is not None and is_class_data_raster:
-                    # For raster class data
-                    with rasterio.open(mask_file) as class_src:
-                        # Get corresponding window in class raster
-                        window_class = rasterio.windows.from_bounds(
-                            minx, miny, maxx, maxy, class_src.transform
+                    try:
+                        label_mask, has_features = _rasterize_label_from_raster(
+                            mask_file,
+                            minx,
+                            miny,
+                            maxx,
+                            maxy,
+                            tile_size,
+                            class_to_id,
                         )
+                    except Exception as e:
+                        if not quiet:
+                            logger.error(f"Error reading class raster window: {e}")
+                        stats["errors"] += 1
 
-                        # Read label data
-                        try:
-                            label_data = class_src.read(
-                                1,
-                                window=window_class,
-                                boundless=True,
-                                out_shape=(tile_size, tile_size),
-                            )
-
-                            # Remap class values if needed
-                            if class_to_id:
-                                remapped_data = np.zeros_like(label_data)
-                                for orig_val, new_val in class_to_id.items():
-                                    remapped_data[label_data == orig_val] = new_val
-                                label_mask = remapped_data
-                            else:
-                                label_mask = label_data
-
-                            # Check if we have any features
-                            if np.any(label_mask > 0):
-                                has_features = True
-                        except Exception as e:
-                            if not quiet:
-                                print(f"Error reading class raster window: {e}")
-                            stats["errors"] += 1
                 elif mask_file is not None:
-                    # For vector class data
-                    # Find features that intersect with window
-                    window_features = gdf[gdf.intersects(window_bounds)]
-
-                    if len(window_features) > 0:
-                        for idx, feature in window_features.iterrows():
-                            # Get class value
-                            if class_value_field in feature:
-                                class_val = feature[class_value_field]
-                                class_id = class_to_id.get(class_val, 1)
-                            else:
-                                class_id = 1
-
-                            # Get geometry in window coordinates
-                            geom = feature.geometry.intersection(window_bounds)
-                            if not geom.is_empty:
-                                try:
-                                    # Rasterize feature
-                                    feature_mask = features.rasterize(
-                                        [(geom, class_id)],
-                                        out_shape=(tile_size, tile_size),
-                                        transform=window_transform,
-                                        fill=0,
-                                        all_touched=all_touched,
-                                    )
-
-                                    # Add to label mask
-                                    label_mask = np.maximum(label_mask, feature_mask)
-
-                                    # Check if the feature was actually rasterized
-                                    if np.any(feature_mask):
-                                        has_features = True
-                                except Exception as e:
-                                    if not quiet:
-                                        print(f"Error rasterizing feature {idx}: {e}")
-                                    stats["errors"] += 1
+                    label_mask, has_features, window_features, errs = (
+                        _rasterize_label_from_vector(
+                            gdf,
+                            window_bounds,
+                            window_transform,
+                            tile_size,
+                            class_value_field,
+                            class_to_id,
+                            all_touched=all_touched,
+                        )
+                    )
+                    stats["errors"] += errs
 
                 # Skip tile if no features and skip_empty_tiles is True (only applies when masks are provided)
                 if mask_file is not None and skip_empty_tiles and not has_features:
@@ -2264,7 +2533,7 @@ def _process_image_mask_pair(
                     stats["total_tiles"] += 1
                 except Exception as e:
                     if not quiet:
-                        print(f"ERROR saving image GeoTIFF: {e}")
+                        logger.error(f"ERROR saving image GeoTIFF: {e}")
                     stats["errors"] += 1
 
                 # Export label as GeoTIFF (only if mask_file and output_masks_dir are provided)
@@ -2289,7 +2558,7 @@ def _process_image_mask_pair(
                             stats["tiles_with_features"] += 1
                     except Exception as e:
                         if not quiet:
-                            print(f"ERROR saving label GeoTIFF: {e}")
+                            logger.error(f"ERROR saving label GeoTIFF: {e}")
                         stats["errors"] += 1
 
                 # Generate annotation metadata based on format (only if mask_file is provided)
@@ -2582,10 +2851,10 @@ def export_training_data(
     # Open raster
     with rasterio.open(in_raster) as src:
         if not quiet:
-            print(f"\nRaster info for {in_raster}:")
-            print(f"  CRS: {src.crs}")
-            print(f"  Dimensions: {src.width} x {src.height}")
-            print(f"  Bounds: {src.bounds}")
+            logger.info(f"Raster info for {in_raster}:")
+            logger.info(f"  CRS: {src.crs}")
+            logger.info(f"  Dimensions: {src.width} x {src.height}")
+            logger.info(f"  Bounds: {src.bounds}")
 
         # Set defaults for stride if not provided
         if stride_x is None:
@@ -2601,15 +2870,15 @@ def export_training_data(
         # Read class data
         gdf = gpd.read_file(in_class_data)
         if not quiet:
-            print(f"Loaded {len(gdf)} features from {in_class_data}")
-            print(f"Available columns: {gdf.columns.tolist()}")
-            print(f"GeoJSON CRS: {gdf.crs}")
+            logger.info(f"Loaded {len(gdf)} features from {in_class_data}")
+            logger.info(f"Available columns: {gdf.columns.tolist()}")
+            logger.info(f"GeoJSON CRS: {gdf.crs}")
 
         # Check if class_value_field exists
         if class_value_field not in gdf.columns:
             if not quiet:
-                print(
-                    f"WARNING: '{class_value_field}' field not found in the input data. Using default class value 1."
+                logger.warning(
+                    f"'{class_value_field}' field not found in the input data. Using default class value 1."
                 )
             # Add a default class column
             gdf[class_value_field] = 1
@@ -2618,16 +2887,18 @@ def export_training_data(
             # Print unique classes for debugging
             unique_classes = gdf[class_value_field].unique()
             if not quiet:
-                print(f"Found {len(unique_classes)} unique classes: {unique_classes}")
+                logger.info(
+                    f"Found {len(unique_classes)} unique classes: {unique_classes}"
+                )
 
         # CRITICAL: Always reproject to match raster CRS to ensure proper alignment
         if gdf.crs != src.crs:
             if not quiet:
-                print(f"Reprojecting features from {gdf.crs} to {src.crs}")
+                logger.info(f"Reprojecting features from {gdf.crs} to {src.crs}")
             gdf = gdf.to_crs(src.crs)
         elif reference_system and gdf.crs != reference_system:
             if not quiet:
-                print(
+                logger.info(
                     f"Reprojecting features to specified reference system {reference_system}"
                 )
             gdf = gdf.to_crs(reference_system)
@@ -2637,17 +2908,17 @@ def export_training_data(
         vector_bounds = box(*gdf.total_bounds)
         if not raster_bounds.intersects(vector_bounds):
             if not quiet:
-                print(
-                    "WARNING: The vector data doesn't intersect with the raster extent!"
+                logger.warning(
+                    "The vector data doesn't intersect with the raster extent!"
                 )
-                print(f"Raster bounds: {src.bounds}")
-                print(f"Vector bounds: {gdf.total_bounds}")
+                logger.warning(f"Raster bounds: {src.bounds}")
+                logger.warning(f"Vector bounds: {gdf.total_bounds}")
         else:
             overlap = (
                 raster_bounds.intersection(vector_bounds).area / vector_bounds.area
             )
             if not quiet:
-                print(f"Overlap between raster and vector: {overlap:.2%}")
+                logger.info(f"Overlap between raster and vector: {overlap:.2%}")
 
         # Apply buffer if specified
         if buffer_radius > 0:
@@ -3181,61 +3452,24 @@ def export_training_data(
                     json.dump(coco_annotations, f)
             except Exception as e:
                 if not quiet:
-                    print(f"ERROR saving COCO annotations: {e}")
+                    logger.error(f"ERROR saving COCO annotations: {e}")
                 stats["errors"] += 1
 
         # Close secondary raster if opened
         if src2:
             src2.close()
 
-    # Print summary
+    # Log summary
     if not quiet:
-        print("\n------- Export Summary -------")
-        print(f"Total tiles exported: {stats['total_tiles']}")
-        print(
-            f"Tiles with features: {stats['tiles_with_features']} ({stats['tiles_with_features']/max(1, stats['total_tiles'])*100:.1f}%)"
+        _log_export_summary(
+            stats,
+            out_folder,
+            total_tiles,
+            image_dir,
+            label_dir=label_dir,
+            in_class_data=in_class_data,
+            start_index=start_index,
         )
-        if stats["tiles_with_features"] > 0:
-            print(
-                f"Average feature pixels per tile: {stats['feature_pixels']/stats['tiles_with_features']:.1f}"
-            )
-        if stats["errors"] > 0:
-            print(f"Errors encountered: {stats['errors']}")
-        print(f"Output saved to: {out_folder}")
-
-        # Verify georeference in a sample image and label
-        if stats["total_tiles"] > 0:
-            print("\n------- Georeference Verification -------")
-            sample_image = os.path.join(image_dir, f"tile_{start_index}.tif")
-            sample_label = os.path.join(label_dir, f"tile_{start_index}.tif")
-
-            if os.path.exists(sample_image):
-                try:
-                    with rasterio.open(sample_image) as img:
-                        print(f"Image CRS: {img.crs}")
-                        print(f"Image transform: {img.transform}")
-                        print(
-                            f"Image has georeference: {img.crs is not None and img.transform is not None}"
-                        )
-                        print(
-                            f"Image dimensions: {img.width}x{img.height}, {img.count} bands, {img.dtypes[0]} type"
-                        )
-                except Exception as e:
-                    print(f"Error verifying image georeference: {e}")
-
-            if os.path.exists(sample_label):
-                try:
-                    with rasterio.open(sample_label) as lbl:
-                        print(f"Label CRS: {lbl.crs}")
-                        print(f"Label transform: {lbl.transform}")
-                        print(
-                            f"Label has georeference: {lbl.crs is not None and lbl.transform is not None}"
-                        )
-                        print(
-                            f"Label dimensions: {lbl.width}x{lbl.height}, {lbl.count} bands, {lbl.dtypes[0]} type"
-                        )
-                except Exception as e:
-                    print(f"Error verifying label georeference: {e}")
 
     # Return statistics
     return stats, out_folder

@@ -1,7 +1,10 @@
 """Device and environment utilities."""
 
+import logging
 import os
 from typing import List, Union
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "get_device",
@@ -40,7 +43,7 @@ def install_package(package: Union[str, List[str]]) -> None:
             if output == b"" and process.poll() is not None:
                 break
             if output:
-                print(output.decode("utf-8").strip())
+                logger.info(output.decode("utf-8").strip())
 
         # Wait for process to complete
         process.wait()
@@ -67,7 +70,7 @@ def temp_file_path(ext: str) -> str:
     return file_path
 
 
-def get_device():
+def get_device() -> "torch.device":
     """
     Returns the best available device for deep learning in the order:
     CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU

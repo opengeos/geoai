@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 import boto3
 import ipywidgets as widgets
@@ -915,14 +918,14 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
         search_payload = self._extract_search_items_payload(result)
         if search_payload is not None:
             if "error" in search_payload:
-                print(f"Search error: {search_payload['error']}")
+                logger.error("Search error: %s", search_payload["error"])
                 return None
 
             items = search_payload.get("items") or []
             if items:
                 return items[0]
 
-            print("No items found in search results")
+            logger.warning("No items found in search results")
             return None
 
         # Fallback: try to parse the final text response
@@ -932,17 +935,17 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             item_data = json.loads(response)
 
             if "error" in item_data:
-                print(f"Search error: {item_data['error']}")
+                logger.error("Search error: %s", item_data["error"])
                 return None
 
             if not all(k in item_data for k in ["id", "collection"]):
-                print("Response missing required fields (id, collection)")
+                logger.warning("Response missing required fields (id, collection)")
                 return None
 
             return item_data
 
         except json.JSONDecodeError:
-            print("Could not extract item data from agent response")
+            logger.warning("Could not extract item data from agent response")
             return None
 
     def _visualize_stac_item(self, item: Dict[str, Any]) -> None:
@@ -1008,7 +1011,7 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             )
             return assets  # Return the assets that were visualized
         except Exception as e:
-            print(f"Could not visualize item on map: {e}")
+            logger.error("Could not visualize item on map: %s", e)
             return None
 
     def show_ui(self, *, height: int = 700) -> None:
@@ -1526,7 +1529,7 @@ Your response: "Found dataset: USGS/NED - USGS Elevation Data"  ← WRONG! This 
         result = json.loads(result_json)
 
         if "error" in result:
-            print(f"Search error: {result['error']}")
+            logger.error("Search error: %s", result["error"])
             return []
 
         return result.get("datasets", [])

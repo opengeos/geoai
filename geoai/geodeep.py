@@ -17,8 +17,11 @@ Install with::
 """
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     import geopandas as gpd
@@ -372,7 +375,7 @@ class GeoDeep:
 
         try:
             geojson_str = _geodeep.run(image_path, self.model_id, **kwargs)
-        except Exception as exc:
+        except (RuntimeError, ValueError, OSError) as exc:
             raise RuntimeError(
                 f"GeoDeep detection failed on '{image_path}': {exc}"
             ) from exc
@@ -382,7 +385,7 @@ class GeoDeep:
         if output_path is not None:
             self._save_vector(gdf, output_path)
             if verbose:
-                print(f"Detections saved to: {output_path}")
+                logger.info("Detections saved to: %s", output_path)
 
         return gdf
 
@@ -447,7 +450,7 @@ class GeoDeep:
                     output_type="raw",
                     **run_kwargs,
                 )
-            except Exception as exc:
+            except (RuntimeError, ValueError, OSError) as exc:
                 raise RuntimeError(
                     f"GeoDeep segmentation failed on '{image_path}': {exc}"
                 ) from exc
@@ -459,7 +462,7 @@ class GeoDeep:
                 _save_mask_to_raster(image_path, mask, output_raster_path)
                 result["raster_path"] = output_raster_path
                 if verbose:
-                    print(f"Mask saved to: {output_raster_path}")
+                    logger.info("Mask saved to: %s", output_raster_path)
 
         # Vectorize segmentation
         if need_vector:
@@ -471,14 +474,14 @@ class GeoDeep:
                     **run_kwargs,
                 )
                 gdf = self._geojson_to_geodataframe(geojson_str)
-            except Exception as exc:
+            except (RuntimeError, ValueError, OSError) as exc:
                 raise RuntimeError(f"GeoDeep vectorization failed: {exc}") from exc
 
             self._save_vector(gdf, output_vector_path)
             result["gdf"] = gdf
             result["vector_path"] = output_vector_path
             if verbose:
-                print(f"Vectors saved to: {output_vector_path}")
+                logger.info("Vectors saved to: %s", output_vector_path)
 
             # If mask wasn't computed above, still get it for completeness
             if "mask" not in result:
@@ -490,7 +493,7 @@ class GeoDeep:
                         **run_kwargs,
                     )
                     result["mask"] = mask
-                except Exception:
+                except (RuntimeError, ValueError, OSError):
                     pass  # Vector output was the priority
 
         return result
@@ -533,7 +536,7 @@ class GeoDeep:
 
         for idx, path in enumerate(image_paths, 1):
             if verbose:
-                print(f"Processing [{idx}/{total}]: {path}")
+                logger.info("Processing [%d/%d]: %s", idx, total, path)
             try:
                 out_path = None
                 if output_dir is not None:
@@ -549,9 +552,9 @@ class GeoDeep:
                 )
                 gdf["source_file"] = path
                 all_gdfs.append(gdf)
-            except Exception as exc:
+            except (RuntimeError, ValueError, OSError) as exc:
                 if verbose:
-                    print(f"  Warning: Failed on '{path}': {exc}")
+                    logger.warning("Failed on '%s': %s", path, exc)
                 continue
 
         if all_gdfs:
@@ -568,7 +571,7 @@ class GeoDeep:
             )
 
         if verbose:
-            print(f"Total detections: {len(combined)}")
+            logger.info("Total detections: %d", len(combined))
 
         return combined
 
@@ -609,7 +612,7 @@ class GeoDeep:
 
         for idx, path in enumerate(image_paths, 1):
             if verbose:
-                print(f"Processing [{idx}/{total}]: {path}")
+                logger.info("Processing [%d/%d]: %s", idx, total, path)
             try:
                 base = os.path.splitext(os.path.basename(path))[0]
                 raster_out = None
@@ -629,13 +632,13 @@ class GeoDeep:
                 )
                 result["source_file"] = path
                 results.append(result)
-            except Exception as exc:
+            except (RuntimeError, ValueError, OSError) as exc:
                 if verbose:
-                    print(f"  Warning: Failed on '{path}': {exc}")
+                    logger.warning("Failed on '%s': %s", path, exc)
                 continue
 
         if verbose:
-            print(f"Processed {len(results)}/{total} images")
+            logger.info("Processed %d/%d images", len(results), total)
 
         return results
 

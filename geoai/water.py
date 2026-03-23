@@ -10,9 +10,12 @@ Reference:
     https://github.com/DPIRD-DMA/OmniWaterMask
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 BAND_ORDER_PRESETS: Dict[str, List[int]] = {
     "naip": [1, 2, 3, 4],
@@ -95,7 +98,7 @@ def _vectorize_mask(
     min_area = min_size * pixel_area
 
     if verbose:
-        print("Converting water mask to vector polygons...")
+        logger.info("Converting water mask to vector polygons...")
 
     gdf = raster_to_vector(
         raster_path=raster_path,
@@ -105,7 +108,7 @@ def _vectorize_mask(
 
     if smooth and len(gdf) > 0:
         if verbose:
-            print(f"Smoothing polygons ({smooth_iterations} iterations)...")
+            logger.info("Smoothing polygons (%d iterations)...", smooth_iterations)
         gdf = smooth_vector(
             gdf,
             smooth_iterations=smooth_iterations,
@@ -126,8 +129,8 @@ def _vectorize_mask(
         gdf.to_file(output_vector)
 
     if verbose:
-        print(f"Water body polygons saved to: {output_vector}")
-        print(f"Total water bodies detected: {len(gdf)}")
+        logger.info("Water body polygons saved to: %s", output_vector)
+        logger.info("Total water bodies detected: %d", len(gdf))
 
     return gdf
 
@@ -390,7 +393,7 @@ def segment_water(
 
     # Run OmniWaterMask inference
     if verbose:
-        print("Running OmniWaterMask water segmentation...")
+        logger.info("Running OmniWaterMask water segmentation...")
 
     result_paths = make_water_mask(**owm_kwargs)
 
@@ -419,7 +422,7 @@ def segment_water(
                 pass
 
         if verbose:
-            print(f"Water mask saved to: {dst_raster}")
+            logger.info("Water mask saved to: %s", dst_raster)
 
         output_rasters.append(dst_raster)
 

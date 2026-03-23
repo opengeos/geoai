@@ -4,9 +4,12 @@ See https://github.com/facebookresearch/detectron2 for more details.
 
 from __future__ import annotations
 
+import logging
 import os
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import rasterio
@@ -177,7 +180,7 @@ def detectron2_segment(
             transform = src.transform
             crs = src.crs
             height, width = src.height, src.width
-    except Exception:
+    except (OSError, ValueError):
         # If not a GeoTIFF, create a simple transform
         height, width = image.shape[:2]
         transform = from_bounds(0, 0, width, height, width, height)
@@ -429,10 +432,10 @@ def batch_detectron2_segment(
             result["image_path"] = image_path
             results.append(result)
 
-            print(f"Processed {i+1}/{len(image_paths)}: {image_path}")
+            logger.info("Processed %d/%d: %s", i + 1, len(image_paths), image_path)
 
-        except Exception as e:
-            print(f"Error processing {image_path}: {str(e)}")
+        except (RuntimeError, OSError, ValueError) as e:
+            logger.error("Error processing %s: %s", image_path, str(e))
             results.append({"image_path": image_path, "error": str(e)})
 
     return results

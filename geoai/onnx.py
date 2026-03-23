@@ -32,10 +32,13 @@ Example:
 """
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
+
+logger = logging.getLogger(__name__)
 import numpy as np
 import rasterio
 from PIL import Image
@@ -218,7 +221,7 @@ def export_to_onnx(
                 input_width = size.get("width", input_width)
             elif isinstance(size, (list, tuple)) and len(size) == 2:
                 input_height, input_width = size
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass  # processor introspection is optional; fall back to defaults
 
     # ------------------------------------------------------------------
@@ -276,7 +279,7 @@ def export_to_onnx(
                 onnx.save(onnx_model_simplified, output_path)
         except ImportError:
             pass  # onnxsim is optional
-        except Exception:
+        except (RuntimeError, ValueError):
             pass  # simplification can fail for some models; keep original
 
     # ------------------------------------------------------------------
@@ -303,8 +306,8 @@ def export_to_onnx(
     with open(meta_path, "w") as fh:
         json.dump(meta, fh, indent=2)
 
-    print(f"ONNX model exported to {output_path}")
-    print(f"Metadata saved to {meta_path}")
+    logger.info("ONNX model exported to %s", output_path)
+    logger.info("Metadata saved to %s", meta_path)
     return os.path.abspath(output_path)
 
 
@@ -412,10 +415,10 @@ class ONNXGeoModel:
                     self._model_width = w
 
         active = self.session.get_providers()
-        print(f"ONNX model loaded from {model_path}")
-        print(f"Execution providers: {active}")
+        logger.info("ONNX model loaded from %s", model_path)
+        logger.info("Execution providers: %s", active)
         if self.task:
-            print(f"Task: {self.task}")
+            logger.info("Task: %s", self.task)
 
     # ------------------------------------------------------------------
     # Image I/O helpers (mirrors AutoGeoImageProcessor)
@@ -748,7 +751,7 @@ class ONNXGeoModel:
         mask_output = np.zeros((height, width), dtype=np.float32)
         count_output = np.zeros((height, width), dtype=np.float32)
 
-        print(f"Processing {total} tiles ({n_x}x{n_y})")
+        logger.info("Processing %d tiles (%dx%d)", total, n_x, n_y)
 
         with tqdm(total=total, desc="Processing tiles") as pbar:
             for iy in range(n_y):
@@ -785,8 +788,8 @@ class ONNXGeoModel:
 
                             mask_output[y_start:y_end, x_start:x_end] += tile_mask
                             count_output[y_start:y_end, x_start:x_end] += 1
-                    except Exception as e:
-                        print(f"Error processing tile ({ix}, {iy}): {e}")
+                    except (RuntimeError, ValueError, IndexError) as e:
+                        logger.error("Error processing tile (%d, %d): %s", ix, iy, e)
 
                     pbar.update(1)
 
@@ -918,7 +921,7 @@ class ONNXGeoModel:
             polygons are found.
         """
         if metadata is None or metadata.get("crs") is None:
-            print("Warning: No CRS information available for vectorization")
+            logger.warning("No CRS information available for vectorization")
             return None
 
         if mask.dtype in (np.float32, np.float64):
@@ -929,7 +932,7 @@ class ONNXGeoModel:
         transform = metadata.get("transform")
         crs = metadata.get("crs")
         if transform is None:
-            print("Warning: No transform available for vectorization")
+            logger.warning("No transform available for vectorization")
             return None
 
         polygons: List = []
@@ -952,8 +955,8 @@ class ONNXGeoModel:
                     if poly.is_valid and not poly.is_empty:
                         polygons.append(poly)
                         values.append(value)
-        except Exception as e:
-            print(f"Error during vectorization: {e}")
+        except (ValueError, TypeError, RuntimeError) as e:
+            logger.error("Error during vectorization: %s", e)
             return None
 
         if not polygons:

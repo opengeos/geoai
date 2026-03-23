@@ -132,7 +132,7 @@ class GroundedSAM:
         # Load models
         self._load_models()
 
-        print(f"GroundedSAM initialized on {self.device}")
+        logger.info("GroundedSAM initialized on %s", self.device)
 
     def _load_models(self) -> None:
         """Load the Grounding DINO and SAM models."""
@@ -380,8 +380,8 @@ class GroundedSAM:
                         polygon = Polygon(geo_coords)
                         if polygon.is_valid and polygon.area > 0:
                             polygons.append({"geometry": polygon, "area_pixels": area})
-                    except Exception as e:
-                        print(f"Error creating polygon: {e}")
+                    except (ValueError, TypeError) as e:
+                        logger.error("Error creating polygon: %s", e)
                         continue
 
         return polygons
@@ -437,7 +437,7 @@ class GroundedSAM:
         nms_threshold: float = 0.5,
         min_polygon_area: int = 50,
         simplify_tolerance: float = 2.0,
-    ) -> str:
+    ) -> Dict[str, str]:
         """
         Segment a GeoTIFF image using text prompts with improved instance segmentation.
 
@@ -487,7 +487,9 @@ class GroundedSAM:
             n_tiles_y = max(1, int(np.ceil(height / effective_tile_size)))
             total_tiles = n_tiles_x * n_tiles_y
 
-            print(f"Processing {total_tiles} tiles ({n_tiles_x}x{n_tiles_y})")
+            logger.info(
+                "Processing %s tiles (%sx%s)", total_tiles, n_tiles_x, n_tiles_y
+            )
 
             # Process tiles with tqdm progress bar
             with tqdm(total=total_tiles, desc="Processing tiles") as pbar:
@@ -521,8 +523,9 @@ class GroundedSAM:
                                     tile_data[0][:, :, np.newaxis], 3, axis=2
                                 )
                             else:
-                                print(
-                                    f"Unsupported number of bands: {tile_data.shape[0]}"
+                                logger.warning(
+                                    "Unsupported number of bands: %s",
+                                    tile_data.shape[0],
                                 )
                                 continue
 
@@ -684,8 +687,10 @@ class GroundedSAM:
                                             mask_slice,
                                         )
 
-                        except Exception as e:
-                            print(f"Error processing tile at ({x}, {y}): {str(e)}")
+                        except (RuntimeError, ValueError, TypeError, IndexError) as e:
+                            logger.error(
+                                "Error processing tile at (%s, %s): %s", x, y, str(e)
+                            )
                             continue
 
                         # Update progress bar
@@ -716,7 +721,9 @@ class GroundedSAM:
                 gdf = gpd.GeoDataFrame(all_boxes, crs=crs)
                 gdf.to_file(boxes_path, driver="GeoJSON")
                 result_files["boxes"] = boxes_path
-                print(f"Exported {len(all_boxes)} bounding boxes to {boxes_path}")
+                logger.info(
+                    "Exported %s bounding boxes to %s", len(all_boxes), boxes_path
+                )
 
             # Export instance polygons if requested
             if export_polygons and all_polygons:
@@ -724,16 +731,15 @@ class GroundedSAM:
                 gdf = gpd.GeoDataFrame(all_polygons, crs=crs)
                 gdf.to_file(polygons_path, driver="GeoJSON")
                 result_files["polygons"] = polygons_path
-                print(
-                    f"Exported {len(all_polygons)} instance polygons to {polygons_path}"
+                logger.info(
+                    "Exported %s instance polygons to %s",
+                    len(all_polygons),
+                    polygons_path,
                 )
 
-            print(f"Segmentation saved to {output_path}")
-            print(
-                f"Found {len(all_polygons)} individual building instances"
-                if export_polygons
-                else ""
-            )
+            logger.info("Segmentation saved to %s", output_path)
+            if export_polygons:
+                logger.info("Found %s individual building instances", len(all_polygons))
 
             return result_files
 
@@ -989,7 +995,7 @@ class CLIPSegmentation:
                                 valid_y_start:valid_y_end, valid_x_start:valid_x_end
                             ]
 
-                        except Exception as e:
+                        except (RuntimeError, ValueError, TypeError, IndexError) as e:
                             logger.warning(
                                 "Error processing tile at (%d, %d): %s", x, y, str(e)
                             )

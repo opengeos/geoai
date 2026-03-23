@@ -1,7 +1,10 @@
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import albumentations as A
+
+logger = logging.getLogger(__name__)
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -225,7 +228,7 @@ def train_model(
 
     trainer.train()
     model.save_pretrained(model_save_path)
-    print(f"Model saved to {model_save_path}")
+    logger.info("Model saved to %s", model_save_path)
     return model_save_path
 
 

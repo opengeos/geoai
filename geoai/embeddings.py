@@ -270,7 +270,7 @@ def list_embedding_datasets(
         )
     df = pd.DataFrame(rows)
     if verbose:
-        print(df.to_string(index=False))
+        logger.info("\n%s", df.to_string(index=False))
     return df
 
 
@@ -986,7 +986,7 @@ def train_embedding_classifier(
         result["classification_report"] = report
 
         if verbose:
-            print(report)
+            logger.info("\n%s", report)
 
     return result
 

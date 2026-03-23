@@ -6,6 +6,7 @@ import logging
 import os
 import subprocess
 from typing import Any, Dict, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -20,10 +21,6 @@ from pystac_client import Client
 from shapely.geometry import box
 from tqdm import tqdm
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 
@@ -87,10 +84,10 @@ def download_naip(
         items = items[:max_items]
 
     if not items:
-        print("No NAIP imagery found for the specified region and parameters.")
+        logger.warning("No NAIP imagery found for the specified region and parameters.")
         return []
 
-    print(f"Found {len(items)} NAIP items.")
+    logger.info("Found %d NAIP items.", len(items))
 
     # Download and save each item
     downloaded_files = []
@@ -101,7 +98,7 @@ def download_naip(
         # Get the RGB asset URL
         rgb_asset = signed_item.assets.get("image")
         if not rgb_asset:
-            print(f"No RGB asset found for item {i+1}")
+            logger.warning("No RGB asset found for item %d", i + 1)
             continue
 
         # Use the original filename from the asset
@@ -110,11 +107,11 @@ def download_naip(
         )  # Remove query parameters
         output_path = os.path.join(output_dir, original_filename)
         if not overwrite and os.path.exists(output_path):
-            print(f"Skipping existing file: {output_path}")
+            logger.info("Skipping existing file: %s", output_path)
             downloaded_files.append(output_path)
             continue
 
-        print(f"Downloading item {i+1}/{len(items)}: {original_filename}")
+        logger.info("Downloading item %d/%d: %s", i + 1, len(items), original_filename)
 
         try:
             # Open and save the data with progress bar
@@ -128,7 +125,7 @@ def download_naip(
                 data.rio.to_raster(output_path)
 
             downloaded_files.append(output_path)
-            print(f"Successfully saved to {output_path}")
+            logger.info("Successfully saved to %s", output_path)
 
             # Optional: Display a preview (uncomment if needed)
             if preview:
@@ -136,20 +133,55 @@ def download_naip(
                 preview_raster(data)
 
         except Exception as e:
-            print(f"Error downloading item {i+1}: {str(e)}")
+            logger.error("Error downloading item %d: %s", i + 1, str(e))
 
     return downloaded_files
 
 
-def download_with_progress(url: str, output_path: str) -> None:
+def _validate_url(url: str) -> None:
+    """Validate that a URL uses an allowed scheme and has a valid structure.
+
+    Args:
+        url: The URL to validate.
+
+    Raises:
+        ValueError: If the URL scheme is not http or https, or if the URL
+            is missing a network location (host).
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"URL scheme must be 'http' or 'https', got {parsed.scheme!r}")
+    if not parsed.netloc:
+        raise ValueError(f"URL is missing a host: {url!r}")
+
+
+def download_with_progress(
+    url: str, output_path: str, max_size: Optional[int] = None
+) -> None:
     """Download a file with a progress bar.
 
     Args:
         url: URL of the file to download.
         output_path: Path where the file will be saved.
+        max_size: Maximum allowed file size in bytes. If the server-reported
+            Content-Length exceeds this value, the download is aborted.
+            Defaults to None (no limit).
+
+    Raises:
+        ValueError: If the URL is invalid or the file exceeds *max_size*.
     """
+    _validate_url(url)
     response = requests.get(url, stream=True)
+    response.raise_for_status()
     total_size = int(response.headers.get("content-length", 0))
+
+    if max_size is not None and total_size > max_size:
+        response.close()
+        raise ValueError(
+            f"File size ({total_size} bytes) exceeds the maximum "
+            f"allowed size ({max_size} bytes)."
+        )
+
     block_size = 1024  # 1 Kibibyte
 
     with (
@@ -244,13 +276,13 @@ def get_overture_latest_release(patch=True) -> str:
         return latest_release
 
     except requests.RequestException as e:
-        print(f"Error making the request: {e}")
+        logger.error("Error making the request: %s", e)
         raise
     except json.JSONDecodeError as e:
-        print(f"Error parsing JSON response: {e}")
+        logger.error("Error parsing JSON response: %s", e)
         raise
     except KeyError as e:
-        print(f"Key error: {e}")
+        logger.error("Key error: %s", e)
         raise
 
 
@@ -589,13 +621,14 @@ def download_pc_stac_item(
         # Check if merged file exists and skip if overwrite is False
         if os.path.exists(merged_path) and not overwrite:
             if show_progress:
-                print(
-                    f"Merged file {merged_path} already exists, skipping (use overwrite=True to force creation)."
+                logger.info(
+                    "Merged file %s already exists, skipping (use overwrite=True to force creation).",
+                    merged_path,
                 )
             result["merged"] = merged_path
         else:
             if show_progress:
-                print("Resampling and merging bands...")
+                logger.info("Resampling and merging bands...")
 
             # Determine target cell size if not provided
             if cell_size is None and band_data_arrays:
@@ -605,17 +638,17 @@ def download_pc_stac_item(
                 # Extract resolution from transform
                 cell_size = abs(first_band_data.rio.transform()[0])
                 if show_progress:
-                    print(f"Using detected resolution: {cell_size}m")
+                    logger.info("Using detected resolution: %sm", cell_size)
             elif cell_size is None:
                 # Default to 10m if no bands are available
                 cell_size = 10
                 if show_progress:
-                    print(f"Using default resolution: {cell_size}m")
+                    logger.info("Using default resolution: %sm", cell_size)
 
             # Process bands in memory-efficient way
             for i, (band_name, data_array) in enumerate(band_data_arrays):
                 if show_progress:
-                    print(f"Processing band: {band_name}")
+                    logger.info("Processing band: %s", band_name)
 
                 # Get current resolution
                 current_res = abs(data_array.rio.transform()[0])
@@ -625,8 +658,11 @@ def download_pc_stac_item(
                     abs(current_res - cell_size) > 0.01
                 ):  # Small tolerance for floating point comparison
                     if show_progress:
-                        print(
-                            f"Resampling {band_name} from {current_res}m to {cell_size}m"
+                        logger.info(
+                            "Resampling %s from %sm to %sm",
+                            band_name,
+                            current_res,
+                            cell_size,
                         )
 
                     # Use bilinear for downsampling (higher to lower resolution)
@@ -647,14 +683,14 @@ def download_pc_stac_item(
                     resampled_arrays.append(data_array)
 
             if show_progress:
-                print("Stacking bands...")
+                logger.info("Stacking bands...")
 
             # Concatenate all resampled arrays along the band dimension
             try:
                 merged_data = xr.concat(resampled_arrays, dim="band")
 
                 if show_progress:
-                    print(f"Writing merged data to {merged_path}...")
+                    logger.info("Writing merged data to %s...", merged_path)
 
                 # Add description metadata
                 merged_data.attrs["description"] = (
@@ -676,12 +712,12 @@ def download_pc_stac_item(
                 result["merged"] = merged_path
 
                 if show_progress:
-                    print(f"Merged bands saved to: {merged_path}")
-                    print(f"Band order in merged file: {', '.join(band_names)}")
+                    logger.info("Merged bands saved to: %s", merged_path)
+                    logger.info("Band order in merged file: %s", ", ".join(band_names))
             except Exception as e:
                 if show_progress:
-                    print(f"Error during merging: {str(e)}")
-                    print(f"Error details: {type(e).__name__}: {str(e)}")
+                    logger.error("Error during merging: %s", str(e))
+                    logger.error("Error details: %s: %s", type(e).__name__, str(e))
                 raise
 
     return result
@@ -804,7 +840,7 @@ def pc_collection_list(
     if sort_by in df.columns:
         df = df.sort_values(by=sort_by)
 
-    print(f"Retrieved {len(df)} collections from Planetary Computer")
+    logger.info("Retrieved %d collections from Planetary Computer", len(df))
 
     # # Print a nicely formatted table
     # if not df.empty:
@@ -901,7 +937,7 @@ def pc_stac_search(
         raise Exception(f"Error retrieving search results: {str(e)}")
 
     if not quiet:
-        print(f"Found {len(items)} items matching search criteria")
+        logger.info("Found %d items matching search criteria", len(items))
 
     return items
 
@@ -982,7 +1018,7 @@ def pc_stac_download(
 
         # Skip if file exists and skip_existing is True
         if skip_existing and os.path.exists(output_path):
-            print(f"Skipping existing asset: {asset_key} -> {output_path}")
+            logger.info("Skipping existing asset: %s -> %s", asset_key, output_path)
             return asset_key, output_path
 
         try:
@@ -1005,7 +1041,9 @@ def pc_stac_download(
 
             return asset_key, output_path
         except Exception as e:
-            print(f"Error downloading {asset_key} for item {item_id}: {str(e)}")
+            logger.error(
+                "Error downloading %s for item %s: %s", asset_key, item_id, str(e)
+            )
             if os.path.exists(output_path):
                 os.remove(output_path)  # Clean up partial download
             return asset_key, None
@@ -1018,16 +1056,18 @@ def pc_stac_download(
         if isinstance(item, str):
             item = pystac.Item.from_file(item)
         item_id = item.id
-        print(f"Processing STAC item: {item_id}")
+        logger.info("Processing STAC item: %s", item_id)
 
         # Determine which assets to download
         if assets:
             assets_to_download = {k: v for k, v in item.assets.items() if k in assets}
             if not assets_to_download:
-                print(
-                    f"Warning: None of the specified asset keys {assets} found in item {item_id}"
+                logger.warning(
+                    "None of the specified asset keys %s found in item %s",
+                    assets,
+                    item_id,
                 )
-                print(f"Available asset keys: {list(item.assets.keys())}")
+                logger.warning("Available asset keys: %s", list(item.assets.keys()))
                 continue
         else:
             assets_to_download = item.assets
@@ -1051,15 +1091,18 @@ def pc_stac_download(
                     if path:
                         item_assets[key] = path
                 except Exception as e:
-                    print(
-                        f"Error processing asset {asset_key} for item {item_id}: {str(e)}"
+                    logger.error(
+                        "Error processing asset %s for item %s: %s",
+                        asset_key,
+                        item_id,
+                        str(e),
                     )
 
         results[item_id] = item_assets
 
     # Count total downloaded assets
     total_assets = sum(len(assets) for assets in results.values())
-    print(f"\nDownloaded {total_assets} assets for {len(results)} items")
+    logger.info("Downloaded %d assets for %d items", total_assets, len(results))
 
     return results
 
@@ -1122,9 +1165,9 @@ def read_pc_item_asset(
         kwargs["driver"] = "COG"  # Ensure the output is a Cloud Optimized GeoTIFF
 
     if output:
-        print(f"Saving asset '{asset}' to {output}...")
+        logger.info("Saving asset '%s' to %s...", asset, output)
         ds.rio.to_raster(output, **kwargs)
-        print(f"Asset '{asset}' saved successfully.")
+        logger.info("Asset '%s' saved successfully.", asset)
     return ds
 
 

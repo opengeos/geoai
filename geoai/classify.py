@@ -1,9 +1,12 @@
 """The module for training semantic segmentation models for classifying remote sensing imagery."""
 
+import logging
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+
+_logger = logging.getLogger(__name__)
 
 
 def train_classifier(
@@ -45,7 +48,7 @@ def train_classifier(
     checkpoint_path: Optional[str] = None,
     every_n_epochs: int = 1,
     **kwargs: Any,
-) -> Any:
+) -> "SemanticSegmentationTask":
     """Train a semantic segmentation model on geospatial imagery.
 
     This function sets up datasets, model, trainer, and executes the training process
@@ -322,20 +325,20 @@ def train_classifier(
         checkpoint_file = os.path.join(test_dir, "last.ckpt")
 
     if os.path.isfile(checkpoint_file):
-        print("Resuming training from previous checkpoint...")
+        _logger.info("Resuming training from previous checkpoint...")
         trainer.fit(model=task, datamodule=datamodule, ckpt_path=checkpoint_file)
     else:
-        print("Starting training from scratch...")
+        _logger.info("Starting training from scratch...")
         trainer.fit(
             model=task,
             datamodule=datamodule,
         )
 
     training_time = timeit.default_timer() - start
-    print(f"The time taken to train was: {training_time:.2f} seconds")
+    _logger.info("The time taken to train was: %.2f seconds", training_time)
 
     best_model_path = checkpoint_callback.best_model_path
-    print(f"Best model saved at: {best_model_path}")
+    _logger.info("Best model saved at: %s", best_model_path)
 
     # Test the model
     trainer.test(model=task, datamodule=datamodule)
@@ -404,13 +407,13 @@ def _classify_image(
         os.makedirs(output_dir)
 
     # Load the model
-    print(f"Loading model from {model_path}...")
+    _logger.info("Loading model from %s...", model_path)
     task = SemanticSegmentationTask.load_from_checkpoint(model_path)
     task.model.eval()
     task.model.cuda()
 
     # Set up dataset and sampler
-    print(f"Loading image from {image_path}...")
+    _logger.info("Loading image from %s...", image_path)
     dataset = RasterDataset(paths=image_path)
 
     # Get the bounds and resolution of the dataset
@@ -431,7 +434,7 @@ def _classify_image(
         **kwargs,
     )
 
-    print(f"Processing image in {len(dataloader)} batches...")
+    _logger.info("Processing image in %s batches...", len(dataloader))
 
     # Helper function to create in-memory geotiffs for chips
     def create_in_memory_geochip(predicted_chip, geotransform, crs):
@@ -541,11 +544,11 @@ def _classify_image(
     progress_bar.close()
 
     prediction_time = timeit.default_timer() - start_time
-    print(f"Prediction complete in {prediction_time:.2f} seconds")
-    print(f"Produced {len(georref_chips_list)} georeferenced chips")
+    _logger.info("Prediction complete in %.2f seconds", prediction_time)
+    _logger.info("Produced %s georeferenced chips", len(georref_chips_list))
 
     # Merge all georeferenced chips into a single output
-    print("Merging predictions...")
+    _logger.info("Merging predictions...")
     merge_start = timeit.default_timer()
 
     # Merge the chips using Rasterio's merge function
@@ -567,7 +570,7 @@ def _classify_image(
         #     dst.write_colormap(1, colormap)
 
     # Clip to original bounds
-    print("Clipping to original image bounds...")
+    _logger.info("Clipping to original image bounds...")
     clip_to_original_bounds(output_path, original_bounds, colormap)
 
     # Close all chip datasets
@@ -577,9 +580,9 @@ def _classify_image(
     merge_time = timeit.default_timer() - merge_start
     total_time = timeit.default_timer() - start_time
 
-    print(f"Merge and save complete in {merge_time:.2f} seconds")
-    print(f"Total processing time: {total_time:.2f} seconds")
-    print(f"Successfully saved classified image to {output_path}")
+    _logger.info("Merge and save complete in %.2f seconds", merge_time)
+    _logger.info("Total processing time: %.2f seconds", total_time)
+    _logger.info("Successfully saved classified image to %s", output_path)
 
     return output_path
 
@@ -648,7 +651,7 @@ def classify_image(
         os.makedirs(output_dir)
 
     # Load the model
-    print(f"Loading model from {model_path}...")
+    _logger.info("Loading model from %s...", model_path)
     task = SemanticSegmentationTask.load_from_checkpoint(model_path)
     task.model.eval()
     task.model.cuda()
@@ -699,8 +702,11 @@ def classify_image(
                 tile_positions.append((y, x, y_end, x_end))
 
         # Print information about the tiling
-        print(
-            f"Processing {len(tile_positions)} patches covering an image of size {height}x{width}..."
+        _logger.info(
+            "Processing %s patches covering an image of size %sx%s...",
+            len(tile_positions),
+            height,
+            width,
         )
         start_time = timeit.default_timer()
 
@@ -812,7 +818,7 @@ def classify_image(
         profile.update({"count": 1, "dtype": "uint8", "nodata": 0})
 
         # Save the result
-        print(f"Saving classified image to {output_path}...")
+        _logger.info("Saving classified image to %s...", output_path)
         with rasterio.open(output_path, "w", **profile) as dst:
             dst.write(output_image[np.newaxis, :, :])
             if isinstance(colormap, dict):
@@ -820,8 +826,8 @@ def classify_image(
 
         # Calculate timing
         total_time = timeit.default_timer() - start_time
-        print(f"Total processing time: {total_time:.2f} seconds")
-        print(f"Successfully saved classified image to {output_path}")
+        _logger.info("Total processing time: %.2f seconds", total_time)
+        _logger.info("Successfully saved classified image to %s", output_path)
 
     return output_path
 
@@ -877,10 +883,16 @@ def classify_images(
 
         # Check if any images were found
         if not image_path_list:
-            print(f"No files with extension '{file_extension}' found in {image_paths}")
+            _logger.warning(
+                "No files with extension '%s' found in %s",
+                file_extension,
+                image_paths,
+            )
             return []
 
-        print(f"Found {len(image_path_list)} images in directory {image_paths}")
+        _logger.info(
+            "Found %s images in directory %s", len(image_path_list), image_paths
+        )
 
     # Process list input
     elif isinstance(image_paths, list):
@@ -924,10 +936,11 @@ def classify_images(
                 **kwargs,
             )
             classified_image_paths.append(classified_image_path)
-        except Exception as e:
-            print(f"Error processing {image_path}: {str(e)}")
+        except (RuntimeError, OSError, ValueError) as e:
+            _logger.error("Error processing %s: %s", image_path, str(e))
 
-    print(
-        f"Classification complete. Processed {len(classified_image_paths)} images successfully."
+    _logger.info(
+        "Classification complete. Processed %s images successfully.",
+        len(classified_image_paths),
     )
     return classified_image_paths

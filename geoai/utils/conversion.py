@@ -1,7 +1,10 @@
 """Data conversion and coordinate transformation utilities."""
 
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import geopandas as gpd
 import leafmap
@@ -178,7 +181,7 @@ def coords_to_xy(
     coord_crs: str = "epsg:4326",
     return_out_of_bounds: bool = False,
     **kwargs: Any,
-) -> np.ndarray:
+) -> Union[np.ndarray, Tuple[np.ndarray, List[int]]]:
     """Converts a list or array of coordinates to pixel coordinates, i.e., (col, row) coordinates.
 
     Args:
@@ -234,9 +237,9 @@ def coords_to_xy(
 
     # Handle cases where no valid pixel coordinates are found
     if len(output) == 0:
-        print("No valid pixel coordinates found.")
+        logger.warning("No valid pixel coordinates found.")
     elif len(output) < len(coords):
-        print("Some coordinates are out of the image boundary.")
+        logger.warning("Some coordinates are out of the image boundary.")
 
     if return_out_of_bounds:
         return output, out_of_bounds
@@ -254,7 +257,7 @@ def rowcol_to_xy(
     output: Optional[str] = None,
     dst_crs: str = "EPSG:4326",
     **kwargs: Any,
-) -> Tuple[List[float], List[float]]:
+) -> Optional[List[List[float]]]:
     """Converts a list of (row, col) coordinates to (x, y) coordinates.
 
     Args:
@@ -304,7 +307,7 @@ def rowcol_to_xy(
 
 def bbox_to_xy(
     src_fp: str, coords: List[float], coord_crs: str = "epsg:4326", **kwargs: Any
-) -> List[float]:
+) -> Optional[Union[List[float], List[List[float]]]]:
     """Converts a list of coordinates to pixel coordinates, i.e., (col, row) coordinates.
         Note that map bbox coords is [minx, miny, maxx, maxy] from bottomleft to topright
         While rasterio bbox coords is [minx, max, maxx, min] from topleft to bottomright
@@ -392,11 +395,11 @@ def bbox_to_xy(
             result.append([minx, maxy, maxx, miny])
 
     if len(result) == 0:
-        print("No valid pixel coordinates found.")
+        logger.warning("No valid pixel coordinates found.")
         return None
     elif len(result) == 1:
         return result[0]
     elif len(result) < len(coords):
-        print("Some coordinates are out of the image boundary.")
+        logger.warning("Some coordinates are out of the image boundary.")
 
     return result

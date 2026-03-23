@@ -1,5 +1,6 @@
 """Module for training and fine-tuning models using timm (PyTorch Image Models) with remote sensing imagery."""
 
+import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -24,6 +25,8 @@ try:
     LIGHTNING_AVAILABLE = True
 except ImportError:
     LIGHTNING_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 def get_timm_model(
@@ -529,7 +532,7 @@ def train_timm_classifier(
     )
 
     # Train model
-    print(f"Training {model_name} for {num_epochs} epochs...")
+    logger.info("Training %s for %s epochs...", model_name, num_epochs)
     trainer.fit(
         model,
         train_dataloaders=train_loader,
@@ -546,10 +549,10 @@ def train_timm_classifier(
             num_workers=num_workers,
             pin_memory=True,
         )
-        print("\nTesting model on test set...")
+        logger.info("\nTesting model on test set...")
         trainer.test(model, dataloaders=test_loader)
 
-    print(f"\nBest model saved at: {checkpoint_callback.best_model_path}")
+    logger.info("\nBest model saved at: %s", checkpoint_callback.best_model_path)
 
     return model
 
