@@ -15,7 +15,9 @@ from strands import tool
 class DataTools:
     """Collection of tools for inspecting and processing geospatial data."""
 
-    @tool(description="Get metadata and band statistics for a raster file (GeoTIFF, etc.)")
+    @tool(
+        description="Get metadata and band statistics for a raster file (GeoTIFF, etc.)"
+    )
     def inspect_raster(self, raster_path: str) -> str:
         """Inspect a raster file and return its metadata and per-band statistics.
 
@@ -67,9 +69,7 @@ class DataTools:
                 zip(["minx", "miny", "maxx", "maxy"], gdf.total_bounds.tolist())
             ),
             "columns": {
-                col: str(gdf[col].dtype)
-                for col in gdf.columns
-                if col != "geometry"
+                col: str(gdf[col].dtype) for col in gdf.columns if col != "geometry"
             },
         }
         return json.dumps(info, indent=2, default=str)
@@ -132,9 +132,7 @@ class DataTools:
 
         _r2v(raster_path, output_path)
         gdf = read_vector(output_path)
-        return json.dumps(
-            {"output_path": output_path, "feature_count": len(gdf)}
-        )
+        return json.dumps({"output_path": output_path, "feature_count": len(gdf)})
 
     @tool(description="List files in a directory, optionally filtered by extension")
     def list_files(

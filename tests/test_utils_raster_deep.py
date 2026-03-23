@@ -105,7 +105,9 @@ class TestGetRasterStats(unittest.TestCase):
     def test_divide_by(self):
         stats_raw = get_raster_stats(self.raster_path, divide_by=1.0)
         stats_div = get_raster_stats(self.raster_path, divide_by=2.0)
-        self.assertAlmostEqual(stats_div["mean"][0], stats_raw["mean"][0] / 2.0, places=2)
+        self.assertAlmostEqual(
+            stats_div["mean"][0], stats_raw["mean"][0] / 2.0, places=2
+        )
 
     def test_min_max_range(self):
         stats = get_raster_stats(self.raster_path)
