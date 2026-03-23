@@ -178,8 +178,11 @@ def _fix_proj_for_qgis() -> None:
                 import pyproj.datadir
 
                 pyproj.datadir.set_data_dir(proj_dir)
-                os.environ["PROJ_DATA"] = proj_dir
-                os.environ["PROJ_LIB"] = proj_dir
+                # Do not set PROJ_DATA/PROJ_LIB env vars -- they cause
+                # pyogrio to fail with "Could not correctly detect PROJ
+                # data files".  set_data_dir() is sufficient for pyproj.
+                os.environ.pop("PROJ_DATA", None)
+                os.environ.pop("PROJ_LIB", None)
                 _diag.append(f"  set pyproj data_dir={proj_dir}")
                 # Verify it works
                 pyproj.CRS("epsg:4326")

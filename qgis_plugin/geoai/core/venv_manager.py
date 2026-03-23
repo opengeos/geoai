@@ -1152,13 +1152,13 @@ def _wrap_bare_imports(filepath: str) -> bool:
 
 
 def _fix_proj_data(site_packages: str) -> None:
-    """Set PROJ_DATA/PROJ_LIB and GDAL_DATA for the venv's geospatial libraries.
+    """Configure PROJ and GDAL data paths for the venv's geospatial libraries.
 
-    The venv's pyproj bundles its own PROJ database at
-    ``<site-packages>/pyproj/proj_dir/share/proj/``.  QGIS may or may not
-    set ``PROJ_LIB`` to its own copy, but the venv's native pyproj
-    library needs the matching version. Similarly, rasterio/pyogrio may
-    bundle their own GDAL data.
+    Configures pyproj via its Python API (``pyproj.datadir.set_data_dir()``)
+    instead of setting ``PROJ_DATA``/``PROJ_LIB`` environment variables.
+    This avoids conflicts with pyogrio, which validates that ``PROJ_DATA``
+    points to its own bundled data and raises
+    "Could not correctly detect PROJ data files" otherwise.
 
     Args:
         site_packages: Path to the venv's site-packages directory.
@@ -1170,13 +1170,36 @@ def _fix_proj_data(site_packages: str) -> None:
         os.path.join(site_packages, "pyogrio", "proj_data"),
     ]
 
+    proj_data_dir = None
     for candidate in proj_candidates:
         proj_db = os.path.join(candidate, "proj.db")
         if os.path.exists(proj_db):
-            os.environ["PROJ_DATA"] = candidate
-            os.environ["PROJ_LIB"] = candidate
-            _log(f"Set PROJ_DATA={candidate}", Qgis.Info)
+            proj_data_dir = candidate
             break
+
+    if proj_data_dir:
+        # Configure pyproj via its internal API so pyogrio/rasterio can
+        # auto-detect their own bundled PROJ data (they fail when
+        # PROJ_DATA points to a foreign copy).
+        try:
+            import pyproj.datadir
+
+            pyproj.datadir.set_data_dir(proj_data_dir)
+            _log(f"Set pyproj.datadir={proj_data_dir}", Qgis.Info)
+        except Exception as exc:
+            # Fallback: if pyproj API is unavailable, set env vars
+            os.environ["PROJ_DATA"] = proj_data_dir
+            os.environ["PROJ_LIB"] = proj_data_dir
+            _log(
+                f"Set PROJ_DATA={proj_data_dir} " f"(pyproj API unavailable: {exc})",
+                Qgis.Info,
+            )
+            return
+
+        # Clear PROJ_DATA/PROJ_LIB so pyogrio and rasterio can use their
+        # own bundled PROJ data files via auto-detection.
+        os.environ.pop("PROJ_DATA", None)
+        os.environ.pop("PROJ_LIB", None)
     else:
         _log("No venv proj.db found; PROJ_DATA unchanged", Qgis.Warning)
 
