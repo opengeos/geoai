@@ -7,7 +7,6 @@ import os
 import re
 import unittest
 
-
 # Since geo_agents.py has heavy dependencies (strands, leafmap, boto3, etc.)
 # that may not be available in all test environments, we test the code
 # structure and logic through AST/source analysis and lightweight checks.
@@ -17,9 +16,7 @@ _geo_agents_path = os.path.join(
 _init_path = os.path.join(
     os.path.dirname(__file__), os.pardir, "geoai", "agents", "__init__.py"
 )
-_pyproject_path = os.path.join(
-    os.path.dirname(__file__), os.pardir, "pyproject.toml"
-)
+_pyproject_path = os.path.join(os.path.dirname(__file__), os.pardir, "pyproject.toml")
 
 
 def _read_source(path):
@@ -47,7 +44,10 @@ class TestCreateMinimaxModelExists(unittest.TestCase):
     def test_function_has_model_id_param(self):
         """Test that create_minimax_model has model_id parameter."""
         for node in ast.walk(self.tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "create_minimax_model":
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "create_minimax_model"
+            ):
                 arg_names = [arg.arg for arg in node.args.args]
                 self.assertIn("model_id", arg_names)
                 break
@@ -57,7 +57,10 @@ class TestCreateMinimaxModelExists(unittest.TestCase):
     def test_function_has_api_key_param(self):
         """Test that create_minimax_model has api_key parameter."""
         for node in ast.walk(self.tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "create_minimax_model":
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "create_minimax_model"
+            ):
                 arg_names = [arg.arg for arg in node.args.args]
                 self.assertIn("api_key", arg_names)
                 break
@@ -67,7 +70,10 @@ class TestCreateMinimaxModelExists(unittest.TestCase):
     def test_function_has_client_args_param(self):
         """Test that create_minimax_model has client_args parameter."""
         for node in ast.walk(self.tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "create_minimax_model":
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "create_minimax_model"
+            ):
                 arg_names = [arg.arg for arg in node.args.args]
                 self.assertIn("client_args", arg_names)
                 break
@@ -133,7 +139,9 @@ class TestMinimaxStringRouting(unittest.TestCase):
         pattern = r'model\.lower\(\)\.startswith\("minimax"\).*?create_minimax_model'
         matches = re.findall(pattern, self.source, re.DOTALL)
         # Should appear 3 times: GeoAgent, STACAgent, CatalogAgent
-        self.assertEqual(len(matches), 3, "Expected 3 minimax routing blocks (one per agent class)")
+        self.assertEqual(
+            len(matches), 3, "Expected 3 minimax routing blocks (one per agent class)"
+        )
 
     def test_minimax_string_detection_logic(self):
         """Test that MiniMax string detection correctly identifies MiniMax models."""
@@ -175,9 +183,14 @@ class TestMinimaxDocstring(unittest.TestCase):
     def test_function_has_docstring(self):
         """Test that create_minimax_model has a proper docstring."""
         for node in ast.walk(self.tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "create_minimax_model":
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "create_minimax_model"
+            ):
                 docstring = ast.get_docstring(node)
-                self.assertIsNotNone(docstring, "create_minimax_model should have a docstring")
+                self.assertIsNotNone(
+                    docstring, "create_minimax_model should have a docstring"
+                )
                 self.assertIn("MiniMax", docstring)
                 break
         else:
@@ -186,7 +199,10 @@ class TestMinimaxDocstring(unittest.TestCase):
     def test_docstring_mentions_api(self):
         """Test that docstring mentions the OpenAI-compatible API."""
         for node in ast.walk(self.tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "create_minimax_model":
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "create_minimax_model"
+            ):
                 docstring = ast.get_docstring(node)
                 self.assertIn("OpenAI-compatible", docstring)
                 break
@@ -194,7 +210,10 @@ class TestMinimaxDocstring(unittest.TestCase):
     def test_docstring_mentions_models(self):
         """Test that docstring mentions available MiniMax model IDs."""
         for node in ast.walk(self.tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "create_minimax_model":
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "create_minimax_model"
+            ):
                 docstring = ast.get_docstring(node)
                 self.assertIn("MiniMax-M2.7", docstring)
                 break
@@ -277,9 +296,7 @@ class TestMinimaxInAllAgents(unittest.TestCase):
 class TestMinimaxModelIntegration(unittest.TestCase):
     """Integration tests for MiniMax model (require strands-agents and MINIMAX_API_KEY)."""
 
-    @unittest.skipUnless(
-        os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set"
-    )
+    @unittest.skipUnless(os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set")
     def test_create_minimax_model_live(self):
         """Integration test: create MiniMax model with real API key."""
         try:
@@ -292,9 +309,7 @@ class TestMinimaxModelIntegration(unittest.TestCase):
         except ImportError:
             self.skipTest("strands-agents or geoai dependencies not installed")
 
-    @unittest.skipUnless(
-        os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set"
-    )
+    @unittest.skipUnless(os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set")
     def test_create_minimax_m25_highspeed_live(self):
         """Integration test: create MiniMax M2.5-highspeed model."""
         try:
@@ -305,9 +320,7 @@ class TestMinimaxModelIntegration(unittest.TestCase):
         except ImportError:
             self.skipTest("strands-agents or geoai dependencies not installed")
 
-    @unittest.skipUnless(
-        os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set"
-    )
+    @unittest.skipUnless(os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set")
     def test_minimax_base_url_live(self):
         """Integration test: verify MiniMax model base URL."""
         try:
