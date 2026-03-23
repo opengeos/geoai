@@ -178,8 +178,10 @@ def _fix_proj_for_qgis() -> None:
                 import pyproj.datadir
 
                 pyproj.datadir.set_data_dir(proj_dir)
-                os.environ["PROJ_DATA"] = proj_dir
-                os.environ["PROJ_LIB"] = proj_dir
+                # Do not modify PROJ_DATA/PROJ_LIB env vars here -- they
+                # can affect QGIS and other plugins. set_data_dir() is
+                # sufficient for pyproj. Any temporary env changes needed
+                # for pyogrio writes are handled by safe_to_file().
                 _diag.append(f"  set pyproj data_dir={proj_dir}")
                 # Verify it works
                 pyproj.CRS("epsg:4326")

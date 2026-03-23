@@ -2125,7 +2125,9 @@ class SamGeoDockWidget(QDockWidget):
                                 driver = "ESRI Shapefile"
                             else:
                                 driver = None
-                            gdf.to_file(output_path, driver=driver)
+                            from ..core.proj_utils import safe_to_file
+
+                            safe_to_file(gdf, output_path, driver=driver)
                 finally:
                     if os.path.exists(temp_raster):
                         os.remove(temp_raster)
@@ -2258,7 +2260,9 @@ class SamGeoDockWidget(QDockWidget):
                                 driver = "ESRI Shapefile"
                             else:
                                 driver = None
-                            gdf.to_file(output_path, driver=driver)
+                            from ..core.proj_utils import safe_to_file
+
+                            safe_to_file(gdf, output_path, driver=driver)
                 finally:
                     if os.path.exists(temp_raster):
                         os.remove(temp_raster)

@@ -1562,7 +1562,9 @@ class DeepForestDockWidget(QDockWidget):
         else:  # Shapefile
             driver = "ESRI Shapefile"
 
-        gdf.to_file(output_path, driver=driver)
+        from ..core.proj_utils import safe_to_file
+
+        safe_to_file(gdf, output_path, driver=driver)
 
     def _save_as_raster(self, output_path):
         """Save predictions as raster by rasterizing bounding boxes.
