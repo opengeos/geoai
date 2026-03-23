@@ -16,9 +16,6 @@ _geo_agents_path = os.path.join(
 _init_path = os.path.join(
     os.path.dirname(__file__), os.pardir, "geoai", "agents", "__init__.py"
 )
-_pyproject_path = os.path.join(os.path.dirname(__file__), os.pardir, "pyproject.toml")
-
-
 def _read_source(path):
     """Read a source file and return its contents."""
     with open(path, encoding="utf-8") as f:
