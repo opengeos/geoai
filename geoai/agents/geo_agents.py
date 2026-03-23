@@ -264,18 +264,22 @@ def create_minimax_model(
         OpenAIModel: An OpenAI-compatible model configured for MiniMax.
     """
 
-    if api_key is None:
-        try:
-            api_key = os.getenv("MINIMAX_API_KEY", None)
-            if api_key is None:
-                raise ValueError("MINIMAX_API_KEY is not set")
-        except Exception:
-            raise ValueError("MINIMAX_API_KEY is not set")
-
+    # Normalize client_args first so we can honor an API key passed there.
     if client_args is None:
-        client_args = kwargs.get("client_args", {})
-    if "api_key" not in client_args and api_key is not None:
-        client_args["api_key"] = api_key
+        client_args = kwargs.get("client_args", {}) or {}
+
+    # Determine the effective API key from the function argument, client_args, or env var.
+    effective_api_key = api_key or client_args.get("api_key")
+    if effective_api_key is None:
+        effective_api_key = os.getenv("MINIMAX_API_KEY", None)
+        if effective_api_key is None:
+            raise ValueError(
+                "MiniMax API key must be provided via the api_key argument, "
+                "client_args['api_key'], or the MINIMAX_API_KEY environment variable"
+            )
+
+    if "api_key" not in client_args:
+        client_args["api_key"] = effective_api_key
     if "base_url" not in client_args:
         client_args["base_url"] = "https://api.minimax.io/v1"
 
