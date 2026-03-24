@@ -29,6 +29,12 @@ The package provides six core capabilities:
 
 GeoAI addresses the growing demand for accessible AI tools in geospatial research by providing high-level APIs that abstract complex machine learning workflows while maintaining flexibility for advanced users. The package supports multiple data formats (GeoTIFF, JPEG2000, GeoJSON, Shapefile, GeoPackage) and includes automatic device management for GPU acceleration when available. With over 10 modules and extensive notebook examples, GeoAI serves as both a research tool and educational resource for the geospatial AI community.
 
+## 📚 Book
+
+A comprehensive book on GeoAI is available at [https://book.opengeoai.org](https://book.opengeoai.org).
+
+![](https://books.gishub.org/geoai/front-cover.webp)
+
 ## 📝 Statement of Need
 
 The integration of artificial intelligence with geospatial data analysis has become increasingly critical across numerous scientific disciplines, from environmental monitoring and urban planning to disaster response and climate research. However, applying AI techniques to geospatial data presents unique challenges including data preprocessing complexities, specialized model architectures, and the need for domain-specific knowledge in both machine learning and geographic information systems.
@@ -44,6 +50,7 @@ The package's design philosophy emphasizes simplicity without sacrificing functi
 If you find GeoAI useful in your research, please consider citing the following paper to support my work. Thank you for your support.
 
 -   Wu, Q., (2026). GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization. _Journal of Open Source Software_, 11(118), 9605, <https://doi.org/10.21105/joss.09605>.
+-   Wu, Q. (2026). *GeoAI with Python: A Practical Guide to Open-Source Geospatial AI*. Independently published. PDF edition ISBN 979-8993859729; Print edition ISBN 979-8253507414. Available at [https://book.opengeoai.org](https://book.opengeoai.org).
 
 ## 🚀 Key Features
 

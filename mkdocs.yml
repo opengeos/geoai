@@ -105,6 +105,7 @@ markdown_extensions:
 
 nav:
     - Home: index.md
+    - Book: https://book.opengeoai.org
     - Installation: installation.md
     - QGIS Plugin: qgis_plugin.md
     - Citations: citations.md
