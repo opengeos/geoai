@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import traceback
@@ -49,9 +50,34 @@ class _ProgressStdout:
         self._buf = ""
 
 
+class _ProgressLoggingHandler(logging.Handler):
+    """Route logging output through the progress callback."""
+
+    def __init__(self, callback: Callable[[str], None]):
+        super().__init__()
+        self._callback = callback
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            self._callback(msg)
+        except Exception:
+            self.handleError(record)
+
+
 def _run_with_progress(fn: Callable[[], Any]) -> Any:
     old_stdout = sys.stdout
     sys.stdout = _ProgressStdout(_progress)
+
+    # Capture logging output (logger.info, etc.) that would otherwise be lost
+    log_handler = _ProgressLoggingHandler(_progress)
+    log_handler.setLevel(logging.INFO)
+    root_logger = logging.getLogger()
+    original_level = root_logger.level
+    if root_logger.level > logging.INFO:
+        root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(log_handler)
+
     try:
         return fn()
     finally:
@@ -60,6 +86,8 @@ def _run_with_progress(fn: Callable[[], Any]) -> Any:
         except Exception:
             pass
         sys.stdout = old_stdout
+        root_logger.removeHandler(log_handler)
+        root_logger.setLevel(original_level)
 
 
 def _geoai():
