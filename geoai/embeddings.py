@@ -1107,6 +1107,78 @@ _AEF_INDEX_URL = f"{_AEF_BASE_URL}/aef_index.parquet"
 _AEF_AVAILABLE_YEARS = list(range(2018, 2025))
 
 
+def _merge_tiles(tile_arrays: List[Dict[str, Any]]) -> Tuple[np.ndarray, Tuple[float, float, float, float]]:
+    """Merge multiple tile arrays into a single mosaic.
+
+    Takes a list of tile dictionaries (each with 'data', 'bounds', 'crs' keys)
+    and merges them into a single contiguous array using rasterio's merge.
+
+    For a single tile, returns the data directly without any merging overhead.
+
+    Args:
+        tile_arrays: List of dicts with keys:
+            - 'data': numpy array of shape (bands, height, width)
+            - 'bounds': tuple (west, south, east, north) in CRS units
+            - 'crs': rasterio CRS object
+
+    Returns:
+        Tuple of (mosaic_data, mosaic_bounds) where mosaic_data has shape
+        (bands, height, width) and mosaic_bounds is (west, south, east, north).
+    """
+    import rasterio
+    from rasterio.transform import from_bounds as transform_from_bounds
+
+    if len(tile_arrays) == 1:
+        return tile_arrays[0]["data"], tile_arrays[0]["bounds"]
+
+    from rasterio.io import MemoryFile
+    from rasterio.merge import merge as rasterio_merge
+
+    merge_crs = tile_arrays[0]["crs"]
+    mem_datasets = []
+    mem_files = []
+    try:
+        for ta in tile_arrays:
+            t_data = ta["data"]
+            t_west, t_south, t_east, t_north = ta["bounds"]
+            t_transform = transform_from_bounds(
+                t_west,
+                t_south,
+                t_east,
+                t_north,
+                t_data.shape[2],
+                t_data.shape[1],
+            )
+            memfile = MemoryFile()
+            mem_files.append(memfile)
+            ds = memfile.open(
+                driver="GTiff",
+                height=t_data.shape[1],
+                width=t_data.shape[2],
+                count=t_data.shape[0],
+                dtype=t_data.dtype,
+                crs=merge_crs,
+                transform=t_transform,
+            )
+            ds.write(t_data)
+            mem_datasets.append(ds)
+
+        mosaic, mosaic_transform = rasterio_merge(mem_datasets)
+        mosaic_bounds = (
+            mosaic_transform.c,
+            mosaic_transform.f + mosaic.shape[1] * mosaic_transform.e,
+            mosaic_transform.c + mosaic.shape[2] * mosaic_transform.a,
+            mosaic_transform.f,
+        )
+    finally:
+        for ds in mem_datasets:
+            ds.close()
+        for mf in mem_files:
+            mf.close()
+
+    return mosaic, mosaic_bounds
+
+
 def _dequantize(values: np.ndarray) -> np.ndarray:
     """De-quantize int8 embedding values to float64.
 
@@ -1353,11 +1425,13 @@ def download_google_satellite_embedding(
             continue
 
         # --- Combine tiles into output ---
-        # For simplicity, use the first tile (most common case is 1 tile)
-        # TODO: support multi-tile merging for large bboxes
-        mosaic = tile_arrays[0]["data"]
-        mosaic_bounds = tile_arrays[0]["bounds"]
         merge_crs = tile_arrays[0]["crs"]
+        mosaic, mosaic_bounds = _merge_tiles(tile_arrays)
+        if len(tile_arrays) > 1:
+            logger.info(
+                f"  Merged {len(tile_arrays)} tiles into "
+                f"{mosaic.shape[1]}x{mosaic.shape[2]} mosaic"
+            )
 
         # De-quantize int8 -> float64
         if dequantize:
