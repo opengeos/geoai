@@ -5,6 +5,7 @@
 import inspect
 import os
 import tempfile
+import types
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -397,12 +398,7 @@ class TestAutoGeoModel(unittest.TestCase):
 
         # Simulate segmentation output (batch, classes, H, W)
         logits = torch.randn(1, 5, 64, 64)
-        outputs = MagicMock()
-        outputs.logits = logits
-        del outputs.pred_masks
-        del outputs.predicted_depth
-        del outputs.masks
-        del outputs.last_hidden_state
+        outputs = types.SimpleNamespace(logits=logits)
 
         result = obj._process_outputs(outputs, (3, 64, 64), threshold=0.5)
         self.assertIn("mask", result)
@@ -419,12 +415,7 @@ class TestAutoGeoModel(unittest.TestCase):
         obj = AutoGeoModel(mock_model, device="cpu")
 
         logits = torch.randn(1, 10)
-        outputs = MagicMock()
-        outputs.logits = logits
-        del outputs.pred_masks
-        del outputs.predicted_depth
-        del outputs.masks
-        del outputs.last_hidden_state
+        outputs = types.SimpleNamespace(logits=logits)
 
         result = obj._process_outputs(outputs, (3, 64, 64))
         self.assertIn("class", result)
@@ -440,12 +431,7 @@ class TestAutoGeoModel(unittest.TestCase):
 
         obj = AutoGeoModel(mock_model, device="cpu")
 
-        outputs = MagicMock()
-        outputs.predicted_depth = torch.randn(1, 64, 64)
-        del outputs.logits
-        del outputs.pred_masks
-        del outputs.masks
-        del outputs.last_hidden_state
+        outputs = types.SimpleNamespace(predicted_depth=torch.randn(1, 64, 64))
 
         result = obj._process_outputs(outputs, (3, 64, 64))
         self.assertIn("depth", result)
@@ -461,12 +447,7 @@ class TestAutoGeoModel(unittest.TestCase):
         obj = AutoGeoModel(mock_model, device="cpu")
 
         logits = torch.randn(1, 5, 64, 64)
-        outputs = MagicMock()
-        outputs.logits = logits
-        del outputs.pred_masks
-        del outputs.predicted_depth
-        del outputs.masks
-        del outputs.last_hidden_state
+        outputs = types.SimpleNamespace(logits=logits)
 
         result = obj._process_outputs(outputs, (3, 64, 64), return_probabilities=True)
         self.assertIn("probabilities", result)
