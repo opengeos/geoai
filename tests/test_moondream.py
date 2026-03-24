@@ -11,10 +11,10 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 from PIL import Image
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _create_test_geotiff(path, width=64, height=64, bands=3, dtype="uint8"):
     """Create a minimal GeoTIFF for testing."""
@@ -152,12 +152,16 @@ class TestCreateSlidingWindows(unittest.TestCase):
         self.proc = _make_mock_processor()
 
     def test_small_image_single_window(self):
-        windows = self.proc._create_sliding_windows(400, 400, window_size=512, overlap=64)
+        windows = self.proc._create_sliding_windows(
+            400, 400, window_size=512, overlap=64
+        )
         self.assertEqual(len(windows), 1)
         self.assertEqual(windows[0], (0, 0, 400, 400))
 
     def test_exact_window_size(self):
-        windows = self.proc._create_sliding_windows(512, 512, window_size=512, overlap=64)
+        windows = self.proc._create_sliding_windows(
+            512, 512, window_size=512, overlap=64
+        )
         self.assertEqual(len(windows), 1)
         self.assertEqual(windows[0], (0, 0, 512, 512))
 
@@ -224,9 +228,7 @@ class TestCreateSlidingWindows(unittest.TestCase):
         overlap = 64
         stride = window_size - overlap
 
-        windows = self.proc._create_sliding_windows(
-            1000, 1000, window_size, overlap
-        )
+        windows = self.proc._create_sliding_windows(1000, 1000, window_size, overlap)
         if len(windows) > 1:
             windows_by_y = {}
             for w in windows:

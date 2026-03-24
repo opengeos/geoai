@@ -14,12 +14,14 @@ from PIL import Image
 from geoai import auto
 from geoai.auto import AutoGeoImageProcessor, AutoGeoModel
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _create_test_geotiff(path, width=64, height=64, bands=3, dtype="uint8", crs="EPSG:4326"):
+
+def _create_test_geotiff(
+    path, width=64, height=64, bands=3, dtype="uint8", crs="EPSG:4326"
+):
     """Create a minimal GeoTIFF for testing."""
     import rasterio
     from rasterio.transform import from_bounds
@@ -46,9 +48,7 @@ def _create_test_geotiff(path, width=64, height=64, bands=3, dtype="uint8", crs=
 
 def _create_test_png(path, width=64, height=64):
     """Create a minimal PNG for testing."""
-    img = Image.fromarray(
-        np.random.randint(0, 256, (height, width, 3), dtype=np.uint8)
-    )
+    img = Image.fromarray(np.random.randint(0, 256, (height, width, 3), dtype=np.uint8))
     img.save(path)
     return img
 
@@ -324,7 +324,9 @@ class TestAutoGeoImageProcessor(unittest.TestCase):
         mock_proc.return_value = {"pixel_values": "dummy"}
         obj = AutoGeoImageProcessor(mock_proc, device="cpu")
 
-        arrs = [np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8) for _ in range(3)]
+        arrs = [
+            np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8) for _ in range(3)
+        ]
         result = obj(arrs)
         mock_proc.assert_called_once()
 
@@ -466,9 +468,7 @@ class TestAutoGeoModel(unittest.TestCase):
         del outputs.masks
         del outputs.last_hidden_state
 
-        result = obj._process_outputs(
-            outputs, (3, 64, 64), return_probabilities=True
-        )
+        result = obj._process_outputs(outputs, (3, 64, 64), return_probabilities=True)
         self.assertIn("probabilities", result)
         self.assertEqual(result["probabilities"].shape[0], 5)
 
@@ -581,9 +581,7 @@ class TestAutoGeoModel(unittest.TestCase):
         mask[10:50, 10:50] = 1
         transform = from_bounds(0, 0, 1, 1, 64, 64)
         meta = {"crs": "EPSG:4326", "transform": transform}
-        result = obj.mask_to_vector(
-            mask, meta, min_object_area=0, max_object_area=1
-        )
+        result = obj.mask_to_vector(mask, meta, min_object_area=0, max_object_area=1)
         # Large polygon should be filtered out by small max_object_area
         self.assertIsNone(result)
 
@@ -666,9 +664,7 @@ class TestAutoGeoModel(unittest.TestCase):
 
         obj = AutoGeoModel(mock_model, device="cpu")
 
-        gdf = gpd.GeoDataFrame(
-            {"geometry": [shp_box(0, 0, 1, 1)]}, crs="EPSG:4326"
-        )
+        gdf = gpd.GeoDataFrame({"geometry": [shp_box(0, 0, 1, 1)]}, crs="EPSG:4326")
         with tempfile.TemporaryDirectory() as td:
             for ext in [".geojson", ".gpkg"]:
                 out = os.path.join(td, f"out{ext}")

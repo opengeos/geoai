@@ -12,7 +12,6 @@ from PIL import Image
 from geoai import segment
 from geoai.segment import BoundingBox, DetectionResult
 
-
 # ---------------------------------------------------------------------------
 # Import / exports
 # ---------------------------------------------------------------------------

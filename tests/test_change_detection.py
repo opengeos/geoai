@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _create_test_geotiff(path, width=64, height=64, bands=3, dtype="uint8"):
     """Create a minimal GeoTIFF for testing."""
@@ -290,16 +290,30 @@ class TestReadAndAlignImages(unittest.TestCase):
             data = np.random.randint(0, 256, (3, 32, 32), dtype=np.uint8)
             t1 = from_bounds(0, 0, 1, 1, 32, 32)
             with rasterio.open(
-                path1, "w", driver="GTiff", height=32, width=32,
-                count=3, dtype="uint8", crs="EPSG:4326", transform=t1,
+                path1,
+                "w",
+                driver="GTiff",
+                height=32,
+                width=32,
+                count=3,
+                dtype="uint8",
+                crs="EPSG:4326",
+                transform=t1,
             ) as dst:
                 dst.write(data)
 
             # Second image at distant location
             t2 = from_bounds(100, 100, 101, 101, 32, 32)
             with rasterio.open(
-                path2, "w", driver="GTiff", height=32, width=32,
-                count=3, dtype="uint8", crs="EPSG:4326", transform=t2,
+                path2,
+                "w",
+                driver="GTiff",
+                height=32,
+                width=32,
+                count=3,
+                dtype="uint8",
+                crs="EPSG:4326",
+                transform=t2,
             ) as dst:
                 dst.write(data)
 
@@ -396,9 +410,7 @@ class TestDetectChanges(unittest.TestCase):
             self.mock_model.forward.return_value = (mock_masks, None, None)
 
             with self.assertRaises(ValueError):
-                self.detector.detect_changes(
-                    path1, path2, export_probability=True
-                )
+                self.detector.detect_changes(path1, path2, export_probability=True)
 
     def test_detect_changes_export_instances_requires_path(self):
         """export_instance_masks=True without path should raise ValueError."""
@@ -412,9 +424,7 @@ class TestDetectChanges(unittest.TestCase):
             self.mock_model.forward.return_value = (mock_masks, None, None)
 
             with self.assertRaises(ValueError):
-                self.detector.detect_changes(
-                    path1, path2, export_instance_masks=True
-                )
+                self.detector.detect_changes(path1, path2, export_instance_masks=True)
 
 
 # ---------------------------------------------------------------------------
