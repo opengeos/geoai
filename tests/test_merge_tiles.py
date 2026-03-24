@@ -45,12 +45,15 @@ class TestMergeTilesAdjacent(unittest.TestCase):
         res = 10.0
 
         left_data = np.full((bands, h, w), fill_left, dtype=np.int8)
-        left_bounds = (500000.0, 4000000.0,
-                       500000.0 + w * res, 4000000.0 + h * res)
+        left_bounds = (500000.0, 4000000.0, 500000.0 + w * res, 4000000.0 + h * res)
 
         right_data = np.full((bands, h, w), fill_right, dtype=np.int8)
-        right_bounds = (500000.0 + w * res, 4000000.0,
-                        500000.0 + 2 * w * res, 4000000.0 + h * res)
+        right_bounds = (
+            500000.0 + w * res,
+            4000000.0,
+            500000.0 + 2 * w * res,
+            4000000.0 + h * res,
+        )
 
         return [
             {"data": left_data, "bounds": left_bounds, "crs": crs},
@@ -91,12 +94,15 @@ class TestMergeTilesVertical(unittest.TestCase):
         res = 10.0
 
         bottom_data = np.full((bands, h, w), 5, dtype=np.int8)
-        bottom_bounds = (500000.0, 4000000.0,
-                         500000.0 + w * res, 4000000.0 + h * res)
+        bottom_bounds = (500000.0, 4000000.0, 500000.0 + w * res, 4000000.0 + h * res)
 
         top_data = np.full((bands, h, w), 15, dtype=np.int8)
-        top_bounds = (500000.0, 4000000.0 + h * res,
-                      500000.0 + w * res, 4000000.0 + 2 * h * res)
+        top_bounds = (
+            500000.0,
+            4000000.0 + h * res,
+            500000.0 + w * res,
+            4000000.0 + 2 * h * res,
+        )
 
         tiles = [
             {"data": bottom_data, "bounds": bottom_bounds, "crs": crs},
@@ -144,13 +150,16 @@ class TestMergeTilesOverlap(unittest.TestCase):
 
         # 50% horizontal overlap
         tile1_data = np.full((bands, h, w), 10, dtype=np.int8)
-        tile1_bounds = (500000.0, 4000000.0,
-                        500000.0 + w * res, 4000000.0 + h * res)
+        tile1_bounds = (500000.0, 4000000.0, 500000.0 + w * res, 4000000.0 + h * res)
 
         tile2_data = np.full((bands, h, w), 20, dtype=np.int8)
         overlap_shift = w * res / 2  # 50% overlap
-        tile2_bounds = (500000.0 + overlap_shift, 4000000.0,
-                        500000.0 + overlap_shift + w * res, 4000000.0 + h * res)
+        tile2_bounds = (
+            500000.0 + overlap_shift,
+            4000000.0,
+            500000.0 + overlap_shift + w * res,
+            4000000.0 + h * res,
+        )
 
         tiles = [
             {"data": tile1_data, "bounds": tile1_bounds, "crs": crs},
@@ -184,8 +193,12 @@ class TestMergeTilesDtype(unittest.TestCase):
         data1 = np.ones((bands, h, w), dtype=dtype)
         data2 = np.ones((bands, h, w), dtype=dtype) * 2
         bounds1 = (500000.0, 4000000.0, 500000.0 + w * res, 4000000.0 + h * res)
-        bounds2 = (500000.0 + w * res, 4000000.0,
-                   500000.0 + 2 * w * res, 4000000.0 + h * res)
+        bounds2 = (
+            500000.0 + w * res,
+            4000000.0,
+            500000.0 + 2 * w * res,
+            4000000.0 + h * res,
+        )
         return [
             {"data": data1, "bounds": bounds1, "crs": crs},
             {"data": data2, "bounds": bounds2, "crs": crs},
@@ -203,8 +216,12 @@ class TestMergeTilesMultiband(unittest.TestCase):
         data1 = np.random.randint(-127, 127, (bands, h, w), dtype=np.int8)
         data2 = np.random.randint(-127, 127, (bands, h, w), dtype=np.int8)
         bounds1 = (500000.0, 4000000.0, 500000.0 + w * res, 4000000.0 + h * res)
-        bounds2 = (500000.0 + w * res, 4000000.0,
-                   500000.0 + 2 * w * res, 4000000.0 + h * res)
+        bounds2 = (
+            500000.0 + w * res,
+            4000000.0,
+            500000.0 + 2 * w * res,
+            4000000.0 + h * res,
+        )
 
         tiles = [
             {"data": data1, "bounds": bounds1, "crs": crs},

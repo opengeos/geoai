@@ -1107,7 +1107,9 @@ _AEF_INDEX_URL = f"{_AEF_BASE_URL}/aef_index.parquet"
 _AEF_AVAILABLE_YEARS = list(range(2018, 2025))
 
 
-def _merge_tiles(tile_arrays: List[Dict[str, Any]]) -> Tuple[np.ndarray, Tuple[float, float, float, float]]:
+def _merge_tiles(
+    tile_arrays: List[Dict[str, Any]],
+) -> Tuple[np.ndarray, Tuple[float, float, float, float]]:
     """Merge multiple tile arrays into a single mosaic.
 
     Takes a list of tile dictionaries (each with 'data', 'bounds', 'crs' keys)
