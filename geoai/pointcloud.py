@@ -759,9 +759,7 @@ class PointCloudClassifier:
                 out_path = os.path.join(output_dir, f"{stem}_classified{ext}")
 
             try:
-                result = self.classify(
-                    path, output_path=out_path, **kwargs
-                )
+                result = self.classify(path, output_path=out_path, **kwargs)
                 results.append(result)
             except Exception as exc:
                 logger.error("Failed to classify '%s': %s", path, exc)
@@ -772,7 +770,9 @@ class PointCloudClassifier:
             failed = [p for p, _ in errors]
             logger.warning(
                 "%d of %d files failed: %s",
-                len(errors), len(input_paths), failed,
+                len(errors),
+                len(input_paths),
+                failed,
             )
 
         return results
