@@ -180,16 +180,40 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
 # ---------------------------------------------------------------------------
 
 
+def _numpy_to_torch(arr: np.ndarray) -> "torch.Tensor":
+    """Convert a numpy array to a torch tensor without numpy ABI dependency.
+
+    When PyTorch is built against NumPy 1.x but NumPy 2.x is installed,
+    both ``torch.as_tensor()`` and ``torch.from_numpy()`` fail.  This
+    helper converts via the raw bytes buffer as a last resort.
+    """
+    _dtype_map = {
+        np.dtype("float16"): torch.float16,
+        np.dtype("float32"): torch.float32,
+        np.dtype("float64"): torch.float64,
+        np.dtype("int8"): torch.int8,
+        np.dtype("int16"): torch.int16,
+        np.dtype("int32"): torch.int32,
+        np.dtype("int64"): torch.int64,
+        np.dtype("uint8"): torch.uint8,
+        np.dtype("bool"): torch.bool,
+    }
+    torch_dtype = _dtype_map.get(arr.dtype)
+    if torch_dtype is None:
+        raise TypeError(f"Unsupported numpy dtype: {arr.dtype}")
+    arr = np.ascontiguousarray(arr)
+    return torch.frombuffer(
+        bytearray(arr.data), dtype=torch_dtype
+    ).reshape(arr.shape).clone()
+
+
 def _patch_torch_as_tensor():
     """Patch ``torch.as_tensor`` for PyTorch/NumPy 2.x compatibility.
 
-    PyTorch wheels built against NumPy 1.x cannot infer dtypes from NumPy 2.x
-    scalar types, causing ``torch.as_tensor()`` to fail with
-    ``RuntimeError: Could not infer dtype of numpy.float32``.
-
-    This patch wraps ``torch.as_tensor`` to fall back to
-    ``torch.from_numpy()`` for numpy arrays, which always works regardless
-    of the NumPy ABI version.
+    PyTorch wheels built against NumPy 1.x cannot use numpy arrays at all
+    when NumPy 2.x is installed — both ``torch.as_tensor()`` and
+    ``torch.from_numpy()`` fail.  This patch converts numpy arrays via
+    their raw bytes buffer as a fallback.
     """
     if getattr(torch, "_geoai_patched", False):
         return
@@ -199,14 +223,14 @@ def _patch_torch_as_tensor():
     def _safe_as_tensor(data, dtype=None, device=None):
         if isinstance(data, np.ndarray):
             try:
-                t = torch.from_numpy(np.ascontiguousarray(data))
-            except Exception:
                 return _orig_as_tensor(data, dtype=dtype, device=device)
-            if dtype is not None:
-                t = t.to(dtype)
-            if device is not None:
-                t = t.to(device)
-            return t
+            except (RuntimeError, TypeError):
+                t = _numpy_to_torch(data)
+                if dtype is not None:
+                    t = t.to(dtype)
+                if device is not None:
+                    t = t.to(device)
+                return t
         return _orig_as_tensor(data, dtype=dtype, device=device)
 
     torch.as_tensor = _safe_as_tensor
