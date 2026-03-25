@@ -5,7 +5,6 @@
 import unittest
 
 import numpy as np
-import rasterio
 from rasterio.crs import CRS
 
 
@@ -261,6 +260,24 @@ class TestMergeTilesThreeTiles(unittest.TestCase):
         self.assertTrue(np.all(mosaic[:, :, :16] == 10))
         self.assertTrue(np.all(mosaic[:, :, 16:32] == 20))
         self.assertTrue(np.all(mosaic[:, :, 32:] == 30))
+
+
+class TestMergeTilesMixedCRS(unittest.TestCase):
+    """Test that mixed CRS raises an error."""
+
+    def test_mixed_crs_raises(self):
+        tile_a = {
+            "data": np.ones((1, 4, 4), dtype=np.float32),
+            "bounds": (0.0, 0.0, 1.0, 1.0),
+            "crs": CRS.from_epsg(4326),
+        }
+        tile_b = {
+            "data": np.ones((1, 4, 4), dtype=np.float32),
+            "bounds": (1.0, 0.0, 2.0, 1.0),
+            "crs": CRS.from_epsg(32617),
+        }
+        with self.assertRaises(ValueError, msg="same CRS"):
+            _merge_tiles([tile_a, tile_b])
 
 
 if __name__ == "__main__":

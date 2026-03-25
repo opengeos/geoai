@@ -1127,8 +1127,7 @@ def _merge_tiles(
         Tuple of (mosaic_data, mosaic_bounds) where mosaic_data has shape
         (bands, height, width) and mosaic_bounds is (west, south, east, north).
     """
-    import rasterio
-    from rasterio.transform import from_bounds as transform_from_bounds
+    from rasterio.transform import array_bounds, from_bounds as transform_from_bounds
 
     if len(tile_arrays) == 1:
         return tile_arrays[0]["data"], tile_arrays[0]["bounds"]
@@ -1137,6 +1136,12 @@ def _merge_tiles(
     from rasterio.merge import merge as rasterio_merge
 
     merge_crs = tile_arrays[0]["crs"]
+    crs_set = {str(ta["crs"]) for ta in tile_arrays}
+    if len(crs_set) > 1:
+        raise ValueError(
+            f"All tiles must share the same CRS, got {len(crs_set)} distinct CRS values: {crs_set}"
+        )
+
     mem_datasets = []
     mem_files = []
     try:
@@ -1166,11 +1171,8 @@ def _merge_tiles(
             mem_datasets.append(ds)
 
         mosaic, mosaic_transform = rasterio_merge(mem_datasets)
-        mosaic_bounds = (
-            mosaic_transform.c,
-            mosaic_transform.f + mosaic.shape[1] * mosaic_transform.e,
-            mosaic_transform.c + mosaic.shape[2] * mosaic_transform.a,
-            mosaic_transform.f,
+        mosaic_bounds = array_bounds(
+            mosaic.shape[1], mosaic.shape[2], mosaic_transform
         )
     finally:
         for ds in mem_datasets:
