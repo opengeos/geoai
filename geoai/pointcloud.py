@@ -899,7 +899,11 @@ class PointCloudClassifier:
             raise FileNotFoundError(f"Input file not found: {input_path}")
 
         if class_map is None:
-            class_map = ASPRS_CLASSES
+            # Use the model's own class names by default so that the
+            # summary labels match the predictions written by classify().
+            class_map = {
+                i: name for i, name in enumerate(self.class_names)
+            }
 
         las = laspy.read(input_path)
         classifications = np.asarray(las.classification, dtype=np.int32)
