@@ -180,6 +180,40 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
 # ---------------------------------------------------------------------------
 
 
+def _patch_open3d_batcher():
+    """Monkey-patch Open3D-ML's default batcher for PyTorch/NumPy 2.x compat.
+
+    PyTorch wheels built against NumPy 1.x cannot infer dtypes from NumPy 2.x
+    scalar types, causing ``torch.as_tensor()`` to fail with
+    ``RuntimeError: Could not infer dtype of numpy.float32``.
+
+    This patch wraps ``default_convert`` in the Open3D-ML batcher to convert
+    numpy arrays to torch tensors via ``torch.from_numpy()`` (which always
+    works) before the problematic ``torch.as_tensor()`` path is reached.
+    """
+    try:
+        import open3d._ml3d.torch.dataloaders.default_batcher as batcher
+    except ImportError:
+        return
+
+    # Only patch once
+    if getattr(batcher, "_geoai_patched", False):
+        return
+
+    _orig_convert = batcher.default_convert
+
+    def _safe_convert(data):
+        if isinstance(data, np.ndarray):
+            try:
+                return torch.from_numpy(np.ascontiguousarray(data))
+            except TypeError:
+                return _orig_convert(data)
+        return _orig_convert(data)
+
+    batcher.default_convert = _safe_convert
+    batcher._geoai_patched = True
+
+
 def _ensure_open3d():
     """Lazily import Open3D-ML and cache the module reference.
 
@@ -198,6 +232,7 @@ def _ensure_open3d():
             "Open3D with ML extension is required for point cloud classification. "
             "Please install it: pip install open3d"
         )
+    _patch_open3d_batcher()
     return ml3d
 
 
@@ -366,8 +401,8 @@ class _LASDatasetSplit:
         labels = np.asarray(las.classification, dtype=np.int32)
 
         return {
-            "point": xyz.astype(np.float64),
-            "feat": features.astype(np.float64),
+            "point": xyz.astype(np.float32),
+            "feat": features,
             "label": labels,
         }
 
@@ -511,12 +546,10 @@ class PointCloudClassifier:
         n_points = len(xyz)
         logger.info("Loaded %d points.", n_points)
 
-        # Prepare data dict for Open3D-ML pipeline.
-        # Use float64 to avoid PyTorch/NumPy 2.x incompatibility where
-        # torch.as_tensor() cannot infer dtype from numpy.float32 arrays.
+        # Prepare data dict for Open3D-ML pipeline
         data = {
-            "point": xyz.astype(np.float64),
-            "feat": features.astype(np.float64),
+            "point": xyz.astype(np.float32),
+            "feat": features,
             "label": np.zeros(n_points, dtype=np.int32),
         }
 
