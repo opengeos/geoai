@@ -207,33 +207,42 @@ def _numpy_to_torch(arr: np.ndarray) -> "torch.Tensor":
     ).reshape(arr.shape).clone()
 
 
-def _patch_torch_as_tensor():
-    """Patch ``torch.as_tensor`` for PyTorch/NumPy 2.x compatibility.
+def _wrap_torch_fn(orig_fn):
+    """Create a numpy-safe wrapper for a torch function like as_tensor/tensor."""
 
-    PyTorch wheels built against NumPy 1.x cannot use numpy arrays at all
-    when NumPy 2.x is installed — both ``torch.as_tensor()`` and
-    ``torch.from_numpy()`` fail.  This patch converts numpy arrays via
-    their raw bytes buffer as a fallback.
-    """
-    if getattr(torch, "_geoai_patched", False):
-        return
-
-    _orig_as_tensor = torch.as_tensor
-
-    def _safe_as_tensor(data, dtype=None, device=None):
+    def _safe_fn(data, *args, **kwargs):
         if isinstance(data, np.ndarray):
             try:
-                return _orig_as_tensor(data, dtype=dtype, device=device)
+                return orig_fn(data, *args, **kwargs)
             except (RuntimeError, TypeError):
                 t = _numpy_to_torch(data)
+                dtype = kwargs.get("dtype") or (args[0] if args else None)
+                device = kwargs.get("device") or (
+                    args[1] if len(args) > 1 else None
+                )
                 if dtype is not None:
                     t = t.to(dtype)
                 if device is not None:
                     t = t.to(device)
                 return t
-        return _orig_as_tensor(data, dtype=dtype, device=device)
+        return orig_fn(data, *args, **kwargs)
 
-    torch.as_tensor = _safe_as_tensor
+    return _safe_fn
+
+
+def _patch_torch_numpy_interop():
+    """Patch torch functions for PyTorch/NumPy 2.x ABI compatibility.
+
+    PyTorch wheels built against NumPy 1.x cannot use numpy arrays at all
+    when NumPy 2.x is installed — ``torch.as_tensor()``, ``torch.tensor()``,
+    and ``torch.from_numpy()`` all fail.  This patches them to fall back to
+    converting via raw bytes buffers.
+    """
+    if getattr(torch, "_geoai_patched", False):
+        return
+
+    torch.as_tensor = _wrap_torch_fn(torch.as_tensor)
+    torch.tensor = _wrap_torch_fn(torch.tensor)
     torch._geoai_patched = True
 
 
@@ -302,7 +311,7 @@ def _ensure_open3d():
             "Open3D with ML extension is required for point cloud classification. "
             "Please install it: pip install open3d"
         )
-    _patch_torch_as_tensor()
+    _patch_torch_numpy_interop()
     _patch_tensor_numpy()
     return ml3d
 
