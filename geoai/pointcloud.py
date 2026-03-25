@@ -480,8 +480,12 @@ class _LASDatasetSplit:
         )
         labels = np.asarray(las.classification, dtype=np.int32)
 
+        # Center coordinates near origin (see classify() for rationale).
+        centroid = xyz.mean(axis=0)
+        xyz_centered = (xyz - centroid).astype(np.float32)
+
         return {
-            "point": xyz.astype(np.float32),
+            "point": xyz_centered,
             "feat": features,
             "label": labels,
         }
@@ -626,9 +630,16 @@ class PointCloudClassifier:
         n_points = len(xyz)
         logger.info("Loaded %d points.", n_points)
 
+        # Center coordinates so the point cloud is near the origin.
+        # Models are trained on locally-centred data; large CRS offsets
+        # (e.g. State Plane / UTM) break grid sub-sampling and produce
+        # garbage predictions.
+        centroid = xyz.mean(axis=0)
+        xyz_centered = (xyz - centroid).astype(np.float32)
+
         # Prepare data dict for Open3D-ML pipeline
         data = {
-            "point": xyz.astype(np.float32),
+            "point": xyz_centered,
             "feat": features,
             "label": np.zeros(n_points, dtype=np.int32),
         }
