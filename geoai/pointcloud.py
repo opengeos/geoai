@@ -366,8 +366,8 @@ class _LASDatasetSplit:
         labels = np.asarray(las.classification, dtype=np.int32)
 
         return {
-            "point": xyz.astype(np.float32),
-            "feat": features,
+            "point": xyz.astype(np.float64),
+            "feat": features.astype(np.float64),
             "label": labels,
         }
 
@@ -511,10 +511,12 @@ class PointCloudClassifier:
         n_points = len(xyz)
         logger.info("Loaded %d points.", n_points)
 
-        # Prepare data dict for Open3D-ML pipeline
+        # Prepare data dict for Open3D-ML pipeline.
+        # Use float64 to avoid PyTorch/NumPy 2.x incompatibility where
+        # torch.as_tensor() cannot infer dtype from numpy.float32 arrays.
         data = {
-            "point": xyz.astype(np.float32),
-            "feat": features,
+            "point": xyz.astype(np.float64),
+            "feat": features.astype(np.float64),
             "label": np.zeros(n_points, dtype=np.int32),
         }
 
