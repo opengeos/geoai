@@ -180,38 +180,37 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
 # ---------------------------------------------------------------------------
 
 
-def _patch_open3d_batcher():
-    """Monkey-patch Open3D-ML's default batcher for PyTorch/NumPy 2.x compat.
+def _patch_torch_as_tensor():
+    """Patch ``torch.as_tensor`` for PyTorch/NumPy 2.x compatibility.
 
     PyTorch wheels built against NumPy 1.x cannot infer dtypes from NumPy 2.x
     scalar types, causing ``torch.as_tensor()`` to fail with
     ``RuntimeError: Could not infer dtype of numpy.float32``.
 
-    This patch wraps ``default_convert`` in the Open3D-ML batcher to convert
-    numpy arrays to torch tensors via ``torch.from_numpy()`` (which always
-    works) before the problematic ``torch.as_tensor()`` path is reached.
+    This patch wraps ``torch.as_tensor`` to fall back to
+    ``torch.from_numpy()`` for numpy arrays, which always works regardless
+    of the NumPy ABI version.
     """
-    try:
-        import open3d._ml3d.torch.dataloaders.default_batcher as batcher
-    except ImportError:
+    if getattr(torch, "_geoai_patched", False):
         return
 
-    # Only patch once
-    if getattr(batcher, "_geoai_patched", False):
-        return
+    _orig_as_tensor = torch.as_tensor
 
-    _orig_convert = batcher.default_convert
-
-    def _safe_convert(data):
+    def _safe_as_tensor(data, dtype=None, device=None):
         if isinstance(data, np.ndarray):
             try:
-                return torch.from_numpy(np.ascontiguousarray(data))
-            except TypeError:
-                return _orig_convert(data)
-        return _orig_convert(data)
+                t = torch.from_numpy(np.ascontiguousarray(data))
+            except Exception:
+                return _orig_as_tensor(data, dtype=dtype, device=device)
+            if dtype is not None:
+                t = t.to(dtype)
+            if device is not None:
+                t = t.to(device)
+            return t
+        return _orig_as_tensor(data, dtype=dtype, device=device)
 
-    batcher.default_convert = _safe_convert
-    batcher._geoai_patched = True
+    torch.as_tensor = _safe_as_tensor
+    torch._geoai_patched = True
 
 
 def _ensure_open3d():
@@ -232,7 +231,7 @@ def _ensure_open3d():
             "Open3D with ML extension is required for point cloud classification. "
             "Please install it: pip install open3d"
         )
-    _patch_open3d_batcher()
+    _patch_torch_as_tensor()
     return ml3d
 
 
