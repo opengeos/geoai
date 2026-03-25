@@ -12,7 +12,6 @@ import numpy as np
 
 import laspy
 
-
 # ---------------------------------------------------------------------------
 # Import tests
 # ---------------------------------------------------------------------------
@@ -21,7 +20,9 @@ import laspy
 class TestPointcloudImport(unittest.TestCase):
     """Tests for pointcloud module import behaviour."""
 
-    @patch.dict("sys.modules", {"open3d.ml.torch": MagicMock(), "open3d.ml": MagicMock()})
+    @patch.dict(
+        "sys.modules", {"open3d.ml.torch": MagicMock(), "open3d.ml": MagicMock()}
+    )
     @patch.dict("sys.modules", {"laspy": MagicMock()})
     def test_module_imports(self):
         import importlib
@@ -135,8 +136,12 @@ class TestPointCloudClassifierSignatures(unittest.TestCase):
 
         sig = inspect.signature(PointCloudClassifier.train)
         expected = [
-            "train_dir", "val_dir", "epochs",
-            "learning_rate", "batch_size", "save_dir",
+            "train_dir",
+            "val_dir",
+            "epochs",
+            "learning_rate",
+            "batch_size",
+            "save_dir",
         ]
         for p in expected:
             self.assertIn(p, sig.parameters)
@@ -341,8 +346,8 @@ class TestSummary(unittest.TestCase):
         # Mix of classes: 50% ground (2), 30% building (6), 20% vegetation (5)
         classes = np.zeros(n, dtype=np.uint8)
         classes[: n // 2] = 2
-        classes[n // 2: n // 2 + 3 * n // 10] = 6
-        classes[n // 2 + 3 * n // 10:] = 5
+        classes[n // 2 : n // 2 + 3 * n // 10] = 6
+        classes[n // 2 + 3 * n // 10 :] = 5
         las.classification = classes
         return las
 
@@ -640,7 +645,8 @@ class TestEdgeCases(unittest.TestCase):
         for name, info in SUPPORTED_MODELS.items():
             for key in required:
                 self.assertIn(
-                    key, info["config"],
+                    key,
+                    info["config"],
                     f"Missing config key '{key}' in {name}",
                 )
 

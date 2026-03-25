@@ -93,10 +93,25 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         "dataset": "SemanticKITTI",
         "in_channels": 3,
         "class_names": [
-            "car", "bicycle", "motorcycle", "truck",
-            "other-vehicle", "person", "bicyclist", "motorcyclist", "road",
-            "parking", "sidewalk", "other-ground", "building", "fence",
-            "vegetation", "trunk", "terrain", "pole", "traffic-sign",
+            "car",
+            "bicycle",
+            "motorcycle",
+            "truck",
+            "other-vehicle",
+            "person",
+            "bicyclist",
+            "motorcyclist",
+            "road",
+            "parking",
+            "sidewalk",
+            "other-ground",
+            "building",
+            "fence",
+            "vegetation",
+            "trunk",
+            "terrain",
+            "pole",
+            "traffic-sign",
         ],
         "config": {
             "name": "RandLANet",
@@ -125,8 +140,14 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         "dataset": "Toronto3D",
         "in_channels": 6,
         "class_names": [
-            "road", "road_marking", "natural", "building",
-            "utility_line", "pole", "car", "fence",
+            "road",
+            "road_marking",
+            "natural",
+            "building",
+            "utility_line",
+            "pole",
+            "car",
+            "fence",
         ],
         "config": {
             "name": "RandLANet",
@@ -155,8 +176,19 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         "dataset": "S3DIS",
         "in_channels": 6,
         "class_names": [
-            "ceiling", "floor", "wall", "beam", "column", "window",
-            "door", "table", "chair", "sofa", "bookcase", "board", "clutter",
+            "ceiling",
+            "floor",
+            "wall",
+            "beam",
+            "column",
+            "window",
+            "door",
+            "table",
+            "chair",
+            "sofa",
+            "bookcase",
+            "board",
+            "clutter",
         ],
         "config": {
             "name": "RandLANet",
@@ -202,9 +234,11 @@ def _numpy_to_torch(arr: np.ndarray) -> "torch.Tensor":
     if torch_dtype is None:
         raise TypeError(f"Unsupported numpy dtype: {arr.dtype}")
     arr = np.ascontiguousarray(arr)
-    return torch.frombuffer(
-        bytearray(arr.data), dtype=torch_dtype
-    ).reshape(arr.shape).clone()
+    return (
+        torch.frombuffer(bytearray(arr.data), dtype=torch_dtype)
+        .reshape(arr.shape)
+        .clone()
+    )
 
 
 def _wrap_torch_fn(orig_fn):
@@ -217,9 +251,7 @@ def _wrap_torch_fn(orig_fn):
             except (RuntimeError, TypeError):
                 t = _numpy_to_torch(data)
                 dtype = kwargs.get("dtype") or (args[0] if args else None)
-                device = kwargs.get("device") or (
-                    args[1] if len(args) > 1 else None
-                )
+                device = kwargs.get("device") or (args[1] if len(args) > 1 else None)
                 if dtype is not None:
                     t = t.to(dtype)
                 if device is not None:
@@ -285,9 +317,7 @@ def _patch_tensor_numpy():
             import ctypes
 
             raw = (ctypes.c_ubyte * nbytes).from_address(buf)
-            return np.frombuffer(bytearray(raw), dtype=np_dtype).reshape(
-                t.shape
-            )
+            return np.frombuffer(bytearray(raw), dtype=np_dtype).reshape(t.shape)
 
     torch.Tensor.numpy = _safe_numpy
     torch.Tensor._geoai_numpy_patched = True
@@ -316,9 +346,7 @@ def _ensure_open3d():
     return ml3d
 
 
-def _download_checkpoint(
-    model_name: str, cache_dir: str = DEFAULT_CACHE_DIR
-) -> str:
+def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) -> str:
     """Download a pre-trained checkpoint if not already cached.
 
     Args:
@@ -406,14 +434,10 @@ def _read_point_cloud(
         feat_arrays.append(intensity)
 
     if hasattr(las, "return_number"):
-        feat_arrays.append(
-            np.asarray(las.return_number, dtype=np.float32)
-        )
+        feat_arrays.append(np.asarray(las.return_number, dtype=np.float32))
 
     if hasattr(las, "number_of_returns"):
-        feat_arrays.append(
-            np.asarray(las.number_of_returns, dtype=np.float32)
-        )
+        feat_arrays.append(np.asarray(las.number_of_returns, dtype=np.float32))
 
     if feat_arrays:
         features = np.column_stack(feat_arrays)
@@ -422,9 +446,7 @@ def _read_point_cloud(
 
     # Pad or truncate to exactly n_extra columns
     if features.shape[1] < n_extra:
-        pad = np.zeros(
-            (len(xyz), n_extra - features.shape[1]), dtype=np.float32
-        )
+        pad = np.zeros((len(xyz), n_extra - features.shape[1]), dtype=np.float32)
         features = np.hstack([features, pad])
     elif features.shape[1] > n_extra:
         features = features[:, :n_extra]
@@ -475,9 +497,7 @@ class _LASDatasetSplit:
         return len(self.file_paths)
 
     def get_data(self, idx: int) -> dict:
-        xyz, features, las = _read_point_cloud(
-            self.file_paths[idx], self.in_channels
-        )
+        xyz, features, las = _read_point_cloud(self.file_paths[idx], self.in_channels)
         labels = np.asarray(las.classification, dtype=np.int32)
 
         # Center coordinates near origin (see classify() for rationale).
@@ -578,11 +598,14 @@ class PointCloudClassifier:
         _ml3d = _ensure_open3d()
         logger.info(
             "Loading %s on %s (%d classes)...",
-            model_name, device, self.num_classes,
+            model_name,
+            device,
+            self.num_classes,
         )
         self._model = _ml3d.models.RandLANet(**self._config)
         self._pipeline = _ml3d.pipelines.SemanticSegmentation(
-            self._model, device=device,
+            self._model,
+            device=device,
         )
         self._pipeline.load_ckpt(self.checkpoint_path)
         logger.info("Model loaded successfully.")
@@ -652,9 +675,7 @@ class PointCloudClassifier:
         if "predict_scores" in result:
             probabilities = np.asarray(result["predict_scores"], dtype=np.float32)
         else:
-            probabilities = np.zeros(
-                (n_points, self.num_classes), dtype=np.float32
-            )
+            probabilities = np.zeros((n_points, self.num_classes), dtype=np.float32)
 
         # Write output
         if output_path is not None:
@@ -691,9 +712,7 @@ class PointCloudClassifier:
                 ext = Path(path).suffix
                 out_path = os.path.join(output_dir, f"{stem}_classified{ext}")
 
-            result = self.classify(
-                path, output_path=out_path, **kwargs
-            )
+            result = self.classify(path, output_path=out_path, **kwargs)
             results.append(result)
 
         return results
@@ -762,9 +781,7 @@ class PointCloudClassifier:
         val_files = []
         if val_dir is not None:
             if not os.path.isdir(val_dir):
-                raise FileNotFoundError(
-                    f"Validation directory not found: {val_dir}"
-                )
+                raise FileNotFoundError(f"Validation directory not found: {val_dir}")
             val_files = sorted(
                 [
                     str(p)
@@ -779,7 +796,8 @@ class PointCloudClassifier:
 
         logger.info(
             "Training with %d files (%d validation).",
-            len(train_files), len(val_files),
+            len(train_files),
+            len(val_files),
         )
 
         # Use the Open3D-ML pipeline's training infrastructure which
@@ -902,9 +920,7 @@ class PointCloudClassifier:
             # Use the model's own class names by default so that the
             # summary labels match the predictions written by classify().
             if hasattr(self, "class_names") and self.class_names:
-                class_map = {
-                    i: name for i, name in enumerate(self.class_names)
-                }
+                class_map = {i: name for i, name in enumerate(self.class_names)}
             else:
                 class_map = ASPRS_CLASSES
 
