@@ -240,12 +240,24 @@ class TestReadPointCloud(unittest.TestCase):
         las = self._make_test_las(200)
         with tempfile.NamedTemporaryFile(suffix=".las", delete=False) as f:
             las.write(f.name)
-            xyz, features, las_obj = _read_point_cloud(f.name)
+            xyz, features, las_obj = _read_point_cloud(f.name, in_channels=6)
         os.unlink(f.name)
 
         self.assertEqual(xyz.shape, (200, 3))
         self.assertEqual(xyz.dtype, np.float64)
-        self.assertGreater(features.shape[1], 0)
+        self.assertEqual(features.shape, (200, 3))
+
+    def test_read_in_channels_3_returns_no_extra_features(self):
+        from geoai.pointcloud import _read_point_cloud
+
+        las = self._make_test_las(50)
+        with tempfile.NamedTemporaryFile(suffix=".las", delete=False) as f:
+            las.write(f.name)
+            xyz, features, _ = _read_point_cloud(f.name, in_channels=3)
+        os.unlink(f.name)
+
+        self.assertEqual(xyz.shape, (50, 3))
+        self.assertEqual(features.shape[1], 0)
 
     def test_read_preserves_coordinates(self):
         from geoai.pointcloud import _read_point_cloud
@@ -431,6 +443,7 @@ class TestClassifyMocked(unittest.TestCase):
         clf = PointCloudClassifier.__new__(PointCloudClassifier)
         clf.model_name = "RandLANet_Toronto3D"
         clf.num_classes = num_classes
+        clf.in_channels = SUPPORTED_MODELS["RandLANet_Toronto3D"].get("in_channels", 3)
         clf.class_names = SUPPORTED_MODELS["RandLANet_Toronto3D"]["class_names"]
         clf.device = "cpu"
         clf.checkpoint_path = "/fake/ckpt.pth"

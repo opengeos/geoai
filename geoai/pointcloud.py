@@ -91,6 +91,7 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         ),
         "num_classes": 19,
         "dataset": "SemanticKITTI",
+        "in_channels": 3,
         "class_names": [
             "car", "bicycle", "motorcycle", "truck",
             "other-vehicle", "person", "bicyclist", "motorcyclist", "road",
@@ -105,8 +106,8 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
             "num_classes": 19,
             "ignored_label_inds": [0],
             "sub_sampling_ratio": [4, 4, 4, 4],
-            "dim_input": 3,
-            "dim_feature": 8,
+            "in_channels": 3,
+            "dim_features": 8,
             "dim_output": [16, 64, 128, 256],
             "grid_size": 0.06,
         },
@@ -122,6 +123,7 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         ),
         "num_classes": 8,
         "dataset": "Toronto3D",
+        "in_channels": 6,
         "class_names": [
             "road", "road_marking", "natural", "building",
             "utility_line", "pole", "car", "fence",
@@ -129,15 +131,15 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         "config": {
             "name": "RandLANet",
             "num_neighbors": 16,
-            "num_layers": 4,
+            "num_layers": 5,
             "num_points": 65536,
             "num_classes": 8,
             "ignored_label_inds": [0],
-            "sub_sampling_ratio": [4, 4, 4, 4],
-            "dim_input": 3,
-            "dim_feature": 8,
-            "dim_output": [16, 64, 128, 256],
-            "grid_size": 0.06,
+            "sub_sampling_ratio": [4, 4, 4, 4, 2],
+            "in_channels": 6,
+            "dim_features": 8,
+            "dim_output": [16, 64, 128, 256, 512],
+            "grid_size": 0.05,
         },
     },
     "RandLANet_S3DIS": {
@@ -151,6 +153,7 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         ),
         "num_classes": 13,
         "dataset": "S3DIS",
+        "in_channels": 6,
         "class_names": [
             "ceiling", "floor", "wall", "beam", "column", "window",
             "door", "table", "chair", "sofa", "bookcase", "board", "clutter",
@@ -158,14 +161,14 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
         "config": {
             "name": "RandLANet",
             "num_neighbors": 16,
-            "num_layers": 4,
-            "num_points": 65536,
+            "num_layers": 5,
+            "num_points": 40960,
             "num_classes": 13,
-            "ignored_label_inds": [0],
-            "sub_sampling_ratio": [4, 4, 4, 4],
-            "dim_input": 3,
-            "dim_feature": 8,
-            "dim_output": [16, 64, 128, 256],
+            "ignored_label_inds": [],
+            "sub_sampling_ratio": [4, 4, 4, 4, 2],
+            "in_channels": 6,
+            "dim_features": 8,
+            "dim_output": [16, 64, 128, 256, 512],
             "grid_size": 0.04,
         },
     },
@@ -247,29 +250,41 @@ def _download_checkpoint(
     return local_path
 
 
-def _read_point_cloud(path: str) -> Tuple[np.ndarray, np.ndarray, "laspy.LasData"]:
+def _read_point_cloud(
+    path: str, in_channels: int = 3
+) -> Tuple[np.ndarray, np.ndarray, "laspy.LasData"]:
     """Read a LAS/LAZ file and return points, features, and the LAS object.
 
     Args:
         path: Path to a LAS or LAZ file.
+        in_channels: Number of input feature channels the model expects.
+            For models expecting 3 channels, only xyz is used (features
+            are empty).  For models expecting 6 channels, xyz is
+            concatenated with intensity, return_number, and
+            number_of_returns (zero-padded if unavailable).
 
     Returns:
         Tuple of (xyz, features, las) where:
             - xyz is an (N, 3) float64 array of coordinates
-            - features is an (N, D) float32 array of point attributes
-              (intensity, return_number, number_of_returns, etc.)
+            - features is an (N, D) float32 array of additional point
+              attributes beyond xyz, with D = in_channels - 3
             - las is the raw laspy.LasData object for metadata access
     """
     las = laspy.read(path)
 
     xyz = np.vstack((las.x, las.y, las.z)).T.astype(np.float64)
 
+    # Extra feature channels beyond xyz
+    n_extra = max(0, in_channels - 3)
+    if n_extra == 0:
+        features = np.zeros((len(xyz), 0), dtype=np.float32)
+        return xyz, features, las
+
     # Build feature array from available dimensions
-    feat_arrays = []
+    feat_arrays: List[np.ndarray] = []
 
     if hasattr(las, "intensity"):
         intensity = np.asarray(las.intensity, dtype=np.float32)
-        # Normalise to [0, 1]
         imax = intensity.max()
         if imax > 0:
             intensity = intensity / imax
@@ -288,7 +303,16 @@ def _read_point_cloud(path: str) -> Tuple[np.ndarray, np.ndarray, "laspy.LasData
     if feat_arrays:
         features = np.column_stack(feat_arrays)
     else:
-        features = np.zeros((len(xyz), 1), dtype=np.float32)
+        features = np.zeros((len(xyz), 0), dtype=np.float32)
+
+    # Pad or truncate to exactly n_extra columns
+    if features.shape[1] < n_extra:
+        pad = np.zeros(
+            (len(xyz), n_extra - features.shape[1]), dtype=np.float32
+        )
+        features = np.hstack([features, pad])
+    elif features.shape[1] > n_extra:
+        features = features[:, :n_extra]
 
     return xyz, features, las
 
@@ -327,15 +351,18 @@ def _write_point_cloud(
 class _LASDatasetSplit:
     """Internal split wrapper used by the Open3D-ML training pipeline."""
 
-    def __init__(self, file_paths: List[str], num_classes: int):
+    def __init__(self, file_paths: List[str], num_classes: int, in_channels: int = 3):
         self.file_paths = file_paths
         self.num_classes = num_classes
+        self.in_channels = in_channels
 
     def __len__(self) -> int:
         return len(self.file_paths)
 
     def get_data(self, idx: int) -> dict:
-        xyz, features, las = _read_point_cloud(self.file_paths[idx])
+        xyz, features, las = _read_point_cloud(
+            self.file_paths[idx], self.in_channels
+        )
         labels = np.asarray(las.classification, dtype=np.int32)
 
         return {
@@ -414,6 +441,7 @@ class PointCloudClassifier:
         info = SUPPORTED_MODELS[model_name]
         self.num_classes = info["num_classes"] if num_classes is None else num_classes
         self.class_names = info["class_names"]
+        self.in_channels = info.get("in_channels", 3)
         self._config = info["config"].copy()
         self._config["num_classes"] = self.num_classes
 
@@ -479,7 +507,7 @@ class PointCloudClassifier:
             raise FileNotFoundError(f"Input file not found: {input_path}")
 
         logger.info("Reading point cloud: %s", input_path)
-        xyz, features, las = _read_point_cloud(input_path)
+        xyz, features, las = _read_point_cloud(input_path, self.in_channels)
         n_points = len(xyz)
         logger.info("Loaded %d points.", n_points)
 
@@ -634,9 +662,11 @@ class PointCloudClassifier:
         _ml3d = _ensure_open3d()
 
         # Build training configuration
-        train_split = _LASDatasetSplit(train_files, self.num_classes)
+        train_split = _LASDatasetSplit(train_files, self.num_classes, self.in_channels)
         val_split = (
-            _LASDatasetSplit(val_files, self.num_classes) if val_files else None
+            _LASDatasetSplit(val_files, self.num_classes, self.in_channels)
+            if val_files
+            else None
         )
 
         cfg = {
