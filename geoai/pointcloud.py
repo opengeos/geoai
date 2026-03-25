@@ -901,9 +901,12 @@ class PointCloudClassifier:
         if class_map is None:
             # Use the model's own class names by default so that the
             # summary labels match the predictions written by classify().
-            class_map = {
-                i: name for i, name in enumerate(self.class_names)
-            }
+            if hasattr(self, "class_names") and self.class_names:
+                class_map = {
+                    i: name for i, name in enumerate(self.class_names)
+                }
+            else:
+                class_map = ASPRS_CLASSES
 
         las = laspy.read(input_path)
         classifications = np.asarray(las.classification, dtype=np.int32)

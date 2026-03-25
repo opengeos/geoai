@@ -349,7 +349,7 @@ class TestSummary(unittest.TestCase):
     @patch("geoai.pointcloud.ml3d")
     @patch("geoai.pointcloud._download_checkpoint")
     def test_summary_counts(self, mock_download, mock_ml3d):
-        from geoai.pointcloud import PointCloudClassifier
+        from geoai.pointcloud import PointCloudClassifier, SUPPORTED_MODELS
 
         mock_download.return_value = "/fake/ckpt.pth"
         mock_model = MagicMock()
@@ -361,6 +361,7 @@ class TestSummary(unittest.TestCase):
         clf.model_name = "RandLANet_Toronto3D"
         clf.num_classes = 8
         clf.device = "cpu"
+        clf.class_names = SUPPORTED_MODELS["RandLANet_Toronto3D"]["class_names"]
 
         las = self._make_classified_las(500)
         with tempfile.NamedTemporaryFile(suffix=".las", delete=False) as f:
