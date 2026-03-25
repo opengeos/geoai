@@ -237,6 +237,53 @@ def _patch_torch_as_tensor():
     torch._geoai_patched = True
 
 
+def _patch_tensor_numpy():
+    """Patch ``torch.Tensor.numpy`` for PyTorch/NumPy 2.x compatibility.
+
+    When PyTorch is built against NumPy 1.x but NumPy 2.x is installed,
+    ``tensor.numpy()`` raises ``RuntimeError: Numpy is not available``.
+    This patch falls back to reconstructing the numpy array from the raw
+    data pointer via ``np.frombuffer``.
+    """
+    if getattr(torch.Tensor, "_geoai_numpy_patched", False):
+        return
+
+    _orig_numpy = torch.Tensor.numpy
+
+    def _safe_numpy(self, *args, **kwargs):
+        try:
+            return _orig_numpy(self, *args, **kwargs)
+        except RuntimeError:
+            # Ensure tensor is on CPU and contiguous
+            t = self.detach().cpu().contiguous()
+            _dtype_map = {
+                torch.float16: np.float16,
+                torch.float32: np.float32,
+                torch.float64: np.float64,
+                torch.int8: np.int8,
+                torch.int16: np.int16,
+                torch.int32: np.int32,
+                torch.int64: np.int64,
+                torch.uint8: np.uint8,
+                torch.bool: np.bool_,
+            }
+            np_dtype = _dtype_map.get(t.dtype)
+            if np_dtype is None:
+                raise TypeError(f"Unsupported torch dtype: {t.dtype}")
+            # Use storage bytes to reconstruct numpy array
+            buf = t.untyped_storage().data_ptr()
+            nbytes = t.nelement() * t.element_size()
+            import ctypes
+
+            raw = (ctypes.c_ubyte * nbytes).from_address(buf)
+            return np.frombuffer(bytearray(raw), dtype=np_dtype).reshape(
+                t.shape
+            )
+
+    torch.Tensor.numpy = _safe_numpy
+    torch.Tensor._geoai_numpy_patched = True
+
+
 def _ensure_open3d():
     """Lazily import Open3D-ML and cache the module reference.
 
@@ -256,6 +303,7 @@ def _ensure_open3d():
             "Please install it: pip install open3d"
         )
     _patch_torch_as_tensor()
+    _patch_tensor_numpy()
     return ml3d
 
 
