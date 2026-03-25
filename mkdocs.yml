@@ -80,6 +80,7 @@ plugins:
                   "examples/image_recognition.ipynb",
                   "examples/clip_classify_vector.ipynb",
                   "examples/impervious_surface_mapping.ipynb",
+                  "examples/point_cloud_classification.ipynb",
                   "examples/geodeep_detection.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
@@ -197,6 +198,7 @@ nav:
           - examples/building_detection_whu.ipynb
           - examples/clip_classify_vector.ipynb
           - examples/impervious_surface_mapping.ipynb
+          - examples/point_cloud_classification.ipynb
           - examples/field_boundary_detection.ipynb
           - examples/super_resolution.ipynb
           - examples/geodeep_detection.ipynb
@@ -228,6 +230,7 @@ nav:
           - landcover_train module: landcover_train.md
           - landcover_utils module: landcover_utils.md
           - object_detect module: object_detect.md
+          - pointcloud module: pointcloud.md
           - map_tools module: map_tools.md
           - map_widgets module: map_widgets.md
           - moondream module: moondream.md
