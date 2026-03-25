@@ -11,6 +11,8 @@ Reference:
     https://arxiv.org/abs/1911.11236
 """
 
+import ctypes
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -85,6 +87,7 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
             "https://storage.googleapis.com/open3d-releases/model-zoo/"
             "randlanet_semantickitti_202201071330utc.pth"
         ),
+        "sha256": "8929a19da311a031245f70cfeaee8221ed50f15c4b932ec34434c9daaf75750a",
         "description": (
             "RandLA-Net trained on SemanticKITTI (outdoor driving, 19 classes). "
             "Best for street-level and mobile LiDAR data."
@@ -132,6 +135,7 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
             "https://storage.googleapis.com/open3d-releases/model-zoo/"
             "randlanet_toronto3d_202201071330utc.pth"
         ),
+        "sha256": "3e9dd978c496374f55ca32dc032842aa4ba7325150818f18387d939b3c216ab3",
         "description": (
             "RandLA-Net trained on Toronto3D (urban outdoor, 8 classes). "
             "Best for urban airborne and mobile mapping data."
@@ -168,6 +172,7 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
             "https://storage.googleapis.com/open3d-releases/model-zoo/"
             "randlanet_s3dis_202010091238.pth"
         ),
+        "sha256": "21b9e3eedc14410e88b863cedee0596d3f21c2970a777ae49d89cf1b53f5c925",
         "description": (
             "RandLA-Net trained on S3DIS (indoor, 13 classes). "
             "Best for indoor point cloud data."
@@ -248,7 +253,11 @@ def _wrap_torch_fn(orig_fn):
         if isinstance(data, np.ndarray):
             try:
                 return orig_fn(data, *args, **kwargs)
-            except (RuntimeError, TypeError):
+            except (RuntimeError, TypeError) as exc:
+                # Only intercept NumPy ABI incompatibility errors
+                msg = str(exc).lower()
+                if "numpy" not in msg and "abi" not in msg and "module" not in msg:
+                    raise
                 t = _numpy_to_torch(data)
                 dtype = kwargs.get("dtype") or (args[0] if args else None)
                 device = kwargs.get("device") or (args[1] if len(args) > 1 else None)
@@ -294,7 +303,11 @@ def _patch_tensor_numpy():
     def _safe_numpy(self, *args, **kwargs):
         try:
             return _orig_numpy(self, *args, **kwargs)
-        except RuntimeError:
+        except RuntimeError as exc:
+            # Only intercept NumPy ABI incompatibility errors
+            msg = str(exc).lower()
+            if "numpy" not in msg and "abi" not in msg and "not available" not in msg:
+                raise
             # Ensure tensor is on CPU and contiguous
             t = self.detach().cpu().contiguous()
             _dtype_map = {
@@ -311,11 +324,11 @@ def _patch_tensor_numpy():
             np_dtype = _dtype_map.get(t.dtype)
             if np_dtype is None:
                 raise TypeError(f"Unsupported torch dtype: {t.dtype}")
-            # Use storage bytes to reconstruct numpy array
-            buf = t.untyped_storage().data_ptr()
+            # Use storage bytes to reconstruct numpy array.
+            # Hold a reference to storage so the data_ptr stays valid.
+            storage = t.untyped_storage()
+            buf = storage.data_ptr()
             nbytes = t.nelement() * t.element_size()
-            import ctypes
-
             raw = (ctypes.c_ubyte * nbytes).from_address(buf)
             return np.frombuffer(bytearray(raw), dtype=np_dtype).reshape(t.shape)
 
@@ -389,6 +402,19 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
             f"Failed to download checkpoint for '{model_name}' from {url}: {exc}"
         ) from exc
 
+    # Verify checkpoint integrity
+    expected_hash = info.get("sha256")
+    if expected_hash:
+        with open(local_path, "rb") as fh:
+            actual_hash = hashlib.sha256(fh.read()).hexdigest()
+        if actual_hash != expected_hash:
+            os.remove(local_path)
+            raise RuntimeError(
+                f"Checkpoint integrity check failed for '{model_name}': "
+                f"expected SHA-256 {expected_hash[:16]}..., "
+                f"got {actual_hash[:16]}..."
+            )
+
     logger.info("Checkpoint saved to: %s", local_path)
     return local_path
 
@@ -413,6 +439,12 @@ def _read_point_cloud(
               attributes beyond xyz, with D = in_channels - 3
             - las is the raw laspy.LasData object for metadata access
     """
+    ext = Path(path).suffix.lower()
+    if ext not in (".las", ".laz"):
+        raise ValueError(
+            f"Unsupported file format '{ext}'. Expected .las or .laz: {path}"
+        )
+
     las = laspy.read(path)
 
     xyz = np.vstack((las.x, las.y, las.z)).T.astype(np.float64)
@@ -471,6 +503,19 @@ def _write_point_cloud(
     Returns:
         The output path written.
     """
+    n_points = len(las_source.points)
+    if len(classifications) != n_points:
+        raise ValueError(
+            f"classifications length ({len(classifications)}) does not match "
+            f"point count ({n_points})"
+        )
+
+    ext = Path(output_path).suffix.lower()
+    if ext not in (".las", ".laz"):
+        raise ValueError(
+            f"Unsupported output format '{ext}'. Expected .las or .laz: {output_path}"
+        )
+
     las_out = laspy.LasData(las_source.header)
     las_out.points = las_source.points.copy()
     las_out.classification = classifications.astype(np.uint8)
@@ -705,6 +750,7 @@ class PointCloudClassifier:
             os.makedirs(output_dir, exist_ok=True)
 
         results = []
+        errors = []
         for path in input_paths:
             out_path = None
             if output_dir is not None:
@@ -712,8 +758,22 @@ class PointCloudClassifier:
                 ext = Path(path).suffix
                 out_path = os.path.join(output_dir, f"{stem}_classified{ext}")
 
-            result = self.classify(path, output_path=out_path, **kwargs)
-            results.append(result)
+            try:
+                result = self.classify(
+                    path, output_path=out_path, **kwargs
+                )
+                results.append(result)
+            except Exception as exc:
+                logger.error("Failed to classify '%s': %s", path, exc)
+                errors.append((path, exc))
+                results.append(None)
+
+        if errors:
+            failed = [p for p, _ in errors]
+            logger.warning(
+                "%d of %d files failed: %s",
+                len(errors), len(input_paths), failed,
+            )
 
         return results
 
@@ -800,12 +860,21 @@ class PointCloudClassifier:
             len(val_files),
         )
 
-        # Use the Open3D-ML pipeline's training infrastructure which
-        # handles random sub-sampling, KNN graph construction, and the
-        # correct forward pass for RandLA-Net.
+        # TODO: The Open3D-ML pipeline integration for training is not
+        # yet fully wired up.  The dataset splits are constructed but
+        # not yet passed to the pipeline's run_train() method correctly.
+        # This will be completed in a future release.
+        import warnings
+
+        warnings.warn(
+            "PointCloudClassifier.train() is experimental and not yet "
+            "fully functional.  Training support will be completed in a "
+            "future release.",
+            stacklevel=2,
+        )
+
         _ml3d = _ensure_open3d()
 
-        # Build training configuration
         train_split = _LASDatasetSplit(train_files, self.num_classes, self.in_channels)
         val_split = (
             _LASDatasetSplit(val_files, self.num_classes, self.in_channels)
@@ -823,11 +892,9 @@ class PointCloudClassifier:
 
         self._pipeline.cfg.update(cfg)
 
-        # Run training through the pipeline
         logger.info("Starting training via Open3D-ML pipeline...")
         self._pipeline.run_train()
 
-        # Save final checkpoint
         final_path = os.path.join(save_dir, "checkpoint_final.pth")
         torch.save(self._model.state_dict(), final_path)
         logger.info("Final checkpoint saved: %s", final_path)

@@ -10,7 +10,9 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-import laspy
+import pytest
+
+laspy = pytest.importorskip("laspy", reason="laspy not installed")
 
 # ---------------------------------------------------------------------------
 # Import tests
