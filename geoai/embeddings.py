@@ -1171,9 +1171,7 @@ def _merge_tiles(
             mem_datasets.append(ds)
 
         mosaic, mosaic_transform = rasterio_merge(mem_datasets)
-        mosaic_bounds = array_bounds(
-            mosaic.shape[1], mosaic.shape[2], mosaic_transform
-        )
+        mosaic_bounds = array_bounds(mosaic.shape[1], mosaic.shape[2], mosaic_transform)
     finally:
         for ds in mem_datasets:
             ds.close()
