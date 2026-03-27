@@ -53,6 +53,8 @@ class TestPointcloudImport(unittest.TestCase):
     def test_supported_models_content(self):
         from geoai.pointcloud import SUPPORTED_MODELS
 
+        self.assertIn("RandLANet_DALES", SUPPORTED_MODELS)
+        self.assertIn("RandLANet_3DEP", SUPPORTED_MODELS)
         self.assertIn("RandLANet_SemanticKITTI", SUPPORTED_MODELS)
         self.assertIn("RandLANet_Toronto3D", SUPPORTED_MODELS)
         self.assertIn("RandLANet_S3DIS", SUPPORTED_MODELS)
@@ -116,7 +118,7 @@ class TestPointCloudClassifierSignatures(unittest.TestCase):
         sig = inspect.signature(PointCloudClassifier.__init__)
         self.assertEqual(
             sig.parameters["model_name"].default,
-            "RandLANet_Toronto3D",
+            "RandLANet_DALES",
         )
 
     def test_classify_params(self):
@@ -393,6 +395,97 @@ class TestSummary(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# _remap_labels tests
+# ---------------------------------------------------------------------------
+
+
+class TestRemapLabels(unittest.TestCase):
+    """Tests for the _remap_labels helper."""
+
+    def test_basic_remapping(self):
+        from geoai.pointcloud import _remap_labels
+
+        labels = np.array([2, 6, 9, 3, 5, 1, 0], dtype=np.int32)
+        asprs_to_model = {0: 0, 1: 0, 2: 1, 3: 2, 5: 2, 6: 3, 9: 4}
+        result = _remap_labels(labels, asprs_to_model)
+        expected = np.array([1, 3, 4, 2, 2, 0, 0], dtype=np.int32)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_unmapped_codes_get_default(self):
+        from geoai.pointcloud import _remap_labels
+
+        labels = np.array([2, 99, 255], dtype=np.int32)
+        asprs_to_model = {2: 1}
+        result = _remap_labels(labels, asprs_to_model, default=0)
+        expected = np.array([1, 0, 0], dtype=np.int32)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_empty_labels(self):
+        from geoai.pointcloud import _remap_labels
+
+        labels = np.array([], dtype=np.int32)
+        result = _remap_labels(labels, {2: 1})
+        self.assertEqual(len(result), 0)
+
+    def test_3dep_full_mapping(self):
+        from geoai.pointcloud import SUPPORTED_MODELS, _remap_labels
+
+        asprs_to_model = SUPPORTED_MODELS["RandLANet_3DEP"]["asprs_to_model"]
+        # All ASPRS codes that 3DEP maps
+        labels = np.array([0, 1, 2, 3, 4, 5, 6, 7, 9, 17, 18], dtype=np.int32)
+        result = _remap_labels(labels, asprs_to_model)
+        expected = np.array([0, 0, 1, 2, 2, 2, 3, 6, 4, 5, 6], dtype=np.int32)
+        np.testing.assert_array_equal(result, expected)
+
+
+# ---------------------------------------------------------------------------
+# 3DEP model config tests
+# ---------------------------------------------------------------------------
+
+
+class TestRandLANet3DEPConfig(unittest.TestCase):
+    """Tests specific to the RandLANet_3DEP model config."""
+
+    def test_asprs_to_model_mapping_exists(self):
+        from geoai.pointcloud import SUPPORTED_MODELS
+
+        info = SUPPORTED_MODELS["RandLANet_3DEP"]
+        self.assertIn("asprs_to_model", info)
+        self.assertIsInstance(info["asprs_to_model"], dict)
+
+    def test_model_to_asprs_mapping_exists(self):
+        from geoai.pointcloud import SUPPORTED_MODELS
+
+        info = SUPPORTED_MODELS["RandLANet_3DEP"]
+        self.assertIn("model_to_asprs", info)
+        self.assertIsInstance(info["model_to_asprs"], dict)
+
+    def test_all_model_indices_covered_in_reverse_map(self):
+        from geoai.pointcloud import SUPPORTED_MODELS
+
+        info = SUPPORTED_MODELS["RandLANet_3DEP"]
+        num_classes = info["num_classes"]
+        model_to_asprs = info["model_to_asprs"]
+        for i in range(num_classes):
+            self.assertIn(i, model_to_asprs, f"Model index {i} not in model_to_asprs")
+
+    def test_class_names_match_num_classes(self):
+        from geoai.pointcloud import SUPPORTED_MODELS
+
+        info = SUPPORTED_MODELS["RandLANet_3DEP"]
+        self.assertEqual(len(info["class_names"]), info["num_classes"])
+
+    def test_asprs_to_model_values_in_range(self):
+        from geoai.pointcloud import SUPPORTED_MODELS
+
+        info = SUPPORTED_MODELS["RandLANet_3DEP"]
+        num_classes = info["num_classes"]
+        for asprs_code, model_idx in info["asprs_to_model"].items():
+            self.assertGreaterEqual(model_idx, 0)
+            self.assertLess(model_idx, num_classes)
+
+
+# ---------------------------------------------------------------------------
 # _LASDatasetSplit tests
 # ---------------------------------------------------------------------------
 
@@ -435,6 +528,102 @@ class TestLASDatasetSplit(unittest.TestCase):
         self.assertIn("label", data)
         self.assertEqual(data["point"].shape, (n, 3))
         self.assertTrue(np.all(data["label"] == 2))
+
+    def test_get_data_with_asprs_remap(self):
+        from geoai.pointcloud import _LASDatasetSplit
+
+        n = 60
+        header = laspy.LasHeader(point_format=0, version="1.2")
+        las = laspy.LasData(header)
+        las.x = np.random.uniform(0, 100, n)
+        las.y = np.random.uniform(0, 100, n)
+        las.z = np.random.uniform(0, 50, n)
+        las.intensity = np.zeros(n, dtype=np.uint16)
+        # 30 ground (ASPRS 2), 30 building (ASPRS 6)
+        classes = np.zeros(n, dtype=np.uint8)
+        classes[:30] = 2
+        classes[30:] = 6
+        las.classification = classes
+
+        asprs_map = {2: 1, 6: 3}
+
+        with tempfile.NamedTemporaryFile(suffix=".las", delete=False) as f:
+            las.write(f.name)
+            split = _LASDatasetSplit(
+                [f.name], num_classes=7, asprs_to_model=asprs_map
+            )
+            data = split.get_data(0)
+        os.unlink(f.name)
+
+        # Ground (ASPRS 2) -> model index 1
+        self.assertTrue(np.all(data["label"][:30] == 1))
+        # Building (ASPRS 6) -> model index 3
+        self.assertTrue(np.all(data["label"][30:] == 3))
+
+
+# ---------------------------------------------------------------------------
+# _LASDataset tests
+# ---------------------------------------------------------------------------
+
+
+class TestLASDataset(unittest.TestCase):
+    """Tests for the _LASDataset Open3D-ML compatible wrapper."""
+
+    def test_get_split_training(self):
+        from geoai.pointcloud import _LASDataset
+
+        ds = _LASDataset(
+            train_files=["a.las", "b.las"],
+            val_files=["c.las"],
+            num_classes=9,
+        )
+        split = ds.get_split("training")
+        self.assertEqual(len(split), 2)
+
+    def test_get_split_validation(self):
+        from geoai.pointcloud import _LASDataset
+
+        ds = _LASDataset(
+            train_files=["a.las"],
+            val_files=["b.las", "c.las"],
+            num_classes=9,
+        )
+        split = ds.get_split("validation")
+        self.assertEqual(len(split), 2)
+
+    def test_get_split_unknown_raises(self):
+        from geoai.pointcloud import _LASDataset
+
+        ds = _LASDataset(train_files=[], val_files=[], num_classes=9)
+        with self.assertRaises(ValueError):
+            ds.get_split("unknown")
+
+    def test_get_split_test_raises(self):
+        from geoai.pointcloud import _LASDataset
+
+        ds = _LASDataset(train_files=[], val_files=[], num_classes=9)
+        with self.assertRaises(NotImplementedError):
+            ds.get_split("test")
+
+    def test_get_label_to_names_roundtrip(self):
+        from geoai.pointcloud import _LASDataset
+
+        labels = {0: "ground", 1: "vegetation", 2: "building"}
+        ds = _LASDataset(
+            train_files=[],
+            val_files=[],
+            num_classes=3,
+            label_to_names=labels,
+        )
+        self.assertEqual(ds.get_label_to_names(), labels)
+
+    def test_cfg_num_points(self):
+        from geoai.pointcloud import _LASDataset
+
+        ds = _LASDataset(
+            train_files=[], val_files=[], num_classes=9, num_points=45056
+        )
+        self.assertEqual(ds.cfg.num_points, 45056)
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ import hashlib
 import logging
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -165,6 +166,104 @@ SUPPORTED_MODELS: Dict[str, Dict[str, Any]] = {
             "dim_features": 8,
             "dim_output": [16, 64, 128, 256, 512],
             "grid_size": 0.05,
+        },
+    },
+    "RandLANet_DALES": {
+        "url": (
+            "https://huggingface.co/jayakumarpujar/randlanet-dales/resolve/main/"
+            "randlanet_dales.pth"
+        ),
+        "sha256": None,  # populated after training
+        "description": (
+            "RandLA-Net trained on DALES (aerial LiDAR, 9 classes). "
+            "Best for airborne/aerial LiDAR data: ground, vegetation, "
+            "buildings, cars, trucks, poles, power lines, fences."
+        ),
+        "num_classes": 9,
+        "dataset": "DALES",
+        "in_channels": 3,
+        "class_names": [
+            "unknown",
+            "ground",
+            "vegetation",
+            "cars",
+            "trucks",
+            "power_lines",
+            "fences",
+            "poles",
+            "buildings",
+        ],
+        "config": {
+            "name": "RandLANet",
+            "num_neighbors": 16,
+            "num_layers": 5,
+            "num_points": 65536,
+            "num_classes": 9,
+            "ignored_label_inds": [0],
+            "sub_sampling_ratio": [4, 4, 4, 4, 2],
+            "in_channels": 3,
+            "dim_features": 8,
+            "dim_output": [16, 64, 128, 256, 512],
+            "grid_size": 0.4,
+        },
+    },
+    "RandLANet_3DEP": {
+        "url": (
+            "https://huggingface.co/jayakumarpujar/randlanet-3dep/resolve/main/"
+            "randlanet_3dep.pth"
+        ),
+        "sha256": None,  # populated after training
+        "description": (
+            "RandLA-Net trained on USGS 3DEP aerial LiDAR (7 classes). "
+            "Best for airborne LiDAR data: ground, vegetation, buildings, "
+            "water, bridge, noise."
+        ),
+        "num_classes": 7,
+        "dataset": "3DEP",
+        "in_channels": 3,
+        "class_names": [
+            "unclassified",
+            "ground",
+            "vegetation",
+            "building",
+            "water",
+            "bridge",
+            "noise",
+        ],
+        "asprs_to_model": {
+            0: 0,
+            1: 0,
+            2: 1,
+            3: 2,
+            4: 2,
+            5: 2,
+            6: 3,
+            7: 6,
+            9: 4,
+            17: 5,
+            18: 6,
+        },
+        "model_to_asprs": {
+            0: 1,
+            1: 2,
+            2: 5,
+            3: 6,
+            4: 9,
+            5: 17,
+            6: 7,
+        },
+        "config": {
+            "name": "RandLANet",
+            "num_neighbors": 16,
+            "num_layers": 5,
+            "num_points": 65536,
+            "num_classes": 7,
+            "ignored_label_inds": [0],
+            "sub_sampling_ratio": [4, 4, 4, 4, 2],
+            "in_channels": 3,
+            "dim_features": 8,
+            "dim_output": [16, 64, 128, 256, 512],
+            "grid_size": 0.4,
         },
     },
     "RandLANet_S3DIS": {
@@ -405,8 +504,11 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
     # Verify checkpoint integrity
     expected_hash = info.get("sha256")
     if expected_hash:
+        h = hashlib.sha256()
         with open(local_path, "rb") as fh:
-            actual_hash = hashlib.sha256(fh.read()).hexdigest()
+            for chunk in iter(lambda: fh.read(65536), b""):
+                h.update(chunk)
+        actual_hash = h.hexdigest()
         if actual_hash != expected_hash:
             os.remove(local_path)
             raise RuntimeError(
@@ -414,6 +516,11 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
                 f"expected SHA-256 {expected_hash[:16]}..., "
                 f"got {actual_hash[:16]}..."
             )
+    else:
+        logger.warning(
+            "No SHA-256 hash available for '%s'; skipping integrity check.",
+            model_name,
+        )
 
     logger.info("Checkpoint saved to: %s", local_path)
     return local_path
@@ -525,18 +632,52 @@ def _write_point_cloud(
     return output_path
 
 
+def _remap_labels(
+    labels: np.ndarray,
+    asprs_to_model: Dict[int, int],
+    default: int = 0,
+) -> np.ndarray:
+    """Remap ASPRS classification codes to contiguous model class indices.
+
+    Args:
+        labels: (N,) int array of ASPRS classification codes.
+        asprs_to_model: Mapping from ASPRS code to model class index.
+        default: Class index for unmapped ASPRS codes.
+
+    Returns:
+        (N,) int32 array of remapped class indices.
+    """
+    remapped = np.full(len(labels), default, dtype=np.int32)
+    for asprs_code, model_idx in asprs_to_model.items():
+        remapped[labels == asprs_code] = model_idx
+    return remapped
+
+
 # ---------------------------------------------------------------------------
 # Custom dataset wrapper for LAS/LAZ files
 # ---------------------------------------------------------------------------
 
 
 class _LASDatasetSplit:
-    """Internal split wrapper used by the Open3D-ML training pipeline."""
+    """Internal split wrapper compatible with Open3D-ML's BaseDatasetSplit.
 
-    def __init__(self, file_paths: List[str], num_classes: int, in_channels: int = 3):
+    Provides ``get_data`` / ``get_attr`` / ``__len__`` so that the
+    Open3D-ML ``TorchDataloader`` can iterate over LAS/LAZ files.
+    """
+
+    def __init__(
+        self,
+        file_paths: List[str],
+        num_classes: int,
+        in_channels: int = 3,
+        split: str = "training",
+        asprs_to_model: Optional[Dict[int, int]] = None,
+    ):
         self.file_paths = file_paths
         self.num_classes = num_classes
         self.in_channels = in_channels
+        self.split = split
+        self.asprs_to_model = asprs_to_model
 
     def __len__(self) -> int:
         return len(self.file_paths)
@@ -544,6 +685,9 @@ class _LASDatasetSplit:
     def get_data(self, idx: int) -> dict:
         xyz, features, las = _read_point_cloud(self.file_paths[idx], self.in_channels)
         labels = np.asarray(las.classification, dtype=np.int32)
+
+        if self.asprs_to_model is not None:
+            labels = _remap_labels(labels, self.asprs_to_model)
 
         # Center coordinates near origin (see classify() for rationale).
         centroid = xyz.mean(axis=0)
@@ -559,8 +703,67 @@ class _LASDatasetSplit:
         return {
             "name": Path(self.file_paths[idx]).stem,
             "path": self.file_paths[idx],
-            "split": "training",
+            "split": self.split,
         }
+
+
+class _LASDataset:
+    """Minimal Open3D-ML compatible dataset backed by LAS/LAZ files.
+
+    Implements the interface expected by ``ml3d.pipelines.SemanticSegmentation``
+    so that ``run_train()`` can consume directories of labeled LAS/LAZ files
+    without requiring a built-in Open3D-ML dataset class.
+    """
+
+    def __init__(
+        self,
+        train_files: List[str],
+        val_files: List[str],
+        num_classes: int,
+        in_channels: int = 3,
+        num_points: int = 65536,
+        label_to_names: Optional[Dict[int, str]] = None,
+        asprs_to_model: Optional[Dict[int, int]] = None,
+    ):
+        self._train_files = train_files
+        self._val_files = val_files
+        self.num_classes = num_classes
+        self.in_channels = in_channels
+        self._label_to_names = label_to_names or {}
+        self._asprs_to_model = asprs_to_model
+
+        # Open3D-ML pipeline reads self.cfg for cache/worker settings.
+        self.cfg = SimpleNamespace(
+            use_cache=False, num_workers=0, num_points=num_points
+        )
+
+    def get_split(self, split: str):
+        if split in ("training", "train"):
+            return _LASDatasetSplit(
+                self._train_files,
+                self.num_classes,
+                self.in_channels,
+                "training",
+                asprs_to_model=self._asprs_to_model,
+            )
+        if split in ("validation", "val"):
+            return _LASDatasetSplit(
+                self._val_files,
+                self.num_classes,
+                self.in_channels,
+                "validation",
+                asprs_to_model=self._asprs_to_model,
+            )
+        if split == "test":
+            raise NotImplementedError(
+                "Separate test split not supported; use val_dir for evaluation."
+            )
+        raise ValueError(f"Unknown split: {split}")
+
+    def get_label_to_names(self) -> Dict[int, str]:
+        return dict(self._label_to_names)
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -573,8 +776,9 @@ class PointCloudClassifier:
 
     This class wraps the Open3D-ML semantic segmentation pipeline to
     provide point cloud classification from LAS/LAZ files.  Pre-trained
-    models are available for outdoor driving (SemanticKITTI), urban
-    mapping (Toronto3D), and indoor scanning (S3DIS) scenarios.
+    models are available for aerial LiDAR (DALES), outdoor driving
+    (SemanticKITTI), urban mapping (Toronto3D), and indoor scanning
+    (S3DIS) scenarios.
 
     Users can also fine-tune on custom annotated point cloud data using
     the :meth:`train` method.
@@ -591,7 +795,7 @@ class PointCloudClassifier:
 
     def __init__(
         self,
-        model_name: str = "RandLANet_Toronto3D",
+        model_name: str = "RandLANet_DALES",
         checkpoint_path: Optional[str] = None,
         device: Optional[str] = None,
         cache_dir: str = DEFAULT_CACHE_DIR,
@@ -602,8 +806,10 @@ class PointCloudClassifier:
         Args:
             model_name: Pre-trained model variant to use.  Options:
 
+                - ``"RandLANet_DALES"`` (default) - aerial LiDAR (9 classes)
+                - ``"RandLANet_3DEP"`` - USGS 3DEP aerial LiDAR (7 classes)
                 - ``"RandLANet_SemanticKITTI"`` - outdoor driving (19 classes)
-                - ``"RandLANet_Toronto3D"`` (default) - urban outdoor (8 classes)
+                - ``"RandLANet_Toronto3D"`` - urban outdoor (8 classes)
                 - ``"RandLANet_S3DIS"`` - indoor scanning (13 classes)
 
             checkpoint_path: Path to a local checkpoint file.  If *None*,
@@ -722,11 +928,22 @@ class PointCloudClassifier:
         else:
             probabilities = np.zeros((n_points, self.num_classes), dtype=np.float32)
 
+        # Map model class indices back to ASPRS codes for LAS output so the
+        # file is interoperable with standard LiDAR tools (e.g. CloudCompare).
+        model_to_asprs = SUPPORTED_MODELS[self.model_name].get("model_to_asprs")
+        if model_to_asprs is not None:
+            asprs_labels = np.zeros_like(predictions)
+            for model_idx, asprs_code in model_to_asprs.items():
+                asprs_labels[predictions == model_idx] = asprs_code
+            output_labels = asprs_labels
+        else:
+            output_labels = predictions
+
         # Write output
         if output_path is not None:
-            _write_point_cloud(las, predictions, output_path)
+            _write_point_cloud(las, output_labels, output_path)
 
-        return predictions, probabilities
+        return output_labels, probabilities
 
     def classify_batch(
         self,
@@ -813,8 +1030,9 @@ class PointCloudClassifier:
             **kwargs: Additional keyword arguments (reserved for future use).
 
         Returns:
-            Dictionary with training history containing ``"train_loss"``
-            and optionally ``"val_loss"`` lists.
+            Dictionary with ``"checkpoint_path"`` (path to the saved
+            weights) and ``"train_loss"`` (currently empty; loss
+            history capture will be added in a future release).
 
         Raises:
             FileNotFoundError: If *train_dir* does not exist.
@@ -860,46 +1078,57 @@ class PointCloudClassifier:
             len(val_files),
         )
 
-        # TODO: The Open3D-ML pipeline integration for training is not
-        # yet fully wired up.  The dataset splits are constructed but
-        # not yet passed to the pipeline's run_train() method correctly.
-        # This will be completed in a future release.
-        import warnings
-
-        warnings.warn(
-            "PointCloudClassifier.train() is experimental and not yet "
-            "fully functional.  Training support will be completed in a "
-            "future release.",
-            stacklevel=2,
-        )
-
         _ml3d = _ensure_open3d()
 
-        train_split = _LASDatasetSplit(train_files, self.num_classes, self.in_channels)
-        val_split = (
-            _LASDatasetSplit(val_files, self.num_classes, self.in_channels)
-            if val_files
-            else None
+        # Build a label-to-names map from the current class names so that
+        # Open3D-ML can display human-readable labels during training.
+        label_to_names = {i: n for i, n in enumerate(self.class_names)}
+
+        if not val_files:
+            logger.warning(
+                "No val_dir provided; validation will be skipped."
+            )
+
+        # Retrieve ASPRS-to-model label remapping if the model defines one
+        # (e.g. RandLANet_3DEP maps ASPRS codes to contiguous class indices).
+        asprs_to_model = SUPPORTED_MODELS[self.model_name].get("asprs_to_model")
+
+        dataset = _LASDataset(
+            train_files=train_files,
+            val_files=val_files,
+            num_classes=self.num_classes,
+            in_channels=self.in_channels,
+            num_points=self._config.get("num_points", 65536),
+            label_to_names=label_to_names,
+            asprs_to_model=asprs_to_model,
         )
 
-        cfg = {
-            "max_epoch": epochs,
-            "optimizer": {"lr": learning_rate},
-            "batch_size": batch_size,
-            "save_ckpt_freq": 20,
-            "log_dir": save_dir,
-        }
+        # Create a fresh training pipeline wired to our dataset.
+        train_pipeline = _ml3d.pipelines.SemanticSegmentation(
+            model=self._model,
+            dataset=dataset,
+            device=self.device,
+            max_epoch=epochs,
+            optimizer={"lr": learning_rate},
+            batch_size=batch_size,
+            save_ckpt_freq=max(1, epochs // 5),
+            main_log_dir=save_dir,
+        )
 
-        self._pipeline.cfg.update(cfg)
+        # Reload current weights so fine-tuning starts from checkpoint.
+        train_pipeline.load_ckpt(self.checkpoint_path)
 
-        logger.info("Starting training via Open3D-ML pipeline...")
-        self._pipeline.run_train()
+        logger.info("Starting training for %d epochs...", epochs)
+        train_pipeline.run_train()
 
+        # Persist the final fine-tuned weights.
         final_path = os.path.join(save_dir, "checkpoint_final.pth")
         torch.save(self._model.state_dict(), final_path)
         logger.info("Final checkpoint saved: %s", final_path)
 
+        # Switch back to eval mode for subsequent inference.
         self._model.eval()
+        self.checkpoint_path = final_path
 
         return {"train_loss": [], "checkpoint_path": final_path}
 
@@ -1030,7 +1259,7 @@ class PointCloudClassifier:
 def classify_point_cloud(
     input_path: str,
     output_path: Optional[str] = None,
-    model_name: str = "RandLANet_Toronto3D",
+    model_name: str = "RandLANet_DALES",
     checkpoint_path: Optional[str] = None,
     device: Optional[str] = None,
     cache_dir: str = DEFAULT_CACHE_DIR,
