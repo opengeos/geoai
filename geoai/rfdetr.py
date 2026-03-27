@@ -45,6 +45,7 @@ __all__ = [
     "push_rfdetr_to_hub",
     "rfdetr_detect_from_hub",
     "prepare_nwpu_for_rfdetr",
+    "plot_rfdetr_metrics",
 ]
 
 # ---------------------------------------------------------------------------
@@ -928,3 +929,137 @@ def prepare_nwpu_for_rfdetr(
         "train_images": len(train_data["images"]),
         "val_images": len(val_data["images"]),
     }
+
+
+def plot_rfdetr_metrics(
+    metrics_path: str,
+    figsize: Optional[tuple] = None,
+    save_path: Optional[str] = None,
+) -> Any:
+    """Plot training and validation metrics from an RF-DETR training run.
+
+    Reads the ``metrics.csv`` file produced by RF-DETR training and plots
+    training loss, validation mAP, F1 score, precision/recall, and
+    per-class AP curves.
+
+    Args:
+        metrics_path: Path to the ``metrics.csv`` file in the RF-DETR
+            output directory, or path to the output directory itself.
+        figsize: Optional figure size as ``(width, height)`` in inches.
+            If None, automatically determined based on number of subplots.
+        save_path: Optional path to save the plot image. If None, the
+            plot is displayed but not saved.
+
+    Returns:
+        pandas.DataFrame: DataFrame containing the validation metrics
+        indexed by epoch.
+    """
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    # Resolve path
+    if os.path.isdir(metrics_path):
+        metrics_path = os.path.join(metrics_path, "metrics.csv")
+    if not os.path.exists(metrics_path):
+        raise FileNotFoundError(f"Metrics file not found: {metrics_path}")
+
+    df = pd.read_csv(metrics_path)
+
+    # Separate train and val rows
+    train_df = df.dropna(subset=["train/loss"])
+    val_df = df.dropna(subset=["val/mAP_50_95"])
+
+    # Identify per-class AP columns
+    ap_cols = [c for c in df.columns if c.startswith("val/AP/")]
+    class_names = [c.replace("val/AP/", "") for c in ap_cols]
+
+    # Determine subplot layout
+    num_plots = 3  # loss, mAP, F1/precision/recall
+    if ap_cols:
+        num_plots += 1  # per-class AP
+
+    if figsize is None:
+        figsize = (14, 4 * num_plots)
+
+    fig, axes = plt.subplots(num_plots, 1, figsize=figsize)
+    if num_plots == 1:
+        axes = [axes]
+
+    idx = 0
+
+    # Plot 1: Training and Validation Loss
+    ax = axes[idx]
+    if not train_df.empty:
+        ax.plot(
+            train_df["epoch"], train_df["train/loss"], label="Train Loss", marker="."
+        )
+    if not val_df.empty and "val/loss" in val_df.columns:
+        ax.plot(val_df["epoch"], val_df["val/loss"], label="Val Loss", marker=".")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+    ax.set_title("Training and Validation Loss")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    idx += 1
+
+    # Plot 2: mAP Metrics
+    ax = axes[idx]
+    if not val_df.empty:
+        ax.plot(val_df["epoch"], val_df["val/mAP_50_95"], label="mAP@50:95", marker="o")
+        ax.plot(val_df["epoch"], val_df["val/mAP_50"], label="mAP@50", marker="s")
+        if "val/mAP_75" in val_df.columns:
+            ax.plot(val_df["epoch"], val_df["val/mAP_75"], label="mAP@75", marker="^")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("mAP")
+    ax.set_title("Validation mAP")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    idx += 1
+
+    # Plot 3: F1, Precision, Recall
+    ax = axes[idx]
+    if not val_df.empty:
+        if "val/F1" in val_df.columns:
+            ax.plot(val_df["epoch"], val_df["val/F1"], label="F1", marker="o")
+        if "val/precision" in val_df.columns:
+            ax.plot(
+                val_df["epoch"], val_df["val/precision"], label="Precision", marker="s"
+            )
+        if "val/recall" in val_df.columns:
+            ax.plot(val_df["epoch"], val_df["val/recall"], label="Recall", marker="^")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Score")
+    ax.set_title("Validation F1 / Precision / Recall")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    idx += 1
+
+    # Plot 4: Per-class AP
+    if ap_cols and idx < num_plots:
+        ax = axes[idx]
+        if not val_df.empty:
+            for col, name in zip(ap_cols, class_names):
+                ax.plot(val_df["epoch"], val_df[col], label=name, marker=".")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("AP@50:95")
+        ax.set_title("Per-Class AP")
+        ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if save_path is not None:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        logger.info("Plot saved to: %s", save_path)
+
+    plt.show()
+
+    # Return val metrics as DataFrame
+    if not val_df.empty:
+        result_cols = ["epoch", "val/mAP_50_95", "val/mAP_50", "val/mAR", "val/F1"]
+        result_cols += [
+            c for c in ["val/precision", "val/recall"] if c in val_df.columns
+        ]
+        result_cols += ap_cols
+        return val_df[result_cols].reset_index(drop=True)
+    return pd.DataFrame()

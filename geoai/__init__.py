@@ -437,6 +437,7 @@ _LAZY_SYMBOL_MAP = {
     "push_rfdetr_to_hub": ("rfdetr", None),
     "rfdetr_detect_from_hub": ("rfdetr", None),
     "prepare_nwpu_for_rfdetr": ("rfdetr", None),
+    "plot_rfdetr_metrics": ("rfdetr", None),
     # --- geoai.water ---
     "segment_water": ("water", None),
     "BAND_ORDER_PRESETS": ("water", None),
