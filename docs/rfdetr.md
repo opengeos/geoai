@@ -1,0 +1,3 @@
+# rfdetr module
+
+::: geoai.rfdetr

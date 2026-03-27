@@ -427,6 +427,16 @@ _LAZY_SYMBOL_MAP = {
     "batch_multiclass_detection": ("object_detect", None),
     "push_detector_to_hub": ("object_detect", None),
     "predict_detector_from_hub": ("object_detect", None),
+    # --- geoai.rfdetr ---
+    "RFDETR_MODELS": ("rfdetr", None),
+    "check_rfdetr_available": ("rfdetr", None),
+    "list_rfdetr_models": ("rfdetr", None),
+    "rfdetr_detect": ("rfdetr", None),
+    "rfdetr_detect_batch": ("rfdetr", None),
+    "rfdetr_train": ("rfdetr", None),
+    "push_rfdetr_to_hub": ("rfdetr", None),
+    "rfdetr_detect_from_hub": ("rfdetr", None),
+    "prepare_nwpu_for_rfdetr": ("rfdetr", None),
     # --- geoai.water ---
     "segment_water": ("water", None),
     "BAND_ORDER_PRESETS": ("water", None),
