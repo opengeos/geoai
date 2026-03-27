@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import traceback
 from typing import Any
 
@@ -20,6 +21,16 @@ _STATE = {
     "temp_vectors": set(),
 }
 
+# Duplicate the real stdout fd so heartbeats always reach the parent,
+# even while redirect_stdout temporarily replaces sys.stdout.
+_HEARTBEAT_STREAM = None
+
+
+def _init_heartbeat_stream():
+    """Capture the original stdout fd for heartbeat writes."""
+    global _HEARTBEAT_STREAM
+    _HEARTBEAT_STREAM = os.fdopen(os.dup(sys.stdout.fileno()), "w")
+
 
 def _send_ok(result: Any = None) -> None:
     print(json.dumps({"type": "ok", "result": result}), flush=True)
@@ -27,6 +38,38 @@ def _send_ok(result: Any = None) -> None:
 
 def _send_error(message: str) -> None:
     print(json.dumps({"type": "error", "message": message}), flush=True)
+
+
+class _HeartbeatThread:
+    """Background thread that sends periodic heartbeats during long operations.
+
+    Heartbeats are written to the duplicated stdout fd so they reach the
+    parent process even while ``redirect_stdout`` is active.
+    """
+
+    def __init__(self, interval: float = 30.0):
+        self._interval = interval
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self):
+        while not self._stop_event.wait(self._interval):
+            try:
+                if _HEARTBEAT_STREAM is not None:
+                    _HEARTBEAT_STREAM.write(json.dumps({"type": "heartbeat"}) + "\n")
+                    _HEARTBEAT_STREAM.flush()
+            except Exception:
+                break
+
+    def start(self):
+        """Start sending heartbeats."""
+        self._thread.start()
+        return self
+
+    def stop(self):
+        """Stop sending heartbeats and wait for the thread to finish."""
+        self._stop_event.set()
+        self._thread.join(timeout=2)
 
 
 def _json_safe(value: Any) -> Any:
@@ -214,6 +257,8 @@ def _dispatch(req: dict) -> Any:
 
 
 def main() -> int:
+    _init_heartbeat_stream()
+
     while True:
         line = sys.stdin.readline()
         if not line:
@@ -227,7 +272,11 @@ def main() -> int:
             continue
 
         try:
-            result = _dispatch(req)
+            hb = _HeartbeatThread(interval=30.0).start()
+            try:
+                result = _dispatch(req)
+            finally:
+                hb.stop()
             _send_ok(result)
             if req.get("action") == "shutdown":
                 return 0
