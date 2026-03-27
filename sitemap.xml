@@ -137,6 +137,10 @@
          <lastmod>2026-03-27</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/rfdetr/</loc>
+         <lastmod>2026-03-27</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/sam/</loc>
          <lastmod>2026-03-27</lastmod>
     </url>
@@ -414,6 +418,10 @@
     </url>
     <url>
          <loc>https://opengeoai.org/examples/regularization/</loc>
+         <lastmod>2026-03-27</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/rfdetr_detection/</loc>
          <lastmod>2026-03-27</lastmod>
     </url>
     <url>
