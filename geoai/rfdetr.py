@@ -159,7 +159,14 @@ def _get_rfdetr_model_class(model_variant: str):
         )
 
     class_name = RFDETR_MODELS[model_variant]["class_name"]
-    return getattr(_rfdetr_pkg, class_name)
+    try:
+        return getattr(_rfdetr_pkg, class_name)
+    except AttributeError:
+        raise ValueError(
+            f"The rfdetr package does not expose class '{class_name}' "
+            f"for variant '{model_variant}'. You may need to update rfdetr: "
+            f"pip install --upgrade rfdetr"
+        )
 
 
 def _create_rfdetr_model(
@@ -283,6 +290,11 @@ def rfdetr_detect(
         all_class_ids = []
 
         stride = window_size - overlap
+        if stride <= 0:
+            raise ValueError(
+                f"overlap ({overlap}) must be less than window_size "
+                f"({window_size})."
+            )
         steps_y = max(1, math.ceil((height - window_size) / stride) + 1)
         steps_x = max(1, math.ceil((width - window_size) / stride) + 1)
         total_windows = steps_y * steps_x
@@ -450,7 +462,14 @@ def rfdetr_detect(
             }
         )
 
-    gdf = gpd.GeoDataFrame(records, crs=crs)
+    if records:
+        gdf = gpd.GeoDataFrame(records, crs=crs)
+    else:
+        gdf = gpd.GeoDataFrame(
+            columns=["geometry", "class_id", "class_name", "confidence"],
+            geometry="geometry",
+            crs=crs,
+        )
 
     if output_path is not None:
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
@@ -507,9 +526,16 @@ def rfdetr_detect_batch(
 
     # Resolve input paths
     if isinstance(input_paths, str):
-        resolved_paths = sorted(_glob.glob(input_paths))
+        if any(ch in input_paths for ch in ("*", "?", "[")):
+            resolved_paths = sorted(_glob.glob(input_paths))
+        elif os.path.isdir(input_paths):
+            tif_paths = _glob.glob(os.path.join(input_paths, "*.tif"))
+            tiff_paths = _glob.glob(os.path.join(input_paths, "*.tiff"))
+            resolved_paths = sorted(set(tif_paths + tiff_paths))
+        else:
+            resolved_paths = [input_paths]
         if not resolved_paths:
-            raise FileNotFoundError(f"No files matched the pattern: {input_paths}")
+            raise FileNotFoundError(f"No input files found for: {input_paths}")
     else:
         resolved_paths = list(input_paths)
 
@@ -853,7 +879,7 @@ def prepare_nwpu_for_rfdetr(
     # annotation files are 1-indexed, and RF-DETR remaps them to
     # 0-indexed internally during training.
     class_names = [name for name in result["class_names"] if name != "background"]
-    images_dir = os.path.join(data_dir, "positive_image_set")
+    images_dir = result.get("images_dir", os.path.join(data_dir, "positive_image_set"))
 
     # Create RF-DETR directory structure
     for split, ann_key in [
