@@ -2,32 +2,15 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including tree segmentation (DeepForest), water segmentation (OmniWaterMask), Moondream vision-language model, Segment Anything (SAM1/SAM2/SAM3), semantic segmentation, and instance segmentation (Mask R-CNN).
-version=1.0.5
+version=1.0.6
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
 about=This plugin provides AI-powered geospatial analysis tools:
 
-    Moondream Vision-Language Model:
-    - Caption: Generate descriptions of geospatial imagery
-    - Query: Ask questions about images using natural language
-    - Detect: Detect and locate objects with bounding boxes
-    - Point: Locate specific objects with point markers
-
-    Semantic Segmentation:
-    - Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
-    - Run inference on raster imagery
-    - Export results as vector or raster data
-
-    Instance Segmentation (Mask R-CNN):
-    - Train Mask R-CNN models for instance-level object detection and segmentation
-    - Run inference on raster imagery with vectorized output
-
-    Segment Anything (SAM1, SAM2, SAM3):
-    - Segment objects using text prompts (e.g., "tree", "building", "road")
-    - Segment using point prompts (foreground/background) or box prompts drawn on the map
-    - Process multiple points interactively or from vector files/layers
-    - Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization
+    Built-in Dependency Installer:
+    - One-click installation of all AI dependencies
+    - Automatic GPU detection (NVIDIA CUDA, Apple MPS)
 
     Tree Segmentation (DeepForest):
     - Detect tree crowns, birds, livestock, nests, and dead trees using pretrained models
@@ -37,9 +20,26 @@ about=This plugin provides AI-powered geospatial analysis tools:
     - Automated water body detection from satellite and aerial imagery
     - Output as raster or vector with optional OSM data integration
 
-    Built-in Dependency Installer:
-    - One-click installation of all AI dependencies
-    - Automatic GPU detection (NVIDIA CUDA, Apple MPS)
+    Moondream Vision-Language Model:
+    - Caption: Generate descriptions of geospatial imagery
+    - Query: Ask questions about images using natural language
+    - Detect: Detect and locate objects with bounding boxes
+    - Point: Locate specific objects with point markers
+
+    Segment Anything with SAM 3:
+    - Segment objects using text prompts (e.g., "tree", "building", "road")
+    - Segment using point prompts (foreground/background) or box prompts drawn on the map
+    - Process multiple points interactively or from vector files/layers
+    - Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization
+
+    Semantic Segmentation:
+    - Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
+    - Run inference on raster imagery
+    - Export results as vector or raster data
+
+    Instance Segmentation (Mask R-CNN):
+    - Train Mask R-CNN models for instance-level object detection and segmentation
+    - Run inference on raster imagery with vectorized output
 
     Requires the geoai-py Python package and PyTorch. CUDA or MPS support recommended for optimal performance.
 
@@ -58,6 +58,8 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.0.6
+        - Add Linux fallback to system Python when standalone download fails
     1.0.5
         - Reorder plugin menu and buttons
     1.0.4
