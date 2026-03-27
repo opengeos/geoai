@@ -69,7 +69,7 @@ class _HeartbeatThread:
     def stop(self):
         """Stop sending heartbeats and wait for the thread to finish."""
         self._stop_event.set()
-        self._thread.join(timeout=2)
+        self._thread.join()
 
 
 def _json_safe(value: Any) -> Any:

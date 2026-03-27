@@ -11,6 +11,7 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -259,6 +260,10 @@ class MoondreamSubprocessClient:
             ) from exc
 
         effective_timeout = timeout or self._TIMEOUT_REQUEST
+        # Total deadline caps overall runtime even when heartbeats keep arriving.
+        # Each heartbeat resets the per-read inactivity timer but cannot extend
+        # past the absolute deadline (3x the per-read timeout).
+        deadline = time.monotonic() + effective_timeout * 3
         line = self._read_response_line(effective_timeout)
         while True:
             try:
@@ -269,8 +274,16 @@ class MoondreamSubprocessClient:
                 continue
 
             if response.get("type") == "heartbeat":
-                # Worker is alive; read the next line with a fresh timeout.
-                line = self._read_response_line(effective_timeout)
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        "Moondream worker exceeded total deadline "
+                        "({}s)".format(effective_timeout * 3)
+                    )
+                # Worker is alive; read the next line with a fresh inactivity
+                # timeout, capped by the remaining total deadline.
+                next_timeout = min(effective_timeout, remaining)
+                line = self._read_response_line(int(max(next_timeout, 1)))
                 continue
 
             break
