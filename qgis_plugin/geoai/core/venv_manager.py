@@ -1287,10 +1287,8 @@ def _get_linux_system_python() -> Optional[str]:
 
     for candidate in candidates:
         try:
-            env = os.environ.copy()
+            env = _get_clean_env_for_venv()
             env["PYTHONIOENCODING"] = "utf-8"
-            for var in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
-                env.pop(var, None)
             subprocess_kwargs = _get_subprocess_kwargs()
 
             result = subprocess.run(
@@ -1332,7 +1330,7 @@ def _get_linux_system_python() -> Optional[str]:
             parts = result.stdout.strip().split()
             if len(parts) == 3:
                 major, minor, micro = int(parts[0]), int(parts[1]), int(parts[2])
-                if major >= 3 and minor >= 9:
+                if (major, minor) >= (3, 9):
                     _log(
                         "System Python verified: {} ({}.{}.{})".format(
                             candidate, major, minor, micro
@@ -3043,9 +3041,12 @@ def get_venv_status() -> Tuple[bool, str]:
     from .python_manager import get_python_full_version, standalone_python_exists
 
     if not standalone_python_exists():
-        # Also check for QGIS Python fallback on Windows
-        if sys.platform == "win32" and venv_exists():
-            pass  # venv was created with QGIS Python fallback
+        # Also check for QGIS Python fallback on Windows or system Python
+        # fallback on Linux
+        if (
+            sys.platform == "win32" or sys.platform.startswith("linux")
+        ) and venv_exists():
+            pass  # venv was created with fallback Python
         else:
             _log("get_venv_status: standalone Python not found", Qgis.Info)
             return False, "Dependencies not installed"
