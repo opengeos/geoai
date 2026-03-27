@@ -955,6 +955,7 @@ def plot_rfdetr_metrics(
         indexed by epoch.
     """
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
     import pandas as pd
 
     # Resolve path
@@ -984,6 +985,8 @@ def plot_rfdetr_metrics(
     fig, axes = plt.subplots(num_plots, 1, figsize=figsize)
     if num_plots == 1:
         axes = [axes]
+    for ax in axes:
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     idx = 0
 
