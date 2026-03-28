@@ -1140,7 +1140,9 @@ class PointCloudClassifier:
         )
 
         # Reload current weights so fine-tuning starts from checkpoint.
-        train_pipeline.load_ckpt(self.checkpoint_path)
+        # Skip if no checkpoint (training from scratch).
+        if self.checkpoint_path is not None:
+            train_pipeline.load_ckpt(self.checkpoint_path)
 
         logger.info("Starting training for %d epochs...", epochs)
         train_pipeline.run_train()
