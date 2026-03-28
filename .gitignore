@@ -4,6 +4,7 @@ private/
 *.py[cod]
 *$py.class
 *.jp2
+data/
 tests/data/
 CLAUDE.md
 AI_AGENTS.md
