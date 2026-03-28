@@ -776,8 +776,6 @@ class _LASDataset:
         return dict(self._label_to_names)
 
 
-
-
 # ---------------------------------------------------------------------------
 # Main class
 # ---------------------------------------------------------------------------
@@ -873,10 +871,12 @@ class PointCloudClassifier:
 
         # Load checkpoint — use strict=False when architecture differs
         # (e.g. transfer learning from SemanticKITTI 4-layer to DALES 5-layer)
-        ckpt = torch.load(
-            self.checkpoint_path, map_location=device, weights_only=False
+        ckpt = torch.load(self.checkpoint_path, map_location=device, weights_only=False)
+        state_dict = (
+            ckpt
+            if isinstance(ckpt, dict) and "model_state_dict" not in ckpt
+            else ckpt.get("model_state_dict", ckpt)
         )
-        state_dict = ckpt if isinstance(ckpt, dict) and "model_state_dict" not in ckpt else ckpt.get("model_state_dict", ckpt)
         missing, unexpected = self._model.load_state_dict(state_dict, strict=False)
         if missing:
             logger.warning(
@@ -1111,9 +1111,7 @@ class PointCloudClassifier:
         label_to_names = {i: n for i, n in enumerate(self.class_names)}
 
         if not val_files:
-            logger.warning(
-                "No val_dir provided; validation will be skipped."
-            )
+            logger.warning("No val_dir provided; validation will be skipped.")
 
         # Retrieve ASPRS-to-model label remapping if the model defines one
         # (e.g. RandLANet_3DEP maps ASPRS codes to contiguous class indices).

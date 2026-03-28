@@ -549,9 +549,7 @@ class TestLASDatasetSplit(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".las", delete=False) as f:
             las.write(f.name)
-            split = _LASDatasetSplit(
-                [f.name], num_classes=7, asprs_to_model=asprs_map
-            )
+            split = _LASDatasetSplit([f.name], num_classes=7, asprs_to_model=asprs_map)
             data = split.get_data(0)
         os.unlink(f.name)
 
@@ -620,9 +618,7 @@ class TestLASDataset(unittest.TestCase):
     def test_cfg_num_points(self):
         from geoai.pointcloud import _LASDataset
 
-        ds = _LASDataset(
-            train_files=[], val_files=[], num_classes=9, num_points=45056
-        )
+        ds = _LASDataset(train_files=[], val_files=[], num_classes=9, num_points=45056)
         self.assertEqual(ds.cfg.num_points, 45056)
 
 
