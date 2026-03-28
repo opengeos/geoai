@@ -206,6 +206,7 @@ nav:
           - examples/field_boundary_detection.ipynb
           - examples/super_resolution.ipynb
           - examples/geodeep_detection.ipynb
+          - examples/rfdetr_detection.ipynb
           - examples/image_captioning.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
@@ -241,6 +242,7 @@ nav:
           - onnx module: onnx.md
           - prithvi module: prithvi.md
           - recognize module: recognize.md
+          - rfdetr module: rfdetr.md
           - sam module: sam.md
           - segment module: segment.md
           - segmentation module: segmentation.md

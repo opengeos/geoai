@@ -44,6 +44,7 @@ sr = ["opensr-model"]
 geodeep = ["geodeep"]
 geodeep-gpu = ["geodeep", "onnxruntime-gpu"]
 pointcloud = ["open3d>=0.18", "laspy[lazrs]>=2.5"]
+rfdetr = ["rfdetr"]
 
 [tool.uv]
 # geodeep hard-depends on onnxruntime (CPU), which shadows onnxruntime-gpu

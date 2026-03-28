@@ -109,8 +109,8 @@ class LoRALinear(nn.Module):
         self.rank = rank
         self.alpha = alpha if alpha is not None else float(rank)
 
-        in_features = original.in_features
-        out_features = original.out_features
+        self.in_features = in_features = original.in_features
+        self.out_features = out_features = original.out_features
 
         self.lora_A = nn.Parameter(torch.empty(rank, in_features))
         self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
