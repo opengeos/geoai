@@ -479,6 +479,18 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
 
     info = SUPPORTED_MODELS[model_name]
     url = info["url"]
+
+    # If sha256 is None, the checkpoint hasn't been trained/uploaded yet.
+    # Users must provide a checkpoint_path (e.g. from another model for
+    # transfer learning) when training a new model for the first time.
+    if info.get("sha256") is None:
+        raise RuntimeError(
+            f"No pre-trained checkpoint available for '{model_name}' yet. "
+            f"For initial training, provide a checkpoint_path argument "
+            f"(e.g. from _download_checkpoint('RandLANet_SemanticKITTI') "
+            f"for transfer learning)."
+        )
+
     filename = os.path.basename(url)
     os.makedirs(cache_dir, exist_ok=True)
     local_path = os.path.join(cache_dir, filename)
