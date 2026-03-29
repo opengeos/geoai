@@ -684,12 +684,25 @@ class _LASDatasetSplit:
         in_channels: int = 3,
         split: str = "training",
         asprs_to_model: Optional[Dict[int, int]] = None,
+        dataset: Optional[object] = None,
     ):
         self.file_paths = file_paths
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.split = split
         self.asprs_to_model = asprs_to_model
+        self.dataset = dataset
+        if dataset is not None:
+            self.cfg = dataset.cfg
+
+        # Open3D-ML pipeline expects a sampler on each split.
+        from open3d._ml3d.utils import get_module
+
+        if split in ("test",):
+            sampler_cls = get_module("sampler", "SemSegSpatiallyRegularSampler")
+        else:
+            sampler_cls = get_module("sampler", "SemSegRandomSampler")
+        self.sampler = sampler_cls(self)
 
     def __len__(self) -> int:
         return len(self.file_paths)
@@ -767,6 +780,7 @@ class _LASDataset:
                 self.in_channels,
                 "training",
                 asprs_to_model=self._asprs_to_model,
+                dataset=self,
             )
         if split in ("validation", "val"):
             return _LASDatasetSplit(
@@ -775,6 +789,7 @@ class _LASDataset:
                 self.in_channels,
                 "validation",
                 asprs_to_model=self._asprs_to_model,
+                dataset=self,
             )
         if split == "test":
             raise NotImplementedError(
