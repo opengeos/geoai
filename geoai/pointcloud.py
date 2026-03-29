@@ -745,8 +745,19 @@ class _LASDataset:
         self._label_to_names = label_to_names or {}
         self._asprs_to_model = asprs_to_model
 
-        # Open3D-ML pipeline reads self.cfg for cache/worker settings.
-        self.cfg = SimpleNamespace(
+        # Open3D-ML pipeline reads self.cfg and calls .keys() on it,
+        # so we need a dict subclass that also supports attribute access.
+        class _AttrDict(dict):
+            def __getattr__(self, key):
+                try:
+                    return self[key]
+                except KeyError:
+                    raise AttributeError(key)
+
+            def __setattr__(self, key, value):
+                self[key] = value
+
+        self.cfg = _AttrDict(
             use_cache=False, num_workers=0, num_points=num_points
         )
 
