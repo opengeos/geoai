@@ -737,6 +737,7 @@ class _LASDataset:
         label_to_names: Optional[Dict[int, str]] = None,
         asprs_to_model: Optional[Dict[int, int]] = None,
     ):
+        self.name = "LASDataset"
         self._train_files = train_files
         self._val_files = val_files
         self.num_classes = num_classes
