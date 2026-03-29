@@ -449,6 +449,12 @@ _LAZY_SYMBOL_MAP = {
     "DINOv3SegmentationDataset": ("dinov3_finetune", None),
     "train_dinov3_segmentation": ("dinov3_finetune", None),
     "dinov3_segment_geotiff": ("dinov3_finetune", None),
+    # --- geoai.pointcloud ---
+    "PointCloudClassifier": ("pointcloud", None),
+    "classify_point_cloud": ("pointcloud", None),
+    "list_pointcloud_models": ("pointcloud", None),
+    "ASPRS_CLASSES": ("pointcloud", None),
+    "SUPPORTED_MODELS": ("pointcloud", None),
 }
 
 # Submodules that can be imported via `from geoai import <submodule>`
@@ -468,6 +474,7 @@ _LAZY_SUBMODULES = {
     "landcover_utils",
     "landcover_train",
     "dinov3_finetune",
+    "pointcloud",
 }
 
 
