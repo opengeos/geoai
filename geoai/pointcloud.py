@@ -1160,6 +1160,7 @@ class PointCloudClassifier:
             max_epoch=epochs,
             optimizer={"lr": learning_rate},
             batch_size=batch_size,
+            num_workers=0,
             save_ckpt_freq=max(1, epochs // 5),
             main_log_dir=save_dir,
         )
