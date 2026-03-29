@@ -757,9 +757,7 @@ class _LASDataset:
             def __setattr__(self, key, value):
                 self[key] = value
 
-        self.cfg = _AttrDict(
-            use_cache=False, num_workers=0, num_points=num_points
-        )
+        self.cfg = _AttrDict(use_cache=False, num_workers=0, num_points=num_points)
 
     def get_split(self, split: str):
         if split in ("training", "train"):
