@@ -52,6 +52,136 @@ except ImportError:
     LIGHTLY_TRAIN_AVAILABLE = False
 
 
+def _validate_training_paths(
+    images_dir: str,
+    labels_dir: str,
+    output_dir: str,
+    input_format: str = "directory",
+) -> None:
+    """Validate training input paths before starting training.
+
+    Checks that directories/files exist, are the correct type, and are readable.
+    On Windows, retries on PermissionError to handle transient file locks from
+    antivirus or indexing services.
+
+    Args:
+        images_dir: Directory containing training images.
+        labels_dir: Directory containing labels (or path to COCO JSON).
+        output_dir: Directory for saving model outputs.
+        input_format: One of 'directory', 'coco', 'coco_detection', 'yolo'.
+
+    Raises:
+        FileNotFoundError: If a required path does not exist or is the wrong type.
+        PermissionError: If a required path cannot be read.
+    """
+    fmt = input_format.lower()
+
+    # --- images_dir ---
+    if not os.path.exists(images_dir):
+        raise FileNotFoundError(f"Images directory not found: {images_dir}")
+    if not os.path.isdir(images_dir):
+        raise FileNotFoundError(
+            f"Images path is not a directory: {images_dir}"
+        )
+    _check_readable(images_dir)
+
+    # --- labels_dir (format-dependent) ---
+    if fmt in ("coco", "coco_detection"):
+        if not os.path.exists(labels_dir):
+            raise FileNotFoundError(
+                f"COCO annotations file not found: {labels_dir}"
+            )
+        if not os.path.isfile(labels_dir):
+            raise FileNotFoundError(
+                f"COCO annotations path is not a file: {labels_dir}. "
+                "For COCO format, labels should point to a JSON file "
+                "(e.g., instances.json)."
+            )
+        _check_readable(labels_dir)
+    elif fmt == "yolo":
+        yolo_images = os.path.join(images_dir, "images")
+        yolo_labels = os.path.join(images_dir, "labels")
+        if not os.path.isdir(yolo_images):
+            raise FileNotFoundError(
+                f"YOLO images subdirectory not found: {yolo_images}. "
+                "YOLO format requires 'images/' and 'labels/' subdirectories."
+            )
+        if not os.path.isdir(yolo_labels):
+            raise FileNotFoundError(
+                f"YOLO labels subdirectory not found: {yolo_labels}. "
+                "YOLO format requires 'images/' and 'labels/' subdirectories."
+            )
+        _check_readable(yolo_images)
+        _check_readable(yolo_labels)
+    else:
+        # directory format
+        if not os.path.exists(labels_dir):
+            raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
+        if not os.path.isdir(labels_dir):
+            raise FileNotFoundError(
+                f"Labels path is not a directory: {labels_dir}"
+            )
+        _check_readable(labels_dir)
+
+    # --- output_dir ---
+    try:
+        os.makedirs(os.path.abspath(output_dir), exist_ok=True)
+    except PermissionError:
+        raise PermissionError(
+            f"Cannot create output directory (permission denied): {output_dir}"
+        )
+
+
+def _check_readable(path: str, max_retries: int = 3, retry_delay: float = 1.0) -> None:
+    """Verify a path is readable, with retry on Windows for transient locks.
+
+    On Windows, antivirus scanners and file indexing services can briefly lock
+    newly created directories, causing PermissionError on os.listdir().  This
+    helper retries a few times before giving up.
+
+    Args:
+        path: File or directory path to check.
+        max_retries: Number of retry attempts on PermissionError (Windows only).
+        retry_delay: Seconds to wait between retries.
+
+    Raises:
+        PermissionError: If the path is not readable after all retries.
+    """
+    is_dir = os.path.isdir(path)
+    attempts = max_retries if platform.system() == "Windows" else 1
+
+    for attempt in range(attempts):
+        try:
+            if is_dir:
+                os.listdir(path)
+            else:
+                with open(path, "rb") as f:
+                    f.read(1)
+            return
+        except PermissionError:
+            if attempt < attempts - 1:
+                logger.warning(
+                    "Permission denied reading %s (attempt %d/%d), retrying...",
+                    path,
+                    attempt + 1,
+                    attempts,
+                )
+                time.sleep(retry_delay)
+            else:
+                hint = ""
+                if platform.system() == "Windows":
+                    hint = (
+                        " This may be caused by Windows Defender, file indexing, "
+                        "or another process holding a lock. Try: (1) waiting a "
+                        "few seconds and retrying, (2) excluding the directory "
+                        "from antivirus scanning, (3) running QGIS as "
+                        "administrator."
+                    )
+                raise PermissionError(
+                    f"Cannot read {path} (permission denied).{hint}"
+                )
+
+
 def parse_coco_annotations(
     coco_json_path: str, images_dir: str, labels_dir: str
 ) -> Tuple[List[str], List[str]]:
@@ -1382,6 +1512,9 @@ def train_MaskRCNN_model(
     if device is None:
         device = get_device()
     logger.info(f"Using device: {device}")
+
+    # Validate input paths before proceeding
+    _validate_training_paths(images_dir, labels_dir, output_dir, input_format)
 
     # Get all image and label files based on input format
     use_coco_detection = input_format.lower() == "coco_detection"
@@ -3845,6 +3978,9 @@ def train_segmentation_model(
     if device is None:
         device = get_device()
     logger.info(f"Using device: {device}")
+
+    # Validate input paths before proceeding
+    _validate_training_paths(images_dir, labels_dir, output_dir, input_format)
 
     # Get all image and label files based on input format
     if input_format.lower() == "coco":

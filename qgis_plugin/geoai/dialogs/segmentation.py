@@ -1308,6 +1308,70 @@ class SegmentationDockWidget(QDockWidget):
             QMessageBox.warning(self, "Warning", "Please fill in all fields.")
             return
 
+        input_format = self.input_format_combo.currentText()
+
+        # Validate paths before launching subprocess
+        if not os.path.isdir(images_dir):
+            QMessageBox.warning(
+                self,
+                "Invalid Path",
+                f"Images directory does not exist:\n{images_dir}\n\n"
+                "Please check the path and try again.",
+            )
+            return
+
+        if input_format == "directory":
+            if not os.path.isdir(labels_dir):
+                QMessageBox.warning(
+                    self,
+                    "Invalid Path",
+                    f"Labels directory does not exist:\n{labels_dir}\n\n"
+                    "Please check the path and try again.",
+                )
+                return
+            if not os.access(labels_dir, os.R_OK):
+                QMessageBox.warning(
+                    self,
+                    "Permission Denied",
+                    f"Cannot read labels directory:\n{labels_dir}\n\n"
+                    "Please check file permissions. On Windows, try running "
+                    "QGIS as administrator or excluding the folder from "
+                    "antivirus scanning.",
+                )
+                return
+        elif input_format in ("coco", "coco_detection"):
+            if not os.path.isfile(labels_dir):
+                QMessageBox.warning(
+                    self,
+                    "Invalid Path",
+                    f"COCO annotations file does not exist:\n{labels_dir}\n\n"
+                    "For COCO format, the labels path should point to a JSON file.",
+                )
+                return
+        elif input_format == "yolo":
+            yolo_imgs = os.path.join(images_dir, "images")
+            yolo_lbls = os.path.join(images_dir, "labels")
+            if not os.path.isdir(yolo_imgs) or not os.path.isdir(yolo_lbls):
+                QMessageBox.warning(
+                    self,
+                    "Invalid Path",
+                    f"YOLO format requires 'images/' and 'labels/' "
+                    f"subdirectories in:\n{images_dir}\n\n"
+                    "Please check the directory structure.",
+                )
+                return
+
+        if not os.access(images_dir, os.R_OK):
+            QMessageBox.warning(
+                self,
+                "Permission Denied",
+                f"Cannot read images directory:\n{images_dir}\n\n"
+                "Please check file permissions. On Windows, try running "
+                "QGIS as administrator or excluding the folder from "
+                "antivirus scanning.",
+            )
+            return
+
         self.train_btn.setEnabled(False)
         num_epochs = self.epochs_spin.value()
         self.train_progress.setRange(0, num_epochs)
