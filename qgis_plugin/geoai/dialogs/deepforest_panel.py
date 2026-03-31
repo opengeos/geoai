@@ -514,9 +514,7 @@ class DeepForestPredictWorker(QThread):
         except Exception:
             pass
         try:
-            return self.model.predict_tile(
-                **tile_kwargs, dataloader_strategy="window"
-            )
+            return self.model.predict_tile(**tile_kwargs, dataloader_strategy="window")
         except RuntimeError as exc2:
             if not self._is_cuda_oom(exc2):
                 raise
@@ -526,9 +524,7 @@ class DeepForestPredictWorker(QThread):
         # --- Retry 2: fall back to CPU --------------------------------------
         if torch is not None:
             torch.cuda.empty_cache()
-        self.progress.emit(
-            "GPU retry failed \u2014 falling back to CPU inference..."
-        )
+        self.progress.emit("GPU retry failed \u2014 falling back to CPU inference...")
         self.model.config["accelerator"] = "cpu"
         self.model.config["batch_size"] = 1
         try:
@@ -540,9 +536,7 @@ class DeepForestPredictWorker(QThread):
         except Exception:
             pass
         try:
-            return self.model.predict_tile(
-                **tile_kwargs, dataloader_strategy="window"
-            )
+            return self.model.predict_tile(**tile_kwargs, dataloader_strategy="window")
         except Exception as cpu_exc:
             raise RuntimeError(
                 f"DeepForest prediction failed on GPU and CPU fallback: {cpu_exc}"
