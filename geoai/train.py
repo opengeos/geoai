@@ -80,17 +80,13 @@ def _validate_training_paths(
     if not os.path.exists(images_dir):
         raise FileNotFoundError(f"Images directory not found: {images_dir}")
     if not os.path.isdir(images_dir):
-        raise FileNotFoundError(
-            f"Images path is not a directory: {images_dir}"
-        )
+        raise FileNotFoundError(f"Images path is not a directory: {images_dir}")
     _check_readable(images_dir)
 
     # --- labels_dir (format-dependent) ---
     if fmt in ("coco", "coco_detection"):
         if not os.path.exists(labels_dir):
-            raise FileNotFoundError(
-                f"COCO annotations file not found: {labels_dir}"
-            )
+            raise FileNotFoundError(f"COCO annotations file not found: {labels_dir}")
         if not os.path.isfile(labels_dir):
             raise FileNotFoundError(
                 f"COCO annotations path is not a file: {labels_dir}. "
@@ -118,9 +114,7 @@ def _validate_training_paths(
         if not os.path.exists(labels_dir):
             raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
         if not os.path.isdir(labels_dir):
-            raise FileNotFoundError(
-                f"Labels path is not a directory: {labels_dir}"
-            )
+            raise FileNotFoundError(f"Labels path is not a directory: {labels_dir}")
         _check_readable(labels_dir)
 
     # --- output_dir ---
@@ -177,9 +171,7 @@ def _check_readable(path: str, max_retries: int = 3, retry_delay: float = 1.0) -
                         "from antivirus scanning, (3) running QGIS as "
                         "administrator."
                     )
-                raise PermissionError(
-                    f"Cannot read {path} (permission denied).{hint}"
-                )
+                raise PermissionError(f"Cannot read {path} (permission denied).{hint}")
 
 
 def parse_coco_annotations(

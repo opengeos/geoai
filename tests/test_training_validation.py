@@ -7,7 +7,6 @@ import pytest
 
 from geoai.train import _check_readable, _validate_training_paths
 
-
 # ---------------------------------------------------------------------------
 # _validate_training_paths — directory format
 # ---------------------------------------------------------------------------
@@ -294,8 +293,6 @@ class TestCheckReadable:
         target = tmp_path / "locked"
         target.mkdir()
 
-        with patch(
-            "geoai.train.os.listdir", side_effect=PermissionError("locked")
-        ):
+        with patch("geoai.train.os.listdir", side_effect=PermissionError("locked")):
             with pytest.raises(PermissionError, match="Windows Defender"):
                 _check_readable(str(target), max_retries=1)
