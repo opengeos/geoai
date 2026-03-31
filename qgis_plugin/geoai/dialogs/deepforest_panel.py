@@ -158,15 +158,15 @@ class _RecordsFrame:
 
 def _get_gpu_memory_mb() -> int:
     """Return total GPU VRAM in MB, or 0 if no GPU is available."""
-    if torch is None:
-        return 0
-    try:
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-            props = torch.cuda.get_device_properties(0)
-            return props.total_mem // (1024 * 1024)
-    except Exception:
-        pass
-    # Fallback: try nvidia-smi via venv_manager
+    if torch is not None:
+        try:
+            if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                props = torch.cuda.get_device_properties(0)
+                return props.total_mem // (1024 * 1024)
+        except Exception:
+            pass
+    # Fallback: try nvidia-smi via venv_manager (works even without torch,
+    # e.g. on Windows where PyTorch DLLs conflict with the QGIS process).
     try:
         from ..core.venv_manager import detect_nvidia_gpu
 
@@ -467,7 +467,13 @@ class DeepForestPredictWorker(QThread):
             oom_cls = getattr(torch.cuda, "OutOfMemoryError", None)
             if oom_cls is not None and isinstance(exc, oom_cls):
                 return True
-        return "out of memory" in str(exc).lower()
+            # String fallback: only match when CUDA is actually in use to
+            # avoid misclassifying CPU OOM or raster I/O errors.
+            if torch.cuda.is_available():
+                msg = str(exc).lower()
+                if "out of memory" in msg and ("cuda" in msg or "cublas" in msg):
+                    return True
+        return False
 
     def _predict_tile_with_oom_retry(self, image_path: str):
         """Run predict_tile with automatic OOM recovery.
@@ -499,7 +505,10 @@ class DeepForestPredictWorker(QThread):
 
         # --- Retry 1: reduce batch, switch to window strategy ---------------
         if torch is not None:
-            torch.cuda.empty_cache()
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
         reduced_batch = max(1, self.batch_size // 2)
         self.progress.emit(
             f"GPU out of memory \u2014 retrying with batch_size={reduced_batch}, "
@@ -523,7 +532,10 @@ class DeepForestPredictWorker(QThread):
 
         # --- Retry 2: fall back to CPU --------------------------------------
         if torch is not None:
-            torch.cuda.empty_cache()
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
         self.progress.emit("GPU retry failed \u2014 falling back to CPU inference...")
         self.model.config["accelerator"] = "cpu"
         self.model.config["batch_size"] = 1
@@ -991,10 +1003,16 @@ class DeepForestDockWidget(QDockWidget):
             self.tile_settings_group.setTitle(
                 f"Large Tile Settings (GPU: {vram_gb:.0f} GB)"
             )
-        self.log_message(
-            f"Auto-configured tile settings for {vram_gb:.0f} GB GPU: "
-            f"batch_size={batch_size}, strategy={strategy}"
-        )
+            self.log_message(
+                f"Auto-configured tile settings for {vram_gb:.0f} GB GPU: "
+                f"batch_size={batch_size}, strategy={strategy}"
+            )
+        else:
+            self.tile_settings_group.setTitle("Large Tile Settings (CPU)")
+            self.log_message(
+                f"No GPU detected — using safe defaults: "
+                f"batch_size={batch_size}, strategy={strategy}"
+            )
 
     def _mark_tile_settings_modified(self):
         """Mark that the user has manually changed tile settings."""

@@ -54,19 +54,6 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-def _get_gpu_memory_mb() -> int:
-    """Return total GPU VRAM in MB, or 0 if no GPU is available."""
-    try:
-        import torch
-
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-            props = torch.cuda.get_device_properties(0)
-            return props.total_mem // (1024 * 1024)
-    except Exception:
-        pass
-    return 0
-
-
 def _configure_process_env() -> None:
     # Prevent PyTorch Lightning distributed process spawning.
     os.environ["WORLD_SIZE"] = "1"
@@ -197,9 +184,15 @@ def _is_cuda_oom(exc: Exception) -> bool:
         oom_cls = getattr(torch.cuda, "OutOfMemoryError", None)
         if oom_cls is not None and isinstance(exc, oom_cls):
             return True
+        # String fallback: only match when CUDA is actually in use to
+        # avoid misclassifying CPU OOM or raster I/O errors.
+        if torch.cuda.is_available():
+            msg = str(exc).lower()
+            if "out of memory" in msg and ("cuda" in msg or "cublas" in msg):
+                return True
     except Exception:
         pass
-    return "out of memory" in str(exc).lower()
+    return False
 
 
 def _predict_tile_with_oom_retry(
