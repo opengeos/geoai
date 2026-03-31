@@ -54,6 +54,19 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def _get_gpu_memory_mb() -> int:
+    """Return total GPU VRAM in MB, or 0 if no GPU is available."""
+    try:
+        import torch
+
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            props = torch.cuda.get_device_properties(0)
+            return props.total_mem // (1024 * 1024)
+    except Exception:
+        pass
+    return 0
+
+
 def _configure_process_env() -> None:
     # Prevent PyTorch Lightning distributed process spawning.
     os.environ["WORLD_SIZE"] = "1"
@@ -176,6 +189,118 @@ def _prepare_image_for_deepforest(image_path: str) -> tuple[str, str | None]:
     return image_path, None
 
 
+def _is_cuda_oom(exc: Exception) -> bool:
+    """Check whether *exc* is a CUDA out-of-memory error."""
+    try:
+        import torch
+
+        oom_cls = getattr(torch.cuda, "OutOfMemoryError", None)
+        if oom_cls is not None and isinstance(exc, oom_cls):
+            return True
+    except Exception:
+        pass
+    return "out of memory" in str(exc).lower()
+
+
+def _predict_tile_with_oom_retry(
+    model,
+    path: str,
+    *,
+    patch_size: int,
+    patch_overlap: float,
+    iou_threshold: float,
+    dataloader_strategy: str,
+    batch_size: int,
+    accelerator: str,
+) -> Any:
+    """Run predict_tile with automatic OOM recovery.
+
+    Model config is restored after retries so the singleton model in
+    ``_STATE`` is not permanently degraded for subsequent requests.
+    """
+    tile_kwargs = dict(
+        path=path,
+        patch_size=patch_size,
+        patch_overlap=patch_overlap,
+        iou_threshold=iou_threshold,
+    )
+
+    # Snapshot config for restoration after retries.
+    orig_batch = model.config.get("batch_size")
+    orig_accel = model.config.get("accelerator")
+
+    try:
+        return _run_quiet_stdout(
+            model.predict_tile,
+            **tile_kwargs,
+            dataloader_strategy=dataloader_strategy,
+        )
+    except RuntimeError as exc:
+        if not _is_cuda_oom(exc):
+            raise
+
+    # Retry 1: reduce batch, switch to window strategy
+    try:
+        import torch
+
+        torch.cuda.empty_cache()
+    except Exception:
+        pass
+    reduced_batch = max(1, batch_size // 2)
+    model.config["batch_size"] = reduced_batch
+    try:
+        _run_quiet_stdout(model.create_trainer, accelerator=accelerator, devices=1)
+    except Exception:
+        pass
+    try:
+        return _run_quiet_stdout(
+            model.predict_tile, **tile_kwargs, dataloader_strategy="window"
+        )
+    except RuntimeError as exc2:
+        if not _is_cuda_oom(exc2):
+            raise
+    finally:
+        model.config["batch_size"] = orig_batch
+
+    # Retry 2: fall back to CPU
+    try:
+        import torch
+
+        torch.cuda.empty_cache()
+        model.model.to("cpu")
+    except Exception:
+        pass
+    model.config["accelerator"] = "cpu"
+    model.config["batch_size"] = 1
+    try:
+        _run_quiet_stdout(model.create_trainer, accelerator="cpu", devices=1)
+    except Exception:
+        pass
+    try:
+        return _run_quiet_stdout(
+            model.predict_tile, **tile_kwargs, dataloader_strategy="window"
+        )
+    except Exception as cpu_exc:
+        raise RuntimeError(
+            f"DeepForest prediction failed on GPU and CPU fallback: {cpu_exc}"
+        ) from cpu_exc
+    finally:
+        # Restore original config so the singleton model is not degraded.
+        model.config["batch_size"] = orig_batch
+        model.config["accelerator"] = orig_accel
+        if orig_accel != "cpu":
+            try:
+                model.model.to(orig_accel.replace("gpu", "cuda"))
+            except Exception:
+                pass
+            try:
+                _run_quiet_stdout(
+                    model.create_trainer, accelerator=orig_accel, devices=1
+                )
+            except Exception:
+                pass
+
+
 def _handle_predict(req: dict) -> Any:
     _configure_process_env()
     model = _get_model()
@@ -216,13 +341,15 @@ def _handle_predict(req: dict) -> Any:
             result = _run_quiet_stdout(model.predict_image, path=pred_path)
             pred_mode = "single"
         else:
-            result = _run_quiet_stdout(
-                model.predict_tile,
-                path=pred_path,
+            result = _predict_tile_with_oom_retry(
+                model,
+                pred_path,
                 patch_size=patch_size,
                 patch_overlap=patch_overlap,
                 iou_threshold=iou_threshold,
                 dataloader_strategy=dataloader_strategy,
+                batch_size=batch_size,
+                accelerator=accelerator,
             )
             pred_mode = "tile"
     finally:
