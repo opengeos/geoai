@@ -6542,11 +6542,11 @@ if txt_files:
     with open(txt_files[0], "r") as f:
         lines = f.readlines()
     print(f"\nSample annotation ({txt_files[0].name}):")
-    print(f"  Format: <class_id> <x_center> <y_center> <width> <height>")
+    print(f"  Format: &lt;class_id&gt; &lt;x_center&gt; &lt;y_center&gt; &lt;width&gt; &lt;height&gt;")
     for line in lines[:5]:  # Show first 5 objects
         print(f"  {line.strip()}")
     if len(lines) &gt; 5:
-        print(f"  ... and {len(lines) - 5} more objects")</height></width></y_center></x_center></class_id></div>
+        print(f"  ... and {len(lines) - 5} more objects")</div>
 </div>
 </div>
 </div>
