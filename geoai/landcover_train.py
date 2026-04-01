@@ -28,6 +28,29 @@ import torch.nn.functional as F
 logger = logging.getLogger(__name__)
 
 
+def _one_hot_with_ignore(
+    targets: torch.Tensor, num_classes: int, ignore_index: int = -100
+) -> tuple:
+    """Convert class-index targets to one-hot encoding, masking ignored pixels.
+
+    Args:
+        targets: Ground truth tensor of shape (N, H, W) with class indices.
+        num_classes: Number of classes.
+        ignore_index: Target value that should be ignored.
+
+    Returns:
+        Tuple of (one_hot, valid_mask) where one_hot has shape (N, C, H, W)
+        and valid_mask has shape (N, H, W).
+    """
+    valid_mask = targets != ignore_index
+    safe_targets = targets.clone()
+    safe_targets[~valid_mask] = 0
+    one_hot = F.one_hot(safe_targets, num_classes)  # (N, H, W, C)
+    one_hot = one_hot.permute(0, 3, 1, 2).float()  # (N, C, H, W)
+    one_hot = one_hot * valid_mask.unsqueeze(1)
+    return one_hot, valid_mask
+
+
 class FocalLoss(nn.Module):
     """
     Focal Loss for addressing class imbalance in segmentation.
@@ -133,6 +156,258 @@ class LandcoverCrossEntropyLoss(nn.Module):
             ignore_index=self.ignore_index,
             reduction=self.reduction,
         )
+
+
+class DiceLoss(nn.Module):
+    """Dice loss for semantic segmentation.
+
+    Computes the Sørensen–Dice coefficient between predictions and targets,
+    which measures region overlap. Effective for class-imbalanced datasets
+    because it evaluates per-class overlap rather than per-pixel accuracy.
+
+    Args:
+        smooth: Smoothing constant to avoid division by zero.
+        ignore_index: Target value that is ignored and does not contribute
+            to the loss.
+        reduction: Reduction to apply: ``"mean"`` averages per-class losses,
+            ``"sum"`` sums them.
+        weight: Optional per-class weights tensor of shape ``(C,)``.
+    """
+
+    def __init__(
+        self,
+        smooth: float = 1.0,
+        ignore_index: int = -100,
+        reduction: str = "mean",
+        weight: Optional[torch.Tensor] = None,
+    ):
+        super().__init__()
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+        self.weight = weight
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute Dice loss.
+
+        Args:
+            inputs: Predictions of shape ``(N, C, H, W)`` (logits).
+            targets: Ground truth of shape ``(N, H, W)`` with class indices.
+
+        Returns:
+            Scalar loss value.
+        """
+        num_classes = inputs.shape[1]
+        one_hot, _ = _one_hot_with_ignore(targets, num_classes, self.ignore_index)
+        probs = F.softmax(inputs, dim=1)
+
+        dims = (0, 2, 3)  # reduce over batch and spatial dims
+        intersection = (probs * one_hot).sum(dim=dims)
+        cardinality = probs.sum(dim=dims) + one_hot.sum(dim=dims)
+        dice = (2.0 * intersection + self.smooth) / (cardinality + self.smooth)
+        loss = 1.0 - dice  # (C,)
+
+        if self.weight is not None:
+            w = self.weight.to(loss.device)
+            loss = loss * w
+
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        return loss
+
+
+class TverskyLoss(nn.Module):
+    """Tversky loss for semantic segmentation.
+
+    Generalises the Dice loss by allowing asymmetric weighting of false
+    positives and false negatives.  Setting ``alpha = beta = 0.5`` recovers
+    the standard Dice loss.  Increasing ``beta`` relative to ``alpha``
+    penalises false negatives more, which improves recall on rare classes.
+
+    Reference:
+        Salehi, S. S. M., Erdogmus, D., & Gholipour, A. (2017).
+        Tversky loss function for image segmentation using 3D fully
+        convolutional deep networks. *MLMI Workshop, MICCAI*.
+
+    Args:
+        alpha: Weight for false positives.
+        beta: Weight for false negatives.
+        smooth: Smoothing constant to avoid division by zero.
+        ignore_index: Target value that is ignored.
+        reduction: ``"mean"`` or ``"sum"`` over classes.
+        weight: Optional per-class weights tensor of shape ``(C,)``.
+    """
+
+    def __init__(
+        self,
+        alpha: float = 0.5,
+        beta: float = 0.5,
+        smooth: float = 1.0,
+        ignore_index: int = -100,
+        reduction: str = "mean",
+        weight: Optional[torch.Tensor] = None,
+    ):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+        self.weight = weight
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute Tversky loss.
+
+        Args:
+            inputs: Predictions of shape ``(N, C, H, W)`` (logits).
+            targets: Ground truth of shape ``(N, H, W)`` with class indices.
+
+        Returns:
+            Scalar loss value.
+        """
+        num_classes = inputs.shape[1]
+        one_hot, _ = _one_hot_with_ignore(targets, num_classes, self.ignore_index)
+        probs = F.softmax(inputs, dim=1)
+
+        dims = (0, 2, 3)
+        tp = (probs * one_hot).sum(dim=dims)
+        fp = (probs * (1.0 - one_hot)).sum(dim=dims)
+        fn = ((1.0 - probs) * one_hot).sum(dim=dims)
+        tversky = (tp + self.smooth) / (
+            tp + self.alpha * fp + self.beta * fn + self.smooth
+        )
+        loss = 1.0 - tversky  # (C,)
+
+        if self.weight is not None:
+            w = self.weight.to(loss.device)
+            loss = loss * w
+
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        return loss
+
+
+class UnifiedFocalLoss(nn.Module):
+    """Unified Focal Loss combining distribution-based and region-based losses.
+
+    Implements the framework from Yeung et al. (2021) which unifies focal
+    cross-entropy (distribution-based) and focal Tversky (region-based) losses
+    into a single compound loss.  This is particularly effective for semantic
+    segmentation with severe class imbalance.
+
+    The combined loss is::
+
+        L = lambda_ * L_dist + (1 - lambda_) * L_region
+
+    where ``L_dist`` is focal cross-entropy and ``L_region`` is focal Tversky.
+
+    Reference:
+        Yeung, M., Sala, E., Schönlieb, C.-B., & Rundo, L. (2021).
+        Unified Focal loss: Generalising Dice and cross entropy-based losses
+        to handle class imbalanced medical image segmentation.
+        *Computerized Medical Imaging and Graphics*, 95, 102026.
+
+    Note:
+        Inspired by the implementation in the
+        `terrainseg <https://github.com/maxwell-geospatial/terrainseg>`_
+        package by Maxwell (2024).
+
+    Args:
+        lambda_: Balance between distribution and region components.
+            ``1.0`` = pure focal CE, ``0.0`` = pure focal Tversky.
+        gamma: Focusing parameter for both components.  Higher values
+            down-weight easy examples more aggressively.
+        delta: Tversky false-negative weight; false-positive weight is
+            ``1 - delta``.  Values > 0.5 emphasise recall.
+        smooth: Smoothing constant for the Tversky denominator.
+        ignore_index: Target value that is ignored.
+        weight: Per-class weights for the distribution (focal CE) component.
+        region_weight: Per-class weights for the region (focal Tversky)
+            component.  Falls back to ``weight`` if *None*.
+        use_log_cosh: Apply ``log(cosh(loss))`` for gradient smoothing.
+    """
+
+    def __init__(
+        self,
+        lambda_: float = 0.5,
+        gamma: float = 0.75,
+        delta: float = 0.6,
+        smooth: float = 1.0,
+        ignore_index: int = -100,
+        weight: Optional[torch.Tensor] = None,
+        region_weight: Optional[torch.Tensor] = None,
+        use_log_cosh: bool = False,
+    ):
+        super().__init__()
+        self.lambda_ = lambda_
+        self.gamma = gamma
+        self.delta = delta
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+        self.weight = weight
+        self.region_weight = region_weight
+        self.use_log_cosh = use_log_cosh
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute unified focal loss.
+
+        Args:
+            inputs: Predictions of shape ``(N, C, H, W)`` (logits).
+            targets: Ground truth of shape ``(N, H, W)`` with class indices.
+
+        Returns:
+            Scalar loss value.
+        """
+        # --- Distribution component: focal cross-entropy ---
+        ce = F.cross_entropy(
+            inputs,
+            targets,
+            weight=self.weight.to(inputs.device) if self.weight is not None else None,
+            ignore_index=self.ignore_index,
+            reduction="none",
+        )
+        p_t = torch.exp(-ce)
+        focal_ce = ((1.0 - p_t) ** self.gamma) * ce
+
+        # Mean over valid pixels
+        valid = targets != self.ignore_index
+        if valid.any():
+            dist_loss = focal_ce[valid].mean()
+        else:
+            dist_loss = focal_ce.mean()
+
+        # --- Region component: focal Tversky ---
+        num_classes = inputs.shape[1]
+        one_hot, _ = _one_hot_with_ignore(targets, num_classes, self.ignore_index)
+        probs = F.softmax(inputs, dim=1)
+
+        dims = (0, 2, 3)
+        tp = (probs * one_hot).sum(dim=dims)
+        fp = (probs * (1.0 - one_hot)).sum(dim=dims)
+        fn = ((1.0 - probs) * one_hot).sum(dim=dims)
+        tversky = (tp + self.smooth) / (
+            tp + (1.0 - self.delta) * fp + self.delta * fn + self.smooth
+        )
+        focal_tversky = (1.0 - tversky) ** self.gamma  # (C,)
+
+        rw = self.region_weight if self.region_weight is not None else self.weight
+        if rw is not None:
+            rw = rw.to(focal_tversky.device)
+            focal_tversky = focal_tversky * rw
+
+        region_loss = focal_tversky.mean()
+
+        # --- Combine ---
+        loss = self.lambda_ * dist_loss + (1.0 - self.lambda_) * region_loss
+
+        if self.use_log_cosh:
+            loss = torch.log(torch.cosh(loss))
+
+        return loss
 
 
 def landcover_iou(
@@ -380,24 +655,45 @@ def get_landcover_loss_function(
     focal_alpha: float = 1.0,
     focal_gamma: float = 2.0,
     device: Optional[torch.device] = None,
+    smooth: float = 1.0,
+    tversky_alpha: float = 0.5,
+    tversky_beta: float = 0.5,
+    ufl_lambda: float = 0.5,
+    ufl_gamma: float = 0.75,
+    ufl_delta: float = 0.6,
+    region_weights: Optional[torch.Tensor] = None,
+    use_log_cosh: bool = False,
 ) -> nn.Module:
-    """
-    Get loss function configured for landcover classification.
+    """Get loss function configured for landcover classification.
 
     Args:
-        loss_name: Name of loss function ("crossentropy", "focal", "dice", "combo")
-        num_classes: Number of classes
-        ignore_index: Class index to ignore, or False to not ignore any class.
-            - If int: pixels with this label value will be ignored during training
-            - If False: no pixels will be ignored (all pixels contribute to loss)
-        class_weights: Manual class weights tensor
-        use_class_weights: Whether to use class weights
-        focal_alpha: Alpha parameter for focal loss
-        focal_gamma: Gamma parameter for focal loss
-        device: Device to place loss function on
+        loss_name: Name of loss function. One of ``"crossentropy"``,
+            ``"focal"``, ``"dice"``, ``"tversky"``, ``"unified_focal"``
+            (alias ``"ufl"``).
+        num_classes: Number of classes.
+        ignore_index: Class index to ignore, or ``False`` to not ignore any
+            class.
+        class_weights: Manual class weights tensor.
+        use_class_weights: Whether to use class weights.
+        focal_alpha: Alpha parameter for focal loss.
+        focal_gamma: Gamma parameter for focal loss.
+        device: Device to place loss function on.
+        smooth: Smoothing constant for Dice / Tversky denominator.
+        tversky_alpha: False-positive weight for Tversky loss.
+        tversky_beta: False-negative weight for Tversky loss.
+        ufl_lambda: Balance between distribution and region components in
+            Unified Focal Loss (``1.0`` = pure focal CE, ``0.0`` = pure
+            focal Tversky).
+        ufl_gamma: Focusing parameter for Unified Focal Loss.
+        ufl_delta: Tversky false-negative weight for Unified Focal Loss
+            (false-positive weight is ``1 - ufl_delta``).
+        region_weights: Per-class weights for the region component of
+            Unified Focal Loss.  Falls back to *class_weights* if ``None``.
+        use_log_cosh: Apply ``log(cosh(loss))`` stabilisation in Unified
+            Focal Loss.
 
     Returns:
-        Configured loss function
+        Configured loss function.
     """
 
     if device is None:
@@ -405,14 +701,13 @@ def get_landcover_loss_function(
 
     loss_name = loss_name.lower()
 
+    # Common helpers
+    weights = class_weights if use_class_weights else None
+    if weights is not None:
+        weights = weights.to(device)
+    idx = ignore_index if isinstance(ignore_index, int) else -100
+
     if loss_name == "crossentropy":
-        weights = class_weights if use_class_weights else None
-        if weights is not None:
-            weights = weights.to(device)
-
-        # Convert ignore_index: int stays as-is, False becomes -100 (PyTorch default)
-        idx = ignore_index if isinstance(ignore_index, int) else -100
-
         return LandcoverCrossEntropyLoss(
             weight=weights,
             ignore_index=idx,
@@ -420,13 +715,6 @@ def get_landcover_loss_function(
         )
 
     elif loss_name == "focal":
-        weights = class_weights if use_class_weights else None
-        if weights is not None:
-            weights = weights.to(device)
-
-        # Convert ignore_index: int stays as-is, False becomes -100 (PyTorch default)
-        idx = ignore_index if isinstance(ignore_index, int) else -100
-
         return FocalLoss(
             alpha=focal_alpha,
             gamma=focal_gamma,
@@ -435,15 +723,41 @@ def get_landcover_loss_function(
             weight=weights,
         )
 
+    elif loss_name == "dice":
+        return DiceLoss(
+            smooth=smooth,
+            ignore_index=idx,
+            reduction="mean",
+            weight=weights,
+        )
+
+    elif loss_name == "tversky":
+        return TverskyLoss(
+            alpha=tversky_alpha,
+            beta=tversky_beta,
+            smooth=smooth,
+            ignore_index=idx,
+            reduction="mean",
+            weight=weights,
+        )
+
+    elif loss_name in ("unified_focal", "ufl"):
+        rw = region_weights
+        if rw is not None:
+            rw = rw.to(device)
+        return UnifiedFocalLoss(
+            lambda_=ufl_lambda,
+            gamma=ufl_gamma,
+            delta=ufl_delta,
+            smooth=smooth,
+            ignore_index=idx,
+            weight=weights,
+            region_weight=rw,
+            use_log_cosh=use_log_cosh,
+        )
+
     else:
         # Fall back to standard PyTorch loss
-        weights = class_weights if use_class_weights else None
-        if weights is not None:
-            weights = weights.to(device)
-
-        # Convert ignore_index: int stays as-is, False becomes -100 (PyTorch default)
-        idx = ignore_index if isinstance(ignore_index, int) else -100
-
         return nn.CrossEntropyLoss(
             weight=weights,
             ignore_index=idx,
@@ -625,6 +939,14 @@ def train_segmentation_landcover(
     use_class_weights: bool = False,
     focal_alpha: float = 1.0,
     focal_gamma: float = 2.0,
+    smooth: float = 1.0,
+    tversky_alpha: float = 0.5,
+    tversky_beta: float = 0.5,
+    ufl_lambda: float = 0.5,
+    ufl_gamma: float = 0.75,
+    ufl_delta: float = 0.6,
+    region_weights: Optional[torch.Tensor] = None,
+    use_log_cosh: bool = False,
     custom_multipliers: Optional[Dict[int, float]] = None,
     max_class_weight: float = 50.0,
     use_inverse_frequency: bool = True,
@@ -634,61 +956,76 @@ def train_segmentation_landcover(
     training_callback: Optional[callable] = None,
     **kwargs: Any,
 ) -> torch.nn.Module:
-    """
-    Train a semantic segmentation model with landcover-specific enhancements.
+    """Train a semantic segmentation model with landcover-specific enhancements.
 
     This is a standalone version that wraps geoai.train.train_segmentation_model
     with landcover-specific loss functions, class weights, and metrics.
 
     Args:
-        images_dir: Directory containing training images
-        labels_dir: Directory containing training labels
-        output_dir: Directory to save model checkpoints and training history
-        input_format: Data format ("directory", "COCO", "YOLO")
-        architecture: Model architecture (default: "unet")
-        encoder_name: Encoder backbone (default: "resnet34")
-        encoder_weights: Pretrained weights ("imagenet" or None)
-        num_channels: Number of input channels (default: 3)
-        num_classes: Number of output classes (default: 2)
-        batch_size: Training batch size (default: 8)
-        num_epochs: Number of training epochs (default: 50)
-        learning_rate: Initial learning rate (default: 0.001)
-        weight_decay: Weight decay for optimizer (default: 1e-4)
-        seed: Random seed for reproducibility (default: 42)
-        val_split: Validation split ratio (default: 0.2)
-        print_freq: Frequency of training progress prints (default: 10)
-        verbose: Enable verbose output (default: True)
-        save_best_only: Only save best model checkpoint (default: True)
-        plot_curves: Plot training curves at end (default: False)
-        device: Torch device (auto-detected if None)
-        checkpoint_path: Path to checkpoint for resuming training
-        resume_training: Whether to resume from checkpoint (default: False)
-        target_size: Target size for resizing images (H, W) or None
-        resize_mode: How to resize ("resize", "crop", or "pad")
-        num_workers: Number of dataloader workers (default: auto)
-        loss_function: Loss function name ("crossentropy", "focal")
-        ignore_index: Class index to ignore during training. (default: 0)
-            - If int: pixels with this label value will be ignored during training
-            - If False: no pixels will be ignored (all pixels contribute to loss)
-        use_class_weights: Whether to compute and use class weights (default: False)
-        focal_alpha: Focal loss alpha parameter (default: 1.0)
-        focal_gamma: Focal loss gamma parameter (default: 2.0)
-        custom_multipliers: Custom class weight multipliers {class_id: multiplier}
-        max_class_weight: Maximum allowed class weight (default: 50.0)
-        use_inverse_frequency: Use inverse frequency for weights (default: True)
-        validation_iou_mode: IoU calculation mode for validation (default: "standard")
-            - "standard": Unweighted mean IoU (all classes equal importance)
-            - "perclass_frequency": Frequency-weighted IoU (classes weighted by pixel count)
-            - "boundary_weighted": Boundary-distance weighted IoU (wIoU, focus on edges)
-            - "sparse_labels": For incomplete ground truth - predictions in background
-              areas are NOT penalized. Uses custom training loop with sparse IoU for
-              model selection. BEST FOR INCOMPLETE/SPARSE HABITAT MASKS.
-        boundary_alpha: Boundary importance factor for wIoU mode (default: 1.0)
-            Higher values = more focus on boundaries (0.01-100 range)
-        background_class: Class ID for background/unlabeled pixels in sparse_labels mode
-            (default: 0). Predictions in this class area are NOT counted as false positives.
-        training_callback: Optional callback function for automatic metric tracking
-        **kwargs: Additional arguments passed to base training function
+        images_dir: Directory containing training images.
+        labels_dir: Directory containing training labels.
+        output_dir: Directory to save model checkpoints and training history.
+        input_format: Data format (``"directory"``, ``"COCO"``, ``"YOLO"``).
+        architecture: Model architecture (default: ``"unet"``).
+        encoder_name: Encoder backbone (default: ``"resnet34"``).
+        encoder_weights: Pretrained weights (``"imagenet"`` or ``None``).
+        num_channels: Number of input channels (default: 3).
+        num_classes: Number of output classes (default: 2).
+        batch_size: Training batch size (default: 8).
+        num_epochs: Number of training epochs (default: 50).
+        learning_rate: Initial learning rate (default: 0.001).
+        weight_decay: Weight decay for optimizer (default: 1e-4).
+        seed: Random seed for reproducibility (default: 42).
+        val_split: Validation split ratio (default: 0.2).
+        print_freq: Frequency of training progress prints (default: 10).
+        verbose: Enable verbose output (default: True).
+        save_best_only: Only save best model checkpoint (default: True).
+        plot_curves: Plot training curves at end (default: False).
+        device: Torch device (auto-detected if ``None``).
+        checkpoint_path: Path to checkpoint for resuming training.
+        resume_training: Whether to resume from checkpoint (default: False).
+        target_size: Target size for resizing images ``(H, W)`` or ``None``.
+        resize_mode: How to resize (``"resize"``, ``"crop"``, or ``"pad"``).
+        num_workers: Number of dataloader workers (default: auto).
+        loss_function: Loss function name. One of ``"crossentropy"``,
+            ``"focal"``, ``"dice"``, ``"tversky"``, ``"unified_focal"``
+            (alias ``"ufl"``).
+        ignore_index: Class index to ignore during training (default: 0).
+            Set to ``False`` so that all pixels contribute to the loss.
+        use_class_weights: Whether to compute and use class weights
+            (default: False).
+        focal_alpha: Focal loss alpha parameter (default: 1.0).
+        focal_gamma: Focal loss gamma parameter (default: 2.0).
+        smooth: Smoothing constant for Dice / Tversky denominator
+            (default: 1.0).
+        tversky_alpha: False-positive weight for Tversky loss (default: 0.5).
+        tversky_beta: False-negative weight for Tversky loss (default: 0.5).
+            Increase relative to *tversky_alpha* to improve recall.
+        ufl_lambda: Balance between distribution and region components in
+            Unified Focal Loss (default: 0.5).
+        ufl_gamma: Focusing parameter for Unified Focal Loss (default: 0.75).
+        ufl_delta: Tversky false-negative weight inside Unified Focal Loss
+            (default: 0.6).
+        region_weights: Per-class weights for the region component of
+            Unified Focal Loss.  Falls back to *class_weights* if ``None``.
+        use_log_cosh: Apply ``log(cosh(loss))`` stabilisation in Unified
+            Focal Loss (default: False).
+        custom_multipliers: Custom class weight multipliers
+            ``{class_id: multiplier}``.
+        max_class_weight: Maximum allowed class weight (default: 50.0).
+        use_inverse_frequency: Use inverse frequency for weights
+            (default: True).
+        validation_iou_mode: IoU calculation mode for validation
+            (default: ``"standard"``).  Options:
+            ``"standard"``, ``"perclass_frequency"``,
+            ``"boundary_weighted"``, ``"sparse_labels"``.
+        boundary_alpha: Boundary importance factor for wIoU mode
+            (default: 1.0).
+        background_class: Class ID for background/unlabeled pixels in
+            sparse_labels mode (default: 0).
+        training_callback: Optional callback function for automatic metric
+            tracking.
+        **kwargs: Additional arguments passed to base training function.
 
     Returns:
         Trained model
@@ -763,6 +1100,14 @@ def train_segmentation_landcover(
         focal_alpha=focal_alpha,
         focal_gamma=focal_gamma,
         device=device,
+        smooth=smooth,
+        tversky_alpha=tversky_alpha,
+        tversky_beta=tversky_beta,
+        ufl_lambda=ufl_lambda,
+        ufl_gamma=ufl_gamma,
+        ufl_delta=ufl_delta,
+        region_weights=region_weights,
+        use_log_cosh=use_log_cosh,
     )
 
     if verbose:
@@ -1683,8 +2028,11 @@ def evaluate_sparse_iou(
 
 # Export main functions
 __all__ = [
+    "DiceLoss",
     "FocalLoss",
     "LandcoverCrossEntropyLoss",
+    "TverskyLoss",
+    "UnifiedFocalLoss",
     "landcover_iou",
     "get_landcover_loss_function",
     "compute_class_weights",

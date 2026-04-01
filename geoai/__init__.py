@@ -279,8 +279,11 @@ _LAZY_SYMBOL_MAP = {
     "export_landcover_tiles": ("landcover_utils", None),
     "normalize_radiometric": ("landcover_utils", None),
     # --- geoai.landcover_train ---
+    "DiceLoss": ("landcover_train", None),
     "FocalLoss": ("landcover_train", None),
     "LandcoverCrossEntropyLoss": ("landcover_train", None),
+    "TverskyLoss": ("landcover_train", None),
+    "UnifiedFocalLoss": ("landcover_train", None),
     "landcover_iou": ("landcover_train", None),
     "get_landcover_loss_function": ("landcover_train", None),
     "compute_class_weights": ("landcover_train", None),

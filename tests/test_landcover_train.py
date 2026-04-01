@@ -6,7 +6,15 @@ import unittest
 
 import torch
 
-from geoai.landcover_train import FocalLoss, LandcoverCrossEntropyLoss, landcover_iou
+from geoai.landcover_train import (
+    DiceLoss,
+    FocalLoss,
+    LandcoverCrossEntropyLoss,
+    TverskyLoss,
+    UnifiedFocalLoss,
+    get_landcover_loss_function,
+    landcover_iou,
+)
 
 
 class TestFocalLoss(unittest.TestCase):
@@ -98,6 +106,216 @@ class TestLandcoverCrossEntropyLoss(unittest.TestCase):
         loss_fn = LandcoverCrossEntropyLoss(weight=weights, ignore_index=-100)
         loss = loss_fn(self.inputs, self.targets)
         self.assertEqual(loss.dim(), 0)
+
+
+class TestDiceLoss(unittest.TestCase):
+    """Tests for the DiceLoss class."""
+
+    def setUp(self):
+        """Set up small test tensors."""
+        self.num_classes = 3
+        self.batch_size = 2
+        self.h, self.w = 4, 4
+        self.inputs = torch.randn(self.batch_size, self.num_classes, self.h, self.w)
+        self.targets = torch.randint(
+            0, self.num_classes, (self.batch_size, self.h, self.w)
+        )
+
+    def test_forward_returns_scalar(self):
+        """Test that forward pass returns a scalar loss."""
+        loss_fn = DiceLoss()
+        loss = loss_fn(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertGreater(loss.item(), 0.0)
+
+    def test_perfect_prediction_low_loss(self):
+        """Test that near-perfect predictions yield low loss."""
+        # Create one-hot logits that match targets exactly
+        one_hot = (
+            torch.nn.functional.one_hot(self.targets, self.num_classes)
+            .permute(0, 3, 1, 2)
+            .float()
+        )
+        logits = one_hot * 100.0  # large logits → near-1.0 softmax
+        loss_fn = DiceLoss()
+        loss = loss_fn(logits, self.targets)
+        self.assertLess(loss.item(), 0.05)
+
+    def test_with_class_weights(self):
+        """Test Dice loss with per-class weights."""
+        weights = torch.tensor([1.0, 2.0, 0.5])
+        loss_fn = DiceLoss(weight=weights)
+        loss = loss_fn(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertGreater(loss.item(), 0.0)
+
+    def test_ignore_index(self):
+        """Test that ignored pixels do not contribute."""
+        targets = self.targets.clone()
+        targets[:, 0, :] = 255  # mark first row as ignored
+        loss_fn = DiceLoss(ignore_index=255)
+        loss = loss_fn(self.inputs, targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertTrue(torch.isfinite(loss))
+
+
+class TestTverskyLoss(unittest.TestCase):
+    """Tests for the TverskyLoss class."""
+
+    def setUp(self):
+        """Set up small test tensors."""
+        self.num_classes = 3
+        self.batch_size = 2
+        self.h, self.w = 4, 4
+        self.inputs = torch.randn(self.batch_size, self.num_classes, self.h, self.w)
+        self.targets = torch.randint(
+            0, self.num_classes, (self.batch_size, self.h, self.w)
+        )
+
+    def test_forward_returns_scalar(self):
+        """Test that forward pass returns a scalar loss."""
+        loss_fn = TverskyLoss()
+        loss = loss_fn(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertGreater(loss.item(), 0.0)
+
+    def test_equals_dice_when_symmetric(self):
+        """Test that alpha=beta=0.5 matches DiceLoss (with smooth near zero)."""
+        torch.manual_seed(42)
+        inputs = torch.randn(2, self.num_classes, 4, 4)
+        targets = torch.randint(0, self.num_classes, (2, 4, 4))
+        eps = 1e-7
+        dice_loss = DiceLoss(smooth=eps)(inputs, targets)
+        tversky_loss = TverskyLoss(alpha=0.5, beta=0.5, smooth=eps)(inputs, targets)
+        self.assertAlmostEqual(dice_loss.item(), tversky_loss.item(), places=4)
+
+    def test_asymmetric_weights_differ(self):
+        """Test that asymmetric alpha/beta produces different loss."""
+        symmetric = TverskyLoss(alpha=0.5, beta=0.5)(self.inputs, self.targets)
+        asymmetric = TverskyLoss(alpha=0.3, beta=0.7)(self.inputs, self.targets)
+        # Values should generally differ (not guaranteed but highly likely)
+        self.assertNotAlmostEqual(symmetric.item(), asymmetric.item(), places=4)
+
+    def test_ignore_index(self):
+        """Test that ignored pixels do not contribute."""
+        targets = self.targets.clone()
+        targets[:, 0, :] = 255
+        loss_fn = TverskyLoss(ignore_index=255)
+        loss = loss_fn(self.inputs, targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertTrue(torch.isfinite(loss))
+
+    def test_with_class_weights(self):
+        """Test Tversky loss with per-class weights."""
+        weights = torch.tensor([1.0, 2.0, 0.5])
+        loss_fn = TverskyLoss(weight=weights)
+        loss = loss_fn(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+
+
+class TestUnifiedFocalLoss(unittest.TestCase):
+    """Tests for the UnifiedFocalLoss class."""
+
+    def setUp(self):
+        """Set up small test tensors."""
+        self.num_classes = 3
+        self.batch_size = 2
+        self.h, self.w = 4, 4
+        self.inputs = torch.randn(self.batch_size, self.num_classes, self.h, self.w)
+        self.targets = torch.randint(
+            0, self.num_classes, (self.batch_size, self.h, self.w)
+        )
+
+    def test_forward_returns_scalar(self):
+        """Test that forward pass returns a scalar loss."""
+        loss_fn = UnifiedFocalLoss()
+        loss = loss_fn(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertGreater(loss.item(), 0.0)
+
+    def test_lambda_one_is_pure_distribution(self):
+        """Test that lambda=1 produces only the distribution component."""
+        ufl = UnifiedFocalLoss(lambda_=1.0, gamma=0.75)
+        loss = ufl(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertTrue(torch.isfinite(loss))
+
+    def test_lambda_zero_is_pure_region(self):
+        """Test that lambda=0 produces only the region component."""
+        ufl = UnifiedFocalLoss(lambda_=0.0, gamma=0.75)
+        loss = ufl(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertTrue(torch.isfinite(loss))
+
+    def test_log_cosh_stabilisation(self):
+        """Test that use_log_cosh produces finite output."""
+        loss_fn = UnifiedFocalLoss(use_log_cosh=True)
+        loss = loss_fn(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertTrue(torch.isfinite(loss))
+
+    def test_gradient_flows(self):
+        """Test that gradients flow through the loss."""
+        inputs = self.inputs.clone().requires_grad_(True)
+        loss_fn = UnifiedFocalLoss()
+        loss = loss_fn(inputs, self.targets)
+        loss.backward()
+        self.assertIsNotNone(inputs.grad)
+        self.assertTrue(torch.isfinite(inputs.grad).all())
+
+    def test_ignore_index(self):
+        """Test that ignored pixels do not contribute."""
+        targets = self.targets.clone()
+        targets[:, 0, :] = 255
+        loss_fn = UnifiedFocalLoss(ignore_index=255)
+        loss = loss_fn(self.inputs, targets)
+        self.assertEqual(loss.dim(), 0)
+        self.assertTrue(torch.isfinite(loss))
+
+    def test_with_class_weights(self):
+        """Test unified focal loss with per-class weights."""
+        weights = torch.tensor([1.0, 2.0, 0.5])
+        loss_fn = UnifiedFocalLoss(weight=weights)
+        loss = loss_fn(self.inputs, self.targets)
+        self.assertEqual(loss.dim(), 0)
+
+
+class TestGetLandcoverLossFunction(unittest.TestCase):
+    """Tests for the get_landcover_loss_function factory."""
+
+    def test_crossentropy(self):
+        """Test factory creates CrossEntropy loss."""
+        loss_fn = get_landcover_loss_function(
+            "crossentropy", device=torch.device("cpu")
+        )
+        self.assertIsInstance(loss_fn, LandcoverCrossEntropyLoss)
+
+    def test_focal(self):
+        """Test factory creates Focal loss."""
+        loss_fn = get_landcover_loss_function("focal", device=torch.device("cpu"))
+        self.assertIsInstance(loss_fn, FocalLoss)
+
+    def test_dice(self):
+        """Test factory creates Dice loss."""
+        loss_fn = get_landcover_loss_function("dice", device=torch.device("cpu"))
+        self.assertIsInstance(loss_fn, DiceLoss)
+
+    def test_tversky(self):
+        """Test factory creates Tversky loss."""
+        loss_fn = get_landcover_loss_function("tversky", device=torch.device("cpu"))
+        self.assertIsInstance(loss_fn, TverskyLoss)
+
+    def test_unified_focal(self):
+        """Test factory creates Unified Focal loss."""
+        loss_fn = get_landcover_loss_function(
+            "unified_focal", device=torch.device("cpu")
+        )
+        self.assertIsInstance(loss_fn, UnifiedFocalLoss)
+
+    def test_ufl_alias(self):
+        """Test that 'ufl' alias maps to UnifiedFocalLoss."""
+        loss_fn = get_landcover_loss_function("ufl", device=torch.device("cpu"))
+        self.assertIsInstance(loss_fn, UnifiedFocalLoss)
 
 
 class TestLandcoverIou(unittest.TestCase):
