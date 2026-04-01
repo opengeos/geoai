@@ -216,6 +216,19 @@ class TestValidateOutputDir:
         )
         assert os.path.isdir(str(output))
 
+    def test_output_dir_is_file(self, tmp_path):
+        images = tmp_path / "images"
+        images.mkdir()
+        labels = tmp_path / "labels"
+        labels.mkdir()
+        output = tmp_path / "output_file"
+        output.write_text("I am a file, not a directory")
+
+        with pytest.raises(NotADirectoryError, match="not a directory"):
+            _validate_training_paths(
+                str(images), str(labels), str(output), input_format="directory"
+            )
+
 
 # ---------------------------------------------------------------------------
 # _check_readable

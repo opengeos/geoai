@@ -1177,6 +1177,19 @@ class InstanceSegmentationDockWidget(QDockWidget):
             )
             return
 
+        try:
+            os.listdir(images_dir)
+        except PermissionError:
+            QMessageBox.warning(
+                self,
+                "Permission Denied",
+                f"Cannot read images directory:\n{images_dir}\n\n"
+                "Please check file permissions. On Windows, try running "
+                "QGIS as administrator or excluding the folder from "
+                "antivirus scanning.",
+            )
+            return
+
         if input_format == "directory":
             if not os.path.isdir(labels_dir):
                 QMessageBox.warning(
@@ -1186,7 +1199,9 @@ class InstanceSegmentationDockWidget(QDockWidget):
                     "Please check the path and try again.",
                 )
                 return
-            if not os.access(labels_dir, os.R_OK):
+            try:
+                os.listdir(labels_dir)
+            except PermissionError:
                 QMessageBox.warning(
                     self,
                     "Permission Denied",
@@ -1196,13 +1211,24 @@ class InstanceSegmentationDockWidget(QDockWidget):
                     "antivirus scanning.",
                 )
                 return
-        elif input_format in ("coco", "coco_detection"):
+        elif input_format == "coco":
             if not os.path.isfile(labels_dir):
                 QMessageBox.warning(
                     self,
                     "Invalid Path",
                     f"COCO annotations file does not exist:\n{labels_dir}\n\n"
                     "For COCO format, the labels path should point to a JSON file.",
+                )
+                return
+            try:
+                with open(labels_dir, "rb") as f:
+                    f.read(1)
+            except PermissionError:
+                QMessageBox.warning(
+                    self,
+                    "Permission Denied",
+                    f"Cannot read COCO annotations file:\n{labels_dir}\n\n"
+                    "Please check file permissions.",
                 )
                 return
         elif input_format == "yolo":
@@ -1217,17 +1243,6 @@ class InstanceSegmentationDockWidget(QDockWidget):
                     "Please check the directory structure.",
                 )
                 return
-
-        if not os.access(images_dir, os.R_OK):
-            QMessageBox.warning(
-                self,
-                "Permission Denied",
-                f"Cannot read images directory:\n{images_dir}\n\n"
-                "Please check file permissions. On Windows, try running "
-                "QGIS as administrator or excluding the folder from "
-                "antivirus scanning.",
-            )
-            return
 
         self.train_btn.setEnabled(False)
         num_epochs = self.epochs_spin.value()

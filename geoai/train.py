@@ -118,12 +118,21 @@ def _validate_training_paths(
         _check_readable(labels_dir)
 
     # --- output_dir ---
+    abs_output_dir = os.path.abspath(output_dir)
+    if os.path.exists(abs_output_dir) and not os.path.isdir(abs_output_dir):
+        raise NotADirectoryError(
+            f"Output path exists and is not a directory: {output_dir}"
+        )
     try:
-        os.makedirs(os.path.abspath(output_dir), exist_ok=True)
+        os.makedirs(abs_output_dir, exist_ok=True)
     except PermissionError:
         raise PermissionError(
             f"Cannot create output directory (permission denied): {output_dir}"
         )
+    except OSError as e:
+        raise OSError(
+            f"Failed to create output directory '{output_dir}': {e}"
+        ) from e
 
 
 def _check_readable(path: str, max_retries: int = 3, retry_delay: float = 1.0) -> None:
