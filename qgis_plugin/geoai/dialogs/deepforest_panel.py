@@ -156,6 +156,44 @@ class _RecordsFrame:
 # ---------------------------------------------------------------------------
 
 
+def _get_gpu_memory_mb() -> int:
+    """Return total GPU VRAM in MB, or 0 if no GPU is available."""
+    if torch is not None:
+        try:
+            if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                props = torch.cuda.get_device_properties(0)
+                return props.total_mem // (1024 * 1024)
+        except Exception:
+            pass
+    # Fallback: try nvidia-smi via venv_manager (works even without torch,
+    # e.g. on Windows where PyTorch DLLs conflict with the QGIS process).
+    try:
+        from ..core.venv_manager import detect_nvidia_gpu
+
+        has_gpu, info = detect_nvidia_gpu()
+        if has_gpu:
+            return info.get("memory_mb", 0)
+    except Exception:
+        pass
+    return 0
+
+
+def _adaptive_tile_defaults(vram_mb: int) -> tuple:
+    """Return (batch_size, dataloader_strategy) for the given VRAM.
+
+    Returns:
+        Tuple of (batch_size, dataloader_strategy_name).
+    """
+    if vram_mb <= 0:
+        # No GPU detected — CPU path; use memory-safe defaults.
+        return 1, "window"
+    if vram_mb <= 8192:  # <=8 GB
+        return 1, "window"
+    if vram_mb <= 12288:  # 8-12 GB
+        return 2, "single"
+    return 4, "batch"  # >=12 GB
+
+
 def _use_deepforest_subprocess() -> bool:
     """Use subprocess DeepForest on Windows to avoid QGIS/PyTorch DLL conflicts."""
     return os.name == "nt"
@@ -398,13 +436,7 @@ class DeepForestPredictWorker(QThread):
                         f"(patch_size={self.patch_size})..."
                     )
 
-                result = self.model.predict_tile(
-                    path=image_path,
-                    patch_size=self.patch_size,
-                    patch_overlap=self.patch_overlap,
-                    iou_threshold=self.iou_threshold,
-                    dataloader_strategy=self.dataloader_strategy,
-                )
+                result = self._predict_tile_with_oom_retry(image_path)
                 pred_mode = "tile"
 
             # Clean up temporary RGB file
@@ -427,6 +459,113 @@ class DeepForestPredictWorker(QThread):
 
         except Exception as e:
             self.error.emit(str(e))
+
+    @staticmethod
+    def _is_cuda_oom(exc: Exception) -> bool:
+        """Check whether *exc* is a CUDA out-of-memory error."""
+        if torch is not None:
+            oom_cls = getattr(torch.cuda, "OutOfMemoryError", None)
+            if oom_cls is not None and isinstance(exc, oom_cls):
+                return True
+            # String fallback: only match when CUDA is actually in use to
+            # avoid misclassifying CPU OOM or raster I/O errors.
+            if torch.cuda.is_available():
+                msg = str(exc).lower()
+                if "out of memory" in msg and ("cuda" in msg or "cublas" in msg):
+                    return True
+        return False
+
+    def _predict_tile_with_oom_retry(self, image_path: str):
+        """Run predict_tile with automatic OOM recovery.
+
+        On CUDA OOM the method clears the GPU cache, reduces batch_size,
+        switches to the 'window' dataloader strategy, and retries.  If the
+        retry still OOMs it falls back to CPU inference.  Model config is
+        always restored after retries so future predictions are not affected.
+        """
+        tile_kwargs = dict(
+            path=image_path,
+            patch_size=self.patch_size,
+            patch_overlap=self.patch_overlap,
+            iou_threshold=self.iou_threshold,
+        )
+
+        # Snapshot config so we can restore it after retries.
+        orig_batch = self.model.config.get("batch_size")
+        orig_accel = self.model.config.get("accelerator")
+
+        try:
+            return self.model.predict_tile(
+                **tile_kwargs,
+                dataloader_strategy=self.dataloader_strategy,
+            )
+        except RuntimeError as exc:
+            if not self._is_cuda_oom(exc):
+                raise
+
+        # --- Retry 1: reduce batch, switch to window strategy ---------------
+        if torch is not None:
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        reduced_batch = max(1, self.batch_size // 2)
+        self.progress.emit(
+            f"GPU out of memory \u2014 retrying with batch_size={reduced_batch}, "
+            f"strategy=window..."
+        )
+        self.model.config["batch_size"] = reduced_batch
+        try:
+            self.model.create_trainer(
+                accelerator=self.model.config.get("accelerator", "gpu"),
+                devices=1,
+            )
+        except Exception:
+            pass
+        try:
+            return self.model.predict_tile(**tile_kwargs, dataloader_strategy="window")
+        except RuntimeError as exc2:
+            if not self._is_cuda_oom(exc2):
+                raise
+        finally:
+            self.model.config["batch_size"] = orig_batch
+
+        # --- Retry 2: fall back to CPU --------------------------------------
+        if torch is not None:
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        self.progress.emit("GPU retry failed \u2014 falling back to CPU inference...")
+        self.model.config["accelerator"] = "cpu"
+        self.model.config["batch_size"] = 1
+        try:
+            self.model.model.to("cpu")
+        except Exception:
+            pass
+        try:
+            self.model.create_trainer(accelerator="cpu", devices=1)
+        except Exception:
+            pass
+        try:
+            return self.model.predict_tile(**tile_kwargs, dataloader_strategy="window")
+        except Exception as cpu_exc:
+            raise RuntimeError(
+                f"DeepForest prediction failed on GPU and CPU fallback: {cpu_exc}"
+            ) from cpu_exc
+        finally:
+            # Restore original config so future predictions are unaffected.
+            self.model.config["batch_size"] = orig_batch
+            self.model.config["accelerator"] = orig_accel
+            if orig_accel != "cpu":
+                try:
+                    self.model.model.to(orig_accel.replace("gpu", "cuda"))
+                except Exception:
+                    pass
+                try:
+                    self.model.create_trainer(accelerator=orig_accel, devices=1)
+                except Exception:
+                    pass
 
 
 class DeepForestDockWidget(QDockWidget):
@@ -459,6 +598,10 @@ class DeepForestDockWidget(QDockWidget):
         # Workers
         self.model_load_worker = None
         self.predict_worker = None
+
+        # GPU VRAM and adaptive defaults
+        self._gpu_vram_mb = _get_gpu_memory_mb()
+        self._user_modified_tile_settings = False
 
         self._setup_ui()
 
@@ -672,7 +815,8 @@ class DeepForestDockWidget(QDockWidget):
         self.batch_size_spin.setToolTip(
             "Number of patches to process simultaneously.\n"
             "Higher values speed up prediction but use more GPU memory.\n"
-            "Default: 4. Reduce if you get out-of-memory errors."
+            "Recommended: 1 for <=8 GB GPU, 2 for 8-12 GB, 4 for >=12 GB.\n"
+            "Reduce if you get out-of-memory errors."
         )
         batch_size_row.addWidget(self.batch_size_spin)
         tile_settings_layout.addLayout(batch_size_row)
@@ -683,12 +827,19 @@ class DeepForestDockWidget(QDockWidget):
         self.dataloader_combo = QComboBox()
         self.dataloader_combo.addItems(["batch", "single", "window"])
         self.dataloader_combo.setToolTip(
-            "batch: fastest, loads entire image into GPU memory\n"
-            "single: loads full image to RAM, processes patches one at a time\n"
-            "window: most memory-efficient, reads only needed windows from disk"
+            "batch: fastest, loads entire image into GPU memory (>=12 GB GPU)\n"
+            "single: loads full image to RAM, processes patches one at a time (8-12 GB GPU)\n"
+            "window: most memory-efficient, reads only needed windows from disk (<=8 GB GPU)\n"
+            "Use 'window' if you experience out-of-memory errors."
         )
         dataloader_row.addWidget(self.dataloader_combo)
         tile_settings_layout.addLayout(dataloader_row)
+
+        # Track user manual changes to prevent overriding with adaptive defaults
+        self.batch_size_spin.valueChanged.connect(self._mark_tile_settings_modified)
+        self.dataloader_combo.currentIndexChanged.connect(
+            self._mark_tile_settings_modified
+        )
 
         self.tile_settings_group.setLayout(tile_settings_layout)
         self.tile_settings_group.setVisible(False)
@@ -830,6 +981,42 @@ class DeepForestDockWidget(QDockWidget):
         """Handle prediction mode change."""
         is_tile_mode = mode == "Large Tile"
         self.tile_settings_group.setVisible(is_tile_mode)
+        if is_tile_mode and not self._user_modified_tile_settings:
+            self._apply_adaptive_defaults()
+
+    def _apply_adaptive_defaults(self):
+        """Set batch_size and dataloader_strategy based on detected GPU VRAM."""
+        batch_size, strategy = _adaptive_tile_defaults(self._gpu_vram_mb)
+        # Block signals so programmatic updates don't trip the user-modified flag.
+        self.batch_size_spin.blockSignals(True)
+        self.dataloader_combo.blockSignals(True)
+        try:
+            self.batch_size_spin.setValue(batch_size)
+            idx = self.dataloader_combo.findText(strategy)
+            if idx >= 0:
+                self.dataloader_combo.setCurrentIndex(idx)
+        finally:
+            self.batch_size_spin.blockSignals(False)
+            self.dataloader_combo.blockSignals(False)
+        vram_gb = self._gpu_vram_mb / 1024 if self._gpu_vram_mb > 0 else 0
+        if vram_gb > 0:
+            self.tile_settings_group.setTitle(
+                f"Large Tile Settings (GPU: {vram_gb:.0f} GB)"
+            )
+            self.log_message(
+                f"Auto-configured tile settings for {vram_gb:.0f} GB GPU: "
+                f"batch_size={batch_size}, strategy={strategy}"
+            )
+        else:
+            self.tile_settings_group.setTitle("Large Tile Settings (CPU)")
+            self.log_message(
+                f"No GPU detected — using safe defaults: "
+                f"batch_size={batch_size}, strategy={strategy}"
+            )
+
+    def _mark_tile_settings_modified(self):
+        """Mark that the user has manually changed tile settings."""
+        self._user_modified_tile_settings = True
 
     def refresh_layers(self):
         """Refresh the list of raster layers."""
