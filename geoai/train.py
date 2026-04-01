@@ -130,9 +130,7 @@ def _validate_training_paths(
             f"Cannot create output directory (permission denied): {output_dir}"
         )
     except OSError as e:
-        raise OSError(
-            f"Failed to create output directory '{output_dir}': {e}"
-        ) from e
+        raise OSError(f"Failed to create output directory '{output_dir}': {e}") from e
 
 
 def _check_readable(path: str, max_retries: int = 3, retry_delay: float = 1.0) -> None:
