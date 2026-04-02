@@ -141,6 +141,7 @@ nav:
           - examples/train_segmentation_model.ipynb
           - examples/train_instance_segmentation_model.ipynb
           - examples/train_landcover_classification.ipynb
+          - examples/loss_functions_segmentation.ipynb
           - examples/train_building_footprints_usa.ipynb
           - examples/train_solar_panel_detection.ipynb
           - examples/train_car_detection.ipynb

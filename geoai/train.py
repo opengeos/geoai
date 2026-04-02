@@ -3752,6 +3752,9 @@ def train_segmentation_model(
     early_stopping_patience: Optional[int] = None,
     train_transforms: Optional[Callable] = None,
     val_transforms: Optional[Callable] = None,
+    loss_fn: Optional[torch.nn.Module] = None,
+    class_weights: Optional[List[float]] = None,
+    ignore_index: int = -100,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -3815,6 +3818,16 @@ def train_segmentation_model(
         val_transforms (callable, optional): Custom transforms for validation data.
             Should be a callable that accepts (image, mask) tensors and returns transformed (image, mask).
             If None, uses default transforms (no augmentation). Defaults to None.
+        loss_fn (torch.nn.Module, optional): Custom loss function. When provided,
+            this overrides class_weights and ignore_index. You can pass any
+            PyTorch loss module, including ``DiceLoss``, ``TverskyLoss``, or
+            ``UnifiedFocalLoss`` from ``geoai.landcover_train``. Defaults to None.
+        class_weights (list, optional): Per-class weights for CrossEntropyLoss
+            (e.g., ``[0.5, 2.0]`` for a 2-class problem). Ignored when *loss_fn*
+            is provided. Defaults to None.
+        ignore_index (int): Target value that is ignored by the default
+            CrossEntropyLoss. Ignored when *loss_fn* is provided.
+            Defaults to -100 (PyTorch default, i.e., no pixels ignored).
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -4064,8 +4077,21 @@ def train_segmentation_model(
         logger.info(f"Using {torch.cuda.device_count()} GPUs for training")
         model = torch.nn.DataParallel(model)
 
-    # Set up loss function (CrossEntropyLoss for multi-class, can also use F1Loss)
-    criterion = torch.nn.CrossEntropyLoss()
+    # Set up loss function
+    if loss_fn is not None:
+        criterion = loss_fn.to(device)
+    elif class_weights is not None:
+        if len(class_weights) != num_classes:
+            raise ValueError(
+                f"class_weights length ({len(class_weights)}) must match "
+                f"num_classes ({num_classes})"
+            )
+        weight_tensor = torch.tensor(class_weights, dtype=torch.float32).to(device)
+        criterion = torch.nn.CrossEntropyLoss(
+            weight=weight_tensor, ignore_index=ignore_index
+        )
+    else:
+        criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
 
     # Set up optimizer
     optimizer = torch.optim.Adam(
