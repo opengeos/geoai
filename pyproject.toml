@@ -39,7 +39,7 @@ dependencies = {file = ["requirements.txt"]}
 extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "smoothify", "geodeep"]
 building = ["buildingregulariser"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
-onnx = ["onnx", "onnxruntime"]
+onnx = ["onnx>=1.21.0", "onnxruntime"]
 sr = ["opensr-model"]
 geodeep = ["geodeep"]
 geodeep-gpu = ["geodeep", "onnxruntime-gpu"]
@@ -52,6 +52,13 @@ rfdetr = ["rfdetr"]
 # Python module with CUDA support) be used instead.
 # See: https://github.com/uav4geo/GeoDeep/issues/7
 override-dependencies = ["onnxruntime ; sys_platform == 'never'"]
+# Enforce minimum versions for transitive dependencies to resolve
+# Dependabot security alerts (aiohttp, requests, cryptography).
+constraint-dependencies = [
+    "aiohttp>=3.13.4",
+    "requests>=2.33.0",
+    "cryptography>=46.0.6",
+]
 
 
 [tool.distutils.bdist_wheel]
