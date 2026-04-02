@@ -150,13 +150,21 @@ class TestDiceLoss(unittest.TestCase):
         self.assertGreater(loss.item(), 0.0)
 
     def test_ignore_index(self):
-        """Test that ignored pixels do not contribute."""
+        """Test that ignored pixels do not affect the loss."""
         targets = self.targets.clone()
         targets[:, 0, :] = 255  # mark first row as ignored
         loss_fn = DiceLoss(ignore_index=255)
+
         loss = loss_fn(self.inputs, targets)
         self.assertEqual(loss.dim(), 0)
         self.assertTrue(torch.isfinite(loss))
+
+        # Changing logits at ignored positions should not change the loss
+        inputs_perturbed = self.inputs.clone()
+        ignore_mask = (targets == 255).unsqueeze(1).expand_as(inputs_perturbed)
+        inputs_perturbed[ignore_mask] = torch.randn_like(inputs_perturbed[ignore_mask])
+        loss_perturbed = loss_fn(inputs_perturbed, targets)
+        self.assertAlmostEqual(loss.item(), loss_perturbed.item(), places=6)
 
 
 class TestTverskyLoss(unittest.TestCase):
@@ -191,9 +199,14 @@ class TestTverskyLoss(unittest.TestCase):
 
     def test_asymmetric_weights_differ(self):
         """Test that asymmetric alpha/beta produces different loss."""
-        symmetric = TverskyLoss(alpha=0.5, beta=0.5)(self.inputs, self.targets)
-        asymmetric = TverskyLoss(alpha=0.3, beta=0.7)(self.inputs, self.targets)
-        # Values should generally differ (not guaranteed but highly likely)
+        # Use a hand-crafted example where the difference is guaranteed:
+        # logits that predict class 0 everywhere, but target has class 1,
+        # so there are non-zero FP and FN that alpha/beta weigh differently.
+        inputs = torch.zeros(1, self.num_classes, 4, 4)
+        inputs[:, 0, :, :] = 10.0  # strongly predict class 0
+        targets = torch.ones(1, 4, 4, dtype=torch.long)  # ground truth is class 1
+        symmetric = TverskyLoss(alpha=0.5, beta=0.5)(inputs, targets)
+        asymmetric = TverskyLoss(alpha=0.3, beta=0.7)(inputs, targets)
         self.assertNotAlmostEqual(symmetric.item(), asymmetric.item(), places=4)
 
     def test_ignore_index(self):

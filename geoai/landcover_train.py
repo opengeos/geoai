@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def _one_hot_with_ignore(
     targets: torch.Tensor, num_classes: int, ignore_index: int = -100
-) -> tuple:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """Convert class-index targets to one-hot encoding, masking ignored pixels.
 
     Args:
@@ -198,8 +198,11 @@ class DiceLoss(nn.Module):
             Scalar loss value.
         """
         num_classes = inputs.shape[1]
-        one_hot, _ = _one_hot_with_ignore(targets, num_classes, self.ignore_index)
+        one_hot, valid_mask = _one_hot_with_ignore(
+            targets, num_classes, self.ignore_index
+        )
         probs = F.softmax(inputs, dim=1)
+        probs = probs * valid_mask.unsqueeze(1)  # zero out ignored pixels
 
         dims = (0, 2, 3)  # reduce over batch and spatial dims
         intersection = (probs * one_hot).sum(dim=dims)
@@ -268,8 +271,11 @@ class TverskyLoss(nn.Module):
             Scalar loss value.
         """
         num_classes = inputs.shape[1]
-        one_hot, _ = _one_hot_with_ignore(targets, num_classes, self.ignore_index)
+        one_hot, valid_mask = _one_hot_with_ignore(
+            targets, num_classes, self.ignore_index
+        )
         probs = F.softmax(inputs, dim=1)
+        probs = probs * valid_mask.unsqueeze(1)  # zero out ignored pixels
 
         dims = (0, 2, 3)
         tp = (probs * one_hot).sum(dim=dims)
@@ -314,7 +320,7 @@ class UnifiedFocalLoss(nn.Module):
     Note:
         Inspired by the implementation in the
         `terrainseg <https://github.com/maxwell-geospatial/terrainseg>`_
-        package by Maxwell (2024).
+        package by Maxwell (2026).
 
     Args:
         lambda_: Balance between distribution and region components.
@@ -382,8 +388,11 @@ class UnifiedFocalLoss(nn.Module):
 
         # --- Region component: focal Tversky ---
         num_classes = inputs.shape[1]
-        one_hot, _ = _one_hot_with_ignore(targets, num_classes, self.ignore_index)
+        one_hot, valid_mask = _one_hot_with_ignore(
+            targets, num_classes, self.ignore_index
+        )
         probs = F.softmax(inputs, dim=1)
+        probs = probs * valid_mask.unsqueeze(1)  # zero out ignored pixels
 
         dims = (0, 2, 3)
         tp = (probs * one_hot).sum(dim=dims)
@@ -405,7 +414,9 @@ class UnifiedFocalLoss(nn.Module):
         loss = self.lambda_ * dist_loss + (1.0 - self.lambda_) * region_loss
 
         if self.use_log_cosh:
-            loss = torch.log(torch.cosh(loss))
+            # Numerically stable log-cosh: |x| + softplus(-2|x|) - log(2)
+            abs_loss = torch.abs(loss)
+            loss = abs_loss + F.softplus(-2.0 * abs_loss) - 0.6931471805599453
 
         return loss
 
