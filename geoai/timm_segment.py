@@ -356,6 +356,7 @@ def train_timm_segmentation(
     num_workers: int = 4,
     freeze_encoder: bool = False,
     class_weights: Optional[List[float]] = None,
+    loss_fn: Optional[nn.Module] = None,
     accelerator: str = "auto",
     devices: str = "auto",
     monitor_metric: str = "val_loss",
@@ -386,7 +387,12 @@ def train_timm_segmentation(
         weight_decay (float): Weight decay for optimizer.
         num_workers (int): Number of data loading workers.
         freeze_encoder (bool): Freeze encoder during training.
-        class_weights (List[float], optional): Class weights for loss.
+        class_weights (List[float], optional): Class weights for loss. Ignored
+            when *loss_fn* is provided.
+        loss_fn (nn.Module, optional): Custom loss function. Overrides
+            *class_weights* when provided. You can pass any PyTorch loss
+            module, including ``DiceLoss``, ``TverskyLoss``, or
+            ``UnifiedFocalLoss`` from ``geoai.landcover_train``.
         accelerator (str): Accelerator type ('auto', 'gpu', 'cpu').
         devices (str): Devices to use.
         monitor_metric (str): Metric to monitor for checkpointing.
@@ -427,6 +433,7 @@ def train_timm_segmentation(
         weight_decay=weight_decay,
         freeze_encoder=freeze_encoder,
         class_weights=weight_tensor,
+        loss_fn=loss_fn,
         use_timm_model=use_timm_model,
         timm_model_name=timm_model_name,
     )
@@ -638,6 +645,7 @@ def train_timm_segmentation_model(
     num_workers: int = 4,
     freeze_encoder: bool = False,
     class_weights: Optional[List[float]] = None,
+    loss_fn: Optional[nn.Module] = None,
     monitor_metric: str = "val_iou",
     mode: str = "max",
     patience: int = 10,
@@ -683,7 +691,12 @@ def train_timm_segmentation_model(
         num_workers (int): Number of data loading workers.
         freeze_encoder (bool): Freeze encoder during training.
         class_weights (list of float, optional): Weights for each class in the
-            loss function. Useful for imbalanced datasets. Defaults to None.
+            loss function. Useful for imbalanced datasets. Ignored when *loss_fn*
+            is provided. Defaults to None.
+        loss_fn (nn.Module, optional): Custom loss function. Overrides
+            *class_weights* when provided. You can pass any PyTorch loss
+            module, including ``DiceLoss``, ``TverskyLoss``, or
+            ``UnifiedFocalLoss`` from ``geoai.landcover_train``.
         monitor_metric (str): Metric to monitor ('val_loss' or 'val_iou').
         mode (str): 'min' for loss, 'max' for metrics.
         patience (int): Early stopping patience.
@@ -802,6 +815,7 @@ def train_timm_segmentation_model(
         num_workers=num_workers,
         freeze_encoder=freeze_encoder,
         class_weights=class_weights,
+        loss_fn=loss_fn,
         accelerator="auto" if device is None else device,
         monitor_metric=monitor_metric,
         mode=mode,
