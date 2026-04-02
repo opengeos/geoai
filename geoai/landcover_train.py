@@ -195,7 +195,8 @@ class DiceLoss(nn.Module):
             targets: Ground truth of shape ``(N, H, W)`` with class indices.
 
         Returns:
-            Scalar loss value.
+            Scalar loss when ``reduction`` is ``"mean"`` or ``"sum"``,
+            or a per-class tensor of shape ``(C,)`` when ``"none"``.
         """
         num_classes = inputs.shape[1]
         one_hot, valid_mask = _one_hot_with_ignore(
@@ -218,7 +219,9 @@ class DiceLoss(nn.Module):
             return loss.mean()
         elif self.reduction == "sum":
             return loss.sum()
-        return loss
+        elif self.reduction == "none":
+            return loss
+        raise ValueError(f"Unknown reduction: {self.reduction!r}")
 
 
 class TverskyLoss(nn.Module):
@@ -268,7 +271,8 @@ class TverskyLoss(nn.Module):
             targets: Ground truth of shape ``(N, H, W)`` with class indices.
 
         Returns:
-            Scalar loss value.
+            Scalar loss when ``reduction`` is ``"mean"`` or ``"sum"``,
+            or a per-class tensor of shape ``(C,)`` when ``"none"``.
         """
         num_classes = inputs.shape[1]
         one_hot, valid_mask = _one_hot_with_ignore(
@@ -294,7 +298,9 @@ class TverskyLoss(nn.Module):
             return loss.mean()
         elif self.reduction == "sum":
             return loss.sum()
-        return loss
+        elif self.reduction == "none":
+            return loss
+        raise ValueError(f"Unknown reduction: {self.reduction!r}")
 
 
 class UnifiedFocalLoss(nn.Module):
@@ -675,7 +681,7 @@ def get_landcover_loss_function(
     region_weights: Optional[torch.Tensor] = None,
     use_log_cosh: bool = False,
 ) -> nn.Module:
-    """Get loss function configured for landcover classification.
+    """Get loss function configured for landcover segmentation.
 
     Args:
         loss_name: Name of loss function. One of ``"crossentropy"``,

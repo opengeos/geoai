@@ -3753,7 +3753,7 @@ def train_segmentation_model(
     train_transforms: Optional[Callable] = None,
     val_transforms: Optional[Callable] = None,
     loss_fn: Optional[torch.nn.Module] = None,
-    class_weights: Optional[list] = None,
+    class_weights: Optional[List[float]] = None,
     ignore_index: int = -100,
     **kwargs: Any,
 ) -> torch.nn.Module:
@@ -4081,6 +4081,11 @@ def train_segmentation_model(
     if loss_fn is not None:
         criterion = loss_fn.to(device)
     elif class_weights is not None:
+        if len(class_weights) != num_classes:
+            raise ValueError(
+                f"class_weights length ({len(class_weights)}) must match "
+                f"num_classes ({num_classes})"
+            )
         weight_tensor = torch.tensor(class_weights, dtype=torch.float32).to(device)
         criterion = torch.nn.CrossEntropyLoss(
             weight=weight_tensor, ignore_index=ignore_index
