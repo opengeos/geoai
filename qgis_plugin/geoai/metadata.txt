@@ -56,6 +56,7 @@ icon=icons/icon.png
 
 experimental=False
 deprecated=False
+supportsQt6=yes
 
 changelog=
     1.0.8
