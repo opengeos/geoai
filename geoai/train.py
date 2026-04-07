@@ -535,6 +535,7 @@ class ObjectDetectionDataset(Dataset):
         transforms: Optional[Callable] = None,
         num_channels: Optional[int] = None,
         instance_labels: bool = False,
+        multiclass: bool = False,
     ) -> None:
         """
         Initialize dataset.
@@ -550,11 +551,32 @@ class ObjectDetectionDataset(Dataset):
                 labeling.  Use this when label masks already encode unique
                 integers per object (e.g., Fields of The World dataset).
                 Defaults to False.
+            multiclass (bool): If True, read class labels from the label
+                mask pixel values instead of assigning every instance to
+                class ``1``. Connected-component labeling is run *per class
+                value* so that adjacent regions of different classes are
+                not merged into a single instance. Use this when training
+                a multi-class Mask R-CNN with ``num_classes > 2`` where
+                pixel values encode class IDs (1..N, with 0 reserved for
+                background). Cannot be combined with ``instance_labels``
+                (which uses the same raster to encode instance IDs).
+                Defaults to False for backward compatibility with binary
+                training.
         """
+        if multiclass and instance_labels:
+            raise ValueError(
+                "multiclass=True is incompatible with instance_labels=True: "
+                "when label pixel values encode pre-assigned instance IDs, "
+                "there is no reliable way to also recover class IDs from "
+                "the same raster. Use separate class and instance rasters, "
+                "or disable one of the options."
+            )
+
         self.image_paths = image_paths
         self.label_paths = label_paths
         self.transforms = transforms
         self.instance_labels = instance_labels
+        self.multiclass = multiclass
 
         # Auto-detect the number of channels if not specified
         if num_channels is None:
@@ -596,28 +618,48 @@ class ObjectDetectionDataset(Dataset):
         with rasterio.open(self.label_paths[idx]) as src:
             label_mask = src.read(1)
 
+        # Build an iterable of (labeled_mask, instance_id, class_label)
+        # triples so the rest of the loop can stay shape-agnostic across
+        # the three extraction modes (instance_labels, multiclass, binary).
         if self.instance_labels:
-            # Use pre-assigned instance IDs directly (e.g., FTW dataset)
+            # Use pre-assigned instance IDs directly (e.g., FTW dataset).
+            # Always single-class in this mode (multiclass+instance_labels
+            # combination is rejected in __init__).
             unique_ids = np.unique(label_mask)
-            unique_ids = unique_ids[unique_ids > 0]  # Remove background
-            num_instances = len(unique_ids)
-            labeled_mask = label_mask
+            unique_ids = unique_ids[unique_ids > 0]
+            instance_sources = [(label_mask, int(i), 1) for i in unique_ids]
+        elif self.multiclass:
+            # Run connected components *per class* so that touching regions
+            # of different classes are not merged into a single instance.
+            class_values = np.unique(label_mask)
+            class_values = class_values[class_values > 0]
+            instance_sources = []
+            for cls in class_values:
+                cls_int = int(cls)
+                cls_mask = (label_mask == cls).astype(np.uint8)
+                cls_labeled, n_cls = measure.label(
+                    cls_mask, return_num=True, connectivity=2
+                )
+                for inst_id in range(1, n_cls + 1):
+                    instance_sources.append((cls_labeled, inst_id, cls_int))
         else:
-            # Find instances using connected components on binary mask
+            # Binary foreground: all instances share class label 1.
             binary_mask = (label_mask > 0).astype(np.uint8)
             labeled_mask, num_instances = measure.label(
                 binary_mask, return_num=True, connectivity=2
             )
-            unique_ids = range(1, num_instances + 1)
+            instance_sources = [
+                (labeled_mask, i, 1) for i in range(1, num_instances + 1)
+            ]
 
         # Create list to hold masks for each object instance
         masks = []
         boxes = []
         labels = []
 
-        for i in unique_ids:
+        for src_mask, i, class_label in instance_sources:
             # Create mask for this instance
-            instance_mask = (labeled_mask == i).astype(np.uint8)
+            instance_mask = (src_mask == i).astype(np.uint8)
 
             # Calculate area and filter out tiny instances (noise)
             area = instance_mask.sum()
@@ -646,7 +688,7 @@ class ObjectDetectionDataset(Dataset):
 
             boxes.append([xmin, ymin, xmax, ymax])
             masks.append(instance_mask)
-            labels.append(1)  # 1 for building class
+            labels.append(class_label)
 
         # Handle case with no valid instances
         if len(boxes) == 0:
@@ -1432,6 +1474,7 @@ def train_MaskRCNN_model(
     verbose: bool = True,
     model_name: str = "maskrcnn_resnet50_fpn",
     instance_labels: bool = False,
+    multiclass: bool = False,
 ) -> torch.nn.Module:
     """Train and evaluate Mask R-CNN model for instance segmentation.
 
@@ -1487,6 +1530,15 @@ def train_MaskRCNN_model(
             pre-assigned instance IDs instead of running connected-component
             labeling. Use this when label masks already encode unique integers
             per object (e.g., Fields of The World dataset). Defaults to False.
+        multiclass (bool): If True (and ``input_format='directory'``), read
+            per-instance class IDs from the label mask pixel values by
+            running connected-component labeling *per class value*. Use
+            this with ``num_classes > 2`` for multi-class training where
+            pixel values encode class IDs (1..N, with 0 reserved for
+            background). When ``num_classes > 2`` and this is left False
+            (directory input format, no ``instance_labels``), a warning is
+            emitted because every target would silently collapse to class 1.
+            Defaults to False. Cannot be combined with ``instance_labels=True``.
     Returns:
         None: Model weights are saved to output_dir.
 
@@ -1645,6 +1697,24 @@ def train_MaskRCNN_model(
             f"Found {len(image_files)} image files and {len(label_files)} label files"
         )
 
+        # Warn when users request multi-class training but forget to opt in
+        # to multiclass label parsing: every target would silently become
+        # class 1 and the model could only learn the first foreground class.
+        if (
+            input_format.lower() == "directory"
+            and num_classes > 2
+            and not multiclass
+            and not instance_labels
+        ):
+            logger.warning(
+                "num_classes=%d was requested but multiclass=False; "
+                "ObjectDetectionDataset will assign every instance label=1 "
+                "and the model will only learn one foreground class. "
+                "Pass multiclass=True to read class IDs from label mask "
+                "pixel values.",
+                num_classes,
+            )
+
         # Split data into train and validation sets
         train_imgs, val_imgs, train_labels, val_labels = train_test_split(
             image_files, label_files, test_size=val_split, random_state=seed
@@ -1661,12 +1731,14 @@ def train_MaskRCNN_model(
             train_labels,
             transforms=get_transform(train=True),
             instance_labels=instance_labels,
+            multiclass=multiclass,
         )
         val_dataset = ObjectDetectionDataset(
             val_imgs,
             val_labels,
             transforms=get_transform(train=False),
             instance_labels=instance_labels,
+            multiclass=multiclass,
         )
 
     # Create data loaders
@@ -5474,6 +5546,7 @@ def train_instance_segmentation_model(
     device: Optional[torch.device] = None,
     verbose: bool = True,
     instance_labels: bool = False,
+    multiclass: bool = False,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -5507,6 +5580,14 @@ def train_instance_segmentation_model(
             pre-assigned instance IDs instead of running connected-component
             labeling. Use this when label masks already encode unique integers
             per object (e.g., Fields of The World dataset). Defaults to False.
+        multiclass (bool): If True (and ``input_format='directory'``), read
+            per-instance class IDs from the label mask pixel values using
+            per-class connected-component labeling. Recommended for
+            multi-class training with ``num_classes > 2`` when using the
+            directory input format. If left False with ``num_classes > 2``
+            in directory mode, every target is silently assigned label ``1``
+            and the model will only learn the first foreground class; a
+            warning is emitted in that case. Defaults to False.
         **kwargs: Additional arguments passed to train_MaskRCNN_model.
 
     Returns:
@@ -5533,6 +5614,7 @@ def train_instance_segmentation_model(
         device=device,
         verbose=verbose,
         instance_labels=instance_labels,
+        multiclass=multiclass,
         **kwargs,
     )
 
