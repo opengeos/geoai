@@ -503,7 +503,7 @@ def train_image_classifier(
         verbose=True,
     )
 
-    logger = CSVLogger(model_dir, name="lightning_logs")
+    csv_logger = CSVLogger(model_dir, name="lightning_logs")
 
     # Trainer
     trainer = pl.Trainer(
@@ -511,7 +511,7 @@ def train_image_classifier(
         accelerator=accelerator,
         devices=devices,
         callbacks=[checkpoint_callback, early_stop_callback],
-        logger=logger,
+        logger=csv_logger,
         log_every_n_steps=10,
         **kwargs,
     )
