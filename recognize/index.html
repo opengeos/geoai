@@ -8873,7 +8873,7 @@ by class and get back a trained model with evaluation results.</p>
         <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="n">logger</span> <span class="o">=</span> <span class="n">CSVLogger</span><span class="p">(</span><span class="n">model_dir</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;lightning_logs&quot;</span><span class="p">)</span>
+    <span class="n">csv_logger</span> <span class="o">=</span> <span class="n">CSVLogger</span><span class="p">(</span><span class="n">model_dir</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;lightning_logs&quot;</span><span class="p">)</span>
 
     <span class="c1"># Trainer</span>
     <span class="n">trainer</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">Trainer</span><span class="p">(</span>
@@ -8881,7 +8881,7 @@ by class and get back a trained model with evaluation results.</p>
         <span class="n">accelerator</span><span class="o">=</span><span class="n">accelerator</span><span class="p">,</span>
         <span class="n">devices</span><span class="o">=</span><span class="n">devices</span><span class="p">,</span>
         <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">checkpoint_callback</span><span class="p">,</span> <span class="n">early_stop_callback</span><span class="p">],</span>
-        <span class="n">logger</span><span class="o">=</span><span class="n">logger</span><span class="p">,</span>
+        <span class="n">logger</span><span class="o">=</span><span class="n">csv_logger</span><span class="p">,</span>
         <span class="n">log_every_n_steps</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
