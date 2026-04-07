@@ -338,6 +338,7 @@ class TestInferenceReturnStructure:
         """Inference time is a positive float."""
         _, inference_time, _ = mock_inference_result
         assert isinstance(inference_time, float)
+        assert inference_time >= 0
 
 
 # ---------------------------------------------------------------------------
@@ -394,6 +395,36 @@ class TestObjectDetectionDatasetMulticlass:
         assert sorted(labels) == [3, 5]
         assert target["boxes"].shape[0] == 2
         assert target["masks"].shape[0] == 2
+
+    def test_multiclass_per_class_connected_components(self, tmp_path):
+        """Touching regions of different classes stay as separate instances."""
+        pytest.importorskip("torch")
+        from geoai.train import ObjectDetectionDataset
+
+        image = np.ones((3, 64, 64), dtype=np.uint8) * 128
+        label = np.zeros((64, 64), dtype=np.uint8)
+        # Two rectangles sharing an edge: a binary CC would merge them,
+        # but per-class CC must keep them as two separate instances.
+        label[10:40, 10:30] = 2  # class 2
+        label[10:40, 30:50] = 4  # class 4
+
+        img, lbl = self._write_pair(tmp_path, image, label, "touch")
+        ds = ObjectDetectionDataset([img], [lbl], multiclass=True)
+        _, target = ds[0]
+
+        labels = sorted(target["labels"].tolist())
+        assert labels == [2, 4]
+        assert target["masks"].shape[0] == 2
+
+    def test_multiclass_and_instance_labels_rejected(self):
+        """Combining multiclass=True with instance_labels=True is a user error."""
+        pytest.importorskip("torch")
+        from geoai.train import ObjectDetectionDataset
+
+        with pytest.raises(ValueError, match="instance_labels"):
+            ObjectDetectionDataset(
+                ["x.tif"], ["y.tif"], multiclass=True, instance_labels=True
+            )
 
     def test_binary_default_still_assigns_one(self, tmp_path):
         """Backward compatible: without multiclass, labels are all 1."""
