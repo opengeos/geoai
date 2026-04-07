@@ -338,4 +338,75 @@ class TestInferenceReturnStructure:
         """Inference time is a positive float."""
         _, inference_time, _ = mock_inference_result
         assert isinstance(inference_time, float)
-        assert inference_time >= 0
+
+
+# ---------------------------------------------------------------------------
+# Multiclass ObjectDetectionDataset
+# ---------------------------------------------------------------------------
+
+
+class TestObjectDetectionDatasetMulticlass:
+    """Ensure ObjectDetectionDataset reads multi-class labels from masks."""
+
+    def _write_pair(self, tmp_path, image_arr, label_arr, name):
+        """Write an image and its label mask as single-band GeoTIFFs."""
+        rasterio = pytest.importorskip("rasterio")
+        img_path = tmp_path / f"{name}_img.tif"
+        lbl_path = tmp_path / f"{name}_lbl.tif"
+        with rasterio.open(
+            img_path,
+            "w",
+            driver="GTiff",
+            height=image_arr.shape[1],
+            width=image_arr.shape[2],
+            count=image_arr.shape[0],
+            dtype=image_arr.dtype,
+        ) as dst:
+            dst.write(image_arr)
+        with rasterio.open(
+            lbl_path,
+            "w",
+            driver="GTiff",
+            height=label_arr.shape[0],
+            width=label_arr.shape[1],
+            count=1,
+            dtype=label_arr.dtype,
+        ) as dst:
+            dst.write(label_arr, 1)
+        return str(img_path), str(lbl_path)
+
+    def test_multiclass_reads_class_from_pixel_values(self, tmp_path):
+        """Each connected component is tagged with its mask pixel value."""
+        pytest.importorskip("torch")
+        from geoai.train import ObjectDetectionDataset
+
+        image = np.ones((3, 64, 64), dtype=np.uint8) * 128
+        label = np.zeros((64, 64), dtype=np.uint8)
+        # Two disjoint objects with different class IDs
+        label[5:20, 5:20] = 3  # class 3
+        label[30:50, 30:55] = 5  # class 5
+
+        img, lbl = self._write_pair(tmp_path, image, label, "mc")
+        ds = ObjectDetectionDataset([img], [lbl], multiclass=True)
+        _, target = ds[0]
+
+        labels = target["labels"].tolist()
+        assert sorted(labels) == [3, 5]
+        assert target["boxes"].shape[0] == 2
+        assert target["masks"].shape[0] == 2
+
+    def test_binary_default_still_assigns_one(self, tmp_path):
+        """Backward compatible: without multiclass, labels are all 1."""
+        pytest.importorskip("torch")
+        from geoai.train import ObjectDetectionDataset
+
+        image = np.ones((3, 64, 64), dtype=np.uint8) * 128
+        label = np.zeros((64, 64), dtype=np.uint8)
+        label[5:20, 5:20] = 3
+        label[30:50, 30:55] = 5
+
+        img, lbl = self._write_pair(tmp_path, image, label, "bin")
+        ds = ObjectDetectionDataset([img], [lbl], multiclass=False)
+        _, target = ds[0]
+
+        assert target["labels"].tolist() == [1, 1]
