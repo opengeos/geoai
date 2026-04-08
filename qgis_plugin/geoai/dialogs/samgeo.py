@@ -2082,52 +2082,45 @@ class SamGeoDockWidget(QDockWidget):
                 try:
                     self.sam.save_masks(output=temp_raster, unique=unique)
 
-                    from .._geoai_lib import get_geoai
-
-                    geoai = get_geoai()
+                    # Run vector conversion in the managed venv subprocess so
+                    # geoai.utils (which requires numpy>=2) is not imported
+                    # into the QGIS process (which may have an older numpy
+                    # already loaded). See issue #688.
+                    from ..core.geoai_task_subprocess import run_geoai_task
 
                     if vector_mode == 0:
                         # Simple mode - just convert raster to vector
-                        geoai.raster_to_vector(
-                            temp_raster,
-                            output_path=output_path,
-                            min_area=min_area if min_area > 0 else 0,
-                            simplify_tolerance=None,
-                            output_format=vec_format,
+                        run_geoai_task(
+                            "raster_to_vector",
+                            {
+                                "mask_path": temp_raster,
+                                "output_path": output_path,
+                                "min_area": min_area if min_area > 0 else 0,
+                                "output_format": vec_format,
+                            },
                         )
                     elif vector_mode == 2:
                         # Use smooth_vector for natural features
-                        gdf = geoai.raster_to_vector(
-                            temp_raster,
-                            min_area=min_area if min_area > 0 else 0,
-                            simplify_tolerance=None,
-                        )
-                        geoai.smooth_vector(
-                            gdf,
-                            smooth_iterations=smooth_iterations,
-                            output_path=output_path,
+                        run_geoai_task(
+                            "smooth_vector",
+                            {
+                                "mask_path": temp_raster,
+                                "output_path": output_path,
+                                "smooth_iterations": smooth_iterations,
+                                "min_area": min_area if min_area > 0 else 0,
+                            },
                         )
                     else:
                         # Use orthogonalize for regularization (buildings)
-                        gdf = geoai.orthogonalize(
-                            temp_raster,
-                            output_path,
-                            epsilon=epsilon,
+                        run_geoai_task(
+                            "vectorize_mask",
+                            {
+                                "mask_path": temp_raster,
+                                "output_path": output_path,
+                                "epsilon": epsilon,
+                                "min_area": min_area if min_area > 0 else None,
+                            },
                         )
-                        if min_area > 0:
-                            gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
-                            gdf = gdf[gdf["area_m2"] >= min_area]
-                            if output_path.endswith(".geojson"):
-                                driver = "GeoJSON"
-                            elif output_path.endswith(".gpkg"):
-                                driver = "GPKG"
-                            elif output_path.endswith(".shp"):
-                                driver = "ESRI Shapefile"
-                            else:
-                                driver = None
-                            from ..core.proj_utils import safe_to_file
-
-                            safe_to_file(gdf, output_path, driver=driver)
                 finally:
                     if os.path.exists(temp_raster):
                         os.remove(temp_raster)
@@ -2217,52 +2210,45 @@ class SamGeoDockWidget(QDockWidget):
                 try:
                     self.sam.save_masks(output=temp_raster, unique=unique)
 
-                    from .._geoai_lib import get_geoai
-
-                    geoai = get_geoai()
+                    # Run vector conversion in the managed venv subprocess so
+                    # geoai.utils (which requires numpy>=2) is not imported
+                    # into the QGIS process (which may have an older numpy
+                    # already loaded). See issue #688.
+                    from ..core.geoai_task_subprocess import run_geoai_task
 
                     if vector_mode == 0:
                         # Simple mode - just convert raster to vector
-                        geoai.raster_to_vector(
-                            temp_raster,
-                            output_path=output_path,
-                            min_area=min_area if min_area > 0 else 0,
-                            simplify_tolerance=None,
-                            output_format=vec_format,
+                        run_geoai_task(
+                            "raster_to_vector",
+                            {
+                                "mask_path": temp_raster,
+                                "output_path": output_path,
+                                "min_area": min_area if min_area > 0 else 0,
+                                "output_format": vec_format,
+                            },
                         )
                     elif vector_mode == 2:
                         # Use smooth_vector for natural features
-                        gdf = geoai.raster_to_vector(
-                            temp_raster,
-                            min_area=min_area if min_area > 0 else 0,
-                            simplify_tolerance=None,
-                        )
-                        geoai.smooth_vector(
-                            gdf,
-                            smooth_iterations=smooth_iterations,
-                            output_path=output_path,
+                        run_geoai_task(
+                            "smooth_vector",
+                            {
+                                "mask_path": temp_raster,
+                                "output_path": output_path,
+                                "smooth_iterations": smooth_iterations,
+                                "min_area": min_area if min_area > 0 else 0,
+                            },
                         )
                     else:
                         # Use orthogonalize for regularization (buildings)
-                        gdf = geoai.orthogonalize(
-                            temp_raster,
-                            output_path,
-                            epsilon=epsilon,
+                        run_geoai_task(
+                            "vectorize_mask",
+                            {
+                                "mask_path": temp_raster,
+                                "output_path": output_path,
+                                "epsilon": epsilon,
+                                "min_area": min_area if min_area > 0 else None,
+                            },
                         )
-                        if min_area > 0:
-                            gdf = geoai.add_geometric_properties(gdf, area_unit="m2")
-                            gdf = gdf[gdf["area_m2"] >= min_area]
-                            if output_path.endswith(".geojson"):
-                                driver = "GeoJSON"
-                            elif output_path.endswith(".gpkg"):
-                                driver = "GPKG"
-                            elif output_path.endswith(".shp"):
-                                driver = "ESRI Shapefile"
-                            else:
-                                driver = None
-                            from ..core.proj_utils import safe_to_file
-
-                            safe_to_file(gdf, output_path, driver=driver)
                 finally:
                     if os.path.exists(temp_raster):
                         os.remove(temp_raster)
