@@ -145,6 +145,26 @@ def _task_instance_segmentation(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_path": params["output_path"]}
 
 
+def _task_raster_to_vector(params: Dict[str, Any]) -> Dict[str, Any]:
+    from geoai.utils.raster import raster_to_vector
+
+    mask_path = params["mask_path"]
+    output_path = params["output_path"]
+    min_area = params.get("min_area") or 0
+    output_format = params.get("output_format", "geojson")
+    simplify_tolerance = params.get("simplify_tolerance")
+
+    _progress("Converting raster to vector...")
+    raster_to_vector(
+        mask_path,
+        output_path=output_path,
+        min_area=min_area,
+        simplify_tolerance=simplify_tolerance,
+        output_format=output_format,
+    )
+    return {"output_path": output_path}
+
+
 def _task_vectorize_mask(params: Dict[str, Any]) -> Dict[str, Any]:
     from geoai.utils.geometry import orthogonalize
     from geoai.utils.vector import add_geometric_properties
@@ -220,6 +240,7 @@ _TASKS = {
     "export_geotiff_tiles": _task_export_geotiff_tiles,
     "semantic_segmentation": _task_semantic_segmentation,
     "instance_segmentation": _task_instance_segmentation,
+    "raster_to_vector": _task_raster_to_vector,
     "vectorize_mask": _task_vectorize_mask,
     "smooth_vector": _task_smooth_vector,
     "segment_water": _task_segment_water,
