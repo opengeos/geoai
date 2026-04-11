@@ -3950,7 +3950,6 @@ def train_segmentation_model(
     device: Optional[torch.device] = None,
     checkpoint_path: Optional[str] = None,
     resume_training: bool = False,
-    freeze_encoder: bool = False,
     target_size: Optional[Tuple[int, int]] = None,
     resize_mode: str = "resize",
     num_workers: Optional[int] = None,
@@ -3960,6 +3959,7 @@ def train_segmentation_model(
     loss_fn: Optional[torch.nn.Module] = None,
     class_weights: Optional[List[float]] = None,
     ignore_index: int = -100,
+    freeze_encoder: bool = False,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -4004,9 +4004,6 @@ def train_segmentation_model(
             If provided, will load model weights and optionally optimizer/scheduler state.
         resume_training (bool): If True and checkpoint_path is provided, will resume training
             from the checkpoint including optimizer and scheduler state. Defaults to False.
-        freeze_encoder (bool): If True, freeze the encoder parameters so only the
-            decoder is trained. Useful for fine-tuning on small datasets to prevent
-            overfitting. Defaults to False.
         target_size (tuple, optional): Target size (height, width) for standardizing images.
             If None, the function will automatically detect if images have varying sizes and set
             a default target_size of (512, 512) to prevent batching errors. To disable automatic
@@ -4036,6 +4033,9 @@ def train_segmentation_model(
         ignore_index (int): Target value that is ignored by the default
             CrossEntropyLoss. Ignored when *loss_fn* is provided.
             Defaults to -100 (PyTorch default, i.e., no pixels ignored).
+        freeze_encoder (bool): If True, freeze the encoder parameters so only the
+            decoder is trained. Useful for fine-tuning on small datasets to prevent
+            overfitting. Defaults to False.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -4408,6 +4408,12 @@ def train_segmentation_model(
 
             logger.info(f"Resuming training from epoch {start_epoch}")
             logger.info(f"Previous best IoU: {best_iou:.4f}")
+        else:
+            logger.warning(
+                "resume_training=True but checkpoint does not contain training "
+                "state (optimizer, scheduler, epoch). Only model weights were "
+                "loaded. Training will start from epoch 0 with a fresh optimizer."
+            )
 
     logger.info(f"Starting training with {architecture} + {encoder_name}")
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)

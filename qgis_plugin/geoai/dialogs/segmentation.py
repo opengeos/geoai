@@ -780,9 +780,11 @@ class SegmentationDockWidget(QDockWidget):
         finetune_layout.addRow("Checkpoint:", checkpoint_layout)
 
         self.resume_training_check = QCheckBox("Resume training (load optimizer state)")
+        self.resume_training_check.setEnabled(False)
         finetune_layout.addRow("", self.resume_training_check)
 
         self.freeze_encoder_check = QCheckBox("Freeze encoder (train decoder only)")
+        self.freeze_encoder_check.setEnabled(False)
         finetune_layout.addRow("", self.freeze_encoder_check)
 
         finetune_group.setLayout(finetune_layout)
@@ -1085,6 +1087,7 @@ class SegmentationDockWidget(QDockWidget):
         self.labels_browse_btn.clicked.connect(self.browse_labels_dir)
         self.model_output_browse_btn.clicked.connect(self.browse_model_output)
         self.checkpoint_browse_btn.clicked.connect(self.browse_checkpoint)
+        self.checkpoint_path_edit.textChanged.connect(self._on_checkpoint_path_changed)
         self.train_btn.clicked.connect(self.start_training)
 
         # Inference tab
@@ -1156,6 +1159,15 @@ class SegmentationDockWidget(QDockWidget):
     def sync_classes_to_inference(self, value):
         """Sync classes to inference tab."""
         self.inf_num_classes_spin.setValue(value)
+
+    def _on_checkpoint_path_changed(self, text):
+        """Enable/disable fine-tuning checkboxes based on checkpoint path."""
+        has_checkpoint = bool(text.strip())
+        self.resume_training_check.setEnabled(has_checkpoint)
+        self.freeze_encoder_check.setEnabled(has_checkpoint)
+        if not has_checkpoint:
+            self.resume_training_check.setChecked(False)
+            self.freeze_encoder_check.setChecked(False)
 
     def log(self, message: str):
         """Add message to log."""
@@ -1434,7 +1446,7 @@ class SegmentationDockWidget(QDockWidget):
                 return
 
         # Validate checkpoint path if provided
-        checkpoint_path = self.checkpoint_path_edit.text() or None
+        checkpoint_path = self.checkpoint_path_edit.text().strip() or None
         if checkpoint_path and not os.path.isfile(checkpoint_path):
             QMessageBox.warning(
                 self,
