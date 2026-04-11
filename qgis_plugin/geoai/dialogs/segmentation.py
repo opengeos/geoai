@@ -87,6 +87,9 @@ class TrainingWorker(QThread):
         val_split: float,
         input_format: str = "directory",
         plot_curves: bool = False,
+        checkpoint_path: Optional[str] = None,
+        resume_training: bool = False,
+        freeze_encoder: bool = False,
     ):
         super().__init__()
         self.images_dir = images_dir
@@ -103,6 +106,9 @@ class TrainingWorker(QThread):
         self.val_split = val_split
         self.input_format = input_format
         self.plot_curves = plot_curves
+        self.checkpoint_path = checkpoint_path
+        self.resume_training = resume_training
+        self.freeze_encoder = freeze_encoder
         self._epoch_pattern = None
 
     def _parse_output_line(self, line: str):
@@ -150,6 +156,9 @@ class TrainingWorker(QThread):
                     "val_split": self.val_split,
                     "verbose": True,
                     "plot_curves": self.plot_curves,
+                    "checkpoint_path": self.checkpoint_path,
+                    "resume_training": self.resume_training,
+                    "freeze_encoder": self.freeze_encoder,
                 },
                 progress_callback=self._parse_output_line,
             )
@@ -753,6 +762,34 @@ class SegmentationDockWidget(QDockWidget):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
+        # Fine-tuning Group (Optional)
+        finetune_group = QGroupBox("Fine-tuning (Optional)")
+        finetune_layout = QFormLayout()
+        finetune_layout.setSpacing(5)
+
+        checkpoint_layout = QHBoxLayout()
+        self.checkpoint_path_edit = QLineEdit()
+        self.checkpoint_path_edit.setPlaceholderText(
+            "Path to pretrained model (.pth)..."
+        )
+        self.checkpoint_path_edit.setStyleSheet(self.line_style)
+        checkpoint_layout.addWidget(self.checkpoint_path_edit)
+        self.checkpoint_browse_btn = QPushButton("...")
+        self.checkpoint_browse_btn.setFixedSize(30, self.input_height)
+        checkpoint_layout.addWidget(self.checkpoint_browse_btn)
+        finetune_layout.addRow("Checkpoint:", checkpoint_layout)
+
+        self.resume_training_check = QCheckBox("Resume training (load optimizer state)")
+        self.resume_training_check.setEnabled(False)
+        finetune_layout.addRow("", self.resume_training_check)
+
+        self.freeze_encoder_check = QCheckBox("Freeze encoder (train decoder only)")
+        self.freeze_encoder_check.setEnabled(False)
+        finetune_layout.addRow("", self.freeze_encoder_check)
+
+        finetune_group.setLayout(finetune_layout)
+        layout.addWidget(finetune_group)
+
         # Train button
         btn_layout = QHBoxLayout()
         self.train_btn = QPushButton("Start Training")
@@ -1049,6 +1086,8 @@ class SegmentationDockWidget(QDockWidget):
         self.images_browse_btn.clicked.connect(self.browse_images_dir)
         self.labels_browse_btn.clicked.connect(self.browse_labels_dir)
         self.model_output_browse_btn.clicked.connect(self.browse_model_output)
+        self.checkpoint_browse_btn.clicked.connect(self.browse_checkpoint)
+        self.checkpoint_path_edit.textChanged.connect(self._on_checkpoint_path_changed)
         self.train_btn.clicked.connect(self.start_training)
 
         # Inference tab
@@ -1121,6 +1160,15 @@ class SegmentationDockWidget(QDockWidget):
         """Sync classes to inference tab."""
         self.inf_num_classes_spin.setValue(value)
 
+    def _on_checkpoint_path_changed(self, text):
+        """Enable/disable fine-tuning checkboxes based on checkpoint path."""
+        has_checkpoint = bool(text.strip())
+        self.resume_training_check.setEnabled(has_checkpoint)
+        self.freeze_encoder_check.setEnabled(has_checkpoint)
+        if not has_checkpoint:
+            self.resume_training_check.setChecked(False)
+            self.freeze_encoder_check.setChecked(False)
+
     def log(self, message: str):
         """Add message to log."""
         self.log_text.append(message)
@@ -1161,6 +1209,16 @@ class SegmentationDockWidget(QDockWidget):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
             self.model_output_dir_edit.setText(dir_path)
+
+    def browse_checkpoint(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Pretrained Model",
+            "",
+            "PyTorch Model (*.pth *.pt);;All (*)",
+        )
+        if file_path:
+            self.checkpoint_path_edit.setText(file_path)
 
     def browse_inf_raster(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1387,6 +1445,17 @@ class SegmentationDockWidget(QDockWidget):
                 )
                 return
 
+        # Validate checkpoint path if provided
+        checkpoint_path = self.checkpoint_path_edit.text().strip() or None
+        if checkpoint_path and not os.path.isfile(checkpoint_path):
+            QMessageBox.warning(
+                self,
+                "Invalid Path",
+                f"Checkpoint file does not exist:\n{checkpoint_path}\n\n"
+                "Please check the path and try again.",
+            )
+            return
+
         self.train_btn.setEnabled(False)
         num_epochs = self.epochs_spin.value()
         self.train_progress.setRange(0, num_epochs)
@@ -1395,6 +1464,12 @@ class SegmentationDockWidget(QDockWidget):
         self.log(f"Starting training: {self.architecture_combo.currentText()}")
         self.log(f"  Encoder: {self.encoder_combo.currentText()}")
         self.log(f"  Epochs: {num_epochs}, Batch size: {self.batch_size_spin.value()}")
+        if checkpoint_path:
+            self.log(f"  Fine-tuning from: {checkpoint_path}")
+            if self.freeze_encoder_check.isChecked():
+                self.log("  Encoder: frozen")
+            if self.resume_training_check.isChecked():
+                self.log("  Resuming training state")
 
         self.train_worker = TrainingWorker(
             images_dir,
@@ -1411,6 +1486,9 @@ class SegmentationDockWidget(QDockWidget):
             self.val_split_spin.value(),
             self.input_format_combo.currentText(),
             self.plot_curves_check.isChecked(),
+            checkpoint_path,
+            self.resume_training_check.isChecked(),
+            self.freeze_encoder_check.isChecked(),
         )
         self.train_worker.finished.connect(self.on_training_finished)
         self.train_worker.error.connect(self.on_training_error)

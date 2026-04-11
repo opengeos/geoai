@@ -3959,6 +3959,7 @@ def train_segmentation_model(
     loss_fn: Optional[torch.nn.Module] = None,
     class_weights: Optional[List[float]] = None,
     ignore_index: int = -100,
+    freeze_encoder: bool = False,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -4032,6 +4033,9 @@ def train_segmentation_model(
         ignore_index (int): Target value that is ignored by the default
             CrossEntropyLoss. Ignored when *loss_fn* is provided.
             Defaults to -100 (PyTorch default, i.e., no pixels ignored).
+        freeze_encoder (bool): If True, freeze the encoder parameters so only the
+            decoder is trained. Useful for fine-tuning on small datasets to prevent
+            overfitting. Defaults to False.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -4300,16 +4304,6 @@ def train_segmentation_model(
     else:
         criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
 
-    # Set up optimizer
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=learning_rate, weight_decay=weight_decay
-    )
-
-    # Set up learning rate scheduler
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=5
-    )
-
     # Initialize tracking variables
     best_iou = 0
     train_losses = []
@@ -4320,6 +4314,7 @@ def train_segmentation_model(
     val_recalls = []
     start_epoch = 0
     epochs_without_improvement = 0
+    checkpoint = None
 
     # Load checkpoint if provided
     if checkpoint_path is not None:
@@ -4333,43 +4328,7 @@ def train_segmentation_model(
             if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
                 # Load model state
                 model.load_state_dict(checkpoint["model_state_dict"])
-
-                if resume_training:
-                    # Resume training from checkpoint
-                    start_epoch = checkpoint.get("epoch", 0) + 1
-                    best_iou = checkpoint.get("best_iou", 0)
-
-                    # Load optimizer state if available
-                    if "optimizer_state_dict" in checkpoint:
-                        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-                    # Load scheduler state if available
-                    if "scheduler_state_dict" in checkpoint:
-                        lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-
-                    # Load training history if available
-                    if "train_losses" in checkpoint:
-                        train_losses = checkpoint["train_losses"]
-                    if "val_losses" in checkpoint:
-                        val_losses = checkpoint["val_losses"]
-                    if "val_ious" in checkpoint:
-                        val_ious = checkpoint["val_ious"]
-                    if "val_f1s" in checkpoint:
-                        val_f1s = checkpoint["val_f1s"]
-                    # Also check for old val_dices format for backward compatibility
-                    elif "val_dices" in checkpoint:
-                        val_f1s = checkpoint["val_dices"]
-                    if "val_precisions" in checkpoint:
-                        val_precisions = checkpoint["val_precisions"]
-                    if "val_recalls" in checkpoint:
-                        val_recalls = checkpoint["val_recalls"]
-
-                    logger.info(f"Resuming training from epoch {start_epoch}")
-                    logger.info(f"Previous best IoU: {best_iou:.4f}")
-                else:
-                    logger.info(
-                        "Loaded model weights only (not resuming training state)"
-                    )
+                logger.info("Loaded model weights from checkpoint")
             else:
                 # Assume it's just model weights
                 model.load_state_dict(checkpoint)
@@ -4378,8 +4337,88 @@ def train_segmentation_model(
         except Exception as e:
             raise RuntimeError(f"Failed to load checkpoint: {str(e)}")
 
+    # Freeze encoder if requested (for fine-tuning)
+    if freeze_encoder:
+        if checkpoint_path is None:
+            logger.warning(
+                "freeze_encoder=True but no checkpoint_path provided. "
+                "Freezing encoder on a randomly initialized model is not recommended."
+            )
+        base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+        if hasattr(base_model, "encoder"):
+            for param in base_model.encoder.parameters():
+                param.requires_grad = False
+            frozen = sum(p.numel() for p in model.parameters() if not p.requires_grad)
+            total = sum(p.numel() for p in model.parameters())
+            logger.info(
+                f"Encoder frozen: {frozen:,}/{total:,} parameters frozen "
+                f"({frozen / total * 100:.1f}%)"
+            )
+        else:
+            logger.warning("Model does not have an encoder attribute to freeze.")
+
+    # Set up optimizer (uses only trainable parameters when encoder is frozen)
+    optimizer = torch.optim.Adam(
+        [p for p in model.parameters() if p.requires_grad],
+        lr=learning_rate,
+        weight_decay=weight_decay,
+    )
+
+    # Set up learning rate scheduler
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=5
+    )
+
+    # Resume training state from checkpoint if requested
+    if resume_training and checkpoint_path is not None:
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            start_epoch = checkpoint.get("epoch", 0) + 1
+            best_iou = checkpoint.get("best_iou", 0)
+
+            # Load optimizer state if available
+            if "optimizer_state_dict" in checkpoint:
+                try:
+                    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+                except Exception:
+                    logger.warning(
+                        "Could not load optimizer state (parameter groups may have "
+                        "changed due to encoder freezing). Using fresh optimizer."
+                    )
+
+            # Load scheduler state if available
+            if "scheduler_state_dict" in checkpoint:
+                lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+            # Load training history if available
+            if "train_losses" in checkpoint:
+                train_losses = checkpoint["train_losses"]
+            if "val_losses" in checkpoint:
+                val_losses = checkpoint["val_losses"]
+            if "val_ious" in checkpoint:
+                val_ious = checkpoint["val_ious"]
+            if "val_f1s" in checkpoint:
+                val_f1s = checkpoint["val_f1s"]
+            # Also check for old val_dices format for backward compatibility
+            elif "val_dices" in checkpoint:
+                val_f1s = checkpoint["val_dices"]
+            if "val_precisions" in checkpoint:
+                val_precisions = checkpoint["val_precisions"]
+            if "val_recalls" in checkpoint:
+                val_recalls = checkpoint["val_recalls"]
+
+            logger.info(f"Resuming training from epoch {start_epoch}")
+            logger.info(f"Previous best IoU: {best_iou:.4f}")
+        else:
+            logger.warning(
+                "resume_training=True but checkpoint does not contain training "
+                "state (optimizer, scheduler, epoch). Only model weights were "
+                "loaded. Training will start from epoch 0 with a fresh optimizer."
+            )
+
     logger.info(f"Starting training with {architecture} + {encoder_name}")
-    logger.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    logger.info(f"Model parameters: {total_params:,} (trainable: {trainable:,})")
     if start_epoch > 0:
         logger.info(f"Resuming from epoch {start_epoch}/{num_epochs}")
 
