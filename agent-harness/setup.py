@@ -1,12 +1,14 @@
 """Setup for cli-anything-geoai -- CLI harness for GeoAI."""
 
+from pathlib import Path
+
 from setuptools import setup, find_namespace_packages
 
 setup(
     name="cli-anything-geoai",
     version="1.0.0",
     description="CLI harness for GeoAI -- AI-powered geospatial analysis",
-    long_description=open("GEOAI.md").read(),
+    long_description=Path("GEOAI.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     author="Qiusheng Wu",
     author_email="giswqs@gmail.com",

@@ -106,6 +106,11 @@ def tile_raster(
 
     output_dir = os.path.abspath(output_dir)
 
+    if overlap >= tile_size:
+        raise ValueError(
+            f"Overlap ({overlap}) must be less than tile_size ({tile_size})"
+        )
+
     from geoai.utils import export_geotiff_tiles
 
     stride = tile_size - overlap
@@ -136,7 +141,6 @@ def tile_raster(
 def vectorize_raster(
     path: str,
     output: str,
-    band: int = 1,
     simplify_tolerance: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Convert a raster to vector polygons.
@@ -144,7 +148,6 @@ def vectorize_raster(
     Args:
         path: Input raster path.
         output: Output vector file path.
-        band: Band to vectorize (1-indexed).
         simplify_tolerance: Optional geometry simplification tolerance.
 
     Returns:
