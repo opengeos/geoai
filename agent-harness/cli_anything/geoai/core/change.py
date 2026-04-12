@@ -7,7 +7,6 @@ for CLI consumption.
 import os
 from typing import Any, Dict, Optional
 
-
 CHANGE_METHODS = ["changestar", "anychange"]
 
 
@@ -53,9 +52,7 @@ def detect_changes(
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
     if method == "changestar":
-        return _run_changestar(
-            image1, image2, output, confidence_threshold, min_area
-        )
+        return _run_changestar(image1, image2, output, confidence_threshold, min_area)
     else:
         return _run_anychange(image1, image2, output, min_area)
 
@@ -162,7 +159,9 @@ def _add_change_stats(result: Dict[str, Any], output: str) -> Dict[str, Any]:
             changed = int(np.count_nonzero(data))
             result["total_pixels"] = total
             result["changed_pixels"] = changed
-            result["change_percentage"] = round(changed / total * 100, 2) if total > 0 else 0.0
+            result["change_percentage"] = (
+                round(changed / total * 100, 2) if total > 0 else 0.0
+            )
     except Exception:
         pass
 
@@ -179,7 +178,4 @@ def list_methods() -> list:
         "changestar": "ChangeStar bi-temporal change detection (torchange backend)",
         "anychange": "AnyChange generic multi-temporal change detector",
     }
-    return [
-        {"name": m, "description": descriptions.get(m, "")}
-        for m in CHANGE_METHODS
-    ]
+    return [{"name": m, "description": descriptions.get(m, "")} for m in CHANGE_METHODS]

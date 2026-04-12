@@ -31,9 +31,7 @@ from cli_anything.geoai.core import (
 
 REPO_ROOT = os.path.dirname(
     os.path.dirname(
-        os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     )
 )
 
@@ -105,9 +103,7 @@ class TestProject:
 
     def test_create_project_custom(self):
         """Create project with custom parameters."""
-        proj = project_mod.create_project(
-            name="landsat_analysis", crs="EPSG:32617"
-        )
+        proj = project_mod.create_project(name="landsat_analysis", crs="EPSG:32617")
         assert proj["name"] == "landsat_analysis"
         assert proj["crs"] == "EPSG:32617"
 
@@ -468,9 +464,7 @@ class TestSegment:
     def test_run_sam_missing_file(self):
         """FileNotFoundError for missing raster."""
         with pytest.raises(FileNotFoundError):
-            segment_mod.run_sam(
-                "/nonexistent/image.tif", "/tmp/out.tif"
-            )
+            segment_mod.run_sam("/nonexistent/image.tif", "/tmp/out.tif")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

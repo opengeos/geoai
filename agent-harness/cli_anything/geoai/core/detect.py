@@ -7,7 +7,6 @@ for CLI consumption.
 import os
 from typing import Any, Dict, List, Optional
 
-
 DETECTION_MODELS = [
     "maskrcnn_resnet50_fpn",
     "maskrcnn_resnet50_fpn_v2",
@@ -204,7 +203,4 @@ def list_input_formats() -> List[Dict[str, str]]:
         "coco": "COCO JSON annotation format with instance polygons",
         "yolo": "YOLO format with .txt label files (class x y w h)",
     }
-    return [
-        {"name": f, "description": descriptions.get(f, "")}
-        for f in INPUT_FORMATS
-    ]
+    return [{"name": f, "description": descriptions.get(f, "")} for f in INPUT_FORMATS]

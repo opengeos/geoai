@@ -134,6 +134,7 @@ def _serialize_info(info: Any) -> Dict[str, Any]:
             else:
                 try:
                     import json
+
                     json.dumps(v)
                     result[k] = v
                 except (TypeError, ValueError):

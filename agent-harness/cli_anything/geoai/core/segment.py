@@ -7,7 +7,6 @@ and model training for CLI consumption.
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-
 SAM_MODELS = [
     "facebook/sam-vit-huge",
     "facebook/sam-vit-large",

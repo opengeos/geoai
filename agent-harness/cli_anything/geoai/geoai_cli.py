@@ -243,7 +243,9 @@ def project_open(path):
 
 
 @project.command("save")
-@click.option("--output", "-o", default=None, help="Save path (default: original path).")
+@click.option(
+    "--output", "-o", default=None, help="Save path (default: original path)."
+)
 @handle_error
 def project_save(output_path=None):
     """Save the current project."""
@@ -268,7 +270,8 @@ def project_info():
 @project.command("add-file")
 @click.argument("path", type=click.Path(exists=True))
 @click.option(
-    "--type", "file_type",
+    "--type",
+    "file_type",
     type=click.Choice(["raster", "vector", "model", "config"]),
     default=None,
     help="File type (auto-detected if omitted).",
@@ -389,16 +392,19 @@ def vector_info(path):
 
 @vector.command("rasterize")
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--template", "-t", required=True, type=click.Path(exists=True),
-              help="Template raster for extent/resolution.")
+@click.option(
+    "--template",
+    "-t",
+    required=True,
+    type=click.Path(exists=True),
+    help="Template raster for extent/resolution.",
+)
 @click.option("--output", "-o", required=True, help="Output raster file path.")
 @click.option("--attribute", "-a", default=None, help="Attribute column to burn.")
 @handle_error
 def vector_rasterize(path, template, output_path, attribute):
     """Convert a vector file to raster."""
-    data = vector_mod.rasterize_vector(
-        path, template, output_path, attribute=attribute
-    )
+    data = vector_mod.rasterize_vector(path, template, output_path, attribute=attribute)
     globals()["output"](data, f"Rasterized to: {output_path}")
 
 
@@ -415,8 +421,9 @@ def data():
 
 @data.command("search")
 @click.option("--bbox", required=True, help="Bounding box: minx,miny,maxx,maxy.")
-@click.option("--collection", "-c", default="sentinel-2-l2a",
-              help="STAC collection ID.")
+@click.option(
+    "--collection", "-c", default="sentinel-2-l2a", help="STAC collection ID."
+)
 @click.option("--start-date", default=None, help="Start date (YYYY-MM-DD).")
 @click.option("--end-date", default=None, help="End date (YYYY-MM-DD).")
 @click.option("--max-items", type=int, default=10, help="Maximum results.")
@@ -445,13 +452,9 @@ def data_download(source, bbox, output_path, year):
     bbox_tuple = data_mod.parse_bbox(bbox)
 
     if source == "naip":
-        result = data_mod.download_naip(
-            bbox=bbox_tuple, output=output_path, year=year
-        )
+        result = data_mod.download_naip(bbox=bbox_tuple, output=output_path, year=year)
     elif source == "overture":
-        result = data_mod.download_overture(
-            bbox=bbox_tuple, output=output_path
-        )
+        result = data_mod.download_overture(bbox=bbox_tuple, output=output_path)
     else:
         raise ValueError(f"Unsupported source: {source}")
 
@@ -480,14 +483,10 @@ def segment():
 @segment.command("sam")
 @click.argument("raster", type=click.Path(exists=True))
 @click.option("--output", "-o", required=True, help="Output mask file path.")
-@click.option("--model", "-m", default="facebook/sam-vit-huge",
-              help="SAM model ID.")
-@click.option("--no-automatic", is_flag=True,
-              help="Disable automatic mask generation.")
-@click.option("--no-foreground", is_flag=True,
-              help="Include background segments.")
-@click.option("--no-unique", is_flag=True,
-              help="Do not assign unique labels.")
+@click.option("--model", "-m", default="facebook/sam-vit-huge", help="SAM model ID.")
+@click.option("--no-automatic", is_flag=True, help="Disable automatic mask generation.")
+@click.option("--no-foreground", is_flag=True, help="Include background segments.")
+@click.option("--no-unique", is_flag=True, help="Do not assign unique labels.")
 @handle_error
 def segment_sam(raster, output_path, model, no_automatic, no_foreground, no_unique):
     """Run SAM (Segment Anything Model) segmentation."""
@@ -505,16 +504,20 @@ def segment_sam(raster, output_path, model, no_automatic, no_foreground, no_uniq
 @segment.command("grounded-sam")
 @click.argument("raster", type=click.Path(exists=True))
 @click.option("--output-path", "-o", required=True, help="Output mask file path.")
-@click.option("--prompt", "-p", required=True,
-              help="Text prompt describing objects to segment.")
-@click.option("--detector-model", default="IDEA-Research/grounding-dino-tiny",
-              help="Grounding DINO model.")
-@click.option("--segmenter-model", default="facebook/sam-vit-huge",
-              help="SAM model.")
+@click.option(
+    "--prompt", "-p", required=True, help="Text prompt describing objects to segment."
+)
+@click.option(
+    "--detector-model",
+    default="IDEA-Research/grounding-dino-tiny",
+    help="Grounding DINO model.",
+)
+@click.option("--segmenter-model", default="facebook/sam-vit-huge", help="SAM model.")
 @click.option("--tile-size", type=int, default=1024, help="Processing tile size.")
 @handle_error
-def segment_grounded_sam(raster, output_path, prompt, detector_model,
-                         segmenter_model, tile_size):
+def segment_grounded_sam(
+    raster, output_path, prompt, detector_model, segmenter_model, tile_size
+):
     """Run GroundedSAM text-prompted segmentation."""
     result = segment_mod.run_grounded_sam(
         raster=raster,
@@ -529,13 +532,19 @@ def segment_grounded_sam(raster, output_path, prompt, detector_model,
 
 @segment.command("semantic")
 @click.argument("raster", type=click.Path(exists=True))
-@click.option("--model", "-m", required=True, type=click.Path(exists=True),
-              help="Path to trained segmentation model.")
+@click.option(
+    "--model",
+    "-m",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to trained segmentation model.",
+)
 @click.option("--output", "-o", required=True, help="Output segmentation raster.")
 @click.option("--num-classes", "-n", type=int, default=2, help="Number of classes.")
 @click.option("--chip-size", type=int, default=512, help="Processing chip size.")
-@click.option("--overlap", type=float, default=0.25,
-              help="Overlap fraction between chips.")
+@click.option(
+    "--overlap", type=float, default=0.25, help="Overlap fraction between chips."
+)
 @handle_error
 def segment_semantic(raster, model, output_path, num_classes, chip_size, overlap):
     """Run semantic segmentation with a trained model."""
@@ -551,12 +560,21 @@ def segment_semantic(raster, model, output_path, num_classes, chip_size, overlap
 
 
 @segment.command("train")
-@click.option("--images", "-i", required=True, type=click.Path(exists=True),
-              help="Training images directory.")
-@click.option("--labels", "-l", required=True, type=click.Path(exists=True),
-              help="Training labels directory.")
-@click.option("--output-dir", "-o", required=True,
-              help="Output directory for model.")
+@click.option(
+    "--images",
+    "-i",
+    required=True,
+    type=click.Path(exists=True),
+    help="Training images directory.",
+)
+@click.option(
+    "--labels",
+    "-l",
+    required=True,
+    type=click.Path(exists=True),
+    help="Training labels directory.",
+)
+@click.option("--output-dir", "-o", required=True, help="Output directory for model.")
 @click.option("--arch", default="unet", help="Architecture (unet, deeplabv3, fpn).")
 @click.option("--backbone", default="resnet50", help="Encoder backbone.")
 @click.option("--num-classes", "-n", type=int, default=2, help="Number of classes.")
@@ -564,11 +582,21 @@ def segment_semantic(raster, model, output_path, num_classes, chip_size, overlap
 @click.option("--epochs", type=int, default=20, help="Training epochs.")
 @click.option("--batch-size", type=int, default=8, help="Batch size.")
 @click.option("--lr", type=float, default=1e-4, help="Learning rate.")
-@click.option("--loss", default="ce",
-              help="Loss function (ce, jaccard, focal, dice).")
+@click.option("--loss", default="ce", help="Loss function (ce, jaccard, focal, dice).")
 @handle_error
-def segment_train(images, labels, output_dir, arch, backbone, num_classes,
-                  in_channels, epochs, batch_size, lr, loss):
+def segment_train(
+    images,
+    labels,
+    output_dir,
+    arch,
+    backbone,
+    num_classes,
+    in_channels,
+    epochs,
+    batch_size,
+    lr,
+    loss,
+):
     """Train a semantic segmentation model."""
     result = segment_mod.train_segmentation(
         image_root=images,
@@ -615,22 +643,43 @@ def detect():
 
 @detect.command("run")
 @click.argument("raster", type=click.Path(exists=True))
-@click.option("--model", "-m", required=True, type=click.Path(exists=True),
-              help="Path to trained detection model.")
-@click.option("--num-classes", "-n", type=int, required=True,
-              help="Number of classes (including background).")
-@click.option("--output-vector", "-ov", default=None,
-              help="Output vector file for detections.")
-@click.option("--output-raster", "-or", default=None,
-              help="Output raster file for detection mask.")
-@click.option("--confidence", type=float, default=0.5,
-              help="Confidence threshold.")
+@click.option(
+    "--model",
+    "-m",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to trained detection model.",
+)
+@click.option(
+    "--num-classes",
+    "-n",
+    type=int,
+    required=True,
+    help="Number of classes (including background).",
+)
+@click.option(
+    "--output-vector", "-ov", default=None, help="Output vector file for detections."
+)
+@click.option(
+    "--output-raster",
+    "-or",
+    default=None,
+    help="Output raster file for detection mask.",
+)
+@click.option("--confidence", type=float, default=0.5, help="Confidence threshold.")
 @click.option("--chip-size", type=int, default=512, help="Processing chip size.")
-@click.option("--overlap", type=float, default=0.25,
-              help="Overlap between chips.")
+@click.option("--overlap", type=float, default=0.25, help="Overlap between chips.")
 @handle_error
-def detect_run(raster, model, num_classes, output_vector, output_raster,
-               confidence, chip_size, overlap):
+def detect_run(
+    raster,
+    model,
+    num_classes,
+    output_vector,
+    output_raster,
+    confidence,
+    chip_size,
+    overlap,
+):
     """Run object detection on a raster image."""
     result = detect_mod.run_detection(
         raster=raster,
@@ -646,24 +695,45 @@ def detect_run(raster, model, num_classes, output_vector, output_raster,
 
 
 @detect.command("train")
-@click.option("--images", "-i", required=True, type=click.Path(exists=True),
-              help="Training images directory.")
-@click.option("--labels", "-l", required=True, type=click.Path(exists=True),
-              help="Training labels directory.")
+@click.option(
+    "--images",
+    "-i",
+    required=True,
+    type=click.Path(exists=True),
+    help="Training images directory.",
+)
+@click.option(
+    "--labels",
+    "-l",
+    required=True,
+    type=click.Path(exists=True),
+    help="Training labels directory.",
+)
 @click.option("--output-dir", "-o", required=True, help="Output directory.")
-@click.option("--model", "-m", default="maskrcnn_resnet50_fpn",
-              help="Model architecture.")
-@click.option("--num-classes", "-n", type=int, required=True,
-              help="Number of classes (including background).")
-@click.option("--format", "input_format", default="directory",
-              type=click.Choice(["directory", "coco", "yolo"]),
-              help="Label format.")
+@click.option(
+    "--model", "-m", default="maskrcnn_resnet50_fpn", help="Model architecture."
+)
+@click.option(
+    "--num-classes",
+    "-n",
+    type=int,
+    required=True,
+    help="Number of classes (including background).",
+)
+@click.option(
+    "--format",
+    "input_format",
+    default="directory",
+    type=click.Choice(["directory", "coco", "yolo"]),
+    help="Label format.",
+)
 @click.option("--epochs", type=int, default=30, help="Training epochs.")
 @click.option("--batch-size", type=int, default=4, help="Batch size.")
 @click.option("--lr", type=float, default=0.005, help="Learning rate.")
 @handle_error
-def detect_train(images, labels, output_dir, model, num_classes,
-                 input_format, epochs, batch_size, lr):
+def detect_train(
+    images, labels, output_dir, model, num_classes, input_format, epochs, batch_size, lr
+):
     """Train an object detection model."""
     result = detect_mod.train_detector(
         images_dir=images,
@@ -699,10 +769,20 @@ def classify():
 
 
 @classify.command("train")
-@click.option("--train-dir", "-t", required=True, type=click.Path(exists=True),
-              help="Training data directory.")
-@click.option("--val-dir", "-v", default=None, type=click.Path(exists=True),
-              help="Validation data directory.")
+@click.option(
+    "--train-dir",
+    "-t",
+    required=True,
+    type=click.Path(exists=True),
+    help="Training data directory.",
+)
+@click.option(
+    "--val-dir",
+    "-v",
+    default=None,
+    type=click.Path(exists=True),
+    help="Validation data directory.",
+)
 @click.option("--output-dir", "-o", required=True, help="Output directory.")
 @click.option("--model", "-m", default="resnet50", help="TIMM model name.")
 @click.option("--epochs", type=int, default=30, help="Training epochs.")
@@ -711,8 +791,17 @@ def classify():
 @click.option("--image-size", type=int, default=224, help="Input image size.")
 @click.option("--in-channels", type=int, default=3, help="Input channels.")
 @handle_error
-def classify_train(train_dir, val_dir, output_dir, model, epochs,
-                   batch_size, lr, image_size, in_channels):
+def classify_train(
+    train_dir,
+    val_dir,
+    output_dir,
+    model,
+    epochs,
+    batch_size,
+    lr,
+    image_size,
+    in_channels,
+):
     """Train an image classification model."""
     result = classify_mod.train_classifier(
         train_dir=train_dir,
@@ -730,10 +819,14 @@ def classify_train(train_dir, val_dir, output_dir, model, epochs,
 
 @classify.command("predict")
 @click.argument("image", type=click.Path(exists=True))
-@click.option("--model", "-m", required=True, type=click.Path(exists=True),
-              help="Path to trained model.")
-@click.option("--num-classes", "-n", type=int, default=None,
-              help="Number of classes.")
+@click.option(
+    "--model",
+    "-m",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to trained model.",
+)
+@click.option("--num-classes", "-n", type=int, default=None, help="Number of classes.")
 @click.option("--image-size", type=int, default=224, help="Input image size.")
 @handle_error
 def classify_predict(image, model, num_classes, image_size):
@@ -762,13 +855,18 @@ def change():
 @click.argument("image1", type=click.Path(exists=True))
 @click.argument("image2", type=click.Path(exists=True))
 @click.option("--output", "-o", required=True, help="Output change map path.")
-@click.option("--method", default="changestar",
-              type=click.Choice(["changestar", "anychange"]),
-              help="Detection method.")
-@click.option("--confidence", type=int, default=155,
-              help="Confidence threshold (0-255).")
-@click.option("--min-area", type=int, default=0,
-              help="Min area for change regions (pixels).")
+@click.option(
+    "--method",
+    default="changestar",
+    type=click.Choice(["changestar", "anychange"]),
+    help="Detection method.",
+)
+@click.option(
+    "--confidence", type=int, default=155, help="Confidence threshold (0-255)."
+)
+@click.option(
+    "--min-area", type=int, default=0, help="Min area for change regions (pixels)."
+)
 @handle_error
 def change_detect(image1, image2, output_path, method, confidence, min_area):
     """Detect changes between two temporal images."""

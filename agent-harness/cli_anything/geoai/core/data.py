@@ -7,7 +7,6 @@ Overture Maps, and tile generation for CLI consumption.
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-
 DATA_SOURCES = ["naip", "overture", "stac"]
 
 
@@ -183,7 +182,4 @@ def list_sources() -> List[Dict[str, str]]:
         "overture": "Overture Maps Foundation (buildings, roads, POIs, global)",
         "stac": "Planetary Computer STAC API (Sentinel-2, Landsat, etc.)",
     }
-    return [
-        {"name": s, "description": descriptions.get(s, "")}
-        for s in DATA_SOURCES
-    ]
+    return [{"name": s, "description": descriptions.get(s, "")} for s in DATA_SOURCES]

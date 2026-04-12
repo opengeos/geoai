@@ -37,9 +37,7 @@ class Session:
         """
         return self.project is not None
 
-    def set_project(
-        self, project: Dict[str, Any], path: Optional[str] = None
-    ) -> None:
+    def set_project(self, project: Dict[str, Any], path: Optional[str] = None) -> None:
         """Load a project into the session, clearing history.
 
         Args:
@@ -186,9 +184,7 @@ class Session:
 
         save_path = path or self.project_path
         if save_path is None:
-            raise RuntimeError(
-                "No save path specified. Use 'project save -o <path>'."
-            )
+            raise RuntimeError("No save path specified. Use 'project save -o <path>'.")
 
         save_path = os.path.abspath(save_path)
         self.project["modified"] = datetime.now().isoformat()

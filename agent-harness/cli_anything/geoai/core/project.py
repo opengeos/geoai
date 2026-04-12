@@ -279,8 +279,14 @@ def _detect_file_type(path: str) -> str:
     ext = os.path.splitext(path)[1].lower()
     raster_exts = {".tif", ".tiff", ".img", ".jp2", ".vrt", ".nc", ".hdf"}
     vector_exts = {
-        ".geojson", ".json", ".shp", ".gpkg", ".parquet",
-        ".geoparquet", ".fgb", ".kml",
+        ".geojson",
+        ".json",
+        ".shp",
+        ".gpkg",
+        ".parquet",
+        ".geoparquet",
+        ".fgb",
+        ".kml",
     }
     model_exts = {".pth", ".pt", ".ckpt", ".onnx"}
     config_exts = {".yaml", ".yml"}

@@ -56,9 +56,7 @@ def get_raster_stats(path: str, band: int = 1) -> Dict[str, Any]:
 
     with rasterio.open(path) as src:
         if band < 1 or band > src.count:
-            raise ValueError(
-                f"Band {band} out of range (1-{src.count})"
-            )
+            raise ValueError(f"Band {band} out of range (1-{src.count})")
         data = src.read(band)
         nodata = src.nodata
 
@@ -230,6 +228,7 @@ def _serialize_info(info: Any) -> Dict[str, Any]:
             else:
                 try:
                     import json
+
                     json.dumps(v)
                     result[k] = v
                 except (TypeError, ValueError):

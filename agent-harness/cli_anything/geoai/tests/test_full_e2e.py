@@ -26,9 +26,7 @@ from cli_anything.geoai.core import session as session_mod
 
 REPO_ROOT = os.path.dirname(
     os.path.dirname(
-        os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     )
 )
 
@@ -230,9 +228,15 @@ class TestProjectWorkflowE2E:
         data = np.random.rand(1, 32, 32).astype(np.float32)
         transform = from_bounds(0, 0, 1, 1, 32, 32)
         with rasterio.open(
-            raster2, "w", driver="GTiff",
-            height=32, width=32, count=1, dtype="float32",
-            crs="EPSG:4326", transform=transform,
+            raster2,
+            "w",
+            driver="GTiff",
+            height=32,
+            width=32,
+            count=1,
+            dtype="float32",
+            crs="EPSG:4326",
+            transform=transform,
         ) as dst:
             dst.write(data)
 

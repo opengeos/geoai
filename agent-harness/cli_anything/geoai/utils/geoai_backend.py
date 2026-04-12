@@ -98,8 +98,12 @@ def get_system_info() -> Dict[str, Any]:
     info.update(torch_info)
 
     deps = [
-        "rasterio", "geopandas", "shapely", "numpy",
-        "transformers", "segmentation_models_pytorch",
+        "rasterio",
+        "geopandas",
+        "shapely",
+        "numpy",
+        "transformers",
+        "segmentation_models_pytorch",
     ]
     for dep in deps:
         try:
