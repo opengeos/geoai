@@ -244,7 +244,11 @@ def project_open(path):
 
 @project.command("save")
 @click.option(
-    "--output", "-o", "output_path", default=None, help="Save path (default: original path)."
+    "--output",
+    "-o",
+    "output_path",
+    default=None,
+    help="Save path (default: original path).",
 )
 @handle_error
 def project_save(output_path=None):
@@ -349,9 +353,7 @@ def raster_stats(path, band):
 @handle_error
 def raster_vectorize(path, output_path, simplify):
     """Convert a raster to vector polygons."""
-    data = raster_mod.vectorize_raster(
-        path, output_path, simplify_tolerance=simplify
-    )
+    data = raster_mod.vectorize_raster(path, output_path, simplify_tolerance=simplify)
     globals()["output"](data, f"Vectorized to: {output_path}")
 
 
@@ -443,7 +445,9 @@ def data_search(bbox, collection, start_date, end_date, max_items):
 @data.command("download")
 @click.argument("source", type=click.Choice(["naip", "overture"]))
 @click.option("--bbox", required=True, help="Bounding box: minx,miny,maxx,maxy.")
-@click.option("--output", "-o", "output_path", required=True, help="Output file/directory.")
+@click.option(
+    "--output", "-o", "output_path", required=True, help="Output file/directory."
+)
 @click.option("--year", type=int, default=None, help="Year (for NAIP).")
 @handle_error
 def data_download(source, bbox, output_path, year):
@@ -481,7 +485,9 @@ def segment():
 
 @segment.command("sam")
 @click.argument("raster", type=click.Path(exists=True))
-@click.option("--output", "-o", "output_path", required=True, help="Output mask file path.")
+@click.option(
+    "--output", "-o", "output_path", required=True, help="Output mask file path."
+)
 @click.option("--model", "-m", default="facebook/sam-vit-huge", help="SAM model ID.")
 @click.option("--no-automatic", is_flag=True, help="Disable automatic mask generation.")
 @click.option("--no-foreground", is_flag=True, help="Include background segments.")
@@ -538,7 +544,9 @@ def segment_grounded_sam(
     type=click.Path(exists=True),
     help="Path to trained segmentation model.",
 )
-@click.option("--output", "-o", "output_path", required=True, help="Output segmentation raster.")
+@click.option(
+    "--output", "-o", "output_path", required=True, help="Output segmentation raster."
+)
 @click.option("--num-classes", "-n", type=int, default=2, help="Number of classes.")
 @click.option("--chip-size", type=int, default=512, help="Processing chip size.")
 @click.option(
@@ -853,7 +861,9 @@ def change():
 @change.command("detect")
 @click.argument("image1", type=click.Path(exists=True))
 @click.argument("image2", type=click.Path(exists=True))
-@click.option("--output", "-o", "output_path", required=True, help="Output change map path.")
+@click.option(
+    "--output", "-o", "output_path", required=True, help="Output change map path."
+)
 @click.option(
     "--method",
     default="changestar",
