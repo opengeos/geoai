@@ -61,8 +61,10 @@ from torch.utils.data import DataLoader, Dataset, DistributedSampler
 try:
     from tqdm import tqdm
 except ImportError:  # tqdm is optional -- fall back to a no-op wrapper
+
     def tqdm(iterable, **_kwargs):  # type: ignore[misc]
         return iterable
+
 
 logger = logging.getLogger(__name__)
 
@@ -329,9 +331,7 @@ class DALESDataset(Dataset):
             raise FileNotFoundError(f"Split directory not found: {self.root}")
 
         self.block_dirs = sorted(
-            d
-            for d in self.root.iterdir()
-            if d.is_dir() and (d / "coord.npy").exists()
+            d for d in self.root.iterdir() if d.is_dir() and (d / "coord.npy").exists()
         )
         if not self.block_dirs:
             raise FileNotFoundError(f"No valid blocks in {self.root}")
@@ -479,6 +479,7 @@ def _stub_torch_scatter_if_broken() -> None:
         return
     try:
         import torch_scatter  # noqa: F401
+
         return  # Real one works -- no stub needed.
     except Exception:
         pass  # Fall through and install stub.
@@ -528,8 +529,8 @@ def _import_ptv3_class() -> type:
     # explicitly listed but discovered by the glob is appended after these.
     preferred_stems = (
         "point_transformer_v3m1_base",  # current stable variant (main branch)
-        "point_transformer_v3m1",        # older name of the same variant
-        "point_transformer_v3",          # legacy un-suffixed path
+        "point_transformer_v3m1",  # older name of the same variant
+        "point_transformer_v3",  # legacy un-suffixed path
         "point_transformer_v3m2",
         "point_transformer_v3m2_sonata",
         "point_transformer_v3m3",
@@ -760,9 +761,7 @@ def train_one_epoch(
         # Optimiser step after accumulating enough micro-batches
         if (step_idx + 1) % accum_steps == 0 or (step_idx + 1) == len(loader):
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(
-                model.parameters(), max_norm=max_grad_norm
-            )
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_norm)
             scaler.step(optimizer)
             scaler.update()
             scheduler.step()
@@ -864,9 +863,7 @@ def print_epoch_report(
     sep = "=" * 78
     print(f"\n{sep}")
     print(
-        f"Epoch {epoch:>3d}/{total_epochs}"
-        f"{'':>50s}"
-        f"lr: {train_stats['lr']:.2e}"
+        f"Epoch {epoch:>3d}/{total_epochs}" f"{'':>50s}" f"lr: {train_stats['lr']:.2e}"
     )
     print(sep)
     print(
@@ -921,9 +918,7 @@ def print_eval_report(split: str, n_blocks: int, stats: dict) -> None:
     for c in sorted(iou):
         name = DALES_CLASSES.get(c, str(c))
         p, r = pr.get(c, (0.0, 0.0))
-        print(
-            f"  {name:<15s} {iou[c] * 100:7.2f}%  {p * 100:7.2f}%  {r * 100:7.2f}%"
-        )
+        print(f"  {name:<15s} {iou[c] * 100:7.2f}%  {p * 100:7.2f}%  {r * 100:7.2f}%")
 
 
 # =====================================================================
@@ -1007,9 +1002,7 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--batch_size", type=int, default=2, help="Per-GPU batch size")
     g.add_argument("--lr", type=float, default=0.002, help="Peak learning rate")
     g.add_argument("--weight_decay", type=float, default=0.005)
-    g.add_argument(
-        "--warmup_pct", type=float, default=0.05, help="LR warmup fraction"
-    )
+    g.add_argument("--warmup_pct", type=float, default=0.05, help="LR warmup fraction")
     g.add_argument(
         "--max_grad_norm",
         type=float,
@@ -1113,9 +1106,7 @@ def main() -> None:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
         os.makedirs(args.save_dir, exist_ok=True)
 
-    device = torch.device(
-        f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu"
-    )
+    device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
 
     # -- metadata ------------------------------------------------------
     data_root = Path(args.data_root)
@@ -1128,9 +1119,9 @@ def main() -> None:
     with open(meta_path) as f:
         metadata = json.load(f)
 
-    class_weights = torch.tensor(
-        metadata["class_weights"], dtype=torch.float32
-    ).to(device)
+    class_weights = torch.tensor(metadata["class_weights"], dtype=torch.float32).to(
+        device
+    )
 
     # -- datasets & loaders --------------------------------------------
     train_tf = build_train_transforms(args.grid_size, args.max_points)
@@ -1147,9 +1138,7 @@ def main() -> None:
         DistributedSampler(train_ds, shuffle=True) if world_size > 1 else None
     )
     val_sampler = (
-        DistributedSampler(val_ds, shuffle=False)
-        if world_size > 1 and val_ds
-        else None
+        DistributedSampler(val_ds, shuffle=False) if world_size > 1 and val_ds else None
     )
 
     train_loader = DataLoader(
@@ -1248,9 +1237,7 @@ def main() -> None:
         logger.info("Model: PTv3Segmentor -- %s parameters", f"{n_params:,}")
 
     # -- loss / optimiser / scheduler ----------------------------------
-    ce_criterion = nn.CrossEntropyLoss(
-        weight=class_weights, ignore_index=IGNORE_INDEX
-    )
+    ce_criterion = nn.CrossEntropyLoss(weight=class_weights, ignore_index=IGNORE_INDEX)
 
     # Scale LR by sqrt(effective_batch / base_batch) for multi-GPU stability.
     # Base batch = 8 (single-GPU low_memory: 2 * 4 accum).
@@ -1351,7 +1338,9 @@ def main() -> None:
         )
         if device.type == "cuda":
             gpu_mem = torch.cuda.get_device_properties(device).total_memory / 1e9
-            logger.info("GPU: %s (%.1f GB)\n", torch.cuda.get_device_name(device), gpu_mem)
+            logger.info(
+                "GPU: %s (%.1f GB)\n", torch.cuda.get_device_name(device), gpu_mem
+            )
         else:
             logger.info(
                 "WARNING: Running on CPU -- PTv3 requires CUDA for "
@@ -1424,7 +1413,8 @@ def main() -> None:
                     {
                         f"val_{k}": v
                         for k, v in val_stats.items()
-                        if k not in ("per_class_iou", "per_class_pr", "confusion_matrix")
+                        if k
+                        not in ("per_class_iou", "per_class_pr", "confusion_matrix")
                     }
                 )
             training_log.append(entry)
