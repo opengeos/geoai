@@ -132,9 +132,7 @@ def split_into_blocks(
                 # Centre in float64 to avoid catastrophic cancellation
                 # with large UTM offsets (Y ~ 5 × 10⁶ overflows f32 mean).
                 centre = block_coord.astype(np.float64).mean(axis=0)
-                centred = (block_coord.astype(np.float64) - centre).astype(
-                    np.float32
-                )
+                centred = (block_coord.astype(np.float64) - centre).astype(np.float32)
                 blocks.append(
                     {
                         "coord": centred,
@@ -180,9 +178,7 @@ def process_tiles(
     for i, path in enumerate(las_paths):
         t0 = time.time()
         coord, strength, segment = read_tile(path)
-        blocks = split_into_blocks(
-            coord, strength, segment, block_size, min_points
-        )
+        blocks = split_into_blocks(coord, strength, segment, block_size, min_points)
 
         tile_name = path.stem
         for block in blocks:
@@ -261,9 +257,7 @@ def main() -> None:
         default=0.15,
         help="Fraction of train tiles held out for validation (default: 0.15)",
     )
-    parser.add_argument(
-        "--seed", type=int, default=42, help="RNG seed for val split"
-    )
+    parser.add_argument("--seed", type=int, default=42, help="RNG seed for val split")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
