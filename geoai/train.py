@@ -2020,6 +2020,15 @@ def inference_on_geotiff(
                     current_height = window_size
                     current_width = window_size
 
+                # Pad window to window_size if needed (edge tiles may be smaller)
+                if current_height < window_size or current_width < window_size:
+                    padded_window = np.zeros(
+                        (window.shape[0], window_size, window_size),
+                        dtype=window.dtype,
+                    )
+                    padded_window[:, :current_height, :current_width] = window
+                    window = padded_window
+
                 # Normalize and prepare input
                 image = window.astype(np.float32) / 255.0
 
@@ -2028,7 +2037,7 @@ def inference_on_geotiff(
                     image = image[:num_channels]
                 elif image.shape[0] < num_channels:
                     padded = np.zeros(
-                        (num_channels, current_height, current_width), dtype=np.float32
+                        (num_channels, window_size, window_size), dtype=np.float32
                     )
                     padded[: image.shape[0]] = image
                     image = padded
@@ -2088,6 +2097,8 @@ def inference_on_geotiff(
                                 combined_mask = (
                                     combined_mask.cpu().numpy().astype(np.float32)
                                 )
+                                # Crop to actual tile dimensions
+                                combined_mask = combined_mask[:h, :w]
 
                                 # Apply weight to prediction
                                 weighted_pred = combined_mask * weight
@@ -2260,6 +2271,15 @@ def instance_segmentation_inference_on_geotiff(
                 # Handle edge cases where window might be smaller than expected
                 actual_height, actual_width = window.shape[1], window.shape[2]
 
+                # Pad window to window_size if needed (edge tiles may be smaller)
+                if actual_height < window_size or actual_width < window_size:
+                    padded_window = np.zeros(
+                        (window.shape[0], window_size, window_size),
+                        dtype=window.dtype,
+                    )
+                    padded_window[:, :actual_height, :actual_width] = window
+                    window = padded_window
+
                 # Convert to [C, H, W] format and normalize
                 image = window.astype(np.float32) / 255.0
 
@@ -2269,7 +2289,7 @@ def instance_segmentation_inference_on_geotiff(
                 elif image.shape[0] < num_channels:
                     # Pad with zeros if less than expected channels
                     padded = np.zeros(
-                        (num_channels, image.shape[1], image.shape[2]), dtype=np.float32
+                        (num_channels, window_size, window_size), dtype=np.float32
                     )
                     padded[: image.shape[0]] = image
                     image = padded
@@ -2307,6 +2327,12 @@ def instance_segmentation_inference_on_geotiff(
                                 score = scores[k].cpu().item()
                                 box = boxes[k].cpu().numpy()
                                 label = det_labels[k].cpu().item()
+
+                                # Skip detections centered in the padding region
+                                box_cx = (box[0] + box[2]) / 2
+                                box_cy = (box[1] + box[3]) / 2
+                                if box_cx >= w or box_cy >= h:
+                                    continue
 
                                 # Convert box to global coordinates
                                 global_box = [
@@ -4689,6 +4715,15 @@ def semantic_inference_on_geotiff(
                 current_height = window.shape[1]
                 current_width = window.shape[2]
 
+                # Pad window to window_size if needed (edge tiles may be smaller)
+                if current_height < window_size or current_width < window_size:
+                    padded_window = np.zeros(
+                        (window.shape[0], window_size, window_size),
+                        dtype=window.dtype,
+                    )
+                    padded_window[:, :current_height, :current_width] = window
+                    window = padded_window
+
                 # Normalize and prepare input
                 image = window.astype(np.float32) / 255.0
 
@@ -4697,7 +4732,7 @@ def semantic_inference_on_geotiff(
                     image = image[:num_channels]
                 elif image.shape[0] < num_channels:
                     padded = np.zeros(
-                        (num_channels, current_height, current_width), dtype=np.float32
+                        (num_channels, window_size, window_size), dtype=np.float32
                     )
                     padded[: image.shape[0]] = image
                     image = padded
@@ -4747,8 +4782,8 @@ def semantic_inference_on_geotiff(
                         if overlap == 0:
                             weight = np.ones_like(weight)
 
-                        # Convert probabilities to numpy [C, H, W]
-                        prob_np = prob.cpu().numpy()
+                        # Convert probabilities to numpy [C, H, W] - crop to actual size
+                        prob_np = prob.cpu().numpy()[:, :h, :w]
 
                         # Accumulate weighted probabilities for each class
                         y_slice = slice(y_pos, y_pos + h)
