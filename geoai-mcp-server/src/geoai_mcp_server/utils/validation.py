@@ -218,11 +218,18 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
     Returns:
         Sanitized filename
     """
-    # Remove/replace dangerous characters
-    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", filename)
+    # Strip leading/trailing whitespace before substitution so they are
+    # removed rather than converted to underscores
+    filename = filename.strip()
 
-    # Remove leading/trailing dots and spaces
-    filename = filename.strip(". ")
+    # Remove/replace dangerous characters and any remaining interior spaces
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f ]', "_", filename)
+
+    # Remove path traversal sequences
+    filename = re.sub(r'\.\.+', "_", filename)
+
+    # Remove leading/trailing dots
+    filename = filename.strip(".")
 
     # Truncate if too long (preserving extension)
     if len(filename) > max_length:
