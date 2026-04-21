@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP as MCPServer
 
 from .config import load_config, GeoAIConfig
 from .schemas import (
@@ -97,7 +97,6 @@ config = load_config()
 # Initialize MCP Server
 mcp = MCPServer(
     "GeoAI Server",
-    version="0.1.0",
     instructions="Geospatial AI tools for remote sensing and Earth observation analysis",
 )
 
