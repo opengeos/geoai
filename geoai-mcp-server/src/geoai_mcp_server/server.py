@@ -1343,7 +1343,10 @@ async def list_available_files(
         total_size_mb = 0.0
 
         for f in files:
-            file_info = {"name": f.name, "path": str(f.resolve().relative_to(base_dir.resolve()))}
+            file_info = {
+                "name": f.name,
+                "path": str(f.resolve().relative_to(base_dir.resolve())),
+            }
 
             if include_metadata:
                 stat = f.stat()
