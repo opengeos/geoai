@@ -433,6 +433,15 @@ _LAZY_SYMBOL_MAP = {
     "DINOv3SegmentationDataset": ("dinov3_finetune", None),
     "train_dinov3_segmentation": ("dinov3_finetune", None),
     "dinov3_segment_geotiff": ("dinov3_finetune", None),
+    # --- geoai.esrgan ---
+    "ESRGAN": ("esrgan", None),
+    "ESRGANDataPreprocess": ("esrgan", None),
+    "ESRGANGenerator": ("esrgan", None),
+    "ResidualDenseBlock": ("esrgan", None),
+    "RRDB": ("esrgan", None),
+    "Discriminator": ("esrgan", None),
+    "VGGPerceptualLoss": ("esrgan", None),
+    "NormalizeToVGG": ("esrgan", None),
 }
 
 # Submodules that can be imported via `from geoai import <submodule>`
@@ -452,6 +461,7 @@ _LAZY_SUBMODULES = {
     "landcover_utils",
     "landcover_train",
     "dinov3_finetune",
+    "esrgan",
 }
 
 
