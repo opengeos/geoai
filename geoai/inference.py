@@ -31,6 +31,7 @@ __all__ = [
     "BlendMode",
     "create_weight_mask",
     "predict_geotiff",
+    "predict_geotiff_superres",
     "d4_forward",
     "d4_inverse",
     "d4_tta_forward",
@@ -540,5 +541,256 @@ def predict_geotiff(
     if verbose:
         logger.info("Output saved to: %s", output_raster)
         logger.info("Output dimensions: %dx%d", width, height)
+
+    return output_raster
+
+
+def predict_geotiff_superres(
+    model: "torch.nn.Module",
+    input_raster: str,
+    output_raster: str,
+    scale: int,
+    tile_size: int = 256,
+    overlap: int = 64,
+    batch_size: int = 4,
+    input_bands: Optional[List[int]] = None,
+    num_classes: int = 1,
+    output_dtype: str = "float32",
+    output_nodata: float = -9999.0,
+    blend_mode: Union[str, BlendMode] = "spline",
+    blend_power: int = 2,
+    tta: bool = False,
+    preprocess_fn: Optional[Callable[..., np.ndarray]] = None,
+    postprocess_fn: Optional[Callable[..., np.ndarray]] = None,
+    device: Optional[str] = None,
+    compress: str = "lzw",
+    verbose: bool = True,
+) -> str:
+    """Run tiled super-resolution inference and write a higher-resolution GeoTIFF.
+
+    This is similar to :func:`predict_geotiff`, but it assumes *model* outputs
+    predictions at a higher spatial resolution than the input (e.g., ESRGAN).
+
+    The input tiles are read on the low-resolution grid. Model outputs are
+    blended on a high-resolution grid of size ``(height*scale, width*scale)``
+    with a correspondingly updated affine transform (pixel sizes divided by
+    *scale*).
+
+    Args:
+        model: PyTorch model accepting ``(B, C, H, W)`` and returning
+            ``(B, num_classes, H*scale, W*scale)``.
+        input_raster: Path to the low-resolution input GeoTIFF.
+        output_raster: Path to save the high-resolution output GeoTIFF.
+        scale: Super-resolution scale factor.
+        tile_size: Low-resolution tile size in pixels.
+        overlap: Low-resolution overlap in pixels.
+        batch_size: Number of tiles per forward pass.
+        input_bands: 1-based band indices to read. If None, reads all bands.
+        num_classes: Number of output channels/classes from the model.
+        output_dtype: NumPy dtype string for the output raster.
+        output_nodata: NoData value for the output raster.
+        blend_mode: Blending strategy on the *high-resolution* grid.
+        blend_power: Exponent for spline blending.
+        tta: If True, apply D4 test-time augmentation.
+        preprocess_fn: Callable applied to each LR tile of shape ``(C, H, W)``.
+        postprocess_fn: Callable applied to the final HR output array.
+        device: PyTorch device string (e.g. "cuda" or "cpu").
+        compress: Compression for the output GeoTIFF.
+        verbose: Print progress information.
+
+    Returns:
+        str: Path to the output raster.
+    """
+    import torch
+    import rasterio
+    from rasterio.windows import Window
+    from tqdm.auto import tqdm
+
+    from geoai.utils import get_device
+
+    if scale <= 0:
+        raise ValueError(f"scale must be > 0, got {scale}")
+
+    if not os.path.exists(input_raster):
+        raise FileNotFoundError(f"Input raster not found: {input_raster}")
+
+    if overlap < 0 or overlap >= tile_size:
+        raise ValueError(
+            f"overlap must be >= 0 and < tile_size ({tile_size}), got {overlap}"
+        )
+
+    out_dt = np.dtype(output_dtype)
+    if np.issubdtype(out_dt, np.integer):
+        info = np.iinfo(out_dt)
+        if not (info.min <= output_nodata <= info.max):
+            raise ValueError(
+                f"output_nodata={output_nodata} is outside the valid range "
+                f"[{info.min}, {info.max}] for output_dtype='{output_dtype}'."
+            )
+
+    if device is None:
+        device = get_device()
+    else:
+        device = torch.device(device)
+
+    preprocess = preprocess_fn if preprocess_fn is not None else _default_preprocess
+    stride = tile_size - overlap
+
+    hr_tile_size = tile_size * scale
+    hr_overlap = overlap * scale
+    hr_stride = stride * scale
+
+    weight_mask_hr = create_weight_mask(
+        hr_tile_size, hr_overlap, mode=blend_mode, power=blend_power
+    ).astype(np.float64)
+
+    model.to(device)
+    model.eval()
+
+    with rasterio.open(input_raster) as src:
+        height = src.height
+        width = src.width
+        profile = src.profile.copy()
+
+        if input_bands is None:
+            input_bands = list(range(1, src.count + 1))
+
+        hr_height = height * scale
+        hr_width = width * scale
+
+        # Update transform: keep origin, scale pixel sizes
+        t = src.transform
+        hr_transform = rasterio.Affine(t.a / scale, t.b, t.c, t.d, t.e / scale, t.f)
+
+        if verbose:
+            print(f"Input raster: {width}x{height}, {len(input_bands)} bands")
+            print(
+                f"Super-res scale: {scale} -> output {hr_width}x{hr_height} (px sizes / {scale})"
+            )
+            print(
+                f"LR tile size: {tile_size}, LR overlap: {overlap}, LR stride: {stride}"
+            )
+            print(
+                f"HR tile size: {hr_tile_size}, HR overlap: {hr_overlap}, HR stride: {hr_stride}"
+            )
+
+        output_sum = np.zeros((num_classes, hr_height, hr_width), dtype=np.float64)
+        weight_sum = np.zeros((1, hr_height, hr_width), dtype=np.float64)
+
+        tiles: List[Tuple[int, int, int, int]] = []
+        for row in range(0, height, stride):
+            for col in range(0, width, stride):
+                row_end = min(row + tile_size, height)
+                col_end = min(col + tile_size, width)
+                row_start = max(0, row_end - tile_size)
+                col_start = max(0, col_end - tile_size)
+                tiles.append((row_start, col_start, row_end, col_end))
+        tiles = list(dict.fromkeys(tiles))
+
+        iterator = range(0, len(tiles), batch_size)
+        if verbose:
+            iterator = tqdm(iterator, desc="Running super-res inference")
+
+        for batch_start in iterator:
+            batch_end = min(batch_start + batch_size, len(tiles))
+            batch_tiles = tiles[batch_start:batch_end]
+
+            batch_images = []
+            batch_actual_sizes: List[Tuple[int, int]] = []
+            batch_positions: List[Tuple[int, int]] = []
+
+            for row_start, col_start, row_end, col_end in batch_tiles:
+                actual_h = row_end - row_start
+                actual_w = col_end - col_start
+                batch_actual_sizes.append((actual_h, actual_w))
+                batch_positions.append((row_start, col_start))
+
+                window = Window(col_start, row_start, actual_w, actual_h)
+                tile_data = src.read(input_bands, window=window).astype(np.float32)
+
+                if actual_h != tile_size or actual_w != tile_size:
+                    padded = np.zeros(
+                        (len(input_bands), tile_size, tile_size), dtype=np.float32
+                    )
+                    padded[:, :actual_h, :actual_w] = tile_data
+                    tile_data = padded
+
+                tile_data = preprocess(tile_data)
+                batch_images.append(tile_data)
+
+            batch_tensor = torch.from_numpy(np.stack(batch_images)).to(device)
+
+            with torch.no_grad():
+                if tta:
+                    preds = d4_tta_forward(model, batch_tensor)
+                else:
+                    preds = model(batch_tensor)
+
+            preds = preds.cpu().numpy()
+
+            if batch_start == 0:
+                if preds.ndim != 4:
+                    raise ValueError(
+                        f"Expected model output (B, C, H, W), got shape {preds.shape}"
+                    )
+                if preds.shape[1] != num_classes:
+                    raise ValueError(
+                        f"Model output has {preds.shape[1]} channels but num_classes={num_classes}"
+                    )
+
+            for i, (actual_h, actual_w) in enumerate(batch_actual_sizes):
+                row_start, col_start = batch_positions[i]
+                hr_row_start = row_start * scale
+                hr_col_start = col_start * scale
+                hr_row_end = hr_row_start + (actual_h * scale)
+                hr_col_end = hr_col_start + (actual_w * scale)
+
+                pred_tile = preds[i]
+
+                # Crop to the actual edge-tile size on HR grid
+                pred_crop = pred_tile[:, : actual_h * scale, : actual_w * scale]
+                weight_crop = weight_mask_hr[: actual_h * scale, : actual_w * scale]
+
+                output_sum[:, hr_row_start:hr_row_end, hr_col_start:hr_col_end] += (
+                    pred_crop * weight_crop[np.newaxis, :, :]
+                )
+                weight_sum[
+                    :, hr_row_start:hr_row_end, hr_col_start:hr_col_end
+                ] += weight_crop[np.newaxis, :, :]
+
+    valid = weight_sum > 0
+    output_array = np.where(
+        valid,
+        output_sum / (weight_sum + 1e-8),
+        output_nodata,
+    ).astype(np.float32)
+
+    if postprocess_fn is not None:
+        output_array = postprocess_fn(output_array)
+
+    output_dir = os.path.dirname(output_raster)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    out_count = output_array.shape[0] if output_array.ndim == 3 else 1
+    profile.update(
+        height=hr_height,
+        width=hr_width,
+        transform=hr_transform,
+        count=out_count,
+        dtype=output_dtype,
+        nodata=output_nodata,
+        compress=compress,
+    )
+
+    with rasterio.open(output_raster, "w", **profile) as dst:
+        if out_count == 1:
+            dst.write(output_array[0] if output_array.ndim == 3 else output_array, 1)
+        else:
+            dst.write(output_array)
+
+    if verbose:
+        print(f"Output saved to: {output_raster}")
+        print(f"Output dimensions: {hr_width}x{hr_height}")
 
     return output_raster
