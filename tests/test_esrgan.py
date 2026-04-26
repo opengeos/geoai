@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 
 """Tests for `geoai.esrgan` module."""

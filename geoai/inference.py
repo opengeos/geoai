@@ -754,9 +754,9 @@ def predict_geotiff_superres(
                 output_sum[:, hr_row_start:hr_row_end, hr_col_start:hr_col_end] += (
                     pred_crop * weight_crop[np.newaxis, :, :]
                 )
-                weight_sum[:, hr_row_start:hr_row_end, hr_col_start:hr_col_end] += (
-                    weight_crop[np.newaxis, :, :]
-                )
+                weight_sum[
+                    :, hr_row_start:hr_row_end, hr_col_start:hr_col_end
+                ] += weight_crop[np.newaxis, :, :]
 
     valid = weight_sum > 0
     output_array = np.where(
