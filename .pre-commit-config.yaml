@@ -30,3 +30,16 @@ repos:
       rev: 0.9.1
       hooks:
           - id: nbstripout
+
+    - repo: https://github.com/PyCQA/bandit
+      rev: 1.9.4
+      hooks:
+          - id: bandit
+            args:
+                [
+                    "-r",
+                    "qgis_plugin/geoai",
+                    "--severity-level",
+                    "medium",
+                ]
+            pass_filenames: false

@@ -392,7 +392,7 @@ class InstanceSegmentationDockWidget(QDockWidget):
         self.spin_style = f"QSpinBox, QDoubleSpinBox {{ min-height: {self.input_height}px; max-height: {self.input_height}px; }}"
 
         # Vertical splitter: tabs on top, log on bottom (user can drag to resize)
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
 
         # Top part: scrollable tabs
         self.scroll_area = QScrollArea()
