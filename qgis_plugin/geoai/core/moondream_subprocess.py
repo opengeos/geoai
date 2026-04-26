@@ -11,6 +11,7 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -31,9 +32,9 @@ def _log(message: str, level=Qgis.Info) -> None:
 class MoondreamSubprocessClient:
     """Thin client that proxies Moondream calls to a persistent subprocess."""
 
-    _TIMEOUT_INIT = 600
-    _TIMEOUT_LOAD_IMAGE = 120
-    _TIMEOUT_REQUEST = 300
+    _TIMEOUT_INIT = 900
+    _TIMEOUT_LOAD_IMAGE = 300
+    _TIMEOUT_REQUEST = 600
 
     def __init__(self, model_name: str, device: Optional[str] = None):
         self.model_name = model_name
@@ -177,7 +178,7 @@ class MoondreamSubprocessClient:
             "stream": bool(stream),
             "kwargs": kwargs,
         }
-        return self._request(payload)
+        return self._request(payload, timeout=max(self._TIMEOUT_REQUEST, 1800))
 
     def point(
         self,
@@ -195,7 +196,7 @@ class MoondreamSubprocessClient:
             "output_path": output_path,
             "kwargs": kwargs,
         }
-        return self._request(payload)
+        return self._request(payload, timeout=max(self._TIMEOUT_REQUEST, 1800))
 
     def close(self) -> None:
         """Shut down the worker process."""
@@ -258,16 +259,34 @@ class MoondreamSubprocessClient:
                 f"Failed to send request to Moondream worker: {exc}"
             ) from exc
 
-        line = self._read_response_line(
-            timeout or self._TIMEOUT_REQUEST,
-        )
+        effective_timeout = timeout or self._TIMEOUT_REQUEST
+        # Total deadline caps overall runtime even when heartbeats keep arriving.
+        # Each heartbeat resets the per-read inactivity timer but cannot extend
+        # past the absolute deadline (3x the per-read timeout).
+        deadline = time.monotonic() + effective_timeout * 3
+        line = self._read_response_line(effective_timeout)
         while True:
             try:
                 response = json.loads(line)
-                break
             except json.JSONDecodeError:
                 # Be tolerant of accidental stdout noise from third-party libs.
-                line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
+                line = self._read_response_line(effective_timeout)
+                continue
+
+            if response.get("type") == "heartbeat":
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        "Moondream worker exceeded total deadline "
+                        "({}s)".format(effective_timeout * 3)
+                    )
+                # Worker is alive; read the next line with a fresh inactivity
+                # timeout, capped by the remaining total deadline.
+                next_timeout = min(effective_timeout, remaining)
+                line = self._read_response_line(int(max(next_timeout, 1)))
+                continue
+
+            break
 
         if response.get("type") == "error":
             message = response.get("message", "Unknown Moondream worker error")
@@ -302,9 +321,11 @@ class MoondreamSubprocessClient:
         thread.join(timeout_seconds)
 
         if thread.is_alive():
-            raise TimeoutError(
-                f"Moondream worker did not respond within {timeout_seconds}s"
-            )
+            stderr_output = self._read_stderr()
+            msg = f"Moondream worker did not respond within {timeout_seconds}s"
+            if stderr_output:
+                msg = f"{msg}\nWorker stderr:\n{stderr_output[:2000]}"
+            raise TimeoutError(msg)
         if error[0] is not None:
             raise error[0]
 

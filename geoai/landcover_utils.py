@@ -15,10 +15,13 @@ Key Features:
 Date: November 2025
 """
 
+import logging
 import os
 import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import geopandas as gpd
 import numpy as np
@@ -183,13 +186,15 @@ def export_landcover_tiles(
                         # Verify CRS match
                         if class_src.crs != src.crs:
                             if not quiet:
-                                print(
-                                    f"Warning: CRS mismatch between image ({src.crs}) and mask ({class_src.crs})"
+                                logger.warning(
+                                    f"CRS mismatch between image ({src.crs}) and mask ({class_src.crs})"
                                 )
                     except Exception as e:
                         is_class_data_raster = False
                         if not quiet:
-                            print(f"Could not open as raster, trying vector: {e}")
+                            logger.debug(
+                                f"Could not open as raster, trying vector: {e}"
+                            )
 
                 # If not raster or raster open failed, try vector
                 if not is_class_data_raster:
@@ -198,7 +203,9 @@ def export_landcover_tiles(
                     # Reproject if needed
                     if gdf.crs != src.crs:
                         if not quiet:
-                            print(f"Reprojecting mask from {gdf.crs} to {src.crs}")
+                            logger.info(
+                                f"Reprojecting mask from {gdf.crs} to {src.crs}"
+                            )
                         gdf = gdf.to_crs(src.crs)
 
                     # Apply buffer if requested
@@ -225,7 +232,7 @@ def export_landcover_tiles(
                 # Reproject if needed
                 if gdf.crs != src.crs:
                     if not quiet:
-                        print(f"Reprojecting mask from {gdf.crs} to {src.crs}")
+                        logger.info("Reprojecting mask from %s to %s", gdf.crs, src.crs)
                     gdf = gdf.to_crs(src.crs)
 
                 # Apply buffer if requested
@@ -373,20 +380,20 @@ def export_landcover_tiles(
 
     # Print summary
     if not quiet:
-        print(f"\n{'='*60}")
-        print("TILE EXPORT SUMMARY")
-        print(f"{'='*60}")
-        print(f"Tiles exported: {stats['tiles_exported']}/{len(tile_positions)}")
+        logger.info(f"\n{'='*60}")
+        logger.info("TILE EXPORT SUMMARY")
+        logger.info(f"{'='*60}")
+        logger.info(f"Tiles exported: {stats['tiles_exported']}/{len(tile_positions)}")
         if skip_empty_tiles:
-            print(f"Tiles skipped (empty): {stats['tiles_skipped_empty']}")
+            logger.info(f"Tiles skipped (empty): {stats['tiles_skipped_empty']}")
         if min_feature_ratio is not False:
-            print(
+            logger.info(
                 f"Tiles skipped (low feature ratio < {min_feature_ratio}): {stats['tiles_skipped_ratio']}"
             )
-        print(f"\nOutput directories:")
-        print(f"  Images: {stats['output_dirs']['images']}")
-        print(f"  Labels: {stats['output_dirs']['labels']}")
-        print(f"{'='*60}\n")
+        logger.info(f"\nOutput directories:")
+        logger.info(f"  Images: {stats['output_dirs']['images']}")
+        logger.info(f"  Labels: {stats['output_dirs']['labels']}")
+        logger.info(f"{'='*60}\n")
 
     return stats
 

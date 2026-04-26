@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 import boto3
 import ipywidgets as widgets
@@ -237,6 +240,52 @@ def create_gemini_model(
     return GeminiModel(client_args=client_args, model_id=model_id, **kwargs)
 
 
+def create_minimax_model(
+    model_id: str = "MiniMax-M2.7",
+    api_key: str = None,
+    client_args: dict = None,
+    **kwargs: Any,
+) -> OpenAIModel:
+    """Create a MiniMax model via OpenAI-compatible API.
+
+    MiniMax provides large language models including MiniMax-M2.7 and
+    MiniMax-M2.5-highspeed, accessible through an OpenAI-compatible
+    chat completions endpoint at https://api.minimax.io/v1.
+
+    Args:
+        model_id: MiniMax model ID. Defaults to "MiniMax-M2.7".
+            For a complete list of supported models,
+            see https://platform.minimaxi.com/document/models.
+        api_key: MiniMax API key.
+        client_args: Client arguments for the MiniMax model.
+        **kwargs: Additional keyword arguments for the MiniMax model.
+
+    Returns:
+        OpenAIModel: An OpenAI-compatible model configured for MiniMax.
+    """
+
+    # Normalize client_args first so we can honor an API key passed there.
+    if client_args is None:
+        client_args = kwargs.get("client_args", {}) or {}
+
+    # Determine the effective API key from the function argument, client_args, or env var.
+    effective_api_key = api_key or client_args.get("api_key")
+    if effective_api_key is None:
+        effective_api_key = os.getenv("MINIMAX_API_KEY", None)
+        if effective_api_key is None:
+            raise ValueError(
+                "MiniMax API key must be provided via the api_key argument, "
+                "client_args['api_key'], or the MINIMAX_API_KEY environment variable"
+            )
+
+    if "api_key" not in client_args:
+        client_args["api_key"] = effective_api_key
+    if "base_url" not in client_args:
+        client_args["base_url"] = "https://api.minimax.io/v1"
+
+    return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
+
+
 class GeoAgent(Agent):
     """Geospatial AI agent with interactive mapping capabilities."""
 
@@ -268,6 +317,11 @@ class GeoAgent(Agent):
             # treat ANY "llama..." model id as Ollama
             self._model_factory = lambda m=model: create_ollama_model(
                 host="http://localhost:11434", model_id=m, **model_args
+            )
+        elif isinstance(model, str) and model.lower().startswith("minimax"):
+            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            self._model_factory = lambda m=model: create_minimax_model(
+                model_id=m, **model_args
             )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
@@ -692,7 +746,11 @@ class STACAgent(Agent):
             self._model_factory = lambda m=model: create_ollama_model(
                 host="http://localhost:11434", model_id=m, **model_args
             )
-
+        elif isinstance(model, str) and model.lower().startswith("minimax"):
+            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            self._model_factory = lambda m=model: create_minimax_model(
+                model_id=m, **model_args
+            )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
             model_id = model.config["model_id"]
@@ -915,14 +973,14 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
         search_payload = self._extract_search_items_payload(result)
         if search_payload is not None:
             if "error" in search_payload:
-                print(f"Search error: {search_payload['error']}")
+                logger.error("Search error: %s", search_payload["error"])
                 return None
 
             items = search_payload.get("items") or []
             if items:
                 return items[0]
 
-            print("No items found in search results")
+            logger.warning("No items found in search results")
             return None
 
         # Fallback: try to parse the final text response
@@ -932,17 +990,17 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             item_data = json.loads(response)
 
             if "error" in item_data:
-                print(f"Search error: {item_data['error']}")
+                logger.error("Search error: %s", item_data["error"])
                 return None
 
             if not all(k in item_data for k in ["id", "collection"]):
-                print("Response missing required fields (id, collection)")
+                logger.warning("Response missing required fields (id, collection)")
                 return None
 
             return item_data
 
         except json.JSONDecodeError:
-            print("Could not extract item data from agent response")
+            logger.warning("Could not extract item data from agent response")
             return None
 
     def _visualize_stac_item(self, item: Dict[str, Any]) -> None:
@@ -1008,7 +1066,7 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             )
             return assets  # Return the assets that were visualized
         except Exception as e:
-            print(f"Could not visualize item on map: {e}")
+            logger.error("Could not visualize item on map: %s", e)
             return None
 
     def show_ui(self, *, height: int = 700) -> None:
@@ -1334,6 +1392,11 @@ class CatalogAgent(Agent):
             self._model_factory = lambda m=model: create_ollama_model(
                 host="http://localhost:11434", model_id=m, **model_args
             )
+        elif isinstance(model, str) and model.lower().startswith("minimax"):
+            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            self._model_factory = lambda m=model: create_minimax_model(
+                model_id=m, **model_args
+            )
         elif isinstance(model, OllamaModel):
             # Extract configuration from existing OllamaModel and create new instances
             model_id = model.config["model_id"]
@@ -1526,7 +1589,7 @@ Your response: "Found dataset: USGS/NED - USGS Elevation Data"  ← WRONG! This 
         result = json.loads(result_json)
 
         if "error" in result:
-            print(f"Search error: {result['error']}")
+            logger.error("Search error: %s", result["error"])
             return []
 
         return result.get("datasets", [])

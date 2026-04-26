@@ -11,11 +11,14 @@ Reference:
     https://fieldsofthe.world/
 """
 
+import logging
 import os
 import shutil
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 # All 25 countries available in the FTW dataset
 FTW_COUNTRIES = [
@@ -106,7 +109,7 @@ def download_ftw(
         country_dir = os.path.join(output_dir, country)
 
         if os.path.exists(country_dir) and not overwrite:
-            print(f"FTW {country} already exists at {country_dir}, skipping.")
+            logger.info("FTW %s already exists at %s, skipping.", country, country_dir)
             continue
 
         # Remove existing directory when overwriting
@@ -117,7 +120,7 @@ def download_ftw(
         zip_path = os.path.join(output_dir, f"{country}.zip")
 
         # Download the zip file
-        print(f"Downloading FTW {country} dataset...")
+        logger.info("Downloading FTW %s dataset...", country)
         download_file(url, output_path=zip_path, overwrite=overwrite, unzip=False)
 
         # Extract into a temporary directory, then move to country_dir
@@ -128,7 +131,7 @@ def download_ftw(
             tmp_dir = os.path.join(output_dir, f"_tmp_{country}")
             os.makedirs(tmp_dir, exist_ok=True)
 
-            print(f"Extracting {zip_path}...")
+            logger.info("Extracting %s...", zip_path)
             with zipfile.ZipFile(zip_path, "r") as zf:
                 zf.extractall(tmp_dir)
 
@@ -144,7 +147,7 @@ def download_ftw(
                 # Flat structure — rename the temp dir
                 shutil.move(tmp_dir, country_dir)
 
-            print(f"Extracted to {country_dir}")
+            logger.info("Extracted to %s", country_dir)
 
     return output_dir
 
@@ -256,12 +259,15 @@ def prepare_ftw(
     all_train_aois = train_aois + val_aois
 
     if verbose:
-        print(f"FTW {country}: {len(chips_df)} total chips")
-        print(
-            f"  Train: {len(train_aois)}, Val: {len(val_aois)}, Test: {len(test_aois)}"
+        logger.info("FTW %s: %d total chips", country, len(chips_df))
+        logger.info(
+            "  Train: %d, Val: %d, Test: %d",
+            len(train_aois),
+            len(val_aois),
+            len(test_aois),
         )
-        print(f"  Using {len(all_train_aois)} chips for training")
-        print(f"Preparing training data...")
+        logger.info("  Using %d chips for training", len(all_train_aois))
+        logger.info("Preparing training data...")
 
     # Process training chips
     prepared_train = 0
@@ -280,7 +286,7 @@ def prepare_ftw(
 
     if verbose:
         skipped = len(all_train_aois) - prepared_train
-        print(f"Prepared {prepared_train} training chips (skipped {skipped})")
+        logger.info("Prepared %d training chips (skipped %d)", prepared_train, skipped)
 
     # Process test chips
     prepared_test = 0
@@ -294,7 +300,7 @@ def prepare_ftw(
                 prepared_test += 1
 
         if verbose:
-            print(f"Prepared {prepared_test} test chips")
+            logger.info("Prepared %d test chips", prepared_test)
 
     return {
         "images_dir": images_dir,
@@ -404,7 +410,7 @@ def display_ftw_samples(
     num_samples = min(num_samples, len(aois))
 
     if num_samples == 0:
-        print(f"No samples found for split='{split}'")
+        logger.warning("No samples found for split='%s'", split)
         return
 
     if figsize is None:

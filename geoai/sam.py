@@ -2,6 +2,7 @@
 The SamGeo class provides an interface for segmenting geospatial data using the Segment Anything Model (SAM).
 """
 
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -19,6 +20,8 @@ from .utils import (
     raster_to_vector,
     vector_to_geojson,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SamGeo:
@@ -449,7 +452,7 @@ class SamGeo:
         anns = self.masks
 
         if self.image is None:
-            print("Please run generate() first.")
+            logger.warning("Please run generate() first.")
             return
 
         if anns is None or len(anns) == 0:
@@ -663,7 +666,7 @@ class SamGeo:
                 if len(point_labels) == 1:
                     point_labels = point_labels * len(point_coords)
                 elif len(out_of_bounds) > 0:
-                    print(f"Removing {len(out_of_bounds)} out-of-bound points.")
+                    logger.info("Removing %d out-of-bound points.", len(out_of_bounds))
                     point_labels_new = []
                     for i, p in enumerate(point_labels):
                         if i not in out_of_bounds:
@@ -811,7 +814,7 @@ class SamGeo:
         masks = masks.squeeze(1)
 
         if boxes is None or (len(boxes) == 0):  # No "object" instances found
-            print("No objects found in the image.")
+            logger.warning("No objects found in the image.")
             return
         else:
             # Create an empty image to store the mask overlays

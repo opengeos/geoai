@@ -8,9 +8,12 @@ segmentation to classify pixels into: Clear (0), Thick Cloud (1), Thin Cloud (2)
 Supports Sentinel-2, Landsat 8, PlanetScope, and Maxar imagery at 10-50m resolution.
 """
 
+import logging
 import os
 from typing import Optional, List, Tuple, Dict, Any, Union
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 try:
     from omnicloudmask import predict_from_array
@@ -312,7 +315,7 @@ def predict_cloud_mask_batch(
 
     for i, input_path in enumerate(input_paths):
         if verbose:
-            print(f"Processing {i+1}/{len(input_paths)}: {input_path}")
+            logger.info("Processing %d/%d: %s", i + 1, len(input_paths), input_path)
 
         # Generate output filename
         basename = os.path.basename(input_path)
@@ -339,11 +342,11 @@ def predict_cloud_mask_batch(
             output_paths.append(output_path)
 
             if verbose:
-                print(f"  ✓ Saved to: {output_path}")
+                logger.info("  ✓ Saved to: %s", output_path)
 
         except Exception as e:
             if verbose:
-                print(f"  ✗ Failed: {e}")
+                logger.error("  ✗ Failed: %s", e)
             continue
 
     return output_paths

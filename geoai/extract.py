@@ -1,6 +1,7 @@
 """This module provides a dataset class for object extraction from raster data"""
 
 # Standard Library
+import logging
 import os
 import time
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
@@ -23,6 +24,8 @@ from tqdm import tqdm
 
 # Local Imports
 from .utils import get_raster_stats
+
+logger = logging.getLogger(__name__)
 
 try:
     from torchgeo.datasets import NonGeoDataset
@@ -160,16 +163,16 @@ class CustomDataset(NonGeoDataset):
             self.rows = len(self.row_starts)
             self.cols = len(self.col_starts)
 
-            print(
+            logger.info(
                 f"Dataset initialized with {self.rows} rows and {self.cols} columns of chips"
             )
-            print(f"Image dimensions: {self.width} x {self.height} pixels")
-            print(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
-            print(
+            logger.info(f"Image dimensions: {self.width} x {self.height} pixels")
+            logger.info(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
+            logger.info(
                 f"Overlap: {overlap*100}% (stride_x={self.stride_x}, stride_y={self.stride_y})"
             )
             if src.crs:
-                print(f"CRS: {src.crs}")
+                logger.info(f"CRS: {src.crs}")
 
         # Get raster stats
         self.raster_stats = get_raster_stats(raster_path, divide_by=255)
@@ -211,7 +214,9 @@ class CustomDataset(NonGeoDataset):
             # Handle RGBA or multispectral images - keep only first 3 bands
             if image.shape[0] > 3:
                 if not self.warned_about_bands and self.verbose:
-                    print(f"Image has {image.shape[0]} bands, using first 3 bands only")
+                    logger.debug(
+                        f"Image has {image.shape[0]} bands, using first 3 bands only"
+                    )
                     self.warned_about_bands = True
                 if self.band_indexes is not None:
                     image = image[self.band_indexes]
@@ -220,7 +225,7 @@ class CustomDataset(NonGeoDataset):
             elif image.shape[0] < 3:
                 # If image has fewer than 3 bands, duplicate the last band to make 3
                 if not self.warned_about_bands and self.verbose:
-                    print(
+                    logger.debug(
                         f"Image has {image.shape[0]} bands, duplicating bands to make 3"
                     )
                     self.warned_about_bands = True
@@ -343,7 +348,7 @@ class ObjectDetector:
         """
         try:
 
-            print("Model path not specified, downloading from Hugging Face...")
+            logger.info("Model path not specified, downloading from Hugging Face...")
 
             # Define the repository ID and model filename
             if repo_id is None:
@@ -354,13 +359,15 @@ class ObjectDetector:
 
             # Download the model
             model_path = hf_hub_download(repo_id=repo_id, filename=model_path)
-            print(f"Model downloaded to: {model_path}")
+            logger.info(f"Model downloaded to: {model_path}")
 
             return model_path
 
         except Exception as e:
-            print(f"Error downloading model from Hugging Face: {e}")
-            print("Please specify a local model path or ensure internet connectivity.")
+            logger.error(f"Error downloading model from Hugging Face: {e}")
+            logger.error(
+                "Please specify a local model path or ensure internet connectivity."
+            )
             raise
 
     def initialize_model(self, model: Optional[Any], num_classes: int = 2) -> Any:
@@ -416,10 +423,10 @@ class ObjectDetector:
             # Try to load state dict
             try:
                 self.model.load_state_dict(state_dict)
-                print("Model loaded successfully")
+                logger.info("Model loaded successfully")
             except Exception as e:
-                print(f"Error loading model: {e}")
-                print("Attempting to fix state_dict keys...")
+                logger.error(f"Error loading model: {e}")
+                logger.warning("Attempting to fix state_dict keys...")
 
                 # Try to fix state_dict keys (remove module prefix if needed)
                 new_state_dict = {}
@@ -430,7 +437,7 @@ class ObjectDetector:
                         new_state_dict[k] = v
 
                 self.model.load_state_dict(new_state_dict)
-                print("Model loaded successfully after key fixing")
+                logger.info("Model loaded successfully after key fixing")
 
         except Exception as e:
             raise RuntimeError(f"Failed to load model: {e}")
@@ -573,7 +580,7 @@ class ObjectDetector:
         if gdf is None or len(gdf) == 0:
             return gdf
 
-        print(f"Objects before filtering: {len(gdf)}")
+        logger.info(f"Objects before filtering: {len(gdf)}")
 
         with rasterio.open(raster_path) as src:
             # Get raster bounds
@@ -597,7 +604,7 @@ class ObjectDetector:
 
             # Check that inner bounds are valid
             if inner_bounds[0] >= inner_bounds[2] or inner_bounds[1] >= inner_bounds[3]:
-                print("Warning: Edge buffer too large, using original bounds")
+                logger.warning("Warning: Edge buffer too large, using original bounds")
                 inner_box = box(*raster_bounds)
             else:
                 inner_box = box(*inner_bounds)
@@ -613,7 +620,7 @@ class ObjectDetector:
 
             filtered_gdf = filtered_gdf.loc[valid_objects]
 
-            print(f"Objects after filtering: {len(filtered_gdf)}")
+            logger.info(f"Objects after filtering: {len(filtered_gdf)}")
 
             return filtered_gdf
 
@@ -675,16 +682,16 @@ class ObjectDetector:
         # if output_path is None:
         #     output_path = os.path.splitext(mask_path)[0] + ".geojson"
 
-        print(f"Converting mask to GeoJSON with parameters:")
-        print(f"- Mask threshold: {mask_threshold}")
-        print(f"- Min object area: {min_object_area}")
-        print(f"- Max object area: {max_object_area}")
-        print(f"- Simplify tolerance: {simplify_tolerance}")
-        print(f"- NMS IoU threshold: {nms_iou_threshold}")
-        print(f"- Regularize objects: {regularize}")
+        logger.info(f"Converting mask to GeoJSON with parameters:")
+        logger.info(f"- Mask threshold: {mask_threshold}")
+        logger.info(f"- Min object area: {min_object_area}")
+        logger.info(f"- Max object area: {max_object_area}")
+        logger.info(f"- Simplify tolerance: {simplify_tolerance}")
+        logger.info(f"- NMS IoU threshold: {nms_iou_threshold}")
+        logger.info(f"- Regularize objects: {regularize}")
         if regularize:
-            print(f"- Angle threshold: {angle_threshold}° from 90°")
-            print(f"- Rectangularity threshold: {rectangularity_threshold*100}%")
+            logger.info(f"- Angle threshold: {angle_threshold}° from 90°")
+            logger.info(f"- Rectangularity threshold: {rectangularity_threshold*100}%")
 
         # Open the mask raster
         with rasterio.open(mask_path) as src:
@@ -694,8 +701,8 @@ class ObjectDetector:
             crs = src.crs
 
             # Print mask statistics
-            print(f"Mask dimensions: {mask_data.shape}")
-            print(f"Mask value range: {mask_data.min()} to {mask_data.max()}")
+            logger.info(f"Mask dimensions: {mask_data.shape}")
+            logger.info(f"Mask value range: {mask_data.min()} to {mask_data.max()}")
 
             # Prepare for connected component analysis
             # Binarize the mask based on threshold
@@ -710,7 +717,7 @@ class ObjectDetector:
                 binary_mask, connectivity=8
             )
 
-            print(
+            logger.info(
                 f"Found {num_labels-1} potential objects"
             )  # Subtract 1 for background
 
@@ -771,13 +778,13 @@ class ObjectDetector:
                                 normalized_size = min(1.0, area / 1000)  # Cap at 1.0
                                 all_confidences.append(normalized_size)
                         except Exception as e:
-                            print(f"Error creating polygon: {e}")
+                            logger.error(f"Error creating polygon: {e}")
 
-            print(f"Created {len(all_polygons)} valid polygons")
+            logger.info(f"Created {len(all_polygons)} valid polygons")
 
             # Create GeoDataFrame
             if not all_polygons:
-                print("No valid polygons found")
+                logger.warning("No valid polygons found")
                 return None
 
             gdf = gpd.GeoDataFrame(
@@ -794,7 +801,7 @@ class ObjectDetector:
                 gdf, nms_iou_threshold=nms_iou_threshold
             )
 
-            print(f"Object count after NMS filtering: {len(gdf)}")
+            logger.info(f"Object count after NMS filtering: {len(gdf)}")
 
             # Apply regularization if requested
             if regularize and len(gdf) > 0:
@@ -826,7 +833,7 @@ class ObjectDetector:
                     gdf.to_parquet(output_path)
                 else:
                     gdf.to_file(output_path)
-                print(f"Saved {len(gdf)} objects to {output_path}")
+                logger.info(f"Saved {len(gdf)} objects to {output_path}")
 
             return gdf
 
@@ -876,18 +883,18 @@ class ObjectDetector:
         simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
 
         # Print parameters being used
-        print(f"Processing with parameters:")
-        print(f"- Confidence threshold: {confidence_threshold}")
-        print(f"- Tile overlap: {overlap}")
-        print(f"- Chip size: {chip_size}")
-        print(f"- NMS IoU threshold: {nms_iou_threshold}")
-        print(f"- Mask threshold: {mask_threshold}")
-        print(f"- Min object area: {min_object_area}")
-        print(f"- Max object area: {max_object_area}")
-        print(f"- Simplify tolerance: {simplify_tolerance}")
-        print(f"- Filter edge objects: {filter_edges}")
+        logger.info(f"Processing with parameters:")
+        logger.info(f"- Confidence threshold: {confidence_threshold}")
+        logger.info(f"- Tile overlap: {overlap}")
+        logger.info(f"- Chip size: {chip_size}")
+        logger.info(f"- NMS IoU threshold: {nms_iou_threshold}")
+        logger.info(f"- Mask threshold: {mask_threshold}")
+        logger.info(f"- Min object area: {min_object_area}")
+        logger.info(f"- Max object area: {max_object_area}")
+        logger.info(f"- Simplify tolerance: {simplify_tolerance}")
+        logger.info(f"- Filter edge objects: {filter_edges}")
         if filter_edges:
-            print(f"- Edge buffer size: {edge_buffer} pixels")
+            logger.info(f"- Edge buffer size: {edge_buffer} pixels")
 
         # Create dataset
         dataset = CustomDataset(
@@ -940,7 +947,7 @@ class ObjectDetector:
         all_polygons = []
         all_scores = []
 
-        print(f"Processing raster with {len(dataloader)} batches")
+        logger.info(f"Processing raster with {len(dataloader)} batches")
         for batch in tqdm(dataloader):
             # Move images to device
             images = batch["image"].to(self.device)
@@ -982,13 +989,13 @@ class ObjectDetector:
                     elif isinstance(coord_item, torch.Tensor):
                         i, j = coord_item.cpu().numpy().tolist()
                     else:
-                        print(f"Unexpected coords format: {type(coord_item)}")
+                        logger.warning(f"Unexpected coords format: {type(coord_item)}")
                         continue
                 elif isinstance(coords, torch.Tensor):
                     # If coords is a tensor of shape [batch_size, 2]
                     i, j = coords[idx].cpu().numpy().tolist()
                 else:
-                    print(f"Unexpected coords type: {type(coords)}")
+                    logger.warning(f"Unexpected coords type: {type(coords)}")
                     continue
 
                 # Get window size
@@ -999,14 +1006,18 @@ class ObjectDetector:
                     elif isinstance(window_item, torch.Tensor):
                         window_width, window_height = window_item.cpu().numpy().tolist()
                     else:
-                        print(f"Unexpected window_size format: {type(window_item)}")
+                        logger.warning(
+                            f"Unexpected window_size format: {type(window_item)}"
+                        )
                         continue
                 elif isinstance(batch["window_size"], torch.Tensor):
                     window_width, window_height = (
                         batch["window_size"][idx].cpu().numpy().tolist()
                     )
                 else:
-                    print(f"Unexpected window_size type: {type(batch['window_size'])}")
+                    logger.warning(
+                        f"Unexpected window_size type: {type(batch['window_size'])}"
+                    )
                     continue
 
                 # Process masks to polygons
@@ -1047,11 +1058,11 @@ class ObjectDetector:
                                         all_polygons.append(shapely_poly)
                                         all_scores.append(float(scores[mask_idx]))
                                 except Exception as e:
-                                    print(f"Error creating polygon: {e}")
+                                    logger.error(f"Error creating polygon: {e}")
 
         # Create GeoDataFrame
         if not all_polygons:
-            print("No valid polygons found")
+            logger.warning("No valid polygons found")
             return None
 
         gdf = gpd.GeoDataFrame(
@@ -1076,7 +1087,7 @@ class ObjectDetector:
                 gdf.to_parquet(output_path)
             else:
                 gdf.to_file(output_path, driver="GeoJSON")
-            print(f"Saved {len(gdf)} objects to {output_path}")
+            logger.info(f"Saved {len(gdf)} objects to {output_path}")
 
         return gdf
 
@@ -1118,10 +1129,10 @@ class ObjectDetector:
             output_path = os.path.splitext(raster_path)[0] + "_masks.tif"
 
         # Print parameters being used
-        print(f"Processing masks with parameters:")
-        print(f"- Confidence threshold: {confidence_threshold}")
-        print(f"- Chip size: {chip_size}")
-        print(f"- Mask threshold: {mask_threshold}")
+        logger.info(f"Processing masks with parameters:")
+        logger.info(f"- Confidence threshold: {confidence_threshold}")
+        logger.info(f"- Chip size: {chip_size}")
+        logger.info(f"- Mask threshold: {mask_threshold}")
 
         # Create dataset
         dataset = CustomDataset(
@@ -1190,7 +1201,7 @@ class ObjectDetector:
                 )
 
                 # Process batches
-                print(f"Processing raster with {len(dataloader)} batches")
+                logger.info(f"Processing raster with {len(dataloader)} batches")
                 for batch in tqdm(dataloader):
                     # Move images to device
                     images = batch["image"].to(self.device)
@@ -1226,12 +1237,14 @@ class ObjectDetector:
                             elif isinstance(coord_item, torch.Tensor):
                                 i, j = coord_item.cpu().numpy().tolist()
                             else:
-                                print(f"Unexpected coords format: {type(coord_item)}")
+                                logger.warning(
+                                    f"Unexpected coords format: {type(coord_item)}"
+                                )
                                 continue
                         elif isinstance(coords, torch.Tensor):
                             i, j = coords[idx].cpu().numpy().tolist()
                         else:
-                            print(f"Unexpected coords type: {type(coords)}")
+                            logger.warning(f"Unexpected coords type: {type(coords)}")
                             continue
 
                         # Get window size
@@ -1244,7 +1257,7 @@ class ObjectDetector:
                                     window_item.cpu().numpy().tolist()
                                 )
                             else:
-                                print(
+                                logger.warning(
                                     f"Unexpected window_size format: {type(window_item)}"
                                 )
                                 continue
@@ -1253,7 +1266,7 @@ class ObjectDetector:
                                 batch["window_size"][idx].cpu().numpy().tolist()
                             )
                         else:
-                            print(
+                            logger.warning(
                                 f"Unexpected window_size type: {type(batch['window_size'])}"
                             )
                             continue
@@ -1275,14 +1288,14 @@ class ObjectDetector:
                                 resize_key = f"{(mask_h, mask_w)}->{(window_height, window_width)}"
                                 if resize_key not in seen_warnings["resize"]:
                                     if verbose:
-                                        print(
+                                        logger.debug(
                                             f"Resizing mask from {binary_mask.shape} to {(window_height, window_width)}"
                                         )
                                     else:
                                         if not seen_warnings[
                                             "resize"
                                         ]:  # If this is the first resize warning
-                                            print(
+                                            logger.debug(
                                                 f"Resizing masks at image edges (set verbose=True for details)"
                                             )
                                     seen_warnings["resize"][resize_key] = True
@@ -1316,7 +1329,7 @@ class ObjectDetector:
                 # Write the final mask to the output file
                 dst.write(mask_array, 1)
 
-        print(f"Object masks saved to {output_path}")
+        logger.info(f"Object masks saved to {output_path}")
         return output_path
 
     def regularize_objects(
@@ -1456,13 +1469,13 @@ class ObjectDetector:
             return rect
 
         if gdf is None or len(gdf) == 0:
-            print("No Objects to regularize")
+            logger.warning("No Objects to regularize")
             return gdf
 
-        print(f"Regularizing {len(gdf)} objects...")
-        print(f"- Angle threshold: {angle_threshold}° from 90°")
-        print(f"- Min orthogonality: {orthogonality_threshold*100}% of angles")
-        print(
+        logger.info(f"Regularizing {len(gdf)} objects...")
+        logger.info(f"- Angle threshold: {angle_threshold}° from 90°")
+        logger.info(f"- Min orthogonality: {orthogonality_threshold*100}% of angles")
+        logger.info(
             f"- Min rectangularity: {rectangularity_threshold*100}% of bounding box area"
         )
 
@@ -1523,15 +1536,15 @@ class ObjectDetector:
                 result_gdf.at[idx, "regularized"] = "original"
 
         # Report statistics
-        print(f"Regularization completed:")
-        print(f"- Total objects: {total_objects}")
-        print(
+        logger.info(f"Regularization completed:")
+        logger.info(f"- Total objects: {total_objects}")
+        logger.info(
             f"- Rectangular objects: {rectangularized_count} ({rectangularized_count/total_objects*100:.1f}%)"
         )
-        print(
+        logger.info(
             f"- Other regularized objects: {regularized_count} ({regularized_count/total_objects*100:.1f}%)"
         )
-        print(
+        logger.info(
             f"- Unmodified objects: {total_objects-rectangularized_count-regularized_count} ({(total_objects-rectangularized_count-regularized_count)/total_objects*100:.1f}%)"
         )
 
@@ -1561,7 +1574,7 @@ class ObjectDetector:
         """
         # Check if raster file exists
         if not os.path.exists(raster_path):
-            print(f"Error: Raster file '{raster_path}' not found.")
+            logger.error(f"Error: Raster file '{raster_path}' not found.")
             return False
 
         # Process raster if GeoDataFrame not provided
@@ -1569,7 +1582,7 @@ class ObjectDetector:
             gdf = self.process_raster(raster_path)
 
         if gdf is None or len(gdf) == 0:
-            print("No objects to visualize")
+            logger.warning("No objects to visualize")
             return False
 
         # Check if confidence column exists in the GeoDataFrame
@@ -1581,14 +1594,16 @@ class ObjectDetector:
                     # Try getitem access
                     conf_val = gdf["confidence"].iloc[0]
                     has_confidence = True
-                    print(
+                    logger.info(
                         f"Using confidence values (range: {gdf['confidence'].min():.2f} - {gdf['confidence'].max():.2f})"
                     )
             except Exception as e:
-                print(f"Confidence column exists but couldn't access values: {e}")
+                logger.warning(
+                    f"Confidence column exists but couldn't access values: {e}"
+                )
                 has_confidence = False
         else:
-            print("No confidence column found in GeoDataFrame")
+            logger.debug("No confidence column found in GeoDataFrame")
             has_confidence = False
 
         # Read raster for visualization
@@ -1658,7 +1673,7 @@ class ObjectDetector:
 
         # Make sure the GeoDataFrame has the same CRS as the raster
         if gdf.crs != crs:
-            print(f"Reprojecting GeoDataFrame from {gdf.crs} to {crs}")
+            logger.info(f"Reprojecting GeoDataFrame from {gdf.crs} to {crs}")
             gdf = gdf.to_crs(crs)
 
         # Set up colors for confidence visualization
@@ -1685,7 +1700,7 @@ class ObjectDetector:
                 )
                 cbar.set_label("Confidence Score")
             except Exception as e:
-                print(f"Error setting up confidence visualization: {e}")
+                logger.error(f"Error setting up confidence visualization: {e}")
                 has_confidence = False
 
         # Function to convert coordinates
@@ -1709,7 +1724,7 @@ class ObjectDetector:
 
                 return pixel_x, pixel_y
             else:
-                print(f"Unsupported geometry type: {geometry.geom_type}")
+                logger.warning(f"Unsupported geometry type: {geometry.geom_type}")
                 return None
 
         # Plot each object
@@ -1761,7 +1776,7 @@ class ObjectDetector:
                                 # Fall back to red if confidence value couldn't be accessed
                                 ax.plot(pixel_x, pixel_y, color="red", linewidth=1)
                         except Exception as e:
-                            print(
+                            logger.error(
                                 f"Error using confidence value for polygon {idx}: {e}"
                             )
                             ax.plot(pixel_x, pixel_y, color="red", linewidth=1)
@@ -1769,7 +1784,7 @@ class ObjectDetector:
                         # No confidence data, just plot outlines in red
                         ax.plot(pixel_x, pixel_y, color="red", linewidth=1)
             except Exception as e:
-                print(f"Error plotting polygon {idx}: {e}")
+                logger.error(f"Error plotting polygon {idx}: {e}")
 
         # Remove axes
         ax.set_xticks([])
@@ -1780,7 +1795,7 @@ class ObjectDetector:
         if output_path:
             plt.tight_layout()
             plt.savefig(output_path, dpi=300, bbox_inches="tight")
-            print(f"Visualization saved to {output_path}")
+            logger.info(f"Visualization saved to {output_path}")
 
         plt.close()
 
@@ -1855,7 +1870,9 @@ class ObjectDetector:
                         )
                         sample_cbar.set_label("Confidence Score")
                     except Exception as e:
-                        print(f"Error setting up sample confidence visualization: {e}")
+                        logger.error(
+                            f"Error setting up sample confidence visualization: {e}"
+                        )
 
                 # Plot objects in sample view
                 for idx, row in visible_gdf.iterrows():
@@ -1922,14 +1939,14 @@ class ObjectDetector:
                                         pixel_x, pixel_y, color="red", linewidth=1.5
                                     )
                             except Exception as e:
-                                print(
+                                logger.error(
                                     f"Error using confidence in sample view for polygon {idx}: {e}"
                                 )
                                 ax.plot(pixel_x, pixel_y, color="red", linewidth=1.5)
                         else:
                             ax.plot(pixel_x, pixel_y, color="red", linewidth=1.5)
                     except Exception as e:
-                        print(f"Error plotting polygon in sample view: {e}")
+                        logger.error(f"Error plotting polygon in sample view: {e}")
 
                 # Set title
                 ax.set_title(f"Sample Area - objects (Showing: {len(visible_gdf)})")
@@ -1947,7 +1964,7 @@ class ObjectDetector:
                     )
                     plt.tight_layout()
                     plt.savefig(sample_output, dpi=300, bbox_inches="tight")
-                    print(f"Sample visualization saved to {sample_output}")
+                    logger.info(f"Sample visualization saved to {sample_output}")
 
     def generate_masks(
         self,
@@ -2059,7 +2076,7 @@ class ObjectDetector:
             )
 
             # Process batches
-            print(f"Processing raster with {len(dataloader)} batches")
+            logger.info(f"Processing raster with {len(dataloader)} batches")
             for batch in tqdm(dataloader):
                 # Move images to device
                 images = batch["image"].to(self.device)
@@ -2100,7 +2117,7 @@ class ObjectDetector:
                             or object_area > max_object_area
                         ):
                             if verbose:
-                                print(
+                                logger.debug(
                                     f"Filtering out object with area {object_area} pixels"
                                 )
                             continue
@@ -2146,7 +2163,7 @@ class ObjectDetector:
                 dst.write(mask_array, 1)
                 dst.write(conf_array, 2)
 
-            print(f"Masks with confidence values saved to {output_path}")
+            logger.info(f"Masks with confidence values saved to {output_path}")
             return output_path
 
     def vectorize_masks(
@@ -2263,7 +2280,7 @@ class ObjectDetector:
             )
 
         start_time = time.time()
-        print(f"Processing masks from: {masks_path}")
+        logger.info(f"Processing masks from: {masks_path}")
 
         if n_workers == -1:
             n_workers = os.cpu_count()
@@ -2280,7 +2297,7 @@ class ObjectDetector:
 
             # Find connected components
             labeled_mask, num_features = ndimage.label(binary_mask)
-            print(f"Found {num_features} connected components")
+            logger.info(f"Found {num_features} connected components")
 
             # Process each component
             polygons = []
@@ -2288,7 +2305,7 @@ class ObjectDetector:
             pixels = []
 
             if n_workers is None or n_workers == 1:
-                print(
+                logger.info(
                     "Using single-threaded processing, you can speed up processing by setting n_workers > 1"
                 )
                 # Add progress bar
@@ -2316,7 +2333,7 @@ class ObjectDetector:
 
             else:
                 # Process components in parallel
-                print(f"Using {n_workers} workers for parallel processing")
+                logger.info(f"Using {n_workers} workers for parallel processing")
 
                 process_args = [
                     (
@@ -2365,15 +2382,21 @@ class ObjectDetector:
                 # Save to file if requested
                 if output_path:
                     gdf.to_file(output_path, driver="GeoJSON")
-                    print(f"Saved {len(gdf)} objects with confidence to {output_path}")
+                    logger.info(
+                        f"Saved {len(gdf)} objects with confidence to {output_path}"
+                    )
 
                 end_time = time.time()
-                print(f"Total processing time: {end_time - start_time:.2f} seconds")
+                logger.info(
+                    f"Total processing time: {end_time - start_time:.2f} seconds"
+                )
                 return gdf
             else:
                 end_time = time.time()
-                print(f"Total processing time: {end_time - start_time:.2f} seconds")
-                print("No valid polygons found")
+                logger.info(
+                    f"Total processing time: {end_time - start_time:.2f} seconds"
+                )
+                logger.warning("No valid polygons found")
                 return None
 
 
@@ -2678,7 +2701,9 @@ class AgricultureFieldDelineator(ObjectDetector):
         if self.use_ndvi:
             num_input_channels += 1
 
-        print(f"Initializing Mask R-CNN model with {num_input_channels} input channels")
+        logger.info(
+            f"Initializing Mask R-CNN model with {num_input_channels} input channels"
+        )
 
         # Create a ResNet50 backbone with modified input channels
         backbone = resnet_fpn_backbone("resnet50", weights=None)
@@ -2793,7 +2818,7 @@ class AgricultureFieldDelineator(ObjectDetector):
             # Check if this is likely a Sentinel-2 product
             band_count = src.count
             if band_count < 3:
-                print(
+                logger.warning(
                     f"Warning: Raster has only {band_count} bands, may not be Sentinel-2 data"
                 )
 
@@ -2832,7 +2857,7 @@ class AgricultureFieldDelineator(ObjectDetector):
                 means.append(mean)
                 stds.append(std)
 
-                print(f"Band {band}: mean={mean:.4f}, std={std:.4f}")
+                logger.info(f"Band {band}: mean={mean:.4f}, std={std:.4f}")
 
             # Update instance variables
             self.sentinel_band_stats = {"means": means, "stds": stds}
@@ -2887,13 +2912,13 @@ class AgricultureFieldDelineator(ObjectDetector):
         if kwargs.get("update_stats", True):
             self.update_band_stats(raster_path, band_selection)
 
-        print(f"Processing with parameters:")
-        print(f"- Using bands: {band_selection}")
-        print(f"- Include NDVI: {use_ndvi}")
-        print(f"- Confidence threshold: {confidence_threshold}")
-        print(f"- Tile overlap: {overlap}")
-        print(f"- Chip size: {chip_size}")
-        print(f"- Filter edge objects: {filter_edges}")
+        logger.info(f"Processing with parameters:")
+        logger.info(f"- Using bands: {band_selection}")
+        logger.info(f"- Include NDVI: {use_ndvi}")
+        logger.info(f"- Confidence threshold: {confidence_threshold}")
+        logger.info(f"- Tile overlap: {overlap}")
+        logger.info(f"- Chip size: {chip_size}")
+        logger.info(f"- Filter edge objects: {filter_edges}")
 
         # Create a custom Sentinel-2 dataset class
         class Sentinel2Dataset(torch.utils.data.Dataset):
@@ -2954,11 +2979,13 @@ class AgricultureFieldDelineator(ObjectDetector):
                 self.rows = len(self.row_starts)
                 self.cols = len(self.col_starts)
 
-                print(
+                logger.info(
                     f"Dataset initialized with {self.rows} rows and {self.cols} columns of chips"
                 )
-                print(f"Image dimensions: {self.width} x {self.height} pixels")
-                print(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
+                logger.info(f"Image dimensions: {self.width} x {self.height} pixels")
+                logger.info(
+                    f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels"
+                )
 
             def __len__(self) -> int:
                 return self.rows * self.cols

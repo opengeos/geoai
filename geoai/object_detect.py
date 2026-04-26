@@ -6,10 +6,13 @@ support for the NWPU-VHR-10 remote sensing benchmark.
 """
 
 import json
+import logging
 import math
 import os
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -104,7 +107,7 @@ def download_nwpu_vhr10_model(
     from huggingface_hub import hf_hub_download
 
     model_path = hf_hub_download(repo_id=repo_id, filename=filename)
-    print(f"Model downloaded to: {model_path}")
+    logger.info(f"Model downloaded to: {model_path}")
     return model_path
 
 
@@ -304,12 +307,12 @@ def prepare_nwpu_vhr10(
     # Check if COCO JSON already exists
     annotations_path = os.path.join(output_dir, "annotations.json")
     if os.path.exists(annotations_path):
-        print(f"Using existing COCO annotations: {annotations_path}")
+        logger.info(f"Using existing COCO annotations: {annotations_path}")
     elif gt_dir is not None:
         # Convert text annotations to COCO JSON
-        print("Converting NWPU-VHR-10 text annotations to COCO JSON format...")
+        logger.info("Converting NWPU-VHR-10 text annotations to COCO JSON format...")
         _convert_nwpu_to_coco(images_dir, gt_dir, annotations_path)
-        print(f"COCO annotations saved to: {annotations_path}")
+        logger.info(f"COCO annotations saved to: {annotations_path}")
     else:
         # Look for existing JSON annotations
         for candidate_ann in [
@@ -373,13 +376,13 @@ def prepare_nwpu_vhr10(
 
     class_names = NWPU_VHR10_CLASSES
 
-    print(f"Dataset prepared:")
-    print(f"  Images directory: {images_dir}")
-    print(f"  Total annotated images: {len(image_ids)}")
-    print(f"  Total annotations: {len(coco_data['annotations'])}")
-    print(f"  Training images: {len(train_ids)}")
-    print(f"  Validation images: {len(val_ids)}")
-    print(f"  Classes: {class_names[1:]}")
+    logger.info(f"Dataset prepared:")
+    logger.info(f"  Images directory: {images_dir}")
+    logger.info(f"  Total annotated images: {len(image_ids)}")
+    logger.info(f"  Total annotations: {len(coco_data['annotations'])}")
+    logger.info(f"  Training images: {len(train_ids)}")
+    logger.info(f"  Validation images: {len(val_ids)}")
+    logger.info(f"  Classes: {class_names[1:]}")
 
     return {
         "images_dir": images_dir,
@@ -456,8 +459,8 @@ def train_multiclass_detector(
         ]
 
     if verbose:
-        print(f"Training {model_name} with {num_classes} classes")
-        print(f"  Classes: {class_names[1:]}")
+        logger.info(f"Training {model_name} with {num_classes} classes")
+        logger.info(f"  Classes: {class_names[1:]}")
 
     # Save class names and model info to output directory for later use
     os.makedirs(os.path.abspath(output_dir), exist_ok=True)
@@ -1171,7 +1174,7 @@ def plot_detection_training_history(
             displays interactively.
     """
     if not os.path.exists(history_path):
-        print(f"Training history not found: {history_path}")
+        logger.warning(f"Training history not found: {history_path}")
         return
 
     history = torch.load(history_path, weights_only=True)
@@ -1186,7 +1189,7 @@ def plot_detection_training_history(
         panels.append("lr")
 
     if not panels:
-        print("No plottable metrics found in training history.")
+        logger.warning("No plottable metrics found in training history.")
         return
 
     from matplotlib.ticker import MaxNLocator
@@ -1444,7 +1447,7 @@ def push_detector_to_hub(
     try:
         from huggingface_hub import HfApi, create_repo
     except ImportError:
-        print(
+        logger.error(
             "huggingface_hub is required to push models. "
             "Install it with: pip install huggingface-hub"
         )
@@ -1490,10 +1493,10 @@ def push_detector_to_hub(
             )
 
         url = f"https://huggingface.co/{repo_id}"
-        print(f"Model successfully pushed to: {url}")
+        logger.info(f"Model successfully pushed to: {url}")
         return url
     except Exception as e:
-        print(f"Failed to push model to Hub: {e}")
+        logger.error(f"Failed to push model to Hub: {e}")
         return None
 
 
@@ -1540,20 +1543,20 @@ def predict_detector_from_hub(
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
-        print(
+        logger.error(
             "huggingface_hub is required. "
             "Install it with: pip install huggingface-hub"
         )
         return None
 
     try:
-        print(f"Downloading model from {repo_id}...")
+        logger.info(f"Downloading model from {repo_id}...")
         model_file = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
         config_file = hf_hub_download(
             repo_id=repo_id, filename="config.json", token=token
         )
     except Exception as e:
-        print(f"Failed to download model from Hub: {e}")
+        logger.error(f"Failed to download model from Hub: {e}")
         return None
 
     with open(config_file) as f:

@@ -18,11 +18,37 @@ Author: ValHab Project
 Date: November 2025
 """
 
+import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+logger = logging.getLogger(__name__)
+
+
+def _one_hot_with_ignore(
+    targets: torch.Tensor, num_classes: int, ignore_index: int = -100
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Convert class-index targets to one-hot encoding, masking ignored pixels.
+
+    Args:
+        targets: Ground truth tensor of shape (N, H, W) with class indices.
+        num_classes: Number of classes.
+        ignore_index: Target value that should be ignored.
+
+    Returns:
+        Tuple of (one_hot, valid_mask) where one_hot has shape (N, C, H, W)
+        and valid_mask has shape (N, H, W).
+    """
+    valid_mask = targets != ignore_index
+    safe_targets = targets.clone()
+    safe_targets[~valid_mask] = 0
+    one_hot = F.one_hot(safe_targets, num_classes)  # (N, H, W, C)
+    one_hot = one_hot.permute(0, 3, 1, 2).float()  # (N, C, H, W)
+    one_hot = one_hot * valid_mask.unsqueeze(1)
+    return one_hot, valid_mask
 
 
 class FocalLoss(nn.Module):
@@ -130,6 +156,275 @@ class LandcoverCrossEntropyLoss(nn.Module):
             ignore_index=self.ignore_index,
             reduction=self.reduction,
         )
+
+
+class DiceLoss(nn.Module):
+    """Dice loss for semantic segmentation.
+
+    Computes the Sørensen–Dice coefficient between predictions and targets,
+    which measures region overlap. Effective for class-imbalanced datasets
+    because it evaluates per-class overlap rather than per-pixel accuracy.
+
+    Args:
+        smooth: Smoothing constant to avoid division by zero.
+        ignore_index: Target value that is ignored and does not contribute
+            to the loss.
+        reduction: Reduction to apply: ``"mean"`` averages per-class losses,
+            ``"sum"`` sums them.
+        weight: Optional per-class weights tensor of shape ``(C,)``.
+    """
+
+    def __init__(
+        self,
+        smooth: float = 1.0,
+        ignore_index: int = -100,
+        reduction: str = "mean",
+        weight: Optional[torch.Tensor] = None,
+    ):
+        super().__init__()
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+        self.weight = weight
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute Dice loss.
+
+        Args:
+            inputs: Predictions of shape ``(N, C, H, W)`` (logits).
+            targets: Ground truth of shape ``(N, H, W)`` with class indices.
+
+        Returns:
+            Scalar loss when ``reduction`` is ``"mean"`` or ``"sum"``,
+            or a per-class tensor of shape ``(C,)`` when ``"none"``.
+        """
+        num_classes = inputs.shape[1]
+        one_hot, valid_mask = _one_hot_with_ignore(
+            targets, num_classes, self.ignore_index
+        )
+        probs = F.softmax(inputs, dim=1)
+        probs = probs * valid_mask.unsqueeze(1)  # zero out ignored pixels
+
+        dims = (0, 2, 3)  # reduce over batch and spatial dims
+        intersection = (probs * one_hot).sum(dim=dims)
+        cardinality = probs.sum(dim=dims) + one_hot.sum(dim=dims)
+        dice = (2.0 * intersection + self.smooth) / (cardinality + self.smooth)
+        loss = 1.0 - dice  # (C,)
+
+        if self.weight is not None:
+            w = self.weight.to(loss.device)
+            loss = loss * w
+
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        elif self.reduction == "none":
+            return loss
+        raise ValueError(f"Unknown reduction: {self.reduction!r}")
+
+
+class TverskyLoss(nn.Module):
+    """Tversky loss for semantic segmentation.
+
+    Generalises the Dice loss by allowing asymmetric weighting of false
+    positives and false negatives.  Setting ``alpha = beta = 0.5`` recovers
+    the standard Dice loss.  Increasing ``beta`` relative to ``alpha``
+    penalises false negatives more, which improves recall on rare classes.
+
+    Reference:
+        Salehi, S. S. M., Erdogmus, D., & Gholipour, A. (2017).
+        Tversky loss function for image segmentation using 3D fully
+        convolutional deep networks. *MLMI Workshop, MICCAI*.
+
+    Args:
+        alpha: Weight for false positives.
+        beta: Weight for false negatives.
+        smooth: Smoothing constant to avoid division by zero.
+        ignore_index: Target value that is ignored.
+        reduction: ``"mean"`` or ``"sum"`` over classes.
+        weight: Optional per-class weights tensor of shape ``(C,)``.
+    """
+
+    def __init__(
+        self,
+        alpha: float = 0.5,
+        beta: float = 0.5,
+        smooth: float = 1.0,
+        ignore_index: int = -100,
+        reduction: str = "mean",
+        weight: Optional[torch.Tensor] = None,
+    ):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+        self.weight = weight
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute Tversky loss.
+
+        Args:
+            inputs: Predictions of shape ``(N, C, H, W)`` (logits).
+            targets: Ground truth of shape ``(N, H, W)`` with class indices.
+
+        Returns:
+            Scalar loss when ``reduction`` is ``"mean"`` or ``"sum"``,
+            or a per-class tensor of shape ``(C,)`` when ``"none"``.
+        """
+        num_classes = inputs.shape[1]
+        one_hot, valid_mask = _one_hot_with_ignore(
+            targets, num_classes, self.ignore_index
+        )
+        probs = F.softmax(inputs, dim=1)
+        probs = probs * valid_mask.unsqueeze(1)  # zero out ignored pixels
+
+        dims = (0, 2, 3)
+        tp = (probs * one_hot).sum(dim=dims)
+        fp = (probs * (1.0 - one_hot)).sum(dim=dims)
+        fn = ((1.0 - probs) * one_hot).sum(dim=dims)
+        tversky = (tp + self.smooth) / (
+            tp + self.alpha * fp + self.beta * fn + self.smooth
+        )
+        loss = 1.0 - tversky  # (C,)
+
+        if self.weight is not None:
+            w = self.weight.to(loss.device)
+            loss = loss * w
+
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        elif self.reduction == "none":
+            return loss
+        raise ValueError(f"Unknown reduction: {self.reduction!r}")
+
+
+class UnifiedFocalLoss(nn.Module):
+    """Unified Focal Loss combining distribution-based and region-based losses.
+
+    Implements the framework from Yeung et al. (2021) which unifies focal
+    cross-entropy (distribution-based) and focal Tversky (region-based) losses
+    into a single compound loss.  This is particularly effective for semantic
+    segmentation with severe class imbalance.
+
+    The combined loss is::
+
+        L = lambda_ * L_dist + (1 - lambda_) * L_region
+
+    where ``L_dist`` is focal cross-entropy and ``L_region`` is focal Tversky.
+
+    Reference:
+        Yeung, M., Sala, E., Schönlieb, C.-B., & Rundo, L. (2021).
+        Unified Focal loss: Generalising Dice and cross entropy-based losses
+        to handle class imbalanced medical image segmentation.
+        *Computerized Medical Imaging and Graphics*, 95, 102026.
+
+    Note:
+        Inspired by the implementation in the
+        `terrainseg <https://github.com/maxwell-geospatial/terrainseg>`_
+        package by Maxwell (2026).
+
+    Args:
+        lambda_: Balance between distribution and region components.
+            ``1.0`` = pure focal CE, ``0.0`` = pure focal Tversky.
+        gamma: Focusing parameter for both components.  Higher values
+            down-weight easy examples more aggressively.
+        delta: Tversky false-negative weight; false-positive weight is
+            ``1 - delta``.  Values > 0.5 emphasise recall.
+        smooth: Smoothing constant for the Tversky denominator.
+        ignore_index: Target value that is ignored.
+        weight: Per-class weights for the distribution (focal CE) component.
+        region_weight: Per-class weights for the region (focal Tversky)
+            component.  Falls back to ``weight`` if *None*.
+        use_log_cosh: Apply ``log(cosh(loss))`` for gradient smoothing.
+    """
+
+    def __init__(
+        self,
+        lambda_: float = 0.5,
+        gamma: float = 0.75,
+        delta: float = 0.6,
+        smooth: float = 1.0,
+        ignore_index: int = -100,
+        weight: Optional[torch.Tensor] = None,
+        region_weight: Optional[torch.Tensor] = None,
+        use_log_cosh: bool = False,
+    ):
+        super().__init__()
+        self.lambda_ = lambda_
+        self.gamma = gamma
+        self.delta = delta
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+        self.weight = weight
+        self.region_weight = region_weight
+        self.use_log_cosh = use_log_cosh
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute unified focal loss.
+
+        Args:
+            inputs: Predictions of shape ``(N, C, H, W)`` (logits).
+            targets: Ground truth of shape ``(N, H, W)`` with class indices.
+
+        Returns:
+            Scalar loss value.
+        """
+        # --- Distribution component: focal cross-entropy ---
+        ce = F.cross_entropy(
+            inputs,
+            targets,
+            weight=self.weight.to(inputs.device) if self.weight is not None else None,
+            ignore_index=self.ignore_index,
+            reduction="none",
+        )
+        p_t = torch.exp(-ce)
+        focal_ce = ((1.0 - p_t) ** self.gamma) * ce
+
+        # Mean over valid pixels
+        valid = targets != self.ignore_index
+        if valid.any():
+            dist_loss = focal_ce[valid].mean()
+        else:
+            dist_loss = focal_ce.mean()
+
+        # --- Region component: focal Tversky ---
+        num_classes = inputs.shape[1]
+        one_hot, valid_mask = _one_hot_with_ignore(
+            targets, num_classes, self.ignore_index
+        )
+        probs = F.softmax(inputs, dim=1)
+        probs = probs * valid_mask.unsqueeze(1)  # zero out ignored pixels
+
+        dims = (0, 2, 3)
+        tp = (probs * one_hot).sum(dim=dims)
+        fp = (probs * (1.0 - one_hot)).sum(dim=dims)
+        fn = ((1.0 - probs) * one_hot).sum(dim=dims)
+        tversky = (tp + self.smooth) / (
+            tp + (1.0 - self.delta) * fp + self.delta * fn + self.smooth
+        )
+        focal_tversky = (1.0 - tversky) ** self.gamma  # (C,)
+
+        rw = self.region_weight if self.region_weight is not None else self.weight
+        if rw is not None:
+            rw = rw.to(focal_tversky.device)
+            focal_tversky = focal_tversky * rw
+
+        region_loss = focal_tversky.mean()
+
+        # --- Combine ---
+        loss = self.lambda_ * dist_loss + (1.0 - self.lambda_) * region_loss
+
+        if self.use_log_cosh:
+            # Numerically stable log-cosh: |x| + softplus(-2|x|) - log(2)
+            abs_loss = torch.abs(loss)
+            loss = abs_loss + F.softplus(-2.0 * abs_loss) - 0.6931471805599453
+
+        return loss
 
 
 def landcover_iou(
@@ -377,24 +672,45 @@ def get_landcover_loss_function(
     focal_alpha: float = 1.0,
     focal_gamma: float = 2.0,
     device: Optional[torch.device] = None,
+    smooth: float = 1.0,
+    tversky_alpha: float = 0.5,
+    tversky_beta: float = 0.5,
+    ufl_lambda: float = 0.5,
+    ufl_gamma: float = 0.75,
+    ufl_delta: float = 0.6,
+    region_weights: Optional[torch.Tensor] = None,
+    use_log_cosh: bool = False,
 ) -> nn.Module:
-    """
-    Get loss function configured for landcover classification.
+    """Get loss function configured for landcover segmentation.
 
     Args:
-        loss_name: Name of loss function ("crossentropy", "focal", "dice", "combo")
-        num_classes: Number of classes
-        ignore_index: Class index to ignore, or False to not ignore any class.
-            - If int: pixels with this label value will be ignored during training
-            - If False: no pixels will be ignored (all pixels contribute to loss)
-        class_weights: Manual class weights tensor
-        use_class_weights: Whether to use class weights
-        focal_alpha: Alpha parameter for focal loss
-        focal_gamma: Gamma parameter for focal loss
-        device: Device to place loss function on
+        loss_name: Name of loss function. One of ``"crossentropy"``,
+            ``"focal"``, ``"dice"``, ``"tversky"``, ``"unified_focal"``
+            (alias ``"ufl"``).
+        num_classes: Number of classes.
+        ignore_index: Class index to ignore, or ``False`` to not ignore any
+            class.
+        class_weights: Manual class weights tensor.
+        use_class_weights: Whether to use class weights.
+        focal_alpha: Alpha parameter for focal loss.
+        focal_gamma: Gamma parameter for focal loss.
+        device: Device to place loss function on.
+        smooth: Smoothing constant for Dice / Tversky denominator.
+        tversky_alpha: False-positive weight for Tversky loss.
+        tversky_beta: False-negative weight for Tversky loss.
+        ufl_lambda: Balance between distribution and region components in
+            Unified Focal Loss (``1.0`` = pure focal CE, ``0.0`` = pure
+            focal Tversky).
+        ufl_gamma: Focusing parameter for Unified Focal Loss.
+        ufl_delta: Tversky false-negative weight for Unified Focal Loss
+            (false-positive weight is ``1 - ufl_delta``).
+        region_weights: Per-class weights for the region component of
+            Unified Focal Loss.  Falls back to *class_weights* if ``None``.
+        use_log_cosh: Apply ``log(cosh(loss))`` stabilisation in Unified
+            Focal Loss.
 
     Returns:
-        Configured loss function
+        Configured loss function.
     """
 
     if device is None:
@@ -402,14 +718,13 @@ def get_landcover_loss_function(
 
     loss_name = loss_name.lower()
 
+    # Common helpers
+    weights = class_weights if use_class_weights else None
+    if weights is not None:
+        weights = weights.to(device)
+    idx = ignore_index if isinstance(ignore_index, int) else -100
+
     if loss_name == "crossentropy":
-        weights = class_weights if use_class_weights else None
-        if weights is not None:
-            weights = weights.to(device)
-
-        # Convert ignore_index: int stays as-is, False becomes -100 (PyTorch default)
-        idx = ignore_index if isinstance(ignore_index, int) else -100
-
         return LandcoverCrossEntropyLoss(
             weight=weights,
             ignore_index=idx,
@@ -417,13 +732,6 @@ def get_landcover_loss_function(
         )
 
     elif loss_name == "focal":
-        weights = class_weights if use_class_weights else None
-        if weights is not None:
-            weights = weights.to(device)
-
-        # Convert ignore_index: int stays as-is, False becomes -100 (PyTorch default)
-        idx = ignore_index if isinstance(ignore_index, int) else -100
-
         return FocalLoss(
             alpha=focal_alpha,
             gamma=focal_gamma,
@@ -432,15 +740,41 @@ def get_landcover_loss_function(
             weight=weights,
         )
 
+    elif loss_name == "dice":
+        return DiceLoss(
+            smooth=smooth,
+            ignore_index=idx,
+            reduction="mean",
+            weight=weights,
+        )
+
+    elif loss_name == "tversky":
+        return TverskyLoss(
+            alpha=tversky_alpha,
+            beta=tversky_beta,
+            smooth=smooth,
+            ignore_index=idx,
+            reduction="mean",
+            weight=weights,
+        )
+
+    elif loss_name in ("unified_focal", "ufl"):
+        rw = region_weights
+        if rw is not None:
+            rw = rw.to(device)
+        return UnifiedFocalLoss(
+            lambda_=ufl_lambda,
+            gamma=ufl_gamma,
+            delta=ufl_delta,
+            smooth=smooth,
+            ignore_index=idx,
+            weight=weights,
+            region_weight=rw,
+            use_log_cosh=use_log_cosh,
+        )
+
     else:
         # Fall back to standard PyTorch loss
-        weights = class_weights if use_class_weights else None
-        if weights is not None:
-            weights = weights.to(device)
-
-        # Convert ignore_index: int stays as-is, False becomes -100 (PyTorch default)
-        idx = ignore_index if isinstance(ignore_index, int) else -100
-
         return nn.CrossEntropyLoss(
             weight=weights,
             ignore_index=idx,
@@ -492,7 +826,7 @@ def compute_class_weights(
         if f.lower().endswith(label_extensions)
     ]
 
-    print(f"Computing class weights from {len(label_files)} label files...")
+    logger.info("Computing class weights from %d label files...", len(label_files))
 
     for label_file in label_files:
         try:
@@ -505,7 +839,7 @@ def compute_class_weights(
                     class_counts[class_id] += int(count)
                     total_pixels += int(count)
         except Exception as e:
-            print(f"Warning: Could not read {label_file}: {e}")
+            logger.warning("Could not read %s: %s", label_file, e)
             continue
 
     if total_pixels == 0:
@@ -537,46 +871,56 @@ def compute_class_weights(
 
     # Apply custom multipliers if provided
     if custom_multipliers:
-        print(f"\nApplying custom multipliers: {custom_multipliers}")
+        logger.info("Applying custom multipliers: %s", custom_multipliers)
         for class_id, multiplier in custom_multipliers.items():
             if class_id < 0 or class_id >= num_classes:
-                print(f"Warning: Invalid class_id {class_id}, skipping")
+                logger.warning("Invalid class_id %d, skipping", class_id)
                 continue
 
             original_weight = weights[class_id].item()
             weights[class_id] = weights[class_id] * multiplier
-            print(
-                f"  Class {class_id}: {original_weight:.4f} × {multiplier} = {weights[class_id].item():.4f}"
+            logger.info(
+                "  Class %d: %.4f x %s = %.4f",
+                class_id,
+                original_weight,
+                multiplier,
+                weights[class_id].item(),
             )
     else:
-        print("\nNo custom multipliers provided, using computed weights as-is")
+        logger.info("No custom multipliers provided, using computed weights as-is")
 
     # Apply maximum weight cap to prevent extreme values
     weights_capped = False
-    print(f"\nApplying maximum weight cap of {max_weight}...")
+    logger.info("Applying maximum weight cap of %s...", max_weight)
     for class_id in range(num_classes):
         if weights[class_id] > max_weight:
-            print(
-                f"  Class {class_id}: {weights[class_id].item():.4f} → {max_weight} (capped)"
+            logger.info(
+                "  Class %d: %.4f -> %s (capped)",
+                class_id,
+                weights[class_id].item(),
+                max_weight,
             )
             weights[class_id] = max_weight
             weights_capped = True
 
     if not weights_capped:
-        print("  No weights exceeded the cap")
+        logger.info("  No weights exceeded the cap")
 
-    print(f"\nClass pixel counts: {dict(class_counts)}")
-    print(f"\nFinal class weights:")
+    logger.info("Class pixel counts: %s", dict(class_counts))
+    logger.info("Final class weights:")
     for class_id in range(num_classes):
         pixel_count = class_counts.get(class_id, 0)
         percent = (pixel_count / total_pixels * 100) if total_pixels > 0 else 0
-        print(
-            f"  Class {class_id}: weight={weights[class_id].item():.4f}, "
-            f"pixels={pixel_count:,} ({percent:.2f}%)"
+        logger.info(
+            "  Class %d: weight=%.4f, pixels=%s (%.2f%%)",
+            class_id,
+            weights[class_id].item(),
+            f"{pixel_count:,}",
+            percent,
         )
 
     if isinstance(ignore_index, int) and 0 <= ignore_index < num_classes:
-        print(f"\nNote: Class {ignore_index} (ignore_index) has weight 0.0")
+        logger.info("Note: Class %d (ignore_index) has weight 0.0", ignore_index)
 
     return weights
 
@@ -612,6 +956,14 @@ def train_segmentation_landcover(
     use_class_weights: bool = False,
     focal_alpha: float = 1.0,
     focal_gamma: float = 2.0,
+    smooth: float = 1.0,
+    tversky_alpha: float = 0.5,
+    tversky_beta: float = 0.5,
+    ufl_lambda: float = 0.5,
+    ufl_gamma: float = 0.75,
+    ufl_delta: float = 0.6,
+    region_weights: Optional[torch.Tensor] = None,
+    use_log_cosh: bool = False,
     custom_multipliers: Optional[Dict[int, float]] = None,
     max_class_weight: float = 50.0,
     use_inverse_frequency: bool = True,
@@ -621,61 +973,76 @@ def train_segmentation_landcover(
     training_callback: Optional[callable] = None,
     **kwargs: Any,
 ) -> torch.nn.Module:
-    """
-    Train a semantic segmentation model with landcover-specific enhancements.
+    """Train a semantic segmentation model with landcover-specific enhancements.
 
     This is a standalone version that wraps geoai.train.train_segmentation_model
     with landcover-specific loss functions, class weights, and metrics.
 
     Args:
-        images_dir: Directory containing training images
-        labels_dir: Directory containing training labels
-        output_dir: Directory to save model checkpoints and training history
-        input_format: Data format ("directory", "COCO", "YOLO")
-        architecture: Model architecture (default: "unet")
-        encoder_name: Encoder backbone (default: "resnet34")
-        encoder_weights: Pretrained weights ("imagenet" or None)
-        num_channels: Number of input channels (default: 3)
-        num_classes: Number of output classes (default: 2)
-        batch_size: Training batch size (default: 8)
-        num_epochs: Number of training epochs (default: 50)
-        learning_rate: Initial learning rate (default: 0.001)
-        weight_decay: Weight decay for optimizer (default: 1e-4)
-        seed: Random seed for reproducibility (default: 42)
-        val_split: Validation split ratio (default: 0.2)
-        print_freq: Frequency of training progress prints (default: 10)
-        verbose: Enable verbose output (default: True)
-        save_best_only: Only save best model checkpoint (default: True)
-        plot_curves: Plot training curves at end (default: False)
-        device: Torch device (auto-detected if None)
-        checkpoint_path: Path to checkpoint for resuming training
-        resume_training: Whether to resume from checkpoint (default: False)
-        target_size: Target size for resizing images (H, W) or None
-        resize_mode: How to resize ("resize", "crop", or "pad")
-        num_workers: Number of dataloader workers (default: auto)
-        loss_function: Loss function name ("crossentropy", "focal")
-        ignore_index: Class index to ignore during training. (default: 0)
-            - If int: pixels with this label value will be ignored during training
-            - If False: no pixels will be ignored (all pixels contribute to loss)
-        use_class_weights: Whether to compute and use class weights (default: False)
-        focal_alpha: Focal loss alpha parameter (default: 1.0)
-        focal_gamma: Focal loss gamma parameter (default: 2.0)
-        custom_multipliers: Custom class weight multipliers {class_id: multiplier}
-        max_class_weight: Maximum allowed class weight (default: 50.0)
-        use_inverse_frequency: Use inverse frequency for weights (default: True)
-        validation_iou_mode: IoU calculation mode for validation (default: "standard")
-            - "standard": Unweighted mean IoU (all classes equal importance)
-            - "perclass_frequency": Frequency-weighted IoU (classes weighted by pixel count)
-            - "boundary_weighted": Boundary-distance weighted IoU (wIoU, focus on edges)
-            - "sparse_labels": For incomplete ground truth - predictions in background
-              areas are NOT penalized. Uses custom training loop with sparse IoU for
-              model selection. BEST FOR INCOMPLETE/SPARSE HABITAT MASKS.
-        boundary_alpha: Boundary importance factor for wIoU mode (default: 1.0)
-            Higher values = more focus on boundaries (0.01-100 range)
-        background_class: Class ID for background/unlabeled pixels in sparse_labels mode
-            (default: 0). Predictions in this class area are NOT counted as false positives.
-        training_callback: Optional callback function for automatic metric tracking
-        **kwargs: Additional arguments passed to base training function
+        images_dir: Directory containing training images.
+        labels_dir: Directory containing training labels.
+        output_dir: Directory to save model checkpoints and training history.
+        input_format: Data format (``"directory"``, ``"COCO"``, ``"YOLO"``).
+        architecture: Model architecture (default: ``"unet"``).
+        encoder_name: Encoder backbone (default: ``"resnet34"``).
+        encoder_weights: Pretrained weights (``"imagenet"`` or ``None``).
+        num_channels: Number of input channels (default: 3).
+        num_classes: Number of output classes (default: 2).
+        batch_size: Training batch size (default: 8).
+        num_epochs: Number of training epochs (default: 50).
+        learning_rate: Initial learning rate (default: 0.001).
+        weight_decay: Weight decay for optimizer (default: 1e-4).
+        seed: Random seed for reproducibility (default: 42).
+        val_split: Validation split ratio (default: 0.2).
+        print_freq: Frequency of training progress prints (default: 10).
+        verbose: Enable verbose output (default: True).
+        save_best_only: Only save best model checkpoint (default: True).
+        plot_curves: Plot training curves at end (default: False).
+        device: Torch device (auto-detected if ``None``).
+        checkpoint_path: Path to checkpoint for resuming training.
+        resume_training: Whether to resume from checkpoint (default: False).
+        target_size: Target size for resizing images ``(H, W)`` or ``None``.
+        resize_mode: How to resize (``"resize"``, ``"crop"``, or ``"pad"``).
+        num_workers: Number of dataloader workers (default: auto).
+        loss_function: Loss function name. One of ``"crossentropy"``,
+            ``"focal"``, ``"dice"``, ``"tversky"``, ``"unified_focal"``
+            (alias ``"ufl"``).
+        ignore_index: Class index to ignore during training (default: 0).
+            Set to ``False`` so that all pixels contribute to the loss.
+        use_class_weights: Whether to compute and use class weights
+            (default: False).
+        focal_alpha: Focal loss alpha parameter (default: 1.0).
+        focal_gamma: Focal loss gamma parameter (default: 2.0).
+        smooth: Smoothing constant for Dice / Tversky denominator
+            (default: 1.0).
+        tversky_alpha: False-positive weight for Tversky loss (default: 0.5).
+        tversky_beta: False-negative weight for Tversky loss (default: 0.5).
+            Increase relative to *tversky_alpha* to improve recall.
+        ufl_lambda: Balance between distribution and region components in
+            Unified Focal Loss (default: 0.5).
+        ufl_gamma: Focusing parameter for Unified Focal Loss (default: 0.75).
+        ufl_delta: Tversky false-negative weight inside Unified Focal Loss
+            (default: 0.6).
+        region_weights: Per-class weights for the region component of
+            Unified Focal Loss.  Falls back to *class_weights* if ``None``.
+        use_log_cosh: Apply ``log(cosh(loss))`` stabilisation in Unified
+            Focal Loss (default: False).
+        custom_multipliers: Custom class weight multipliers
+            ``{class_id: multiplier}``.
+        max_class_weight: Maximum allowed class weight (default: 50.0).
+        use_inverse_frequency: Use inverse frequency for weights
+            (default: True).
+        validation_iou_mode: IoU calculation mode for validation
+            (default: ``"standard"``).  Options:
+            ``"standard"``, ``"perclass_frequency"``,
+            ``"boundary_weighted"``, ``"sparse_labels"``.
+        boundary_alpha: Boundary importance factor for wIoU mode
+            (default: 1.0).
+        background_class: Class ID for background/unlabeled pixels in
+            sparse_labels mode (default: 0).
+        training_callback: Optional callback function for automatic metric
+            tracking.
+        **kwargs: Additional arguments passed to base training function.
 
     Returns:
         Trained model
@@ -711,9 +1078,9 @@ def train_segmentation_landcover(
     class_weights_tensor = None
     if use_class_weights:
         if verbose:
-            print("\n" + "=" * 60)
-            print("COMPUTING CLASS WEIGHTS")
-            print("=" * 60)
+            logger.info("=" * 60)
+            logger.info("COMPUTING CLASS WEIGHTS")
+            logger.info("=" * 60)
 
         class_weights_tensor = compute_class_weights(
             labels_dir=labels_dir,
@@ -725,7 +1092,7 @@ def train_segmentation_landcover(
         )
 
         if verbose:
-            print("=" * 60 + "\n")
+            logger.info("=" * 60)
 
     # Create custom loss function using landcover-specific implementation
     # This ensures ignore_index and class_weights are properly used
@@ -750,14 +1117,24 @@ def train_segmentation_landcover(
         focal_alpha=focal_alpha,
         focal_gamma=focal_gamma,
         device=device,
+        smooth=smooth,
+        tversky_alpha=tversky_alpha,
+        tversky_beta=tversky_beta,
+        ufl_lambda=ufl_lambda,
+        ufl_gamma=ufl_gamma,
+        ufl_delta=ufl_delta,
+        region_weights=region_weights,
+        use_log_cosh=use_log_cosh,
     )
 
     if verbose:
-        print(
-            f"Created {loss_function} loss function with ignore_index={ignore_idx_for_loss}"
+        logger.info(
+            "Created %s loss function with ignore_index=%s",
+            loss_function,
+            ignore_idx_for_loss,
         )
         if use_class_weights:
-            print(f"Class weights applied: {class_weights_tensor}")
+            logger.info("Class weights applied: %s", class_weights_tensor)
 
     # ==========================================================================
     # ALL MODES: Use custom training loop with landcover_iou for model selection
@@ -772,23 +1149,28 @@ def train_segmentation_landcover(
             "boundary_weighted": f"BOUNDARY-WEIGHTED IoU (wIoU, α={boundary_alpha})",
             "sparse_labels": f"SPARSE LABELS IoU (bg={background_class} ignored)",
         }
-        print("\n" + "=" * 60)
-        print(
-            f"CUSTOM TRAINING LOOP: {mode_descriptions.get(validation_iou_mode, validation_iou_mode)}"
+        logger.info("=" * 60)
+        logger.info(
+            "CUSTOM TRAINING LOOP: %s",
+            mode_descriptions.get(validation_iou_mode, validation_iou_mode),
         )
-        print("=" * 60)
+        logger.info("=" * 60)
         if validation_iou_mode == "sparse_labels":
-            print(
-                f"Background class: {background_class} (predictions here NOT penalized)"
+            logger.info(
+                "Background class: %d (predictions here NOT penalized)",
+                background_class,
             )
         elif validation_iou_mode == "boundary_weighted":
-            print(
-                f"Boundary alpha: {boundary_alpha} (higher = more focus on boundaries)"
+            logger.info(
+                "Boundary alpha: %s (higher = more focus on boundaries)",
+                boundary_alpha,
             )
         elif validation_iou_mode == "perclass_frequency":
-            print("Classes weighted by pixel frequency in dataset")
-        print(f"Using {validation_iou_mode} IoU for model selection during training")
-        print("=" * 60 + "\n")
+            logger.info("Classes weighted by pixel frequency in dataset")
+        logger.info(
+            "Using %s IoU for model selection during training", validation_iou_mode
+        )
+        logger.info("=" * 60)
 
     model = _train_with_custom_iou(
         images_dir=images_dir,
@@ -971,7 +1353,7 @@ def _train_with_custom_iou(
 
     # Ensure matching files
     if len(image_files) != len(label_files):
-        print("Warning: Number of image files and label files don't match!")
+        logger.warning("Number of image files and label files don't match!")
         basenames = [os.path.basename(f) for f in image_files]
         label_files = [
             os.path.join(labels_dir, os.path.basename(f))
@@ -983,9 +1365,11 @@ def _train_with_custom_iou(
             for f, b in zip(image_files, basenames)
             if os.path.exists(os.path.join(labels_dir, b))
         ]
-        print(f"Using {len(image_files)} matching files")
+        logger.info("Using %d matching files", len(image_files))
 
-    print(f"Found {len(image_files)} image files and {len(label_files)} label files")
+    logger.info(
+        "Found %d image files and %d label files", len(image_files), len(label_files)
+    )
 
     if len(image_files) == 0:
         raise FileNotFoundError("No matching image and label files found")
@@ -995,7 +1379,11 @@ def _train_with_custom_iou(
         image_files, label_files, test_size=val_split, random_state=seed
     )
 
-    print(f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images")
+    logger.info(
+        "Training on %d images, validating on %d images",
+        len(train_imgs),
+        len(val_imgs),
+    )
 
     # Simple dataset class for sparse labels training
     class SparseLabelsDataset(Dataset):
@@ -1090,10 +1478,10 @@ def _train_with_custom_iou(
     )
 
     # Test data loader
-    print("Testing data loader...")
+    logger.info("Testing data loader...")
     try:
         next(iter(train_loader))
-        print("Data loader test passed.")
+        logger.info("Data loader test passed.")
     except RuntimeError as e:
         if "stack expects each tensor to be equal size" in str(e):
             raise RuntimeError(
@@ -1133,23 +1521,25 @@ def _train_with_custom_iou(
 
     # Enable multi-GPU training if available
     if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs for training")
+        logger.info("Using %d GPUs for training", torch.cuda.device_count())
         model = torch.nn.DataParallel(model)
 
     # ===== PERFORMANCE OPTIMIZATIONS =====
     # Enable cuDNN auto-tuner for optimal conv algorithms (fixed input size)
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
-        print("cuDNN benchmark mode enabled")
+        logger.info("cuDNN benchmark mode enabled")
 
     # Setup mixed precision training (AMP) for ~2x speedup
     use_amp = torch.cuda.is_available()
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
     if use_amp:
-        print("Mixed precision training (AMP) enabled")
+        logger.info("Mixed precision training (AMP) enabled")
 
-    print(f"Starting training with {architecture} + {encoder_name}")
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    logger.info("Starting training with %s + %s", architecture, encoder_name)
+    logger.info(
+        "Model parameters: %s", f"{sum(p.numel() for p in model.parameters()):,}"
+    )
 
     # Setup optimizer and scheduler
     optimizer = torch.optim.Adam(
@@ -1168,7 +1558,7 @@ def _train_with_custom_iou(
 
     # Load checkpoint if provided
     if checkpoint_path is not None and os.path.exists(checkpoint_path):
-        print(f"Loading checkpoint from {checkpoint_path}")
+        logger.info("Loading checkpoint from %s", checkpoint_path)
         checkpoint = torch.load(checkpoint_path, map_location=device)
         if isinstance(checkpoint, dict):
             if "model_state_dict" in checkpoint:
@@ -1177,8 +1567,10 @@ def _train_with_custom_iou(
                     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
                     start_epoch = checkpoint.get("epoch", 0) + 1
                     best_iou = checkpoint.get("best_iou", 0.0)
-                    print(
-                        f"Resuming from epoch {start_epoch}, best IoU: {best_iou:.4f}"
+                    logger.info(
+                        "Resuming from epoch %d, best IoU: %.4f",
+                        start_epoch,
+                        best_iou,
                     )
         else:
             model.load_state_dict(checkpoint)
@@ -1191,8 +1583,9 @@ def _train_with_custom_iou(
         "boundary_weighted": f"BOUNDARY-WEIGHTED (wIoU, α={boundary_alpha})",
         "sparse_labels": f"SPARSE LABELS (bg={background_class} ignored)",
     }
-    print(
-        f"\nStarting training with {mode_labels.get(validation_iou_mode, validation_iou_mode)} IoU..."
+    logger.info(
+        "Starting training with %s IoU...",
+        mode_labels.get(validation_iou_mode, validation_iou_mode),
     )
 
     for epoch in range(start_epoch, num_epochs):
@@ -1223,8 +1616,12 @@ def _train_with_custom_iou(
             num_batches += 1
 
             if verbose and batch_idx % print_freq == 0:
-                print(
-                    f"  Epoch {epoch+1} [{batch_idx}/{len(train_loader)}] Loss: {loss.item():.4f}"
+                logger.debug(
+                    "  Epoch %d [%d/%d] Loss: %.4f",
+                    epoch + 1,
+                    batch_idx,
+                    len(train_loader),
+                    loss.item(),
                 )
 
         train_loss = epoch_loss / num_batches
@@ -1325,11 +1722,13 @@ def _train_with_custom_iou(
         lr_scheduler.step(val_iou)
 
         # Print metrics
-        print(
-            f"Epoch {epoch+1}/{num_epochs}: "
-            f"Train Loss: {train_loss:.4f}, "
-            f"Val Loss: {val_loss:.4f}, "
-            f"{iou_display}"
+        logger.info(
+            "Epoch %d/%d: Train Loss: %.4f, Val Loss: %.4f, %s",
+            epoch + 1,
+            num_epochs,
+            train_loss,
+            val_loss,
+            iou_display,
         )
 
         # Call training callback if provided
@@ -1348,12 +1747,12 @@ def _train_with_custom_iou(
                     is_best=is_best,
                 )
             except Exception as e:
-                print(f"Warning: Training callback error: {e}")
+                logger.warning("Training callback error: %s", e)
 
         # Save best model based on validation IoU
         if val_iou > best_iou:
             best_iou = val_iou
-            print(f"New best model! {iou_display}")
+            logger.info("New best model! %s", iou_display)
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
 
         # Save checkpoint every 10 epochs if not save_best_only
@@ -1387,8 +1786,8 @@ def _train_with_custom_iou(
     }
     iou_label = mode_labels.get(validation_iou_mode, validation_iou_mode)
 
-    print(f"\nTraining complete! Best {iou_label}: {best_iou:.4f}")
-    print(f"Best model saved to: {os.path.join(output_dir, 'best_model.pth')}")
+    logger.info("Training complete! Best %s: %.4f", iou_label, best_iou)
+    logger.info("Best model saved to: %s", os.path.join(output_dir, "best_model.pth"))
 
     # Plot training curves if requested
     if plot_curves:
@@ -1419,17 +1818,18 @@ def _train_with_custom_iou(
             plot_filename = f"training_curves_{validation_iou_mode}.png"
             plt.savefig(os.path.join(output_dir, plot_filename), dpi=150)
             plt.show()
-            print(
-                f"Training curves saved to: {os.path.join(output_dir, plot_filename)}"
+            logger.info(
+                "Training curves saved to: %s",
+                os.path.join(output_dir, plot_filename),
             )
         except Exception as e:
-            print(f"Warning: Could not plot training curves: {e}")
+            logger.warning("Could not plot training curves: %s", e)
 
     # Load best model weights
     best_model_path = os.path.join(output_dir, "best_model.pth")
     if os.path.exists(best_model_path):
         model.load_state_dict(torch.load(best_model_path, map_location=device))
-        print(f"Loaded best model ({iou_label}: {best_iou:.4f})")
+        logger.info("Loaded best model (%s: %.4f)", iou_label, best_iou)
 
     return model
 
@@ -1522,12 +1922,14 @@ def evaluate_sparse_iou(
         )
 
     if verbose:
-        print(f"\n{'='*60}")
-        print("SPARSE LABELS IoU EVALUATION")
-        print(f"{'='*60}")
-        print(f"Evaluating {len(image_files)} image-label pairs")
-        print(f"Background class: {background_class} (predictions here NOT penalized)")
-        print(f"Number of classes: {num_classes}")
+        logger.info("=" * 60)
+        logger.info("SPARSE LABELS IoU EVALUATION")
+        logger.info("=" * 60)
+        logger.info("Evaluating %d image-label pairs", len(image_files))
+        logger.info(
+            "Background class: %d (predictions here NOT penalized)", background_class
+        )
+        logger.info("Number of classes: %d", num_classes)
 
     # Accumulate predictions and targets
     all_preds = []
@@ -1560,7 +1962,7 @@ def evaluate_sparse_iou(
             all_targets.append(label_tensor)
 
             if verbose and (i + 1) % 50 == 0:
-                print(f"   Processed {i + 1}/{len(image_files)} tiles...")
+                logger.info("   Processed %d/%d tiles...", i + 1, len(image_files))
 
     # Concatenate all predictions and targets
     all_preds = torch.cat(all_preds, dim=0)
@@ -1615,30 +2017,39 @@ def evaluate_sparse_iou(
     }
 
     if verbose:
-        print("\nSPARSE LABELS IoU RESULTS:")
-        print(f"   (Predictions in background areas NOT counted as false positives)")
-        print(f"\n   {'Class':<8} {'IoU':>8} {'Recall':>8} {'Precision':>10}")
-        print(f"   {'-'*36}")
+        logger.info("SPARSE LABELS IoU RESULTS:")
+        logger.info(
+            "   (Predictions in background areas NOT counted as false positives)"
+        )
+        logger.info("   %-8s %8s %8s %10s", "Class", "IoU", "Recall", "Precision")
+        logger.info("   %s", "-" * 36)
         for cls in sorted(per_class_iou_dict.keys()):
             iou = per_class_iou_dict.get(cls, 0.0)
             recall = per_class_recall_dict.get(cls, 0.0)
             precision = per_class_precision_dict.get(cls, 0.0)
-            print(f"   {cls:<8} {iou:>8.4f} {recall:>8.4f} {precision:>10.4f}")
+            logger.info("   %-8s %8.4f %8.4f %10.4f", cls, iou, recall, precision)
 
-        print(f"   {'-'*36}")
-        print(
-            f"   {'MEAN':<8} {mean_iou:>8.4f} {mean_recall:>8.4f} {mean_precision:>10.4f}"
+        logger.info("   %s", "-" * 36)
+        logger.info(
+            "   %-8s %8.4f %8.4f %10.4f",
+            "MEAN",
+            mean_iou,
+            mean_recall,
+            mean_precision,
         )
-        print("\nSparse IoU evaluation complete!")
-        print(f"{'='*60}\n")
+        logger.info("Sparse IoU evaluation complete!")
+        logger.info("=" * 60)
 
     return results
 
 
 # Export main functions
 __all__ = [
+    "DiceLoss",
     "FocalLoss",
     "LandcoverCrossEntropyLoss",
+    "TverskyLoss",
+    "UnifiedFocalLoss",
     "landcover_iou",
     "get_landcover_loss_function",
     "compute_class_weights",

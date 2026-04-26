@@ -1,8 +1,11 @@
 """Change detection module for remote sensing imagery using torchange."""
 
+import logging
 import os
 import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,7 +25,7 @@ from .utils import download_file
 class ChangeDetection:
     """A class for change detection on geospatial imagery using torchange and SAM."""
 
-    def __init__(self, sam_model_type="vit_h", sam_checkpoint=None):
+    def __init__(self, sam_model_type="vit_h", sam_checkpoint=None) -> None:
         """
         Initialize the ChangeDetection class.
 
@@ -361,8 +364,8 @@ class ChangeDetection:
                                 combined_mask, mask.astype(bool)
                             )
 
-                    except Exception as e:
-                        print(f"Warning: Failed to decode RLE mask: {e}")
+                    except (ValueError, IndexError, KeyError) as e:
+                        logger.warning(f"Failed to decode RLE mask: {e}")
                         continue
 
         # Convert to uint8 first, then resize if needed
@@ -513,8 +516,8 @@ class ChangeDetection:
                     new_prob = np.maximum(current_prob, prob_weight)
                     probability_mask[mask_bool] = new_prob
 
-                except Exception as e:
-                    print(f"Warning: Failed to process probability mask {i}: {e}")
+                except (ValueError, IndexError, KeyError) as e:
+                    logger.warning(f"Failed to process probability mask {i}: {e}")
                     continue
 
         # Resize back to original shape if needed
@@ -584,7 +587,7 @@ class ChangeDetection:
         prob_path,
         title1="Earlier Image",
         title2="Later Image",
-    ):
+    ) -> None:
         """Create enhanced visualization with probability analysis."""
 
         # Load data
@@ -723,7 +726,9 @@ class ChangeDetection:
         plt.savefig("enhanced_probability_results.png", dpi=150, bbox_inches="tight")
         plt.show()
 
-        print("💾 Enhanced visualization saved as 'enhanced_probability_results.png'")
+        logger.info(
+            "Enhanced visualization saved as 'enhanced_probability_results.png'"
+        )
 
     def create_split_comparison(
         self,
@@ -734,7 +739,7 @@ class ChangeDetection:
         title1="Earlier Image",
         title2="Later Image",
         output_path="split_comparison.png",
-    ):
+    ) -> None:
         """Create a split comparison visualization showing before/after with change overlay."""
         import cv2  # Lazy import to avoid QGIS opencv conflicts
 
@@ -817,11 +822,11 @@ class ChangeDetection:
         plt.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.show()
 
-        print(f"💾 Split comparison saved as '{output_path}'")
+        logger.info(f"Split comparison saved as '{output_path}'")
 
     def analyze_instances(
         self, instance_mask_path, scores_path, output_path="instance_analysis.png"
-    ):
+    ) -> List[Dict[str, Any]]:
         """Analyze and visualize instance segmentation results."""
 
         # Load instance mask and scores
@@ -919,23 +924,25 @@ class ChangeDetection:
         plt.show()
 
         # Print summary statistics
-        print(f"\n📊 Instance Analysis Summary:")
-        print(f"   Total instances: {len(unique_instances)}")
-        print(f"   Average confidence: {np.mean(all_scores):.3f}")
-        print(f"   Score range: {np.min(all_scores):.3f} - {np.max(all_scores):.3f}")
-        print(f"   Total change area: {sum(areas):,} pixels")
+        logger.info(f"Instance Analysis Summary:")
+        logger.info(f"   Total instances: {len(unique_instances)}")
+        logger.info(f"   Average confidence: {np.mean(all_scores):.3f}")
+        logger.info(
+            f"   Score range: {np.min(all_scores):.3f} - {np.max(all_scores):.3f}"
+        )
+        logger.info(f"   Total change area: {sum(areas):,} pixels")
 
-        print(f"\n💾 Instance analysis saved as '{output_path}'")
+        logger.info(f"Instance analysis saved as '{output_path}'")
 
         return instance_stats
 
     def create_comprehensive_report(
         self, results_dict, output_path="comprehensive_report.png"
-    ):
+    ) -> None:
         """Create a comprehensive visualization report from detailed results."""
 
         if not results_dict or "masks" not in results_dict:
-            print("❌ No detailed results provided")
+            logger.warning("No detailed results provided")
             return
 
         masks = results_dict["masks"]
@@ -1113,11 +1120,11 @@ Areas:
         plt.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.show()
 
-        print(f"💾 Comprehensive report saved as '{output_path}'")
+        logger.info(f"Comprehensive report saved as '{output_path}'")
 
     def run_complete_analysis(
         self, image1_path, image2_path, output_dir="change_detection_results"
-    ):
+    ) -> Dict[str, Any]:
         """Run complete change detection analysis with all outputs and visualizations."""
 
         # Create output directory
@@ -1128,7 +1135,7 @@ Areas:
         prob_path = os.path.join(output_dir, "probability_mask.tif")
         instance_path = os.path.join(output_dir, "instance_masks.tif")
 
-        print("🔍 Running complete change detection analysis...")
+        logger.info("Running complete change detection analysis...")
 
         # Run detection with all outputs
         results = self.detect_changes(
@@ -1143,7 +1150,7 @@ Areas:
             return_results=False,
         )
 
-        print("📊 Creating visualizations...")
+        logger.info("Creating visualizations...")
 
         # Create all visualizations
         self.visualize_results(image1_path, image2_path, binary_path, prob_path)
@@ -1167,7 +1174,7 @@ Areas:
             results, os.path.join(output_dir, "comprehensive_report.png")
         )
 
-        print(f"✅ Complete analysis finished! Results saved to: {output_dir}")
+        logger.info(f"Complete analysis finished! Results saved to: {output_dir}")
         return results
 
     def _save_instance_segmentation_masks(
@@ -1220,8 +1227,8 @@ Areas:
                     # Assign instance ID to this mask
                     instance_mask[mask.astype(bool)] = instance_id
 
-                except Exception as e:
-                    print(f"Warning: Failed to process mask {instance_id}: {e}")
+                except (ValueError, IndexError, KeyError) as e:
+                    logger.warning(f"Failed to process mask {instance_id}: {e}")
                     continue
 
         # Resize back to original shape if needed
@@ -1260,7 +1267,7 @@ Areas:
                 instance_range=f"1-{len(rles)}",
             )
 
-        print(
+        logger.info(
             f"Saved instance segmentation mask with {len(rles)} instances to {output_path}"
         )
         return len(rles)
@@ -1356,9 +1363,9 @@ Areas:
                     # Assign confidence score to this mask
                     scores_mask[mask.astype(bool)] = confidence_score
 
-                except Exception as e:
-                    print(
-                        f"Warning: Failed to process scores for mask {instance_id}: {e}"
+                except (ValueError, IndexError, KeyError) as e:
+                    logger.warning(
+                        f"Failed to process scores for mask {instance_id}: {e}"
                     )
                     continue
 
@@ -1400,7 +1407,9 @@ Areas:
                 score_range="0.0-1.0",
             )
 
-        print(f"Saved instance scores mask with {len(rles)} instances to {output_path}")
+        logger.info(
+            f"Saved instance scores mask with {len(rles)} instances to {output_path}"
+        )
         return len(rles)
 
     def _extract_detailed_results(
@@ -1590,7 +1599,7 @@ def download_checkpoint(
 
     checkpoint = os.path.join(checkpoint_dir, model_types[model_type]["name"])
     if not os.path.exists(checkpoint):
-        print(f"Model checkpoint for {model_type} not found.")
+        logger.info(f"Model checkpoint for {model_type} not found.")
         url = model_types[model_type]["url"]
         if isinstance(url, str):
             download_file(url, checkpoint)
@@ -1661,7 +1670,7 @@ class ChangeStarDetection:
         self,
         model_name: str = "s1_s1c1_vitb",
         device: Optional[str] = None,
-    ):
+    ) -> None:
         self.model_name = model_name
         self.device = device
         self.model = None
@@ -2248,8 +2257,8 @@ class ChangeStarDetection:
             from rasterio.features import shapes
             from shapely.geometry import shape as shapely_shape
         except ImportError as e:
-            print(
-                f"Warning: Cannot save vector output. "
+            logger.warning(
+                f"Cannot save vector output. "
                 f"Missing dependency: {e}. "
                 f"Install geopandas and shapely."
             )
@@ -2268,7 +2277,7 @@ class ChangeStarDetection:
                 values.append(int(val))
 
         if not geometries:
-            print("No change polygons found.")
+            logger.info("No change polygons found.")
             return
 
         gdf = gpd.GeoDataFrame(

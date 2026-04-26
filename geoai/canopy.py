@@ -11,6 +11,7 @@ Reference:
     https://doi.org/10.1016/j.rse.2023.113888
 """
 
+import logging
 import math
 import os
 import warnings
@@ -19,6 +20,8 @@ from typing import Dict, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch
@@ -836,15 +839,16 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
     if os.path.exists(checkpoint_path):
         return checkpoint_path
 
-    print(f"Downloading {model_name} checkpoint ({info['description']})...")
-    print(f"URL: {info['url']}")
-    print(f"Saving to: {checkpoint_path}")
+    logger.info("Downloading %s checkpoint (%s)...", model_name, info["description"])
+    logger.info("URL: %s", info["url"])
+    logger.info("Saving to: %s", checkpoint_path)
 
+    import urllib.error
     import urllib.request
 
     try:
         urllib.request.urlretrieve(info["url"], checkpoint_path)
-    except Exception as e:
+    except (OSError, urllib.error.URLError) as e:
         # Clean up partial download
         if os.path.exists(checkpoint_path):
             os.remove(checkpoint_path)
@@ -855,7 +859,7 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
             f"s3://dataforgood-fb-data/forests/v1/models/saved_checkpoints/{info['filename']}"
         ) from e
 
-    print("Download complete.")
+    logger.info("Download complete.")
     return checkpoint_path
 
 
@@ -1008,10 +1012,10 @@ class CanopyHeightEstimation:
         self.checkpoint_path = checkpoint_path
 
         # Load model
-        print(f"Loading {model_name} model on {device}...")
+        logger.info("Loading %s model on %s...", model_name, device)
         self.model = _load_model(model_name, checkpoint_path, device)
         self.model.eval()
-        print("Model loaded successfully.")
+        logger.info("Model loaded successfully.")
 
         # Image normalization (from Meta's inference.py)
         self._norm_mean = [0.420, 0.411, 0.296]
@@ -1207,7 +1211,7 @@ class CanopyHeightEstimation:
 
             with rasterio.open(output_path, "w", **out_profile) as dst:
                 dst.write(result, 1)
-            print(f"Canopy height map saved to: {output_path}")
+            logger.info("Canopy height map saved to: %s", output_path)
 
         return result
 
@@ -1349,7 +1353,7 @@ class CanopyHeightEstimation:
 
         if output_path:
             fig.savefig(output_path, dpi=150, bbox_inches="tight")
-            print(f"Figure saved to: {output_path}")
+            logger.info("Figure saved to: %s", output_path)
 
         return fig
 

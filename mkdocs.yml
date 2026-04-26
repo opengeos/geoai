@@ -105,6 +105,7 @@ markdown_extensions:
 
 nav:
     - Home: index.md
+    - Book: https://book.opengeoai.org
     - Installation: installation.md
     - QGIS Plugin: qgis_plugin.md
     - Citations: citations.md
@@ -140,6 +141,7 @@ nav:
           - examples/train_segmentation_model.ipynb
           - examples/train_instance_segmentation_model.ipynb
           - examples/train_landcover_classification.ipynb
+          - examples/loss_functions_segmentation.ipynb
           - examples/train_building_footprints_usa.ipynb
           - examples/train_solar_panel_detection.ipynb
           - examples/train_car_detection.ipynb
@@ -199,6 +201,7 @@ nav:
           - examples/field_boundary_detection.ipynb
           - examples/super_resolution.ipynb
           - examples/geodeep_detection.ipynb
+          - examples/rfdetr_detection.ipynb
           - examples/image_captioning.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb
@@ -233,6 +236,7 @@ nav:
           - onnx module: onnx.md
           - prithvi module: prithvi.md
           - recognize module: recognize.md
+          - rfdetr module: rfdetr.md
           - sam module: sam.md
           - segment module: segment.md
           - segmentation module: segmentation.md

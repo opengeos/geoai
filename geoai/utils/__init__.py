@@ -55,6 +55,7 @@ from .geometry import (
     regularize,
 )
 from .raster import (
+    RasterMetadata,
     batch_vector_to_raster,
     calc_stats,
     clean_instance_mask,
@@ -69,6 +70,7 @@ from .raster import (
     raster_to_vector,
     raster_to_vector_batch,
     read_raster,
+    read_raster_metadata,
     read_vector,
     stack_bands,
     vector_to_raster,

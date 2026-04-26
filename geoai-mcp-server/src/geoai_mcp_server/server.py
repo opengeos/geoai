@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP as MCPServer
 
 from .config import load_config, GeoAIConfig
 from .schemas import (
@@ -97,7 +97,6 @@ config = load_config()
 # Initialize MCP Server
 mcp = MCPServer(
     "GeoAI Server",
-    version="0.1.0",
     instructions="Geospatial AI tools for remote sensing and Earth observation analysis",
 )
 
@@ -1344,7 +1343,10 @@ async def list_available_files(
         total_size_mb = 0.0
 
         for f in files:
-            file_info = {"name": f.name, "path": str(f.relative_to(base_dir))}
+            file_info = {
+                "name": f.name,
+                "path": str(f.resolve().relative_to(base_dir.resolve())),
+            }
 
             if include_metadata:
                 stat = f.stat()

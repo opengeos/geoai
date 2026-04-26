@@ -1,7 +1,10 @@
 """Module for training semantic segmentation models using timm encoders with PyTorch Lightning."""
 
+import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import torch
@@ -98,7 +101,7 @@ class TimmSegmentationModel(pl.LightningModule):
                     num_classes=num_classes,
                     in_chans=in_channels,
                 )
-                print(f"Loaded timm model: {timm_model_name}")
+                logger.info(f"Loaded timm model: {timm_model_name}")
             except Exception as e:
                 raise ValueError(
                     f"Failed to load timm model '{timm_model_name}'. "
@@ -353,6 +356,7 @@ def train_timm_segmentation(
     num_workers: int = 4,
     freeze_encoder: bool = False,
     class_weights: Optional[List[float]] = None,
+    loss_fn: Optional[nn.Module] = None,
     accelerator: str = "auto",
     devices: str = "auto",
     monitor_metric: str = "val_loss",
@@ -383,7 +387,12 @@ def train_timm_segmentation(
         weight_decay (float): Weight decay for optimizer.
         num_workers (int): Number of data loading workers.
         freeze_encoder (bool): Freeze encoder during training.
-        class_weights (List[float], optional): Class weights for loss.
+        class_weights (List[float], optional): Class weights for loss. Ignored
+            when *loss_fn* is provided.
+        loss_fn (nn.Module, optional): Custom loss function. Overrides
+            *class_weights* when provided. You can pass any PyTorch loss
+            module, including ``DiceLoss``, ``TverskyLoss``, or
+            ``UnifiedFocalLoss`` from ``geoai.landcover_train``.
         accelerator (str): Accelerator type ('auto', 'gpu', 'cpu').
         devices (str): Devices to use.
         monitor_metric (str): Metric to monitor for checkpointing.
@@ -424,6 +433,7 @@ def train_timm_segmentation(
         weight_decay=weight_decay,
         freeze_encoder=freeze_encoder,
         class_weights=weight_tensor,
+        loss_fn=loss_fn,
         use_timm_model=use_timm_model,
         timm_model_name=timm_model_name,
     )
@@ -486,7 +496,7 @@ def train_timm_segmentation(
     )
 
     # Train model
-    print(f"Training {encoder_name} {architecture} for {num_epochs} epochs...")
+    logger.info(f"Training {encoder_name} {architecture} for {num_epochs} epochs...")
     trainer.fit(
         model,
         train_dataloaders=train_loader,
@@ -503,10 +513,10 @@ def train_timm_segmentation(
             num_workers=num_workers,
             pin_memory=True,
         )
-        print("\nTesting model on test set...")
+        logger.info("Testing model on test set...")
         trainer.test(model, dataloaders=test_loader)
 
-    print(f"\nBest model saved at: {checkpoint_callback.best_model_path}")
+    logger.info(f"Best model saved at: {checkpoint_callback.best_model_path}")
 
     # Save training history in compatible format
     metrics = trainer.logged_metrics
@@ -542,7 +552,7 @@ def train_timm_segmentation(
     # Save history
     history_path = os.path.join(model_dir, "training_history.pth")
     torch.save(history, history_path)
-    print(f"Training history saved to: {history_path}")
+    logger.info(f"Training history saved to: {history_path}")
 
     return model
 
@@ -635,6 +645,7 @@ def train_timm_segmentation_model(
     num_workers: int = 4,
     freeze_encoder: bool = False,
     class_weights: Optional[List[float]] = None,
+    loss_fn: Optional[nn.Module] = None,
     monitor_metric: str = "val_iou",
     mode: str = "max",
     patience: int = 10,
@@ -680,7 +691,12 @@ def train_timm_segmentation_model(
         num_workers (int): Number of data loading workers.
         freeze_encoder (bool): Freeze encoder during training.
         class_weights (list of float, optional): Weights for each class in the
-            loss function. Useful for imbalanced datasets. Defaults to None.
+            loss function. Useful for imbalanced datasets. Ignored when *loss_fn*
+            is provided. Defaults to None.
+        loss_fn (nn.Module, optional): Custom loss function. Overrides
+            *class_weights* when provided. You can pass any PyTorch loss
+            module, including ``DiceLoss``, ``TverskyLoss``, or
+            ``UnifiedFocalLoss`` from ``geoai.landcover_train``.
         monitor_metric (str): Metric to monitor ('val_loss' or 'val_iou').
         mode (str): 'min' for loss, 'max' for metrics.
         patience (int): Early stopping patience.
@@ -720,7 +736,7 @@ def train_timm_segmentation_model(
     if input_format.lower() == "coco":
         # Parse COCO format annotations
         if verbose:
-            print(f"Loading COCO format annotations from {labels_dir}")
+            logger.info(f"Loading COCO format annotations from {labels_dir}")
         # For COCO format, labels_dir is path to instances.json
         # Labels are typically in a "labels" directory parallel to "annotations"
         coco_root = os.path.dirname(os.path.dirname(labels_dir))  # Go up two levels
@@ -731,7 +747,7 @@ def train_timm_segmentation_model(
     elif input_format.lower() == "yolo":
         # Parse YOLO format annotations
         if verbose:
-            print(f"Loading YOLO format data from {images_dir}")
+            logger.info(f"Loading YOLO format data from {images_dir}")
         image_paths, label_paths = parse_yolo_annotations(images_dir)
     else:
         # Default: directory format
@@ -755,7 +771,7 @@ def train_timm_segmentation_model(
         )
 
     if verbose:
-        print(f"Found {len(image_paths)} image-label pairs")
+        logger.info(f"Found {len(image_paths)} image-label pairs")
 
     # Split into train and validation
     train_images, val_images, train_labels, val_labels = train_test_split(
@@ -763,8 +779,8 @@ def train_timm_segmentation_model(
     )
 
     if verbose:
-        print(f"Training samples: {len(train_images)}")
-        print(f"Validation samples: {len(val_images)}")
+        logger.info(f"Training samples: {len(train_images)}")
+        logger.info(f"Validation samples: {len(val_images)}")
 
     # Create datasets
     train_dataset = SegmentationDataset(
@@ -799,6 +815,7 @@ def train_timm_segmentation_model(
         num_workers=num_workers,
         freeze_encoder=freeze_encoder,
         class_weights=class_weights,
+        loss_fn=loss_fn,
         accelerator="auto" if device is None else device,
         monitor_metric=monitor_metric,
         mode=mode,
@@ -810,7 +827,7 @@ def train_timm_segmentation_model(
     )
 
     if verbose:
-        print(f"\nTraining completed. Model saved to {output_dir}")
+        logger.info(f"Training completed. Model saved to {output_dir}")
 
     return model.model  # Return the underlying model
 
@@ -955,7 +972,7 @@ def timm_semantic_segmentation(
         n_cols = int(np.ceil((width - overlap) / stride))
 
         if not quiet:
-            print(f"Processing {n_rows} x {n_cols} = {n_rows * n_cols} windows")
+            logger.info(f"Processing {n_rows} x {n_cols} = {n_rows * n_cols} windows")
 
         # Initialize probability accumulators for proper overlap blending
         prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
@@ -1064,7 +1081,7 @@ def timm_semantic_segmentation(
                     normalized_probs[1, valid_pixels] >= probability_threshold
                 ).astype(np.uint8)
                 if not quiet:
-                    print(f"Using probability threshold: {probability_threshold}")
+                    logger.info(f"Using probability threshold: {probability_threshold}")
             else:
                 output[valid_pixels] = np.argmax(
                     normalized_probs[:, valid_pixels], axis=0
@@ -1080,7 +1097,7 @@ def timm_semantic_segmentation(
         dst.write(output, 1)
 
     if not quiet:
-        print(f"Segmentation saved to {output_path}")
+        logger.info(f"Segmentation saved to {output_path}")
 
     # Save probability map if requested
     if probability_path is not None:
@@ -1097,7 +1114,7 @@ def timm_semantic_segmentation(
                 dst.write(normalized_probs[class_idx], class_idx + 1)
 
         if not quiet:
-            print(f"Saved probability map to {probability_path}")
+            logger.info(f"Saved probability map to {probability_path}")
 
         # Save individual class probabilities if requested
         if save_class_probabilities:
@@ -1114,8 +1131,8 @@ def timm_semantic_segmentation(
                     dst.write(normalized_probs[class_idx], 1)
 
                 if not quiet:
-                    print(
-                        f"Saved class {class_idx} probability " f"to {class_prob_path}"
+                    logger.info(
+                        f"Saved class {class_idx} probability to {class_prob_path}"
                     )
 
 
@@ -1157,7 +1174,7 @@ def push_timm_model_to_hub(
     try:
         from huggingface_hub import HfApi, create_repo
     except ImportError:
-        print(
+        logger.error(
             "huggingface_hub is required to push models. "
             "Install it with: pip install huggingface-hub"
         )
@@ -1218,7 +1235,7 @@ def push_timm_model_to_hub(
     try:
         create_repo(repo_id, private=private, token=token, exist_ok=True)
     except Exception as e:
-        print(f"Repository creation note: {e}")
+        logger.warning(f"Repository creation note: {e}")
 
     # Save model configuration
     config = {
@@ -1258,7 +1275,7 @@ def push_timm_model_to_hub(
         )
 
     url = f"https://huggingface.co/{repo_id}"
-    print(f"Model successfully pushed to: {url}")
+    logger.info(f"Model successfully pushed to: {url}")
     return url
 
 
@@ -1309,7 +1326,7 @@ def timm_segmentation_from_hub(
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
-        print(
+        logger.error(
             "huggingface_hub is required. Install it with: pip install huggingface-hub"
         )
         return None
@@ -1318,7 +1335,7 @@ def timm_segmentation_from_hub(
 
     # Download model and config from HuggingFace Hub
     if not quiet:
-        print(f"Downloading model from {repo_id}...")
+        logger.info(f"Downloading model from {repo_id}...")
 
     model_path = hf_hub_download(repo_id=repo_id, filename="model.pth", token=token)
     config_path = hf_hub_download(repo_id=repo_id, filename="config.json", token=token)
@@ -1328,7 +1345,7 @@ def timm_segmentation_from_hub(
         config = json.load(f)
 
     if not quiet:
-        print(f"Model config: {config}")
+        logger.info(f"Model config: {config}")
 
     encoder_name = config.get("encoder_name", "resnet50")
     architecture = config.get("architecture", "unet")

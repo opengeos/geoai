@@ -109,8 +109,8 @@ class LoRALinear(nn.Module):
         self.rank = rank
         self.alpha = alpha if alpha is not None else float(rank)
 
-        in_features = original.in_features
-        out_features = original.out_features
+        self.in_features = in_features = original.in_features
+        self.out_features = out_features = original.out_features
 
         self.lora_A = nn.Parameter(torch.empty(rank, in_features))
         self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
@@ -629,6 +629,7 @@ def train_dinov3_segmentation(
     lora_rank: int = 4,
     lora_alpha: Optional[float] = None,
     class_weights: Optional[List[float]] = None,
+    loss_fn: Optional[nn.Module] = None,
     ignore_index: int = 255,
     accelerator: str = "auto",
     devices: str = "auto",
@@ -663,8 +664,14 @@ def train_dinov3_segmentation(
         use_lora: Apply LoRA to backbone attention layers.
         lora_rank: LoRA rank.
         lora_alpha: LoRA scaling factor.
-        class_weights: Per-class loss weights.
-        ignore_index: Label value to ignore in loss (default 255).
+        class_weights: Per-class loss weights. Ignored when *loss_fn* is
+            provided.
+        loss_fn: Custom loss function. Overrides *class_weights* and
+            *ignore_index* when provided. You can pass any PyTorch loss
+            module, including ``DiceLoss``, ``TverskyLoss``, or
+            ``UnifiedFocalLoss`` from ``geoai.landcover_train``.
+        ignore_index: Label value to ignore in loss (default 255). Ignored
+            when *loss_fn* is provided.
         accelerator: Lightning accelerator.
         devices: Lightning devices.
         monitor_metric: Metric to monitor for checkpointing.
@@ -708,6 +715,7 @@ def train_dinov3_segmentation(
         use_lora=use_lora,
         lora_rank=lora_rank,
         lora_alpha=lora_alpha,
+        loss_fn=loss_fn,
         class_weights=weight_tensor,
         ignore_index=ignore_index,
     )

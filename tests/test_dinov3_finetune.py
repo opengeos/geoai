@@ -327,6 +327,16 @@ class TestLoRALinear(unittest.TestCase):
             actual = lora(x)
         self.assertTrue(torch.allclose(expected, actual, atol=1e-6))
 
+    def test_in_out_features_exposed(self):
+        """LoRALinear must expose in_features/out_features for Lightning summary."""
+        from geoai.dinov3_finetune import LoRALinear
+
+        original = nn.Linear(64, 32)
+        lora = LoRALinear(original, rank=4)
+
+        self.assertEqual(lora.in_features, 64)
+        self.assertEqual(lora.out_features, 32)
+
 
 # ------------------------------------------------------------------ #
 # DPTSegmentationHead unit tests

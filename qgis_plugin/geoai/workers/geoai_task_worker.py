@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import traceback
@@ -49,9 +50,34 @@ class _ProgressStdout:
         self._buf = ""
 
 
+class _ProgressLoggingHandler(logging.Handler):
+    """Route logging output through the progress callback."""
+
+    def __init__(self, callback: Callable[[str], None]):
+        super().__init__()
+        self._callback = callback
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            self._callback(msg)
+        except Exception:
+            self.handleError(record)
+
+
 def _run_with_progress(fn: Callable[[], Any]) -> Any:
     old_stdout = sys.stdout
     sys.stdout = _ProgressStdout(_progress)
+
+    # Capture logging output (logger.info, etc.) that would otherwise be lost
+    log_handler = _ProgressLoggingHandler(_progress)
+    log_handler.setLevel(logging.INFO)
+    root_logger = logging.getLogger()
+    original_level = root_logger.level
+    if root_logger.level > logging.INFO:
+        root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(log_handler)
+
     try:
         return fn()
     finally:
@@ -60,6 +86,8 @@ def _run_with_progress(fn: Callable[[], Any]) -> Any:
         except Exception:
             pass
         sys.stdout = old_stdout
+        root_logger.removeHandler(log_handler)
+        root_logger.setLevel(original_level)
 
 
 def _geoai():
@@ -115,6 +143,26 @@ def _task_instance_segmentation(params: Dict[str, Any]) -> Dict[str, Any]:
     _progress("Running instance segmentation inference...")
     _run_with_progress(lambda: geoai.instance_segmentation(**params))
     return {"output_path": params["output_path"]}
+
+
+def _task_raster_to_vector(params: Dict[str, Any]) -> Dict[str, Any]:
+    from geoai.utils.raster import raster_to_vector
+
+    mask_path = params["mask_path"]
+    output_path = params["output_path"]
+    min_area = params.get("min_area") or 0
+    output_format = params.get("output_format", "geojson")
+    simplify_tolerance = params.get("simplify_tolerance")
+
+    _progress("Converting raster to vector...")
+    raster_to_vector(
+        mask_path,
+        output_path=output_path,
+        min_area=min_area,
+        simplify_tolerance=simplify_tolerance,
+        output_format=output_format,
+    )
+    return {"output_path": output_path}
 
 
 def _task_vectorize_mask(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -192,6 +240,7 @@ _TASKS = {
     "export_geotiff_tiles": _task_export_geotiff_tiles,
     "semantic_segmentation": _task_semantic_segmentation,
     "instance_segmentation": _task_instance_segmentation,
+    "raster_to_vector": _task_raster_to_vector,
     "vectorize_mask": _task_vectorize_mask,
     "smooth_vector": _task_smooth_vector,
     "segment_water": _task_segment_water,

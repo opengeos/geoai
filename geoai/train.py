@@ -1,4 +1,5 @@
 import glob
+import logging
 import math
 import os
 import platform
@@ -31,6 +32,8 @@ from tqdm import tqdm
 
 from .utils import download_model_from_hf, get_device
 
+logger = logging.getLogger(__name__)
+
 # Additional imports for semantic segmentation
 try:
     import segmentation_models_pytorch as smp
@@ -47,6 +50,135 @@ try:
     LIGHTLY_TRAIN_AVAILABLE = True
 except ImportError:
     LIGHTLY_TRAIN_AVAILABLE = False
+
+
+def _validate_training_paths(
+    images_dir: str,
+    labels_dir: str,
+    output_dir: str,
+    input_format: str = "directory",
+) -> None:
+    """Validate training input paths before starting training.
+
+    Checks that directories/files exist, are the correct type, and are readable.
+    On Windows, retries on PermissionError to handle transient file locks from
+    antivirus or indexing services.
+
+    Args:
+        images_dir: Directory containing training images.
+        labels_dir: Directory containing labels (or path to COCO JSON).
+        output_dir: Directory for saving model outputs.
+        input_format: One of 'directory', 'coco', 'coco_detection', 'yolo'.
+
+    Raises:
+        FileNotFoundError: If a required path does not exist or is the wrong type.
+        PermissionError: If a required path cannot be read.
+    """
+    fmt = input_format.lower()
+
+    # --- images_dir ---
+    if not os.path.exists(images_dir):
+        raise FileNotFoundError(f"Images directory not found: {images_dir}")
+    if not os.path.isdir(images_dir):
+        raise FileNotFoundError(f"Images path is not a directory: {images_dir}")
+    _check_readable(images_dir)
+
+    # --- labels_dir (format-dependent) ---
+    if fmt in ("coco", "coco_detection"):
+        if not os.path.exists(labels_dir):
+            raise FileNotFoundError(f"COCO annotations file not found: {labels_dir}")
+        if not os.path.isfile(labels_dir):
+            raise FileNotFoundError(
+                f"COCO annotations path is not a file: {labels_dir}. "
+                "For COCO format, labels should point to a JSON file "
+                "(e.g., instances.json)."
+            )
+        _check_readable(labels_dir)
+    elif fmt == "yolo":
+        yolo_images = os.path.join(images_dir, "images")
+        yolo_labels = os.path.join(images_dir, "labels")
+        if not os.path.isdir(yolo_images):
+            raise FileNotFoundError(
+                f"YOLO images subdirectory not found: {yolo_images}. "
+                "YOLO format requires 'images/' and 'labels/' subdirectories."
+            )
+        if not os.path.isdir(yolo_labels):
+            raise FileNotFoundError(
+                f"YOLO labels subdirectory not found: {yolo_labels}. "
+                "YOLO format requires 'images/' and 'labels/' subdirectories."
+            )
+        _check_readable(yolo_images)
+        _check_readable(yolo_labels)
+    else:
+        # directory format
+        if not os.path.exists(labels_dir):
+            raise FileNotFoundError(f"Labels directory not found: {labels_dir}")
+        if not os.path.isdir(labels_dir):
+            raise FileNotFoundError(f"Labels path is not a directory: {labels_dir}")
+        _check_readable(labels_dir)
+
+    # --- output_dir ---
+    abs_output_dir = os.path.abspath(output_dir)
+    if os.path.exists(abs_output_dir) and not os.path.isdir(abs_output_dir):
+        raise NotADirectoryError(
+            f"Output path exists and is not a directory: {output_dir}"
+        )
+    try:
+        os.makedirs(abs_output_dir, exist_ok=True)
+    except PermissionError:
+        raise PermissionError(
+            f"Cannot create output directory (permission denied): {output_dir}"
+        )
+    except OSError as e:
+        raise OSError(f"Failed to create output directory '{output_dir}': {e}") from e
+
+
+def _check_readable(path: str, max_retries: int = 3, retry_delay: float = 1.0) -> None:
+    """Verify a path is readable, with retry on Windows for transient locks.
+
+    On Windows, antivirus scanners and file indexing services can briefly lock
+    newly created directories, causing PermissionError on os.listdir().  This
+    helper retries a few times before giving up.
+
+    Args:
+        path: File or directory path to check.
+        max_retries: Number of retry attempts on PermissionError (Windows only).
+        retry_delay: Seconds to wait between retries.
+
+    Raises:
+        PermissionError: If the path is not readable after all retries.
+    """
+    is_dir = os.path.isdir(path)
+    attempts = max_retries if platform.system() == "Windows" else 1
+
+    for attempt in range(attempts):
+        try:
+            if is_dir:
+                os.listdir(path)
+            else:
+                with open(path, "rb") as f:
+                    f.read(1)
+            return
+        except PermissionError:
+            if attempt < attempts - 1:
+                logger.warning(
+                    "Permission denied reading %s (attempt %d/%d), retrying...",
+                    path,
+                    attempt + 1,
+                    attempts,
+                )
+                time.sleep(retry_delay)
+            else:
+                hint = ""
+                if platform.system() == "Windows":
+                    hint = (
+                        " This may be caused by Windows Defender, file indexing, "
+                        "or another process holding a lock. Try: (1) waiting a "
+                        "few seconds and retrying, (2) excluding the directory "
+                        "from antivirus scanning, (3) running QGIS as "
+                        "administrator."
+                    )
+                raise PermissionError(f"Cannot read {path} (permission denied).{hint}")
 
 
 def parse_coco_annotations(
@@ -403,6 +535,7 @@ class ObjectDetectionDataset(Dataset):
         transforms: Optional[Callable] = None,
         num_channels: Optional[int] = None,
         instance_labels: bool = False,
+        multiclass: bool = False,
     ) -> None:
         """
         Initialize dataset.
@@ -418,11 +551,32 @@ class ObjectDetectionDataset(Dataset):
                 labeling.  Use this when label masks already encode unique
                 integers per object (e.g., Fields of The World dataset).
                 Defaults to False.
+            multiclass (bool): If True, read class labels from the label
+                mask pixel values instead of assigning every instance to
+                class ``1``. Connected-component labeling is run *per class
+                value* so that adjacent regions of different classes are
+                not merged into a single instance. Use this when training
+                a multi-class Mask R-CNN with ``num_classes > 2`` where
+                pixel values encode class IDs (1..N, with 0 reserved for
+                background). Cannot be combined with ``instance_labels``
+                (which uses the same raster to encode instance IDs).
+                Defaults to False for backward compatibility with binary
+                training.
         """
+        if multiclass and instance_labels:
+            raise ValueError(
+                "multiclass=True is incompatible with instance_labels=True: "
+                "when label pixel values encode pre-assigned instance IDs, "
+                "there is no reliable way to also recover class IDs from "
+                "the same raster. Use separate class and instance rasters, "
+                "or disable one of the options."
+            )
+
         self.image_paths = image_paths
         self.label_paths = label_paths
         self.transforms = transforms
         self.instance_labels = instance_labels
+        self.multiclass = multiclass
 
         # Auto-detect the number of channels if not specified
         if num_channels is None:
@@ -464,28 +618,48 @@ class ObjectDetectionDataset(Dataset):
         with rasterio.open(self.label_paths[idx]) as src:
             label_mask = src.read(1)
 
+        # Build an iterable of (labeled_mask, instance_id, class_label)
+        # triples so the rest of the loop can stay shape-agnostic across
+        # the three extraction modes (instance_labels, multiclass, binary).
         if self.instance_labels:
-            # Use pre-assigned instance IDs directly (e.g., FTW dataset)
+            # Use pre-assigned instance IDs directly (e.g., FTW dataset).
+            # Always single-class in this mode (multiclass+instance_labels
+            # combination is rejected in __init__).
             unique_ids = np.unique(label_mask)
-            unique_ids = unique_ids[unique_ids > 0]  # Remove background
-            num_instances = len(unique_ids)
-            labeled_mask = label_mask
+            unique_ids = unique_ids[unique_ids > 0]
+            instance_sources = [(label_mask, int(i), 1) for i in unique_ids]
+        elif self.multiclass:
+            # Run connected components *per class* so that touching regions
+            # of different classes are not merged into a single instance.
+            class_values = np.unique(label_mask)
+            class_values = class_values[class_values > 0]
+            instance_sources = []
+            for cls in class_values:
+                cls_int = int(cls)
+                cls_mask = (label_mask == cls).astype(np.uint8)
+                cls_labeled, n_cls = measure.label(
+                    cls_mask, return_num=True, connectivity=2
+                )
+                for inst_id in range(1, n_cls + 1):
+                    instance_sources.append((cls_labeled, inst_id, cls_int))
         else:
-            # Find instances using connected components on binary mask
+            # Binary foreground: all instances share class label 1.
             binary_mask = (label_mask > 0).astype(np.uint8)
             labeled_mask, num_instances = measure.label(
                 binary_mask, return_num=True, connectivity=2
             )
-            unique_ids = range(1, num_instances + 1)
+            instance_sources = [
+                (labeled_mask, i, 1) for i in range(1, num_instances + 1)
+            ]
 
         # Create list to hold masks for each object instance
         masks = []
         boxes = []
         labels = []
 
-        for i in unique_ids:
+        for src_mask, i, class_label in instance_sources:
             # Create mask for this instance
-            instance_mask = (labeled_mask == i).astype(np.uint8)
+            instance_mask = (src_mask == i).astype(np.uint8)
 
             # Calculate area and filter out tiny instances (noise)
             area = instance_mask.sum()
@@ -514,7 +688,7 @@ class ObjectDetectionDataset(Dataset):
 
             boxes.append([xmin, ymin, xmax, ymax])
             masks.append(instance_mask)
-            labels.append(1)  # 1 for building class
+            labels.append(class_label)
 
         # Handle case with no valid instances
         if len(boxes) == 0:
@@ -1064,7 +1238,7 @@ def train_one_epoch(
         if i % print_freq == 0:
             elapsed_time = time.time() - start_time
             if verbose:
-                print(
+                logger.info(
                     f"Epoch: {epoch + 1}, Batch: {i + 1}/{len(data_loader)}, Loss: {losses.item():.4f}, Time: {elapsed_time:.2f}s"
                 )
             start_time = time.time()
@@ -1300,6 +1474,7 @@ def train_MaskRCNN_model(
     verbose: bool = True,
     model_name: str = "maskrcnn_resnet50_fpn",
     instance_labels: bool = False,
+    multiclass: bool = False,
 ) -> torch.nn.Module:
     """Train and evaluate Mask R-CNN model for instance segmentation.
 
@@ -1355,6 +1530,15 @@ def train_MaskRCNN_model(
             pre-assigned instance IDs instead of running connected-component
             labeling. Use this when label masks already encode unique integers
             per object (e.g., Fields of The World dataset). Defaults to False.
+        multiclass (bool): If True (and ``input_format='directory'``), read
+            per-instance class IDs from the label mask pixel values by
+            running connected-component labeling *per class value*. Use
+            this with ``num_classes > 2`` for multi-class training where
+            pixel values encode class IDs (1..N, with 0 reserved for
+            background). When ``num_classes > 2`` and this is left False
+            (directory input format, no ``instance_labels``), a warning is
+            emitted because every target would silently collapse to class 1.
+            Defaults to False. Cannot be combined with ``instance_labels=True``.
     Returns:
         None: Model weights are saved to output_dir.
 
@@ -1378,7 +1562,10 @@ def train_MaskRCNN_model(
     # Get device
     if device is None:
         device = get_device()
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
+
+    # Validate input paths before proceeding
+    _validate_training_paths(images_dir, labels_dir, output_dir, input_format)
 
     # Get all image and label files based on input format
     use_coco_detection = input_format.lower() == "coco_detection"
@@ -1386,7 +1573,7 @@ def train_MaskRCNN_model(
     if use_coco_detection:
         # COCO detection format: read annotations directly from COCO JSON
         if verbose:
-            print(f"Loading COCO detection annotations from {labels_dir}")
+            logger.info(f"Loading COCO detection annotations from {labels_dir}")
 
         # Create a full dataset to determine image IDs, then split
         _needs_masks = model_has_masks(model_name)
@@ -1407,7 +1594,7 @@ def train_MaskRCNN_model(
         if num_classes == 2 and detected > 2:
             num_classes = detected
             if verbose:
-                print(
+                logger.info(
                     f"Auto-detected {num_classes} classes "
                     f"(including background): {full_dataset.class_names}"
                 )
@@ -1422,7 +1609,7 @@ def train_MaskRCNN_model(
         train_image_ids = [full_dataset.image_info[i]["id"] for i in train_indices]
         val_image_ids = [full_dataset.image_info[i]["id"] for i in val_indices]
 
-        print(
+        logger.info(
             f"Training on {len(train_indices)} images, "
             f"validating on {len(val_indices)} images"
         )
@@ -1452,7 +1639,7 @@ def train_MaskRCNN_model(
     elif input_format.lower() == "coco":
         # Parse COCO format annotations
         if verbose:
-            print(f"Loading COCO format annotations from {labels_dir}")
+            logger.info(f"Loading COCO format annotations from {labels_dir}")
         # For COCO format, labels_dir is path to instances.json
         # Labels are typically in a "labels" directory parallel to "annotations"
         coco_root = os.path.dirname(os.path.dirname(labels_dir))  # Go up two levels
@@ -1463,7 +1650,7 @@ def train_MaskRCNN_model(
     elif input_format.lower() == "yolo":
         # Parse YOLO format annotations
         if verbose:
-            print(f"Loading YOLO format data from {images_dir}")
+            logger.info(f"Loading YOLO format data from {images_dir}")
         image_files, label_files = parse_yolo_annotations(images_dir)
     else:
         # Default: directory format
@@ -1488,7 +1675,9 @@ def train_MaskRCNN_model(
 
         # Ensure matching files
         if len(image_files) != len(label_files):
-            print("Warning: Number of image files and label files don't match!")
+            logger.warning(
+                "Warning: Number of image files and label files don't match!"
+            )
             # Find matching files by basename
             basenames = [os.path.basename(f) for f in image_files]
             label_files = [
@@ -1501,19 +1690,37 @@ def train_MaskRCNN_model(
                 for f, b in zip(image_files, basenames)
                 if os.path.exists(os.path.join(labels_dir, b))
             ]
-            print(f"Using {len(image_files)} matching files")
+            logger.info(f"Using {len(image_files)} matching files")
 
     if not use_coco_detection:
-        print(
+        logger.info(
             f"Found {len(image_files)} image files and {len(label_files)} label files"
         )
+
+        # Warn when users request multi-class training but forget to opt in
+        # to multiclass label parsing: every target would silently become
+        # class 1 and the model could only learn the first foreground class.
+        if (
+            input_format.lower() == "directory"
+            and num_classes > 2
+            and not multiclass
+            and not instance_labels
+        ):
+            logger.warning(
+                "num_classes=%d was requested but multiclass=False; "
+                "ObjectDetectionDataset will assign every instance label=1 "
+                "and the model will only learn one foreground class. "
+                "Pass multiclass=True to read class IDs from label mask "
+                "pixel values.",
+                num_classes,
+            )
 
         # Split data into train and validation sets
         train_imgs, val_imgs, train_labels, val_labels = train_test_split(
             image_files, label_files, test_size=val_split, random_state=seed
         )
 
-        print(
+        logger.info(
             f"Training on {len(train_imgs)} images, "
             f"validating on {len(val_imgs)} images"
         )
@@ -1524,12 +1731,14 @@ def train_MaskRCNN_model(
             train_labels,
             transforms=get_transform(train=True),
             instance_labels=instance_labels,
+            multiclass=multiclass,
         )
         val_dataset = ObjectDetectionDataset(
             val_imgs,
             val_labels,
             transforms=get_transform(train=False),
             instance_labels=instance_labels,
+            multiclass=multiclass,
         )
 
     # Create data loaders
@@ -1594,7 +1803,7 @@ def train_MaskRCNN_model(
                 f"Pretrained model file not found: {pretrained_model_path}"
             )
 
-        print(f"Loading pretrained model from: {pretrained_model_path}")
+        logger.info(f"Loading pretrained model from: {pretrained_model_path}")
         try:
             # Check if it's a full checkpoint or just model weights
             checkpoint = torch.load(pretrained_model_path, map_location=device)
@@ -1614,13 +1823,13 @@ def train_MaskRCNN_model(
                     if "scheduler_state_dict" in checkpoint:
                         lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
 
-                    print(f"Resuming training from epoch {start_epoch}")
-                    print(f"Previous best IoU: {best_iou:.4f}")
+                    logger.info(f"Resuming training from epoch {start_epoch}")
+                    logger.info(f"Previous best IoU: {best_iou:.4f}")
             else:
                 # Assume it's just the model weights
                 model.load_state_dict(checkpoint)
 
-            print("Pretrained model loaded successfully")
+            logger.info("Pretrained model loaded successfully")
         except Exception as e:
             raise RuntimeError(f"Failed to load pretrained model: {str(e)}")
 
@@ -1647,14 +1856,14 @@ def train_MaskRCNN_model(
         training_history["lr"].append(optimizer.param_groups[0]["lr"])
 
         # Print metrics
-        print(
+        logger.info(
             f"Epoch {epoch+1}/{num_epochs}: Train Loss: {train_loss:.4f}, Val Loss: {eval_metrics['loss']:.4f}, Val IoU: {eval_metrics['IoU']:.4f}"
         )
 
         # Save best model
         if eval_metrics["IoU"] > best_iou:
             best_iou = eval_metrics["IoU"]
-            print(f"Saving best model with IoU: {best_iou:.4f}")
+            logger.info(f"Saving best model with IoU: {best_iou:.4f}")
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
 
     # Save final model
@@ -1668,13 +1877,13 @@ def train_MaskRCNN_model(
 
     # Final evaluation
     final_metrics = evaluate(model, val_loader, device)
-    print(
+    logger.info(
         f"Final Evaluation - Loss: {final_metrics['loss']:.4f}, IoU: {final_metrics['IoU']:.4f}"
     )
 
     # Visualize results
     if visualize:
-        print("Generating visualizations...")
+        logger.info("Generating visualizations...")
         visualize_predictions(
             model,
             val_dataset,
@@ -1698,7 +1907,34 @@ def train_MaskRCNN_model(
             if resume_training:
                 f.write(f"Resumed training from epoch {start_epoch}\n")
 
-    print(f"Training complete! Trained model saved to {output_dir}")
+    logger.info(f"Training complete! Trained model saved to {output_dir}")
+
+
+def _pad_window(
+    window: np.ndarray,
+    window_size: int,
+) -> tuple:
+    """Pad an undersized edge tile to ``(C, window_size, window_size)``.
+
+    Args:
+        window: Array of shape ``(C, H, W)`` read from a raster window.
+        window_size: Target spatial size for the model input.
+
+    Returns:
+        A tuple ``(padded_window, actual_h, actual_w)`` where
+        ``padded_window`` has shape ``(C, window_size, window_size)`` and
+        ``actual_h``/``actual_w`` are the original spatial dimensions.
+    """
+    actual_h = window.shape[1]
+    actual_w = window.shape[2]
+    if actual_h < window_size or actual_w < window_size:
+        padded = np.zeros(
+            (window.shape[0], window_size, window_size),
+            dtype=window.dtype,
+        )
+        padded[:, :actual_h, :actual_w] = window
+        return padded, actual_h, actual_w
+    return window, actual_h, actual_w
 
 
 def inference_on_geotiff(
@@ -1766,7 +2002,7 @@ def inference_on_geotiff(
         last_x = width - window_size
 
         total_windows = steps_y * steps_x
-        print(
+        logger.info(
             f"Processing {total_windows} windows with size {window_size}x{window_size} and overlap {overlap}..."
         )
 
@@ -1811,6 +2047,8 @@ def inference_on_geotiff(
                     current_height = window_size
                     current_width = window_size
 
+                window, current_height, current_width = _pad_window(window, window_size)
+
                 # Normalize and prepare input
                 image = window.astype(np.float32) / 255.0
 
@@ -1819,7 +2057,7 @@ def inference_on_geotiff(
                     image = image[:num_channels]
                 elif image.shape[0] < num_channels:
                     padded = np.zeros(
-                        (num_channels, current_height, current_width), dtype=np.float32
+                        (num_channels, window_size, window_size), dtype=np.float32
                     )
                     padded[: image.shape[0]] = image
                     image = padded
@@ -1879,6 +2117,8 @@ def inference_on_geotiff(
                                 combined_mask = (
                                     combined_mask.cpu().numpy().astype(np.float32)
                                 )
+                                # Crop to actual tile dimensions
+                                combined_mask = combined_mask[:h, :w]
 
                                 # Apply weight to prediction
                                 weighted_pred = combined_mask * weight
@@ -1914,13 +2154,13 @@ def inference_on_geotiff(
 
         # Record time
         inference_time = time.time() - start_time
-        print(f"Inference completed in {inference_time:.2f} seconds")
+        logger.info(f"Inference completed in {inference_time:.2f} seconds")
 
         # Save output
         with rasterio.open(output_path, "w", **out_meta) as dst:
             dst.write(mask, 1)
 
-        print(f"Saved prediction to {output_path}")
+        logger.info(f"Saved prediction to {output_path}")
 
         return output_path, inference_time
 
@@ -2010,7 +2250,7 @@ def instance_segmentation_inference_on_geotiff(
         last_x = width - window_size
 
         total_windows = steps_y * steps_x
-        print(
+        logger.info(
             f"Processing {total_windows} windows with size {window_size}x{window_size} and overlap {overlap}..."
         )
 
@@ -2049,7 +2289,7 @@ def instance_segmentation_inference_on_geotiff(
                     continue
 
                 # Handle edge cases where window might be smaller than expected
-                actual_height, actual_width = window.shape[1], window.shape[2]
+                window, actual_height, actual_width = _pad_window(window, window_size)
 
                 # Convert to [C, H, W] format and normalize
                 image = window.astype(np.float32) / 255.0
@@ -2060,7 +2300,7 @@ def instance_segmentation_inference_on_geotiff(
                 elif image.shape[0] < num_channels:
                     # Pad with zeros if less than expected channels
                     padded = np.zeros(
-                        (num_channels, image.shape[1], image.shape[2]), dtype=np.float32
+                        (num_channels, window_size, window_size), dtype=np.float32
                     )
                     padded[: image.shape[0]] = image
                     image = padded
@@ -2099,6 +2339,16 @@ def instance_segmentation_inference_on_geotiff(
                                 box = boxes[k].cpu().numpy()
                                 label = det_labels[k].cpu().item()
 
+                                # Clip box to actual tile dims and skip
+                                # if no area remains inside the real region
+                                box = box.copy()
+                                box[0] = np.clip(box[0], 0, w)
+                                box[1] = np.clip(box[1], 0, h)
+                                box[2] = np.clip(box[2], 0, w)
+                                box[3] = np.clip(box[3], 0, h)
+                                if box[2] <= box[0] or box[3] <= box[1]:
+                                    continue
+
                                 # Convert box to global coordinates
                                 global_box = [
                                     box[0] + x_pos,
@@ -2130,7 +2380,7 @@ def instance_segmentation_inference_on_geotiff(
         # Close progress bar
         pbar.close()
 
-        print(f"Collected {len(all_detections)} detections before NMS")
+        logger.info(f"Collected {len(all_detections)} detections before NMS")
 
         # Apply class-aware Non-Maximum Suppression
         if len(all_detections) > 0:
@@ -2155,7 +2405,7 @@ def instance_segmentation_inference_on_geotiff(
 
             # Keep only the selected detections
             final_detections = [all_detections[i] for i in keep_indices]
-            print(f"After NMS: {len(final_detections)} detections")
+            logger.info(f"After NMS: {len(final_detections)} detections")
 
             # Create final output masks
             class_mask = np.zeros((height, width), dtype=np.uint16)
@@ -2195,8 +2445,8 @@ def instance_segmentation_inference_on_geotiff(
 
         # Record time
         inference_time = time.time() - start_time
-        print(f"Instance segmentation completed in {inference_time:.2f} seconds")
-        print(f"Final instances: {len(final_detections)}")
+        logger.info(f"Instance segmentation completed in {inference_time:.2f} seconds")
+        logger.info(f"Final instances: {len(final_detections)}")
 
         # Save instance raster (uint32)
         inst_meta = meta.copy()
@@ -2221,9 +2471,9 @@ def instance_segmentation_inference_on_geotiff(
             "class_label": class_path,
             "score": score_path,
         }
-        print(f"Saved instance raster to {output_path}")
-        print(f"Saved class raster to {class_path}")
-        print(f"Saved score raster to {score_path}")
+        logger.info(f"Saved instance raster to {output_path}")
+        logger.info(f"Saved class raster to {class_path}")
+        logger.info(f"Saved score raster to {score_path}")
 
         return output_paths, inference_time, final_detections
 
@@ -2288,7 +2538,7 @@ def multiclass_detection_inference_on_geotiff(
         steps_x = max(1, math.ceil((width - window_size) / stride) + 1)
         total_windows = steps_y * steps_x
 
-        print(
+        logger.info(
             f"Processing {total_windows} windows with size "
             f"{window_size}x{window_size} and overlap {overlap}..."
         )
@@ -2385,7 +2635,7 @@ def multiclass_detection_inference_on_geotiff(
                     pbar.update(len(outputs))
 
         pbar.close()
-        print(f"Collected {len(all_detections)} detections before NMS")
+        logger.info(f"Collected {len(all_detections)} detections before NMS")
 
         # Apply class-aware Non-Maximum Suppression
         if len(all_detections) > 0:
@@ -2404,7 +2654,7 @@ def multiclass_detection_inference_on_geotiff(
             )
 
             final_detections = [all_detections[i] for i in keep_indices]
-            print(f"After NMS: {len(final_detections)} detections")
+            logger.info(f"After NMS: {len(final_detections)} detections")
 
             # Create output rasters (uint8 for class, uint32 for instance)
             class_mask = np.zeros((height, width), dtype=np.uint8)
@@ -2431,8 +2681,8 @@ def multiclass_detection_inference_on_geotiff(
             final_detections = []
 
         inference_time = time.time() - start_time
-        print(f"Multi-class detection completed in {inference_time:.2f} seconds")
-        print(f"Final detections: {len(final_detections)}")
+        logger.info(f"Multi-class detection completed in {inference_time:.2f} seconds")
+        logger.info(f"Final detections: {len(final_detections)}")
 
         if class_names and len(final_detections) > 0:
             from collections import Counter
@@ -2444,7 +2694,7 @@ def multiclass_detection_inference_on_geotiff(
                     if label_id < len(class_names)
                     else f"class_{label_id}"
                 )
-                print(f"  {name}: {count} detections")
+                logger.info(f"  {name}: {count} detections")
 
         # Write class band as uint8, instance band as uint32
         out_meta.update({"count": 2, "dtype": "uint32"})
@@ -2452,7 +2702,7 @@ def multiclass_detection_inference_on_geotiff(
             dst.write(class_mask.astype(np.uint32), 1)
             dst.write(instance_mask, 2)
 
-        print(f"Saved multi-class detection to {output_path}")
+        logger.info(f"Saved multi-class detection to {output_path}")
 
         return output_path, inference_time, final_detections
 
@@ -2494,7 +2744,7 @@ def evaluate_coco_metrics(
     all_targets = []
 
     if verbose:
-        print("Running inference for evaluation...")
+        logger.info("Running inference for evaluation...")
 
     for images, targets in tqdm(data_loader, disable=not verbose):
         images = [img.to(device) for img in images]
@@ -2701,15 +2951,15 @@ def evaluate_coco_metrics(
     results["mAP@[0.5:0.95]"] = sum(all_maps) / len(all_maps) if all_maps else 0.0
 
     if verbose:
-        print(f"\nEvaluation Results:")
-        print(f"  mAP@0.5:        {results.get('mAP@0.5', 0.0):.4f}")
-        print(f"  mAP@0.75:       {results.get('mAP@0.75', 0.0):.4f}")
-        print(f"  mAP@[0.5:0.95]: {results['mAP@[0.5:0.95]']:.4f}")
+        logger.info(f"\nEvaluation Results:")
+        logger.info(f"  mAP@0.5:        {results.get('mAP@0.5', 0.0):.4f}")
+        logger.info(f"  mAP@0.75:       {results.get('mAP@0.75', 0.0):.4f}")
+        logger.info(f"  mAP@[0.5:0.95]: {results['mAP@[0.5:0.95]']:.4f}")
         if class_names:
-            print(f"\n  Per-class AP@0.5:")
+            logger.info(f"\n  Per-class AP@0.5:")
             for key, value in sorted(results.items()):
                 if key.startswith("AP@0.5/"):
-                    print(f"    {key}: {value:.4f}")
+                    logger.info(f"    {key}: {value:.4f}")
 
     return results
 
@@ -2890,7 +3140,7 @@ def object_detection_batch(
             raise ValueError("Number of filenames must match number of input files.")
 
     for index, file in enumerate(files):
-        print(f"Processing file {index + 1}/{len(files)}: {file}")
+        logger.info(f"Processing file {index + 1}/{len(files)}: {file}")
         inference_on_geotiff(
             model=model,
             geotiff_path=file,
@@ -3639,7 +3889,7 @@ def train_semantic_one_epoch(
         if i % print_freq == 0:
             elapsed_time = time.time() - start_time
             if verbose:
-                print(
+                logger.info(
                     f"Epoch: {epoch + 1}, Batch: {i + 1}/{num_batches}, Loss: {loss.item():.4f}, Time: {elapsed_time:.2f}s"
                 )
             start_time = time.time()
@@ -3747,6 +3997,10 @@ def train_segmentation_model(
     early_stopping_patience: Optional[int] = None,
     train_transforms: Optional[Callable] = None,
     val_transforms: Optional[Callable] = None,
+    loss_fn: Optional[torch.nn.Module] = None,
+    class_weights: Optional[List[float]] = None,
+    ignore_index: int = -100,
+    freeze_encoder: bool = False,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -3810,6 +4064,19 @@ def train_segmentation_model(
         val_transforms (callable, optional): Custom transforms for validation data.
             Should be a callable that accepts (image, mask) tensors and returns transformed (image, mask).
             If None, uses default transforms (no augmentation). Defaults to None.
+        loss_fn (torch.nn.Module, optional): Custom loss function. When provided,
+            this overrides class_weights and ignore_index. You can pass any
+            PyTorch loss module, including ``DiceLoss``, ``TverskyLoss``, or
+            ``UnifiedFocalLoss`` from ``geoai.landcover_train``. Defaults to None.
+        class_weights (list, optional): Per-class weights for CrossEntropyLoss
+            (e.g., ``[0.5, 2.0]`` for a 2-class problem). Ignored when *loss_fn*
+            is provided. Defaults to None.
+        ignore_index (int): Target value that is ignored by the default
+            CrossEntropyLoss. Ignored when *loss_fn* is provided.
+            Defaults to -100 (PyTorch default, i.e., no pixels ignored).
+        freeze_encoder (bool): If True, freeze the encoder parameters so only the
+            decoder is trained. Useful for fine-tuning on small datasets to prevent
+            overfitting. Defaults to False.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
         None: Model weights are saved to output_dir.
@@ -3839,13 +4106,16 @@ def train_segmentation_model(
     # Get device
     if device is None:
         device = get_device()
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
+
+    # Validate input paths before proceeding
+    _validate_training_paths(images_dir, labels_dir, output_dir, input_format)
 
     # Get all image and label files based on input format
     if input_format.lower() == "coco":
         # Parse COCO format annotations
         if verbose:
-            print(f"Loading COCO format annotations from {labels_dir}")
+            logger.info(f"Loading COCO format annotations from {labels_dir}")
         # For COCO format, labels_dir is path to instances.json
         # Labels are typically in a "labels" directory parallel to "annotations"
         coco_root = os.path.dirname(os.path.dirname(labels_dir))  # Go up two levels
@@ -3856,7 +4126,7 @@ def train_segmentation_model(
     elif input_format.lower() == "yolo":
         # Parse YOLO format annotations
         if verbose:
-            print(f"Loading YOLO format data from {images_dir}")
+            logger.info(f"Loading YOLO format data from {images_dir}")
         image_files, label_files = parse_yolo_annotations(images_dir)
     else:
         # Default: directory format
@@ -3881,7 +4151,9 @@ def train_segmentation_model(
 
         # Ensure matching files
         if len(image_files) != len(label_files):
-            print("Warning: Number of image files and label files don't match!")
+            logger.warning(
+                "Warning: Number of image files and label files don't match!"
+            )
             # Find matching files by basename
             basenames = [os.path.basename(f) for f in image_files]
             label_files = [
@@ -3894,9 +4166,11 @@ def train_segmentation_model(
                 for f, b in zip(image_files, basenames)
                 if os.path.exists(os.path.join(labels_dir, b))
             ]
-            print(f"Using {len(image_files)} matching files")
+            logger.info(f"Using {len(image_files)} matching files")
 
-    print(f"Found {len(image_files)} image files and {len(label_files)} label files")
+    logger.info(
+        f"Found {len(image_files)} image files and {len(label_files)} label files"
+    )
 
     if len(image_files) == 0:
         raise FileNotFoundError("No matching image and label files found")
@@ -3906,11 +4180,13 @@ def train_segmentation_model(
         image_files, label_files, test_size=val_split, random_state=seed
     )
 
-    print(f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images")
+    logger.info(
+        f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images"
+    )
 
     # Auto-detect image sizes and set target_size if needed
     if target_size is None:
-        print("Checking image sizes for compatibility...")
+        logger.info("Checking image sizes for compatibility...")
 
         # Sample a few images to check size consistency
         sample_images = train_imgs[: min(5, len(train_imgs))]
@@ -3926,30 +4202,32 @@ def train_segmentation_model(
                         width, height = img.size
                 image_sizes.append((height, width))
             except Exception as e:
-                print(f"Warning: Could not read image {img_path}: {e}")
+                logger.warning(f"Warning: Could not read image {img_path}: {e}")
                 continue
 
         # Check if all images have the same size
         if len(image_sizes) == 0:
-            print(
+            logger.info(
                 "Warning: Could not read any sample images. Setting target_size to (512, 512) as a safe default."
             )
             target_size = (512, 512)
         else:
             unique_sizes = set(image_sizes)
             if len(unique_sizes) > 1:
-                print(
+                logger.info(
                     f"Warning: Found images with different sizes: {list(unique_sizes)}"
                 )
-                print(
+                logger.info(
                     "Setting target_size to (512, 512) to standardize image dimensions."
                 )
-                print("This will resize all images to 512x512 pixels.")
-                print("To use a different size, set target_size parameter explicitly.")
+                logger.info("This will resize all images to 512x512 pixels.")
+                logger.info(
+                    "To use a different size, set target_size parameter explicitly."
+                )
                 target_size = (512, 512)
             else:
-                print(f"All sampled images have the same size: {image_sizes[0]}")
-                print("No resizing needed.")
+                logger.info(f"All sampled images have the same size: {image_sizes[0]}")
+                logger.info("No resizing needed.")
 
     # Create datasets
     # Use custom transforms if provided, otherwise use default transforms
@@ -4008,10 +4286,10 @@ def train_segmentation_model(
         )
 
         # Test the data loader by loading one batch to catch size mismatch errors early
-        print("Testing data loader...")
+        logger.info("Testing data loader...")
         try:
             next(iter(train_loader))
-            print("Data loader test passed.")
+            logger.info("Data loader test passed.")
         except RuntimeError as e:
             if "stack expects each tensor to be equal size" in str(e):
                 raise RuntimeError(
@@ -4048,21 +4326,24 @@ def train_segmentation_model(
 
     # Enable multi-GPU training if multiple GPUs are available
     if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs for training")
+        logger.info(f"Using {torch.cuda.device_count()} GPUs for training")
         model = torch.nn.DataParallel(model)
 
-    # Set up loss function (CrossEntropyLoss for multi-class, can also use F1Loss)
-    criterion = torch.nn.CrossEntropyLoss()
-
-    # Set up optimizer
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=learning_rate, weight_decay=weight_decay
-    )
-
-    # Set up learning rate scheduler
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=5
-    )
+    # Set up loss function
+    if loss_fn is not None:
+        criterion = loss_fn.to(device)
+    elif class_weights is not None:
+        if len(class_weights) != num_classes:
+            raise ValueError(
+                f"class_weights length ({len(class_weights)}) must match "
+                f"num_classes ({num_classes})"
+            )
+        weight_tensor = torch.tensor(class_weights, dtype=torch.float32).to(device)
+        criterion = torch.nn.CrossEntropyLoss(
+            weight=weight_tensor, ignore_index=ignore_index
+        )
+    else:
+        criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
 
     # Initialize tracking variables
     best_iou = 0
@@ -4074,66 +4355,113 @@ def train_segmentation_model(
     val_recalls = []
     start_epoch = 0
     epochs_without_improvement = 0
+    checkpoint = None
 
     # Load checkpoint if provided
     if checkpoint_path is not None:
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
 
-        print(f"Loading checkpoint from: {checkpoint_path}")
+        logger.info(f"Loading checkpoint from: {checkpoint_path}")
         try:
             checkpoint = torch.load(checkpoint_path, map_location=device)
 
             if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
                 # Load model state
                 model.load_state_dict(checkpoint["model_state_dict"])
-
-                if resume_training:
-                    # Resume training from checkpoint
-                    start_epoch = checkpoint.get("epoch", 0) + 1
-                    best_iou = checkpoint.get("best_iou", 0)
-
-                    # Load optimizer state if available
-                    if "optimizer_state_dict" in checkpoint:
-                        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-                    # Load scheduler state if available
-                    if "scheduler_state_dict" in checkpoint:
-                        lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-
-                    # Load training history if available
-                    if "train_losses" in checkpoint:
-                        train_losses = checkpoint["train_losses"]
-                    if "val_losses" in checkpoint:
-                        val_losses = checkpoint["val_losses"]
-                    if "val_ious" in checkpoint:
-                        val_ious = checkpoint["val_ious"]
-                    if "val_f1s" in checkpoint:
-                        val_f1s = checkpoint["val_f1s"]
-                    # Also check for old val_dices format for backward compatibility
-                    elif "val_dices" in checkpoint:
-                        val_f1s = checkpoint["val_dices"]
-                    if "val_precisions" in checkpoint:
-                        val_precisions = checkpoint["val_precisions"]
-                    if "val_recalls" in checkpoint:
-                        val_recalls = checkpoint["val_recalls"]
-
-                    print(f"Resuming training from epoch {start_epoch}")
-                    print(f"Previous best IoU: {best_iou:.4f}")
-                else:
-                    print("Loaded model weights only (not resuming training state)")
+                logger.info("Loaded model weights from checkpoint")
             else:
                 # Assume it's just model weights
                 model.load_state_dict(checkpoint)
-                print("Loaded model weights only")
+                logger.info("Loaded model weights only")
 
         except Exception as e:
             raise RuntimeError(f"Failed to load checkpoint: {str(e)}")
 
-    print(f"Starting training with {architecture} + {encoder_name}")
-    print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    # Freeze encoder if requested (for fine-tuning)
+    if freeze_encoder:
+        if checkpoint_path is None:
+            logger.warning(
+                "freeze_encoder=True but no checkpoint_path provided. "
+                "Freezing encoder on a randomly initialized model is not recommended."
+            )
+        base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+        if hasattr(base_model, "encoder"):
+            for param in base_model.encoder.parameters():
+                param.requires_grad = False
+            frozen = sum(p.numel() for p in model.parameters() if not p.requires_grad)
+            total = sum(p.numel() for p in model.parameters())
+            logger.info(
+                f"Encoder frozen: {frozen:,}/{total:,} parameters frozen "
+                f"({frozen / total * 100:.1f}%)"
+            )
+        else:
+            logger.warning("Model does not have an encoder attribute to freeze.")
+
+    # Set up optimizer (uses only trainable parameters when encoder is frozen)
+    optimizer = torch.optim.Adam(
+        [p for p in model.parameters() if p.requires_grad],
+        lr=learning_rate,
+        weight_decay=weight_decay,
+    )
+
+    # Set up learning rate scheduler
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=5
+    )
+
+    # Resume training state from checkpoint if requested
+    if resume_training and checkpoint_path is not None:
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            start_epoch = checkpoint.get("epoch", 0) + 1
+            best_iou = checkpoint.get("best_iou", 0)
+
+            # Load optimizer state if available
+            if "optimizer_state_dict" in checkpoint:
+                try:
+                    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+                except Exception:
+                    logger.warning(
+                        "Could not load optimizer state (parameter groups may have "
+                        "changed due to encoder freezing). Using fresh optimizer."
+                    )
+
+            # Load scheduler state if available
+            if "scheduler_state_dict" in checkpoint:
+                lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+            # Load training history if available
+            if "train_losses" in checkpoint:
+                train_losses = checkpoint["train_losses"]
+            if "val_losses" in checkpoint:
+                val_losses = checkpoint["val_losses"]
+            if "val_ious" in checkpoint:
+                val_ious = checkpoint["val_ious"]
+            if "val_f1s" in checkpoint:
+                val_f1s = checkpoint["val_f1s"]
+            # Also check for old val_dices format for backward compatibility
+            elif "val_dices" in checkpoint:
+                val_f1s = checkpoint["val_dices"]
+            if "val_precisions" in checkpoint:
+                val_precisions = checkpoint["val_precisions"]
+            if "val_recalls" in checkpoint:
+                val_recalls = checkpoint["val_recalls"]
+
+            logger.info(f"Resuming training from epoch {start_epoch}")
+            logger.info(f"Previous best IoU: {best_iou:.4f}")
+        else:
+            logger.warning(
+                "resume_training=True but checkpoint does not contain training "
+                "state (optimizer, scheduler, epoch). Only model weights were "
+                "loaded. Training will start from epoch 0 with a fresh optimizer."
+            )
+
+    logger.info(f"Starting training with {architecture} + {encoder_name}")
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    logger.info(f"Model parameters: {total_params:,} (trainable: {trainable:,})")
     if start_epoch > 0:
-        print(f"Resuming from epoch {start_epoch}/{num_epochs}")
+        logger.info(f"Resuming from epoch {start_epoch}/{num_epochs}")
 
     # Training loop
     for epoch in range(start_epoch, num_epochs):
@@ -4164,7 +4492,7 @@ def train_segmentation_model(
         lr_scheduler.step(eval_metrics["loss"])
 
         # Print metrics
-        print(
+        logger.info(
             f"Epoch {epoch+1}/{num_epochs}: "
             f"Train Loss: {train_loss:.4f}, "
             f"Val Loss: {eval_metrics['loss']:.4f}, "
@@ -4178,7 +4506,7 @@ def train_segmentation_model(
         if eval_metrics["IoU"] > best_iou:
             best_iou = eval_metrics["IoU"]
             epochs_without_improvement = 0
-            print(f"Saving best model with IoU: {best_iou:.4f}")
+            logger.info(f"Saving best model with IoU: {best_iou:.4f}")
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
         else:
             epochs_without_improvement += 1
@@ -4186,10 +4514,10 @@ def train_segmentation_model(
                 early_stopping_patience is not None
                 and epochs_without_improvement >= early_stopping_patience
             ):
-                print(
+                logger.info(
                     f"\nEarly stopping triggered after {epochs_without_improvement} epochs without improvement"
                 )
-                print(f"Best validation IoU: {best_iou:.4f}")
+                logger.info(f"Best validation IoU: {best_iou:.4f}")
                 break
 
         # Save checkpoint every 10 epochs (if not save_best_only)
@@ -4246,8 +4574,8 @@ def train_segmentation_model(
         f.write(f"Final validation Recall: {val_recalls[-1]:.4f}\n")
         f.write(f"Final validation loss: {val_losses[-1]:.4f}\n")
 
-    print(f"Training complete! Best IoU: {best_iou:.4f}")
-    print(f"Models saved to {output_dir}")
+    logger.info(f"Training complete! Best IoU: {best_iou:.4f}")
+    logger.info(f"Models saved to {output_dir}")
 
     # Plot training curves
     if plot_curves:
@@ -4285,12 +4613,12 @@ def train_segmentation_model(
                 dpi=150,
                 bbox_inches="tight",
             )
-            print(
+            logger.info(
                 f"Training curves saved to {os.path.join(output_dir, 'training_curves.png')}"
             )
             plt.close()
         except Exception as e:
-            print(f"Could not save training curves: {e}")
+            logger.info(f"Could not save training curves: {e}")
 
 
 def semantic_inference_on_geotiff(
@@ -4366,7 +4694,7 @@ def semantic_inference_on_geotiff(
 
         total_windows = steps_y * steps_x
         if not quiet:
-            print(f"Processing {total_windows} windows...")
+            logger.info(f"Processing {total_windows} windows...")
 
         if not quiet:
             pbar = tqdm(total=total_windows)
@@ -4399,8 +4727,7 @@ def semantic_inference_on_geotiff(
                 if window.shape[1] == 0 or window.shape[2] == 0:
                     continue
 
-                current_height = window.shape[1]
-                current_width = window.shape[2]
+                window, current_height, current_width = _pad_window(window, window_size)
 
                 # Normalize and prepare input
                 image = window.astype(np.float32) / 255.0
@@ -4410,7 +4737,7 @@ def semantic_inference_on_geotiff(
                     image = image[:num_channels]
                 elif image.shape[0] < num_channels:
                     padded = np.zeros(
-                        (num_channels, current_height, current_width), dtype=np.float32
+                        (num_channels, window_size, window_size), dtype=np.float32
                     )
                     padded[: image.shape[0]] = image
                     image = padded
@@ -4460,8 +4787,8 @@ def semantic_inference_on_geotiff(
                         if overlap == 0:
                             weight = np.ones_like(weight)
 
-                        # Convert probabilities to numpy [C, H, W]
-                        prob_np = prob.cpu().numpy()
+                        # Convert probabilities to numpy [C, H, W] - crop to actual size
+                        prob_np = prob.cpu().numpy()[:, :h, :w]
 
                         # Accumulate weighted probabilities for each class
                         y_slice = slice(y_pos, y_pos + h)
@@ -4506,7 +4833,7 @@ def semantic_inference_on_geotiff(
                     normalized_probs[1, valid_pixels] >= probability_threshold
                 ).astype(np.uint8)
                 if not quiet:
-                    print(f"Using probability threshold: {probability_threshold}")
+                    logger.info(f"Using probability threshold: {probability_threshold}")
             else:
                 # Take argmax to get final class predictions
                 mask[valid_pixels] = np.argmax(
@@ -4519,13 +4846,13 @@ def semantic_inference_on_geotiff(
             )
             bg_ratio = np.sum(mask == 0) / mask.size
             if not quiet:
-                print(
+                logger.info(
                     f"Predicted classes: {len(unique_classes)} classes, Background: {bg_ratio:.1%}"
                 )
 
         inference_time = time.time() - start_time
         if not quiet:
-            print(f"Inference completed in {inference_time:.2f} seconds")
+            logger.info(f"Inference completed in {inference_time:.2f} seconds")
 
         # Save output
         out_dir = os.path.abspath(os.path.dirname(output_path))
@@ -4534,7 +4861,7 @@ def semantic_inference_on_geotiff(
             dst.write(mask, 1)
 
         if not quiet:
-            print(f"Saved prediction to {output_path}")
+            logger.info(f"Saved prediction to {output_path}")
 
         # Save probability map if requested
         if probability_path is not None:
@@ -4557,7 +4884,7 @@ def semantic_inference_on_geotiff(
                     dst.write(prob_band, class_idx + 1)
 
             if not quiet:
-                print(f"Saved probability map to {probability_path}")
+                logger.info(f"Saved probability map to {probability_path}")
 
             # Save individual class probabilities if requested
             if save_class_probabilities:
@@ -4585,7 +4912,7 @@ def semantic_inference_on_geotiff(
                         dst.write(prob_band, 1)
 
                     if not quiet:
-                        print(
+                        logger.info(
                             f"Saved class {class_idx} probability to {class_prob_path}"
                         )
 
@@ -4659,7 +4986,7 @@ def semantic_inference_on_image(
         img_array = np.transpose(img_array, (2, 0, 1))
 
         if not quiet:
-            print(f"Processing image: {width}x{height}")
+            logger.info(f"Processing image: {width}x{height}")
 
         # Initialize accumulator arrays for multi-class probability blending
         prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
@@ -4673,7 +5000,7 @@ def semantic_inference_on_image(
 
         total_windows = steps_y * steps_x
         if not quiet:
-            print(f"Processing {total_windows} windows...")
+            logger.info(f"Processing {total_windows} windows...")
 
         if not quiet:
             pbar = tqdm(total=total_windows)
@@ -4708,16 +5035,7 @@ def semantic_inference_on_image(
                 if window.shape[1] == 0 or window.shape[2] == 0:
                     continue
 
-                current_height = window.shape[1]
-                current_width = window.shape[2]
-
-                # Pad window to window_size if needed
-                if current_height < window_size or current_width < window_size:
-                    padded_window = np.zeros(
-                        (window.shape[0], window_size, window_size), dtype=window.dtype
-                    )
-                    padded_window[:, :current_height, :current_width] = window
-                    window = padded_window
+                window, current_height, current_width = _pad_window(window, window_size)
 
                 # Normalize and prepare input
                 image = window.astype(np.float32) / 255.0
@@ -4823,7 +5141,7 @@ def semantic_inference_on_image(
                     normalized_probs[1, valid_pixels] >= probability_threshold
                 ).astype(np.uint8)
                 if not quiet:
-                    print(f"Using probability threshold: {probability_threshold}")
+                    logger.info(f"Using probability threshold: {probability_threshold}")
             else:
                 # Take argmax to get final class predictions
                 mask[valid_pixels] = np.argmax(
@@ -4837,7 +5155,7 @@ def semantic_inference_on_image(
                 int(cls): int(count) for cls, count in zip(unique_classes, class_counts)
             }
             if not quiet:
-                print(f"Raw predicted classes and counts: {class_distribution}")
+                logger.info(f"Raw predicted classes and counts: {class_distribution}")
 
             # Convert to binary if requested and num_classes == 2
             if binary_output and num_classes == 2:
@@ -4855,11 +5173,13 @@ def semantic_inference_on_image(
                     for cls, count in zip(unique_classes, class_counts)
                 }
                 if not quiet:
-                    print(f"Binary predicted classes and counts: {binary_distribution}")
+                    logger.info(
+                        f"Binary predicted classes and counts: {binary_distribution}"
+                    )
 
         inference_time = time.time() - start_time
         if not quiet:
-            print(f"Inference completed in {inference_time:.2f} seconds")
+            logger.info(f"Inference completed in {inference_time:.2f} seconds")
 
         # Save output as image
         # For binary masks, use PNG to avoid JPEG compression artifacts
@@ -4871,19 +5191,21 @@ def semantic_inference_on_image(
             os.makedirs(out_dir, exist_ok=True)
             output_img.save(output_path_png)
             if not quiet:
-                print(
+                logger.info(
                     f"Saved binary prediction to {output_path_png} (PNG format to preserve exact values)"
                 )
 
             # Also save the original requested format for compatibility
             if output_path != output_path_png:
                 output_img.save(output_path)
-                print(f"Also saved to {output_path} (may have compression artifacts)")
+                logger.info(
+                    f"Also saved to {output_path} (may have compression artifacts)"
+                )
         else:
             output_img = Image.fromarray(mask, mode="L")
             output_img.save(output_path)
             if not quiet:
-                print(f"Saved prediction to {output_path}")
+                logger.info(f"Saved prediction to {output_path}")
 
         # Save probability map if requested
         if probability_path is not None:
@@ -4917,7 +5239,7 @@ def semantic_inference_on_image(
                     dst.write(prob_band, class_idx + 1)
 
             if not quiet:
-                print(f"Saved probability map to {probability_path}")
+                logger.info(f"Saved probability map to {probability_path}")
 
             # Save individual class probabilities if requested
             if save_class_probabilities:
@@ -4948,7 +5270,7 @@ def semantic_inference_on_image(
                         dst.write(prob_band, 1)
 
                     if not quiet:
-                        print(
+                        logger.info(
                             f"Saved class {class_idx} probability to {class_prob_path}"
                         )
 
@@ -5022,7 +5344,7 @@ def semantic_segmentation(
     }
 
     if not quiet:
-        print(
+        logger.info(
             f"Input file format: {formats[input_ext] if is_geotiff else 'Regular image'} ({input_ext})"
         )
 
@@ -5177,7 +5499,7 @@ def semantic_segmentation_batch(
     if len(image_files) == 0:
         raise FileNotFoundError(f"No supported image files found in {input_dir}")
 
-    print(f"Found {len(image_files)} image files to process")
+    logger.info(f"Found {len(image_files)} image files to process")
 
     # Load model once for all images
     model = get_smp_model(
@@ -5232,7 +5554,7 @@ def semantic_segmentation_batch(
 
     # Process each image
     for i, (input_path, output_path) in enumerate(zip(image_files, filenames)):
-        print(
+        logger.info(
             f"Processing file {i + 1}/{len(image_files)}: {os.path.basename(input_path)}"
         )
 
@@ -5272,10 +5594,10 @@ def semantic_segmentation_batch(
                     **kwargs,
                 )
         except Exception as e:
-            print(f"Error processing {input_path}: {str(e)}")
+            logger.error(f"Error processing {input_path}: {str(e)}")
             continue
 
-    print(f"Batch processing completed. Results saved to {output_dir}")
+    logger.info(f"Batch processing completed. Results saved to {output_dir}")
 
 
 def train_instance_segmentation_model(
@@ -5294,6 +5616,7 @@ def train_instance_segmentation_model(
     device: Optional[torch.device] = None,
     verbose: bool = True,
     instance_labels: bool = False,
+    multiclass: bool = False,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -5327,6 +5650,14 @@ def train_instance_segmentation_model(
             pre-assigned instance IDs instead of running connected-component
             labeling. Use this when label masks already encode unique integers
             per object (e.g., Fields of The World dataset). Defaults to False.
+        multiclass (bool): If True (and ``input_format='directory'``), read
+            per-instance class IDs from the label mask pixel values using
+            per-class connected-component labeling. Recommended for
+            multi-class training with ``num_classes > 2`` when using the
+            directory input format. If left False with ``num_classes > 2``
+            in directory mode, every target is silently assigned label ``1``
+            and the model will only learn the first foreground class; a
+            warning is emitted in that case. Defaults to False.
         **kwargs: Additional arguments passed to train_MaskRCNN_model.
 
     Returns:
@@ -5353,6 +5684,7 @@ def train_instance_segmentation_model(
         device=device,
         verbose=verbose,
         instance_labels=instance_labels,
+        multiclass=multiclass,
         **kwargs,
     )
 
@@ -5497,7 +5829,7 @@ def instance_segmentation(
         )
         gdf.to_file(vector_path, driver="GPKG")
         result["vector"] = vector_path
-        print(f"Saved vector output to {vector_path}")
+        logger.info(f"Saved vector output to {vector_path}")
 
     return result
 
@@ -5572,13 +5904,13 @@ def instance_segmentation_batch(
     )
 
     if not input_files:
-        print(f"No GeoTIFF files found in {input_dir}")
+        logger.info(f"No GeoTIFF files found in {input_dir}")
         return
 
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Processing {len(input_files)} files...")
+    logger.info(f"Processing {len(input_files)} files...")
 
     for input_file in input_files:
         try:
@@ -5586,7 +5918,7 @@ def instance_segmentation_batch(
             base_name = os.path.splitext(os.path.basename(input_file))[0]
             output_file = os.path.join(output_dir, f"{base_name}_instances.tif")
 
-            print(f"Processing {input_file}...")
+            logger.info(f"Processing {input_file}...")
 
             # Run instance segmentation inference
             instance_segmentation_inference_on_geotiff(
@@ -5603,13 +5935,13 @@ def instance_segmentation_batch(
                 **kwargs,
             )
 
-            print(f"Saved result to {output_file}")
+            logger.info(f"Saved result to {output_file}")
 
         except Exception as e:
-            print(f"Error processing {input_file}: {str(e)}")
+            logger.error(f"Error processing {input_file}: {str(e)}")
             continue
 
-    print(f"Batch processing completed. Results saved to {output_dir}")
+    logger.info(f"Batch processing completed. Results saved to {output_dir}")
 
 
 def lightly_train_model(
@@ -5702,9 +6034,9 @@ def lightly_train_model(
             f"For ViT models, use 'dinov2', 'dinov2_distillation', or 'dino'."
         )
 
-    print(f"Found {len(image_files)} images in {data_dir}")
-    print(f"Starting self-supervised pretraining with {method} method...")
-    print(f"Model: {model}")
+    logger.info(f"Found {len(image_files)} images in {data_dir}")
+    logger.info(f"Starting self-supervised pretraining with {method} method...")
+    logger.info(f"Model: {model}")
 
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -5747,7 +6079,7 @@ def lightly_train_model(
     )
 
     if os.path.exists(exported_model_path):
-        print(
+        logger.info(
             f"Model training completed. Exported model saved to: {exported_model_path}"
         )
         return exported_model_path
@@ -5760,10 +6092,12 @@ def lightly_train_model(
 
         for path in possible_paths:
             if os.path.exists(path):
-                print(f"Model training completed. Exported model saved to: {path}")
+                logger.info(
+                    f"Model training completed. Exported model saved to: {path}"
+                )
                 return path
 
-        print(f"Model training completed. Output saved to: {output_dir}")
+        logger.info(f"Model training completed. Output saved to: {output_dir}")
         return output_dir
 
 
@@ -5799,7 +6133,7 @@ def load_lightly_pretrained_model(
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    print(f"Loading pretrained model from: {model_path}")
+    logger.info(f"Loading pretrained model from: {model_path}")
 
     # Load the model based on architecture
     if model_architecture.startswith("torchvision/"):
@@ -5837,7 +6171,7 @@ def load_lightly_pretrained_model(
         state_dict = torch.load(model_path, map_location=device)
     model.load_state_dict(state_dict)
 
-    print(f"Successfully loaded pretrained model: {model_architecture}")
+    logger.info(f"Successfully loaded pretrained model: {model_architecture}")
     return model
 
 
@@ -5895,8 +6229,8 @@ def lightly_embed_images(
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file does not exist: {model_path}")
 
-    print(f"Generating embeddings for images in: {data_dir}")
-    print(f"Using pretrained model: {model_path}")
+    logger.info(f"Generating embeddings for images in: {data_dir}")
+    logger.info(f"Using pretrained model: {model_path}")
 
     output_dir = os.path.dirname(output_path)
     if output_dir:
@@ -5912,5 +6246,5 @@ def lightly_embed_images(
         **kwargs,
     )
 
-    print(f"Embeddings saved to: {output_path}")
+    logger.info(f"Embeddings saved to: {output_path}")
     return output_path

@@ -11,11 +11,14 @@ Supports Sentinel-2, Landsat, NAIP, and any other GeoTIFF-based imagery
 with consistent spatial reference and resolution.
 """
 
+import logging
 import os
 import re
 import tempfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -469,7 +472,7 @@ def create_temporal_composite(
             nodata = src.nodata
 
     if verbose:
-        print(
+        logger.info(
             f"Creating {method} composite from {num_scenes} scenes, "
             f"{num_bands} bands, {width}x{height} pixels"
         )
@@ -479,7 +482,7 @@ def create_temporal_composite(
 
     for i, path in enumerate(input_paths):
         if verbose:
-            print(f"  Reading {i + 1}/{num_scenes}: {os.path.basename(path)}")
+            logger.info(f"  Reading {i + 1}/{num_scenes}: {os.path.basename(path)}")
         with rasterio.open(path) as src:
             for j, band_idx in enumerate(bands):
                 stack[i, j] = src.read(band_idx).astype(np.float32)
@@ -508,7 +511,7 @@ def create_temporal_composite(
     if verbose:
         total_pixels = num_scenes * height * width
         valid_pixels = valid.sum()
-        print(
+        logger.info(
             f"  Valid observations: {valid_pixels}/{total_pixels} "
             f"({valid_pixels / total_pixels * 100:.1f}%)"
         )
@@ -550,7 +553,7 @@ def create_temporal_composite(
             dst.write(composite[j], j + 1)
 
     if verbose:
-        print(f"  Composite saved to: {output_path}")
+        logger.info(f"  Composite saved to: {output_path}")
 
     return output_path
 
@@ -691,11 +694,11 @@ def create_cloud_free_composite(
 
     try:
         if verbose:
-            print(f"Generating cloud masks for {len(input_paths)} scenes...")
+            logger.info(f"Generating cloud masks for {len(input_paths)} scenes...")
 
         for i, path in enumerate(input_paths):
             if verbose:
-                print(
+                logger.info(
                     f"  Cloud masking {i + 1}/{len(input_paths)}: "
                     f"{os.path.basename(path)}"
                 )
@@ -746,7 +749,7 @@ def create_cloud_free_composite(
             cloud_mask_paths.append(mask_path)
 
         if verbose:
-            print("Creating cloud-free composite...")
+            logger.info("Creating cloud-free composite...")
 
         # Create composite using clear-sky masks
         # The clear mask has 1 = usable, so cloud_clear_value=1
@@ -861,7 +864,7 @@ def calculate_spectral_index_timeseries(
             nodata = src.nodata
 
     if verbose:
-        print(
+        logger.info(
             f"Computing {index_upper} time-series for {num_scenes} scenes, "
             f"{width}x{height} pixels"
         )
@@ -882,7 +885,7 @@ def calculate_spectral_index_timeseries(
 
     for i, path in enumerate(input_paths):
         if verbose:
-            print(f"  Processing {i + 1}/{num_scenes}: {os.path.basename(path)}")
+            logger.info(f"  Processing {i + 1}/{num_scenes}: {os.path.basename(path)}")
 
         with rasterio.open(path) as src:
             # Read required bands
@@ -947,7 +950,7 @@ def calculate_spectral_index_timeseries(
             dst.write(index_stack[i], i + 1)
 
     if verbose:
-        print(f"  {index_upper} time-series saved to: {output_path}")
+        logger.info(f"  {index_upper} time-series saved to: {output_path}")
 
     return output_path
 
@@ -1033,7 +1036,7 @@ def detect_change(
         bands = [1]
 
     if verbose:
-        print(
+        logger.info(
             f"Detecting changes ({method}) between "
             f"{os.path.basename(image1_path)} and "
             f"{os.path.basename(image2_path)}, bands={bands}"
@@ -1122,8 +1125,8 @@ def detect_change(
             changed_pixels = (output_data == 1).sum()
             total_valid = (~nodata_mask).sum()
             pct = changed_pixels / total_valid * 100 if total_valid > 0 else 0
-            print(f"  Changed pixels: {changed_pixels} ({pct:.1f}%)")
-        print(f"  Change map saved to: {output_path}")
+            logger.info(f"  Changed pixels: {changed_pixels} ({pct:.1f}%)")
+        logger.info(f"  Change map saved to: {output_path}")
 
     return output_path
 
@@ -1204,7 +1207,7 @@ def calculate_temporal_statistics(
     num_output_bands = len(bands) * len(statistics)
 
     if verbose:
-        print(
+        logger.info(
             f"Computing temporal statistics for {num_scenes} scenes, "
             f"{len(bands)} band(s), {len(statistics)} statistic(s)"
         )
@@ -1214,7 +1217,7 @@ def calculate_temporal_statistics(
 
     for band_idx in bands:
         if verbose:
-            print(f"  Reading band {band_idx}...")
+            logger.info(f"  Reading band {band_idx}...")
 
         # Read all scenes for this band
         stack = np.empty((num_scenes, height, width), dtype=np.float32)
@@ -1229,7 +1232,7 @@ def calculate_temporal_statistics(
         # Compute each requested statistic
         for stat in statistics:
             if verbose:
-                print(f"  Computing {stat} for band {band_idx}...")
+                logger.info(f"  Computing {stat} for band {band_idx}...")
 
             if stat == "mean":
                 result = np.nanmean(stack, axis=0)
@@ -1268,6 +1271,6 @@ def calculate_temporal_statistics(
             dst.write(result, i + 1)
 
     if verbose:
-        print(f"  Temporal statistics saved to: {output_path}")
+        logger.info(f"  Temporal statistics saved to: {output_path}")
 
     return output_path

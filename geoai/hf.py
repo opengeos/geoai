@@ -1,8 +1,11 @@
 """This module contains utility functions for working with Hugging Face models."""
 
 import csv
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
@@ -64,8 +67,10 @@ def get_model_input_channels(model_id: str) -> int:
             if hasattr(model.backbone.embeddings, "patch_embeddings"):
                 # Swin models typically have patch embeddings that indicate channel count
                 return model.backbone.embeddings.patch_embeddings.in_channels
-    except Exception as e:
-        print(f"Couldn't inspect model architecture: {e}")
+    except (
+        Exception
+    ) as e:  # Model loading can fail in many ways (network, format, etc.)
+        logger.debug(f"Couldn't inspect model architecture: {e}")
 
     # Default for most vision models
     return 3
@@ -79,7 +84,7 @@ def image_segmentation(
     model_name: Optional[str] = None,
     segmenter_args: Optional[Dict] = None,
     **kwargs: Any,
-) -> str:
+) -> Tuple[str, Dict[str, int], Dict[str, float]]:
     """
     Segments an image with a Hugging Face segmentation model and saves the results
     as a single georeferenced image where each class has a unique integer value.
@@ -243,12 +248,12 @@ def mask_generation(
         RuntimeError: If mask generation fails.
     """
     # Set up the mask generator
-    print("Setting up mask generator...")
+    logger.info("Setting up mask generator...")
     mask_generator = pipeline(model=model, task="mask-generation", **kwargs)
 
     # Open the GeoTIFF file
     try:
-        print(f"Reading input GeoTIFF: {input_path}")
+        logger.info(f"Reading input GeoTIFF: {input_path}")
         with rasterio.open(input_path) as src:
             # Read metadata
             profile = src.profile
@@ -257,21 +262,21 @@ def mask_generation(
 
             # Read the image data
             if band_indices is not None:
-                print(f"Using specified bands: {band_indices}")
+                logger.info(f"Using specified bands: {band_indices}")
                 image_data = np.stack([src.read(i + 1) for i in band_indices])
             else:
-                print("Using all bands")
+                logger.info("Using all bands")
                 image_data = src.read()
 
             # Handle image with more than 3 bands (convert to RGB for visualization)
             if image_data.shape[0] > 3:
-                print(
+                logger.info(
                     f"Converting {image_data.shape[0]} bands to RGB (using first 3 bands)"
                 )
                 # Select first three bands or perform other band combination
                 image_data = image_data[:3]
             elif image_data.shape[0] == 1:
-                print("Duplicating single band to create 3-band image")
+                logger.info("Duplicating single band to create 3-band image")
                 # Duplicate single band to create a 3-band image
                 image_data = np.vstack([image_data] * 3)
 
@@ -280,9 +285,9 @@ def mask_generation(
 
             # Normalize the image if needed
             if image_data.dtype != np.uint8:
-                print(f"Normalizing image from {image_data.dtype} to uint8")
+                logger.info(f"Normalizing image from {image_data.dtype} to uint8")
                 image_data = (image_data / image_data.max() * 255).astype(np.uint8)
-    except Exception as e:
+    except (OSError, ValueError, TypeError) as e:
         raise ValueError(f"Failed to open or process input GeoTIFF: {e}")
 
     # Process the image with the mask generator
@@ -293,14 +298,14 @@ def mask_generation(
             image_data = (image_data / image_data.max() * 255).astype(np.uint8)
 
         # Create a PIL Image from the numpy array
-        print("Converting to PIL Image for mask generation")
+        logger.info("Converting to PIL Image for mask generation")
         pil_image = Image.fromarray(image_data)
 
         # Use the SAM pipeline for mask generation
         if generator_kwargs is None:
             generator_kwargs = {}
 
-        print("Running mask generation...")
+        logger.info("Running mask generation...")
         mask_results = mask_generator(
             pil_image,
             points_per_side=points_per_side,
@@ -314,11 +319,11 @@ def mask_generation(
             **generator_kwargs,
         )
 
-        print(
+        logger.info(
             f"Number of initial masks: {len(mask_results['masks']) if isinstance(mask_results, dict) and 'masks' in mask_results else len(mask_results)}"
         )
 
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError) as e:
         raise RuntimeError(f"Mask generation failed: {e}")
 
     # Create a mask raster with unique IDs for each mask
@@ -332,7 +337,7 @@ def mask_generation(
         and "scores" in mask_results
     ):
         # Handle dictionary with 'masks' and 'scores' lists
-        print("Processing masks...")
+        logger.info("Processing masks...")
         total_masks = len(mask_results["masks"])
 
         # Create progress bar
@@ -350,8 +355,10 @@ def mask_generation(
                 # Try to convert from tensor or other format if needed
                 try:
                     mask_data = np.array(mask_data)
-                except Exception:
-                    print(f"Could not convert mask at index {i} to numpy array")
+                except (ValueError, TypeError):
+                    logger.warning(
+                        f"Could not convert mask at index {i} to numpy array"
+                    )
                     continue
 
             mask_binary = mask_data.astype(bool)
@@ -370,7 +377,7 @@ def mask_generation(
             )
     elif isinstance(mask_results, list):
         # Handle list of dictionaries format (SAM original format)
-        print("Processing masks...")
+        logger.info("Processing masks...")
         total_masks = len(mask_results)
 
         # Create progress bar
@@ -402,8 +409,8 @@ def mask_generation(
                 try:
                     mask_data = np.array(mask_result)
                     score = 1.0  # Default score
-                except Exception:
-                    print(f"Could not process mask at index {i}")
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not process mask at index {i}")
                     continue
 
             if mask_data is not None:
@@ -411,8 +418,10 @@ def mask_generation(
                 if not isinstance(mask_data, np.ndarray):
                     try:
                         mask_data = np.array(mask_data)
-                    except Exception:
-                        print(f"Could not convert mask at index {i} to numpy array")
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            f"Could not convert mask at index {i} to numpy array"
+                        )
                         continue
 
                 mask_binary = mask_data.astype(bool)
@@ -437,10 +446,10 @@ def mask_generation(
         # If we couldn't figure out the format, raise an error
         raise ValueError(f"Unexpected format for mask_results: {type(mask_results)}")
 
-    print(f"Number of final masks (after size filtering): {len(mask_records)}")
+    logger.info(f"Number of final masks (after size filtering): {len(mask_records)}")
 
     # Save the mask raster as a GeoTIFF
-    print(f"Saving mask GeoTIFF to {output_mask_path}")
+    logger.info(f"Saving mask GeoTIFF to {output_mask_path}")
     output_profile = profile.copy()
     output_profile.update(dtype=rasterio.uint32, count=1, compress="lzw", nodata=0)
 
@@ -448,9 +457,9 @@ def mask_generation(
         dst.write(mask_raster.astype(rasterio.uint32), 1)
 
     # Save the mask data as a CSV
-    print(f"Saving mask metadata to {output_csv_path}")
+    logger.info(f"Saving mask metadata to {output_csv_path}")
     mask_df = pd.DataFrame(mask_records)
     mask_df.to_csv(output_csv_path, index=False)
 
-    print("Processing complete!")
+    logger.info("Processing complete!")
     return output_mask_path, output_csv_path

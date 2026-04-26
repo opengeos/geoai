@@ -1152,13 +1152,13 @@ def _wrap_bare_imports(filepath: str) -> bool:
 
 
 def _fix_proj_data(site_packages: str) -> None:
-    """Set PROJ_DATA/PROJ_LIB and GDAL_DATA for the venv's geospatial libraries.
+    """Configure PROJ and GDAL data paths for the venv's geospatial libraries.
 
-    The venv's pyproj bundles its own PROJ database at
-    ``<site-packages>/pyproj/proj_dir/share/proj/``.  QGIS may or may not
-    set ``PROJ_LIB`` to its own copy, but the venv's native pyproj
-    library needs the matching version. Similarly, rasterio/pyogrio may
-    bundle their own GDAL data.
+    Configures pyproj via its Python API (``pyproj.datadir.set_data_dir()``)
+    instead of setting ``PROJ_DATA``/``PROJ_LIB`` environment variables.
+    This avoids conflicts with pyogrio, which validates that ``PROJ_DATA``
+    points to its own bundled data and raises
+    "Could not correctly detect PROJ data files" otherwise.
 
     Args:
         site_packages: Path to the venv's site-packages directory.
@@ -1170,13 +1170,32 @@ def _fix_proj_data(site_packages: str) -> None:
         os.path.join(site_packages, "pyogrio", "proj_data"),
     ]
 
+    proj_data_dir = None
     for candidate in proj_candidates:
         proj_db = os.path.join(candidate, "proj.db")
         if os.path.exists(proj_db):
-            os.environ["PROJ_DATA"] = candidate
-            os.environ["PROJ_LIB"] = candidate
-            _log(f"Set PROJ_DATA={candidate}", Qgis.Info)
+            proj_data_dir = candidate
             break
+
+    if proj_data_dir:
+        # Configure pyproj via its internal API instead of setting
+        # PROJ_DATA/PROJ_LIB env vars.  Setting those env vars globally
+        # causes pyogrio to fail ("Could not correctly detect PROJ data
+        # files"); any temporary clearing needed for pyogrio writes is
+        # handled by safe_to_file() in proj_utils.py.
+        try:
+            import pyproj.datadir
+
+            pyproj.datadir.set_data_dir(proj_data_dir)
+            _log(f"Set pyproj.datadir={proj_data_dir}", Qgis.Info)
+        except Exception as exc:
+            # Fallback: if pyproj API is unavailable, set env vars
+            os.environ["PROJ_DATA"] = proj_data_dir
+            os.environ["PROJ_LIB"] = proj_data_dir
+            _log(
+                f"Set PROJ_DATA={proj_data_dir} " f"(pyproj API unavailable: {exc})",
+                Qgis.Info,
+            )
     else:
         _log("No venv proj.db found; PROJ_DATA unchanged", Qgis.Warning)
 
@@ -1242,11 +1261,114 @@ def _get_qgis_python() -> Optional[str]:
         return None
 
 
+def _get_linux_system_python() -> Optional[str]:
+    """Get a suitable system Python on Linux for creating venvs.
+
+    Searches for python3 on PATH, verifies version >= 3.9 and
+    that the venv module is available.
+
+    Returns:
+        Path to a suitable Python executable, or None if not found.
+    """
+    if sys.platform == "win32" or sys.platform == "darwin":
+        return None
+
+    candidates = []
+
+    for name in ("python3", "python"):
+        path = shutil.which(name)
+        if path and path not in candidates:
+            candidates.append(path)
+
+    if sys.executable and os.path.isfile(sys.executable):
+        real_path = os.path.realpath(sys.executable)
+        if real_path not in candidates:
+            candidates.append(real_path)
+
+    for candidate in candidates:
+        try:
+            env = _get_clean_env_for_venv()
+            env["PYTHONIOENCODING"] = "utf-8"
+            subprocess_kwargs = _get_subprocess_kwargs()
+
+            result = subprocess.run(
+                [
+                    candidate,
+                    "-c",
+                    (
+                        "import sys, venv; "
+                        "print(sys.version_info.major, "
+                        "sys.version_info.minor, "
+                        "sys.version_info.micro)"
+                    ),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env=env,
+                **subprocess_kwargs,
+            )
+            if result.returncode != 0:
+                stderr = result.stderr.strip()
+                if "No module named" in stderr and "venv" in stderr:
+                    _log(
+                        "System Python {} lacks the venv module. "
+                        "Install it with: sudo apt install python3-venv".format(
+                            candidate
+                        ),
+                        Qgis.Warning,
+                    )
+                else:
+                    _log(
+                        "System Python {} failed verification: {}".format(
+                            candidate, stderr
+                        ),
+                        Qgis.Warning,
+                    )
+                continue
+
+            parts = result.stdout.strip().split()
+            if len(parts) == 3:
+                major, minor, micro = int(parts[0]), int(parts[1]), int(parts[2])
+                if (major, minor) >= (3, 9):
+                    _log(
+                        "System Python verified: {} ({}.{}.{})".format(
+                            candidate, major, minor, micro
+                        ),
+                        Qgis.Info,
+                    )
+                    return candidate
+                else:
+                    _log(
+                        "System Python {} version {}.{}.{} "
+                        "is too old (need >= 3.9)".format(
+                            candidate, major, minor, micro
+                        ),
+                        Qgis.Warning,
+                    )
+            else:
+                _log(
+                    "Unexpected version output from {}: {}".format(
+                        candidate, result.stdout.strip()
+                    ),
+                    Qgis.Warning,
+                )
+        except Exception as e:
+            _log(
+                "Error checking system Python {}: {}".format(candidate, e),
+                Qgis.Warning,
+            )
+            continue
+
+    _log("No suitable system Python found on Linux", Qgis.Warning)
+    return None
+
+
 def _get_system_python() -> str:
     """Get the path to the Python executable for creating venvs.
 
     Uses standalone Python downloaded by python_manager, with fallback
-    to QGIS's bundled Python on Windows.
+    to QGIS's bundled Python on Windows or system Python on Linux.
 
     Returns:
         Path to the Python executable.
@@ -1269,7 +1391,21 @@ def _get_system_python() -> str:
                 Qgis.Warning,
             )
             return qgis_python
+    elif sys.platform.startswith("linux"):
+        linux_python = _get_linux_system_python()
+        if linux_python:
+            _log(
+                "Standalone Python unavailable, using system Python as fallback",
+                Qgis.Warning,
+            )
+            return linux_python
 
+    if sys.platform.startswith("linux"):
+        raise RuntimeError(
+            "Python standalone not installed and no suitable system Python found. "
+            "Please ensure python3 and python3-venv are installed "
+            "(e.g., sudo apt install python3-venv) and click 'Install Dependencies'."
+        )
     raise RuntimeError(
         "Python standalone not installed. "
         "Please click 'Install Dependencies' to download Python automatically."
@@ -2905,9 +3041,12 @@ def get_venv_status() -> Tuple[bool, str]:
     from .python_manager import get_python_full_version, standalone_python_exists
 
     if not standalone_python_exists():
-        # Also check for QGIS Python fallback on Windows
-        if sys.platform == "win32" and venv_exists():
-            pass  # venv was created with QGIS Python fallback
+        # Also check for QGIS Python fallback on Windows or system Python
+        # fallback on Linux
+        if (
+            sys.platform == "win32" or sys.platform.startswith("linux")
+        ) and venv_exists():
+            pass  # venv was created with fallback Python
         else:
             _log("get_venv_status: standalone Python not found", Qgis.Info)
             return False, "Dependencies not installed"
@@ -3064,6 +3203,23 @@ def create_venv_and_install(
                         progress_callback(10, "Using QGIS Python (fallback)...")
                 else:
                     return False, f"Failed to download Python: {msg}"
+            elif sys.platform.startswith("linux"):
+                linux_python = _get_linux_system_python()
+                if linux_python:
+                    _log(
+                        "Standalone Python download failed, "
+                        "falling back to system Python: {}".format(msg),
+                        Qgis.Warning,
+                    )
+                    if progress_callback:
+                        progress_callback(10, "Using system Python (fallback)...")
+                else:
+                    return False, (
+                        "Failed to download Python: {}\n"
+                        "No suitable system Python found. Please ensure python3 "
+                        "and python3-venv are installed "
+                        "(e.g., sudo apt install python3-venv)."
+                    ).format(msg)
             else:
                 return False, f"Failed to download Python: {msg}"
 

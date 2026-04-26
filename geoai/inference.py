@@ -18,11 +18,14 @@ References:
 
 from __future__ import annotations
 
+import logging
 import os
 from enum import Enum
 from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "BlendMode",
@@ -399,8 +402,12 @@ def predict_geotiff(
             input_bands = list(range(1, src.count + 1))
 
         if verbose:
-            print(f"Input raster: {width}x{height}, {len(input_bands)} bands")
-            print(f"Tile size: {tile_size}, overlap: {overlap}, stride: {stride}")
+            logger.info(
+                "Input raster: %dx%d, %d bands", width, height, len(input_bands)
+            )
+            logger.info(
+                "Tile size: %d, overlap: %d, stride: %d", tile_size, overlap, stride
+            )
 
         # ---- allocate output accumulators ----
         output_sum = np.zeros((num_classes, height, width), dtype=np.float64)
@@ -421,7 +428,7 @@ def predict_geotiff(
         tiles = list(dict.fromkeys(tiles))
 
         if verbose:
-            print(f"Total tiles: {len(tiles)}")
+            logger.info("Total tiles: %d", len(tiles))
 
         # ---- process in batches ----
         iterator = range(0, len(tiles), batch_size)
@@ -532,8 +539,8 @@ def predict_geotiff(
             dst.write(output_array.astype(output_dtype), 1)
 
     if verbose:
-        print(f"Output saved to: {output_raster}")
-        print(f"Output dimensions: {width}x{height}")
+        logger.info("Output saved to: %s", output_raster)
+        logger.info("Output dimensions: %dx%d", width, height)
 
     return output_raster
 

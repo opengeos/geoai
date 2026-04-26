@@ -88,9 +88,16 @@ def run_geoai_task(
             elif msg_type == "ok":
                 final_result = msg.get("result")
             elif msg_type == "error":
-                raise RuntimeError(
-                    msg.get("message", "Unknown geoai task worker error")
-                )
+                error_msg = msg.get("message", "Unknown geoai task worker error")
+                error_msg_lower = error_msg.lower()
+                if "permission denied" in error_msg_lower:
+                    raise PermissionError(error_msg)
+                if (
+                    "no such file or directory" in error_msg_lower
+                    or "not found" in error_msg_lower
+                ):
+                    raise FileNotFoundError(error_msg)
+                raise RuntimeError(error_msg)
 
         returncode = proc.wait()
         if returncode != 0:

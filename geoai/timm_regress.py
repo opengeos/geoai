@@ -4,6 +4,7 @@ This module provides tools for remote sensing regression tasks like predicting N
 biomass, temperature, or other continuous values at the pixel level.
 """
 
+import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -39,6 +40,8 @@ try:
     LIGHTNING_AVAILABLE = True
 except ImportError:
     LIGHTNING_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 class _CompactProgressBar(TQDMProgressBar):
@@ -475,11 +478,14 @@ def create_regression_tiles(
             n_tiles_y = (height - tile_size) // stride + 1
             n_tiles_x = (width - tile_size) // stride + 1
 
-            print(f"Input raster: {width}x{height}, {src_input.count} bands")
-            print(f"Target raster: {src_target.width}x{src_target.height}")
-            print(f"Tile size: {tile_size}x{tile_size}, stride: {stride}")
-            print(
-                f"Expected tiles: {n_tiles_y} x {n_tiles_x} = {n_tiles_y * n_tiles_x}"
+            logger.info("Input raster: %dx%d, %d bands", width, height, src_input.count)
+            logger.info("Target raster: %dx%d", src_target.width, src_target.height)
+            logger.info("Tile size: %dx%d, stride: %d", tile_size, tile_size, stride)
+            logger.info(
+                "Expected tiles: %d x %d = %d",
+                n_tiles_y,
+                n_tiles_x,
+                n_tiles_y * n_tiles_x,
             )
 
             tile_idx = 0
@@ -581,9 +587,9 @@ def create_regression_tiles(
                     valid_tiles += 1
                     tile_idx += 1
 
-    print(f"\nCreated {valid_tiles} valid tiles out of {tile_idx} total")
-    print(f"Skipped due to nodata: {skipped_nodata}")
-    print(f"Skipped due to target range: {skipped_range}")
+    logger.info("Created %d valid tiles out of %d total", valid_tiles, tile_idx)
+    logger.info("Skipped due to nodata: %d", skipped_nodata)
+    logger.info("Skipped due to target range: %d", skipped_range)
 
     return image_paths, target_paths
 
@@ -767,11 +773,13 @@ def train_pixel_regressor(
     )
 
     if verbose:
-        print(
-            f"Training {architecture} with {encoder_name} encoder"
-            f" for {num_epochs} epochs..."
+        logger.info(
+            "Training %s with %s encoder for %d epochs...",
+            architecture,
+            encoder_name,
+            num_epochs,
         )
-        print(f"Loss function: {loss_type.upper()}")
+        logger.info("Loss function: %s", loss_type.upper())
 
     trainer.fit(
         model,
@@ -783,12 +791,12 @@ def train_pixel_regressor(
     best_model_path = checkpoint_callback.best_model_path
     if best_model_path:
         if verbose:
-            print(f"\nBest model saved at: {best_model_path}")
+            logger.info("Best model saved at: %s", best_model_path)
         model = PixelRegressionModel.load_from_checkpoint(best_model_path)
         model.best_model_path = best_model_path
     else:
         if verbose:
-            print("\nBest model path not found; returning last epoch model.")
+            logger.info("Best model path not found; returning last epoch model.")
 
     return model
 
@@ -849,8 +857,10 @@ def predict_raster(
         if input_bands is None:
             input_bands = list(range(1, src.count + 1))
 
-        print(f"Input raster: {width}x{height}")
-        print(f"Tile size: {tile_size}, overlap: {overlap}, stride: {stride}")
+        logger.info("Input raster: %dx%d", width, height)
+        logger.info(
+            "Tile size: %d, overlap: %d, stride: %d", tile_size, overlap, stride
+        )
 
         # Initialize output arrays
         output_sum = np.zeros((height, width), dtype=np.float64)
@@ -909,7 +919,7 @@ def predict_raster(
                 tiles.append((row_start, col_start, row_end, col_end))
                 positions.append((row_start, col_start))
 
-        print(f"Total tiles: {len(tiles)}")
+        logger.info("Total tiles: %d", len(tiles))
 
         # Process in batches
         for batch_start in tqdm(
@@ -1005,10 +1015,12 @@ def predict_raster(
             dst.write(output_array, 1)
 
     valid_data = output_array[~nodata_mask & valid_weights]
-    print(f"\nOutput saved to: {output_raster}")
-    print(f"Output dimensions: {width}x{height} (same as input)")
+    logger.info("Output saved to: %s", output_raster)
+    logger.info("Output dimensions: %dx%d (same as input)", width, height)
     if len(valid_data) > 0:
-        print(f"Prediction range: [{valid_data.min():.4f}, {valid_data.max():.4f}]")
+        logger.info(
+            "Prediction range: [%.4f, %.4f]", valid_data.min(), valid_data.max()
+        )
 
     return output_raster
 
@@ -1074,14 +1086,14 @@ def evaluate_regression(
     }
 
     if print_results:
-        print("=" * 50)
-        print("Regression Evaluation Metrics")
-        print("=" * 50)
-        print(f"MSE:  {mse:.6f}")
-        print(f"RMSE: {rmse:.6f}")
-        print(f"MAE:  {mae:.6f}")
-        print(f"R²:   {r2:.4f}")
-        print("=" * 50)
+        logger.info("=" * 50)
+        logger.info("Regression Evaluation Metrics")
+        logger.info("=" * 50)
+        logger.info("MSE:  %.6f", mse)
+        logger.info("RMSE: %.6f", rmse)
+        logger.info("MAE:  %.6f", mae)
+        logger.info("R2:   %.4f", r2)
+        logger.info("=" * 50)
 
     return metrics
 
@@ -1182,7 +1194,7 @@ def plot_regression_comparison(
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
-        print(f"Figure saved to: {save_path}")
+        logger.info("Figure saved to: %s", save_path)
 
     plt.show()
 
@@ -1293,7 +1305,7 @@ def plot_scatter(
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
-        print(f"Figure saved to: {save_path}")
+        logger.info("Figure saved to: %s", save_path)
 
     plt.show()
 
@@ -1366,7 +1378,7 @@ def plot_training_history(
 
     df = pd.read_csv(csv_path)
     _n_epochs = df["epoch"].nunique() if "epoch" in df.columns else len(df)
-    print(f"Reading logs: {csv_path} ({_n_epochs} epochs)")
+    logger.info("Reading logs: %s (%d epochs)", csv_path, _n_epochs)
 
     # Group rows by epoch – Lightning logs multiple rows per epoch (one per
     # step plus validation).  Use ``last()`` with ``skipna`` so we keep the
@@ -1470,7 +1482,7 @@ def plot_training_history(
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
-        print(f"Figure saved to: {save_path}")
+        logger.info("Figure saved to: %s", save_path)
 
     plt.show()
 
@@ -1642,7 +1654,7 @@ def plot_regression_results(
 
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
-        print(f"Figure saved to: {save_path}")
+        logger.info("Figure saved to: %s", save_path)
 
     plt.show()
 

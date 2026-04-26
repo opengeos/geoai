@@ -8,12 +8,15 @@ only when a specific symbol is first accessed.
 
 __author__ = """Qiusheng Wu"""
 __email__ = "giswqs@gmail.com"
-__version__ = "0.35.0"
+__version__ = "0.37.2"
 
 
 import importlib
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def set_proj_lib_path(verbose=False):
@@ -58,7 +61,7 @@ def set_proj_lib_path(verbose=False):
                 if os.path.exists(os.path.join(proj_path, "proj.db")):
                     os.environ["PROJ_LIB"] = proj_path
                     if verbose:
-                        print(f"PROJ_LIB set to: {proj_path}")
+                        logger.debug("PROJ_LIB set to: %s", proj_path)
                     proj_set = True
                     break
 
@@ -72,7 +75,7 @@ def set_proj_lib_path(verbose=False):
                 ) or os.path.exists(os.path.join(gdal_path, "gcs.csv")):
                     os.environ["GDAL_DATA"] = gdal_path
                     if verbose:
-                        print(f"GDAL_DATA set to: {gdal_path}")
+                        logger.debug("GDAL_DATA set to: %s", gdal_path)
                     gdal_set = True
                     break
 
@@ -83,13 +86,13 @@ def set_proj_lib_path(verbose=False):
                 if not gdal_set and "header.dxf" in files:
                     os.environ["GDAL_DATA"] = root
                     if verbose:
-                        print(f"GDAL_DATA set to: {root} (deep search)")
+                        logger.debug("GDAL_DATA set to: %s (deep search)", root)
                     gdal_set = True
 
                 if not proj_set and "proj.db" in files:
                     os.environ["PROJ_LIB"] = root
                     if verbose:
-                        print(f"PROJ_LIB set to: {root} (deep search)")
+                        logger.debug("PROJ_LIB set to: %s (deep search)", root)
                     proj_set = True
 
                 if proj_set and gdal_set:
@@ -98,8 +101,8 @@ def set_proj_lib_path(verbose=False):
         set_gdal_config("PROJ_LIB", os.environ["PROJ_LIB"])
         set_gdal_config("GDAL_DATA", os.environ["GDAL_DATA"])
 
-    except Exception as e:
-        print(f"Error setting projection library paths: {e}")
+    except (KeyError, OSError) as e:
+        logger.error("Error setting projection library paths: %s", e)
         return
 
 
@@ -266,6 +269,8 @@ _LAZY_SYMBOL_MAP = {
     "get_device": ("utils", None),
     "plot_prediction_comparison": ("utils", None),
     "get_raster_resolution": ("utils", None),
+    "RasterMetadata": ("utils", None),
+    "read_raster_metadata": ("utils", None),
     "stack_bands": ("utils", None),
     "empty_cache": ("utils", None),
     "smooth_vector": ("utils", None),
@@ -274,8 +279,11 @@ _LAZY_SYMBOL_MAP = {
     "export_landcover_tiles": ("landcover_utils", None),
     "normalize_radiometric": ("landcover_utils", None),
     # --- geoai.landcover_train ---
+    "DiceLoss": ("landcover_train", None),
     "FocalLoss": ("landcover_train", None),
     "LandcoverCrossEntropyLoss": ("landcover_train", None),
+    "TverskyLoss": ("landcover_train", None),
+    "UnifiedFocalLoss": ("landcover_train", None),
     "landcover_iou": ("landcover_train", None),
     "get_landcover_loss_function": ("landcover_train", None),
     "compute_class_weights": ("landcover_train", None),
@@ -422,6 +430,17 @@ _LAZY_SYMBOL_MAP = {
     "batch_multiclass_detection": ("object_detect", None),
     "push_detector_to_hub": ("object_detect", None),
     "predict_detector_from_hub": ("object_detect", None),
+    # --- geoai.rfdetr ---
+    "RFDETR_MODELS": ("rfdetr", None),
+    "check_rfdetr_available": ("rfdetr", None),
+    "list_rfdetr_models": ("rfdetr", None),
+    "rfdetr_detect": ("rfdetr", None),
+    "rfdetr_detect_batch": ("rfdetr", None),
+    "rfdetr_train": ("rfdetr", None),
+    "push_rfdetr_to_hub": ("rfdetr", None),
+    "rfdetr_detect_from_hub": ("rfdetr", None),
+    "prepare_nwpu_for_rfdetr": ("rfdetr", None),
+    "plot_rfdetr_metrics": ("rfdetr", None),
     # --- geoai.water ---
     "segment_water": ("water", None),
     "BAND_ORDER_PRESETS": ("water", None),

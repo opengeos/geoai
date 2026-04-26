@@ -1,8 +1,11 @@
 """Geometry processing and regularization utilities."""
 
+import logging
 import math
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 import geopandas as gpd
 import numpy as np
@@ -65,13 +68,13 @@ def regularization(
             try:
                 # Try to parse as WKT
                 building = wkt.loads(building)
-            except Exception:
-                print(f"Failed to parse geometry string: {building[:30]}...")
+            except (ValueError, TypeError):
+                logger.warning("Failed to parse geometry string: %s...", building[:30])
                 continue
 
         # Ensure we have a valid geometry
         if not hasattr(building, "simplify"):
-            print(f"Invalid geometry type: {type(building)}")
+            logger.warning("Invalid geometry type: %s", type(building))
             continue
 
         # Step 1: Simplify to remove noise and small vertices
@@ -82,7 +85,7 @@ def regularization(
         if orthogonalize:
             # Make sure we have a valid polygon with an exterior
             if not hasattr(simplified, "exterior") or simplified.exterior is None:
-                print(f"Simplified geometry has no exterior: {simplified}")
+                logger.warning("Simplified geometry has no exterior: %s", simplified)
                 regularized_buildings.append(building)  # Use original instead
                 continue
 
@@ -91,7 +94,9 @@ def regularization(
 
             # Make sure we have enough coordinates for angle calculation
             if len(coords) < 3:
-                print(f"Not enough coordinates for angle calculation: {len(coords)}")
+                logger.warning(
+                    "Not enough coordinates for angle calculation: %d", len(coords)
+                )
                 regularized_buildings.append(building)  # Use original instead
                 continue
 
@@ -606,8 +611,8 @@ def region_groups(
                         os.remove(tmp_raster)
                     if tmp_vector is not None and os.path.exists(tmp_vector):
                         os.remove(tmp_vector)
-                except Exception as e:
-                    print(f"Warning: Failed to delete temporary files: {str(e)}")
+                except OSError as e:
+                    logger.warning("Failed to delete temporary files: %s", str(e))
 
         return da, df
 
@@ -1265,7 +1270,7 @@ def orthogonalize(
                         ring.append([x3, y3])
                 else:
                     ring.append(intersection)
-            except Exception:
+            except (ValueError, ZeroDivisionError, IndexError):
                 # If intersection calculation fails, use the endpoint of the first segment
                 ring.append([x2, y2])
 
@@ -1326,7 +1331,7 @@ def orthogonalize(
                     ring.append([x3, y3])
             else:
                 ring.append(intersection)
-        except Exception:
+        except (ValueError, ZeroDivisionError, IndexError):
             # If intersection calculation fails, use the endpoint of the last segment
             ring.append([x2, y2])
 
@@ -1497,7 +1502,7 @@ def orthogonalize(
         shapes = list(features.shapes(mask, transform=transform))
 
         # Initialize progress bar
-        print(f"Processing {len(shapes)} features...")
+        logger.info("Processing %d features...", len(shapes))
 
         # Convert shapes to GeoJSON features
         features_list = []
@@ -1619,7 +1624,7 @@ def orthogonalize(
                             "geometry": geometry,
                         }
                     )
-                except Exception as e:
+                except (ValueError, TypeError, IndexError) as e:
                     # Keep the original shape if orthogonalization fails
                     features_list.append(
                         {
@@ -1641,9 +1646,9 @@ def orthogonalize(
 
         # Save to file if output_path is provided
         if output_path:
-            print(f"Saving to {output_path}...")
+            logger.info("Saving to %s...", output_path)
             gdf.to_file(output_path)
-            print("Done!")
+            logger.info("Done!")
 
         return gdf
 
