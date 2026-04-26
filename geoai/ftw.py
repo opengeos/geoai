@@ -432,11 +432,11 @@ def display_ftw_samples(
         with rasterio.open(mask_path) as src:
             mask = src.read(1)
 
-        axes[0, i].imshow(img)
+        axes[0, i].imshow(img, origin="lower")
         axes[0, i].set_title(f"Image {i + 1}")
         axes[0, i].axis("off")
 
-        axes[1, i].imshow(mask, cmap=cmap, interpolation="nearest")
+        axes[1, i].imshow(mask, cmap=cmap, interpolation="nearest", origin="lower")
         axes[1, i].set_title(f"Mask {i + 1}")
         axes[1, i].axis("off")
 

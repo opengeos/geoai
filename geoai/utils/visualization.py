@@ -932,10 +932,14 @@ def display_training_tiles(
         with rasterio.open(image_path) as src:
             if show_axes:
                 data = src.read()
+                # Pick imshow origin from the affine transform so south-up
+                # rasters (positive y-scale, e.g. FTW Sentinel-2 chips) are
+                # not displayed upside down.
+                origin = "lower" if src.transform.e > 0 else "upper"
                 if data.shape[0] >= 3:
-                    axes[0, idx].imshow(data[:3].transpose(1, 2, 0))
+                    axes[0, idx].imshow(data[:3].transpose(1, 2, 0), origin=origin)
                 else:
-                    axes[0, idx].imshow(data[0])
+                    axes[0, idx].imshow(data[0], origin=origin)
             else:
                 show(src, ax=axes[0, idx])
         axes[0, idx].set_title(f"Image {idx+1}")
@@ -948,7 +952,8 @@ def display_training_tiles(
             with rasterio.open(mask_path) as src:
                 if show_axes:
                     data = src.read(1)
-                    axes[1, idx].imshow(data, cmap=cmap)
+                    origin = "lower" if src.transform.e > 0 else "upper"
+                    axes[1, idx].imshow(data, cmap=cmap, origin=origin)
                 else:
                     show(src, ax=axes[1, idx], cmap=cmap)
         else:
