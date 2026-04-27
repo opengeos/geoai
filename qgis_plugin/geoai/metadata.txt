@@ -3,7 +3,7 @@ name=GeoAI
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including tree segmentation (DeepForest), water segmentation (OmniWaterMask), Moondream vision-language model, Segment Anything (SAM1/SAM2/SAM3), semantic segmentation, and instance segmentation (Mask R-CNN).
-version=1.2.0
+version=1.2.1
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -59,6 +59,8 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.2.1
+        - Fix AttributeError on PyQt6 (#715): qualify remaining short-form Qt enums (DockWidgetArea, ScrollBarPolicy, CursorShape, MouseButton) missed in #707
     1.2.0
         - Qt5/Qt6 dual compatibility for QGIS 4.0
     1.1.0

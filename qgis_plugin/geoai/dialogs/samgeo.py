@@ -176,7 +176,9 @@ class SamGeoDockWidget(QDockWidget):
         super().__init__("Segment Anything", parent)
         self.iface = iface
         self.canvas = iface.mapCanvas()
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+        )
 
         # SamGeo model instance
         self.sam = None
@@ -211,7 +213,7 @@ class SamGeoDockWidget(QDockWidget):
         # Main widget with scroll area
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         main_widget = QWidget()
         main_layout = QVBoxLayout()

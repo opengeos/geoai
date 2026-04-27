@@ -42,7 +42,9 @@ class DepsInstallDockWidget(QDockWidget):
         """
         super().__init__("GeoAI - Setup", parent)
         self.setObjectName("GeoAIDepsInstallDock")
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+        )
 
         container = QWidget()
         layout = QVBoxLayout(container)

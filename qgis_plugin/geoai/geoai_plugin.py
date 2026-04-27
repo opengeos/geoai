@@ -345,7 +345,7 @@ class GeoAIPlugin:
         self._deps_dock.install_requested.connect(self._on_install_requested)
         self._deps_dock.cancel_requested.connect(self._on_cancel_install)
 
-        self.iface.addDockWidget(Qt.RightDockWidgetArea, self._deps_dock)
+        self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._deps_dock)
         self._deps_dock.show()
         self._deps_dock.raise_()
 
@@ -442,7 +442,9 @@ class GeoAIPlugin:
                 self._moondream_dock.visibilityChanged.connect(
                     self._on_moondream_visibility_changed
                 )
-                self.iface.addDockWidget(Qt.RightDockWidgetArea, self._moondream_dock)
+                self.iface.addDockWidget(
+                    Qt.DockWidgetArea.RightDockWidgetArea, self._moondream_dock
+                )
                 self._moondream_dock.show()
                 self._moondream_dock.raise_()
                 return
@@ -484,7 +486,7 @@ class GeoAIPlugin:
                     self._on_segmentation_visibility_changed
                 )
                 self.iface.addDockWidget(
-                    Qt.RightDockWidgetArea, self._segmentation_dock
+                    Qt.DockWidgetArea.RightDockWidgetArea, self._segmentation_dock
                 )
                 self._segmentation_dock.show()
                 self._segmentation_dock.raise_()
@@ -526,7 +528,9 @@ class GeoAIPlugin:
                 self._samgeo_dock.visibilityChanged.connect(
                     self._on_samgeo_visibility_changed
                 )
-                self.iface.addDockWidget(Qt.RightDockWidgetArea, self._samgeo_dock)
+                self.iface.addDockWidget(
+                    Qt.DockWidgetArea.RightDockWidgetArea, self._samgeo_dock
+                )
                 self._samgeo_dock.show()
                 self._samgeo_dock.raise_()
                 return
@@ -567,7 +571,9 @@ class GeoAIPlugin:
                 self._deepforest_dock.visibilityChanged.connect(
                     self._on_deepforest_visibility_changed
                 )
-                self.iface.addDockWidget(Qt.RightDockWidgetArea, self._deepforest_dock)
+                self.iface.addDockWidget(
+                    Qt.DockWidgetArea.RightDockWidgetArea, self._deepforest_dock
+                )
                 self._deepforest_dock.show()
                 self._deepforest_dock.raise_()
                 return
@@ -613,7 +619,7 @@ class GeoAIPlugin:
                     self._on_water_segmentation_visibility_changed
                 )
                 self.iface.addDockWidget(
-                    Qt.RightDockWidgetArea, self._water_segmentation_dock
+                    Qt.DockWidgetArea.RightDockWidgetArea, self._water_segmentation_dock
                 )
                 self._water_segmentation_dock.show()
                 self._water_segmentation_dock.raise_()
@@ -660,7 +666,8 @@ class GeoAIPlugin:
                     self._on_instance_segmentation_visibility_changed
                 )
                 self.iface.addDockWidget(
-                    Qt.RightDockWidgetArea, self._instance_segmentation_dock
+                    Qt.DockWidgetArea.RightDockWidgetArea,
+                    self._instance_segmentation_dock,
                 )
                 self._instance_segmentation_dock.show()
                 self._instance_segmentation_dock.raise_()

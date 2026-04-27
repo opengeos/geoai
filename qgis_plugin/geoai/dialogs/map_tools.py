@@ -29,7 +29,7 @@ class PointPromptTool(QgsMapTool):
         self.markers = []
 
         # Set cursor
-        self.setCursor(Qt.CrossCursor)
+        self.setCursor(Qt.CursorShape.CrossCursor)
 
     def set_foreground(self, foreground):
         """Set whether we're adding foreground or background points."""
@@ -41,7 +41,7 @@ class PointPromptTool(QgsMapTool):
 
     def canvasReleaseEvent(self, event):
         """Handle mouse release event - add a point."""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             point = self.toMapCoordinates(event.pos())
 
             # Add visual marker
@@ -65,7 +65,7 @@ class PointPromptTool(QgsMapTool):
             else:
                 self.plugin.add_point(point, self.is_foreground)
 
-        elif event.button() == Qt.RightButton:
+        elif event.button() == Qt.MouseButton.RightButton:
             # Right-click to finish
             self.deactivate()
             if self.batch_mode:
@@ -111,11 +111,11 @@ class BoxPromptTool(QgsMapTool):
         self.is_drawing = False
 
         # Set cursor
-        self.setCursor(Qt.CrossCursor)
+        self.setCursor(Qt.CursorShape.CrossCursor)
 
     def canvasPressEvent(self, event):
         """Handle mouse press event - start drawing."""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.start_point = self.toMapCoordinates(event.pos())
             self.is_drawing = True
             self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
@@ -128,7 +128,7 @@ class BoxPromptTool(QgsMapTool):
 
     def canvasReleaseEvent(self, event):
         """Handle mouse release event - finish drawing."""
-        if event.button() == Qt.LeftButton and self.is_drawing:
+        if event.button() == Qt.MouseButton.LeftButton and self.is_drawing:
             end_point = self.toMapCoordinates(event.pos())
             self.is_drawing = False
 
@@ -145,7 +145,7 @@ class BoxPromptTool(QgsMapTool):
             self.deactivate()
             self.plugin.draw_box_btn.setChecked(False)
 
-        elif event.button() == Qt.RightButton:
+        elif event.button() == Qt.MouseButton.RightButton:
             # Right-click to cancel
             self.is_drawing = False
             self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
