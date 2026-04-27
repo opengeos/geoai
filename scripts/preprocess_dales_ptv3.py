@@ -71,7 +71,7 @@ def read_tile(
     Returns
     -------
     coord : (N, 3) float32
-    strength : (N, 1) float32  normalised intensity [0, 1]
+    strength : (N, 1) float32  normalised return_number [0, 1] (falls back to intensity)
     segment : (N,) int32  class labels clipped to [0, 8]
     """
     las = laspy.read(str(las_path))
@@ -130,7 +130,7 @@ def split_into_blocks(
             if n >= min_points:
                 block_coord = coord[mask].copy()
                 # Centre in float64 to avoid catastrophic cancellation
-                # with large UTM offsets (Y ~ 5 × 10⁶ overflows f32 mean).
+                # with large UTM offsets (Y ~ 5 × 10⁶ causes f32 precision loss).
                 centre = block_coord.astype(np.float64).mean(axis=0)
                 centred = (block_coord.astype(np.float64) - centre).astype(np.float32)
                 blocks.append(
