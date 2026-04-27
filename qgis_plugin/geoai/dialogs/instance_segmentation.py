@@ -378,7 +378,9 @@ class InstanceSegmentationDockWidget(QDockWidget):
         self.smooth_worker = None
         self.last_output_path = None
 
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+        )
         self.setup_ui()
         self.connect_signals()
 
@@ -397,7 +399,9 @@ class InstanceSegmentationDockWidget(QDockWidget):
         # Top part: scrollable tabs
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
 
         tab_container = QWidget()
         tab_layout = QVBoxLayout()

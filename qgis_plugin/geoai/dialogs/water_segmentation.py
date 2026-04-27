@@ -206,7 +206,9 @@ class WaterSegmentationDockWidget(QDockWidget):
         super().__init__("Water Segmentation", parent)
         self.iface = iface
         self.canvas = iface.mapCanvas()
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+        )
 
         self.worker = None
         self._temp_files = []
@@ -217,7 +219,7 @@ class WaterSegmentationDockWidget(QDockWidget):
         """Set up the user interface."""
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         main_widget = QWidget()
         main_layout = QVBoxLayout()

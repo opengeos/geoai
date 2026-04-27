@@ -158,7 +158,9 @@ class MoondreamDockWidget(QDockWidget):
         self.worker = None
         self.model_load_worker = None
 
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+        )
         self.setup_ui()
         self.connect_signals()
 
@@ -167,7 +169,7 @@ class MoondreamDockWidget(QDockWidget):
         # Main widget with scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         main_widget = QWidget()
         layout = QVBoxLayout()

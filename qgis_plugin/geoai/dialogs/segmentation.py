@@ -411,7 +411,9 @@ class SegmentationDockWidget(QDockWidget):
         self.smooth_worker = None
         self.last_output_path = None
 
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+        )
         self.setup_ui()
         self.connect_signals()
 
@@ -427,7 +429,7 @@ class SegmentationDockWidget(QDockWidget):
         # Main scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         main_widget = QWidget()
         layout = QVBoxLayout()
