@@ -21,7 +21,7 @@ scikit-learn
 # segment-geospatial
 smoothify
 timm
-tokenizers>=0.22.1
+tokenizers>=0.22.2
 torch
 # torchange
 torchgeo
