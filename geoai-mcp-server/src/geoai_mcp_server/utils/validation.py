@@ -226,7 +226,7 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
     filename = re.sub(r'[<>:"/\\|?*\x00-\x1f ]', "_", filename)
 
     # Remove path traversal sequences
-    filename = re.sub(r'\.\.+', "_", filename)
+    filename = re.sub(r"\.\.+", "_", filename)
 
     # Remove leading/trailing dots
     filename = filename.strip(".")
