@@ -116,6 +116,14 @@ class TestValidation:
     def test_sanitize_filename_traversal(self):
         """Test path traversal prevention."""
         assert ".." not in sanitize_filename("../../../etc/passwd")
+        # Windows-style traversal (backslash already caught by char class)
+        assert ".." not in sanitize_filename("..\\..\\etc\\passwd")
+        # Triple-dot sequences
+        assert ".." not in sanitize_filename(".../secret")
+        # Mid-filename double-dot is also collapsed
+        result = sanitize_filename("file..backup.tif")
+        assert ".." not in result
+        assert result.endswith(".tif")
 
 
 class TestFileManagement:
