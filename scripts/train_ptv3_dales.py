@@ -200,9 +200,8 @@ class GridSample:
         coord = data["coord"]
         n = len(coord)
         gc = np.floor(coord / self.grid_size).astype(np.int64)
-        # hash-based dedup (much faster than np.unique on rows)
-        keys = gc[:, 0] * 1_000_003 + gc[:, 1] * 1_000_033 + gc[:, 2]
-        _, idx = np.unique(keys, return_index=True)
+        # Collision-free dedup: treat each (x,y,z) int64 row as a byte key
+        _, idx = np.unique(gc.view(np.dtype((np.void, gc.dtype.itemsize * 3))), return_index=True)
         return {
             k: v[idx] if isinstance(v, np.ndarray) and v.shape[0] == n else v
             for k, v in data.items()
@@ -749,7 +748,11 @@ def train_one_epoch(
                 segment,
                 ignore_index=IGNORE_INDEX,
             )
-            loss = (ce_loss + lv_loss) / accum_steps
+        # Compute actual window size for this optimizer step (handles partial last window)
+        window_start = (step_idx // accum_steps) * accum_steps
+        window_end = min(window_start + accum_steps, len(loader))
+        actual_accum = window_end - window_start
+        loss = (ce_loss + lv_loss) / actual_accum
 
         if not math.isfinite(loss.item()):
             logger.warning("NaN/Inf loss at step %d -- skipping", n_steps)
@@ -772,7 +775,7 @@ def train_one_epoch(
                 seg_logits.argmax(dim=1).cpu().numpy(),
                 segment.cpu().numpy(),
             )
-            total_loss += loss.item() * accum_steps  # undo the /accum_steps
+            total_loss += loss.item() * actual_accum  # undo the /actual_accum scaling
             n_steps += 1
 
         # Live progress line -- cheap, one-line update per step.
@@ -800,6 +803,7 @@ def evaluate(
     ce_criterion: nn.Module,
     device: torch.device,
     use_amp: bool = True,
+    world_size: int = 1,
 ) -> dict:
     """Evaluate on val / test set.  Returns metrics dict."""
     model.eval()
@@ -836,6 +840,16 @@ def evaluate(
         )
         total_loss += loss.item()
         n_steps += 1
+
+    # In DDP, all-reduce the confusion matrix so every rank gets global metrics
+    if world_size > 1:
+        cm_tensor = torch.from_numpy(metrics.cm).to(device)
+        dist.all_reduce(cm_tensor, op=dist.ReduceOp.SUM)
+        metrics.cm = cm_tensor.cpu().numpy()
+        # All-reduce the loss sum and step count too
+        stats_tensor = torch.tensor([total_loss, float(n_steps)], device=device)
+        dist.all_reduce(stats_tensor, op=dist.ReduceOp.SUM)
+        total_loss, n_steps = stats_tensor[0].item(), int(stats_tensor[1].item())
 
     return {
         "loss": total_loss / max(n_steps, 1),
@@ -935,6 +949,7 @@ def save_checkpoint(
     best_miou: float,
     best_epoch: int,
     path: Path,
+    num_classes: int = NUM_CLASSES,
 ) -> None:
     raw = model.module if isinstance(model, DDP) else model
     torch.save(
@@ -946,7 +961,7 @@ def save_checkpoint(
             "scaler_state_dict": scaler.state_dict(),
             "best_miou": best_miou,
             "best_epoch": best_epoch,
-            "num_classes": NUM_CLASSES,
+            "num_classes": num_classes,
             "class_names": DALES_CLASSES,
         },
         path,
@@ -985,15 +1000,10 @@ def parse_args() -> argparse.Namespace:
         help="Download pre-trained DALES checkpoint from HuggingFace and resume",
     )
     g.add_argument(
-        "--no_flash_attn",
-        action="store_true",
-        default=True,
-        help="Disable flash attention (default: disabled; use --flash_attn to enable)",
-    )
-    g.add_argument(
         "--flash_attn",
         action="store_true",
-        help="Enable flash attention (requires flash-attn package, A100/H100)",
+        default=False,
+        help="Enable flash attention (requires flash-attn package, A100/H100 only)",
     )
 
     # Training
@@ -1049,10 +1059,6 @@ def parse_args() -> argparse.Namespace:
 
     args = p.parse_args()
 
-    # --flash_attn overrides --no_flash_attn
-    if args.flash_attn:
-        args.no_flash_attn = False
-
     # Apply memory presets (defaults are already low_memory safe).
     # --low_memory is a no-op; medium/high scale up for bigger GPUs.
     if args.medium_memory:
@@ -1065,7 +1071,7 @@ def parse_args() -> argparse.Namespace:
         args.max_points = 100_000
         args.batch_size = 4
         args.accum_steps = 1
-        args.no_flash_attn = False  # A100/H100 should use flash attention
+        args.flash_attn = True  # A100/H100 should use flash attention
 
     return args
 
@@ -1118,6 +1124,13 @@ def main() -> None:
         )
     with open(meta_path) as f:
         metadata = json.load(f)
+
+    meta_nc = metadata.get("num_classes", NUM_CLASSES)
+    if args.num_classes != meta_nc:
+        raise SystemExit(
+            f"--num_classes {args.num_classes} does not match metadata "
+            f"num_classes {meta_nc}. Re-run preprocessing or drop --num_classes."
+        )
 
     class_weights = torch.tensor(metadata["class_weights"], dtype=torch.float32).to(
         device
@@ -1175,7 +1188,7 @@ def main() -> None:
 
     # -- model ---------------------------------------------------------
     backbone_cfg = copy.deepcopy(PTV3_BACKBONE_DEFAULTS)
-    if args.no_flash_attn:
+    if not args.flash_attn:
         backbone_cfg["enable_flash"] = False
 
     model = PTv3Segmentor(
@@ -1304,7 +1317,7 @@ def main() -> None:
                 num_workers=args.num_workers,
                 pin_memory=True,
             )
-            stats = evaluate(model, ldr, ce_criterion, device, use_amp=use_amp)
+            stats = evaluate(model, ldr, ce_criterion, device, use_amp=use_amp, world_size=world_size)
             if is_main:
                 print_eval_report(split, len(ds), stats)
                 # Save confusion matrix
@@ -1334,7 +1347,7 @@ def main() -> None:
         logger.info(
             "AMP: %s,  Flash attention: %s",
             "on" if use_amp else "off",
-            "off" if args.no_flash_attn else "on",
+            "on" if args.flash_attn else "off",
         )
         if device.type == "cuda":
             gpu_mem = torch.cuda.get_device_properties(device).total_memory / 1e9
@@ -1370,7 +1383,8 @@ def main() -> None:
         val_stats = None
         if val_loader is not None:
             val_stats = evaluate(
-                model, val_loader, ce_criterion, device, use_amp=use_amp
+                model, val_loader, ce_criterion, device, use_amp=use_amp,
+                world_size=world_size,
             )
 
         current_miou = val_stats["miou"] if val_stats else train_stats["miou"]
@@ -1394,6 +1408,7 @@ def main() -> None:
                     best_miou,
                     best_epoch,
                     save_path / "ptv3_dales_best.pth",
+                    num_classes=args.num_classes,
                 )
             if epoch % args.save_every == 0:
                 save_checkpoint(
@@ -1405,6 +1420,7 @@ def main() -> None:
                     best_miou,
                     best_epoch,
                     save_path / f"ptv3_dales_epoch_{epoch:03d}.pth",
+                    num_classes=args.num_classes,
                 )
 
             entry = {"epoch": epoch, **{k: v for k, v in train_stats.items()}}
@@ -1430,6 +1446,7 @@ def main() -> None:
             best_miou,
             best_epoch,
             save_path / "ptv3_dales_final.pth",
+            num_classes=args.num_classes,
         )
         with open(save_path / "training_log.json", "w") as f:
             json.dump(training_log, f, indent=2, default=float)
