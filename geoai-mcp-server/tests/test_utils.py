@@ -96,10 +96,12 @@ class TestValidation:
     def test_sanitize_filename_basic(self):
         """Test basic filename sanitization."""
         assert sanitize_filename("test.tif") == "test.tif"
-        # Spaces are replaced with underscores
+        # Interior spaces are replaced with underscores
         result = sanitize_filename("my file.tif")
         assert " " not in result
         assert result.endswith(".tif")
+        # Leading/trailing whitespace is removed, not converted to underscores
+        assert sanitize_filename("  file.tif  ") == "file.tif"
 
     def test_sanitize_filename_special_chars(self):
         """Test special character removal."""
