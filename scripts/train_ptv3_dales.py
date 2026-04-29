@@ -201,7 +201,9 @@ class GridSample:
         n = len(coord)
         gc = np.floor(coord / self.grid_size).astype(np.int64)
         # Collision-free dedup: treat each (x,y,z) int64 row as a byte key
-        _, idx = np.unique(gc.view(np.dtype((np.void, gc.dtype.itemsize * 3))), return_index=True)
+        _, idx = np.unique(
+            gc.view(np.dtype((np.void, gc.dtype.itemsize * 3))), return_index=True
+        )
         return {
             k: v[idx] if isinstance(v, np.ndarray) and v.shape[0] == n else v
             for k, v in data.items()
@@ -1317,7 +1319,9 @@ def main() -> None:
                 num_workers=args.num_workers,
                 pin_memory=True,
             )
-            stats = evaluate(model, ldr, ce_criterion, device, use_amp=use_amp, world_size=world_size)
+            stats = evaluate(
+                model, ldr, ce_criterion, device, use_amp=use_amp, world_size=world_size
+            )
             if is_main:
                 print_eval_report(split, len(ds), stats)
                 # Save confusion matrix
@@ -1383,7 +1387,11 @@ def main() -> None:
         val_stats = None
         if val_loader is not None:
             val_stats = evaluate(
-                model, val_loader, ce_criterion, device, use_amp=use_amp,
+                model,
+                val_loader,
+                ce_criterion,
+                device,
+                use_amp=use_amp,
                 world_size=world_size,
             )
 
