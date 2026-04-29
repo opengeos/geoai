@@ -1663,7 +1663,9 @@ def _train_with_custom_iou(
                 if stream_iou:
                     # Stream confusion matrix on GPU, accumulate on CPU.
                     # bool is a subclass of int; treat bool False as "no ignore".
-                    if isinstance(ignore_index, int) and not isinstance(ignore_index, bool):
+                    if isinstance(ignore_index, int) and not isinstance(
+                        ignore_index, bool
+                    ):
                         valid = targets != ignore_index
                         t_flat = targets[valid].to(torch.int64)
                         p_flat = preds[valid].to(torch.int64)
@@ -1698,9 +1700,7 @@ def _train_with_custom_iou(
             if isinstance(ignore_index, int) and not isinstance(ignore_index, bool):
                 if 0 <= ignore_index < num_classes:
                     present[ignore_index] = False
-            val_iou = (
-                iou_per_class[present].mean().item() if present.any() else 0.0
-            )
+            val_iou = iou_per_class[present].mean().item() if present.any() else 0.0
             iou_display = f"Val IoU: {val_iou:.4f}"
         else:
             # Concatenate all predictions and targets (legacy path for non-mean modes)
