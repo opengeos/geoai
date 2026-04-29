@@ -1661,8 +1661,9 @@ def _train_with_custom_iou(
                 preds = torch.argmax(outputs, dim=1)
 
                 if stream_iou:
-                    # Stream confusion matrix on GPU, accumulate on CPU
-                    if isinstance(ignore_index, int):
+                    # Stream confusion matrix on GPU, accumulate on CPU.
+                    # bool is a subclass of int; treat bool False as "no ignore".
+                    if isinstance(ignore_index, int) and not isinstance(ignore_index, bool):
                         valid = targets != ignore_index
                         t_flat = targets[valid].to(torch.int64)
                         p_flat = preds[valid].to(torch.int64)
@@ -1693,6 +1694,10 @@ def _train_with_custom_iou(
                 denom > 0, tp / (denom + 1e-10), torch.zeros_like(tp)
             )
             present = denom > 0
+            # Exclude ignore_index from mean, matching landcover_iou(mode='mean') behaviour.
+            if isinstance(ignore_index, int) and not isinstance(ignore_index, bool):
+                if 0 <= ignore_index < num_classes:
+                    present[ignore_index] = False
             val_iou = (
                 iou_per_class[present].mean().item() if present.any() else 0.0
             )
