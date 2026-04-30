@@ -93,6 +93,12 @@ class ESRGANGenerator(nn.Module):
 
     def __init__(self, in_nc=1, out_nc=1, nf=64, nb=16, gc=32, scale=4):
         super().__init__()
+        if not isinstance(scale, int) or scale <= 0:
+            raise ValueError(f"scale must be a positive integer, got {scale!r}")
+        if (scale & (scale - 1)) != 0:
+            raise ValueError(
+                f"scale must be a power of 2 (e.g., 2, 4, 8), got {scale}"
+            )
         self.scale = scale
 
         self.conv_first = nn.Conv2d(in_nc, nf, 3, 1, 1, bias=False)
@@ -317,8 +323,8 @@ class ESRGANDataPreprocess:
     def __init__(
         self,
         output_dir: str,
-        target_band_files: dict[int, str] = {},
-        input_band_files: dict[int, str] = {},
+        target_band_files: dict[int, str] | None = None,
+        input_band_files: dict[int, str] | None = None,
         target_file: str | None = None,
         input_file: str | None = None,
         scale_factor: int = None,
@@ -327,6 +333,10 @@ class ESRGANDataPreprocess:
         overlap: int = 96,
         batch_size: int = 8,
     ):
+        if target_band_files is None:
+            target_band_files = {}
+        if input_band_files is None:
+            input_band_files = {}
         assert (
             target_band_files is not None or target_file is not None
         ), "Either target_band_files or target_file must be provided"
@@ -454,22 +464,12 @@ class ESRGANDataPreprocess:
                 input_ds = None
                 out_ds = None
 
-<<<<<<< Updated upstream
-    def preprocess_band(
-        self,
-        ds: gdal.Dataset,
-        band: int,
-        is_target: bool = True,
-        tile_ranges: List[Tuple[float, float, int, int, float, float]] = [],
-    ) -> List[Tuple[float, float, int, int, float, float]]:
-=======
 
     def preprocess_band(self,
                         ds: gdal.Dataset,
                         band: int,
                         is_target: bool = True,
                         tile_ranges: List[Tuple[float, float, int, int, float, float]] = None) -> List[Tuple[float, float, int, int, float, float]]:
->>>>>>> Stashed changes
         """
         Preprocess a single band from a GDAL dataset.
 
@@ -487,13 +487,9 @@ class ESRGANDataPreprocess:
         Returns:
             List of tile ranges
         """
-<<<<<<< Updated upstream
-        sr = ds.GetSpatialRef().GetAttrValue("AUTHORITY", 1)
-=======
         if tile_ranges is None:
             tile_ranges = []
         sr = ds.GetSpatialRef().GetAttrValue('AUTHORITY', 1)
->>>>>>> Stashed changes
         if not is_target:
             if sr != tile_ranges[0][6]:
                 # The inputs have a different spatial projection.  Reprojected intermediate file needed
@@ -1177,7 +1173,7 @@ class ESRGAN:
         adv_active = False  # only "turn on" adversarial training after initialization
 
         # Restart a previous epoch from a command line parameter
-        if last_epoch > 0:
+        if last_epoch >= 0:
             pts_file = os.path.join(self.model_path, "generator_checkpoint.pt")
             state_dict = torch.load(pts_file, gen.state_dict())
             result = gen.load_state_dict(state_dict)
@@ -1199,7 +1195,8 @@ class ESRGAN:
         # Track best epoch improvement (signal to noise ratio)
         best_val_psnr = -1e9
 
-        for epoch in range(last_epoch, num_epochs):
+        start_epoch = max(0, last_epoch + 1)
+        for epoch in range(start_epoch, num_epochs):
 
             # "turn on" discriminator/GAN after warmup period
             if epoch >= warmup_epochs:

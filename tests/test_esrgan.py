@@ -155,5 +155,95 @@ class TestEsrganDataPreprocessHelpers(unittest.TestCase):
         self.assertTrue(np.any(out1 == 0))
 
 
+class TestPredictGeotiffSuperres(unittest.TestCase):
+    def test_predict_geotiff_superres_writes_scaled_raster(self):
+        try:
+            import tempfile
+
+            import rasterio
+            from rasterio.transform import Affine
+            import torch
+            import torch.nn as nn
+            import torch.nn.functional as F
+
+            from geoai.inference import predict_geotiff_superres
+        except ImportError as e:
+            self.skipTest(f"Missing dependency for superres inference test: {e}")
+
+        class DummyUpsample(nn.Module):
+            def __init__(self, scale: int):
+                super().__init__()
+                self.scale = scale
+
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return F.interpolate(x, scale_factor=self.scale, mode="nearest")
+
+        scale = 4
+        h, w = 10, 12
+        transform = Affine(2.0, 0.0, 100.0, 0.0, -2.0, 200.0)
+        crs = "EPSG:4326"
+
+        data = np.arange(h * w, dtype=np.float32).reshape(h, w)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            in_path = f"{tmpdir}/in.tif"
+            out_path = f"{tmpdir}/out.tif"
+
+            profile = {
+                "driver": "GTiff",
+                "height": h,
+                "width": w,
+                "count": 1,
+                "dtype": "float32",
+                "crs": crs,
+                "transform": transform,
+                "nodata": None,
+            }
+
+            with rasterio.open(in_path, "w", **profile) as dst:
+                dst.write(data, 1)
+
+            model = DummyUpsample(scale=scale)
+
+            predict_geotiff_superres(
+                model=model,
+                input_raster=in_path,
+                output_raster=out_path,
+                scale=scale,
+                tile_size=6,
+                overlap=2,
+                batch_size=2,
+                input_bands=[1],
+                num_classes=1,
+                output_dtype="float32",
+                output_nodata=-9999.0,
+                blend_mode="spline",
+                tta=False,
+                preprocess_fn=lambda x: x.astype(np.float32),
+                device="cpu",
+                verbose=False,
+            )
+
+            with rasterio.open(out_path) as src:
+                self.assertEqual(src.width, w * scale)
+                self.assertEqual(src.height, h * scale)
+                self.assertEqual(src.count, 1)
+                self.assertEqual(src.crs.to_string(), crs)
+
+                # Pixel sizes should be divided by scale
+                self.assertAlmostEqual(src.transform.a, transform.a / scale)
+                self.assertAlmostEqual(src.transform.e, transform.e / scale)
+                self.assertAlmostEqual(src.transform.c, transform.c)
+                self.assertAlmostEqual(src.transform.f, transform.f)
+
+                out = src.read(1)
+                self.assertEqual(out.shape, (h * scale, w * scale))
+                self.assertNotEqual(float(out[0, 0]), -9999.0)
+
+                # With nearest-neighbor upsampling, the top-left scale x scale block matches input[0,0]
+                self.assertAlmostEqual(float(out[0, 0]), float(data[0, 0]))
+                self.assertAlmostEqual(float(out[scale - 1, scale - 1]), float(data[0, 0]))
+
+
 if __name__ == "__main__":
     unittest.main()
