@@ -658,9 +658,10 @@ def predict_geotiff_superres(
         hr_height = height * scale
         hr_width = width * scale
 
-        # Update transform: keep origin, scale pixel sizes
+        # Update transform: keep origin and scale the full affine so any
+        # rotation/shear terms remain consistent for the higher-resolution grid.
         t = src.transform
-        hr_transform = rasterio.Affine(t.a / scale, t.b, t.c, t.d, t.e / scale, t.f)
+        hr_transform = t * rasterio.Affine.scale(1 / scale, 1 / scale)
 
         if verbose:
             print(f"Input raster: {width}x{height}, {len(input_bands)} bands")
