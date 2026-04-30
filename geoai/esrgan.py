@@ -1075,19 +1075,21 @@ class ESRGAN:
         n_train = len(low_res) - n_val
         train_ds, val_ds = random_split(list(zip(low_res, high_res)), [n_train, n_val])
         if n_samples is not None:
-            indices = np.arange(n_samples)
-            sampler = SubsetRandomSampler(indices)
+            train_indices = np.arange(min(n_samples, len(train_ds)))
+            val_indices = np.arange(min(n_samples, len(val_ds)))
+            train_sampler = SubsetRandomSampler(train_indices)
+            val_sampler = SubsetRandomSampler(val_indices)
             train_loader = DataLoader(
                 train_ds,
                 batch_size=batch_size,
-                sampler=sampler,
+                sampler=train_sampler,
                 num_workers=4,
                 pin_memory=True,
             )
             val_loader = DataLoader(
                 val_ds,
                 batch_size=batch_size,
-                sampler=sampler,
+                sampler=val_sampler,
                 num_workers=4,
                 pin_memory=True,
             )
