@@ -869,6 +869,8 @@ class ESRGAN:
         self.scale = scale
         self.band = band
         self.data_path = data_path
+        if model_path is None:
+            raise ValueError("model_path must be provided")
         self.model_path = os.path.join(model_path, f"band_{self.band}")
         if not os.path.exists(self.model_path):
             os.makedirs(self.model_path, exist_ok=True)
