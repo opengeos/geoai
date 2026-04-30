@@ -191,18 +191,37 @@ class VGGPerceptualLoss(nn.Module):
 
     This loss helps generate images that are not only visually similar
     but also perceptually similar to the target images.
+
+    By default, ImageNet VGG19 weights are loaded explicitly. Depending on
+    the local torchvision cache, this may trigger a one-time weight download.
     """
 
-    def __init__(self, layer_index=9):
+    def __init__(self, layer_index=9, weights=None):
         """
-        layer_index: index in features list to cut at
-                     (e.g., 9 ≈ relu2_2 for VGG19)
+        Args:
+            layer_index: index in features list to cut at
+                         (e.g., 9 ≈ relu2_2 for VGG19)
+            weights: torchvision VGG19 weights to load. Defaults to the
+                     ImageNet pretrained VGG19 weights. Pass ``False`` to
+                     disable pretrained weights when using older torchvision
+                     versions, or ``None`` only when explicitly overriding
+                     the default behavior in newer versions.
         """
         super(VGGPerceptualLoss, self).__init__()
-        vgg = models.vgg19().features
+
+        vgg19_weights_enum = getattr(models, "VGG19_Weights", None)
+        if weights is None and vgg19_weights_enum is not None:
+            weights = vgg19_weights_enum.DEFAULT
+
+        try:
+            vgg = models.vgg19(weights=weights).features
+        except TypeError:
+            vgg = models.vgg19(pretrained=bool(weights)).features
+
         self.slice = nn.Sequential(*[vgg[i] for i in range(layer_index + 1)])
         for p in self.slice.parameters():
             p.requires_grad = False  # freeze VGG params
+        self.slice.eval()
         self.criterion = nn.L1Loss()
 
     def forward(self, x, y):
