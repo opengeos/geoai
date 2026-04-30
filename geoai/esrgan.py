@@ -696,10 +696,15 @@ class ESRGANDataPreprocess:
         Returns:
             np.ndarray: Array read from the raster file.
         """
-        with gdal.Open(raster_file) as ds:
+        ds = gdal.Open(raster_file)
+        if ds is None:
+            raise ValueError(f"Failed to open raster file {raster_file}")
+        try:
             band = ds.GetRasterBand(band)
             arr = band.ReadAsArray()
             nodata = band.GetNoDataValue()
+        finally:
+            ds = None
         if arr is None:
             raise ValueError(f"Failed to read array from {raster_file}")
         arr = cls._pad(arr=arr, target_shape=shape, fill_value=nodata)
