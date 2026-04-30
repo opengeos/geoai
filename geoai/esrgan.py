@@ -167,7 +167,6 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(512, 1, 1),
-            nn.Sigmoid(),
         )
         self.apply(self.weights_init)
 
