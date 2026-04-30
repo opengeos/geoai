@@ -1639,7 +1639,7 @@ def _train_with_custom_iou(
         # when training set grew). Other modes still need full tensors.
         stream_iou = iou_mode == "mean"
         conf = (
-            torch.zeros(num_classes, num_classes, dtype=torch.long)
+            torch.zeros(num_classes, num_classes, dtype=torch.long, device=device)
             if stream_iou
             else None
         )
@@ -1672,14 +1672,12 @@ def _train_with_custom_iou(
                     else:
                         t_flat = targets.reshape(-1).to(torch.int64)
                         p_flat = preds.reshape(-1).to(torch.int64)
-                    # Clamp to valid class range to avoid out-of-bounds bincount
+                    # preds (argmax) always in [0, num_classes-1]; clamp targets only
                     t_flat = t_flat.clamp_(0, num_classes - 1)
-                    p_flat = p_flat.clamp_(0, num_classes - 1)
                     idx = t_flat * num_classes + p_flat
-                    binc = torch.bincount(
+                    conf += torch.bincount(
                         idx, minlength=num_classes * num_classes
-                    ).cpu()
-                    conf += binc.view(num_classes, num_classes).to(torch.long)
+                    ).view(num_classes, num_classes)
                 else:
                     all_preds.append(preds.cpu())
                     all_targets.append(targets.cpu())
@@ -1688,6 +1686,7 @@ def _train_with_custom_iou(
         val_losses.append(val_loss)
 
         if stream_iou:
+            conf = conf.cpu()
             tp = conf.diag().to(torch.float64)
             fp = conf.sum(0).to(torch.float64) - tp
             fn = conf.sum(1).to(torch.float64) - tp
