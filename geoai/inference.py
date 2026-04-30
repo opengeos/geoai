@@ -738,6 +738,17 @@ def predict_geotiff_superres(
                     raise ValueError(
                         f"Model output has {preds.shape[1]} channels but num_classes={num_classes}"
                     )
+                expected_hr_tile_size = tile_size * scale
+                if (
+                    preds.shape[2] != expected_hr_tile_size
+                    or preds.shape[3] != expected_hr_tile_size
+                ):
+                    raise ValueError(
+                        "Model output spatial dimensions "
+                        f"{preds.shape[2]}x{preds.shape[3]} do not match the expected "
+                        f"{expected_hr_tile_size}x{expected_hr_tile_size} for "
+                        f"tile_size={tile_size} and scale={scale}"
+                    )
 
             for i, (actual_h, actual_w) in enumerate(batch_actual_sizes):
                 row_start, col_start = batch_positions[i]
