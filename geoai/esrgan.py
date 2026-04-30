@@ -825,24 +825,23 @@ class ESRGANDataPreprocess:
             tar_flip2 = np.flip(target_noise, 1)
             input_arrays = [arr_noise, arr_flip1, arr_flip2]
             target_arrays = [target_noise, tar_flip1, tar_flip2]
-            for a in input_arrays:
-                # a = np.stack((a, canny(a)))
-                new_inputs.append(a)
-                new_inputs.append(np.rot90(a, k=1))
-                new_inputs.append(np.rot90(a, k=3))
-            for a in target_arrays:
-                # a = np.stack((a, canny(a)))
-                new_targets.append(a)
-                new_targets.append(np.rot90(a, k=1))
-                new_targets.append(np.rot90(a, k=3))
+            for input_arr, target_arr in zip(input_arrays, target_arrays):
+                # input_arr = np.stack((input_arr, canny(input_arr)))
+                # target_arr = np.stack((target_arr, canny(target_arr)))
+                new_inputs.append(input_arr)
+                new_targets.append(target_arr)
+                new_inputs.append(np.rot90(input_arr, k=1))
+                new_targets.append(np.rot90(target_arr, k=1))
+                new_inputs.append(np.rot90(input_arr, k=3))
+                new_targets.append(np.rot90(target_arr, k=3))
         x = np.array(
             [
                 np.reshape(i, (1, target_shp[0], target_shp[1])).copy()
-                for i in target_imgs
+                for i in new_targets
             ]
         )
         y = np.array(
-            [np.reshape(i, (1, input_shp[0], input_shp[1])).copy() for i in input_imgs]
+            [np.reshape(i, (1, input_shp[0], input_shp[1])).copy() for i in new_inputs]
         )
         # Create random index at length of input, target arrays then apply
         if manual_seed:
