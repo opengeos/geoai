@@ -173,6 +173,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(512, 1, 1),
+            nn.Sigmoid(),
         )
         self.apply(self.weights_init)
 
@@ -201,33 +202,16 @@ class VGGPerceptualLoss(nn.Module):
     By default, ImageNet VGG19 weights are loaded explicitly. Depending on
     the local torchvision cache, this may trigger a one-time weight download.
     """
-
-    def __init__(self, layer_index=9, weights=None):
+    def __init__(self, layer_index=9):
         """
-        Args:
-            layer_index: index in features list to cut at
-                         (e.g., 9 ≈ relu2_2 for VGG19)
-            weights: torchvision VGG19 weights to load. Defaults to the
-                     ImageNet pretrained VGG19 weights. Pass ``False`` to
-                     disable pretrained weights when using older torchvision
-                     versions, or ``None`` only when explicitly overriding
-                     the default behavior in newer versions.
+        layer_index: index in features list to cut at
+                     (e.g., 9 ≈ relu2_2 for VGG19)
         """
         super(VGGPerceptualLoss, self).__init__()
-
-        vgg19_weights_enum = getattr(models, "VGG19_Weights", None)
-        if weights is None and vgg19_weights_enum is not None:
-            weights = vgg19_weights_enum.DEFAULT
-
-        try:
-            vgg = models.vgg19(weights=weights).features
-        except TypeError:
-            vgg = models.vgg19(pretrained=bool(weights)).features
-
+        vgg = models.vgg19().features
         self.slice = nn.Sequential(*[vgg[i] for i in range(layer_index + 1)])
         for p in self.slice.parameters():
             p.requires_grad = False  # freeze VGG params
-        self.slice.eval()
         self.criterion = nn.L1Loss()
 
     def forward(self, x, y):
@@ -235,6 +219,7 @@ class VGGPerceptualLoss(nn.Module):
         x_vgg = self.slice(x)
         y_vgg = self.slice(y)
         return self.criterion(x_vgg, y_vgg)
+
 
 
 class NormalizeToVGG(nn.Module):
@@ -542,26 +527,16 @@ class ESRGANDataPreprocess:
                     this_xmin = tile_range[0]
                     this_ymax = tile_range[1]
                     xoff = (tile_range[0] - xmin) / xres + i * (tile_size - overlap)
-                    yoff = (tile_range[1] - ymax) / yres + j * (tile_size - overlap)
-                    this_x_size = (
-                        tile_size if xcells - xoff >= tile_size else xcells - xoff
-                    )
-                    this_y_size = (
-                        tile_size if ycells - yoff >= tile_size else ycells - yoff
-                    )
+                    yoff = (tile_range[1] - ymax) / yres +j * (tile_size - overlap) 
+                    this_x_size = tile_size if xcells - xoff >= tile_size else xcells - xoff 
+                    this_y_size = tile_size if ycells - yoff >= tile_size else ycells - yoff
                 else:
                     xoff = i * (tile_size - overlap)
                     yoff = j * (tile_size - overlap)
-                    this_x_size = (
-                        tile_size if xcells - xoff >= tile_size else xcells - xoff
-                    )
-                    this_y_size = (
-                        tile_size if ycells - yoff >= tile_size else ycells - yoff
-                    )
+                    this_x_size = tile_size if xcells - xoff >= tile_size else xcells - xoff
+                    this_y_size = tile_size if ycells - yoff >= tile_size else ycells - yoff
                 # Read from source image at windowed (subset) area
-                arr = bnd.ReadAsArray(
-                    int(xoff), int(yoff), int(this_x_size), int(this_y_size)
-                )
+                arr = bnd.ReadAsArray(int(xoff), int(yoff), int(this_x_size), int(this_y_size))
                 if arr is None or arr.size == 0 or arr.max() == 0:
                     tile_ranges.append([])
                     continue  # No data found
@@ -573,7 +548,7 @@ class ESRGANDataPreprocess:
                     this_y_size,
                     1,
                     gdal.GDT_Float32,
-                    options=["COMPRESS=LZW"],
+                    options=["COMPRESS=LZW"]
                 )
                 out_band = out_ds.GetRasterBand(1)
                 out_band.WriteArray(arr)
@@ -583,18 +558,8 @@ class ESRGANDataPreprocess:
                 out_ds = None
                 if is_target:
                     # Conserve cumulative list of tile ranges for target file
-                    tile_ranges.append(
-                        (
-                            this_xmin,
-                            this_ymax,
-                            no_tiles_width,
-                            no_tiles_height,
-                            xres,
-                            yres,
-                            sr,
-                        )
-                    )
-        return tile_ranges
+                    tile_ranges.append((this_xmin, this_ymax, no_tiles_width, no_tiles_height, xres, yres, sr))
+        return tile_ranges    
 
     def initiate_preprocessing(self):
         """
@@ -783,38 +748,25 @@ class ESRGANDataPreprocess:
         targets_dir = os.path.join(self.output_dir, "target", str(band))
         inputs_dir = os.path.join(self.output_dir, "input", str(band))
         # Retrieve targets images (high/goal resolution) from source folder
-        src_imgs = glob(os.path.join(targets_dir, "*.tif"))
+        src_imgs = glob(os.path.join(targets_dir, '*.tif'))
         target_imgs = []
         target_resolution = (self.tile_size, self.tile_size)
-        input_resolution = (
-            int(self.tile_size / self.scale_factor),
-            int(self.tile_size / self.scale_factor),
-        )
+        input_resolution = (int(self.tile_size / self.scale_factor), int(self.tile_size / self.scale_factor))
         for img in src_imgs:
             if not using_tiles:
-                this_img = self._get_as_array(img, target_resolution, band).astype(
-                    np.float64
-                )
+                this_img = self._get_as_array(img, target_resolution, band).astype(np.float64)
             else:
-                this_img = self._get_as_array(img, target_resolution, 1).astype(
-                    np.float64
-                )
+                this_img = self._get_as_array(img, target_resolution, 1).astype(np.float64)
             # Filenames are used to match target and input images
             target_imgs.append((this_img, os.path.basename(img)))
-        target_imgs = [
-            i for i in target_imgs if np.array(i[0]).max() > 0
-        ]  # Allow for zeros/nulls if values are present
-        input_im_fs = glob(os.path.join(inputs_dir, "*.tif"))
+        target_imgs = [i for i in target_imgs if np.array(i[0]).max() > 0]  # Allow for zeros/nulls if values are present
+        input_im_fs = glob(os.path.join(inputs_dir, '*.tif'))
         input_imgs = []
         for img in input_im_fs:
             if not using_tiles:
-                this_img = self._get_as_array(img, input_resolution, band).astype(
-                    np.float64
-                )
+                this_img = self._get_as_array(img, input_resolution, band).astype(np.float64)
             else:
-                this_img = self._get_as_array(img, input_resolution, 1).astype(
-                    np.float64
-                )
+                this_img = self._get_as_array(img, input_resolution, 1).astype(np.float64)
             input_imgs.append((this_img, os.path.basename(img)))
         # Omit any images not sourced in targets folder
         input_imgs = [i for i in input_imgs if i[1] in [j[1] for j in target_imgs]]
@@ -828,7 +780,7 @@ class ESRGANDataPreprocess:
         # Individually _normalize images with pair from other set
         new_inputs = []
         new_targets = []
-        for arr, target in zip(input_imgs, target_imgs):
+        for (arr, target) in zip(input_imgs, target_imgs):
             # Interpolate null values from target images to input images
             arr, target = self._match_nulls(arr, target)
             target = match_histograms(target, arr, channel_axis=None)
@@ -838,26 +790,22 @@ class ESRGANDataPreprocess:
             arr_flip2 = np.flip(arr_noise, 1)
             tar_flip1 = np.flip(target_noise, 0)
             tar_flip2 = np.flip(target_noise, 1)
-            input_arrays = [arr_noise, arr_flip1, arr_flip2]
-            target_arrays = [target_noise, tar_flip1, tar_flip2]
-            for input_arr, target_arr in zip(input_arrays, target_arrays):
-                # input_arr = np.stack((input_arr, canny(input_arr)))
-                # target_arr = np.stack((target_arr, canny(target_arr)))
-                new_inputs.append(input_arr)
-                new_targets.append(target_arr)
-                new_inputs.append(np.rot90(input_arr, k=1))
-                new_targets.append(np.rot90(target_arr, k=1))
-                new_inputs.append(np.rot90(input_arr, k=3))
-                new_targets.append(np.rot90(target_arr, k=3))
-        x = np.array(
-            [
-                np.reshape(i, (1, target_shp[0], target_shp[1])).copy()
-                for i in new_targets
-            ]
-        )
-        y = np.array(
-            [np.reshape(i, (1, input_shp[0], input_shp[1])).copy() for i in new_inputs]
-        )
+            input_arrays = [arr_noise,
+                            arr_flip1, arr_flip2]
+            target_arrays = [target_noise,
+                            tar_flip1, tar_flip2]
+            for a in input_arrays:
+                # a = np.stack((a, canny(a)))
+                new_inputs.append(a)
+                new_inputs.append(np.rot90(a, k=1))
+                new_inputs.append(np.rot90(a, k=3))
+            for a in target_arrays:
+                # a = np.stack((a, canny(a)))
+                new_targets.append(a)
+                new_targets.append(np.rot90(a, k=1))
+                new_targets.append(np.rot90(a, k=3))
+        x = np.array([np.reshape(i, (1,target_shp[0],target_shp[1])).copy() for i in target_imgs])
+        y = np.array([np.reshape(i, (1,input_shp[0],input_shp[1])).copy() for i in input_imgs])
         # Create random index at length of input, target arrays then apply
         if manual_seed:
             torch.manual_seed(manual_seed)
@@ -867,8 +815,8 @@ class ESRGANDataPreprocess:
         if save_tensor:
             save_dir = os.path.join(self.output_dir, "tensors")
             os.makedirs(save_dir, exist_ok=True)
-            torch.save(x, os.path.join(save_dir, "x_hr_tensors.pt"))
-            torch.save(y, os.path.join(save_dir, "y_lr_tensors.pt"))
+            torch.save(x, os.path.join(save_dir, 'x_hr_tensors.pt'))
+            torch.save(y, os.path.join(save_dir, 'y_lr_tensors.pt'))
         if verbose:
             print(f"Completed {len(x)} batches from {self.output_dir}.")
         if not save_tensor:
