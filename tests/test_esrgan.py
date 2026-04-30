@@ -242,7 +242,9 @@ class TestPredictGeotiffSuperres(unittest.TestCase):
 
                 # With nearest-neighbor upsampling, the top-left scale x scale block matches input[0,0]
                 self.assertAlmostEqual(float(out[0, 0]), float(data[0, 0]))
-                self.assertAlmostEqual(float(out[scale - 1, scale - 1]), float(data[0, 0]))
+                self.assertAlmostEqual(
+                    float(out[scale - 1, scale - 1]), float(data[0, 0])
+                )
 
 
 if __name__ == "__main__":
