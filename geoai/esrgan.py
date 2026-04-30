@@ -96,9 +96,7 @@ class ESRGANGenerator(nn.Module):
         if not isinstance(scale, int) or scale <= 0:
             raise ValueError(f"scale must be a positive integer, got {scale!r}")
         if (scale & (scale - 1)) != 0:
-            raise ValueError(
-                f"scale must be a power of 2 (e.g., 2, 4, 8), got {scale}"
-            )
+            raise ValueError(f"scale must be a power of 2 (e.g., 2, 4, 8), got {scale}")
         self.scale = scale
 
         self.conv_first = nn.Conv2d(in_nc, nf, 3, 1, 1, bias=False)
@@ -449,12 +447,13 @@ class ESRGANDataPreprocess:
                 input_ds = None
                 out_ds = None
 
-
-    def preprocess_band(self,
-                        ds: gdal.Dataset,
-                        band: int,
-                        is_target: bool = True,
-                        tile_ranges: List[Tuple[float, float, int, int, float, float]] = None) -> List[Tuple[float, float, int, int, float, float]]:
+    def preprocess_band(
+        self,
+        ds: gdal.Dataset,
+        band: int,
+        is_target: bool = True,
+        tile_ranges: List[Tuple[float, float, int, int, float, float]] = None,
+    ) -> List[Tuple[float, float, int, int, float, float]]:
         """
         Preprocess a single band from a GDAL dataset.
 
@@ -474,7 +473,7 @@ class ESRGANDataPreprocess:
         """
         if tile_ranges is None:
             tile_ranges = []
-        sr = ds.GetSpatialRef().GetAttrValue('AUTHORITY', 1)
+        sr = ds.GetSpatialRef().GetAttrValue("AUTHORITY", 1)
         if not is_target:
             if sr != tile_ranges[0][6]:
                 # The inputs have a different spatial projection.  Reprojected intermediate file needed
