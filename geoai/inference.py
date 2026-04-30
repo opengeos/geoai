@@ -795,11 +795,18 @@ def predict_geotiff_superres(
         compress=compress,
     )
 
+    output_array_to_write = np.asarray(output_array, dtype=output_dtype)
+
     with rasterio.open(output_raster, "w", **profile) as dst:
         if out_count == 1:
-            dst.write(output_array[0] if output_array.ndim == 3 else output_array, 1)
+            dst.write(
+                output_array_to_write[0]
+                if output_array_to_write.ndim == 3
+                else output_array_to_write,
+                1,
+            )
         else:
-            dst.write(output_array)
+            dst.write(output_array_to_write)
 
     if verbose:
         print(f"Output saved to: {output_raster}")
