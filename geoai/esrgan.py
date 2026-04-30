@@ -445,7 +445,7 @@ class ESRGANDataPreprocess:
     ) -> List[Tuple[float, float, int, int, float, float]]:
 =======
 
-    def preprocess_band(self, 
+    def preprocess_band(self,
                         ds: gdal.Dataset,
                         band: int,
                         is_target: bool = True,
