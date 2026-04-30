@@ -800,9 +800,11 @@ def predict_geotiff_superres(
     with rasterio.open(output_raster, "w", **profile) as dst:
         if out_count == 1:
             dst.write(
-                output_array_to_write[0]
-                if output_array_to_write.ndim == 3
-                else output_array_to_write,
+                (
+                    output_array_to_write[0]
+                    if output_array_to_write.ndim == 3
+                    else output_array_to_write
+                ),
                 1,
             )
         else:
