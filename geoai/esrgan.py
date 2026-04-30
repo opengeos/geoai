@@ -1152,7 +1152,7 @@ class ESRGAN:
             loss_D_avg = 0.0
             loss_pixel_avg = 0.0
             loss_vgg_avg = 0.0
-            batches = low_res.shape[0]
+            batches = len(train_loader)
 
             for imgs_lr, imgs_hr in tqdm(train_loader, ascii=True, total=batches):
 
