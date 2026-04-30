@@ -228,7 +228,19 @@ class NormalizeToVGG(nn.Module):
         )
 
     def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
-        # actual per-image tensor normalization using ImageNet statistics
+        if input_tensor.ndim != 4:
+            raise ValueError(
+                f"NormalizeToVGG expects a 4D tensor (B, C, H, W), got shape {tuple(input_tensor.shape)}"
+            )
+
+        # VGG expects 3-channel input. For single-band imagery, repeat the channel.
+        if input_tensor.shape[1] == 1:
+            input_tensor = input_tensor.repeat(1, 3, 1, 1)
+        elif input_tensor.shape[1] != 3:
+            raise ValueError(
+                f"NormalizeToVGG expects 1 or 3 channels, got {input_tensor.shape[1]}"
+            )
+
         return (input_tensor - self.mean) / self.std
 
 
@@ -423,6 +435,7 @@ class ESRGANDataPreprocess:
                 input_ds = None
                 out_ds = None
 
+<<<<<<< Updated upstream
     def preprocess_band(
         self,
         ds: gdal.Dataset,
@@ -430,6 +443,14 @@ class ESRGANDataPreprocess:
         is_target: bool = True,
         tile_ranges: List[Tuple[float, float, int, int, float, float]] = [],
     ) -> List[Tuple[float, float, int, int, float, float]]:
+=======
+
+    def preprocess_band(self, 
+                        ds: gdal.Dataset,
+                        band: int,
+                        is_target: bool = True,
+                        tile_ranges: List[Tuple[float, float, int, int, float, float]] = None) -> List[Tuple[float, float, int, int, float, float]]:
+>>>>>>> Stashed changes
         """
         Preprocess a single band from a GDAL dataset.
 
@@ -447,7 +468,13 @@ class ESRGANDataPreprocess:
         Returns:
             List of tile ranges
         """
+<<<<<<< Updated upstream
         sr = ds.GetSpatialRef().GetAttrValue("AUTHORITY", 1)
+=======
+        if tile_ranges is None:
+            tile_ranges = []
+        sr = ds.GetSpatialRef().GetAttrValue('AUTHORITY', 1)
+>>>>>>> Stashed changes
         if not is_target:
             if sr != tile_ranges[0][6]:
                 # The inputs have a different spatial projection.  Reprojected intermediate file needed
