@@ -1000,6 +1000,7 @@ class ESRGAN:
             ...     batch_size=8,
             ... )
         """
+
         # check for either presence of prepared tensors or parameterized inputs
         def _resolve_tensor_input(tensor_or_path, name):
             if isinstance(tensor_or_path, (str, bytes, os.PathLike)):
@@ -1014,9 +1015,7 @@ class ESRGAN:
             )
         elif load_tensors:
             if not getattr(self, "data_path", None):
-                raise ValueError(
-                    "load_tensors is True but data_path is not set."
-                )
+                raise ValueError("load_tensors is True but data_path is not set.")
             x_hr_tensor_path = os.path.join(self.data_path, "x_hr_tensors.pt")
             y_lr_tensor_path = os.path.join(self.data_path, "y_lr_tensors.pt")
             if not os.path.exists(x_hr_tensor_path):
