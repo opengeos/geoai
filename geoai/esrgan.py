@@ -1001,28 +1001,37 @@ class ESRGAN:
             ... )
         """
         # check for either presence of prepared tensors or parameterized inputs
+        def _resolve_tensor_input(tensor_or_path, name):
+            if isinstance(tensor_or_path, (str, bytes, os.PathLike)):
+                return torch.load(tensor_or_path)
+            if tensor_or_path is None:
+                raise ValueError(f"{name} must not be None.")
+            return tensor_or_path
+
         if not load_tensors and (low_res is None or high_res is None):
             raise ValueError(
                 "Either load_tensors must be True or both low_res and high_res must be provided."
             )
-        elif load_tensors and not os.path.exists(
-            os.path.join(self.data_path, "x_hr_tensors.pt")
-        ):
-            raise ValueError(
-                "load_tensors is True but x_hr_tensors.pt not found in data_path."
-            )
-        elif load_tensors and not os.path.exists(
-            os.path.join(self.data_path, "y_lr_tensors.pt")
-        ):
-            raise ValueError(
-                "load_tensors is True but y_lr_tensors.pt not found in data_path."
-            )
-        elif low_res is not None and high_res is not None:
-            low_res = torch.load(low_res)
-            high_res = torch.load(high_res)
+        elif load_tensors:
+            if not getattr(self, "data_path", None):
+                raise ValueError(
+                    "load_tensors is True but data_path is not set."
+                )
+            x_hr_tensor_path = os.path.join(self.data_path, "x_hr_tensors.pt")
+            y_lr_tensor_path = os.path.join(self.data_path, "y_lr_tensors.pt")
+            if not os.path.exists(x_hr_tensor_path):
+                raise ValueError(
+                    "load_tensors is True but x_hr_tensors.pt not found in data_path."
+                )
+            if not os.path.exists(y_lr_tensor_path):
+                raise ValueError(
+                    "load_tensors is True but y_lr_tensors.pt not found in data_path."
+                )
+            low_res = torch.load(y_lr_tensor_path)
+            high_res = torch.load(x_hr_tensor_path)
         else:
-            low_res = torch.load(os.path.join(self.data_path, "y_lr_tensors.pt"))
-            high_res = torch.load(os.path.join(self.data_path, "x_hr_tensors.pt"))
+            low_res = _resolve_tensor_input(low_res, "low_res")
+            high_res = _resolve_tensor_input(high_res, "high_res")
         device = get_device()
         if use_mp:
             mp.set_start_method("spawn", force=True)
