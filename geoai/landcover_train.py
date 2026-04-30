@@ -1630,8 +1630,21 @@ def _train_with_custom_iou(
         # ===== VALIDATION PHASE WITH CUSTOM IoU =====
         model.eval()
         val_loss = 0.0
-        all_preds = []
-        all_targets = []
+
+        # Map "standard" to "mean" for landcover_iou
+        iou_mode = "mean" if validation_iou_mode == "standard" else validation_iou_mode
+
+        # Streaming confusion matrix for "mean" mode avoids materializing the
+        # full validation set on CPU each epoch (root cause of OOM after epoch 1
+        # when training set grew). Other modes still need full tensors.
+        stream_iou = iou_mode == "mean"
+        conf = (
+            torch.zeros(num_classes, num_classes, dtype=torch.long, device=device)
+            if stream_iou
+            else None
+        )
+        all_preds = [] if not stream_iou else None
+        all_targets = [] if not stream_iou else None
 
         with torch.no_grad():
             for images, targets in val_loader:
@@ -1645,33 +1658,56 @@ def _train_with_custom_iou(
                     loss = criterion(outputs, targets)
                 val_loss += loss.item()
 
-                # Collect predictions and targets for custom IoU
-                # Keep argmax on GPU, only move final result to CPU
-                preds = torch.argmax(outputs, dim=1).cpu()
-                all_preds.append(preds)
-                all_targets.append(targets.cpu())
+                preds = torch.argmax(outputs, dim=1)
+
+                if stream_iou:
+                    # Stream confusion matrix on GPU, accumulate on CPU.
+                    # bool is a subclass of int; treat bool False as "no ignore".
+                    if isinstance(ignore_index, int) and not isinstance(
+                        ignore_index, bool
+                    ):
+                        valid = targets != ignore_index
+                        t_flat = targets[valid].to(torch.int64)
+                        p_flat = preds[valid].to(torch.int64)
+                    else:
+                        t_flat = targets.reshape(-1).to(torch.int64)
+                        p_flat = preds.reshape(-1).to(torch.int64)
+                    # preds (argmax) always in [0, num_classes-1]; clamp targets only
+                    t_flat = t_flat.clamp_(0, num_classes - 1)
+                    idx = t_flat * num_classes + p_flat
+                    conf += torch.bincount(
+                        idx, minlength=num_classes * num_classes
+                    ).view(num_classes, num_classes)
+                else:
+                    all_preds.append(preds.cpu())
+                    all_targets.append(targets.cpu())
 
         val_loss = val_loss / len(val_loader)
         val_losses.append(val_loss)
 
-        # Concatenate all predictions and targets
-        all_preds = torch.cat(all_preds, dim=0)
-        all_targets = torch.cat(all_targets, dim=0)
-
-        # Calculate IoU based on validation_iou_mode
-        # Map "standard" to "mean" for landcover_iou
-        iou_mode = "mean" if validation_iou_mode == "standard" else validation_iou_mode
-
-        if iou_mode == "mean":
-            # Standard mean IoU
-            val_iou = landcover_iou(
-                pred=all_preds,
-                target=all_targets,
-                num_classes=num_classes,
-                ignore_index=ignore_index,
-                mode="mean",
+        if stream_iou:
+            conf = conf.cpu()
+            tp = conf.diag().to(torch.float64)
+            fp = conf.sum(0).to(torch.float64) - tp
+            fn = conf.sum(1).to(torch.float64) - tp
+            denom = tp + fp + fn
+            iou_per_class = torch.where(
+                denom > 0, tp / (denom + 1e-10), torch.zeros_like(tp)
             )
+            present = denom > 0
+            # Exclude ignore_index from mean, matching landcover_iou(mode='mean') behaviour.
+            if isinstance(ignore_index, int) and not isinstance(ignore_index, bool):
+                if 0 <= ignore_index < num_classes:
+                    present[ignore_index] = False
+            val_iou = iou_per_class[present].mean().item() if present.any() else 0.0
             iou_display = f"Val IoU: {val_iou:.4f}"
+        else:
+            # Concatenate all predictions and targets (legacy path for non-mean modes)
+            all_preds = torch.cat(all_preds, dim=0)
+            all_targets = torch.cat(all_targets, dim=0)
+
+        if stream_iou:
+            pass  # val_iou already computed above
 
         elif iou_mode == "perclass_frequency":
             # Per-class frequency weighted IoU
