@@ -970,7 +970,7 @@ class ESRGAN:
             num_epochs (int): Number of epochs to train for.
             last_epoch (int): If defined, resume processing from previous iteration.  Zipped model training weights and data (as .pt files) must be defined.
             use_mp (bool): Engage pytorch multiprocessing.
-            detect_anomaly (bool): Use pytorch autogradient anomally detection.
+            detect_anomaly (bool): Use pytorch autogradient anomaly detection.
             input_channels (int): Number of input channels for the generator.
             output_channels (int): Number of output channels for the generator.
             nfilters (int): Number of filters for the generator.

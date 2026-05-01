@@ -142,8 +142,5 @@ ENV/
 .vscode/
 .DS_Store
 CLAUDE.md
-lightning_logs/
-TASKS.md
-
-# working
+lightning_logs working
 scratch/
