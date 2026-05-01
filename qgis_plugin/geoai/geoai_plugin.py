@@ -71,6 +71,7 @@ class GeoAIPlugin:
         """
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
+        self._disable_application_menu_role(action)
         action.triggered.connect(callback)
         action.setEnabled(enabled_flag)
         action.setCheckable(checkable)
@@ -87,6 +88,15 @@ class GeoAIPlugin:
         self.actions.append(action)
 
         return action
+
+    @staticmethod
+    def _disable_application_menu_role(action):
+        """Keep plugin actions in the GeoAI menu on macOS."""
+        try:
+            no_role = QAction.MenuRole.NoRole
+        except AttributeError:
+            no_role = QAction.NoRole
+        action.setMenuRole(no_role)
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""

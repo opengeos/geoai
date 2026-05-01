@@ -12,10 +12,13 @@ to the plugin package (``qgis_plugin/geoai``) instead of the unrelated
 top-level library package at the repo root.
 """
 
+import os
 import pathlib
 import sys
 import types
 from unittest.mock import MagicMock
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 PLUGIN_PARENT = pathlib.Path(__file__).resolve().parent.parent
 if str(PLUGIN_PARENT) in sys.path:
