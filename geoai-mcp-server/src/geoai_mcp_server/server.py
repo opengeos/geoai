@@ -231,7 +231,9 @@ async def segment_objects_with_prompts(
         # Calculate statistics
         num_objects = 0
         if isinstance(masks, dict):
-            num_objects = sum(len(v) if hasattr(v, "__len__") else 1 for v in masks.values())
+            num_objects = sum(
+                len(v) if hasattr(v, "__len__") else 1 for v in masks.values()
+            )
         elif hasattr(masks, "__len__"):
             num_objects = len(masks) if not isinstance(masks, str) else 1
 
