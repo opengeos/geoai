@@ -1,0 +1,3 @@
+# ESRGAN module
+
+::: geoai.esrgan
