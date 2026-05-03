@@ -1,5 +1,7 @@
 """ESRGAN - Enhanced Super-Resolution Generative Adversarial Networks"""
 
+from __future__ import annotations
+
 from glob import glob
 from typing import List, LiteralString, Tuple
 import math
@@ -7,7 +9,10 @@ import os
 import sys
 
 from affine import Affine
-from osgeo import gdal
+try:
+    from osgeo import gdal  # type: ignore
+except ImportError:  # pragma: no cover
+    gdal = None
 from rasterio.crs import CRS
 from rasterio.enums import Resampling
 from rasterio.warp import reproject
@@ -27,8 +32,19 @@ import torchvision.models as models
 
 from .utils.device import get_device
 
+
 # gdal related exceptions are built into processing functionality
-gdal.DontUseExceptions()
+def _require_gdal():
+    if gdal is None:
+        raise ImportError(
+            "GDAL is required for ESRGAN preprocessing. Install GDAL (e.g. 'pip install GDAL' "
+            "or 'conda install -c conda-forge gdal') and ensure the 'osgeo' package is importable."
+        )
+
+
+if gdal is not None:
+    gdal.DontUseExceptions()
+
 
 
 class ResidualDenseBlock(nn.Module):
@@ -252,6 +268,41 @@ class NormalizeToVGG(nn.Module):
         return (input_tensor - self.mean) / self.std
 
 
+
+class ShardedTensorDataset(Dataset):
+    """
+    Helper class to help avoid loading large tensors into RAM or swap disk. 
+    "Shards" are pre-saved tensor files that are loaded on-demand.
+    """
+    def __init__(self, shards_index: list[tuple[str, str, int]]):
+        self._shards_index = shards_index
+        self._prefix = [0]
+        for _, _, n in shards_index:
+            self._prefix.append(self._prefix[-1] + int(n))
+        self._cache_shard_idx = None
+        self._cache_x = None
+        self._cache_y = None
+
+    def __len__(self) -> int:
+        return self._prefix[-1]
+
+    def _load_shard(self, shard_idx: int):
+        if self._cache_shard_idx == shard_idx:
+            return
+        x_path, y_path, _ = self._shards_index[shard_idx]
+        self._cache_x = torch.load(x_path)
+        self._cache_y = torch.load(y_path)
+        self._cache_shard_idx = shard_idx
+
+    def __getitem__(self, idx: int):
+        if idx < 0 or idx >= len(self):
+            raise IndexError(idx)
+        shard_idx = int(np.searchsorted(self._prefix, idx, side="right") - 1)
+        local_idx = idx - self._prefix[shard_idx]
+        self._load_shard(shard_idx)
+        return self._cache_y[local_idx], self._cache_x[local_idx]
+
+
 class ESRGANDataPreprocess:
     """
     Data preprocessing for ESRGAN training.
@@ -340,7 +391,7 @@ class ESRGANDataPreprocess:
 
     def preprocess_single_inputs(
         self,
-        ds: gdal.Dataset,
+        ds: "gdal.Dataset",
         band: int,
         resample_method: LiteralString[
             "bilinear",
@@ -369,6 +420,7 @@ class ESRGANDataPreprocess:
             resample_method: Resampling method to use.
                              Must be one of: 'bilinear', 'cubic', 'average', 'cubicspline', 'max', 'min', 'med', 'nearest'
         """
+        _require_gdal()
         match (resample_method):
             case "bilinear":
                 resample = gdal.GRA_Bilinear
@@ -449,7 +501,7 @@ class ESRGANDataPreprocess:
 
     def preprocess_band(
         self,
-        ds: gdal.Dataset,
+        ds: "gdal.Dataset",
         band: int,
         is_target: bool = True,
         tile_ranges: List[Tuple[float, float, int, int, float, float]] = None,
@@ -471,6 +523,7 @@ class ESRGANDataPreprocess:
         Returns:
             List of tile ranges
         """
+        _require_gdal()
         if tile_ranges is None:
             tile_ranges = []
         sr = ds.GetSpatialRef().GetAttrValue("AUTHORITY", 1)
@@ -584,6 +637,8 @@ class ESRGANDataPreprocess:
         """
         After setting up source raster information and parameters, initiate tiling.
         """
+        _require_gdal()
+        these_tile_ranges = None
         if self.target_file is not None:
             ds = gdal.Open(self.target_file)
             for band in range(1, ds.RasterCount + 1):
@@ -602,6 +657,9 @@ class ESRGANDataPreprocess:
                     )
                 else:
                     self.preprocess_single_inputs(ds, band)
+
+        if self.use_downsampled_targets:
+            return
         if self.input_file is not None:
             ds = gdal.Open(self.input_file)
             for band in range(1, ds.RasterCount + 1):
@@ -695,6 +753,7 @@ class ESRGANDataPreprocess:
         Returns:
             np.ndarray: Array read from the raster file.
         """
+        _require_gdal()
         ds = gdal.Open(raster_file)
         if ds is None:
             raise ValueError(f"Failed to open raster file {raster_file}")
@@ -746,10 +805,12 @@ class ESRGANDataPreprocess:
     def to_tensor(
         self,
         save_tensor: bool = True,
+        data_augmentation: bool = True,
         manual_seed: int = None,
         verbose: bool = True,
         band: int = 1,
         using_tiles: bool = True,
+        chunk_size: int = 512,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Convert images in src_dir to tensors.
@@ -768,98 +829,108 @@ class ESRGANDataPreprocess:
         inputs_dir = os.path.join(self.output_dir, "input", str(band))
         # Retrieve targets images (high/goal resolution) from source folder
         src_imgs = glob(os.path.join(targets_dir, "*.tif"))
-        target_imgs = []
         target_resolution = (self.tile_size, self.tile_size)
         input_resolution = (
             int(self.tile_size / self.scale_factor),
             int(self.tile_size / self.scale_factor),
         )
-        for img in src_imgs:
-            if not using_tiles:
-                this_img = self._get_as_array(img, target_resolution, band).astype(
-                    np.float64
-                )
-            else:
-                this_img = self._get_as_array(img, target_resolution, 1).astype(
-                    np.float64
-                )
-            # Filenames are used to match target and input images
-            target_imgs.append((this_img, os.path.basename(img)))
-        target_imgs = [
-            i for i in target_imgs if np.array(i[0]).max() > 0
-        ]  # Allow for zeros/nulls if values are present
         input_im_fs = glob(os.path.join(inputs_dir, "*.tif"))
-        input_imgs = []
-        for img in input_im_fs:
-            if not using_tiles:
-                this_img = self._get_as_array(img, input_resolution, band).astype(
-                    np.float64
-                )
-            else:
-                this_img = self._get_as_array(img, input_resolution, 1).astype(
-                    np.float64
-                )
-            input_imgs.append((this_img, os.path.basename(img)))
-        # Omit any images not sourced in targets folder
-        input_imgs = [i for i in input_imgs if i[1] in [j[1] for j in target_imgs]]
-        target_img_fs = [i[1] for i in target_imgs]
-        # Ensure matching order
-        input_imgs = sorted(input_imgs, key=lambda x: target_img_fs.index(x[1]))
-        target_imgs = [i[0] for i in target_imgs]
-        target_shp = target_imgs[0].shape
-        input_imgs = [i[0] for i in input_imgs]
-        input_shp = input_imgs[0].shape
-        # Individually _normalize images with pair from other set
-        new_inputs = []
-        new_targets = []
-        for arr, target in zip(input_imgs, target_imgs):
-            # Interpolate null values from target images to input images
+
+        targets_by_name = {os.path.basename(p): p for p in src_imgs}
+        inputs_by_name = {os.path.basename(p): p for p in input_im_fs}
+        common_names = sorted(set(targets_by_name.keys()) & set(inputs_by_name.keys()))
+        if not common_names:
+            raise ValueError("No matching target/input filenames found to build tensors.")
+
+        target_band = band if not using_tiles else 1
+        input_band = band if not using_tiles else 1
+
+        save_dir = os.path.join(self.output_dir, "tensors")
+        if save_tensor:
+            os.makedirs(save_dir, exist_ok=True)
+        shards_index: list[tuple[str, str, int]] = []
+
+        if manual_seed:
+            rng = np.random.default_rng(manual_seed)
+        else:
+            rng = np.random.default_rng()
+
+        chunk_x: list[torch.Tensor] = []
+        chunk_y: list[torch.Tensor] = []
+        shard_id = 0
+
+        def _flush_chunk():
+            nonlocal shard_id
+            if not chunk_x:
+                return
+            x_t = torch.stack(chunk_x)
+            y_t = torch.stack(chunk_y)
+            if save_tensor:
+                x_path = os.path.join(save_dir, f"x_hr_tensors_shard_{shard_id:05d}.pt")
+                y_path = os.path.join(save_dir, f"y_lr_tensors_shard_{shard_id:05d}.pt")
+                torch.save(x_t, x_path)
+                torch.save(y_t, y_path)
+                shards_index.append((x_path, y_path, int(x_t.shape[0])))
+            shard_id += 1
+            chunk_x.clear()
+            chunk_y.clear()
+
+        for idx, name in enumerate(common_names, start=1):
+            if verbose and (idx % 25 == 0 or idx == len(common_names)):
+                print(f"Processing {idx} of {len(common_names)}", end="\r")
+            target = self._get_as_array(targets_by_name[name], target_resolution, target_band).astype(np.float32)
+            arr = self._get_as_array(inputs_by_name[name], input_resolution, input_band).astype(np.float32)
+
             arr, target = self._match_nulls(arr, target)
             target = match_histograms(target, arr, channel_axis=None)
-            target_noise = self._noise(target)
-            arr_noise = self._noise(arr)
-            arr_flip1 = np.flip(arr_noise, 0)
-            arr_flip2 = np.flip(arr_noise, 1)
-            tar_flip1 = np.flip(target_noise, 0)
-            tar_flip2 = np.flip(target_noise, 1)
-            input_arrays = [arr_noise, arr_flip1, arr_flip2]
-            target_arrays = [target_noise, tar_flip1, tar_flip2]
-            for a in input_arrays:
-                # a = np.stack((a, canny(a)))
-                new_inputs.append(a)
-                new_inputs.append(np.rot90(a, k=1))
-                new_inputs.append(np.rot90(a, k=3))
-            for a in target_arrays:
-                # a = np.stack((a, canny(a)))
-                new_targets.append(a)
-                new_targets.append(np.rot90(a, k=1))
-                new_targets.append(np.rot90(a, k=3))
-        x = np.array(
-            [
-                np.reshape(i, (1, target_shp[0], target_shp[1])).copy()
-                for i in target_imgs
-            ]
-        )
-        y = np.array(
-            [np.reshape(i, (1, input_shp[0], input_shp[1])).copy() for i in input_imgs]
-        )
-        # Create random index at length of input, target arrays then apply
-        if manual_seed:
-            torch.manual_seed(manual_seed)
-        z = torch.randperm(x.shape[0])
-        x = torch.stack([torch.from_numpy(arr).float() for arr in x])[z]
-        y = torch.stack([torch.from_numpy(arr).float() for arr in y])[z]
+
+            if data_augmentation:
+                target_noise = self._noise(target)
+                arr_noise = self._noise(arr)
+
+                arr_flip1 = np.flip(arr_noise, 0)
+                arr_flip2 = np.flip(arr_noise, 1)
+                tar_flip1 = np.flip(target_noise, 0)
+                tar_flip2 = np.flip(target_noise, 1)
+                input_arrays = [arr_noise, arr_flip1, arr_flip2]
+                target_arrays = [target_noise, tar_flip1, tar_flip2]
+
+                pairs = []
+                for in_a, tar_a in zip(input_arrays, target_arrays):
+                    pairs.append((in_a, tar_a))
+                    pairs.append((np.rot90(in_a, k=1, axes=(1, 0)), np.rot90(tar_a, k=1, axes=(1, 0))))
+                    pairs.append((np.rot90(in_a, k=3, axes=(1, 0)), np.rot90(tar_a, k=3, axes=(1, 0))))
+            else:
+                pairs = [(arr, target)]
+
+            order = rng.permutation(len(pairs))
+            for j in order:
+                in_a, tar_a = pairs[int(j)]
+                tar_a = np.ascontiguousarray(tar_a)
+                in_a = np.ascontiguousarray(in_a)
+                chunk_x.append(
+                    torch.from_numpy(tar_a.reshape(1, *target_resolution)).float()
+                )
+                chunk_y.append(
+                    torch.from_numpy(in_a.reshape(1, *input_resolution)).float()
+                )
+                if len(chunk_x) >= int(chunk_size):
+                    _flush_chunk()
+
+        _flush_chunk()
+
         if save_tensor:
-            save_dir = os.path.join(self.output_dir, "tensors")
-            os.makedirs(save_dir, exist_ok=True)
-            torch.save(x, os.path.join(save_dir, "x_hr_tensors.pt"))
-            torch.save(y, os.path.join(save_dir, "y_lr_tensors.pt"))
+            torch.save(shards_index, os.path.join(save_dir, "shards_index.pt"))
+            if verbose:
+                total = int(sum(n for _, _, n in shards_index))
+                print(f"Completed {total} batches from {self.output_dir}.")
+            return None, None
+
+        x_all = torch.cat(chunk_x, dim=0) if chunk_x else torch.empty((0, 1, *target_resolution))
+        y_all = torch.cat(chunk_y, dim=0) if chunk_y else torch.empty((0, 1, *input_resolution))
         if verbose:
-            print(f"Completed {len(x)} batches from {self.output_dir}.")
-        if not save_tensor:
-            return x, y
-        else:
-            return None
+            print(f"Completed {len(x_all)} batches from {self.output_dir}.")
+        return x_all, y_all
 
 
 class ESRGAN:
@@ -1049,18 +1120,25 @@ class ESRGAN:
         elif load_tensors:
             if not getattr(self, "data_path", None):
                 raise ValueError("load_tensors is True but data_path is not set.")
-            x_hr_tensor_path = os.path.join(self.data_path, "x_hr_tensors.pt")
-            y_lr_tensor_path = os.path.join(self.data_path, "y_lr_tensors.pt")
-            if not os.path.exists(x_hr_tensor_path):
-                raise ValueError(
-                    "load_tensors is True but x_hr_tensors.pt not found in data_path."
-                )
-            if not os.path.exists(y_lr_tensor_path):
-                raise ValueError(
-                    "load_tensors is True but y_lr_tensors.pt not found in data_path."
-                )
-            low_res = torch.load(y_lr_tensor_path)
-            high_res = torch.load(x_hr_tensor_path)
+            x_hr_tensor_path = os.path.join(self.data_path, "tensors", "x_hr_tensors.pt")
+            y_lr_tensor_path = os.path.join(self.data_path, "tensors", "y_lr_tensors.pt")
+            shards_index_path = os.path.join(self.data_path, "tensors", "shards_index.pt")
+            if os.path.exists(shards_index_path):
+                shards_index = torch.load(shards_index_path)
+                ds = ShardedTensorDataset(shards_index)
+                low_res = None
+                high_res = None
+            else:
+                if not os.path.exists(x_hr_tensor_path):
+                    raise ValueError(
+                        "load_tensors is True but x_hr_tensors.pt not found in data_path."
+                    )
+                if not os.path.exists(y_lr_tensor_path):
+                    raise ValueError(
+                        "load_tensors is True but y_lr_tensors.pt not found in data_path."
+                    )
+                low_res = torch.load(y_lr_tensor_path)
+                high_res = torch.load(x_hr_tensor_path)
         else:
             low_res = _resolve_tensor_input(low_res, "low_res")
             high_res = _resolve_tensor_input(high_res, "high_res")
@@ -1069,8 +1147,8 @@ class ESRGAN:
             mp.set_start_method("spawn", force=True)
         if detect_anomaly:
             torch.autograd.set_detect_anomaly(True)
-        model_path = f"./models/{self.band}"
-        os.makedirs(model_path, exist_ok=True)
+        #model_path = f"./models/{self.band}"
+        os.makedirs(self.model_path, exist_ok=True)
 
         # =====================
         # TRAINING SETUP
@@ -1111,9 +1189,14 @@ class ESRGAN:
         norm_to_vgg = NormalizeToVGG().to(device)
 
         # Create training validation splits and move input tensors to dataloader
-        n_val = max(1, int(len(low_res) * validation_split))
-        n_train = len(low_res) - n_val
-        train_ds, val_ds = random_split(list(zip(low_res, high_res)), [n_train, n_val])
+        if load_tensors and 'ds' in locals():
+            n_val = max(1, int(len(ds) * validation_split))
+            n_train = len(ds) - n_val
+            train_ds, val_ds = random_split(ds, [n_train, n_val])
+        else:
+            n_val = max(1, int(len(low_res) * validation_split))
+            n_train = len(low_res) - n_val
+            train_ds, val_ds = random_split(list(zip(low_res, high_res)), [n_train, n_val])
         if n_samples is not None:
             train_indices = np.arange(min(n_samples, len(train_ds)))
             val_indices = np.arange(min(n_samples, len(val_ds)))
@@ -1276,8 +1359,8 @@ class ESRGAN:
                     imgs_hr = imgs_hr.to(device)
                     sr = gen(imgs_lr)
                     mse = F.mse_loss(sr, imgs_hr, reduction="mean")
-                    val_mses.append(mse)
-                    val_psnrs.append(self._psnr(torch.tensor(mse)))
+                    val_mses.append(mse.item())
+                    val_psnrs.append(self._psnr(mse).item())
                     # perceptual/VGG loss
                     vgg_loss = criterion_perceptual(
                         norm_to_vgg(sr), norm_to_vgg(imgs_hr)
@@ -1293,10 +1376,10 @@ class ESRGAN:
             if mean_val_psnr > best_val_psnr:
                 best_val_psnr = mean_val_psnr
                 torch.save(
-                    gen.state_dict(), os.path.join(model_path, "best_generator.pt")
+                    gen.state_dict(), os.path.join(self.model_path, "best_generator.pt")
                 )
                 torch.save(
-                    dis.state_dict(), os.path.join(model_path, "best_discriminator.pt")
+                    dis.state_dict(), os.path.join(self.model_path, "best_discriminator.pt")
                 )
             else:
                 non_improvement_counter += 1
@@ -1336,8 +1419,9 @@ class ESRGAN:
             losses["Dis"].append(loss_D_avg / batches)
             losses["Pix"].append(loss_pixel_avg / batches)
             losses["VGG"].append(loss_vgg_avg / batches)
-            metrics["mse"].append(mean_val_mse.item())
-            metrics["msnr"].append(mean_val_psnr.item())
+            # mean_val_mse and mean_val_psnr have already been evaluated from .item(), and are float here
+            metrics["mse"].append(mean_val_mse)
+            metrics["msnr"].append(mean_val_psnr)
 
             self.losses = losses
             self.metrics = metrics
