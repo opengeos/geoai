@@ -526,21 +526,35 @@ class ESRGANDataPreprocess:
         _require_gdal()
         if tile_ranges is None:
             tile_ranges = []
+        reference_tile = None
+        if not is_target:
+            reference_tile = next(
+                (
+                    tile_range
+                    for tile_range in tile_ranges
+                    if isinstance(tile_range, (list, tuple)) and len(tile_range) > 6
+                ),
+                None,
+            )
+            if reference_tile is None:
+                raise ValueError(
+                    "Non-target preprocessing requires at least one non-empty target tile range"
+                )
         sr = ds.GetSpatialRef().GetAttrValue("AUTHORITY", 1)
         if not is_target:
-            if sr != tile_ranges[0][6]:
+            if sr != reference_tile[6]:
                 # The inputs have a different spatial projection.  Reprojected intermediate file needed
                 fname = ds.GetFileList()[0]
                 reproj = os.path.join(
                     os.path.dirname(fname), f"reproj_{os.path.basename(fname)}"
                 )
-                ds = gdal.Warp(reproj, ds, dstSRS=f"EPSG:{tile_ranges[0][6]}")
+                ds = gdal.Warp(reproj, ds, dstSRS=f"EPSG:{reference_tile[6]}")
                 bnd = ds.GetRasterBand(1)
                 proj = ds.GetProjection()
         xmin, xres, xskew, ymax, yskew, yres = ds.GetGeoTransform()
         if not is_target:
-            tile_size = int(math.ceil(self.tile_size / (xres / tile_ranges[0][4])))
-            overlap = int(math.ceil(self.overlap / (xres / tile_ranges[0][4])))
+            tile_size = int(math.ceil(self.tile_size / (xres / reference_tile[4])))
+            overlap = int(math.ceil(self.overlap / (xres / reference_tile[4])))
         else:
             tile_size = self.tile_size
             overlap = self.overlap
