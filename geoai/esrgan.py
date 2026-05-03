@@ -9,6 +9,7 @@ import os
 import sys
 
 from affine import Affine
+
 try:
     from osgeo import gdal  # type: ignore
 except ImportError:  # pragma: no cover
@@ -44,7 +45,6 @@ def _require_gdal():
 
 if gdal is not None:
     gdal.DontUseExceptions()
-
 
 
 class ResidualDenseBlock(nn.Module):
@@ -268,12 +268,12 @@ class NormalizeToVGG(nn.Module):
         return (input_tensor - self.mean) / self.std
 
 
-
 class ShardedTensorDataset(Dataset):
     """
-    Helper class to help avoid loading large tensors into RAM or swap disk. 
+    Helper class to help avoid loading large tensors into RAM or swap disk.
     "Shards" are pre-saved tensor files that are loaded on-demand.
     """
+
     def __init__(self, shards_index: list[tuple[str, str, int]]):
         self._shards_index = shards_index
         self._prefix = [0]
@@ -854,7 +854,9 @@ class ESRGANDataPreprocess:
         inputs_by_name = {os.path.basename(p): p for p in input_im_fs}
         common_names = sorted(set(targets_by_name.keys()) & set(inputs_by_name.keys()))
         if not common_names:
-            raise ValueError("No matching target/input filenames found to build tensors.")
+            raise ValueError(
+                "No matching target/input filenames found to build tensors."
+            )
 
         target_band = band if not using_tiles else 1
         input_band = band if not using_tiles else 1
@@ -892,8 +894,12 @@ class ESRGANDataPreprocess:
         for idx, name in enumerate(common_names, start=1):
             if verbose and (idx % 25 == 0 or idx == len(common_names)):
                 print(f"Processing {idx} of {len(common_names)}", end="\r")
-            target = self._get_as_array(targets_by_name[name], target_resolution, target_band).astype(np.float32)
-            arr = self._get_as_array(inputs_by_name[name], input_resolution, input_band).astype(np.float32)
+            target = self._get_as_array(
+                targets_by_name[name], target_resolution, target_band
+            ).astype(np.float32)
+            arr = self._get_as_array(
+                inputs_by_name[name], input_resolution, input_band
+            ).astype(np.float32)
 
             arr, target = self._match_nulls(arr, target)
             target = match_histograms(target, arr, channel_axis=None)
@@ -912,8 +918,18 @@ class ESRGANDataPreprocess:
                 pairs = []
                 for in_a, tar_a in zip(input_arrays, target_arrays):
                     pairs.append((in_a, tar_a))
-                    pairs.append((np.rot90(in_a, k=1, axes=(1, 0)), np.rot90(tar_a, k=1, axes=(1, 0))))
-                    pairs.append((np.rot90(in_a, k=3, axes=(1, 0)), np.rot90(tar_a, k=3, axes=(1, 0))))
+                    pairs.append(
+                        (
+                            np.rot90(in_a, k=1, axes=(1, 0)),
+                            np.rot90(tar_a, k=1, axes=(1, 0)),
+                        )
+                    )
+                    pairs.append(
+                        (
+                            np.rot90(in_a, k=3, axes=(1, 0)),
+                            np.rot90(tar_a, k=3, axes=(1, 0)),
+                        )
+                    )
             else:
                 pairs = [(arr, target)]
 
@@ -940,8 +956,16 @@ class ESRGANDataPreprocess:
                 print(f"Completed {total} batches from {self.output_dir}.")
             return None, None
 
-        x_all = torch.cat(chunk_x, dim=0) if chunk_x else torch.empty((0, 1, *target_resolution))
-        y_all = torch.cat(chunk_y, dim=0) if chunk_y else torch.empty((0, 1, *input_resolution))
+        x_all = (
+            torch.cat(chunk_x, dim=0)
+            if chunk_x
+            else torch.empty((0, 1, *target_resolution))
+        )
+        y_all = (
+            torch.cat(chunk_y, dim=0)
+            if chunk_y
+            else torch.empty((0, 1, *input_resolution))
+        )
         if verbose:
             print(f"Completed {len(x_all)} batches from {self.output_dir}.")
         return x_all, y_all
@@ -1134,9 +1158,15 @@ class ESRGAN:
         elif load_tensors:
             if not getattr(self, "data_path", None):
                 raise ValueError("load_tensors is True but data_path is not set.")
-            x_hr_tensor_path = os.path.join(self.data_path, "tensors", "x_hr_tensors.pt")
-            y_lr_tensor_path = os.path.join(self.data_path, "tensors", "y_lr_tensors.pt")
-            shards_index_path = os.path.join(self.data_path, "tensors", "shards_index.pt")
+            x_hr_tensor_path = os.path.join(
+                self.data_path, "tensors", "x_hr_tensors.pt"
+            )
+            y_lr_tensor_path = os.path.join(
+                self.data_path, "tensors", "y_lr_tensors.pt"
+            )
+            shards_index_path = os.path.join(
+                self.data_path, "tensors", "shards_index.pt"
+            )
             if os.path.exists(shards_index_path):
                 shards_index = torch.load(shards_index_path)
                 ds = ShardedTensorDataset(shards_index)
@@ -1161,7 +1191,7 @@ class ESRGAN:
             mp.set_start_method("spawn", force=True)
         if detect_anomaly:
             torch.autograd.set_detect_anomaly(True)
-        #model_path = f"./models/{self.band}"
+        # model_path = f"./models/{self.band}"
         os.makedirs(self.model_path, exist_ok=True)
 
         # =====================
@@ -1203,14 +1233,16 @@ class ESRGAN:
         norm_to_vgg = NormalizeToVGG().to(device)
 
         # Create training validation splits and move input tensors to dataloader
-        if load_tensors and 'ds' in locals():
+        if load_tensors and "ds" in locals():
             n_val = max(1, int(len(ds) * validation_split))
             n_train = len(ds) - n_val
             train_ds, val_ds = random_split(ds, [n_train, n_val])
         else:
             n_val = max(1, int(len(low_res) * validation_split))
             n_train = len(low_res) - n_val
-            train_ds, val_ds = random_split(list(zip(low_res, high_res)), [n_train, n_val])
+            train_ds, val_ds = random_split(
+                list(zip(low_res, high_res)), [n_train, n_val]
+            )
         if n_samples is not None:
             train_indices = np.arange(min(n_samples, len(train_ds)))
             val_indices = np.arange(min(n_samples, len(val_ds)))
@@ -1393,7 +1425,8 @@ class ESRGAN:
                     gen.state_dict(), os.path.join(self.model_path, "best_generator.pt")
                 )
                 torch.save(
-                    dis.state_dict(), os.path.join(self.model_path, "best_discriminator.pt")
+                    dis.state_dict(),
+                    os.path.join(self.model_path, "best_discriminator.pt"),
                 )
             else:
                 non_improvement_counter += 1
