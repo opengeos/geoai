@@ -5,7 +5,7 @@ datasets>=4.8.4
 geopandas
 huggingface_hub
 jupyter-server-proxy
-leafmap>=0.61.1
+leafmap>=0.62.0
 localtileserver
 mapclassify
 maplibre
