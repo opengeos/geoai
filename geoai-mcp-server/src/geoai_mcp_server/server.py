@@ -250,11 +250,18 @@ async def segment_objects_with_prompts(
         # Calculate statistics
         num_objects = 0
         if isinstance(masks, dict):
-            num_objects = sum(
-                len(v) if hasattr(v, "__len__") else 1 for v in masks.values()
-            )
-        elif hasattr(masks, "__len__"):
-            num_objects = len(masks) if not isinstance(masks, str) else 1
+            # GroundedSAM returns a dict of output file paths, not mask arrays.
+            # Count actual detected objects from the vector sidecar if present.
+            import geopandas as gpd
+
+            count_file = masks.get("polygons") or masks.get("boxes")
+            if count_file:
+                try:
+                    num_objects = len(gpd.read_file(count_file))
+                except Exception:
+                    pass
+        elif hasattr(masks, "__len__") and not isinstance(masks, str):
+            num_objects = len(masks)
 
         processing_time = time.time() - start_time
 
