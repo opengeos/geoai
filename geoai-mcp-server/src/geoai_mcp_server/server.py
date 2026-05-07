@@ -154,7 +154,7 @@ async def segment_objects_with_prompts(
         output_format: Output format - "geojson", "geotiff", "shapefile", "geopackage".
         model: Model to use - "sam", "sam2", "grounded_sam", "clipseg", "auto".
         confidence_threshold: Minimum confidence (0-1). Lower = more detections.
-        tile_size: Tile size for large images (256-4096 pixels).
+        tile_size: Tile size for large images (512-4096 pixels).
         output_filename: Custom output filename (optional).
 
     Returns:
