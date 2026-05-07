@@ -265,10 +265,18 @@ async def segment_objects_with_prompts(
 
         processing_time = time.time() - start_time
 
+        if isinstance(masks, dict):
+            output_files = list(masks.values())
+        elif isinstance(masks, str):
+            # CLIPSeg returns the path it actually wrote; use it directly.
+            output_files = [masks]
+        else:
+            output_files = [str(output_path)]
+
         return SegmentationResult(
             success=True,
             message=f"Successfully segmented objects matching {prompts}",
-            output_files=[str(output_path)],
+            output_files=output_files,
             processing_time_seconds=processing_time,
             num_objects=num_objects,
             classes_found=prompts,
