@@ -46,6 +46,93 @@ class TestSegmentationTools:
             assert "not found" in result["message"].lower()
 
 
+    @pytest.mark.asyncio
+    async def test_segment_objects_grounded_sam_success(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """GroundedSAM path: output_files lists all result files; num_objects reflects detected count."""
+        from geoai_mcp_server.server import segment_objects_with_prompts
+
+        raster_path = temp_output_dir / "sample_segmented.tif"
+        polygons_path = temp_output_dir / "sample_segmented_polygons.geojson"
+
+        fake_result = {
+            "segmentation": str(raster_path),
+            "polygons": str(polygons_path),
+        }
+
+        mock_segmenter = MagicMock()
+        mock_segmenter.segment_image.return_value = fake_result
+        mock_segment = MagicMock()
+        mock_segment.GroundedSAM.return_value = mock_segmenter
+
+        mock_gdf = MagicMock()
+        mock_gdf.__len__ = MagicMock(return_value=3)
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch(
+                "geoai_mcp_server.server._get_geoai_module",
+                return_value=mock_segment,
+            ),
+            patch("geopandas.read_file", return_value=mock_gdf),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            result = await segment_objects_with_prompts(
+                image_path=sample_geotiff.name,
+                prompts=["building"],
+                model="grounded_sam",
+                output_format="geojson",
+            )
+
+        assert result["success"] is True
+        assert str(raster_path) in result["output_files"]
+        assert str(polygons_path) in result["output_files"]
+        assert result["num_objects"] == 3
+
+    @pytest.mark.asyncio
+    async def test_segment_objects_clipseg_uses_clipsegmentation(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """model='clipseg' routes to CLIPSegmentation, not GroundedSAM."""
+        from geoai_mcp_server.server import segment_objects_with_prompts
+
+        raster_path = temp_output_dir / "sample_segmented.tif"
+
+        mock_segmenter = MagicMock()
+        mock_segmenter.segment_image.return_value = str(raster_path)
+        mock_segment = MagicMock()
+        mock_segment.CLIPSegmentation.return_value = mock_segmenter
+
+        mock_utils = MagicMock()
+
+        def get_module(name):
+            return mock_segment if name == "segment" else mock_utils
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", side_effect=get_module),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            result = await segment_objects_with_prompts(
+                image_path=sample_geotiff.name,
+                prompts=["building"],
+                model="clipseg",
+                output_format="geotiff",
+            )
+
+        assert result["success"] is True
+        mock_segment.CLIPSegmentation.assert_called_once()
+        mock_segment.GroundedSAM.assert_not_called()
+        # CLIPSeg writes to raster_path (.tif), not to the user-facing output_path
+        # (.geotiff). output_files must point to the file that was actually written.
+        assert result["output_files"] == [str(raster_path)]
+
+
 class TestDetectionTools:
     """Tests for detection-related tools."""
 
