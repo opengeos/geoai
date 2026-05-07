@@ -193,12 +193,10 @@ async def segment_objects_with_prompts(
 
         logger.info(f"Segmenting objects in {full_input_path} with prompts: {prompts}")
 
-        # Import GeoAI modules
-        segment_module = _get_geoai_module("segment")
-
         # Initialize model based on selection
-        if model in ("grounded_sam", "auto", "clipseg"):
+        if model in ("grounded_sam", "auto"):
             # GroundedSAM: detector + SAM segmenter driven by text prompts
+            segment_module = _get_geoai_module("segment")
             segmenter = segment_module.GroundedSAM(
                 threshold=confidence_threshold,
                 tile_size=input_data.tile_size,
@@ -211,6 +209,24 @@ async def segment_objects_with_prompts(
                 export_boxes=(input_data.output_format != OutputFormat.GEOJSON),
             )
             masks = result
+        elif model == "clipseg":
+            # CLIPSegmentation accepts a single text prompt; join multiple prompts
+            segment_module = _get_geoai_module("segment")
+            segmenter = segment_module.CLIPSegmentation(
+                tile_size=input_data.tile_size,
+            )
+            text_prompt = ", ".join(prompts)
+            raster_path = output_path.with_suffix(".tif")
+            masks = segmenter.segment_image(
+                input_path=str(full_input_path),
+                output_path=str(raster_path),
+                text_prompt=text_prompt,
+                threshold=confidence_threshold,
+            )
+            if input_data.output_format == OutputFormat.GEOJSON:
+                utils_module = _get_geoai_module("utils")
+                utils_module.raster_to_vector(str(raster_path), str(output_path))
+                masks = str(output_path)
         else:
             # SAM without text prompts — automatic segmentation
             sam_module = _get_geoai_module("sam")
