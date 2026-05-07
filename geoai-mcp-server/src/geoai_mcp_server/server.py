@@ -196,14 +196,17 @@ async def segment_objects_with_prompts(
         # Initialize model based on selection
         if model in ("grounded_sam", "auto"):
             # GroundedSAM: detector + SAM segmenter driven by text prompts
+            # segment_image() always writes a GeoTIFF and derives vector sidecars
+            # by replacing ".tif" in the path, so the raster path must end in .tif.
             segment_module = _get_geoai_module("segment")
+            raster_path = output_path.with_suffix(".tif")
             segmenter = segment_module.GroundedSAM(
                 threshold=confidence_threshold,
                 tile_size=input_data.tile_size,
             )
             result = segmenter.segment_image(
                 input_path=str(full_input_path),
-                output_path=str(output_path),
+                output_path=str(raster_path),
                 text_prompts=prompts,
                 export_polygons=(input_data.output_format == OutputFormat.GEOJSON),
                 export_boxes=(input_data.output_format != OutputFormat.GEOJSON),
