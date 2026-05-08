@@ -1452,8 +1452,14 @@ def create_venv(
     if progress_callback:
         progress_callback(10, "Creating virtual environment...")
 
-    system_python = _get_system_python()
-    _log(f"Using Python: {system_python}", Qgis.Info)
+    system_python = None
+    python_lookup_error = ""
+    try:
+        system_python = _get_system_python()
+    except RuntimeError as exc:
+        python_lookup_error = str(exc)
+    if system_python:
+        _log(f"Using Python: {system_python}", Qgis.Info)
 
     from .uv_manager import get_uv_path, uv_exists
 
@@ -1461,9 +1467,15 @@ def create_venv(
 
     if use_uv:
         uv_path = get_uv_path()
-        cmd = [uv_path, "venv", "--python", system_python, venv_dir]
+        uv_python = system_python or f"{sys.version_info.major}.{sys.version_info.minor}"
+        cmd = [uv_path, "venv"]
+        if system_python is None:
+            cmd.append("--managed-python")
+        cmd += ["--python", uv_python, venv_dir]
         _log(f"Creating venv with uv: {uv_path}", Qgis.Info)
     else:
+        if system_python is None:
+            return False, python_lookup_error
         cmd = [system_python, "-m", "venv", venv_dir]
         _log("Creating venv with python -m venv", Qgis.Info)
 
@@ -1480,7 +1492,7 @@ def create_venv(
             **subprocess_kwargs,
         )
 
-        if result.returncode != 0 and use_uv:
+        if result.returncode != 0 and use_uv and system_python:
             # uv venv failed; fall back to stdlib venv
             _log(
                 "uv venv failed ({}), falling back to python -m venv".format(
