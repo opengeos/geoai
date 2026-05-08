@@ -58,7 +58,9 @@ icon=icons/icon.png
 experimental=False
 deprecated=False
 
-changelog=Fix macOS QGIS installer dependency installation and bump patch version.
+changelog=
+    1.2.3
+        - Fix macOS QGIS installer dependency installation
     1.2.2
         - Fix macOS About QGIS menu collision by keeping GeoAI actions out of the application menu (#723)
     1.2.1
