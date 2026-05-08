@@ -1217,6 +1217,41 @@ def _fix_proj_data(site_packages: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _is_python_executable_name(path: str) -> bool:
+    """Return True when a path name looks like a Python interpreter."""
+    name = os.path.basename(path).lower()
+    if name.endswith(".exe"):
+        name = name[:-4]
+    if name in ("python", "python3"):
+        return True
+    if not name.startswith("python"):
+        return False
+    suffix = name[6:]
+    if "-" in suffix:
+        return False
+    return suffix.isdigit() or (
+        suffix.count(".") == 1 and all(part.isdigit() for part in suffix.split("."))
+    )
+
+
+def _is_macos_qgis_app_bundle_python(path: str) -> bool:
+    """Return True for unsafe Python launchers in QGIS.app/Contents/MacOS."""
+    if not (platform.system() == "Darwin" or sys.platform == "darwin"):
+        return False
+    parts = os.path.abspath(path).split(os.sep)
+    for idx, part in enumerate(parts):
+        lower = part.lower()
+        if not (lower.startswith("qgis") and lower.endswith(".app")):
+            continue
+        if idx + 2 >= len(parts):
+            return False
+        if parts[idx + 1].lower() != "contents" or parts[idx + 2].lower() != "macos":
+            return False
+        name = os.path.basename(path).lower()
+        return name.startswith("qgis") or _is_python_executable_name(path)
+    return False
+
+
 def _get_qgis_python() -> Optional[str]:
     """Get the path to QGIS's bundled Python on Windows.
 
@@ -1391,6 +1426,11 @@ def _get_system_python() -> str:
                 Qgis.Warning,
             )
             return qgis_python
+    elif _is_macos_qgis_app_bundle_python(sys.executable):
+        raise RuntimeError(
+            "QGIS app-bundle Python is not safe for creating virtual "
+            "environments; use uv-managed Python instead."
+        )
     elif sys.platform.startswith("linux"):
         linux_python = _get_linux_system_python()
         if linux_python:
@@ -1452,8 +1492,20 @@ def create_venv(
     if progress_callback:
         progress_callback(10, "Creating virtual environment...")
 
-    system_python = _get_system_python()
-    _log(f"Using Python: {system_python}", Qgis.Info)
+    system_python = None
+    python_lookup_error = ""
+    try:
+        system_python = _get_system_python()
+    except RuntimeError as exc:
+        python_lookup_error = str(exc)
+    if python_lookup_error and system_python is None:
+        _log(
+            "Python lookup failed; falling back to uv-managed Python if "
+            f"available: {python_lookup_error}",
+            Qgis.Warning,
+        )
+    if system_python:
+        _log(f"Using Python: {system_python}", Qgis.Info)
 
     from .uv_manager import get_uv_path, uv_exists
 
@@ -1461,9 +1513,17 @@ def create_venv(
 
     if use_uv:
         uv_path = get_uv_path()
-        cmd = [uv_path, "venv", "--python", system_python, venv_dir]
+        uv_python = (
+            system_python or f"{sys.version_info.major}.{sys.version_info.minor}"
+        )
+        cmd = [uv_path, "venv"]
+        if system_python is None:
+            cmd.append("--managed-python")
+        cmd += ["--python", uv_python, venv_dir]
         _log(f"Creating venv with uv: {uv_path}", Qgis.Info)
     else:
+        if system_python is None:
+            return False, python_lookup_error
         cmd = [system_python, "-m", "venv", venv_dir]
         _log("Creating venv with python -m venv", Qgis.Info)
 
@@ -1480,7 +1540,7 @@ def create_venv(
             **subprocess_kwargs,
         )
 
-        if result.returncode != 0 and use_uv:
+        if result.returncode != 0 and use_uv and system_python:
             # uv venv failed; fall back to stdlib venv
             _log(
                 "uv venv failed ({}), falling back to python -m venv".format(
@@ -1565,8 +1625,9 @@ def create_venv(
         _cleanup_partial_venv(venv_dir)
         return False, "Virtual environment creation timed out"
     except FileNotFoundError:
-        _log(f"Python executable not found: {system_python}", Qgis.Critical)
-        return False, f"Python not found: {system_python}"
+        missing_executable = cmd[0] if cmd else system_python
+        _log(f"Venv creation executable not found: {missing_executable}", Qgis.Critical)
+        return False, f"Executable not found: {missing_executable}"
     except Exception as e:
         _log(f"Exception during venv creation: {str(e)}", Qgis.Critical)
         _cleanup_partial_venv(venv_dir)
