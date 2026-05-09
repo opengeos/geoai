@@ -45,7 +45,6 @@ class TestSegmentationTools:
             assert result["success"] is False
             assert "not found" in result["message"].lower()
 
-
     @pytest.mark.asyncio
     async def test_segment_objects_grounded_sam_success(
         self, sample_geotiff, temp_output_dir
