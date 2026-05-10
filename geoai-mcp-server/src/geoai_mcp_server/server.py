@@ -154,7 +154,7 @@ async def segment_objects_with_prompts(
         output_format: Output format - "geojson", "geotiff", "shapefile", "geopackage".
         model: Model to use - "sam", "sam2", "grounded_sam", "clipseg", "auto".
         confidence_threshold: Minimum confidence (0-1). Lower = more detections.
-        tile_size: Tile size for large images (256-4096 pixels).
+        tile_size: Tile size for large images (512-4096 pixels).
         output_filename: Custom output filename (optional).
 
     Returns:
@@ -193,73 +193,90 @@ async def segment_objects_with_prompts(
 
         logger.info(f"Segmenting objects in {full_input_path} with prompts: {prompts}")
 
-        # Import GeoAI modules
-        sam_module = _get_geoai_module("sam")
-
         # Initialize model based on selection
         if model in ("grounded_sam", "auto"):
-            # Try GroundedSAM first for text prompts
-            try:
-                segmenter = sam_module.SamGeo(
-                    model_type="vit_h",
-                    checkpoint=None,  # Uses default
-                )
-                # Use text prompts for segmentation
-                segmenter.set_image(str(full_input_path))
-                masks = segmenter.predict_with_text(
-                    text_prompts=prompts,
-                    box_threshold=confidence_threshold,
-                    text_threshold=confidence_threshold,
-                )
-            except Exception as e:
-                logger.warning(f"GroundedSAM failed, falling back to CLIPSeg: {e}")
-                # Fallback to CLIPSeg
-                segment_module = _get_geoai_module("segment")
-                masks = segment_module.segment_with_text(
-                    str(full_input_path),
-                    prompts,
-                    threshold=confidence_threshold,
-                )
-        elif model == "clipseg":
+            # GroundedSAM: detector + SAM segmenter driven by text prompts
+            # segment_image() always writes a GeoTIFF and derives vector sidecars
+            # by replacing ".tif" in the path, so the raster path must end in .tif.
             segment_module = _get_geoai_module("segment")
-            masks = segment_module.segment_with_text(
-                str(full_input_path),
-                prompts,
+            raster_path = output_path.with_suffix(".tif")
+            segmenter = segment_module.GroundedSAM(
+                threshold=confidence_threshold,
+                tile_size=input_data.tile_size,
+            )
+            result = segmenter.segment_image(
+                input_path=str(full_input_path),
+                output_path=str(raster_path),
+                text_prompts=prompts,
+                export_polygons=(input_data.output_format == OutputFormat.GEOJSON),
+                export_boxes=(input_data.output_format != OutputFormat.GEOJSON),
+            )
+            masks = result
+        elif model == "clipseg":
+            # CLIPSegmentation accepts a single text prompt; join multiple prompts
+            segment_module = _get_geoai_module("segment")
+            segmenter = segment_module.CLIPSegmentation(
+                tile_size=input_data.tile_size,
+            )
+            text_prompt = ", ".join(prompts)
+            raster_path = output_path.with_suffix(".tif")
+            masks = segmenter.segment_image(
+                input_path=str(full_input_path),
+                output_path=str(raster_path),
+                text_prompt=text_prompt,
                 threshold=confidence_threshold,
             )
+            if input_data.output_format == OutputFormat.GEOJSON:
+                utils_module = _get_geoai_module("utils")
+                utils_module.raster_to_vector(str(raster_path), str(output_path))
+                masks = str(output_path)
         else:
-            # SAM with automatic prompt generation
+            # SAM without text prompts — automatic segmentation
+            sam_module = _get_geoai_module("sam")
             segmenter = sam_module.SamGeo(model_type="vit_h")
             segmenter.set_image(str(full_input_path))
 
-            # Always generate a raster mask first, then convert to vector if needed.
-            # Use a raster-friendly extension when the requested output is vector (e.g., GEOJSON).
             if input_data.output_format == OutputFormat.GEOJSON:
                 raster_output_path = output_path.with_suffix(".tif")
             else:
                 raster_output_path = output_path
 
             masks = segmenter.generate(output=str(raster_output_path))
-        # Save results
-        if input_data.output_format == OutputFormat.GEOJSON:
-            # Convert masks to vector
-            utils_module = _get_geoai_module("utils")
-            utils_module.raster_to_vector(
-                masks if isinstance(masks, str) else str(output_path),
-                str(output_path),
-            )
+
+            if input_data.output_format == OutputFormat.GEOJSON:
+                utils_module = _get_geoai_module("utils")
+                utils_module.raster_to_vector(str(raster_output_path), str(output_path))
 
         # Calculate statistics
         num_objects = 0
-        if hasattr(masks, "__len__"):
-            num_objects = len(masks) if not isinstance(masks, str) else 1
+        if isinstance(masks, dict):
+            # GroundedSAM returns a dict of output file paths, not mask arrays.
+            # Count actual detected objects from the vector sidecar if present.
+            import geopandas as gpd
+
+            count_file = masks.get("polygons") or masks.get("boxes")
+            if count_file:
+                try:
+                    num_objects = len(gpd.read_file(count_file))
+                except Exception:
+                    pass
+        elif hasattr(masks, "__len__") and not isinstance(masks, str):
+            num_objects = len(masks)
 
         processing_time = time.time() - start_time
+
+        if isinstance(masks, dict):
+            output_files = list(masks.values())
+        elif isinstance(masks, str):
+            # CLIPSeg returns the path it actually wrote; use it directly.
+            output_files = [masks]
+        else:
+            output_files = [str(output_path)]
 
         return SegmentationResult(
             success=True,
             message=f"Successfully segmented objects matching {prompts}",
-            output_files=[str(output_path)],
+            output_files=output_files,
             processing_time_seconds=processing_time,
             num_objects=num_objects,
             classes_found=prompts,

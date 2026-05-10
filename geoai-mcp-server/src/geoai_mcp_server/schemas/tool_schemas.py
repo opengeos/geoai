@@ -141,7 +141,7 @@ class SegmentObjectsInput(BaseModel):
         default=1024,
         description="Size of tiles for processing large images. Larger tiles use more memory but "
         "may produce better results.",
-        ge=256,
+        ge=512,
         le=4096,
     )
     output_filename: Optional[str] = Field(
