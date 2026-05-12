@@ -11,6 +11,9 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QMenu, QToolBar, QMessageBox
 
+TOOLBAR_OBJECT_NAME = "GeoAIToolbar"
+MENU_TITLE = "&GeoAI"
+
 
 class GeoAIPlugin:
     """GeoAI Plugin implementation class for QGIS."""
@@ -100,13 +103,15 @@ class GeoAIPlugin:
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
+        self._remove_toolbars_by_object_name()
+        self._remove_menus_by_title()
         # Create menu
         self.menu = QMenu("&GeoAI")
         self.iface.mainWindow().menuBar().addMenu(self.menu)
 
         # Create toolbar
         self.toolbar = QToolBar("GeoAI Toolbar")
-        self.toolbar.setObjectName("GeoAIToolbar")
+        self.toolbar.setObjectName(TOOLBAR_OBJECT_NAME)
         self.iface.addToolBar(self.toolbar)
 
         # Get icon paths
@@ -244,6 +249,92 @@ class GeoAIPlugin:
             parent=self.iface.mainWindow(),
         )
 
+    def _remove_toolbar(self, toolbar):
+        """Detach and schedule deletion of a plugin toolbar widget."""
+        if toolbar is None:
+            return
+
+        main_window = self.iface.mainWindow()
+        actions = []
+        try:
+            actions = list(toolbar.actions())
+        except Exception:
+            pass  # nosec B110
+        try:
+            toolbar.clear()
+        except Exception:
+            pass  # nosec B110
+        for action in actions:
+            try:
+                action.deleteLater()
+            except Exception:
+                pass  # nosec B110
+        try:
+            main_window.removeToolBar(toolbar)
+        except Exception:
+            pass  # nosec B110
+        try:
+            toolbar.hide()
+        except Exception:
+            pass  # nosec B110
+        try:
+            toolbar.setParent(None)
+        except Exception:
+            pass  # nosec B110
+        try:
+            toolbar.deleteLater()
+        except Exception:
+            pass  # nosec B110
+
+    def _remove_toolbars_by_object_name(self):
+        """Remove current or stale plugin toolbars from QGIS."""
+        main_window = self.iface.mainWindow()
+        for toolbar in main_window.findChildren(QToolBar, TOOLBAR_OBJECT_NAME):
+            self._remove_toolbar(toolbar)
+
+    def _plugin_menu_titles(self):
+        """Return possible translated and untranslated plugin menu titles."""
+        titles = {MENU_TITLE}
+        translator = getattr(self, "tr", None)
+        if callable(translator):
+            try:
+                titles.add(translator(MENU_TITLE))
+            except Exception:
+                pass  # nosec B110
+        return titles
+
+    def _remove_menu(self, menu):
+        """Detach and schedule deletion of a plugin menu."""
+        if menu is None:
+            return
+
+        main_window = self.iface.mainWindow()
+        try:
+            menu.clear()
+        except Exception:
+            pass  # nosec B110
+        try:
+            main_window.menuBar().removeAction(menu.menuAction())
+        except Exception:
+            pass  # nosec B110
+        try:
+            menu.setParent(None)
+        except Exception:
+            pass  # nosec B110
+        try:
+            menu.deleteLater()
+        except Exception:
+            pass  # nosec B110
+
+    def _remove_menus_by_title(self):
+        """Remove current or stale plugin menus from QGIS."""
+        menu_bar = self.iface.mainWindow().menuBar()
+        titles = self._plugin_menu_titles()
+        for action in menu_bar.actions():
+            menu = action.menu()
+            if menu is not None and menu.title() in titles:
+                self._remove_menu(menu)
+
     def unload(self):
         """Remove the plugin menu item and icon from QGIS GUI."""
         # Stop install worker if running
@@ -305,6 +396,9 @@ class GeoAIPlugin:
         # Remove menu
         if self.menu:
             self.menu.deleteLater()
+
+        self._remove_toolbars_by_object_name()
+        self._remove_menus_by_title()
 
     # ------------------------------------------------------------------
     # Dependency management
