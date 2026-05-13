@@ -29,17 +29,24 @@ jobs:
               with:
                   python-version: "3.13"
 
-            - name: Build plugin zip
-              run: python "qgis_plugin/package_plugin.py" --source "$PLUGIN_DIR" --output "$ZIP_PATH"
-
-            - name: Verify metadata version matches release tag
+            - name: Read plugin version
+              id: plugin_version
               run: |
-                  metadata_version=$(grep '^version=' "$PLUGIN_DIR/metadata.txt" | cut -d'=' -f2 | tr -d '[:space:]')
-                  tag_version="${TAG#v}"
-                  if [ "$metadata_version" != "$tag_version" ]; then
-                      echo "::error::metadata.txt version ($metadata_version) does not match release tag ($tag_version)"
+                  plugin_version=$(grep '^version=' "$PLUGIN_DIR/metadata.txt" | cut -d'=' -f2 | tr -d '[:space:]')
+                  if [ -z "$plugin_version" ]; then
+                      echo "::error::Could not read plugin version from $PLUGIN_DIR/metadata.txt"
                       exit 1
                   fi
+                  if ! echo "$plugin_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-].+)?$'; then
+                      echo "::error::Plugin version '$plugin_version' is not a valid version string"
+                      exit 1
+                  fi
+                  echo "version=$plugin_version" >> "$GITHUB_OUTPUT"
+                  echo "Release tag (package): $TAG"
+                  echo "Plugin version (metadata.txt): $plugin_version"
+
+            - name: Build plugin zip
+              run: python "qgis_plugin/package_plugin.py" --source "$PLUGIN_DIR" --output "$ZIP_PATH"
 
             - name: Attach zip to GitHub release
               env:
