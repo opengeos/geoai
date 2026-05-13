@@ -176,6 +176,40 @@ def _prepare_image_for_deepforest(image_path: str) -> tuple[str, str | None]:
     return image_path, None
 
 
+def _predict_image_on_cpu(model, path: str) -> Any:
+    """Run ``predict_image`` with the model temporarily on CPU.
+
+    Workaround for an upstream DeepForest bug: ``deepforest.predict._predict_image_``
+    constructs the input tensor on CPU and never moves it to the model's device,
+    so a model placed on CUDA crashes with "Input type (torch.FloatTensor) and
+    weight type (torch.cuda.FloatTensor)". Single image inference is cheap, so
+    we move the model to CPU for the call and restore the original device after.
+    See https://github.com/opengeos/geoai/issues/742.
+    """
+    original_device = None
+    try:
+        original_device = next(model.model.parameters()).device
+    except Exception:
+        pass
+
+    moved = False
+    if original_device is not None and original_device.type != "cpu":
+        try:
+            _run_quiet_stdout(model.model.to, "cpu")
+            moved = True
+        except Exception:
+            moved = False
+
+    try:
+        return _run_quiet_stdout(model.predict_image, path=path)
+    finally:
+        if moved:
+            try:
+                _run_quiet_stdout(model.model.to, original_device)
+            except Exception:
+                pass
+
+
 def _is_cuda_oom(exc: Exception) -> bool:
     """Check whether *exc* is a CUDA out-of-memory error."""
     try:
@@ -331,7 +365,7 @@ def _handle_predict(req: dict) -> Any:
     pred_path, temp_rgb_path = _prepare_image_for_deepforest(image_path)
     try:
         if mode == "Single Image":
-            result = _run_quiet_stdout(model.predict_image, path=pred_path)
+            result = _predict_image_on_cpu(model, pred_path)
             pred_mode = "single"
         else:
             result = _predict_tile_with_oom_retry(

@@ -412,7 +412,7 @@ class DeepForestPredictWorker(QThread):
 
             if self.mode == "Single Image":
                 self.progress.emit("Running prediction on single image...")
-                result = self.model.predict_image(path=image_path)
+                result = self._predict_image_on_cpu(image_path)
                 pred_mode = "single"
             else:
                 # Estimate number of patches for progress info
@@ -459,6 +459,39 @@ class DeepForestPredictWorker(QThread):
 
         except Exception as e:
             self.error.emit(str(e))
+
+    def _predict_image_on_cpu(self, image_path: str):
+        """Run ``predict_image`` with the model temporarily on CPU.
+
+        Workaround for an upstream DeepForest bug: ``_predict_image_`` builds
+        the input tensor on CPU and never moves it to the model's device, so a
+        model on CUDA crashes with "Input type (torch.FloatTensor) and weight
+        type (torch.cuda.FloatTensor)". Single image inference is cheap, so we
+        move the model to CPU for the call and restore the original device
+        afterward. See https://github.com/opengeos/geoai/issues/742.
+        """
+        original_device = None
+        try:
+            original_device = next(self.model.model.parameters()).device
+        except Exception:
+            pass
+
+        moved = False
+        if original_device is not None and original_device.type != "cpu":
+            try:
+                self.model.model.to("cpu")
+                moved = True
+            except Exception:
+                moved = False
+
+        try:
+            return self.model.predict_image(path=image_path)
+        finally:
+            if moved:
+                try:
+                    self.model.model.to(original_device)
+                except Exception:
+                    pass
 
     @staticmethod
     def _is_cuda_oom(exc: Exception) -> bool:
