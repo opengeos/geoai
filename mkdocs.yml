@@ -80,7 +80,6 @@ plugins:
                   "examples/image_recognition.ipynb",
                   "examples/clip_classify_vector.ipynb",
                   "examples/impervious_surface_mapping.ipynb",
-                  "examples/geodeep_detection.ipynb",
                   "workshops/GeoAI_Workshop_2025.ipynb",
               ]
 
@@ -200,7 +199,6 @@ nav:
           - examples/impervious_surface_mapping.ipynb
           - examples/field_boundary_detection.ipynb
           - examples/super_resolution.ipynb
-          - examples/geodeep_detection.ipynb
           - examples/rfdetr_detection.ipynb
           - examples/image_captioning.ipynb
     - Workshops:
@@ -220,7 +218,6 @@ nav:
           - DINOv3 module: dinov3.md
           - ESRGAN module: esrgan.md
           - ftw module: ftw.md
-          - geodeep module: geodeep.md
           - geo_agents module: geo_agents.md
           - geoai module: geoai.md
           - download module: download.md

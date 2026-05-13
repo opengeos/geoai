@@ -1,7 +1,7 @@
 """Object detection operations.
 
-Wraps geoai object detection functions: Mask R-CNN, GeoDeep, RF-DETR
-for CLI consumption.
+Wraps geoai object detection functions (Mask R-CNN and friends via
+``multiclass_detection`` / ``train_MaskRCNN_model``) for CLI consumption.
 """
 
 import os
