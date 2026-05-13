@@ -197,8 +197,14 @@ def _predict_image_on_cpu(model, path: str) -> Any:
         try:
             _run_quiet_stdout(model.model.to, "cpu")
             moved = True
-        except Exception:
-            moved = False
+        except Exception as exc:
+            # Surface the underlying reason; predict_image would otherwise
+            # crash next with the original device-mismatch error.
+            print(
+                f"DeepForest worker: could not move model to CPU for "
+                f"predict_image ({exc}); leaving model on {original_device}.",
+                file=sys.stderr,
+            )
 
     try:
         return _run_quiet_stdout(model.predict_image, path=path)
@@ -206,8 +212,15 @@ def _predict_image_on_cpu(model, path: str) -> Any:
         if moved:
             try:
                 _run_quiet_stdout(model.model.to, original_device)
-            except Exception:
-                pass
+            except Exception as exc:
+                # Restore failed: the singleton model is now stuck on CPU,
+                # which silently downgrades subsequent CUDA predictions.
+                print(
+                    f"DeepForest worker: could not restore model to "
+                    f"{original_device} after predict_image ({exc}); "
+                    f"model remains on CPU.",
+                    file=sys.stderr,
+                )
 
 
 def _is_cuda_oom(exc: Exception) -> bool:

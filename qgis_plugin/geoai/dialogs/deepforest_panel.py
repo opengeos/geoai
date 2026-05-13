@@ -481,8 +481,16 @@ class DeepForestPredictWorker(QThread):
             try:
                 self.model.model.to("cpu")
                 moved = True
-            except Exception:
-                moved = False
+            except Exception as exc:
+                # Surface the underlying reason; predict_image would otherwise
+                # crash next with the original device-mismatch error.
+                QgsMessageLog.logMessage(
+                    f"DeepForest: could not move model to CPU for "
+                    f"predict_image ({exc}); leaving model on "
+                    f"{original_device}.",
+                    "GeoAI - Tree Segmentation",
+                    Qgis.Warning,
+                )
 
         try:
             return self.model.predict_image(path=image_path)
@@ -490,8 +498,16 @@ class DeepForestPredictWorker(QThread):
             if moved:
                 try:
                     self.model.model.to(original_device)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # Restore failed: the model is now stuck on CPU, which
+                    # silently downgrades subsequent CUDA predictions.
+                    QgsMessageLog.logMessage(
+                        f"DeepForest: could not restore model to "
+                        f"{original_device} after predict_image ({exc}); "
+                        f"model remains on CPU.",
+                        "GeoAI - Tree Segmentation",
+                        Qgis.Warning,
+                    )
 
     @staticmethod
     def _is_cuda_oom(exc: Exception) -> bool:
