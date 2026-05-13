@@ -50,10 +50,16 @@ Ready to contribute? Here's how to set up geoai for local development.
 
 1.  Fork the geoai repo on GitHub.
 
-2.  Clone your fork locally:
+2.  Clone your fork locally, using either SSH:
 
     ```shell
     $ git clone git@github.com:your_name_here/geoai.git
+    ```
+
+    Or HTTPS:
+
+    ```shell
+    $ git clone https://github.com/your_name_here/geoai.git
     ```
 
 3.  Install your local copy into a virtual environment:
@@ -61,8 +67,25 @@ Ready to contribute? Here's how to set up geoai for local development.
     ```shell
     $ cd geoai/
     $ python -m venv venv
-    $ source venv/bin/activate  # On Windows: venv\Scripts\activate
-    $ pip install -e .
+    ```
+
+    On macOS and Linux:
+
+    ```shell
+    $ source venv/bin/activate
+    ```
+
+    On Windows PowerShell:
+
+    ```powershell
+    PS> .\venv\Scripts\Activate.ps1
+    ```
+
+    Then install the package:
+
+    ```shell
+    $ python -m pip install --upgrade pip
+    $ python -m pip install -e .
     ```
 
 4.  Create a branch for local development:
@@ -76,7 +99,7 @@ Ready to contribute? Here's how to set up geoai for local development.
 5.  When you're done making changes, check that your changes pass the tests:
 
     ```shell
-    $ pytest .
+    $ python -m pytest .
     ```
 
 6.  Commit your changes and push your branch to GitHub:
