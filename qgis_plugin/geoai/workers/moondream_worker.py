@@ -128,7 +128,13 @@ def _run_quiet_stdout(fn, *args, **kwargs):
 
 
 def _handle_init(req: dict) -> Any:
-    from geoai import MoondreamGeo
+    # Import the submodule directly. `from geoai import MoondreamGeo` would
+    # go through the package's lazy ``__getattr__``, which converts any
+    # underlying ImportError (missing torch / transformers / etc.) into an
+    # AttributeError; Python's ``from X import Y`` machinery then strips
+    # the chained cause and leaves users with a misleading
+    # "cannot import name 'MoondreamGeo'" error.
+    from geoai.moondream import MoondreamGeo
 
     _STATE["moondream"] = _run_quiet_stdout(
         MoondreamGeo,
