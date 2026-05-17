@@ -127,6 +127,14 @@ class TestValidation:
         assert ".." not in result
         assert result.endswith(".tif")
 
+    @pytest.mark.parametrize("filename", ["CON", "aux.tif", "LPT1.geojson"])
+    def test_sanitize_filename_windows_reserved_names(self, filename):
+        """Test Windows reserved device names are avoided."""
+        result = sanitize_filename(filename)
+
+        assert result.startswith("_")
+        assert Path(result).stem.upper() not in {"CON", "AUX", "LPT1"}
+
 
 class TestFileManagement:
     """Tests for file management utilities."""
@@ -175,8 +183,8 @@ class TestConfig:
             max_memory_gb=16,
             device="cuda",
         )
-        assert config.input_dir == Path("/custom/input")
-        assert config.output_dir == Path("/custom/output")
+        assert config.input_dir == Path("/custom/input").resolve()
+        assert config.output_dir == Path("/custom/output").resolve()
         assert config.log_level == "DEBUG"
         assert config.timeout == 600
         assert config.max_memory_gb == 16
