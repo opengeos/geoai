@@ -376,6 +376,7 @@ Steps:
     - Choose prediction mode:
         - **Single Image**: Predict on the entire image at once (best for small images)
         - **Large Tile**: Split large geospatial tiles into overlapping patches for prediction
+    - When a large image is selected, the panel shows the pixel dimensions and recommends **Large Tile** mode for high-resolution imagery.
     - For Large Tile mode, configure:
         - **Patch Size**: Size of each prediction window (default 400px; experiment with 400-800 for 0.1m data)
         - **Patch Overlap**: Overlap between adjacent patches (default 0.25)
