@@ -199,6 +199,23 @@ def _use_deepforest_subprocess() -> bool:
     return os.name == "nt"
 
 
+def _empty_detection_guidance(mode: str) -> str:
+    """Return guidance for predictions that complete without detections."""
+    if mode == "Single Image":
+        return (
+            "No detections found. For high-resolution or very large imagery, "
+            "try Large Tile mode so DeepForest evaluates smaller patches. "
+            "You can also lower the score threshold or choose a model that "
+            "matches the object type and image scale."
+        )
+
+    return (
+        "No detections found. Try lowering the score threshold, increasing "
+        "patch overlap, or choosing a model that matches the object type and "
+        "image scale."
+    )
+
+
 class DeepForestModelLoadWorker(QThread):
     """Worker thread for loading DeepForest model."""
 
@@ -816,6 +833,10 @@ class DeepForestDockWidget(QDockWidget):
         mode_row.addWidget(QLabel("Mode:"))
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["Single Image", "Large Tile"])
+        self.mode_combo.setToolTip(
+            "Use Large Tile for high-resolution or very large imagery; "
+            "it processes smaller patches and exposes tile settings below."
+        )
         self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self.mode_combo)
         mode_layout.addLayout(mode_row)
@@ -1587,7 +1608,7 @@ class DeepForestDockWidget(QDockWidget):
             self.predict_status_label.setText("No detections found.")
             self.predict_status_label.setStyleSheet("color: orange;")
             self.results_text.setText(
-                "No detections found. Try adjusting the score threshold."
+                _empty_detection_guidance(self.mode_combo.currentText())
             )
 
     def _on_prediction_error(self, error_message: str):
