@@ -12,6 +12,15 @@ from .error_handling import InputValidationError
 
 logger = logging.getLogger("geoai_mcp.validation")
 
+_WINDOWS_RESERVED_FILENAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{i}" for i in range(1, 10)),
+    *(f"LPT{i}" for i in range(1, 10)),
+}
+
 
 def validate_bbox(
     bbox: List[float] | Tuple[float, ...],
@@ -231,15 +240,19 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
     # Remove leading/trailing dots
     filename = filename.strip(".")
 
+    # Fallback for empty result
+    if not filename:
+        filename = "unnamed_file"
+
+    base, ext = filename.rsplit(".", 1) if "." in filename else (filename, "")
+    if base.upper() in _WINDOWS_RESERVED_FILENAMES:
+        filename = f"_{base}" + (f".{ext}" if ext else "")
+
     # Truncate if too long (preserving extension)
     if len(filename) > max_length:
         base, ext = filename.rsplit(".", 1) if "." in filename else (filename, "")
         max_base = max_length - len(ext) - 1
         filename = base[:max_base] + ("." + ext if ext else "")
-
-    # Fallback for empty result
-    if not filename:
-        filename = "unnamed_file"
 
     return filename
 
