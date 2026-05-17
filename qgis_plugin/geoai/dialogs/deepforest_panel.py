@@ -199,6 +199,90 @@ def _use_deepforest_subprocess() -> bool:
     return os.name == "nt"
 
 
+def _empty_detection_guidance(mode: str) -> str:
+    """Return guidance for predictions that complete without detections."""
+    if mode == "Single Image":
+        return (
+            "No detections found. For high-resolution or very large imagery, "
+            "try Large Tile mode so DeepForest evaluates smaller patches. "
+            "You can also lower the score threshold or choose a model that "
+            "matches the object type and image scale."
+        )
+
+    return (
+        "No detections found. Try lowering the score threshold, increasing "
+        "patch overlap, or choosing a model that matches the object type and "
+        "image scale."
+    )
+
+
+_LARGE_IMAGE_SIDE_PIXELS = 4096
+_LARGE_IMAGE_TOTAL_PIXELS = 16_000_000
+
+
+def _read_dimension(obj, attr: str):
+    value = getattr(obj, attr, None)
+    if callable(value):
+        value = value()
+    if value is None:
+        return None
+    return int(value)
+
+
+def _raster_layer_dimensions(layer):
+    """Return raster layer dimensions as (width, height), when available."""
+    provider = None
+    try:
+        provider = layer.dataProvider()
+    except Exception:
+        provider = None
+
+    for source, width_attr, height_attr in (
+        (provider, "xSize", "ySize"),
+        (layer, "width", "height"),
+    ):
+        if source is None:
+            continue
+        try:
+            width = _read_dimension(source, width_attr)
+            height = _read_dimension(source, height_attr)
+        except (TypeError, ValueError):
+            continue
+        if width and height:
+            return width, height
+
+    return None
+
+
+def _is_large_image(width: int, height: int) -> bool:
+    """Return True when an image is large enough to prefer tiled prediction."""
+    if width <= 0 or height <= 0:
+        return False
+    return (
+        max(width, height) >= _LARGE_IMAGE_SIDE_PIXELS
+        or width * height >= _LARGE_IMAGE_TOTAL_PIXELS
+    )
+
+
+def _large_image_recommendation(dimensions, mode: str):
+    """Return a tiled-prediction recommendation for large imagery."""
+    if not dimensions:
+        return None
+
+    width, height = dimensions
+    if not _is_large_image(width, height):
+        return None
+
+    size = f"{width} x {height} px"
+    if mode == "Large Tile":
+        return f"Large image detected ({size}). Large Tile mode is active."
+
+    return (
+        f"Large image detected ({size}). Large Tile mode is recommended for "
+        "high-resolution imagery."
+    )
+
+
 class DeepForestModelLoadWorker(QThread):
     """Worker thread for loading DeepForest model."""
 
@@ -638,6 +722,7 @@ class DeepForestDockWidget(QDockWidget):
         self.deepforest = None
         self.current_layer = None
         self.current_image_path = None
+        self.current_image_dimensions = None
 
         # Store predictions and mode
         self.predictions = None
@@ -796,6 +881,11 @@ class DeepForestDockWidget(QDockWidget):
         self.image_status.setStyleSheet("color: gray;")
         layer_layout.addWidget(self.image_status)
 
+        self.image_recommendation_label = QLabel("")
+        self.image_recommendation_label.setWordWrap(True)
+        self.image_recommendation_label.setVisible(False)
+        layer_layout.addWidget(self.image_recommendation_label)
+
         layer_group.setLayout(layer_layout)
         model_layout.addWidget(layer_group)
 
@@ -816,6 +906,10 @@ class DeepForestDockWidget(QDockWidget):
         mode_row.addWidget(QLabel("Mode:"))
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["Single Image", "Large Tile"])
+        self.mode_combo.setToolTip(
+            "Use Large Tile for high-resolution or very large imagery; "
+            "it processes smaller patches and exposes tile settings below."
+        )
         self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self.mode_combo)
         mode_layout.addLayout(mode_row)
@@ -1034,6 +1128,7 @@ class DeepForestDockWidget(QDockWidget):
         self.tile_settings_group.setVisible(is_tile_mode)
         if is_tile_mode and not self._user_modified_tile_settings:
             self._apply_adaptive_defaults()
+        self._refresh_image_recommendation()
 
     def _apply_adaptive_defaults(self):
         """Set batch_size and dataloader_strategy based on detected GPU VRAM."""
@@ -1109,6 +1204,22 @@ class DeepForestDockWidget(QDockWidget):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Export Directory", "")
         if dir_path:
             self.export_dir_edit.setText(dir_path)
+
+    def _refresh_image_recommendation(self):
+        """Refresh the large-image recommendation for the current prediction mode."""
+        message = _large_image_recommendation(
+            self.current_image_dimensions,
+            self.mode_combo.currentText(),
+        )
+        if not message:
+            self.image_recommendation_label.clear()
+            self.image_recommendation_label.setVisible(False)
+            return
+
+        self.image_recommendation_label.setText(message)
+        color = "green" if self.mode_combo.currentText() == "Large Tile" else "orange"
+        self.image_recommendation_label.setStyleSheet(f"color: {color};")
+        self.image_recommendation_label.setVisible(True)
 
     def check_cuda_devices(self):
         """Check CUDA device availability and fix CUDA_VISIBLE_DEVICES if needed.
@@ -1430,13 +1541,18 @@ class DeepForestDockWidget(QDockWidget):
 
             self.current_layer = layer
             self.current_image_path = image_path
+            self.current_image_dimensions = _raster_layer_dimensions(layer)
 
             # Build status message
             status_msg = f"Image: {layer.name()}"
             if is_gpkg:
                 status_msg += " (from GeoPackage)"
+            if self.current_image_dimensions:
+                width, height = self.current_image_dimensions
+                status_msg += f" ({width} x {height} px)"
             self.image_status.setText(status_msg)
             self.image_status.setStyleSheet("color: green;")
+            self._refresh_image_recommendation()
 
             log_msg = f"Image set from layer: {layer.name()}"
             if is_gpkg:
@@ -1446,6 +1562,8 @@ class DeepForestDockWidget(QDockWidget):
         except Exception as e:
             self.image_status.setText("Image: Failed to set")
             self.image_status.setStyleSheet("color: red;")
+            self.current_image_dimensions = None
+            self._refresh_image_recommendation()
             # Clean up temp file if export succeeded but set_image failed
             if temp_export_path and os.path.exists(temp_export_path):
                 try:
@@ -1488,18 +1606,25 @@ class DeepForestDockWidget(QDockWidget):
                 QgsProject.instance().addMapLayer(layer)
                 self.current_layer = layer
                 self.current_image_path = file_path
+                self.current_image_dimensions = _raster_layer_dimensions(layer)
 
                 status_msg = f"Image: {os.path.basename(file_path)}"
+                if self.current_image_dimensions:
+                    width, height = self.current_image_dimensions
+                    status_msg += f" ({width} x {height} px)"
                 self.image_status.setText(status_msg)
                 self.image_status.setStyleSheet("color: green;")
+                self._refresh_image_recommendation()
 
                 self.log_message(f"Image set from file: {file_path}")
                 self.refresh_layers()
             else:
                 self.current_layer = None
                 self.current_image_path = None
+                self.current_image_dimensions = None
                 self.image_status.setText("Image: Failed to set (invalid layer)")
                 self.image_status.setStyleSheet("color: red;")
+                self._refresh_image_recommendation()
                 self.show_error(
                     "Failed to add image layer: The raster layer is invalid."
                 )
@@ -1507,6 +1632,8 @@ class DeepForestDockWidget(QDockWidget):
         except Exception as e:
             self.image_status.setText("Image: Failed to set")
             self.image_status.setStyleSheet("color: red;")
+            self.current_image_dimensions = None
+            self._refresh_image_recommendation()
             self.show_error(f"Failed to set image: {str(e)}")
 
         finally:
@@ -1587,7 +1714,7 @@ class DeepForestDockWidget(QDockWidget):
             self.predict_status_label.setText("No detections found.")
             self.predict_status_label.setStyleSheet("color: orange;")
             self.results_text.setText(
-                "No detections found. Try adjusting the score threshold."
+                _empty_detection_guidance(self.mode_combo.currentText())
             )
 
     def _on_prediction_error(self, error_message: str):
