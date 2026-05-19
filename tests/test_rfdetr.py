@@ -4,6 +4,10 @@
 
 import inspect
 import unittest
+from unittest.mock import patch
+
+import numpy as np
+import pytest
 
 
 class TestRFDETRImport(unittest.TestCase):
@@ -33,6 +37,12 @@ class TestRFDETRImport(unittest.TestCase):
         from geoai.rfdetr import rfdetr_detect
 
         self.assertTrue(callable(rfdetr_detect))
+
+    def test_rfdetr_segment_function_exists(self):
+        """Test that rfdetr_segment convenience function exists."""
+        from geoai.rfdetr import rfdetr_segment
+
+        self.assertTrue(callable(rfdetr_segment))
 
     def test_rfdetr_detect_batch_function_exists(self):
         """Test that rfdetr_detect_batch convenience function exists."""
@@ -77,6 +87,7 @@ class TestRFDETRAllExports(unittest.TestCase):
             "check_rfdetr_available",
             "list_rfdetr_models",
             "rfdetr_detect",
+            "rfdetr_segment",
             "rfdetr_detect_batch",
             "rfdetr_train",
             "push_rfdetr_to_hub",
@@ -154,6 +165,21 @@ class TestRFDETRModels(unittest.TestCase):
         seg_count = sum(1 for name in RFDETR_MODELS if name.startswith("seg-"))
         self.assertEqual(seg_count, 6)
 
+    def test_segmentation_model_resolutions_match_current_rfdetr(self):
+        """Test RF-DETR-Seg native resolutions."""
+        from geoai.rfdetr import RFDETR_MODELS
+
+        expected = {
+            "seg-nano": 312,
+            "seg-small": 384,
+            "seg-medium": 432,
+            "seg-large": 504,
+            "seg-xlarge": 624,
+            "seg-2xlarge": 768,
+        }
+        for model_id, resolution in expected.items():
+            self.assertEqual(RFDETR_MODELS[model_id]["resolution"], resolution)
+
     def test_list_rfdetr_models_returns_descriptions(self):
         """Test that list_rfdetr_models returns model descriptions."""
         from geoai.rfdetr import RFDETR_MODELS, list_rfdetr_models
@@ -185,6 +211,30 @@ class TestRFDETRSignatures(unittest.TestCase):
             "overlap",
             "batch_size",
             "class_names",
+            "use_mask_geometry",
+            "simplify_tolerance",
+            "device",
+        ]
+        for param in expected_params:
+            self.assertIn(param, sig.parameters)
+
+    def test_rfdetr_segment_params(self):
+        """Test rfdetr_segment has expected parameters."""
+        from geoai.rfdetr import rfdetr_segment
+
+        sig = inspect.signature(rfdetr_segment)
+        expected_params = [
+            "input_path",
+            "output_path",
+            "model_variant",
+            "pretrain_weights",
+            "confidence_threshold",
+            "nms_threshold",
+            "window_size",
+            "overlap",
+            "batch_size",
+            "class_names",
+            "simplify_tolerance",
             "device",
         ]
         for param in expected_params:
@@ -265,6 +315,13 @@ class TestRFDETRValidation(unittest.TestCase):
         with self.assertRaises((ValueError, ImportError)):
             _get_rfdetr_model_class("nonexistent_variant")
 
+    def test_rfdetr_segment_rejects_detection_variant(self):
+        """Test rfdetr_segment requires a segmentation model variant."""
+        from geoai.rfdetr import rfdetr_segment
+
+        with self.assertRaises(ValueError):
+            rfdetr_segment("dummy.tif", model_variant="base")
+
 
 class TestRFDETRLazyImport(unittest.TestCase):
     """Tests for lazy import from the top-level geoai package."""
@@ -274,6 +331,12 @@ class TestRFDETRLazyImport(unittest.TestCase):
         from geoai import rfdetr_detect
 
         self.assertTrue(callable(rfdetr_detect))
+
+    def test_lazy_import_rfdetr_segment(self):
+        """Test rfdetr_segment can be imported from geoai via lazy loading."""
+        from geoai import rfdetr_segment
+
+        self.assertTrue(callable(rfdetr_segment))
 
     def test_lazy_import_list_rfdetr_models(self):
         """Test list_rfdetr_models can be imported from geoai."""
@@ -295,11 +358,13 @@ class TestRFDETRLazyImport(unittest.TestCase):
         from geoai import (
             rfdetr_detect,
             rfdetr_detect_batch,
+            rfdetr_segment,
             rfdetr_train,
         )
 
         self.assertTrue(callable(rfdetr_detect))
         self.assertTrue(callable(rfdetr_detect_batch))
+        self.assertTrue(callable(rfdetr_segment))
         self.assertTrue(callable(rfdetr_train))
 
     def test_lazy_import_hub_functions(self):
@@ -308,6 +373,73 @@ class TestRFDETRLazyImport(unittest.TestCase):
 
         self.assertTrue(callable(push_rfdetr_to_hub))
         self.assertTrue(callable(rfdetr_detect_from_hub))
+
+
+class _FakeRFDETRDetections:
+    """Small Supervision-style detections object for RF-DETR tests."""
+
+    def __init__(self):
+        self.xyxy = np.array([[8.0, 8.0, 28.0, 28.0]], dtype=float)
+        self.confidence = np.array([0.92], dtype=float)
+        self.class_id = np.array([0], dtype=int)
+        mask = np.zeros((64, 64), dtype=bool)
+        mask[8:28, 8:18] = True
+        mask[18:28, 18:28] = True
+        self.mask = mask[np.newaxis, ...]
+
+
+class _FakeRFDETRModel:
+    """Small RF-DETR model double returning deterministic masks."""
+
+    class_names = ["building"]
+
+    def predict(self, images, threshold=0.5):
+        return [_FakeRFDETRDetections() for _ in images]
+
+
+def test_rfdetr_segment_vectorizes_masks(tmp_path):
+    """RF-DETR-Seg masks are returned as georeferenced mask polygons."""
+    pytest.importorskip("geopandas")
+    rasterio = pytest.importorskip("rasterio")
+    pytest.importorskip("torch")
+    pytest.importorskip("torchvision")
+
+    from rasterio.transform import from_origin
+
+    from geoai.rfdetr import rfdetr_segment
+
+    image_path = tmp_path / "image.tif"
+    transform = from_origin(0, 64, 1, 1)
+    with rasterio.open(
+        image_path,
+        "w",
+        driver="GTiff",
+        height=64,
+        width=64,
+        count=3,
+        dtype="uint8",
+        crs="EPSG:3857",
+        transform=transform,
+    ) as dst:
+        dst.write(np.zeros((3, 64, 64), dtype=np.uint8))
+
+    with (
+        patch("geoai.rfdetr.RFDETR_AVAILABLE", True),
+        patch("geoai.rfdetr._create_rfdetr_model", return_value=_FakeRFDETRModel()),
+    ):
+        gdf = rfdetr_segment(
+            str(image_path),
+            model_variant="seg-medium",
+            window_size=64,
+            overlap=0,
+            batch_size=1,
+        )
+
+    assert len(gdf) == 1
+    assert gdf.iloc[0]["class_name"] == "building"
+    assert gdf.iloc[0]["area_pixels"] == 300
+    assert gdf.geometry.iloc[0].area == 300
+    assert gdf.geometry.iloc[0].area < 400
 
 
 if __name__ == "__main__":

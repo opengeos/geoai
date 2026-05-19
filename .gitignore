@@ -36,6 +36,7 @@ docs/examples/ndvi_regression_output/
 docs/examples/timm_regression_output/
 docs/examples/ndvi_model/
 *.pth
+*.pt
 *.ckpt
 docs/examples/cache/
 docs/examples/*_cache/
@@ -59,6 +60,7 @@ wheels/
 *.egg
 docs/examples/**/*.txt
 docs/examples/**/*.pth
+docs/examples/**/*.pt
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

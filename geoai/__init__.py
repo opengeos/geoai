@@ -436,6 +436,7 @@ _LAZY_SYMBOL_MAP = {
     "check_rfdetr_available": ("rfdetr", None),
     "list_rfdetr_models": ("rfdetr", None),
     "rfdetr_detect": ("rfdetr", None),
+    "rfdetr_segment": ("rfdetr", None),
     "rfdetr_detect_batch": ("rfdetr", None),
     "rfdetr_train": ("rfdetr", None),
     "push_rfdetr_to_hub": ("rfdetr", None),

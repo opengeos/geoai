@@ -202,6 +202,7 @@ nav:
           - examples/field_boundary_detection.ipynb
           - examples/super_resolution.ipynb
           - examples/rfdetr_detection.ipynb
+          - examples/rfdetr_segmentation.ipynb
           - examples/image_captioning.ipynb
     - Workshops:
           - workshops/GeoAI_Workshop_2025.ipynb

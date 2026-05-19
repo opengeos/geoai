@@ -40,6 +40,7 @@ __all__ = [
     "check_rfdetr_available",
     "list_rfdetr_models",
     "rfdetr_detect",
+    "rfdetr_segment",
     "rfdetr_detect_batch",
     "rfdetr_train",
     "push_rfdetr_to_hub",
@@ -82,35 +83,102 @@ RFDETR_MODELS: Dict[str, Dict[str, Any]] = {
     # Segmentation models
     "seg-nano": {
         "class_name": "RFDETRSegNano",
-        "resolution": 384,
-        "description": "RF-DETR Seg Nano (instance segmentation, 384px)",
+        "resolution": 312,
+        "description": "RF-DETR Seg Nano (instance segmentation, 312px)",
     },
     "seg-small": {
         "class_name": "RFDETRSegSmall",
-        "resolution": 512,
-        "description": "RF-DETR Seg Small (instance segmentation, 512px)",
+        "resolution": 384,
+        "description": "RF-DETR Seg Small (instance segmentation, 384px)",
     },
     "seg-medium": {
         "class_name": "RFDETRSegMedium",
-        "resolution": 576,
-        "description": "RF-DETR Seg Medium (instance segmentation, 576px)",
+        "resolution": 432,
+        "description": "RF-DETR Seg Medium (instance segmentation, 432px)",
     },
     "seg-large": {
         "class_name": "RFDETRSegLarge",
-        "resolution": 704,
-        "description": "RF-DETR Seg Large (instance segmentation, 704px)",
+        "resolution": 504,
+        "description": "RF-DETR Seg Large (instance segmentation, 504px)",
     },
     "seg-xlarge": {
         "class_name": "RFDETRSegXLarge",
-        "resolution": 700,
-        "description": "RF-DETR Seg XLarge (instance segmentation, 700px)",
+        "resolution": 624,
+        "description": "RF-DETR Seg XLarge (instance segmentation, 624px)",
     },
     "seg-2xlarge": {
         "class_name": "RFDETRSeg2XLarge",
-        "resolution": 880,
-        "description": "RF-DETR Seg 2XLarge (instance segmentation, 880px)",
+        "resolution": 768,
+        "description": "RF-DETR Seg 2XLarge (instance segmentation, 768px)",
     },
 }
+
+
+def _is_rfdetr_segmentation_variant(model_variant: str) -> bool:
+    """Return True if the RF-DETR variant is an instance segmentation model."""
+    return model_variant.startswith("seg-")
+
+
+def _normalize_detection_masks(
+    masks: Optional[Any], expected_count: int
+) -> Optional[np.ndarray]:
+    """Normalize Supervision detection masks to ``(N, H, W)`` boolean arrays."""
+    if masks is None:
+        return None
+
+    masks_array = np.asarray(masks)
+    if masks_array.ndim == 4 and masks_array.shape[-1] == 1:
+        masks_array = masks_array[..., 0]
+    if masks_array.ndim == 2 and expected_count == 1:
+        masks_array = masks_array[np.newaxis, ...]
+    if masks_array.ndim != 3 or masks_array.shape[0] != expected_count:
+        logger.warning(
+            "Skipping RF-DETR masks with unexpected shape %s for %d detections.",
+            masks_array.shape,
+            expected_count,
+        )
+        return None
+    return masks_array.astype(bool)
+
+
+def _mask_to_georeferenced_geometry(
+    mask: np.ndarray,
+    x_offset: int,
+    y_offset: int,
+    transform: Any,
+    simplify_tolerance: float = 0.0,
+) -> Optional[Any]:
+    """Vectorize a tile-local mask into georeferenced polygon geometry."""
+    if mask is None or not np.any(mask):
+        return None
+
+    from rasterio.features import shapes as rasterio_shapes
+    from rasterio.transform import Affine
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+
+    mask_uint8 = mask.astype(np.uint8)
+    tile_transform = transform * Affine.translation(x_offset, y_offset)
+
+    parts = []
+    for geom_dict, value in rasterio_shapes(
+        mask_uint8, mask=mask_uint8.astype(bool), transform=tile_transform
+    ):
+        if value == 0:
+            continue
+        candidate = shape(geom_dict)
+        if candidate.is_valid and not candidate.is_empty:
+            parts.append(candidate)
+
+    if not parts:
+        return None
+
+    geom = unary_union(parts) if len(parts) > 1 else parts[0]
+    if simplify_tolerance > 0:
+        simplified = geom.simplify(simplify_tolerance, preserve_topology=True)
+        if simplified.is_valid and not simplified.is_empty:
+            geom = simplified
+    return geom
 
 
 def check_rfdetr_available() -> None:
@@ -211,6 +279,8 @@ def rfdetr_detect(
     overlap: Optional[int] = None,
     batch_size: int = 4,
     class_names: Optional[List[str]] = None,
+    use_mask_geometry: Optional[bool] = None,
+    simplify_tolerance: float = 0.0,
     device: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
@@ -243,13 +313,21 @@ def rfdetr_detect(
         class_names: Optional list of class names for labeling detections.
             If None and using COCO pretrained weights, COCO class names
             are used.
+        use_mask_geometry: If True, use RF-DETR-Seg instance masks as output
+            geometries when masks are available. If None, this is enabled
+            automatically for ``seg-*`` model variants and disabled for
+            detection variants. Defaults to None.
+        simplify_tolerance: Optional polygon simplification tolerance in
+            georeferenced units for mask geometries. Defaults to 0.0.
         device: Device to use ("cpu", "cuda", "mps"). If None, auto-detected.
         **kwargs: Additional keyword arguments passed to the model constructor.
 
     Returns:
         geopandas.GeoDataFrame: GeoDataFrame with columns: geometry,
         class_id, class_name, confidence. The geometry column contains
-        georeferenced bounding box polygons.
+        georeferenced bounding box polygons for detection variants and
+        georeferenced mask polygons for segmentation variants when masks
+        are available.
     """
     import geopandas as gpd
     import rasterio
@@ -261,6 +339,9 @@ def rfdetr_detect(
     from tqdm import tqdm
 
     check_rfdetr_available()
+
+    if use_mask_geometry is None:
+        use_mask_geometry = _is_rfdetr_segmentation_variant(model_variant)
 
     model = _create_rfdetr_model(
         model_variant=model_variant,
@@ -289,6 +370,8 @@ def rfdetr_detect(
         all_boxes = []
         all_scores = []
         all_class_ids = []
+        all_masks = []
+        all_mask_offsets = []
 
         stride = window_size - overlap
         if stride <= 0:
@@ -386,6 +469,14 @@ def rfdetr_detect(
                                 valid = (boxes[:, 2] > boxes[:, 0]) & (
                                     boxes[:, 3] > boxes[:, 1]
                                 )
+                                masks = None
+                                if use_mask_geometry:
+                                    masks = _normalize_detection_masks(
+                                        getattr(det, "mask", None), len(det.xyxy)
+                                    )
+                                    if masks is not None:
+                                        masks = masks[valid]
+
                                 boxes = boxes[valid]
                                 scores = det.confidence[valid]
                                 class_ids = det.class_id[valid]
@@ -399,6 +490,16 @@ def rfdetr_detect(
                                 all_boxes.append(boxes)
                                 all_scores.append(scores)
                                 all_class_ids.append(class_ids)
+                                if use_mask_geometry:
+                                    if masks is None:
+                                        all_masks.extend([None] * len(boxes))
+                                        all_mask_offsets.extend(
+                                            [(x_pos, y_pos)] * len(boxes)
+                                        )
+                                    else:
+                                        for mask in masks:
+                                            all_masks.append(mask[:h, :w])
+                                            all_mask_offsets.append((x_pos, y_pos))
 
                         pbar.update(len(batch_images))
                         batch_images = []
@@ -423,16 +524,25 @@ def rfdetr_detect(
         keep_indices = torchvision.ops.batched_nms(
             boxes_tensor, scores_tensor, labels_tensor, nms_threshold
         )
+        keep_indices_np = keep_indices.numpy()
 
-        final_boxes = all_boxes[keep_indices.numpy()]
-        final_scores = all_scores[keep_indices.numpy()]
-        final_class_ids = all_class_ids[keep_indices.numpy()]
+        final_boxes = all_boxes[keep_indices_np]
+        final_scores = all_scores[keep_indices_np]
+        final_class_ids = all_class_ids[keep_indices_np]
+        if use_mask_geometry:
+            final_masks = [all_masks[int(idx)] for idx in keep_indices_np]
+            final_mask_offsets = [all_mask_offsets[int(idx)] for idx in keep_indices_np]
+        else:
+            final_masks = []
+            final_mask_offsets = []
 
         logger.info("After NMS: %d detections", len(final_boxes))
     else:
         final_boxes = np.empty((0, 4))
         final_scores = np.empty((0,))
         final_class_ids = np.empty((0,), dtype=int)
+        final_masks = []
+        final_mask_offsets = []
 
     # Convert pixel coordinates to georeferenced polygons
     records = []
@@ -441,12 +551,28 @@ def rfdetr_detect(
         class_id = int(final_class_ids[idx])
         score = float(final_scores[idx])
 
-        # Convert pixel corners to georeferenced coordinates
-        pts = []
-        for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
-            geo_x, geo_y = transform * (float(c), float(r))
-            pts.append((geo_x, geo_y))
-        geom = Polygon(pts)
+        geom = None
+        area_pixels = 0
+        if use_mask_geometry and idx < len(final_masks):
+            mask = final_masks[idx]
+            if mask is not None:
+                x_offset, y_offset = final_mask_offsets[idx]
+                area_pixels = int(np.sum(mask))
+                geom = _mask_to_georeferenced_geometry(
+                    mask,
+                    x_offset=x_offset,
+                    y_offset=y_offset,
+                    transform=transform,
+                    simplify_tolerance=simplify_tolerance,
+                )
+
+        if geom is None:
+            # Convert pixel corners to georeferenced coordinates
+            pts = []
+            for c, r in [(c0, r0), (c1, r0), (c1, r1), (c0, r1)]:
+                geo_x, geo_y = transform * (float(c), float(r))
+                pts.append((geo_x, geo_y))
+            geom = Polygon(pts)
 
         # Resolve class name
         if class_names and class_id < len(class_names):
@@ -454,20 +580,24 @@ def rfdetr_detect(
         else:
             name = f"class_{class_id}"
 
-        records.append(
-            {
-                "geometry": geom,
-                "class_id": class_id,
-                "class_name": name,
-                "confidence": score,
-            }
-        )
+        record = {
+            "geometry": geom,
+            "class_id": class_id,
+            "class_name": name,
+            "confidence": score,
+        }
+        if use_mask_geometry:
+            record["area_pixels"] = area_pixels
+        records.append(record)
 
     if records:
         gdf = gpd.GeoDataFrame(records, crs=crs)
     else:
+        columns = ["geometry", "class_id", "class_name", "confidence"]
+        if use_mask_geometry:
+            columns.append("area_pixels")
         gdf = gpd.GeoDataFrame(
-            columns=["geometry", "class_id", "class_name", "confidence"],
+            columns=columns,
             geometry="geometry",
             crs=crs,
         )
@@ -478,6 +608,80 @@ def rfdetr_detect(
         logger.info("Saved %d detections to %s", len(gdf), output_path)
 
     return gdf
+
+
+def rfdetr_segment(
+    input_path: str,
+    output_path: Optional[str] = None,
+    model_variant: str = "seg-medium",
+    pretrain_weights: Optional[str] = None,
+    confidence_threshold: float = 0.5,
+    nms_threshold: float = 0.3,
+    window_size: Optional[int] = None,
+    overlap: Optional[int] = None,
+    batch_size: int = 4,
+    class_names: Optional[List[str]] = None,
+    simplify_tolerance: float = 0.0,
+    device: Optional[str] = None,
+    **kwargs: Any,
+) -> Any:
+    """Perform RF-DETR-Seg instance segmentation on a GeoTIFF.
+
+    This is a convenience wrapper around :func:`rfdetr_detect` that requires
+    a ``seg-*`` model variant and returns georeferenced mask polygons when
+    RF-DETR provides masks.
+
+    Args:
+        input_path: Path to input GeoTIFF image.
+        output_path: Optional path to save the output GeoDataFrame.
+        model_variant: RF-DETR-Seg model variant to use. Defaults to
+            ``"seg-medium"``.
+        pretrain_weights: Path to custom pretrained weights file. If None,
+            uses RF-DETR's default pretrained weights.
+        confidence_threshold: Minimum confidence score for detections.
+        nms_threshold: IoU threshold for Non-Maximum Suppression across
+            tiles.
+        window_size: Size of the sliding window in pixels. Defaults to the
+            model's native resolution.
+        overlap: Overlap between adjacent windows in pixels. Defaults to
+            ``window_size // 4``.
+        batch_size: Number of tiles to process in each batch.
+        class_names: Optional list of class names for labeling detections.
+        simplify_tolerance: Optional polygon simplification tolerance in
+            georeferenced units. Defaults to 0.0.
+        device: Device to use ("cpu", "cuda", "mps"). If None, auto-detected.
+        **kwargs: Additional keyword arguments passed to the model constructor.
+
+    Returns:
+        geopandas.GeoDataFrame: GeoDataFrame with georeferenced mask polygons.
+    """
+    if not _is_rfdetr_segmentation_variant(model_variant):
+        available = ", ".join(
+            sorted(
+                name for name in RFDETR_MODELS if _is_rfdetr_segmentation_variant(name)
+            )
+        )
+        raise ValueError(
+            f"rfdetr_segment requires a segmentation variant. "
+            f"Available segmentation variants: {available}"
+        )
+
+    return rfdetr_detect(
+        input_path=input_path,
+        output_path=output_path,
+        model_variant=model_variant,
+        pretrain_weights=pretrain_weights,
+        confidence_threshold=confidence_threshold,
+        nms_threshold=nms_threshold,
+        window_size=window_size,
+        overlap=overlap,
+        batch_size=batch_size,
+        class_names=class_names,
+        use_mask_geometry=True,
+        simplify_tolerance=simplify_tolerance,
+        device=device,
+        **kwargs,
+    )
 
 
 def rfdetr_detect_batch(
@@ -491,6 +695,8 @@ def rfdetr_detect_batch(
     overlap: Optional[int] = None,
     batch_size: int = 4,
     class_names: Optional[List[str]] = None,
+    use_mask_geometry: Optional[bool] = None,
+    simplify_tolerance: float = 0.0,
     device: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
@@ -513,6 +719,11 @@ def rfdetr_detect_batch(
         overlap: Overlap between adjacent windows in pixels.
         batch_size: Number of tiles per inference batch. Defaults to 4.
         class_names: Optional list of class names.
+        use_mask_geometry: If True, use RF-DETR-Seg instance masks as output
+            geometries when masks are available. If None, this is enabled
+            automatically for ``seg-*`` model variants.
+        simplify_tolerance: Optional polygon simplification tolerance in
+            georeferenced units for mask geometries. Defaults to 0.0.
         device: Device to use. If None, auto-detected.
         **kwargs: Additional keyword arguments passed to the model constructor.
 
@@ -566,6 +777,8 @@ def rfdetr_detect_batch(
             overlap=overlap,
             batch_size=batch_size,
             class_names=class_names,
+            use_mask_geometry=use_mask_geometry,
+            simplify_tolerance=simplify_tolerance,
             device=device,
             **kwargs,
         )
