@@ -260,6 +260,11 @@ class DINOv3Segmenter(_LightningBase):
         loss_fn: Custom loss function.  Defaults to ``CrossEntropyLoss``.
         class_weights: Optional per-class weights for the loss.
         ignore_index: Label index to ignore in the loss (e.g. 255 for nodata).
+        num_channels: Number of input channels to feed to the backbone (default
+            3). Image batches with more bands are truncated to this count.
+        normalize_input: When ``True`` (default), integer-dtype image batches
+            are divided by 255 inside ``_unpack_batch``. Float batches are
+            assumed to be already model-ready and are passed through unchanged.
     """
 
     def __init__(
@@ -277,6 +282,8 @@ class DINOv3Segmenter(_LightningBase):
         loss_fn: Optional[nn.Module] = None,
         class_weights: Optional[torch.Tensor] = None,
         ignore_index: int = 255,
+        num_channels: int = 3,
+        normalize_input: bool = True,
     ) -> None:
         if not LIGHTNING_AVAILABLE:
             raise ImportError(
@@ -321,6 +328,8 @@ class DINOv3Segmenter(_LightningBase):
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+        self.num_channels = num_channels
+        self.normalize_input = normalize_input
 
     # -- backbone loading (mirrors DINOv3GeoProcessor) --
 
@@ -414,8 +423,8 @@ class DINOv3Segmenter(_LightningBase):
         x, y = geo_sample_to_tuple(
             batch,
             target_key=target_key,
-            num_channels=3,
-            normalize=True,
+            num_channels=self.num_channels,
+            normalize=self.normalize_input,
             squeeze_target=True,
         )
         if require_target and y is None:
@@ -658,6 +667,8 @@ def train_dinov3_segmentation(
     patience: int = 10,
     save_top_k: int = 1,
     checkpoint_path: Optional[str] = None,
+    num_channels: int = 3,
+    normalize_input: bool = True,
     **kwargs: Any,
 ) -> "DINOv3Segmenter":
     """Train a DINOv3-based semantic segmentation model.
@@ -703,6 +714,10 @@ def train_dinov3_segmentation(
         patience: Early-stopping patience.
         save_top_k: Number of best checkpoints to keep.
         checkpoint_path: Path to resume training from.
+        num_channels: Number of image channels expected by the backbone. Image
+            batches with more bands are truncated to this count.
+        normalize_input: When ``True`` (default), integer image batches are
+            divided by 255. Float batches are assumed to be model-ready.
         **kwargs: Extra arguments forwarded to ``pl.Trainer``.
 
     Returns:
@@ -745,6 +760,8 @@ def train_dinov3_segmentation(
         loss_fn=loss_fn,
         class_weights=weight_tensor,
         ignore_index=ignore_index,
+        num_channels=num_channels,
+        normalize_input=normalize_input,
     )
 
     if train_dataloader is None:

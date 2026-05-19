@@ -9,6 +9,7 @@ when they are called.
 from __future__ import annotations
 
 import inspect
+import warnings
 from typing import Any, Dict, Optional, Tuple
 
 __all__ = [
@@ -388,7 +389,13 @@ def _as_tensor(value: Any) -> Any:
 
 
 def _coerce_channels(image: Any, num_channels: Optional[int]) -> Any:
-    """Truncate or zero-pad the channel dimension to ``num_channels``."""
+    """Truncate or zero-pad the channel dimension to ``num_channels``.
+
+    When the input has more channels than ``num_channels``, the first
+    ``num_channels`` bands are kept and a warning is emitted because dropped
+    bands may carry meaningful information (NIR/SWIR, etc.). Callers that
+    need explicit band selection should subset the image before calling.
+    """
     if num_channels is None:
         return image
 
@@ -402,6 +409,12 @@ def _coerce_channels(image: Any, num_channels: Optional[int]) -> Any:
     if channels == num_channels:
         return image
     if channels > num_channels:
+        warnings.warn(
+            f"Dropping {channels - num_channels} band(s) to match num_channels="
+            f"{num_channels}; keeping the first {num_channels} band(s). Subset "
+            "the image yourself to control which bands are retained.",
+            stacklevel=2,
+        )
         index = [slice(None)] * image.ndim
         index[channel_dim] = slice(0, num_channels)
         return image[tuple(index)]
@@ -445,9 +458,13 @@ def geo_sample_to_tuple(
     image = _as_tensor(image)
     image = _coerce_channels(image, num_channels)
     if normalize:
-        image = image.float()
-        if image.numel() and image.max() > 1.0:
-            image = image / 255.0
+        # Only divide by 255 when the input is an integer dtype; float tensors
+        # are assumed to be already model-ready (e.g. ImageNet-normalized) so
+        # that callers who pre-normalize are not silently re-scaled.
+        if not image.is_floating_point():
+            image = image.float() / 255.0
+        else:
+            image = image.float()
 
     if target is None:
         return image, None
@@ -716,6 +733,11 @@ def train_torchgeo_segmentation_model(
             total_iou += _segmentation_mean_iou(logits.detach(), masks, num_classes)
             count += 1
 
+        if count == 0:
+            raise ValueError(
+                "Dataloader yielded no batches; cannot compute epoch metrics. "
+                "Check that the dataset and sampler produce at least one sample."
+            )
         return total_loss / count, total_iou / count
 
     for epoch in range(num_epochs):

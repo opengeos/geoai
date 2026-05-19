@@ -294,11 +294,14 @@ class TestTorchGeoSegmentationTraining(unittest.TestCase):
             predict_torchgeo_segmentation_batch,
             train_torchgeo_segmentation_model,
         )
+        from tests.test_fixtures import get_test_data_paths
+
+        paths = get_test_data_paths()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = train_torchgeo_segmentation_model(
-                image_path="tests/data/test_raster_rgb.tif",
-                mask_path="tests/data/test_raster_single.tif",
+                image_path=paths["test_raster_rgb"],
+                mask_path=paths["test_raster_single"],
                 output_dir=tmpdir,
                 chip_size=16,
                 train_length=2,
