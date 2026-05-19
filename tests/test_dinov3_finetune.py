@@ -164,6 +164,9 @@ class TestDinov3FinetuneSignatures(unittest.TestCase):
             "train_dataset",
             "val_dataset",
             "test_dataset",
+            "train_dataloader",
+            "val_dataloader",
+            "test_dataloader",
             "model_name",
             "weights_path",
             "num_classes",
@@ -618,6 +621,61 @@ class TestDINOv3Segmenter(unittest.TestCase):
         target = torch.tensor([[255, 255, 255, 255]])
         iou = model._compute_miou(pred, target)
         self.assertEqual(iou.item(), 0.0)
+
+    @patch("geoai.dinov3_finetune.DINOv3Segmenter._load_backbone")
+    def test_unpack_batch_supports_torchgeo_dict(self, mock_load):
+        """TorchGeo-style dict batches should convert to DINOv3 tensors."""
+        from geoai.dinov3_finetune import DINOv3Segmenter
+
+        mock_load.return_value = self._make_mock_backbone()
+        model = DINOv3Segmenter(num_classes=2)
+
+        batch = {
+            "image": torch.full((2, 4, 16, 16), 255, dtype=torch.uint8),
+            "mask": torch.ones(2, 1, 16, 16, dtype=torch.uint8),
+            "bounds": object(),
+        }
+        x, y = model._unpack_batch(batch)
+
+        self.assertEqual(x.shape, (2, 3, 16, 16))
+        self.assertLessEqual(float(x.max()), 1.0)
+        self.assertEqual(y.shape, (2, 16, 16))
+        self.assertEqual(y.dtype, torch.long)
+
+    @patch("geoai.dinov3_finetune.DINOv3Segmenter._load_backbone")
+    def test_unpack_batch_keeps_tuple_batches_supported(self, mock_load):
+        """Existing tuple-based dataset batches should remain supported."""
+        from geoai.dinov3_finetune import DINOv3Segmenter
+
+        mock_load.return_value = self._make_mock_backbone()
+        model = DINOv3Segmenter(num_classes=2)
+
+        image = torch.ones(2, 3, 16, 16)
+        mask = torch.ones(2, 16, 16)
+        x, y = model._unpack_batch((image, mask))
+
+        self.assertEqual(x.shape, image.shape)
+        self.assertEqual(y.shape, mask.shape)
+
+
+class TestTrainDINOv3SegmentationDataloaders(unittest.TestCase):
+    """Tests for the DINOv3 training entry point dataloader API."""
+
+    def test_train_dataloader_parameters_exist(self):
+        """Prebuilt dataloader parameters should be part of the public API."""
+        from geoai.dinov3_finetune import train_dinov3_segmentation
+
+        sig = inspect.signature(train_dinov3_segmentation)
+        self.assertIn("train_dataloader", sig.parameters)
+        self.assertIn("val_dataloader", sig.parameters)
+        self.assertIn("test_dataloader", sig.parameters)
+
+    def test_train_requires_dataset_or_dataloader(self):
+        """Training should fail early without a dataset or dataloader."""
+        from geoai.dinov3_finetune import train_dinov3_segmentation
+
+        with self.assertRaisesRegex(ValueError, "train_dataset or train_dataloader"):
+            train_dinov3_segmentation(output_dir=".")
 
 
 # ------------------------------------------------------------------ #

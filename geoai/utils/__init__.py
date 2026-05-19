@@ -12,6 +12,7 @@ This package is organized into focused submodules:
 - ``raster``: Raster I/O and processing
 - ``vector``: Vector I/O and processing
 - ``training``: Training data export and augmentation
+- ``sampling``: TorchGeo-style sampling and dataloader helpers
 
 All public functions are re-exported here for backward compatibility,
 so ``from geoai.utils import <function>`` continues to work.
@@ -105,6 +106,17 @@ _LAZY_IMPORTS: dict = {
     # .models
     "inspect_pth_file": "models",
     "try_common_architectures": "models",
+    # .sampling
+    "create_geo_dataloader": "sampling",
+    "create_geo_dataloaders": "sampling",
+    "create_geo_sampler": "sampling",
+    "create_raster_dataset": "sampling",
+    "create_segmentation_dataset": "sampling",
+    "create_torchgeo_segmentation_dataloaders": "sampling",
+    "geo_sample_to_tuple": "sampling",
+    "plot_torchgeo_segmentation_predictions": "sampling",
+    "predict_torchgeo_segmentation_batch": "sampling",
+    "train_torchgeo_segmentation_model": "sampling",
     # .training
     "export_flipnslide_tiles": "training",
     "export_geotiff_tiles": "training",
@@ -211,4 +223,14 @@ __all__ = [
     "flipnslide_augmentation",
     "export_flipnslide_tiles",
     "calc_f1_score",
+    "create_raster_dataset",
+    "create_segmentation_dataset",
+    "create_geo_sampler",
+    "create_geo_dataloader",
+    "create_geo_dataloaders",
+    "create_torchgeo_segmentation_dataloaders",
+    "geo_sample_to_tuple",
+    "predict_torchgeo_segmentation_batch",
+    "plot_torchgeo_segmentation_predictions",
+    "train_torchgeo_segmentation_model",
 ]

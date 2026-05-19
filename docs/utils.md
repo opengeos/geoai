@@ -14,6 +14,8 @@
 
 ::: geoai.utils.raster
 
+::: geoai.utils.sampling
+
 ::: geoai.utils.training
 
 ::: geoai.utils.vector

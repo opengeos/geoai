@@ -402,10 +402,29 @@ class DINOv3Segmenter(_LightningBase):
         multi_scale = self._extract_multi_scale(x)
         return self.decoder(multi_scale, target_size)
 
-    def training_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
-        x, y = batch
+    def _unpack_batch(
+        self, batch: Any, require_target: bool = True
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """Convert tuple or TorchGeo dict batches to tensors for DINOv3."""
+        from .utils.sampling import geo_sample_to_tuple
+
+        target_key = "mask"
+        if not require_target and isinstance(batch, dict) and target_key not in batch:
+            target_key = None
+        x, y = geo_sample_to_tuple(
+            batch,
+            target_key=target_key,
+            num_channels=3,
+            normalize=True,
+            squeeze_target=True,
+        )
+        if require_target and y is None:
+            raise ValueError("DINOv3 segmentation batches must include a target mask")
+        return x, y
+
+    def training_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
+        x, y = self._unpack_batch(batch)
+        assert y is not None
         logits = self(x)
         loss = self.loss_fn(logits, y)
         pred = torch.argmax(logits, dim=1)
@@ -414,10 +433,9 @@ class DINOv3Segmenter(_LightningBase):
         self.log("train_iou", iou, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
-    def validation_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
-        x, y = batch
+    def validation_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
+        x, y = self._unpack_batch(batch)
+        assert y is not None
         logits = self(x)
         loss = self.loss_fn(logits, y)
         pred = torch.argmax(logits, dim=1)
@@ -426,10 +444,9 @@ class DINOv3Segmenter(_LightningBase):
         self.log("val_iou", iou, on_epoch=True, prog_bar=True)
         return loss
 
-    def test_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
-        x, y = batch
+    def test_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
+        x, y = self._unpack_batch(batch)
+        assert y is not None
         logits = self(x)
         loss = self.loss_fn(logits, y)
         pred = torch.argmax(logits, dim=1)
@@ -481,7 +498,7 @@ class DINOv3Segmenter(_LightningBase):
         }
 
     def predict_step(self, batch: Any, batch_idx: int) -> Dict[str, torch.Tensor]:
-        x = batch[0] if isinstance(batch, (list, tuple)) else batch
+        x, _ = self._unpack_batch(batch, require_target=False)
         logits = self(x)
         probs = torch.softmax(logits, dim=1)
         preds = torch.argmax(probs, dim=1)
@@ -611,9 +628,12 @@ class DINOv3SegmentationDataset(Dataset):
 
 
 def train_dinov3_segmentation(
-    train_dataset: Dataset,
+    train_dataset: Optional[Dataset] = None,
     val_dataset: Optional[Dataset] = None,
     test_dataset: Optional[Dataset] = None,
+    train_dataloader: Any = None,
+    val_dataloader: Any = None,
+    test_dataloader: Any = None,
     model_name: str = "dinov3_vitl16",
     weights_path: Optional[str] = None,
     num_classes: int = 2,
@@ -650,6 +670,10 @@ def train_dinov3_segmentation(
         train_dataset: Training dataset returning ``(image, mask)`` tuples.
         val_dataset: Optional validation dataset.
         test_dataset: Optional test dataset.
+        train_dataloader: Optional prebuilt training dataloader. This can be a
+            TorchGeo dataloader returning sample dictionaries.
+        val_dataloader: Optional prebuilt validation dataloader.
+        test_dataloader: Optional prebuilt test dataloader.
         model_name: DINOv3 model name (``"dinov3_vitl16"``, etc.).
         weights_path: Optional path to pretrained backbone weights.
         num_classes: Number of segmentation classes.
@@ -700,6 +724,9 @@ def train_dinov3_segmentation(
     model_dir = os.path.join(output_dir, "models")
     os.makedirs(model_dir, exist_ok=True)
 
+    if train_dataloader is None and train_dataset is None:
+        raise ValueError("Provide either train_dataset or train_dataloader")
+
     weight_tensor = None
     if class_weights is not None:
         weight_tensor = torch.tensor(class_weights, dtype=torch.float32)
@@ -720,16 +747,19 @@ def train_dinov3_segmentation(
         ignore_index=ignore_index,
     )
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=True,
-    )
+    if train_dataloader is None:
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=True,
+        )
+    else:
+        train_loader = train_dataloader
 
-    val_loader = None
-    if val_dataset is not None:
+    val_loader = val_dataloader
+    if val_loader is None and val_dataset is not None:
         val_loader = DataLoader(
             val_dataset,
             batch_size=batch_size,
@@ -778,7 +808,8 @@ def train_dinov3_segmentation(
         ckpt_path=checkpoint_path,
     )
 
-    if test_dataset is not None:
+    test_loader = test_dataloader
+    if test_loader is None and test_dataset is not None:
         test_loader = DataLoader(
             test_dataset,
             batch_size=batch_size,
@@ -786,6 +817,8 @@ def train_dinov3_segmentation(
             num_workers=num_workers,
             pin_memory=True,
         )
+
+    if test_loader is not None:
         logger.info("Testing model on test set...")
         trainer.test(model, dataloaders=test_loader)
 
