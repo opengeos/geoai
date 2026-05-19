@@ -469,6 +469,14 @@
          <lastmod>2026-05-19</lastmod>
     </url>
     <url>
+         <loc>https://opengeoai.org/examples/torchgeo_sampling_segmentation/</loc>
+         <lastmod>2026-05-19</lastmod>
+    </url>
+    <url>
+         <loc>https://opengeoai.org/examples/torchgeo_segmentation_simple/</loc>
+         <lastmod>2026-05-19</lastmod>
+    </url>
+    <url>
          <loc>https://opengeoai.org/examples/train_building_footprints_usa/</loc>
          <lastmod>2026-05-19</lastmod>
     </url>
