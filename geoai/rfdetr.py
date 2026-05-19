@@ -370,8 +370,8 @@ def rfdetr_detect(
         all_boxes = []
         all_scores = []
         all_class_ids = []
-        all_masks = []
-        all_mask_offsets = []
+        all_mask_geoms = []
+        all_mask_areas = []
 
         stride = window_size - overlap
         if stride <= 0:
@@ -492,14 +492,26 @@ def rfdetr_detect(
                                 all_class_ids.append(class_ids)
                                 if use_mask_geometry:
                                     if masks is None:
-                                        all_masks.extend([None] * len(boxes))
-                                        all_mask_offsets.extend(
-                                            [(x_pos, y_pos)] * len(boxes)
-                                        )
+                                        all_mask_geoms.extend([None] * len(boxes))
+                                        all_mask_areas.extend([0] * len(boxes))
                                     else:
+                                        # Vectorize masks immediately so we
+                                        # don't hold (N x window_size^2) bool
+                                        # arrays in memory until after NMS.
                                         for mask in masks:
-                                            all_masks.append(mask[:h, :w])
-                                            all_mask_offsets.append((x_pos, y_pos))
+                                            cropped = mask[:h, :w]
+                                            all_mask_areas.append(int(np.sum(cropped)))
+                                            all_mask_geoms.append(
+                                                _mask_to_georeferenced_geometry(
+                                                    cropped,
+                                                    x_offset=x_pos,
+                                                    y_offset=y_pos,
+                                                    transform=transform,
+                                                    simplify_tolerance=(
+                                                        simplify_tolerance
+                                                    ),
+                                                )
+                                            )
 
                         pbar.update(len(batch_images))
                         batch_images = []
@@ -530,19 +542,19 @@ def rfdetr_detect(
         final_scores = all_scores[keep_indices_np]
         final_class_ids = all_class_ids[keep_indices_np]
         if use_mask_geometry:
-            final_masks = [all_masks[int(idx)] for idx in keep_indices_np]
-            final_mask_offsets = [all_mask_offsets[int(idx)] for idx in keep_indices_np]
+            final_mask_geoms = [all_mask_geoms[int(idx)] for idx in keep_indices_np]
+            final_mask_areas = [all_mask_areas[int(idx)] for idx in keep_indices_np]
         else:
-            final_masks = []
-            final_mask_offsets = []
+            final_mask_geoms = []
+            final_mask_areas = []
 
         logger.info("After NMS: %d detections", len(final_boxes))
     else:
         final_boxes = np.empty((0, 4))
         final_scores = np.empty((0,))
         final_class_ids = np.empty((0,), dtype=int)
-        final_masks = []
-        final_mask_offsets = []
+        final_mask_geoms = []
+        final_mask_areas = []
 
     # Convert pixel coordinates to georeferenced polygons
     records = []
@@ -553,18 +565,9 @@ def rfdetr_detect(
 
         geom = None
         area_pixels = 0
-        if use_mask_geometry and idx < len(final_masks):
-            mask = final_masks[idx]
-            if mask is not None:
-                x_offset, y_offset = final_mask_offsets[idx]
-                area_pixels = int(np.sum(mask))
-                geom = _mask_to_georeferenced_geometry(
-                    mask,
-                    x_offset=x_offset,
-                    y_offset=y_offset,
-                    transform=transform,
-                    simplify_tolerance=simplify_tolerance,
-                )
+        if use_mask_geometry and idx < len(final_mask_geoms):
+            geom = final_mask_geoms[idx]
+            area_pixels = final_mask_areas[idx]
 
         if geom is None:
             # Convert pixel corners to georeferenced coordinates
