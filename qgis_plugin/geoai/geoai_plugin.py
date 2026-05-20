@@ -146,6 +146,10 @@ class GeoAIPlugin:
         if not os.path.exists(about_icon):
             about_icon = ":/images/themes/default/mActionHelpContents.svg"
 
+        diagnostics_icon = os.path.join(icon_base, "diagnostics.svg")
+        if not os.path.exists(diagnostics_icon):
+            diagnostics_icon = ":/images/themes/default/mActionIdentify.svg"
+
         # Add Tree Segmentation action (checkable for dock toggle)
         self.deepforest_action = self.add_action(
             deepforest_icon,
@@ -241,7 +245,7 @@ class GeoAIPlugin:
 
         # Add Diagnostics Report action (menu only)
         self.add_action(
-            about_icon,
+            diagnostics_icon,
             "Generate Diagnostics Report...",
             self.show_diagnostics_report,
             add_to_toolbar=False,

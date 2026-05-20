@@ -75,7 +75,7 @@ class DiagnosticsDialog(QDialog):
 
     def refresh_report(self):
         """Regenerate the diagnostics report on a background thread."""
-        if self._worker is not None and self._worker.isRunning():
+        if self._worker_is_running():
             return
 
         self.refresh_button.setEnabled(False)
@@ -89,6 +89,7 @@ class DiagnosticsDialog(QDialog):
 
         worker = _DiagnosticsWorker()
         worker.finished_report.connect(self._on_report_ready)
+        worker.finished.connect(self._on_worker_finished)
         worker.finished.connect(worker.deleteLater)
         self._worker = worker
         worker.start()
@@ -100,13 +101,28 @@ class DiagnosticsDialog(QDialog):
         self.copy_button.setEnabled(True)
         self.save_button.setEnabled(True)
 
+    def _on_worker_finished(self):
+        """Clear the worker reference before Qt deletes the C++ object."""
+        self._worker = None
+
+    def _worker_is_running(self):
+        """Return whether the current worker is running, tolerating Qt deletion."""
+        if self._worker is None:
+            return False
+        try:
+            return self._worker.isRunning()
+        except RuntimeError:
+            self._worker = None
+            return False
+
     def closeEvent(self, event):
         """Detach from the worker so a late report does not touch a dead dialog."""
-        if self._worker is not None and self._worker.isRunning():
+        if self._worker is not None:
             try:
                 self._worker.finished_report.disconnect(self._on_report_ready)
-            except (TypeError, RuntimeError):
+            except (AttributeError, TypeError, RuntimeError):
                 pass
+        self._worker_is_running()
         super().closeEvent(event)
 
     def copy_report(self):
