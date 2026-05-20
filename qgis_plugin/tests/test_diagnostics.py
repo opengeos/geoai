@@ -2,6 +2,7 @@ from geoai.core import diagnostics
 
 
 def test_diagnostics_report_is_github_markdown(monkeypatch):
+    monkeypatch.setenv("HOME", "/home/testuser")
     monkeypatch.setattr(
         diagnostics,
         "_get_nvidia_gpu_detection",
@@ -11,12 +12,12 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
         diagnostics,
         "_get_venv_info",
         lambda: {
-            "cache_dir": "/tmp/geoai-cache",
-            "venv_dir": "/tmp/geoai-cache/venv_py3.12",
+            "cache_dir": "/home/testuser/.qgis_geoai",
+            "venv_dir": "/home/testuser/.qgis_geoai/venv_py3.12",
             "exists": True,
-            "python_path": "/tmp/geoai-cache/venv_py3.12/bin/python3",
+            "python_path": "/home/testuser/.qgis_geoai/venv_py3.12/bin/python3",
             "site_packages": (
-                "/tmp/geoai-cache/venv_py3.12/lib/python3.12/site-packages"
+                "/home/testuser/.qgis_geoai/venv_py3.12/lib/python3.12/site-packages"
             ),
         },
     )
@@ -25,8 +26,8 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
         "_collect_venv_runtime_info",
         lambda _venv_info: {
             "python_version": "3.12.8",
-            "python_executable": "/tmp/geoai-cache/venv_py3.12/bin/python3",
-            "python_prefix": "/tmp/geoai-cache/venv_py3.12",
+            "python_executable": "/home/testuser/.qgis_geoai/venv_py3.12/bin/python3",
+            "python_prefix": "/home/testuser/.qgis_geoai/venv_py3.12",
             "platform": "Linux-test",
             "torch_runtime": {
                 "torch_import_ok": True,
@@ -46,7 +47,10 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
                     "module_name": "geoai",
                     "dist_version": "0.38.0",
                     "module_version": "0.38.0",
-                    "module_file": "/tmp/site-packages/geoai/__init__.py",
+                    "module_file": (
+                        "/home/testuser/.qgis_geoai/venv_py3.12/"
+                        "lib/python3.12/site-packages/geoai/__init__.py"
+                    ),
                     "import_ok": True,
                     "import_error": None,
                 },
@@ -56,7 +60,10 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
                     "module_name": "transformers",
                     "dist_version": "4.57.6",
                     "module_version": "4.57.6",
-                    "module_file": "/tmp/site-packages/transformers/__init__.py",
+                    "module_file": (
+                        "/home/testuser/.qgis_geoai/venv_py3.12/"
+                        "lib/python3.12/site-packages/transformers/__init__.py"
+                    ),
                     "import_ok": True,
                     "import_error": None,
                 },
@@ -68,7 +75,10 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
 
     assert report.startswith("# GeoAI QGIS Diagnostics Report")
     assert "## Managed Environment" in report
-    assert "- Virtual environment path: `/tmp/geoai-cache/venv_py3.12`" in report
+    assert "- Virtual environment path: `~/.qgis_geoai/venv_py3.12`" in report
+    assert "/home/testuser" not in report
+    assert "`~/.qgis_geoai/venv_py3.12/bin/python3`" in report
+    assert "`~/.qgis_geoai/venv_py3.12/lib/python3.12/site-packages" in report
     assert "## CUDA / Accelerator" in report
     assert "- CUDA available: `Yes`" in report
     assert "| GeoAI | `geoai-py` | `geoai` | `0.38.0` | `OK` |" in report

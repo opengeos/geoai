@@ -3,6 +3,7 @@
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import textwrap
@@ -52,33 +53,33 @@ def generate_diagnostics_report() -> str:
         "",
         "## Plugin",
         "",
-        f"- GeoAI plugin version: `{plugin_info.get('version', 'Unknown')}`",
-        f"- Plugin path: `{plugin_info.get('path', 'Unknown')}`",
+        f"- GeoAI plugin version: `{_value(plugin_info.get('version'))}`",
+        f"- Plugin path: `{_value(plugin_info.get('path'))}`",
         "",
         "## QGIS Process",
         "",
-        f"- QGIS version: `{qgis_info.get('qgis_version', 'Unknown')}`",
-        f"- Python version: `{qgis_info.get('python_version', 'Unknown')}`",
-        f"- Python executable: `{qgis_info.get('python_executable', 'Unknown')}`",
-        f"- Python prefix: `{qgis_info.get('python_prefix', 'Unknown')}`",
+        f"- QGIS version: `{_value(qgis_info.get('qgis_version'))}`",
+        f"- Python version: `{_value(qgis_info.get('python_version'))}`",
+        f"- Python executable: `{_value(qgis_info.get('python_executable'))}`",
+        f"- Python prefix: `{_value(qgis_info.get('python_prefix'))}`",
         "",
         "## Operating System",
         "",
-        f"- OS: `{system_info.get('platform', 'Unknown')}`",
-        f"- System: `{system_info.get('system', 'Unknown')}`",
-        f"- Release: `{system_info.get('release', 'Unknown')}`",
-        f"- Machine: `{system_info.get('machine', 'Unknown')}`",
-        f"- Processor: `{system_info.get('processor', 'Unknown')}`",
+        f"- OS: `{_value(system_info.get('platform'))}`",
+        f"- System: `{_value(system_info.get('system'))}`",
+        f"- Release: `{_value(system_info.get('release'))}`",
+        f"- Machine: `{_value(system_info.get('machine'))}`",
+        f"- Processor: `{_value(system_info.get('processor'))}`",
         "",
         "## Managed Environment",
         "",
-        f"- Cache directory: `{venv_info['cache_dir']}`",
-        f"- Virtual environment path: `{venv_info['venv_dir']}`",
+        f"- Cache directory: `{_value(venv_info['cache_dir'])}`",
+        f"- Virtual environment path: `{_value(venv_info['venv_dir'])}`",
         f"- Virtual environment exists: `{_yes_no(venv_info['exists'])}`",
-        f"- Virtual environment Python: `{venv_info['python_path']}`",
-        f"- Virtual environment site-packages: `{venv_info['site_packages']}`",
-        f"- GEOAI_CACHE_DIR: `{os.environ.get('GEOAI_CACHE_DIR', '<unset>')}`",
-        f"- GEOAI_VENV_DIR: `{os.environ.get('GEOAI_VENV_DIR', '<unset>')}`",
+        f"- Virtual environment Python: `{_value(venv_info['python_path'])}`",
+        f"- Virtual environment site-packages: `{_value(venv_info['site_packages'])}`",
+        f"- GEOAI_CACHE_DIR: `{_value(os.environ.get('GEOAI_CACHE_DIR'), '<unset>')}`",
+        f"- GEOAI_VENV_DIR: `{_value(os.environ.get('GEOAI_VENV_DIR'), '<unset>')}`",
         "",
         "## GPU Detection",
         "",
@@ -88,13 +89,13 @@ def generate_diagnostics_report() -> str:
 
     if gpu_detect_info["details"]:
         for key, value in gpu_detect_info["details"].items():
-            lines.append(f"- NVIDIA {key}: `{value}`")
+            lines.append(f"- NVIDIA {key}: `{_value(value)}`")
     if gpu_detect_info["error"]:
-        lines.append(f"- NVIDIA detection error: `{gpu_detect_info['error']}`")
+        lines.append(f"- NVIDIA detection error: `{_value(gpu_detect_info['error'])}`")
 
     lines.extend(["", "## Venv Runtime", ""])
     if venv_runtime.get("error"):
-        lines.append(f"- Error: `{venv_runtime['error']}`")
+        lines.append(f"- Error: `{_value(venv_runtime['error'])}`")
     else:
         lines.extend(_format_venv_runtime(venv_runtime))
 
@@ -308,10 +309,10 @@ def _venv_probe_script() -> str:
 def _format_venv_runtime(runtime: Dict[str, Any]) -> List[str]:
     torch_runtime = runtime.get("torch_runtime", {})
     lines = [
-        f"- Python version: `{runtime.get('python_version', 'Unknown')}`",
-        f"- Python executable: `{runtime.get('python_executable', 'Unknown')}`",
-        f"- Python prefix: `{runtime.get('python_prefix', 'Unknown')}`",
-        f"- Platform: `{runtime.get('platform', 'Unknown')}`",
+        f"- Python version: `{_value(runtime.get('python_version'))}`",
+        f"- Python executable: `{_value(runtime.get('python_executable'))}`",
+        f"- Python prefix: `{_value(runtime.get('python_prefix'))}`",
+        f"- Platform: `{_value(runtime.get('platform'))}`",
         "",
         "## CUDA / Accelerator",
         "",
@@ -324,10 +325,10 @@ def _format_venv_runtime(runtime: Dict[str, Any]) -> List[str]:
 
     cuda_devices = torch_runtime.get("cuda_devices") or []
     for index, name in enumerate(cuda_devices):
-        lines.append(f"- CUDA device {index}: `{name}`")
+        lines.append(f"- CUDA device {index}: `{_value(name)}`")
 
     if torch_runtime.get("cuda_error"):
-        lines.append(f"- CUDA error: `{torch_runtime['cuda_error']}`")
+        lines.append(f"- CUDA error: `{_value(torch_runtime['cuda_error'])}`")
     lines.extend(
         [
             f"- cuDNN version: `{_value(torch_runtime.get('cudnn_version'))}`",
@@ -336,9 +337,11 @@ def _format_venv_runtime(runtime: Dict[str, Any]) -> List[str]:
         ]
     )
     if torch_runtime.get("mps_error"):
-        lines.append(f"- MPS error: `{torch_runtime['mps_error']}`")
+        lines.append(f"- MPS error: `{_value(torch_runtime['mps_error'])}`")
     if torch_runtime.get("torch_import_error"):
-        lines.append(f"- PyTorch import error: `{torch_runtime['torch_import_error']}`")
+        lines.append(
+            f"- PyTorch import error: `{_value(torch_runtime['torch_import_error'])}`"
+        )
 
     lines.extend(["", "## Package Versions", ""])
     lines.extend(_format_packages(runtime.get("packages", [])))
@@ -372,12 +375,12 @@ def _format_packages(packages: Iterable[Dict[str, Any]]) -> List[str]:
         detail_lines = []
         if package.get("module_version") and package.get("module_version") != version:
             detail_lines.append(
-                f"- module `__version__`: `{package['module_version']}`"
+                f"- module `__version__`: `{_value(package['module_version'])}`"
             )
         if package.get("module_file"):
-            detail_lines.append(f"- module file: `{package['module_file']}`")
+            detail_lines.append(f"- module file: `{_value(package['module_file'])}`")
         if package.get("import_error"):
-            detail_lines.append(f"- import error: `{package['import_error']}`")
+            detail_lines.append(f"- import error: `{_value(package['import_error'])}`")
         if detail_lines:
             details.append("")
             details.append(f"<details><summary>{label} details</summary>")
@@ -398,8 +401,30 @@ def _yes_no(value: Optional[bool]) -> str:
 def _value(value: Any, missing: str = "Unknown") -> str:
     if value is None or value == "":
         return missing
-    return str(value)
+    return _redact_home(str(value))
 
 
 def _escape_table(value: Any) -> str:
-    return str(value).replace("|", "\\|").replace("\n", " ")
+    return _value(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _redact_home(value: str) -> str:
+    """Replace the current user's home directory with ``~`` in report output."""
+    home = os.path.expanduser("~")
+    if not home or home == "~":
+        return value
+
+    redacted = value
+    candidates = {home, os.path.abspath(home)}
+    candidates.update(path.replace("\\", "/") for path in list(candidates))
+
+    for candidate in sorted(candidates, key=len, reverse=True):
+        if not candidate or candidate == os.path.sep:
+            continue
+        redacted = re.sub(
+            re.escape(candidate) + r"(?=$|[/\\\s`'\"),;:])",
+            "~",
+            redacted,
+        )
+
+    return redacted
