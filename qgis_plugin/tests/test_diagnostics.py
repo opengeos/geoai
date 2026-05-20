@@ -144,6 +144,41 @@ def test_diagnostics_report_renders_import_errors_in_fenced_block(monkeypatch):
     assert "`SyntaxError: invalid syntax" not in report
 
 
+def test_package_import_probe_reports_windows_native_crash(monkeypatch):
+    def fake_run_probe(_python_path, _script, _env, _kwargs, timeout):
+        assert timeout == 30
+        return {
+            "error": (
+                "Probe subprocess failed with code 3221225477 "
+                "(Windows native crash/access violation)"
+            )
+        }
+
+    monkeypatch.setattr(diagnostics, "_run_probe", fake_run_probe)
+
+    packages = [
+        {
+            "label": "PyTorch",
+            "dist_name": "torch",
+            "module_name": "torch",
+            "dist_version": "2.7.0",
+            "module_version": None,
+            "module_file": None,
+            "import_ok": None,
+            "import_error": None,
+        }
+    ]
+
+    result = diagnostics._collect_package_import_info(packages, "python", {}, {})
+    report_lines = diagnostics._format_packages(result)
+    report = "\n".join(report_lines)
+
+    assert result[0]["import_ok"] is False
+    assert "Windows native crash/access violation" in result[0]["import_error"]
+    assert "| PyTorch | `torch` | `torch` | `2.7.0` | `FAILED` |" in report
+    assert "Probe subprocess failed with code 3221225477" in report
+
+
 def test_diagnostics_report_handles_missing_venv(monkeypatch):
     monkeypatch.setattr(
         diagnostics,

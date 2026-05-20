@@ -82,8 +82,8 @@ class DiagnosticsDialog(QDialog):
         self.copy_button.setEnabled(False)
         self.save_button.setEnabled(False)
         self.report_text.setPlainText(
-            "Generating diagnostics report... this may take up to 90 seconds while "
-            "the managed environment is probed."
+            "Generating diagnostics report... this may take a few minutes while "
+            "the managed environment and package imports are probed."
         )
         QApplication.processEvents()
 
