@@ -380,6 +380,10 @@ Go to `GeoAI` menu → `Check for Updates...` to see if a newer version of the G
 
 ![](https://github.com/user-attachments/assets/cc0dfd38-9b41-4735-9af0-c49b7aa71b72)
 
+### Diagnostics Report
+
+Go to `GeoAI` menu → `Generate Diagnostics Report...` to create a Markdown report that can be copied directly into a GitHub issue. The report includes the plugin version, QGIS/Python runtime, operating system, managed virtual environment path, CUDA availability, GPU details, and versions/import status for key packages such as `geoai-py`, PyTorch, SAM3, Transformers, and `segment-geospatial`.
+
 ## Supported Model Architectures (Segmentation)
 
 The QGIS plugin supports any models supported by [Pytorch Segmentation Models](https://smp.readthedocs.io/en/latest/models.html), including:
@@ -412,6 +416,7 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 
 ## Troubleshooting
 
+-   If you report a plugin issue on GitHub, include the Markdown from `GeoAI` menu → `Generate Diagnostics Report...`.
 -   Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
 -   CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
 -   Model download failures: check network/firewall, then retry loading models from the panel.

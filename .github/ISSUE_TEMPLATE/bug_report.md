@@ -12,6 +12,16 @@ labels: bug
 -   Python version:
 -   Operating System:
 
+### QGIS Plugin Diagnostics
+
+If this bug is related to the QGIS plugin, open QGIS and go to
+`GeoAI` → `Generate Diagnostics Report...`, click **Copy Markdown**, and paste
+the full report below.
+
+```markdown
+Paste the QGIS plugin diagnostics report here.
+```
+
 ### Description
 
 Describe what you were trying to get done.
