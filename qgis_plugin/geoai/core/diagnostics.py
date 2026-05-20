@@ -37,12 +37,12 @@ PACKAGE_SPECS = [
 ]
 
 _WINDOWS_CRASH_CODES = {
-    3221225477,  # 0xC0000005 ACCESS_VIOLATION
-    -1073741819,
-    3221225725,  # 0xC00000FD STACK_OVERFLOW
-    -1073741571,
-    3221225781,  # 0xC0000135 DLL_NOT_FOUND
-    -1073741515,
+    3221225477: "Windows access violation (0xC0000005)",
+    -1073741819: "Windows access violation (0xC0000005)",
+    3221225725: "Windows stack overflow (0xC00000FD)",
+    -1073741571: "Windows stack overflow (0xC00000FD)",
+    3221225781: "Windows DLL not found (0xC0000135)",
+    -1073741515: "Windows DLL not found (0xC0000135)",
 }
 
 
@@ -456,8 +456,9 @@ def _torch_runtime_probe_script() -> str:
 def _format_probe_failure(result: subprocess.CompletedProcess) -> str:
     output = (result.stderr or result.stdout or "").strip()
     message = f"Probe subprocess failed with code {result.returncode}"
-    if result.returncode in _WINDOWS_CRASH_CODES:
-        message += " (Windows native crash/access violation)"
+    crash_reason = _WINDOWS_CRASH_CODES.get(result.returncode)
+    if crash_reason:
+        message += f" ({crash_reason})"
     if output:
         message += f": {output[:2000]}"
     return message
