@@ -45,8 +45,8 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
                     "label": "GeoAI",
                     "dist_name": "geoai-py",
                     "module_name": "geoai",
-                    "dist_version": "0.38.0",
-                    "module_version": "0.38.0",
+                    "dist_version": "0.39.0",
+                    "module_version": "0.39.0",
                     "module_file": (
                         "/home/testuser/.qgis_geoai/venv_py3.12/"
                         "lib/python3.12/site-packages/geoai/__init__.py"
@@ -81,7 +81,7 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
     assert "`~/.qgis_geoai/venv_py3.12/lib/python3.12/site-packages" in report
     assert "## CUDA / Accelerator" in report
     assert "- CUDA available: `Yes`" in report
-    assert "| GeoAI | `geoai-py` | `geoai` | `0.38.0` | `OK` |" in report
+    assert "| GeoAI | `geoai-py` | `geoai` | `0.39.0` | `OK` |" in report
     assert (
         "| Transformers | `transformers` | `transformers` | `4.57.6` | `OK` |" in report
     )
