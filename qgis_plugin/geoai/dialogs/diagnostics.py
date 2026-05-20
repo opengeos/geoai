@@ -3,7 +3,7 @@
 import os
 from datetime import datetime
 
-from qgis.PyQt.QtCore import QTimer
+from qgis.PyQt.QtCore import QThread, QTimer, pyqtSignal
 from qgis.PyQt.QtWidgets import (
     QApplication,
     QDialog,
@@ -16,6 +16,21 @@ from qgis.PyQt.QtWidgets import (
 )
 
 
+class _DiagnosticsWorker(QThread):
+    """Background worker that builds the diagnostics report off the UI thread."""
+
+    finished_report = pyqtSignal(str)
+
+    def run(self):
+        try:
+            from ..core.diagnostics import generate_diagnostics_report
+
+            report = generate_diagnostics_report()
+        except Exception as exc:
+            report = f"Failed to generate diagnostics report:\n{exc}"
+        self.finished_report.emit(report)
+
+
 class DiagnosticsDialog(QDialog):
     """Dialog that displays and exports a GeoAI diagnostics report."""
 
@@ -23,6 +38,8 @@ class DiagnosticsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("GeoAI Diagnostics Report")
         self.resize(900, 650)
+
+        self._worker = None
 
         layout = QVBoxLayout(self)
 
@@ -57,18 +74,40 @@ class DiagnosticsDialog(QDialog):
         QTimer.singleShot(0, self.refresh_report)
 
     def refresh_report(self):
-        """Regenerate the diagnostics report."""
-        self.refresh_button.setEnabled(False)
-        self.report_text.setPlainText("Generating diagnostics report...")
-        QApplication.processEvents()
-        try:
-            from ..core.diagnostics import generate_diagnostics_report
+        """Regenerate the diagnostics report on a background thread."""
+        if self._worker is not None and self._worker.isRunning():
+            return
 
-            report = generate_diagnostics_report()
-        except Exception as exc:
-            report = f"Failed to generate diagnostics report:\n{exc}"
+        self.refresh_button.setEnabled(False)
+        self.copy_button.setEnabled(False)
+        self.save_button.setEnabled(False)
+        self.report_text.setPlainText(
+            "Generating diagnostics report... this may take up to 90 seconds while "
+            "the managed environment is probed."
+        )
+        QApplication.processEvents()
+
+        worker = _DiagnosticsWorker()
+        worker.finished_report.connect(self._on_report_ready)
+        worker.finished.connect(worker.deleteLater)
+        self._worker = worker
+        worker.start()
+
+    def _on_report_ready(self, report):
+        """Handle the completed diagnostics report."""
         self.report_text.setPlainText(report)
         self.refresh_button.setEnabled(True)
+        self.copy_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+
+    def closeEvent(self, event):
+        """Detach from the worker so a late report does not touch a dead dialog."""
+        if self._worker is not None and self._worker.isRunning():
+            try:
+                self._worker.finished_report.disconnect(self._on_report_ready)
+            except (TypeError, RuntimeError):
+                pass
+        super().closeEvent(event)
 
     def copy_report(self):
         """Copy the diagnostics report to the clipboard."""

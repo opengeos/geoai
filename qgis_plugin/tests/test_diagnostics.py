@@ -87,6 +87,63 @@ def test_diagnostics_report_is_github_markdown(monkeypatch):
     )
 
 
+def test_diagnostics_report_renders_import_errors_in_fenced_block(monkeypatch):
+    """Multi-line tracebacks with backticks must not break Markdown rendering."""
+    monkeypatch.setattr(
+        diagnostics,
+        "_get_nvidia_gpu_detection",
+        lambda: {"detected": False, "details": {}, "error": None},
+    )
+    monkeypatch.setattr(
+        diagnostics,
+        "_get_venv_info",
+        lambda: {
+            "cache_dir": "/tmp/geoai-cache",
+            "venv_dir": "/tmp/geoai-cache/venv_py3.12",
+            "exists": True,
+            "python_path": "/tmp/geoai-cache/venv_py3.12/bin/python3",
+            "site_packages": (
+                "/tmp/geoai-cache/venv_py3.12/lib/python3.12/site-packages"
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        diagnostics,
+        "_collect_venv_runtime_info",
+        lambda _venv_info: {
+            "python_version": "3.12.8",
+            "python_executable": "/tmp/geoai-cache/venv_py3.12/bin/python3",
+            "python_prefix": "/tmp/geoai-cache/venv_py3.12",
+            "platform": "Linux-test",
+            "torch_runtime": {"torch_import_ok": True, "torch_version": "2.7.0"},
+            "packages": [
+                {
+                    "label": "Broken",
+                    "dist_name": "broken-pkg",
+                    "module_name": "broken_pkg",
+                    "dist_version": "1.0.0",
+                    "module_version": None,
+                    "module_file": None,
+                    "import_ok": False,
+                    "import_error": (
+                        "SyntaxError: invalid syntax\n" "  File '`/tmp/foo.py`', line 1"
+                    ),
+                }
+            ],
+        },
+    )
+
+    report = diagnostics.generate_diagnostics_report()
+
+    assert "- import error:" in report
+    assert "SyntaxError: invalid syntax" in report
+    assert "  File '`/tmp/foo.py`', line 1" in report
+    # Fenced block must use a fence longer than any backtick run in the body.
+    assert "\n```\nSyntaxError" in report
+    # No inline-code wrapper around the raw multi-line error.
+    assert "`SyntaxError: invalid syntax" not in report
+
+
 def test_diagnostics_report_handles_missing_venv(monkeypatch):
     monkeypatch.setattr(
         diagnostics,

@@ -380,7 +380,8 @@ def _format_packages(packages: Iterable[Dict[str, Any]]) -> List[str]:
         if package.get("module_file"):
             detail_lines.append(f"- module file: `{_value(package['module_file'])}`")
         if package.get("import_error"):
-            detail_lines.append(f"- import error: `{_value(package['import_error'])}`")
+            detail_lines.append("- import error:")
+            detail_lines.extend(_fenced_block(_value(package["import_error"])))
         if detail_lines:
             details.append("")
             details.append(f"<details><summary>{label} details</summary>")
@@ -406,6 +407,26 @@ def _value(value: Any, missing: str = "Unknown") -> str:
 
 def _escape_table(value: Any) -> str:
     return _value(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _fenced_block(value: str) -> List[str]:
+    """Render arbitrary text as a Markdown fenced code block.
+
+    The fence length is chosen so that any internal backtick run cannot close
+    the block, which keeps multi-line tracebacks and backtick characters from
+    breaking the surrounding Markdown rendering.
+    """
+    text = "" if value is None else str(value)
+    longest_run = 0
+    current_run = 0
+    for char in text:
+        if char == "`":
+            current_run += 1
+            longest_run = max(longest_run, current_run)
+        else:
+            current_run = 0
+    fence = "`" * max(3, longest_run + 1)
+    return [fence] + text.splitlines() + [fence]
 
 
 def _redact_home(value: str) -> str:
