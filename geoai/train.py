@@ -3167,6 +3167,7 @@ class SemanticSegmentationDataset(Dataset):
         target_size: Optional[Tuple[int, int]] = None,
         resize_mode: str = "resize",
         num_classes: int = 2,
+        ignore_index: Optional[int] = -100,
     ) -> None:
         """
         Initialize dataset for semantic segmentation.
@@ -3183,6 +3184,8 @@ class SemanticSegmentationDataset(Dataset):
                 'resize' - Resize images to target_size (may change aspect ratio)
                 'pad' - Pad images to target_size (preserves aspect ratio)
             num_classes (int): Number of classes for segmentation. Used for mask normalization.
+            ignore_index (int, optional): Label value to preserve as ignored pixels
+                during mask normalization and resizing. Defaults to -100.
         """
         self.image_paths = image_paths
         self.label_paths = label_paths
@@ -3190,6 +3193,7 @@ class SemanticSegmentationDataset(Dataset):
         self.target_size = target_size
         self.resize_mode = resize_mode
         self.num_classes = num_classes
+        self.ignore_index = ignore_index
 
         # Auto-detect the number of channels if not specified
         if num_channels is None:
@@ -3219,14 +3223,50 @@ class SemanticSegmentationDataset(Dataset):
                     # Convert to RGB and return 3 channels
                     return 3
 
+    def _normalize_label_mask(self, label_mask: np.ndarray) -> np.ndarray:
+        """Normalize class labels while preserving ignored pixels."""
+        label_mask = label_mask.astype(np.int64)
+        ignore_mask = None
+        if self.ignore_index is not None:
+            ignore_mask = label_mask == self.ignore_index
+
+        unique_vals = np.unique(label_mask)
+        if self.num_classes == 2:
+            # Binary segmentation: normalize any non-zero value to foreground (1)
+            if unique_vals.max() > 1:
+                label_mask = (label_mask > 0).astype(np.int64)
+        else:
+            # Multi-class segmentation: preserve class IDs and clamp to valid range.
+            label_mask = np.clip(label_mask, 0, self.num_classes - 1)
+
+        if ignore_mask is not None:
+            label_mask[ignore_mask] = self.ignore_index
+
+        return label_mask
+
+    def _clamp_mask_tensor(self, mask: torch.Tensor) -> torch.Tensor:
+        """Clamp resized labels to class range while preserving ignored pixels."""
+        ignore_mask = None
+        if self.ignore_index is not None:
+            ignore_mask = mask == self.ignore_index
+
+        mask = torch.clamp(mask, 0, self.num_classes - 1)
+
+        if ignore_mask is not None:
+            mask = mask.clone()
+            mask[ignore_mask] = self.ignore_index
+
+        return mask
+
     def _resize_image_and_mask(
-        self, image: np.ndarray, mask: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Resize image and mask to target size."""
         if self.target_size is None:
             return image, mask
 
         target_h, target_w = self.target_size
+        mask_pad_value = 0 if self.ignore_index is None else self.ignore_index
 
         if self.resize_mode == "resize":
             # Direct resize (may change aspect ratio)
@@ -3247,22 +3287,35 @@ class SemanticSegmentationDataset(Dataset):
                 .squeeze(0)
                 .long()
             )
-            # Clamp mask values to ensure they're within valid range [0, num_classes-1]
-            mask = torch.clamp(mask, 0, self.num_classes - 1)
+            # Clamp valid mask values without converting ignore_index to a class.
+            mask = self._clamp_mask_tensor(mask)
 
         elif self.resize_mode == "pad":
-            # Pad to target size (preserves aspect ratio)
+            # Pad to target size (preserves aspect ratio). Pad masks with
+            # ignore_index (when set) so newly introduced padding pixels are
+            # excluded from loss/metrics rather than being learned as class 0.
             image = self._pad_to_size(image, (target_h, target_w))
-            mask = self._pad_to_size(mask.unsqueeze(0), (target_h, target_w)).squeeze(0)
-            # Clamp mask values to ensure they're within valid range [0, num_classes-1]
-            mask = torch.clamp(mask, 0, self.num_classes - 1)
+            mask = self._pad_to_size(
+                mask.unsqueeze(0), (target_h, target_w), pad_value=mask_pad_value
+            ).squeeze(0)
+            # Clamp valid mask values without converting ignore_index to a class.
+            mask = self._clamp_mask_tensor(mask)
 
         return image, mask
 
     def _pad_to_size(
-        self, tensor: torch.Tensor, target_size: Tuple[int, int]
+        self,
+        tensor: torch.Tensor,
+        target_size: Tuple[int, int],
+        pad_value: float = 0,
     ) -> torch.Tensor:
-        """Pad tensor to target size with zeros."""
+        """Pad tensor to target size.
+
+        Args:
+            tensor: Tensor with shape ``[C, H, W]`` or ``[H, W]``.
+            target_size: Target ``(height, width)``.
+            pad_value: Fill value used for padded pixels. Defaults to ``0``.
+        """
         target_h, target_w = target_size
 
         if tensor.dim() == 3:  # Image [C, H, W]
@@ -3283,7 +3336,9 @@ class SemanticSegmentationDataset(Dataset):
         pad_right = pad_w - pad_left
 
         # Apply padding (left, right, top, bottom)
-        padded = F.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), value=0)
+        padded = F.pad(
+            tensor, (pad_left, pad_right, pad_top, pad_bottom), value=pad_value
+        )
 
         # Crop if tensor is larger than target
         if tensor.dim() == 3:
@@ -3348,17 +3403,8 @@ class SemanticSegmentationDataset(Dataset):
                     img = img.convert("L")
                 label_mask = np.array(img, dtype=np.int64)
 
-        # Normalize mask values to expected class range [0, num_classes-1]
-        # This handles cases where masks contain pixel values outside the expected range
-        unique_vals = np.unique(label_mask)
-        if self.num_classes == 2:
-            # Binary segmentation: normalize any non-zero value to foreground (1)
-            if unique_vals.max() > 1:
-                label_mask = (label_mask > 0).astype(np.int64)
-        else:
-            # Multi-class segmentation:
-            # Preserve class IDs and only clamp to valid range
-            label_mask = np.clip(label_mask, 0, self.num_classes - 1)
+        # Normalize mask values while preserving ignored/no-data pixels.
+        label_mask = self._normalize_label_mask(label_mask)
 
         # Convert to tensor
         mask = torch.as_tensor(label_mask, dtype=torch.long)
@@ -3645,6 +3691,7 @@ def f1_score(
     target: torch.Tensor,
     smooth: float = 1e-6,
     num_classes: Optional[int] = None,
+    ignore_index: Optional[int] = None,
 ) -> float:
     """
     Calculate F1 score (also known as Dice coefficient) for segmentation (binary or multi-class).
@@ -3654,6 +3701,7 @@ def f1_score(
         target (torch.Tensor): Ground truth mask with shape [H, W].
         smooth (float): Smoothing factor to avoid division by zero.
         num_classes (int, optional): Number of classes. If None, auto-detected.
+        ignore_index (int, optional): Target value to exclude from scoring.
 
     Returns:
         float: Mean F1 score across all classes.
@@ -3667,15 +3715,28 @@ def f1_score(
     else:
         raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
 
+    if ignore_index is not None:
+        valid_mask = target != ignore_index
+        if not torch.any(valid_mask):
+            return 0.0
+    else:
+        valid_mask = torch.ones_like(target, dtype=torch.bool)
+
     # Auto-detect number of classes if not provided
     if num_classes is None:
-        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
+        num_classes = (
+            max(pred_classes[valid_mask].max().item(), target[valid_mask].max().item())
+            + 1
+        )
 
     # Calculate F1 score for each class and average
     f1_scores = []
     for class_id in range(num_classes):
-        pred_class = (pred_classes == class_id).float()
-        target_class = (target == class_id).float()
+        if ignore_index is not None and class_id == ignore_index:
+            continue
+
+        pred_class = ((pred_classes == class_id) & valid_mask).float()
+        target_class = ((target == class_id) & valid_mask).float()
 
         intersection = (pred_class * target_class).sum()
         union = pred_class.sum() + target_class.sum()
@@ -3692,6 +3753,7 @@ def iou_coefficient(
     target: torch.Tensor,
     smooth: float = 1e-6,
     num_classes: Optional[int] = None,
+    ignore_index: Optional[int] = None,
 ) -> float:
     """
     Calculate IoU coefficient for segmentation (binary or multi-class).
@@ -3701,6 +3763,7 @@ def iou_coefficient(
         target (torch.Tensor): Ground truth mask with shape [H, W].
         smooth (float): Smoothing factor to avoid division by zero.
         num_classes (int, optional): Number of classes. If None, auto-detected.
+        ignore_index (int, optional): Target value to exclude from scoring.
 
     Returns:
         float: Mean IoU coefficient across all classes.
@@ -3714,15 +3777,28 @@ def iou_coefficient(
     else:
         raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
 
+    if ignore_index is not None:
+        valid_mask = target != ignore_index
+        if not torch.any(valid_mask):
+            return 0.0
+    else:
+        valid_mask = torch.ones_like(target, dtype=torch.bool)
+
     # Auto-detect number of classes if not provided
     if num_classes is None:
-        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
+        num_classes = (
+            max(pred_classes[valid_mask].max().item(), target[valid_mask].max().item())
+            + 1
+        )
 
     # Calculate IoU for each class and average
     iou_scores = []
     for class_id in range(num_classes):
-        pred_class = (pred_classes == class_id).float()
-        target_class = (target == class_id).float()
+        if ignore_index is not None and class_id == ignore_index:
+            continue
+
+        pred_class = ((pred_classes == class_id) & valid_mask).float()
+        target_class = ((target == class_id) & valid_mask).float()
 
         intersection = (pred_class * target_class).sum()
         union = pred_class.sum() + target_class.sum() - intersection
@@ -3739,6 +3815,7 @@ def precision_score(
     target: torch.Tensor,
     smooth: float = 1e-6,
     num_classes: Optional[int] = None,
+    ignore_index: Optional[int] = None,
 ) -> float:
     """
     Calculate precision score for segmentation (binary or multi-class).
@@ -3752,6 +3829,7 @@ def precision_score(
         target (torch.Tensor): Ground truth mask with shape [H, W].
         smooth (float): Smoothing factor to avoid division by zero.
         num_classes (int, optional): Number of classes. If None, auto-detected.
+        ignore_index (int, optional): Target value to exclude from scoring.
 
     Returns:
         float: Mean precision score across all classes.
@@ -3765,15 +3843,28 @@ def precision_score(
     else:
         raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
 
+    if ignore_index is not None:
+        valid_mask = target != ignore_index
+        if not torch.any(valid_mask):
+            return 0.0
+    else:
+        valid_mask = torch.ones_like(target, dtype=torch.bool)
+
     # Auto-detect number of classes if not provided
     if num_classes is None:
-        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
+        num_classes = (
+            max(pred_classes[valid_mask].max().item(), target[valid_mask].max().item())
+            + 1
+        )
 
     # Calculate precision for each class and average
     precision_scores = []
     for class_id in range(num_classes):
-        pred_class = (pred_classes == class_id).float()
-        target_class = (target == class_id).float()
+        if ignore_index is not None and class_id == ignore_index:
+            continue
+
+        pred_class = ((pred_classes == class_id) & valid_mask).float()
+        target_class = ((target == class_id) & valid_mask).float()
 
         true_positives = (pred_class * target_class).sum()
         predicted_positives = pred_class.sum()
@@ -3790,6 +3881,7 @@ def recall_score(
     target: torch.Tensor,
     smooth: float = 1e-6,
     num_classes: Optional[int] = None,
+    ignore_index: Optional[int] = None,
 ) -> float:
     """
     Calculate recall score (also known as sensitivity) for segmentation (binary or multi-class).
@@ -3803,6 +3895,7 @@ def recall_score(
         target (torch.Tensor): Ground truth mask with shape [H, W].
         smooth (float): Smoothing factor to avoid division by zero.
         num_classes (int, optional): Number of classes. If None, auto-detected.
+        ignore_index (int, optional): Target value to exclude from scoring.
 
     Returns:
         float: Mean recall score across all classes.
@@ -3816,15 +3909,28 @@ def recall_score(
     else:
         raise ValueError(f"Unexpected prediction dimensions: {pred.shape}")
 
+    if ignore_index is not None:
+        valid_mask = target != ignore_index
+        if not torch.any(valid_mask):
+            return 0.0
+    else:
+        valid_mask = torch.ones_like(target, dtype=torch.bool)
+
     # Auto-detect number of classes if not provided
     if num_classes is None:
-        num_classes = max(pred_classes.max().item(), target.max().item()) + 1
+        num_classes = (
+            max(pred_classes[valid_mask].max().item(), target[valid_mask].max().item())
+            + 1
+        )
 
     # Calculate recall for each class and average
     recall_scores = []
     for class_id in range(num_classes):
-        pred_class = (pred_classes == class_id).float()
-        target_class = (target == class_id).float()
+        if ignore_index is not None and class_id == ignore_index:
+            continue
+
+        pred_class = ((pred_classes == class_id) & valid_mask).float()
+        target_class = ((target == class_id) & valid_mask).float()
 
         true_positives = (pred_class * target_class).sum()
         actual_positives = target_class.sum()
@@ -3905,6 +4011,7 @@ def evaluate_semantic(
     device: torch.device,
     criterion: Any,
     num_classes: int = 2,
+    ignore_index: Optional[int] = None,
 ) -> Dict[str, float]:
     """
     Evaluate the semantic segmentation model on the validation set.
@@ -3915,6 +4022,7 @@ def evaluate_semantic(
         device (torch.device): Device to evaluate on.
         criterion: Loss function.
         num_classes (int): Number of classes for evaluation metrics.
+        ignore_index (int, optional): Target value to exclude from scoring.
 
     Returns:
         dict: Evaluation metrics including loss, IoU, F1, precision, and recall.
@@ -3941,10 +4049,30 @@ def evaluate_semantic(
 
             # Calculate metrics for each sample in the batch
             for pred, target in zip(outputs, targets):
-                f1 = f1_score(pred, target, num_classes=num_classes)
-                iou = iou_coefficient(pred, target, num_classes=num_classes)
-                precision = precision_score(pred, target, num_classes=num_classes)
-                recall = recall_score(pred, target, num_classes=num_classes)
+                f1 = f1_score(
+                    pred,
+                    target,
+                    num_classes=num_classes,
+                    ignore_index=ignore_index,
+                )
+                iou = iou_coefficient(
+                    pred,
+                    target,
+                    num_classes=num_classes,
+                    ignore_index=ignore_index,
+                )
+                precision = precision_score(
+                    pred,
+                    target,
+                    num_classes=num_classes,
+                    ignore_index=ignore_index,
+                )
+                recall = recall_score(
+                    pred,
+                    target,
+                    num_classes=num_classes,
+                    ignore_index=ignore_index,
+                )
                 f1_scores.append(f1)
                 iou_scores.append(iou)
                 precision_scores.append(precision)
@@ -3999,7 +4127,7 @@ def train_segmentation_model(
     val_transforms: Optional[Callable] = None,
     loss_fn: Optional[torch.nn.Module] = None,
     class_weights: Optional[List[float]] = None,
-    ignore_index: int = -100,
+    ignore_index: Optional[int] = -100,
     freeze_encoder: bool = False,
     **kwargs: Any,
 ) -> torch.nn.Module:
@@ -4071,9 +4199,10 @@ def train_segmentation_model(
         class_weights (list, optional): Per-class weights for CrossEntropyLoss
             (e.g., ``[0.5, 2.0]`` for a 2-class problem). Ignored when *loss_fn*
             is provided. Defaults to None.
-        ignore_index (int): Target value that is ignored by the default
+        ignore_index (int, optional): Target value that is ignored by the default
             CrossEntropyLoss. Ignored when *loss_fn* is provided.
-            Defaults to -100 (PyTorch default, i.e., no pixels ignored).
+            Set to None to disable ignore-index handling in label normalization,
+            loss, and metrics. Defaults to -100 (PyTorch default).
         freeze_encoder (bool): If True, freeze the encoder parameters so only the
             decoder is trained. Useful for fine-tuning on small datasets to prevent
             overfitting. Defaults to False.
@@ -4250,6 +4379,7 @@ def train_segmentation_model(
         target_size=target_size,
         resize_mode=resize_mode,
         num_classes=num_classes,
+        ignore_index=ignore_index,
     )
     val_dataset = SemanticSegmentationDataset(
         val_imgs,
@@ -4259,6 +4389,7 @@ def train_segmentation_model(
         target_size=target_size,
         resize_mode=resize_mode,
         num_classes=num_classes,
+        ignore_index=ignore_index,
     )
 
     # Create data loaders
@@ -4339,11 +4470,17 @@ def train_segmentation_model(
                 f"num_classes ({num_classes})"
             )
         weight_tensor = torch.tensor(class_weights, dtype=torch.float32).to(device)
-        criterion = torch.nn.CrossEntropyLoss(
-            weight=weight_tensor, ignore_index=ignore_index
-        )
+        if ignore_index is None:
+            criterion = torch.nn.CrossEntropyLoss(weight=weight_tensor)
+        else:
+            criterion = torch.nn.CrossEntropyLoss(
+                weight=weight_tensor, ignore_index=ignore_index
+            )
     else:
-        criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
+        if ignore_index is None:
+            criterion = torch.nn.CrossEntropyLoss()
+        else:
+            criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
 
     # Initialize tracking variables
     best_iou = 0
@@ -4480,7 +4617,12 @@ def train_segmentation_model(
 
         # Evaluate on validation set
         eval_metrics = evaluate_semantic(
-            model, val_loader, device, criterion, num_classes=num_classes
+            model,
+            val_loader,
+            device,
+            criterion,
+            num_classes=num_classes,
+            ignore_index=ignore_index,
         )
         val_losses.append(eval_metrics["loss"])
         val_ious.append(eval_metrics["IoU"])
