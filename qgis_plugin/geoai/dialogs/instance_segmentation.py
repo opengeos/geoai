@@ -6,6 +6,7 @@ segmentation models and running inference, combined in a single dockable panel.
 """
 
 import os
+import tempfile
 from typing import Optional
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -32,9 +33,16 @@ from qgis.PyQt.QtWidgets import (
     QSplitter,
 )
 
-from qgis.core import QgsProject, QgsVectorLayer, QgsRasterLayer
+from qgis.core import (
+    QgsCoordinateTransform,
+    QgsProject,
+    QgsVectorLayer,
+    QgsRasterLayer,
+)
 from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
+
+from .map_tools import RectangleRangeTool
 
 
 class OutputCapture:
@@ -221,6 +229,8 @@ class InstanceInferenceWorker(QThread):
         overlap: int,
         confidence_threshold: float,
         batch_size: int,
+        inference_bbox: Optional[list] = None,
+        inference_bbox_crs: Optional[str] = None,
     ):
         super().__init__()
         self.input_path = input_path
@@ -232,6 +242,8 @@ class InstanceInferenceWorker(QThread):
         self.overlap = overlap
         self.confidence_threshold = confidence_threshold
         self.batch_size = batch_size
+        self.inference_bbox = inference_bbox
+        self.inference_bbox_crs = inference_bbox_crs
 
     def _forward_line(self, line: str):
         """Forward stdout lines as progress messages."""
@@ -239,14 +251,37 @@ class InstanceInferenceWorker(QThread):
 
     def run(self):
         """Execute the inference."""
+        clipped_input_path = None
         try:
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Running instance segmentation inference...")
+            input_path = self.input_path
+
+            if self.inference_bbox is not None:
+                temp_file = tempfile.NamedTemporaryFile(
+                    suffix=".tif", prefix="geoai_inference_range_", delete=False
+                )
+                clipped_input_path = temp_file.name
+                temp_file.close()
+                self.progress.emit("Clipping raster to selected range...")
+                run_geoai_task(
+                    "clip_raster_by_bbox",
+                    {
+                        "input_raster": self.input_path,
+                        "output_raster": clipped_input_path,
+                        "bbox": self.inference_bbox,
+                        "bbox_type": "geo",
+                        "bbox_crs": self.inference_bbox_crs,
+                    },
+                    progress_callback=self._forward_line,
+                )
+                input_path = clipped_input_path
+
             run_geoai_task(
                 "instance_segmentation",
                 {
-                    "input_path": self.input_path,
+                    "input_path": input_path,
                     "output_path": self.output_path,
                     "model_path": self.model_path,
                     "num_channels": self.num_channels,
@@ -265,6 +300,12 @@ class InstanceInferenceWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+        finally:
+            if clipped_input_path and os.path.exists(clipped_input_path):
+                try:
+                    os.remove(clipped_input_path)
+                except OSError:
+                    pass
 
 
 class VectorizeWorker(QThread):
@@ -377,6 +418,11 @@ class InstanceSegmentationDockWidget(QDockWidget):
         self.vectorize_worker = None
         self.smooth_worker = None
         self.last_output_path = None
+        self.inference_range_tool = None
+        self.previous_map_tool = None
+        self.inference_bbox = None
+        self.inference_bbox_crs = None
+        self.inference_range_layer_source = None
 
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
@@ -726,6 +772,28 @@ class InstanceSegmentationDockWidget(QDockWidget):
         input_group.setLayout(input_layout)
         layout.addWidget(input_group)
 
+        # Inference Range Group
+        range_group = QGroupBox("Inference Range")
+        range_layout = QFormLayout()
+        range_layout.setSpacing(5)
+
+        range_button_layout = QHBoxLayout()
+        self.draw_range_btn = QPushButton("Draw Range")
+        self.draw_range_btn.setCheckable(True)
+        self.draw_range_btn.setStyleSheet(self.btn_style)
+        range_button_layout.addWidget(self.draw_range_btn)
+
+        self.clear_range_btn = QPushButton("Clear")
+        self.clear_range_btn.setStyleSheet(self.btn_style)
+        range_button_layout.addWidget(self.clear_range_btn)
+        range_layout.addRow("Range:", range_button_layout)
+
+        self.range_status_label = QLabel("Full raster")
+        range_layout.addRow("", self.range_status_label)
+
+        range_group.setLayout(range_layout)
+        layout.addWidget(range_group)
+
         # Model Group
         model_group = QGroupBox("Model")
         model_layout = QFormLayout()
@@ -918,7 +986,11 @@ class InstanceSegmentationDockWidget(QDockWidget):
             self.on_inf_raster_layer_changed
         )
         self.inf_raster_path_edit.textChanged.connect(self.on_inf_raster_path_changed)
+        self.inf_raster_layer_combo.layerChanged.connect(self.clear_inference_range)
+        self.inf_raster_path_edit.textChanged.connect(self.clear_inference_range)
         self.inf_raster_browse_btn.clicked.connect(self.browse_inf_raster)
+        self.draw_range_btn.clicked.connect(self.start_inference_range_tool)
+        self.clear_range_btn.clicked.connect(self.clear_inference_range)
         self.model_browse_btn.clicked.connect(self.browse_model)
         self.output_browse_btn.clicked.connect(self.browse_output)
         self.vector_output_browse_btn.clicked.connect(self.browse_vector_output)
@@ -1042,6 +1114,131 @@ class InstanceSegmentationDockWidget(QDockWidget):
         )
         if file_path:
             self.inf_raster_path_edit.setText(file_path)
+
+    @staticmethod
+    def _bbox_from_rect(rect):
+        return [
+            float(rect.xMinimum()),
+            float(rect.yMinimum()),
+            float(rect.xMaximum()),
+            float(rect.yMaximum()),
+        ]
+
+    @staticmethod
+    def _intersect_bboxes(first, second):
+        minx = max(first[0], second[0])
+        miny = max(first[1], second[1])
+        maxx = min(first[2], second[2])
+        maxy = min(first[3], second[3])
+        if minx >= maxx or miny >= maxy:
+            return None
+        return [minx, miny, maxx, maxy]
+
+    def _current_inference_layer(self):
+        return self.inf_raster_layer_combo.currentLayer()
+
+    def _layer_crs_authid(self, layer):
+        crs = layer.crs()
+        authid = getattr(crs, "authid", None)
+        return authid() if callable(authid) else None
+
+    def _range_bbox_for_layer(self, rect, layer):
+        canvas_crs = self.iface.mapCanvas().mapSettings().destinationCrs()
+        layer_crs = layer.crs()
+        if canvas_crs != layer_crs:
+            transform = QgsCoordinateTransform(
+                canvas_crs, layer_crs, QgsProject.instance()
+            )
+            rect = transform.transformBoundingBox(rect)
+
+        rect_bbox = self._bbox_from_rect(rect)
+        extent_bbox = self._bbox_from_rect(layer.extent())
+        return self._intersect_bboxes(rect_bbox, extent_bbox)
+
+    def start_inference_range_tool(self):
+        """Start drawing the inference range on the map canvas."""
+        layer = self._current_inference_layer()
+        if layer is None:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "Please select a raster layer before drawing an inference range.",
+            )
+            self.draw_range_btn.setChecked(False)
+            return
+
+        if self.inference_range_tool is None:
+            self.inference_range_tool = RectangleRangeTool(self.iface.mapCanvas())
+            self.inference_range_tool.range_drawn.connect(self.set_inference_range)
+            self.inference_range_tool.range_canceled.connect(
+                self.cancel_inference_range_tool
+            )
+
+        self.previous_map_tool = self.iface.mapCanvas().mapTool()
+        self.iface.mapCanvas().setMapTool(self.inference_range_tool)
+
+    def cancel_inference_range_tool(self):
+        """Handle range drawing cancellation without clearing the saved range."""
+        self.draw_range_btn.setChecked(False)
+        if self.previous_map_tool:
+            self.iface.mapCanvas().setMapTool(self.previous_map_tool)
+
+    def set_inference_range(self, rect):
+        """Store the drawn inference range as a layer-CRS bbox."""
+        layer = self._current_inference_layer()
+        if layer is None:
+            self.clear_inference_range()
+            QMessageBox.warning(
+                self, "Warning", "Selected raster layer is no longer available."
+            )
+            return
+
+        bbox = self._range_bbox_for_layer(rect, layer)
+        if bbox is None:
+            self.clear_inference_range()
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "The drawn range does not intersect the selected raster layer.",
+            )
+            return
+
+        self.inference_bbox = bbox
+        self.inference_bbox_crs = self._layer_crs_authid(layer)
+        self.inference_range_layer_source = layer.source()
+        self.range_status_label.setText(
+            f"{bbox[0]:.3f}, {bbox[1]:.3f}, {bbox[2]:.3f}, {bbox[3]:.3f}"
+        )
+        self.draw_range_btn.setChecked(False)
+        if self.previous_map_tool:
+            self.iface.mapCanvas().setMapTool(self.previous_map_tool)
+
+    def clear_inference_range(self, *args):
+        """Clear the selected inference range."""
+        self.inference_bbox = None
+        self.inference_bbox_crs = None
+        self.inference_range_layer_source = None
+        if "range_status_label" in self.__dict__:
+            self.range_status_label.setText("Full raster")
+        if "draw_range_btn" in self.__dict__:
+            self.draw_range_btn.setChecked(False)
+        if self.inference_range_tool is not None:
+            self.inference_range_tool.clear_rubber_band()
+
+    def _validated_inference_bbox(self, input_path):
+        if self.inference_bbox is None:
+            return None, None, None
+        if (
+            self.inference_range_layer_source
+            and input_path != self.inference_range_layer_source
+        ):
+            return (
+                None,
+                None,
+                "The selected inference range belongs to a different raster layer. "
+                "Clear the range or select the matching raster layer.",
+            )
+        return self.inference_bbox, self.inference_bbox_crs, None
 
     def browse_model(self):
         """Browse for a trained model file."""
@@ -1350,9 +1547,19 @@ class InstanceSegmentationDockWidget(QDockWidget):
             QMessageBox.warning(self, "Warning", "Please fill in all fields.")
             return
 
+        inference_bbox, inference_bbox_crs, range_error = (
+            self._validated_inference_bbox(input_path)
+        )
+        if range_error:
+            QMessageBox.warning(self, "Warning", range_error)
+            return
+
         self.run_inference_btn.setEnabled(False)
         self.inference_progress.setRange(0, 0)
-        self.log("Starting instance segmentation inference...")
+        if inference_bbox is not None:
+            self.log("Starting instance segmentation inference on selected range...")
+        else:
+            self.log("Starting instance segmentation inference...")
 
         self.inference_worker = InstanceInferenceWorker(
             input_path,
@@ -1364,6 +1571,8 @@ class InstanceSegmentationDockWidget(QDockWidget):
             self.overlap_spin.value(),
             self.confidence_spin.value(),
             self.inf_batch_size_spin.value(),
+            inference_bbox=inference_bbox,
+            inference_bbox_crs=inference_bbox_crs,
         )
         self.inference_worker.finished.connect(self.on_inference_finished)
         self.inference_worker.error.connect(self.on_inference_error)

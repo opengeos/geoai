@@ -170,3 +170,66 @@ class BoxPromptTool(QgsMapTool):
         """Deactivate the tool."""
         self.is_drawing = False
         super().deactivate()
+
+
+class RectangleRangeTool(QgsMapTool):
+    """Map tool for drawing a reusable rectangular map range."""
+
+    range_drawn = pyqtSignal(object)  # QgsRectangle
+    range_canceled = pyqtSignal()
+
+    def __init__(self, canvas):
+        super().__init__(canvas)
+        self.canvas = canvas
+        self.rubber_band = QgsRubberBand(canvas, QgsWkbTypes.PolygonGeometry)
+        self.rubber_band.setColor(QColor(255, 170, 0, 70))
+        self.rubber_band.setStrokeColor(QColor(255, 140, 0))
+        self.rubber_band.setWidth(2)
+        self.start_point = None
+        self.is_drawing = False
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def canvasPressEvent(self, event):
+        """Start drawing a rectangular range."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.start_point = self.toMapCoordinates(event.pos())
+            self.is_drawing = True
+            self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+
+    def canvasMoveEvent(self, event):
+        """Update range preview while dragging."""
+        if self.is_drawing and self.start_point is not None:
+            self.update_rubber_band(
+                self.start_point, self.toMapCoordinates(event.pos())
+            )
+
+    def canvasReleaseEvent(self, event):
+        """Finish drawing and emit the selected range."""
+        if event.button() == Qt.MouseButton.LeftButton and self.is_drawing:
+            end_point = self.toMapCoordinates(event.pos())
+            self.is_drawing = False
+            self.update_rubber_band(self.start_point, end_point)
+            self.range_drawn.emit(QgsRectangle(self.start_point, end_point))
+            self.deactivate()
+        elif event.button() == Qt.MouseButton.RightButton:
+            self.is_drawing = False
+            self.clear_rubber_band()
+            self.range_canceled.emit()
+            self.deactivate()
+
+    def update_rubber_band(self, start_point, end_point):
+        """Update the rubber band rectangle."""
+        self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+        self.rubber_band.addPoint(QgsPointXY(start_point.x(), start_point.y()), False)
+        self.rubber_band.addPoint(QgsPointXY(end_point.x(), start_point.y()), False)
+        self.rubber_band.addPoint(QgsPointXY(end_point.x(), end_point.y()), False)
+        self.rubber_band.addPoint(QgsPointXY(start_point.x(), end_point.y()), True)
+
+    def clear_rubber_band(self):
+        """Clear the drawn range preview."""
+        self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+
+    def deactivate(self):
+        """Deactivate the tool."""
+        self.is_drawing = False
+        super().deactivate()
