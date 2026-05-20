@@ -1,3 +1,7 @@
+import subprocess
+
+import pytest
+
 from geoai.core import diagnostics
 
 
@@ -142,6 +146,55 @@ def test_diagnostics_report_renders_import_errors_in_fenced_block(monkeypatch):
     assert "\n```\nSyntaxError" in report
     # No inline-code wrapper around the raw multi-line error.
     assert "`SyntaxError: invalid syntax" not in report
+
+
+@pytest.mark.parametrize(
+    "returncode, expected_reason",
+    [
+        (3221225477, "Windows access violation (0xC0000005)"),
+        (3221225725, "Windows stack overflow (0xC00000FD)"),
+        (3221225781, "Windows DLL not found (0xC0000135)"),
+    ],
+)
+def test_package_import_probe_reports_windows_native_crash(
+    monkeypatch, returncode, expected_reason
+):
+    completed = subprocess.CompletedProcess(
+        args=["python", "-c", "import torch"],
+        returncode=returncode,
+        stdout="",
+        stderr="",
+    )
+    formatted_failure = diagnostics._format_probe_failure(completed)
+
+    def fake_run_probe(_python_path, _script, _env, _kwargs, timeout):
+        assert timeout == 30
+        return {"error": formatted_failure}
+
+    monkeypatch.setattr(diagnostics, "_run_probe", fake_run_probe)
+
+    packages = [
+        {
+            "label": "PyTorch",
+            "dist_name": "torch",
+            "module_name": "torch",
+            "dist_version": "2.7.0",
+            "module_version": None,
+            "module_file": None,
+            "import_ok": None,
+            "import_error": None,
+        }
+    ]
+
+    result = diagnostics._collect_package_import_info(packages, "python", {}, {})
+    report_lines = diagnostics._format_packages(result)
+    report = "\n".join(report_lines)
+
+    assert result[0]["import_ok"] is False
+    assert expected_reason in result[0]["import_error"]
+    assert "| PyTorch | `torch` | `torch` | `2.7.0` | `FAILED` |" in report
+    assert f"Probe subprocess failed with code {returncode}" in report
+    assert expected_reason in report
 
 
 def test_diagnostics_report_handles_missing_venv(monkeypatch):

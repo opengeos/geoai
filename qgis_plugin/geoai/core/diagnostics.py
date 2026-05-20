@@ -36,6 +36,15 @@ PACKAGE_SPECS = [
     ("numpy", "numpy", "NumPy"),
 ]
 
+_WINDOWS_CRASH_CODES = {
+    3221225477: "Windows access violation (0xC0000005)",
+    -1073741819: "Windows access violation (0xC0000005)",
+    3221225725: "Windows stack overflow (0xC00000FD)",
+    -1073741571: "Windows stack overflow (0xC00000FD)",
+    3221225781: "Windows DLL not found (0xC0000135)",
+    -1073741515: "Windows DLL not found (0xC0000135)",
+}
+
 
 def generate_diagnostics_report() -> str:
     """Generate a Markdown diagnostics report for support and bug reports."""
@@ -169,19 +178,19 @@ def _collect_venv_runtime_info(venv_info: Dict[str, Any]) -> Dict[str, Any]:
     if not os.path.exists(python_path):
         return {"error": f"Virtual environment Python not found: {python_path}"}
 
-    script = _venv_probe_script()
     env = _get_clean_env_for_venv()
     env.setdefault("TRANSFORMERS_VERBOSITY", "error")
     env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    subprocess_kwargs = _get_subprocess_kwargs()
 
     try:
         result = subprocess.run(
-            [python_path, "-c", script],
+            [python_path, "-c", _venv_probe_script()],
             capture_output=True,
             text=True,
             timeout=90,
             env=env,
-            **_get_subprocess_kwargs(),
+            **subprocess_kwargs,
         )
     except subprocess.TimeoutExpired:
         return {"error": "Timed out while collecting venv runtime diagnostics."}
@@ -197,7 +206,7 @@ def _collect_venv_runtime_info(venv_info: Dict[str, Any]) -> Dict[str, Any]:
         }
 
     try:
-        return json.loads(result.stdout)
+        runtime = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         return {
             "error": "Could not parse venv diagnostics output: {}\n{}".format(
@@ -205,16 +214,23 @@ def _collect_venv_runtime_info(venv_info: Dict[str, Any]) -> Dict[str, Any]:
             )
         }
 
+    runtime["packages"] = _collect_package_import_info(
+        runtime.get("packages") or [], python_path, env, subprocess_kwargs
+    )
+    runtime["torch_runtime"] = _collect_torch_runtime_info(
+        python_path, env, subprocess_kwargs
+    )
+    return runtime
+
 
 def _venv_probe_script() -> str:
     specs_json = json.dumps(PACKAGE_SPECS)
     return textwrap.dedent(f"""
-        import importlib
+        import importlib.util
         import importlib.metadata as metadata
         import json
         import platform
         import sys
-        import traceback
 
         PACKAGE_SPECS = {specs_json}
 
@@ -226,70 +242,27 @@ def _venv_probe_script() -> str:
             except Exception as exc:
                 return "error: " + str(exc)
 
-        def package_info(dist_name, module_name, label):
+        def module_origin(module_name):
+            try:
+                spec = importlib.util.find_spec(module_name)
+            except Exception:
+                return None
+            if spec is None:
+                return None
+            return spec.origin
+
+        def package_metadata(dist_name, module_name, label):
             info = {{
                 "label": label,
                 "dist_name": dist_name,
                 "module_name": module_name,
                 "dist_version": dist_version(dist_name),
                 "module_version": None,
-                "module_file": None,
-                "import_ok": False,
+                "module_file": module_origin(module_name),
+                "import_ok": None,
                 "import_error": None,
             }}
-            try:
-                module = importlib.import_module(module_name)
-                info["import_ok"] = True
-                info["module_version"] = getattr(module, "__version__", None)
-                info["module_file"] = getattr(module, "__file__", None)
-            except Exception as exc:
-                info["import_error"] = "".join(
-                    traceback.format_exception_only(type(exc), exc)
-                ).strip()
             return info
-
-        def torch_runtime():
-            runtime = {{
-                "torch_import_ok": False,
-                "torch_import_error": None,
-                "torch_version": None,
-                "cuda_available": None,
-                "cuda_version": None,
-                "cuda_device_count": None,
-                "cuda_devices": [],
-                "cudnn_version": None,
-                "mps_available": None,
-                "mps_built": None,
-            }}
-            try:
-                import torch
-                runtime["torch_import_ok"] = True
-                runtime["torch_version"] = getattr(torch, "__version__", None)
-                runtime["cuda_version"] = getattr(torch.version, "cuda", None)
-                try:
-                    runtime["cuda_available"] = bool(torch.cuda.is_available())
-                    runtime["cuda_device_count"] = int(torch.cuda.device_count())
-                    for idx in range(runtime["cuda_device_count"]):
-                        runtime["cuda_devices"].append(torch.cuda.get_device_name(idx))
-                except Exception as exc:
-                    runtime["cuda_available"] = False
-                    runtime["cuda_error"] = str(exc)
-                try:
-                    runtime["cudnn_version"] = torch.backends.cudnn.version()
-                except Exception:
-                    pass
-                try:
-                    mps = getattr(torch.backends, "mps", None)
-                    if mps is not None:
-                        runtime["mps_available"] = bool(mps.is_available())
-                        runtime["mps_built"] = bool(mps.is_built())
-                except Exception as exc:
-                    runtime["mps_error"] = str(exc)
-            except Exception as exc:
-                runtime["torch_import_error"] = "".join(
-                    traceback.format_exception_only(type(exc), exc)
-                ).strip()
-            return runtime
 
         payload = {{
             "python_version": sys.version.replace("\\n", " "),
@@ -297,13 +270,198 @@ def _venv_probe_script() -> str:
             "python_prefix": sys.prefix,
             "platform": platform.platform(),
             "packages": [
-                package_info(dist_name, module_name, label)
+                package_metadata(dist_name, module_name, label)
                 for dist_name, module_name, label in PACKAGE_SPECS
             ],
-            "torch_runtime": torch_runtime(),
+            "torch_runtime": {{}},
         }}
         print(json.dumps(payload, sort_keys=True))
         """)
+
+
+def _collect_package_import_info(
+    packages: List[Dict[str, Any]],
+    python_path: str,
+    env: dict,
+    subprocess_kwargs: dict,
+) -> List[Dict[str, Any]]:
+    """Probe package imports one process at a time so native crashes are isolated."""
+    updated = []
+    for package in packages:
+        package = dict(package)
+        module_name = package.get("module_name")
+        if not module_name:
+            package["import_ok"] = False
+            package["import_error"] = "No module name configured for import probe."
+            updated.append(package)
+            continue
+
+        result = _run_probe(
+            python_path,
+            _package_import_probe_script(module_name),
+            env,
+            subprocess_kwargs,
+            timeout=30,
+        )
+        if result.get("error"):
+            package["import_ok"] = False
+            package["import_error"] = result["error"]
+        else:
+            package.update(result["payload"])
+        updated.append(package)
+    return updated
+
+
+def _collect_torch_runtime_info(
+    python_path: str,
+    env: dict,
+    subprocess_kwargs: dict,
+) -> Dict[str, Any]:
+    """Collect PyTorch accelerator info in its own crash-isolated process."""
+    result = _run_probe(
+        python_path,
+        _torch_runtime_probe_script(),
+        env,
+        subprocess_kwargs,
+        timeout=45,
+    )
+    if not result.get("error"):
+        return result["payload"]
+
+    return {
+        "torch_import_ok": False,
+        "torch_import_error": result["error"],
+        "torch_version": None,
+        "cuda_available": None,
+        "cuda_version": None,
+        "cuda_device_count": None,
+        "cuda_devices": [],
+        "cudnn_version": None,
+        "mps_available": None,
+        "mps_built": None,
+    }
+
+
+def _run_probe(
+    python_path: str,
+    script: str,
+    env: dict,
+    subprocess_kwargs: dict,
+    timeout: int,
+) -> Dict[str, Any]:
+    """Run a JSON probe and convert subprocess crashes into reportable errors."""
+    try:
+        result = subprocess.run(
+            [python_path, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            **subprocess_kwargs,
+        )
+    except subprocess.TimeoutExpired:
+        return {"error": f"Probe timed out after {timeout} seconds."}
+    except Exception as exc:
+        return {"error": f"Probe failed to start: {exc}"}
+
+    if result.returncode != 0:
+        return {"error": _format_probe_failure(result)}
+
+    try:
+        return {"payload": json.loads(result.stdout)}
+    except json.JSONDecodeError as exc:
+        return {
+            "error": "Probe returned invalid JSON: {}\n{}".format(
+                exc, (result.stdout or result.stderr)[:2000]
+            )
+        }
+
+
+def _package_import_probe_script(module_name: str) -> str:
+    module_json = json.dumps(module_name)
+    return textwrap.dedent(f"""
+        import importlib
+        import json
+        import traceback
+
+        module_name = {module_json}
+        payload = {{
+            "import_ok": False,
+            "module_version": None,
+            "module_file": None,
+            "import_error": None,
+        }}
+        try:
+            module = importlib.import_module(module_name)
+            payload["import_ok"] = True
+            payload["module_version"] = getattr(module, "__version__", None)
+            payload["module_file"] = getattr(module, "__file__", None)
+        except Exception as exc:
+            payload["import_error"] = "".join(
+                traceback.format_exception_only(type(exc), exc)
+            ).strip()
+        print(json.dumps(payload, sort_keys=True))
+        """)
+
+
+def _torch_runtime_probe_script() -> str:
+    return textwrap.dedent("""
+        import json
+        import traceback
+
+        runtime = {
+            "torch_import_ok": False,
+            "torch_import_error": None,
+            "torch_version": None,
+            "cuda_available": None,
+            "cuda_version": None,
+            "cuda_device_count": None,
+            "cuda_devices": [],
+            "cudnn_version": None,
+            "mps_available": None,
+            "mps_built": None,
+        }
+        try:
+            import torch
+            runtime["torch_import_ok"] = True
+            runtime["torch_version"] = getattr(torch, "__version__", None)
+            runtime["cuda_version"] = getattr(torch.version, "cuda", None)
+            try:
+                runtime["cuda_available"] = bool(torch.cuda.is_available())
+                runtime["cuda_device_count"] = int(torch.cuda.device_count())
+                for idx in range(runtime["cuda_device_count"]):
+                    runtime["cuda_devices"].append(torch.cuda.get_device_name(idx))
+            except Exception as exc:
+                runtime["cuda_available"] = False
+                runtime["cuda_error"] = str(exc)
+            try:
+                runtime["cudnn_version"] = torch.backends.cudnn.version()
+            except Exception:
+                pass
+            try:
+                mps = getattr(torch.backends, "mps", None)
+                if mps is not None:
+                    runtime["mps_available"] = bool(mps.is_available())
+                    runtime["mps_built"] = bool(mps.is_built())
+            except Exception as exc:
+                runtime["mps_error"] = str(exc)
+        except Exception as exc:
+            runtime["torch_import_error"] = "".join(
+                traceback.format_exception_only(type(exc), exc)
+            ).strip()
+        print(json.dumps(runtime, sort_keys=True))
+        """)
+
+
+def _format_probe_failure(result: subprocess.CompletedProcess) -> str:
+    output = (result.stderr or result.stdout or "").strip()
+    message = f"Probe subprocess failed with code {result.returncode}"
+    crash_reason = _WINDOWS_CRASH_CODES.get(result.returncode)
+    if crash_reason:
+        message += f" ({crash_reason})"
+    if output:
+        message += f": {output[:2000]}"
+    return message
 
 
 def _format_venv_runtime(runtime: Dict[str, Any]) -> List[str]:
