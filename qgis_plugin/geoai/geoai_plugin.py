@@ -146,6 +146,10 @@ class GeoAIPlugin:
         if not os.path.exists(about_icon):
             about_icon = ":/images/themes/default/mActionHelpContents.svg"
 
+        diagnostics_icon = os.path.join(icon_base, "diagnostics.svg")
+        if not os.path.exists(diagnostics_icon):
+            diagnostics_icon = ":/images/themes/default/mActionIdentify.svg"
+
         # Add Tree Segmentation action (checkable for dock toggle)
         self.deepforest_action = self.add_action(
             deepforest_icon,
@@ -236,6 +240,16 @@ class GeoAIPlugin:
             self.show_update_checker,
             add_to_toolbar=False,
             status_tip="Check for plugin updates from GitHub",
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add Diagnostics Report action (menu only)
+        self.add_action(
+            diagnostics_icon,
+            "Generate Diagnostics Report...",
+            self.show_diagnostics_report,
+            add_to_toolbar=False,
+            status_tip="Generate a Markdown diagnostics report for GitHub issues",
             parent=self.iface.mainWindow(),
         )
 
@@ -1136,6 +1150,28 @@ class GeoAIPlugin:
             "About GeoAI Plugin",
             about_text,
         )
+
+    def show_diagnostics_report(self):
+        """Display a Markdown diagnostics report dialog."""
+        try:
+            from .dialogs.diagnostics import DiagnosticsDialog
+        except ImportError as e:
+            QMessageBox.critical(
+                self.iface.mainWindow(),
+                "Error",
+                f"Failed to import diagnostics dialog:\n{str(e)}",
+            )
+            return
+
+        try:
+            dialog = DiagnosticsDialog(self.iface.mainWindow())
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(
+                self.iface.mainWindow(),
+                "Error",
+                f"Failed to generate diagnostics report:\n{str(e)}",
+            )
 
     def show_update_checker(self):
         """Display the update checker dialog."""

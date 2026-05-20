@@ -38,8 +38,19 @@ def test_plugin_actions_stay_out_of_application_menu():
         about_actions = [
             action for action in plugin.actions if action.text() == "About GeoAI"
         ]
+        diagnostics_actions = [
+            action
+            for action in plugin.actions
+            if action.text() == "Generate Diagnostics Report..."
+        ]
         assert len(about_actions) == 1
+        assert len(diagnostics_actions) == 1
+        assert (
+            diagnostics_actions[0].icon().cacheKey()
+            != about_actions[0].icon().cacheKey()
+        )
         assert about_actions[0].menuRole() == _no_menu_role()
+        assert diagnostics_actions[0].menuRole() == _no_menu_role()
         assert all(action.menuRole() == _no_menu_role() for action in plugin.actions)
     finally:
         plugin.unload()
