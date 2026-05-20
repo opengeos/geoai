@@ -145,6 +145,14 @@ def _task_instance_segmentation(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_path": params["output_path"]}
 
 
+def _task_clip_raster_by_bbox(params: Dict[str, Any]) -> Dict[str, Any]:
+    from geoai.utils.raster import clip_raster_by_bbox
+
+    _progress("Clipping raster to inference range...")
+    output_path = clip_raster_by_bbox(**params)
+    return {"output_path": output_path}
+
+
 def _task_raster_to_vector(params: Dict[str, Any]) -> Dict[str, Any]:
     from geoai.utils.raster import raster_to_vector
 
@@ -240,6 +248,7 @@ _TASKS = {
     "export_geotiff_tiles": _task_export_geotiff_tiles,
     "semantic_segmentation": _task_semantic_segmentation,
     "instance_segmentation": _task_instance_segmentation,
+    "clip_raster_by_bbox": _task_clip_raster_by_bbox,
     "raster_to_vector": _task_raster_to_vector,
     "vectorize_mask": _task_vectorize_mask,
     "smooth_vector": _task_smooth_vector,

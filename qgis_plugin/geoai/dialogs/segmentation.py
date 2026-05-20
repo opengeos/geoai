@@ -6,6 +6,8 @@ and running inference, combined in a single dockable panel.
 """
 
 import os
+import shutil
+import tempfile
 from typing import Optional
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -34,6 +36,8 @@ from qgis.PyQt.QtWidgets import (
 from qgis.core import QgsProject, QgsVectorLayer, QgsRasterLayer
 from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
+
+from .inference_range import InferenceRangeMixin
 
 
 class OutputCapture:
@@ -245,6 +249,8 @@ class InferenceWorker(QThread):
         batch_size: int,
         probability_path: Optional[str] = None,
         probability_threshold: Optional[float] = None,
+        inference_bbox: Optional[list] = None,
+        inference_bbox_crs: Optional[str] = None,
     ):
         super().__init__()
         self.input_path = input_path
@@ -259,13 +265,34 @@ class InferenceWorker(QThread):
         self.batch_size = batch_size
         self.probability_path = probability_path
         self.probability_threshold = probability_threshold
+        self.inference_bbox = inference_bbox
+        self.inference_bbox_crs = inference_bbox_crs
 
     def run(self):
         """Execute the inference."""
+        temp_dir = None
         try:
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Running inference...")
+            input_path = self.input_path
+
+            if self.inference_bbox is not None:
+                temp_dir = tempfile.mkdtemp(prefix="geoai_inference_range_")
+                clipped_input_path = os.path.join(temp_dir, "clip.tif")
+                self.progress.emit("Clipping raster to selected range...")
+                run_geoai_task(
+                    "clip_raster_by_bbox",
+                    {
+                        "input_raster": self.input_path,
+                        "output_raster": clipped_input_path,
+                        "bbox": self.inference_bbox,
+                        "bbox_type": "geo",
+                        "bbox_crs": self.inference_bbox_crs,
+                    },
+                    progress_callback=self.progress.emit,
+                )
+                input_path = clipped_input_path
 
             kwargs = {}
             if self.probability_path:
@@ -274,7 +301,7 @@ class InferenceWorker(QThread):
                 kwargs["probability_threshold"] = self.probability_threshold
 
             params = {
-                "input_path": self.input_path,
+                "input_path": input_path,
                 "output_path": self.output_path,
                 "model_path": self.model_path,
                 "architecture": self.architecture,
@@ -298,6 +325,9 @@ class InferenceWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+        finally:
+            if temp_dir:
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 class VectorizeWorker(QThread):
@@ -392,7 +422,7 @@ class SmoothVectorWorker(QThread):
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
-class SegmentationDockWidget(QDockWidget):
+class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
     """Dockable widget for segmentation training and inference."""
 
     def __init__(self, iface, parent=None):
@@ -410,6 +440,11 @@ class SegmentationDockWidget(QDockWidget):
         self.vectorize_worker = None
         self.smooth_worker = None
         self.last_output_path = None
+        self.inference_range_tool = None
+        self.previous_map_tool = None
+        self.inference_bbox = None
+        self.inference_bbox_crs = None
+        self.inference_range_layer_source = None
 
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
@@ -834,6 +869,28 @@ class SegmentationDockWidget(QDockWidget):
         input_group.setLayout(input_layout)
         layout.addWidget(input_group)
 
+        # Inference Range Group
+        range_group = QGroupBox("Inference Range")
+        range_layout = QFormLayout()
+        range_layout.setSpacing(5)
+
+        range_button_layout = QHBoxLayout()
+        self.draw_range_btn = QPushButton("Draw Range")
+        self.draw_range_btn.setCheckable(True)
+        self.draw_range_btn.setStyleSheet(self.btn_style)
+        range_button_layout.addWidget(self.draw_range_btn)
+
+        self.clear_range_btn = QPushButton("Clear")
+        self.clear_range_btn.setStyleSheet(self.btn_style)
+        range_button_layout.addWidget(self.clear_range_btn)
+        range_layout.addRow("Range:", range_button_layout)
+
+        self.range_status_label = QLabel("Full raster")
+        range_layout.addRow("", self.range_status_label)
+
+        range_group.setLayout(range_layout)
+        layout.addWidget(range_group)
+
         # Model Group
         model_group = QGroupBox("Model")
         model_layout = QFormLayout()
@@ -1094,6 +1151,10 @@ class SegmentationDockWidget(QDockWidget):
 
         # Inference tab
         self.inf_raster_browse_btn.clicked.connect(self.browse_inf_raster)
+        self.inf_raster_layer_combo.layerChanged.connect(self.clear_inference_range)
+        self.inf_raster_path_edit.textChanged.connect(self.clear_inference_range)
+        self.draw_range_btn.clicked.connect(self.start_inference_range_tool)
+        self.clear_range_btn.clicked.connect(self.clear_inference_range)
         self.model_browse_btn.clicked.connect(self.browse_model)
         self.output_browse_btn.clicked.connect(self.browse_output)
         self.vector_output_browse_btn.clicked.connect(self.browse_vector_output)
@@ -1579,9 +1640,19 @@ class SegmentationDockWidget(QDockWidget):
             QMessageBox.warning(self, "Warning", "Please fill in all fields.")
             return
 
+        inference_bbox, inference_bbox_crs, range_error = (
+            self._validated_inference_bbox(input_path)
+        )
+        if range_error:
+            QMessageBox.warning(self, "Warning", range_error)
+            return
+
         self.run_inference_btn.setEnabled(False)
         self.inference_progress.setRange(0, 0)
-        self.log("Starting inference...")
+        if inference_bbox is not None:
+            self.log("Starting inference on selected range...")
+        else:
+            self.log("Starting inference...")
 
         threshold = (
             self.threshold_spin.value() if self.threshold_check.isChecked() else None
@@ -1609,6 +1680,8 @@ class SegmentationDockWidget(QDockWidget):
             self.inf_batch_size_spin.value(),
             probability_path=probability_path,
             probability_threshold=threshold,
+            inference_bbox=inference_bbox,
+            inference_bbox_crs=inference_bbox_crs,
         )
         self.inference_worker.finished.connect(self.on_inference_finished)
         self.inference_worker.error.connect(self.on_inference_error)
