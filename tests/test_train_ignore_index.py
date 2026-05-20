@@ -107,12 +107,24 @@ class TestSemanticMetricsIgnoreIndex(unittest.TestCase):
         )
 
     def test_metrics_return_zero_when_all_pixels_ignored(self):
-        """All-ignored targets should produce a defined zero score."""
+        """All-ignored targets should produce a defined zero score for every metric."""
         pred = torch.tensor([[0, 1], [1, 0]])
         target = torch.full((2, 2), -100, dtype=torch.long)
 
         self.assertEqual(
             iou_coefficient(pred, target, num_classes=2, ignore_index=-100),
+            0.0,
+        )
+        self.assertEqual(
+            f1_score(pred, target, num_classes=2, ignore_index=-100),
+            0.0,
+        )
+        self.assertEqual(
+            precision_score(pred, target, num_classes=2, ignore_index=-100),
+            0.0,
+        )
+        self.assertEqual(
+            recall_score(pred, target, num_classes=2, ignore_index=-100),
             0.0,
         )
 

@@ -3259,13 +3259,14 @@ class SemanticSegmentationDataset(Dataset):
         return mask
 
     def _resize_image_and_mask(
-        self, image: np.ndarray, mask: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, image: torch.Tensor, mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Resize image and mask to target size."""
         if self.target_size is None:
             return image, mask
 
         target_h, target_w = self.target_size
+        mask_pad_value = 0 if self.ignore_index is None else self.ignore_index
 
         if self.resize_mode == "resize":
             # Direct resize (may change aspect ratio)
@@ -3290,18 +3291,31 @@ class SemanticSegmentationDataset(Dataset):
             mask = self._clamp_mask_tensor(mask)
 
         elif self.resize_mode == "pad":
-            # Pad to target size (preserves aspect ratio)
+            # Pad to target size (preserves aspect ratio). Pad masks with
+            # ignore_index (when set) so newly introduced padding pixels are
+            # excluded from loss/metrics rather than being learned as class 0.
             image = self._pad_to_size(image, (target_h, target_w))
-            mask = self._pad_to_size(mask.unsqueeze(0), (target_h, target_w)).squeeze(0)
+            mask = self._pad_to_size(
+                mask.unsqueeze(0), (target_h, target_w), pad_value=mask_pad_value
+            ).squeeze(0)
             # Clamp valid mask values without converting ignore_index to a class.
             mask = self._clamp_mask_tensor(mask)
 
         return image, mask
 
     def _pad_to_size(
-        self, tensor: torch.Tensor, target_size: Tuple[int, int]
+        self,
+        tensor: torch.Tensor,
+        target_size: Tuple[int, int],
+        pad_value: float = 0,
     ) -> torch.Tensor:
-        """Pad tensor to target size with zeros."""
+        """Pad tensor to target size.
+
+        Args:
+            tensor: Tensor with shape ``[C, H, W]`` or ``[H, W]``.
+            target_size: Target ``(height, width)``.
+            pad_value: Fill value used for padded pixels. Defaults to ``0``.
+        """
         target_h, target_w = target_size
 
         if tensor.dim() == 3:  # Image [C, H, W]
@@ -3322,7 +3336,9 @@ class SemanticSegmentationDataset(Dataset):
         pad_right = pad_w - pad_left
 
         # Apply padding (left, right, top, bottom)
-        padded = F.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), value=0)
+        padded = F.pad(
+            tensor, (pad_left, pad_right, pad_top, pad_bottom), value=pad_value
+        )
 
         # Crop if tensor is larger than target
         if tensor.dim() == 3:
