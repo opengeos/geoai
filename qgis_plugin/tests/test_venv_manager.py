@@ -81,9 +81,77 @@ def test_pip_ssl_flags_trust_pytorch_wheel_host():
     assert "download.pytorch.org" in flags
 
 
-def test_uv_ssl_flags_use_native_tls_and_allow_pytorch_wheel_host():
+def test_insecure_package_hosts_is_immutable():
+    assert isinstance(venv_manager._INSECURE_PACKAGE_HOSTS, tuple)
+
+
+def test_uv_ssl_flags_use_native_tls_without_insecure_hosts():
     flags = venv_manager._get_uv_ssl_flags()
 
     assert "--native-tls" in flags
+    assert "--allow-insecure-host" not in flags
+
+
+def test_uv_insecure_host_flags_allow_pytorch_wheel_host():
+    flags = venv_manager._get_uv_insecure_host_flags()
+
     assert "--allow-insecure-host" in flags
     assert "download.pytorch.org" in flags
+
+
+def test_uv_insecure_host_retry_only_after_ssl_error(monkeypatch):
+    calls = []
+
+    def fake_run_pip_install(**kwargs):
+        calls.append(kwargs["cmd"])
+        return venv_manager._PipResult(0, "ok", "")
+
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+
+    result = venv_manager._retry_uv_install_with_insecure_hosts(
+        result=venv_manager._PipResult(1, "", "CERTIFICATE_VERIFY_FAILED"),
+        cmd=["uv", "pip", "install", "--native-tls", "torch"],
+        timeout=1,
+        env={},
+        subprocess_kwargs={},
+        label="torch",
+        progress_start=0,
+        progress_end=1,
+    )
+
+    assert result.returncode == 0
+    assert calls == [
+        [
+            "uv",
+            "pip",
+            "install",
+            "--native-tls",
+            "torch",
+        ]
+        + venv_manager._get_uv_insecure_host_flags()
+    ]
+
+
+def test_uv_insecure_host_retry_skips_non_ssl_errors(monkeypatch):
+    calls = []
+
+    def fake_run_pip_install(**kwargs):
+        calls.append(kwargs["cmd"])
+        return venv_manager._PipResult(0, "ok", "")
+
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+    original = venv_manager._PipResult(1, "", "No matching distribution found")
+
+    result = venv_manager._retry_uv_install_with_insecure_hosts(
+        result=original,
+        cmd=["uv", "pip", "install", "--native-tls", "torch"],
+        timeout=1,
+        env={},
+        subprocess_kwargs={},
+        label="torch",
+        progress_start=0,
+        progress_end=1,
+    )
+
+    assert result is original
+    assert calls == []
