@@ -418,6 +418,13 @@ _WINDOWS_CRASH_CODES = {
     -1073741515,  # 0xC0000135 signed
 }
 
+_INSECURE_PACKAGE_HOSTS = [
+    "pypi.org",
+    "pypi.python.org",
+    "files.pythonhosted.org",
+    "download.pytorch.org",
+]
+
 
 def _is_ssl_error(stderr: str) -> bool:
     """Detect SSL/certificate errors in pip output.
@@ -451,14 +458,10 @@ def _get_pip_ssl_flags() -> List[str]:
     Returns:
         List of pip command-line flags.
     """
-    return [
-        "--trusted-host",
-        "pypi.org",
-        "--trusted-host",
-        "pypi.python.org",
-        "--trusted-host",
-        "files.pythonhosted.org",
-    ]
+    flags = []
+    for host in _INSECURE_PACKAGE_HOSTS:
+        flags.extend(["--trusted-host", host])
+    return flags
 
 
 def _get_uv_ssl_flags() -> List[str]:
@@ -467,12 +470,10 @@ def _get_uv_ssl_flags() -> List[str]:
     Returns:
         List of uv command-line flags.
     """
-    return [
-        "--allow-insecure-host",
-        "pypi.org",
-        "--allow-insecure-host",
-        "files.pythonhosted.org",
-    ]
+    flags = ["--native-tls"]
+    for host in _INSECURE_PACKAGE_HOSTS:
+        flags.extend(["--allow-insecure-host", host])
+    return flags
 
 
 def _is_network_error(output: str) -> bool:

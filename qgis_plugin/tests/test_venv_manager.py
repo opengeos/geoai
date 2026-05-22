@@ -72,3 +72,18 @@ def test_version_satisfies_rejects_prerelease_for_minimum_version():
 
 def test_version_satisfies_fails_closed_for_unsupported_specifier():
     assert venv_manager._version_satisfies("0.39.0", "~=0.39.0") is False
+
+
+def test_pip_ssl_flags_trust_pytorch_wheel_host():
+    flags = venv_manager._get_pip_ssl_flags()
+
+    assert "--trusted-host" in flags
+    assert "download.pytorch.org" in flags
+
+
+def test_uv_ssl_flags_use_native_tls_and_allow_pytorch_wheel_host():
+    flags = venv_manager._get_uv_ssl_flags()
+
+    assert "--native-tls" in flags
+    assert "--allow-insecure-host" in flags
+    assert "download.pytorch.org" in flags
