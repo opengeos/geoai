@@ -3,7 +3,7 @@ name=GeoAI
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including tree segmentation (DeepForest), water segmentation (OmniWaterMask), Moondream vision-language model, Segment Anything (SAM1/SAM2/SAM3), semantic segmentation, and instance segmentation (Mask R-CNN).
-version=1.4.1
+version=1.4.2
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -59,6 +59,8 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.4.2
+        - Fix QGIS installer SSL trust for PyTorch wheels (#775)
     1.4.1
         - Fix QGIS stale GeoAI venv detection (#773)
         - Add inference range drawing to QGIS segmentation panels (#771)
