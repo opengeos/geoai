@@ -32,7 +32,7 @@ VENV_DIR = os.path.join(CACHE_DIR, f"venv_{PYTHON_VERSION}")
 REQUIRED_PACKAGES = [
     ("torch", ">=2.0.0"),
     ("torchvision", ">=0.15.0"),
-    ("geoai-py", ""),
+    ("geoai-py", ">=0.39.0"),
     ("segment-geospatial", ""),
     ("sam3", ""),
     ("deepforest", ""),
@@ -48,7 +48,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "9"
+_INSTALL_LOGIC_VERSION = "10"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -3050,10 +3050,164 @@ def cleanup_old_venv_directories() -> List[str]:
 # ---------------------------------------------------------------------------
 
 
+def _normalize_dist_name(name: str) -> str:
+    """Normalize a Python distribution name for metadata comparisons.
+
+    Args:
+        name: Distribution name.
+
+    Returns:
+        Normalized distribution name.
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _read_dist_version(site_packages: str, dist_name: str) -> Optional[str]:
+    """Read installed distribution version from ``*.dist-info/METADATA``.
+
+    Args:
+        site_packages: Path to the venv site-packages directory.
+        dist_name: Distribution name to look up.
+
+    Returns:
+        Installed version string, or None if metadata was not found.
+    """
+    expected_name = _normalize_dist_name(dist_name)
+    try:
+        entries = os.listdir(site_packages)
+    except OSError:
+        return None
+
+    for entry in entries:
+        if not entry.endswith(".dist-info"):
+            continue
+        metadata_path = os.path.join(site_packages, entry, "METADATA")
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                metadata = f.read()
+        except OSError:
+            continue
+
+        found_name = None
+        found_version = None
+        for line in metadata.splitlines():
+            if line.startswith("Name:"):
+                found_name = line.split(":", 1)[1].strip()
+            elif line.startswith("Version:"):
+                found_version = line.split(":", 1)[1].strip()
+            if found_name and found_version:
+                break
+
+        if found_name and _normalize_dist_name(found_name) == expected_name:
+            return found_version
+
+    return None
+
+
+def _fallback_version_parts(version: str) -> Tuple[Tuple[int, ...], int]:
+    """Convert a version string to fallback comparable parts.
+
+    Args:
+        version: Version string.
+
+    Returns:
+        Tuple of numeric release components and prerelease rank.
+    """
+    match = re.match(r"(\d+(?:\.\d+)*)(.*)", version or "")
+    if not match:
+        return (), -1
+    release = tuple(int(part) for part in match.group(1).split("."))
+    suffix = match.group(2).lower().lstrip(".-")
+    if not suffix:
+        return release, 0
+    if suffix.startswith(("dev", "a", "b", "rc")):
+        return release, -1
+    if suffix.startswith("post"):
+        return release, 1
+    return release, -1
+
+
+def _compare_versions(version: str, other: str) -> int:
+    """Compare two version strings using PEP 440 when available.
+
+    Args:
+        version: First version string.
+        other: Second version string.
+
+    Returns:
+        -1 if version is lower, 0 if equal, 1 if higher.
+    """
+    try:
+        from packaging.version import parse as parse_version
+
+        parsed_version = parse_version(version)
+        parsed_other = parse_version(other)
+        if parsed_version < parsed_other:
+            return -1
+        if parsed_version > parsed_other:
+            return 1
+        return 0
+    except Exception:
+        version_release, version_rank = _fallback_version_parts(version)
+        other_release, other_rank = _fallback_version_parts(other)
+        max_len = max(len(version_release), len(other_release))
+        version_key = version_release + (0,) * (max_len - len(version_release))
+        other_key = other_release + (0,) * (max_len - len(other_release))
+        if version_key < other_key:
+            return -1
+        if version_key > other_key:
+            return 1
+        if version_rank < other_rank:
+            return -1
+        if version_rank > other_rank:
+            return 1
+        return 0
+
+
+def _version_satisfies(version: str, spec: str) -> bool:
+    """Check whether a version satisfies a simple requirement specifier.
+
+    Args:
+        version: Installed version string.
+        spec: Requirement specifier. Supports ``>=`` and ``==``.
+
+    Returns:
+        True if the version satisfies the specifier.
+    """
+    spec = (spec or "").strip()
+    if not spec:
+        return True
+    if spec.startswith(">="):
+        return _compare_versions(version, spec[2:].strip()) >= 0
+    if spec.startswith("=="):
+        return _compare_versions(version, spec[2:].strip()) == 0
+    return False
+
+
+def _package_dir_name(package_name: str) -> str:
+    """Return the import package directory expected in site-packages.
+
+    Args:
+        package_name: Distribution name.
+
+    Returns:
+        Expected import package directory name.
+    """
+    package_markers = {
+        "geoai-py": "geoai",
+        "segment-geospatial": "samgeo",
+        "triton-windows": "triton",
+    }
+    return package_markers.get(package_name, package_name.replace("-", "_"))
+
+
 def _quick_check_packages(venv_dir: str = None) -> Tuple[bool, str]:
     """Fast filesystem check that packages exist in site-packages.
 
-    Does NOT spawn subprocesses -- safe for the main thread.
+    Does NOT spawn subprocesses -- safe for the main thread. Also checks
+    simple version constraints from installed distribution metadata, so a
+    stale managed environment is not treated as ready only because package
+    directories exist.
 
     Args:
         venv_dir: Optional venv directory path. Uses VENV_DIR if None.
@@ -3068,13 +3222,10 @@ def _quick_check_packages(venv_dir: str = None) -> Tuple[bool, str]:
     if not os.path.exists(site_packages):
         return False, "site-packages directory not found"
 
-    package_markers = {
-        "torch": "torch",
-        "torchvision": "torchvision",
-        "geoai": "geoai",
-    }
-
-    for package_name, dir_name in package_markers.items():
+    for package_name, _ in _get_required_packages():
+        if _is_optional_verify_package(package_name):
+            continue
+        dir_name = _package_dir_name(package_name)
         pkg_dir = os.path.join(site_packages, dir_name)
         if not os.path.exists(pkg_dir):
             _log(
@@ -3082,6 +3233,32 @@ def _quick_check_packages(venv_dir: str = None) -> Tuple[bool, str]:
                 Qgis.Warning,
             )
             return False, "Package {} not found".format(package_name)
+
+    for package_name, version_spec in _get_required_packages():
+        if not version_spec:
+            continue
+        installed_version = _read_dist_version(site_packages, package_name)
+        if installed_version is None:
+            _log(
+                "Quick check: distribution metadata not found for {}".format(
+                    package_name
+                ),
+                Qgis.Warning,
+            )
+            return False, "Package {} metadata not found".format(package_name)
+        if not _version_satisfies(installed_version, version_spec):
+            _log(
+                "Quick check: {} {} does not satisfy {}".format(
+                    package_name, installed_version, version_spec
+                ),
+                Qgis.Warning,
+            )
+            return (
+                False,
+                "Package {} {} does not satisfy {}".format(
+                    package_name, installed_version, version_spec
+                ),
+            )
 
     _log(
         "Quick check: all packages found in {}".format(site_packages),
