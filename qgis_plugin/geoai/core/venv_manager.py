@@ -3104,19 +3104,64 @@ def _read_dist_version(site_packages: str, dist_name: str) -> Optional[str]:
     return None
 
 
-def _version_key(version: str) -> Tuple[int, ...]:
-    """Convert a simple numeric version string to a comparable tuple.
+def _fallback_version_parts(version: str) -> Tuple[Tuple[int, ...], int]:
+    """Convert a version string to fallback comparable parts.
 
     Args:
         version: Version string.
 
     Returns:
-        Tuple of numeric release components.
+        Tuple of numeric release components and prerelease rank.
     """
-    match = re.match(r"\d+(?:\.\d+)*", version or "")
+    match = re.match(r"(\d+(?:\.\d+)*)(.*)", version or "")
     if not match:
-        return ()
-    return tuple(int(part) for part in match.group(0).split("."))
+        return (), -1
+    release = tuple(int(part) for part in match.group(1).split("."))
+    suffix = match.group(2).lower().lstrip(".-")
+    if not suffix:
+        return release, 0
+    if suffix.startswith(("dev", "a", "b", "rc")):
+        return release, -1
+    if suffix.startswith("post"):
+        return release, 1
+    return release, -1
+
+
+def _compare_versions(version: str, other: str) -> int:
+    """Compare two version strings using PEP 440 when available.
+
+    Args:
+        version: First version string.
+        other: Second version string.
+
+    Returns:
+        -1 if version is lower, 0 if equal, 1 if higher.
+    """
+    try:
+        from packaging.version import parse as parse_version
+
+        parsed_version = parse_version(version)
+        parsed_other = parse_version(other)
+        if parsed_version < parsed_other:
+            return -1
+        if parsed_version > parsed_other:
+            return 1
+        return 0
+    except Exception:
+        version_release, version_rank = _fallback_version_parts(version)
+        other_release, other_rank = _fallback_version_parts(other)
+        max_len = max(len(version_release), len(other_release))
+        version_key = version_release + (0,) * (max_len - len(version_release))
+        other_key = other_release + (0,) * (max_len - len(other_release))
+        if version_key < other_key:
+            return -1
+        if version_key > other_key:
+            return 1
+        if version_rank < other_rank:
+            return -1
+        if version_rank > other_rank:
+            return 1
+        return 0
 
 
 def _version_satisfies(version: str, spec: str) -> bool:
@@ -3133,10 +3178,10 @@ def _version_satisfies(version: str, spec: str) -> bool:
     if not spec:
         return True
     if spec.startswith(">="):
-        return _version_key(version) >= _version_key(spec[2:].strip())
+        return _compare_versions(version, spec[2:].strip()) >= 0
     if spec.startswith("=="):
-        return version.strip() == spec[2:].strip()
-    return True
+        return _compare_versions(version, spec[2:].strip()) == 0
+    return False
 
 
 def _package_dir_name(package_name: str) -> str:

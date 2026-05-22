@@ -63,3 +63,12 @@ def test_quick_check_accepts_current_geoai_distribution(tmp_path, monkeypatch):
 
     assert ready is True
     assert message == "All packages found"
+
+
+def test_version_satisfies_rejects_prerelease_for_minimum_version():
+    assert venv_manager._version_satisfies("0.39.0rc1", ">=0.39.0") is False
+    assert venv_manager._version_satisfies("0.39.0", ">=0.39.0") is True
+
+
+def test_version_satisfies_fails_closed_for_unsupported_specifier():
+    assert venv_manager._version_satisfies("0.39.0", "~=0.39.0") is False
