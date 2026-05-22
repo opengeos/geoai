@@ -418,6 +418,13 @@ _WINDOWS_CRASH_CODES = {
     -1073741515,  # 0xC0000135 signed
 }
 
+_INSECURE_PACKAGE_HOSTS = (
+    "pypi.org",
+    "pypi.python.org",
+    "files.pythonhosted.org",
+    "download.pytorch.org",
+)
+
 
 def _is_ssl_error(stderr: str) -> bool:
     """Detect SSL/certificate errors in pip output.
@@ -451,28 +458,31 @@ def _get_pip_ssl_flags() -> List[str]:
     Returns:
         List of pip command-line flags.
     """
-    return [
-        "--trusted-host",
-        "pypi.org",
-        "--trusted-host",
-        "pypi.python.org",
-        "--trusted-host",
-        "files.pythonhosted.org",
-    ]
+    flags = []
+    for host in _INSECURE_PACKAGE_HOSTS:
+        flags.extend(["--trusted-host", host])
+    return flags
 
 
 def _get_uv_ssl_flags() -> List[str]:
-    """Get uv flags to bypass SSL verification for corporate proxies.
+    """Get default uv TLS flags.
 
     Returns:
         List of uv command-line flags.
     """
-    return [
-        "--allow-insecure-host",
-        "pypi.org",
-        "--allow-insecure-host",
-        "files.pythonhosted.org",
-    ]
+    return ["--native-tls"]
+
+
+def _get_uv_insecure_host_flags() -> List[str]:
+    """Get uv flags to bypass SSL verification after a certificate failure.
+
+    Returns:
+        List of uv command-line flags.
+    """
+    flags = []
+    for host in _INSECURE_PACKAGE_HOSTS:
+        flags.extend(["--allow-insecure-host", host])
+    return flags
 
 
 def _is_network_error(output: str) -> bool:
@@ -1856,6 +1866,67 @@ def _run_pip_install(
             pass
 
 
+def _retry_uv_install_with_insecure_hosts(
+    result: _PipResult,
+    cmd: List[str],
+    timeout: int,
+    env: dict,
+    subprocess_kwargs: dict,
+    label: str,
+    progress_start: int,
+    progress_end: int,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> _PipResult:
+    """Retry a failed uv install with explicit insecure package hosts.
+
+    Args:
+        result: The failed install result to inspect.
+        cmd: The original uv install command.
+        timeout: Maximum time in seconds.
+        env: Environment variables dict.
+        subprocess_kwargs: Platform-specific kwargs for subprocess.
+        label: Human-readable label for progress messages.
+        progress_start: Start percentage for this install's progress range.
+        progress_end: End percentage for this install's progress range.
+        progress_callback: Optional progress callback.
+        cancel_check: Optional cancellation check callback.
+
+    Returns:
+        Original result if no SSL retry is needed, otherwise the retry result.
+    """
+    if result.returncode == 0:
+        return result
+
+    error_output = result.stderr or result.stdout or ""
+    if not _is_ssl_error(error_output):
+        return result
+
+    _log(
+        "uv SSL certificate error, retrying with explicit trusted package hosts...",
+        Qgis.Warning,
+    )
+    if progress_callback:
+        progress_callback(
+            progress_start,
+            "SSL certificate error, retrying with trusted package hosts...",
+        )
+    if cancel_check and cancel_check():
+        return _PipResult(-1, "", "Installation cancelled")
+
+    return _run_pip_install(
+        cmd=cmd + _get_uv_insecure_host_flags(),
+        timeout=timeout,
+        env=env,
+        subprocess_kwargs=subprocess_kwargs,
+        label="{} (SSL retry)".format(label),
+        progress_start=progress_start,
+        progress_end=progress_end,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Dependency installation
 # ---------------------------------------------------------------------------
@@ -1985,6 +2056,24 @@ def _reinstall_cpu_torch(
                 _log(f"Installed {pkg} (CPU)", Qgis.Success)
             else:
                 err = result.stderr or result.stdout or ""
+                if _use_uv and _is_ssl_error(err):
+                    _log(
+                        "CPU torch reinstall hit a uv SSL certificate error, "
+                        "retrying with explicit trusted package hosts...",
+                        Qgis.Warning,
+                    )
+                    retry_result = subprocess.run(
+                        cmd + _get_uv_insecure_host_flags(),
+                        capture_output=True,
+                        text=True,
+                        timeout=600,
+                        env=env,
+                        **subprocess_kwargs,
+                    )
+                    if retry_result.returncode == 0:
+                        _log(f"Installed {pkg} (CPU)", Qgis.Success)
+                        continue
+                    err = retry_result.stderr or retry_result.stdout or err
                 _log(f"Failed to install {pkg} (CPU): {err[:200]}", Qgis.Warning)
         except Exception as e:
             _log(f"Exception installing {pkg} (CPU): {e}", Qgis.Warning)
@@ -2337,6 +2426,20 @@ def install_dependencies(
                             cancel_check=cancel_check,
                         )
 
+                if result.returncode != 0 and use_uv:
+                    result = _retry_uv_install_with_insecure_hosts(
+                        result=result,
+                        cmd=base_cmd,
+                        timeout=pkg_timeout,
+                        env=env,
+                        subprocess_kwargs=subprocess_kwargs,
+                        label=label,
+                        progress_start=pkg_start,
+                        progress_end=pkg_end,
+                        progress_callback=progress_callback,
+                        cancel_check=cancel_check,
+                    )
+
                 # Retry on network errors
                 if result.returncode != 0:
                     error_output = result.stderr or result.stdout or ""
@@ -2458,6 +2561,19 @@ def install_dependencies(
                         progress_callback=progress_callback,
                         cancel_check=cancel_check,
                     )
+                    if cpu_result.returncode != 0 and use_uv:
+                        cpu_result = _retry_uv_install_with_insecure_hosts(
+                            result=cpu_result,
+                            cmd=cpu_cmd,
+                            timeout=600,
+                            env=env,
+                            subprocess_kwargs=subprocess_kwargs,
+                            label="{} (CPU fallback)".format(package_name),
+                            progress_start=pkg_start,
+                            progress_end=pkg_end,
+                            progress_callback=progress_callback,
+                            cancel_check=cancel_check,
+                        )
                     if cpu_result.returncode == 0:
                         _log(
                             "Successfully installed {} (CPU)".format(package_spec),
@@ -2613,6 +2729,20 @@ def install_dependencies(
                         cancel_check=cancel_check,
                     )
 
+            if result.returncode != 0 and use_uv:
+                result = _retry_uv_install_with_insecure_hosts(
+                    result=result,
+                    cmd=base_cmd,
+                    timeout=batch_timeout,
+                    env=env,
+                    subprocess_kwargs=subprocess_kwargs,
+                    label="dependencies",
+                    progress_start=batch_start,
+                    progress_end=batch_end,
+                    progress_callback=progress_callback,
+                    cancel_check=cancel_check,
+                )
+
             # Retry on network errors
             if result.returncode != 0:
                 error_output = result.stderr or result.stdout or ""
@@ -2698,6 +2828,19 @@ def install_dependencies(
                             progress_callback=progress_callback,
                             cancel_check=cancel_check,
                         )
+                        if result.returncode != 0 and use_uv:
+                            result = _retry_uv_install_with_insecure_hosts(
+                                result=result,
+                                cmd=retry_cmd,
+                                timeout=batch_timeout,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label="dependencies (without {})".format(failed_pkg),
+                                progress_start=batch_start,
+                                progress_end=batch_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
                         if result.returncode == 0:
                             _log(
                                 "Batch succeeded without optional "
