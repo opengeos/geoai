@@ -388,8 +388,14 @@ _SSL_ERROR_PATTERNS = [
     "SSLError",
     "SSLCertVerificationError",
     "tlsv1 alert",
+    "tls error",
     "unable to get local issuer certificate",
     "self signed certificate in certificate chain",
+    "invalid peer certificate",
+    "invalid certificate",
+    "unknownissuer",
+    "unknown issuer",
+    "certificate unknown",
 ]
 
 _NETWORK_ERROR_PATTERNS = [
@@ -483,6 +489,39 @@ def _get_uv_insecure_host_flags() -> List[str]:
     for host in _INSECURE_PACKAGE_HOSTS:
         flags.extend(["--allow-insecure-host", host])
     return flags
+
+
+def _append_space_separated_env(env: dict, key: str, values: Tuple[str, ...]) -> None:
+    """Append unique values to a space-separated subprocess environment variable.
+
+    Args:
+        env: Environment dictionary to update in-place.
+        key: Environment variable name.
+        values: Values to append if missing.
+    """
+    existing = env.get(key, "")
+    parts = [p for p in existing.split() if p]
+    for value in values:
+        if value not in parts:
+            parts.append(value)
+    if parts:
+        env[key] = " ".join(parts)
+
+
+def _apply_package_host_env(env: dict) -> None:
+    """Apply package-host trust settings to subprocess environment.
+
+    Command-line flags are still used for top-level pip/uv commands. These
+    environment variables provide the same host allow-list to nested package
+    operations and to uv code paths where the first failure must be classified
+    before an explicit retry can be attempted.
+
+    Args:
+        env: Environment dictionary to update in-place.
+    """
+    _append_space_separated_env(env, "PIP_TRUSTED_HOST", _INSECURE_PACKAGE_HOSTS)
+    env.setdefault("UV_NATIVE_TLS", "true")
+    _append_space_separated_env(env, "UV_INSECURE_HOST", _INSECURE_PACKAGE_HOSTS)
 
 
 def _is_network_error(output: str) -> bool:
@@ -624,6 +663,8 @@ def _get_clean_env_for_venv() -> dict:
     if proxy_url:
         env.setdefault("HTTP_PROXY", proxy_url)
         env.setdefault("HTTPS_PROXY", proxy_url)
+
+    _apply_package_host_env(env)
     return env
 
 

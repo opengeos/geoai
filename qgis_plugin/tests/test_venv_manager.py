@@ -99,6 +99,28 @@ def test_uv_insecure_host_flags_allow_pytorch_wheel_host():
     assert "download.pytorch.org" in flags
 
 
+def test_apply_package_host_env_preserves_existing_values():
+    env = {"PIP_TRUSTED_HOST": "internal.example.com pypi.org"}
+
+    venv_manager._apply_package_host_env(env)
+
+    assert env["UV_NATIVE_TLS"] == "true"
+    assert "internal.example.com" in env["PIP_TRUSTED_HOST"].split()
+    assert env["PIP_TRUSTED_HOST"].split().count("pypi.org") == 1
+    assert "files.pythonhosted.org" in env["PIP_TRUSTED_HOST"].split()
+    assert "pypi.org" in env["UV_INSECURE_HOST"].split()
+    assert "download.pytorch.org" in env["UV_INSECURE_HOST"].split()
+
+
+def test_ssl_error_detects_uv_rustls_unknown_issuer():
+    assert (
+        venv_manager._is_ssl_error(
+            "invalid peer certificate: UnknownIssuer when contacting pypi.org"
+        )
+        is True
+    )
+
+
 def test_uv_insecure_host_retry_only_after_ssl_error(monkeypatch):
     calls = []
 
