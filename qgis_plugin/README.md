@@ -66,7 +66,7 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 ### 1. Set up the environment
 
-Installing the GeoAI QGIS plugin on can be challenging due to the complicated pytorch/cuda dependencies. Conda or mamba might take a while to resolve the dependencies, while pip might fail to install the dependencies properly. It is recommended to use [pixi](https://pixi.prefix.dev/latest) to install the dependencies to avoid these issues.
+Installing the GeoAI QGIS plugin can be challenging due to the complicated pytorch/cuda dependencies. Conda or mamba might take a while to resolve the dependencies, while pip might fail to install the dependencies properly. It is recommended to use [pixi](https://pixi.prefix.dev/latest) to install the dependencies to avoid these issues.
 
 #### 1) Install Pixi
 
@@ -420,6 +420,23 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 -   Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
 -   CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
 -   Model download failures: check network/firewall, then retry loading models from the panel.
+
+### Windows installation issues
+
+If the plugin or dependencies fail to install on Windows when using the QGIS Plugin Manager, try a clean reinstall with the quick installer instead:
+
+1. Uninstall the GeoAI plugin completely from QGIS.
+2. Close QGIS.
+3. Open PowerShell and run:
+
+    ```powershell
+    powershell -ExecutionPolicy ByPass -c "irm https://qgis.gishub.org/install.ps1 | iex"
+    ```
+
+4. Restart QGIS.
+5. Open `Plugins` → `Manage and Install Plugins...`, enable **GeoAI**, then use the plugin's dependency installer.
+
+This sequence has resolved cases where installing dependencies directly from PowerShell or installing the plugin only through the Plugin Manager failed on Windows.
 
 ## License
 
