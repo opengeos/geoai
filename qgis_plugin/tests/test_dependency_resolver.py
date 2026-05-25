@@ -8,7 +8,7 @@ def test_windows_dependency_specs_include_python_312_and_triton():
 
     assert "python==3.12.*" in specs
     assert "triton-windows" in specs
-    assert "transformers>=5.6.2" in specs
+    assert "transformers>=4.56.2" in specs
 
 
 def test_resolution_failure_diagnostic_identifies_impossible_constraint():
@@ -34,10 +34,10 @@ def test_resolution_failure_diagnostic_identifies_impossible_constraint():
 
 
 def test_dependency_resolver_dry_run_uses_uv_compile(monkeypatch):
-    commands = []
+    calls = []
 
-    def fake_run(cmd, capture_output, text, timeout):
-        commands.append(cmd)
+    def fake_run(cmd, *args, **kwargs):
+        calls.append({"cmd": cmd, "input": kwargs.get("input")})
         return subprocess.CompletedProcess(
             cmd, 0, stdout="Resolved 10 packages", stderr=""
         )
@@ -53,8 +53,13 @@ def test_dependency_resolver_dry_run_uses_uv_compile(monkeypatch):
 
     assert ok is True
     assert "Dependency resolution succeeded" in message
-    assert commands
-    assert commands[0][:4] == ["uv", "pip", "compile", "--python-version"]
-    assert "3.12" in commands[0]
-    assert "--python-platform" in commands[0]
-    assert "windows" in commands[0]
+    assert calls
+    cmd = calls[0]["cmd"]
+    assert cmd[:4] == ["uv", "pip", "compile", "--python-version"]
+    assert "3.12" in cmd
+    assert "--python-platform" in cmd
+    assert "windows" in cmd
+    requirements = calls[0]["input"]
+    assert requirements is not None
+    assert "transformers>=4.56.2" in requirements
+    assert "triton-windows" in requirements

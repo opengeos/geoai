@@ -41,7 +41,7 @@ REQUIRED_PACKAGES = [
     # QGIS managed environment can resolve on Windows/Python 3.12.
     # Older exact pins caused impossible constraints when geoai-py required a
     # newer transformers release.
-    ("transformers", ">=5.6.2"),
+    ("transformers", ">=4.56.2"),
 ]
 
 DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
@@ -373,9 +373,6 @@ def resolve_qgis_dependencies(
             text=True,
             timeout=timeout,
         )
-    except TypeError:
-        # Some tests monkeypatch subprocess.run with a small signature.
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError:
         return False, "uv is not installed; install uv to run dependency resolution."
     except subprocess.TimeoutExpired:
@@ -3221,18 +3218,11 @@ def _get_verification_code(package_name: str) -> str:
     elif package_name == "sam3":
         return "import sam3; print('ok')"
     elif package_name == "transformers":
-        if sys.platform == "darwin":
-            return (
-                "import transformers; "
-                "from packaging.version import parse as _v; "
-                "v = transformers.__version__; "
-                "assert _v(v) >= _v('5.1.0'), f'Expected >=5.1.0 on macOS, got {v}'; "
-                "print(v)"
-            )
         return (
             "import transformers; "
+            "from packaging.version import parse as _v; "
             "v = transformers.__version__; "
-            "assert v == '4.57.6', f'Expected 4.57.6 on this platform, got {v}'; "
+            "assert _v(v) >= _v('4.56.2'), f'Expected >=4.56.2, got {v}'; "
             "print(v)"
         )
     elif package_name == "triton-windows":
