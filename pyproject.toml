@@ -42,6 +42,7 @@ agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "s
 onnx = ["onnx>=1.21.0", "onnxruntime"]
 sr = ["opensr-model"]
 rfdetr = ["rfdetr"]
+networks = ["neatnet", "osmnx"]
 
 [tool.uv]
 # Enforce minimum versions for transitive dependencies to resolve

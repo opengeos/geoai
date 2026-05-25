@@ -188,6 +188,7 @@ nav:
           - examples/AutoModel.ipynb
           - examples/onnx.ipynb
           - examples/smooth_vector.ipynb
+          - examples/road_network_simplification.ipynb
           - examples/timelapse.ipynb
           - examples/prithvi.ipynb
           - examples/train_timm_regressor.ipynb
@@ -234,6 +235,7 @@ nav:
           - map_tools module: map_tools.md
           - map_widgets module: map_widgets.md
           - moondream module: moondream.md
+          - networks module: networks.md
           - onnx module: onnx.md
           - prithvi module: prithvi.md
           - recognize module: recognize.md

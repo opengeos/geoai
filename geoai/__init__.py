@@ -141,6 +141,8 @@ _LAZY_SYMBOL_MAP = {
     "classify_image": ("classify", None),
     "classify_images": ("classify", None),
     "train_classifier": ("classify", None),
+    # --- geoai.networks ---
+    "simplify_road_network": ("networks", None),
     # --- geoai.download ---
     "download_naip": ("download", None),
     "download_overture_buildings": ("download", None),
