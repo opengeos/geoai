@@ -1,0 +1,45 @@
+name: Minimal import CI
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    minimal-import:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+              with:
+                  version: ""
+                  enable-cache: false
+
+            - name: Create minimal environment
+              run: |
+                  uv venv --python 3.12
+                  uv pip install --no-deps .
+                  uv pip install click tqdm
+
+            - name: Verify minimal import surface
+              run: |
+                  .venv/bin/python - <<'PY'
+                  import sys
+                  import geoai
+                  print('geoai', geoai.__version__)
+                  assert geoai.__version__
+                  assert 'torch' not in sys.modules
+                  assert 'geopandas' not in sys.modules
+                  assert 'leafmap' not in sys.modules
+                  from geoai import FunctionStep, Pipeline
+                  step = FunctionStep('identity', lambda item: item)
+                  pipe = Pipeline([step], name='minimal-smoke')
+                  result = pipe.run(items=[{'input_path': 'minimal.tif'}])
+                  assert result.summary['completed'] == 1
+                  PY
+                  .venv/bin/geoai --help

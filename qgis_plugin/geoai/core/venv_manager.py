@@ -37,11 +37,11 @@ REQUIRED_PACKAGES = [
     ("sam3", ""),
     ("deepforest", ""),
     ("omniwatermask", ""),
-    # Version is platform-specific and replaced in _get_required_packages():
-    # - macOS: >=5.1.0 (SAM 3 meta backend requirement)
-    # - Linux/Windows: ==4.57.6 (Moondream stability)
-    # Note: ordering doesn't matter with batch installs (resolver handles constraints).
-    ("transformers", ""),
+    # Version is kept at or above the geoai-py runtime requirement so the
+    # QGIS managed environment can resolve on Windows/Python 3.12.
+    # Older exact pins caused impossible constraints when geoai-py required a
+    # newer transformers release.
+    ("transformers", ">=5.6.2"),
 ]
 
 DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
@@ -190,29 +190,211 @@ def _compute_deps_hash() -> str:
     return hashlib.md5(data, usedforsecurity=False).hexdigest()
 
 
-def _get_required_packages() -> List[Tuple[str, str]]:
-    """Return platform-aware dependency list.
+def _get_required_packages_for_platform(platform_name: str) -> List[Tuple[str, str]]:
+    """Return dependency list for a target platform.
 
-    On Windows, install ``triton-windows`` so SamGeo3/SAM3 imports can resolve
-    ``import triton`` in the managed venv subprocess worker.
+    Args:
+        platform_name: Python platform name such as ``win32``, ``darwin``, or
+            ``linux``.
+
+    Returns:
+        Platform-aware dependency tuples of distribution name and specifier.
     """
     packages = list(REQUIRED_PACKAGES)
-    transformers_idx = next(
-        (i for i, (name, _) in enumerate(packages) if name == "transformers"),
-        None,
-    )
-    if transformers_idx is not None:
-        if sys.platform == "darwin":
-            packages[transformers_idx] = ("transformers", ">=5.1.0")
-        else:
-            packages[transformers_idx] = ("transformers", "==4.57.6")
-    if sys.platform == "win32":
+    if platform_name == "win32":
         sam3_idx = next(
             (i for i, (name, _) in enumerate(packages) if name == "sam3"),
             len(packages),
         )
         packages.insert(sam3_idx, ("triton-windows", ""))
     return packages
+
+
+def _get_required_packages() -> List[Tuple[str, str]]:
+    """Return platform-aware dependency list.
+
+    On Windows, install ``triton-windows`` so SamGeo3/SAM3 imports can resolve
+    ``import triton`` in the managed venv subprocess worker.
+    """
+    return _get_required_packages_for_platform(sys.platform)
+
+
+def get_qgis_dependency_specs(
+    platform_name: Optional[str] = None,
+    python_version: str = "3.12",
+    include_python: bool = True,
+) -> List[str]:
+    """Return QGIS plugin dependency specifiers for resolver dry-runs.
+
+    Args:
+        platform_name: Target Python platform. Defaults to the running platform.
+        python_version: Target Python version used by the QGIS plugin workflow.
+        include_python: Include a synthetic Python constraint for diagnostics.
+
+    Returns:
+        Requirement specifier strings suitable for resolver checks.
+    """
+    target_platform = platform_name or sys.platform
+    specs = []
+    if include_python:
+        specs.append("python=={}.*".format(python_version))
+    for name, version_spec in _get_required_packages_for_platform(target_platform):
+        specs.append("{}{}".format(name, version_spec))
+    return specs
+
+
+def _uv_platform_name(platform_name: str) -> str:
+    """Map Python ``sys.platform`` names to uv resolver platform names."""
+    if platform_name == "win32":
+        return "windows"
+    if platform_name == "darwin":
+        return "macos"
+    return "linux"
+
+
+def _looks_like_resolution_conflict(output: str) -> bool:
+    """Return True if resolver output describes unsatisfiable constraints."""
+    output_lower = (output or "").lower()
+    patterns = (
+        "no solution found",
+        "resolutionimpossible",
+        "resolution impossible",
+        "unsatisfiable",
+        "cannot install",
+        "conflicting dependencies",
+        "because you require",
+        "no matching distribution found",
+        "has no wheels",
+        "requires-python",
+    )
+    return any(pattern in output_lower for pattern in patterns)
+
+
+def _extract_relevant_specs(output: str, package_specs: List[str]) -> List[str]:
+    """Find requested specs mentioned by resolver output."""
+    output_key = (output or "").lower().replace("_", "-")
+    relevant = []
+    for spec in package_specs:
+        name = re.split(r"[><=!]", spec, 1)[0].strip()
+        if name and name.lower().replace("_", "-") in output_key:
+            relevant.append(spec)
+    return relevant
+
+
+def format_dependency_resolution_diagnostic(
+    output: str,
+    package_specs: List[str],
+    python_version: str,
+    platform_name: str,
+) -> str:
+    """Format resolver failures as actionable user-facing diagnostics.
+
+    Args:
+        output: Combined stdout/stderr from the dependency resolver.
+        package_specs: Requirement specifiers involved in the attempted resolve.
+        python_version: Target Python version.
+        platform_name: Target Python platform.
+
+    Returns:
+        Concise diagnostic text for QGIS users and CI logs.
+    """
+    platform_label = {
+        "win32": "Windows",
+        "darwin": "macOS",
+        "linux": "Linux",
+    }.get(platform_name, platform_name)
+    relevant = _extract_relevant_specs(output, package_specs)
+    conflict = _looks_like_resolution_conflict(output)
+    lines = [
+        "Dependency resolution failed before installation for the GeoAI QGIS plugin.",
+        "Target environment: {} + Python {}.".format(platform_label, python_version),
+    ]
+    if conflict:
+        lines.append(
+            "The resolver reported unsatisfiable or impossible version constraints."
+        )
+    if relevant:
+        lines.append("Relevant constraints: {}.".format(", ".join(relevant[:8])))
+    lines.append(
+        "Try updating the pinned package versions in qgis_plugin/geoai/core/"
+        "venv_manager.py, or relax exact pins when upstream packages do not "
+        "publish wheels for this Python/platform combination."
+    )
+    if output:
+        lines.append("Resolver output: {}".format(output.strip()[:1200]))
+    return "\n".join(lines)
+
+
+def resolve_qgis_dependencies(
+    python_version: str = "3.12",
+    platform_name: str = "win32",
+    resolver: str = "uv",
+    timeout: int = 600,
+) -> Tuple[bool, str]:
+    """Dry-run dependency resolution for the QGIS plugin install environment.
+
+    This is intended for CI and support diagnostics. It resolves the dependency
+    set without installing large AI packages.
+
+    Args:
+        python_version: Target Python version, e.g. ``3.12``.
+        platform_name: Target Python platform, e.g. ``win32``.
+        resolver: Resolver backend. Currently only ``uv`` is supported.
+        timeout: Subprocess timeout in seconds.
+
+    Returns:
+        Tuple of success flag and diagnostic message.
+    """
+    if resolver != "uv":
+        return False, "Unsupported resolver: {}".format(resolver)
+
+    package_specs = get_qgis_dependency_specs(
+        platform_name=platform_name,
+        python_version=python_version,
+        include_python=False,
+    )
+    cmd = [
+        "uv",
+        "pip",
+        "compile",
+        "--python-version",
+        python_version,
+        "--python-platform",
+        _uv_platform_name(platform_name),
+        "--quiet",
+        "-",
+    ]
+    requirements = "\n".join(package_specs) + "\n"
+    try:
+        result = subprocess.run(
+            cmd,
+            input=requirements,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except TypeError:
+        # Some tests monkeypatch subprocess.run with a small signature.
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        return False, "uv is not installed; install uv to run dependency resolution."
+    except subprocess.TimeoutExpired:
+        return False, "Dependency resolution timed out after {} seconds.".format(timeout)
+
+    output = (result.stderr or result.stdout or "").strip()
+    if result.returncode == 0:
+        return True, "Dependency resolution succeeded for QGIS plugin on {} Python {}.".format(
+            {"win32": "Windows"}.get(platform_name, platform_name), python_version
+        )
+    return (
+        False,
+        format_dependency_resolution_diagnostic(
+            output,
+            package_specs=package_specs,
+            python_version=python_version,
+            platform_name=platform_name,
+        ),
+    )
 
 
 def _read_deps_hash() -> Optional[str]:
@@ -2652,6 +2834,18 @@ def install_dependencies(
                     "pip error output: {}".format(install_error_msg[:500]),
                     Qgis.Critical,
                 )
+                if _looks_like_resolution_conflict(install_error_msg):
+                    return (
+                        False,
+                        format_dependency_resolution_diagnostic(
+                            install_error_msg,
+                            package_specs=[package_spec],
+                            python_version="{}.{}".format(
+                                sys.version_info.major, sys.version_info.minor
+                            ),
+                            platform_name=sys.platform,
+                        ),
+                    )
                 if _is_ssl_error(install_error_msg):
                     return (
                         False,
@@ -2902,6 +3096,18 @@ def install_dependencies(
                     "Batch install failed: {}".format(error_output[:500]),
                     Qgis.Critical,
                 )
+                if _looks_like_resolution_conflict(error_output):
+                    return (
+                        False,
+                        format_dependency_resolution_diagnostic(
+                            error_output,
+                            package_specs=batch_specs,
+                            python_version="{}.{}".format(
+                                sys.version_info.major, sys.version_info.minor
+                            ),
+                            platform_name=sys.platform,
+                        ),
+                    )
                 if _is_ssl_error(error_output):
                     return (
                         False,

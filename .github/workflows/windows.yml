@@ -11,8 +11,9 @@ jobs:
     test-windows:
         runs-on: windows-latest
         strategy:
+            fail-fast: false
             matrix:
-                python-version: ["3.12"]
+                python-version: ["3.11", "3.12"]
 
         steps:
             - uses: actions/checkout@v6
@@ -23,18 +24,19 @@ jobs:
                   version: ""
                   enable-cache: false
 
+            - name: Set up Python ${{ matrix.python-version }}
+              run: uv python install ${{ matrix.python-version }}
+
             - name: Install dependencies
               run: |
                   uv venv --python ${{ matrix.python-version }}
-                  uv pip install .
+                  uv pip install . pytest
 
-            # - name: Update PROJ data files
-            #   run: |
-            #       pip install --upgrade pyproj
-            #       curl -L -o proj-data.zip https://download.osgeo.org/proj/proj-data-1.9.zip
-            #       unzip proj-data.zip -d proj-data
-            #       cp -r proj-data/* $(python -m pyproj -v | grep "PROJ_LIB" | cut -d ' ' -f 2)
-
-            - name: Test import
+            - name: Test import and CLI
               run: |
-                  .venv\Scripts\python -c "import geoai; print('geoai import successful')"
+                  .venv\Scripts\python -c "import geoai; print('geoai', geoai.__version__)"
+                  .venv\Scripts\geoai --help
+
+            - name: Run lightweight tests
+              run: |
+                  .venv\Scripts\python -m pytest tests/test_lazy_import.py -q

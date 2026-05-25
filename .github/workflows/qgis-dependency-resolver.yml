@@ -1,0 +1,54 @@
+name: QGIS dependency resolver
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - "qgis_plugin/**"
+            - ".github/workflows/qgis-dependency-resolver.yml"
+    pull_request:
+        branches:
+            - main
+        paths:
+            - "qgis_plugin/**"
+            - ".github/workflows/qgis-dependency-resolver.yml"
+
+jobs:
+    windows-python-312-resolve:
+        name: Windows Python 3.12 dependency resolve
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: "3.12"
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+              with:
+                  version: ""
+                  enable-cache: false
+
+            - name: Resolve QGIS plugin dependencies without installing
+              run: |
+                  python qgis_plugin/tools/check_dependency_resolution.py --platform win32 --python-version 3.12 --timeout 900
+
+    diagnostics-unit-tests:
+        name: Resolver diagnostics tests
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: actions/setup-python@v6
+              with:
+                  python-version: "3.12"
+
+            - name: Install test dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install PyQt6 pytest
+
+            - name: Run resolver diagnostics tests
+              run: pytest qgis_plugin/tests/test_dependency_resolver.py -q
