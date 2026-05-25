@@ -379,12 +379,17 @@ def resolve_qgis_dependencies(
     except FileNotFoundError:
         return False, "uv is not installed; install uv to run dependency resolution."
     except subprocess.TimeoutExpired:
-        return False, "Dependency resolution timed out after {} seconds.".format(timeout)
+        return False, "Dependency resolution timed out after {} seconds.".format(
+            timeout
+        )
 
     output = (result.stderr or result.stdout or "").strip()
     if result.returncode == 0:
-        return True, "Dependency resolution succeeded for QGIS plugin on {} Python {}.".format(
-            {"win32": "Windows"}.get(platform_name, platform_name), python_version
+        return (
+            True,
+            "Dependency resolution succeeded for QGIS plugin on {} Python {}.".format(
+                {"win32": "Windows"}.get(platform_name, platform_name), python_version
+            ),
         )
     return (
         False,

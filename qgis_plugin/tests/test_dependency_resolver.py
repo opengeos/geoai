@@ -38,7 +38,9 @@ def test_dependency_resolver_dry_run_uses_uv_compile(monkeypatch):
 
     def fake_run(cmd, capture_output, text, timeout):
         commands.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout="Resolved 10 packages", stderr="")
+        return subprocess.CompletedProcess(
+            cmd, 0, stdout="Resolved 10 packages", stderr=""
+        )
 
     monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
 
