@@ -478,6 +478,7 @@ _LAZY_SUBMODULES = {
     "extract",
     "hf",
     "inference",
+    "networks",
     "segment",
     "train",
     "agents",
