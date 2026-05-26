@@ -583,6 +583,12 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 ## Troubleshooting
 
 - If you report a plugin issue on GitHub, include the Markdown from `GeoAI` menu → `Generate Diagnostics Report...`.
+- Dependency installer shows `Failed to install geoai-py: SSL certificate error`:
+  - Update the GeoAI plugin to v1.4.4 or newer.
+  - Click **Reinstall Dependencies**, and restart QGIS.
+  - Recent plugin versions retry package installs with native TLS plus trusted package hosts for PyPI, PyTorch, and uv certificate errors.
+  - If the error persists on a managed network, confirm that QGIS can access `pypi.org`, `files.pythonhosted.org`, and `download.pytorch.org`.
+  - Configure the QGIS proxy settings before reinstalling.
 - Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
 - CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
 - Model download failures: check network/firewall, then retry loading models from the panel.
