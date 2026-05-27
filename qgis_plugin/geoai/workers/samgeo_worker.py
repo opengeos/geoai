@@ -47,12 +47,13 @@ def _bootstrap_windows_torch_dll_dirs() -> None:
         os.path.join(site_packages, "torchvision"),
     ]
     path_parts = [p for p in os.environ.get("PATH", "").split(os.pathsep) if p]
+    _dll_handles: list = []
     for dll_dir in dll_dirs:
         if not os.path.isdir(dll_dir):
             continue
         if hasattr(os, "add_dll_directory"):
             try:
-                os.add_dll_directory(dll_dir)
+                _dll_handles.append(os.add_dll_directory(dll_dir))
             except OSError:
                 pass
         if dll_dir not in path_parts:

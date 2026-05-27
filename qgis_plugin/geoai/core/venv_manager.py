@@ -905,17 +905,21 @@ def _get_windows_dll_setup_code() -> str:
                     p for p in _geoai_os.environ.get("PATH", "").split(_geoai_os.pathsep)
                     if p
                 ]
+                _geoai_dll_handles = []
                 for _geoai_dll_dir in _geoai_dll_dirs:
                     if not _geoai_os.path.isdir(_geoai_dll_dir):
                         continue
                     if hasattr(_geoai_os, "add_dll_directory"):
                         try:
-                            _geoai_os.add_dll_directory(_geoai_dll_dir)
+                            _geoai_dll_handles.append(
+                                _geoai_os.add_dll_directory(_geoai_dll_dir)
+                            )
                         except OSError:
                             pass
                     if _geoai_dll_dir not in _geoai_path_parts:
                         _geoai_path_parts.insert(0, _geoai_dll_dir)
                 _geoai_os.environ["PATH"] = _geoai_os.pathsep.join(_geoai_path_parts)
+                _geoai_sys._geoai_dll_handles = _geoai_dll_handles
         """).strip()
 
 
