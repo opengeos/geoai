@@ -226,3 +226,22 @@ def test_diagnostics_report_handles_missing_venv(monkeypatch):
 
     assert "- Virtual environment exists: `No`" in report
     assert "- Error: `Virtual environment does not exist.`" in report
+
+
+def test_diagnostics_import_probes_bootstrap_windows_torch_dll_dirs():
+    script = diagnostics._package_import_probe_script("samgeo")
+
+    compile(script, "<geoai_package_probe>", "exec")
+
+    assert "add_dll_directory" in script
+    assert 'module_name = "samgeo"' in script
+    assert "importlib.import_module(module_name)" in script
+
+
+def test_diagnostics_torch_runtime_probe_bootstraps_windows_torch_dll_dirs():
+    script = diagnostics._torch_runtime_probe_script()
+
+    compile(script, "<geoai_torch_probe>", "exec")
+
+    assert "add_dll_directory" in script
+    assert "import torch" in script

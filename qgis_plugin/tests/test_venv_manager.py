@@ -177,3 +177,27 @@ def test_uv_insecure_host_retry_skips_non_ssl_errors(monkeypatch):
 
     assert result is original
     assert calls == []
+
+
+def test_windows_dll_setup_code_compiles_and_registers_torch_dirs():
+    code = venv_manager._get_windows_dll_setup_code()
+
+    compile(code, "<geoai_windows_dll_setup>", "exec")
+
+    assert "add_dll_directory" in code
+    assert '"torch", "lib"' in code
+    assert '"torchvision"' in code
+
+
+def test_segment_geospatial_verification_bootstraps_torch_before_samgeo():
+    code = venv_manager._get_verification_code("segment-geospatial")
+
+    assert "add_dll_directory" in code
+    assert "import torch; import samgeo" in code
+
+
+def test_omniwatermask_verification_bootstraps_torch_before_import():
+    code = venv_manager._get_verification_code("omniwatermask")
+
+    assert "add_dll_directory" in code
+    assert "import torch; import omniwatermask" in code

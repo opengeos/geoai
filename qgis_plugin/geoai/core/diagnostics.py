@@ -15,6 +15,7 @@ from .venv_manager import (
     VENV_DIR,
     _get_clean_env_for_venv,
     _get_subprocess_kwargs,
+    _get_windows_dll_setup_code,
     detect_nvidia_gpu,
     get_venv_python_path,
     get_venv_site_packages,
@@ -379,7 +380,7 @@ def _run_probe(
 
 def _package_import_probe_script(module_name: str) -> str:
     module_json = json.dumps(module_name)
-    return textwrap.dedent(f"""
+    return _get_windows_dll_setup_code() + "\n" + textwrap.dedent(f"""
         import importlib
         import json
         import traceback
@@ -405,7 +406,7 @@ def _package_import_probe_script(module_name: str) -> str:
 
 
 def _torch_runtime_probe_script() -> str:
-    return textwrap.dedent("""
+    return _get_windows_dll_setup_code() + "\n" + textwrap.dedent("""
         import json
         import traceback
 
