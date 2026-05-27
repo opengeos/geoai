@@ -24,6 +24,45 @@ _STATE = {
 }
 
 
+def _bootstrap_windows_torch_dll_dirs() -> None:
+    """Register venv PyTorch DLL directories before importing SamGeo on Windows."""
+    if sys.platform != "win32":
+        return
+
+    try:
+        import sysconfig
+
+        site_packages = sysconfig.get_paths().get(
+            "platlib"
+        ) or sysconfig.get_paths().get("purelib")
+    except Exception:
+        site_packages = None
+
+    if not site_packages:
+        return
+
+    dll_dirs = [
+        os.path.join(site_packages, "torch", "lib"),
+        os.path.join(site_packages, "torch", "bin"),
+        os.path.join(site_packages, "torchvision"),
+    ]
+    path_parts = [p for p in os.environ.get("PATH", "").split(os.pathsep) if p]
+    for dll_dir in dll_dirs:
+        if not os.path.isdir(dll_dir):
+            continue
+        if hasattr(os, "add_dll_directory"):
+            try:
+                os.add_dll_directory(dll_dir)
+            except OSError:
+                pass
+        if dll_dir not in path_parts:
+            path_parts.insert(0, dll_dir)
+    os.environ["PATH"] = os.pathsep.join(path_parts)
+
+
+_bootstrap_windows_torch_dll_dirs()
+
+
 def _send_ok(result: Any = None) -> None:
     _PROTO_STDOUT.write(json.dumps({"type": "ok", "result": result}) + "\n")
     _PROTO_STDOUT.flush()

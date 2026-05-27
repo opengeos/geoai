@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 from typing import Callable, List, Optional, Tuple
 
@@ -870,6 +871,52 @@ def _get_subprocess_kwargs() -> dict:
         kwargs["startupinfo"] = startupinfo
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     return kwargs
+
+
+def _get_windows_dll_setup_code() -> str:
+    """Return Python code that registers venv DLL directories on Windows.
+
+    Returns:
+        A Python source string that is safe to prepend to isolated subprocess
+        probes before importing packages with native PyTorch dependencies.
+    """
+    return textwrap.dedent("""
+        import os as _geoai_os
+        import sys as _geoai_sys
+
+        if _geoai_sys.platform == "win32":
+            try:
+                import sysconfig as _geoai_sysconfig
+
+                _geoai_site_packages = (
+                    _geoai_sysconfig.get_paths().get("platlib")
+                    or _geoai_sysconfig.get_paths().get("purelib")
+                )
+            except Exception:
+                _geoai_site_packages = None
+
+            if _geoai_site_packages:
+                _geoai_dll_dirs = [
+                    _geoai_os.path.join(_geoai_site_packages, "torch", "lib"),
+                    _geoai_os.path.join(_geoai_site_packages, "torch", "bin"),
+                    _geoai_os.path.join(_geoai_site_packages, "torchvision"),
+                ]
+                _geoai_path_parts = [
+                    p for p in _geoai_os.environ.get("PATH", "").split(_geoai_os.pathsep)
+                    if p
+                ]
+                for _geoai_dll_dir in _geoai_dll_dirs:
+                    if not _geoai_os.path.isdir(_geoai_dll_dir):
+                        continue
+                    if hasattr(_geoai_os, "add_dll_directory"):
+                        try:
+                            _geoai_os.add_dll_directory(_geoai_dll_dir)
+                        except OSError:
+                            pass
+                    if _geoai_dll_dir not in _geoai_path_parts:
+                        _geoai_path_parts.insert(0, _geoai_dll_dir)
+                _geoai_os.environ["PATH"] = _geoai_os.pathsep.join(_geoai_path_parts)
+        """).strip()
 
 
 def _get_qgis_proxy_settings() -> Optional[str]:
@@ -2321,6 +2368,7 @@ def _verify_cuda_in_venv(venv_dir: str) -> bool:
     subprocess_kwargs = _get_subprocess_kwargs()
 
     cuda_test_code = (
+        _get_windows_dll_setup_code() + "\n"
         "import torch; "
         "print('torch=' + torch.__version__); "
         "print('cuda_built=' + str(torch.version.cuda)); "
@@ -3207,18 +3255,19 @@ def _get_verification_code(package_name: str) -> str:
     Returns:
         Python code string to verify the package.
     """
+    prefix = _get_windows_dll_setup_code() + "\n"
     if package_name == "torch":
-        return "import torch; t = torch.tensor([1, 2, 3]); print(t.sum())"
+        code = "import torch; t = torch.tensor([1, 2, 3]); print(t.sum())"
     elif package_name == "torchvision":
-        return "import torchvision; print(torchvision.__version__)"
+        code = "import torchvision; print(torchvision.__version__)"
     elif package_name == "geoai-py":
-        return "import geoai; print(geoai.__version__)"
+        code = "import geoai; print(geoai.__version__)"
     elif package_name == "segment-geospatial":
-        return "import samgeo; print(samgeo.__version__)"
+        code = "import torch; import samgeo; print(samgeo.__version__)"
     elif package_name == "sam3":
-        return "import sam3; print('ok')"
+        code = "import torch; import sam3; print('ok')"
     elif package_name == "transformers":
-        return (
+        code = (
             "import transformers; "
             "from packaging.version import parse as _v; "
             "v = transformers.__version__; "
@@ -3226,14 +3275,15 @@ def _get_verification_code(package_name: str) -> str:
             "print(v)"
         )
     elif package_name == "triton-windows":
-        return "import triton; print('ok')"
+        code = "import triton; print('ok')"
     elif package_name == "deepforest":
-        return "from deepforest import main; print('ok')"
+        code = "import torch; from deepforest import main; print('ok')"
     elif package_name == "omniwatermask":
-        return "import omniwatermask; print('ok')"
+        code = "import torch; import omniwatermask; print('ok')"
     else:
         import_name = package_name.replace("-", "_")
-        return f"import {import_name}"
+        code = f"import {import_name}"
+    return prefix + code
 
 
 def verify_venv(
