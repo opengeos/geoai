@@ -11,6 +11,16 @@ def test_windows_dependency_specs_include_python_312_and_triton():
     assert "transformers>=4.56.2" in specs
 
 
+def test_macos_sam3_is_optional_without_triton_windows():
+    specs = venv_manager.get_qgis_dependency_specs(platform_name="darwin")
+
+    assert "python==3.12.*" in specs
+    assert "sam3" in specs
+    assert "triton-windows" not in specs
+    assert venv_manager._is_optional_verify_package("sam3", "darwin") is True
+    assert venv_manager._is_optional_install_package("sam3", "darwin") is True
+
+
 def test_resolution_failure_diagnostic_identifies_impossible_constraint():
     output = """
     Because transformers==4.57.6 has no wheels with a matching Python requirement
