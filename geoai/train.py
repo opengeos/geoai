@@ -1521,8 +1521,10 @@ def train_MaskRCNN_model(
             will try to load optimizer and scheduler states as well. Defaults to False.
         print_freq (int): Frequency of printing training progress. Defaults to 10.
         device (torch.device): Device to train on. If None, uses CUDA if available.
-        num_workers (int): Number of workers for data loading. If None, uses 0 on
-            macOS and Windows, 8 otherwise.
+        num_workers (int): Number of workers for data loading. If None, uses 0.
+            GeoTIFF loading through rasterio/GDAL can hang when forked by
+            DataLoader workers, especially in notebooks. Pass a positive value
+            explicitly when multiprocessing is known to be stable.
         verbose (bool): If True, prints detailed training progress. Defaults to True.
         model_name (str): Name of the model architecture. Defaults to
             "maskrcnn_resnet50_fpn".
@@ -1741,12 +1743,10 @@ def train_MaskRCNN_model(
             multiclass=multiclass,
         )
 
-    # Create data loaders
-    # Use num_workers=0 on macOS and Windows to avoid multiprocessing issues
-    # Windows often has issues with multiprocessing in Jupyter notebooks
-    # Increase num_workers for better data loading performance
+    # Use a conservative default to avoid rasterio/GDAL multiprocessing hangs.
+    # Pass a positive num_workers explicitly for faster loading when stable.
     if num_workers is None:
-        num_workers = 0 if platform.system() in ["Darwin", "Windows"] else 8
+        num_workers = 0
 
     train_loader = DataLoader(
         train_dataset,
@@ -5756,6 +5756,7 @@ def train_instance_segmentation_model(
     val_split: float = 0.2,
     visualize: bool = False,
     device: Optional[torch.device] = None,
+    num_workers: Optional[int] = None,
     verbose: bool = True,
     instance_labels: bool = False,
     multiclass: bool = False,
@@ -5787,6 +5788,10 @@ def train_instance_segmentation_model(
         val_split (float): Fraction of data to use for validation (0-1). Defaults to 0.2.
         visualize (bool): Whether to generate visualizations. Defaults to False.
         device (torch.device): Device to train on. If None, uses CUDA if available.
+        num_workers (int): Number of workers for data loading. If None, uses 0.
+            GeoTIFF loading through rasterio/GDAL can hang when forked by
+            DataLoader workers, especially in notebooks. Pass a positive value
+            explicitly when multiprocessing is known to be stable.
         verbose (bool): If True, prints detailed training progress. Defaults to True.
         instance_labels (bool): If True, treat label mask pixel values as
             pre-assigned instance IDs instead of running connected-component
@@ -5824,6 +5829,7 @@ def train_instance_segmentation_model(
         val_split=val_split,
         visualize=visualize,
         device=device,
+        num_workers=num_workers,
         verbose=verbose,
         instance_labels=instance_labels,
         multiclass=multiclass,
