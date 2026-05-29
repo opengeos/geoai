@@ -928,14 +928,35 @@ def dinov3_segment_geotiff(
                 "Processing %d x %d = %d windows", n_rows, n_cols, n_rows * n_cols
             )
 
-        # Accumulate per-class votes for overlapping windows.
-        votes = np.zeros((num_classes, height, width), dtype=np.float32)
-        count = np.zeros((height, width), dtype=np.float32)
-
         # Precompute the padded tensor size so every window in a batch
         # has the same spatial dimensions.
         padded_h = window_size + (patch_size - window_size % patch_size) % patch_size
         padded_w = padded_h  # square
+
+        row_starts = [min(i * stride, height - 1) for i in range(n_rows)]
+        col_starts = [min(j * stride, width - 1) for j in range(n_cols)]
+
+        def _write_boundaries(starts: List[int], size: int) -> List[int]:
+            """Return output boundaries for non-overlapping window interiors.
+
+            Args:
+                starts: Window start offsets along one raster dimension.
+                size: Full size of the raster dimension.
+
+            Returns:
+                Monotonic boundaries with one more element than ``starts``.
+            """
+            boundaries = [0]
+            for idx in range(len(starts) - 1):
+                left_end = min(starts[idx] + window_size, size)
+                right_start = starts[idx + 1]
+                overlap_size = max(0, left_end - right_start)
+                boundaries.append(right_start + overlap_size // 2)
+            boundaries.append(size)
+            return boundaries
+
+        row_boundaries = _write_boundaries(row_starts, height)
+        col_boundaries = _write_boundaries(col_starts, width)
 
         def _prepare_window(img: np.ndarray) -> Tuple[np.ndarray, int, int]:
             """Normalise, channel-select, and pad a raw window."""
@@ -960,64 +981,83 @@ def dinov3_segment_geotiff(
 
         def _flush_batch(
             batch_imgs: List[np.ndarray],
-            batch_meta: List[Tuple[int, int, int, int, int, int]],
+            batch_meta: List[Tuple[int, int, int, int, int, int, int, int, int, int]],
+            dst: Any,
         ) -> None:
-            """Run inference on a collected batch and accumulate votes."""
+            """Run inference on a batch and write each output window."""
             tensor = torch.from_numpy(np.stack(batch_imgs)).to(dev)
             logits = model_module(tensor)
-            probs = torch.softmax(logits, dim=1).cpu().numpy()
+            preds = torch.argmax(logits, dim=1).cpu().numpy().astype(np.uint8)
 
-            for k, (rs, re, cs, ce, h, w) in enumerate(batch_meta):
-                votes[:, rs:re, cs:ce] += probs[k, :, :h, :w]
-                count[rs:re, cs:ce] += 1.0
+            for k, (rs, _re, cs, _ce, wrs, wre, wcs, wce, h, w) in enumerate(
+                batch_meta
+            ):
+                local_rs = wrs - rs
+                local_re = local_rs + (wre - wrs)
+                local_cs = wcs - cs
+                local_ce = local_cs + (wce - wcs)
+                pred = preds[k, :h, :w]
+                pred = pred[local_rs:local_re, local_cs:local_ce]
+                out_window = Window(wcs, wrs, wce - wcs, wre - wrs)
+                dst.write(pred, 1, window=out_window)
 
+        meta.update({"count": 1, "dtype": "uint8", "compress": "lzw"})
         with torch.no_grad():
             batch_imgs: List[np.ndarray] = []
-            batch_meta: List[Tuple[int, int, int, int, int, int]] = []
+            batch_meta: List[
+                Tuple[int, int, int, int, int, int, int, int, int, int]
+            ] = []
 
             total_windows = n_rows * n_cols
             pbar = tqdm(total=total_windows, disable=quiet, desc="Windows")
 
-            for i in range(n_rows):
-                for j in range(n_cols):
-                    row_start = i * stride
-                    col_start = j * stride
-                    row_end = min(row_start + window_size, height)
-                    col_end = min(col_start + window_size, width)
+            with rasterio.open(output_path, "w", **meta) as dst:
+                for i, row_start in enumerate(row_starts):
+                    for j, col_start in enumerate(col_starts):
+                        row_end = min(row_start + window_size, height)
+                        col_end = min(col_start + window_size, width)
+                        write_row_start = row_boundaries[i]
+                        write_row_end = row_boundaries[i + 1]
+                        write_col_start = col_boundaries[j]
+                        write_col_end = col_boundaries[j + 1]
 
-                    win = Window(
-                        col_start,
-                        row_start,
-                        col_end - col_start,
-                        row_end - row_start,
-                    )
-                    raw = src.read(window=win).astype(np.float32)
-                    img, h, w = _prepare_window(raw)
+                        win = Window(
+                            col_start,
+                            row_start,
+                            col_end - col_start,
+                            row_end - row_start,
+                        )
+                        raw = src.read(window=win).astype(np.float32)
+                        img, h, w = _prepare_window(raw)
 
-                    batch_imgs.append(img)
-                    batch_meta.append((row_start, row_end, col_start, col_end, h, w))
+                        batch_imgs.append(img)
+                        batch_meta.append(
+                            (
+                                row_start,
+                                row_end,
+                                col_start,
+                                col_end,
+                                write_row_start,
+                                write_row_end,
+                                write_col_start,
+                                write_col_end,
+                                h,
+                                w,
+                            )
+                        )
 
-                    if len(batch_imgs) == batch_size:
-                        _flush_batch(batch_imgs, batch_meta)
-                        pbar.update(len(batch_imgs))
-                        batch_imgs.clear()
-                        batch_meta.clear()
+                        if len(batch_imgs) == batch_size:
+                            _flush_batch(batch_imgs, batch_meta, dst)
+                            pbar.update(len(batch_imgs))
+                            batch_imgs.clear()
+                            batch_meta.clear()
 
-            # Flush remaining windows.
-            if batch_imgs:
-                _flush_batch(batch_imgs, batch_meta)
-                pbar.update(len(batch_imgs))
+                # Flush remaining windows.
+                if batch_imgs:
+                    _flush_batch(batch_imgs, batch_meta, dst)
+                    pbar.update(len(batch_imgs))
 
             pbar.close()
-
-        # Majority vote (avoid division by zero).
-        count = np.maximum(count, 1.0)
-        votes /= count[np.newaxis, :, :]
-        output = np.argmax(votes, axis=0).astype(np.uint8)
-
-    meta.update({"count": 1, "dtype": "uint8", "compress": "lzw"})
-    with rasterio.open(output_path, "w", **meta) as dst:
-        dst.write(output, 1)
 
     if not quiet:
         logger.info("Segmentation saved to %s", output_path)

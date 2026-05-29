@@ -754,6 +754,126 @@ class TestSegmentGeotiffFunction(unittest.TestCase):
                 overlap=512,
             )
 
+    def test_streams_window_outputs_without_full_raster_buffers(self):
+        """dinov3_segment_geotiff should write windows without full buffers."""
+        try:
+            from rasterio.windows import Window
+        except ImportError:
+            self.skipTest("rasterio not installed")
+
+        import geoai.dinov3_finetune as dinov3_finetune
+
+        image = np.ones((3, 6, 6), dtype=np.uint8) * 255
+        output = np.full((6, 6), 255, dtype=np.uint8)
+        original_zeros = np.zeros
+        test_case = self
+
+        class ConstantSegmenter(nn.Module):
+            """Dummy segmenter that predicts class 1 everywhere."""
+
+            patch_size = 2
+
+            def forward(self, tensor):
+                """Return constant two-class logits matching the input size."""
+                batch, _, height, width = tensor.shape
+                logits = torch.zeros((batch, 2, height, width), device=tensor.device)
+                logits[:, 1] = 1.0
+                return logits
+
+        class FakeSrc:
+            """Minimal raster source for windowed reads."""
+
+            count = 3
+            shape = (6, 6)
+            meta = {
+                "driver": "GTiff",
+                "height": 6,
+                "width": 6,
+                "count": 3,
+                "dtype": "uint8",
+            }
+
+            def __enter__(self):
+                """Return the fake source context."""
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                """Exit the fake source context."""
+                return False
+
+            def read(self, window):
+                """Read a CHW slice for the requested raster window."""
+                row_start = int(window.row_off)
+                col_start = int(window.col_off)
+                row_end = row_start + int(window.height)
+                col_end = col_start + int(window.width)
+                return image[:, row_start:row_end, col_start:col_end]
+
+        class FakeDst:
+            """Minimal raster destination for windowed writes."""
+
+            def __enter__(self):
+                """Return the fake destination context."""
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                """Exit the fake destination context."""
+                return False
+
+            def write(self, data, indexes, window):
+                """Write a 2D array into the requested output window."""
+                test_case.assertEqual(indexes, 1)
+                test_case.assertNotEqual(data.shape, output.shape)
+                test_case.assertIsInstance(window, Window)
+                row_start = int(window.row_off)
+                col_start = int(window.col_off)
+                row_end = row_start + int(window.height)
+                col_end = col_start + int(window.width)
+                output[row_start:row_end, col_start:col_end] = data
+
+        def fake_open(path, mode="r", **kwargs):
+            """Return a fake raster source or destination."""
+            if mode == "w":
+                self.assertEqual(kwargs["count"], 1)
+                self.assertEqual(kwargs["dtype"], "uint8")
+                return FakeDst()
+            return FakeSrc()
+
+        def guarded_zeros(shape, *args, **kwargs):
+            """Fail on full-raster accumulator allocations."""
+            shape_tuple = tuple(shape) if isinstance(shape, tuple) else (shape,)
+            forbidden_shapes = {(2, 6, 6), (6, 6)}
+            if shape_tuple in forbidden_shapes:
+                raise AssertionError(f"full-raster allocation attempted: {shape_tuple}")
+            return original_zeros(shape, *args, **kwargs)
+
+        def fail_softmax(*args, **kwargs):
+            """Fail if streaming inference materializes class probabilities."""
+            raise AssertionError("streaming inference should use logits argmax")
+
+        with (
+            patch.object(
+                dinov3_finetune.DINOv3Segmenter,
+                "load_from_checkpoint",
+                return_value=ConstantSegmenter(),
+            ),
+            patch("rasterio.open", side_effect=fake_open),
+            patch("geoai.dinov3_finetune.np.zeros", side_effect=guarded_zeros),
+            patch("geoai.dinov3_finetune.torch.softmax", side_effect=fail_softmax),
+        ):
+            dinov3_finetune.dinov3_segment_geotiff(
+                input_path="input.tif",
+                output_path="output.tif",
+                checkpoint_path="model.ckpt",
+                window_size=4,
+                overlap=2,
+                batch_size=2,
+                device="cpu",
+                quiet=True,
+            )
+
+        np.testing.assert_array_equal(output, np.ones((6, 6), dtype=np.uint8))
+
 
 if __name__ == "__main__":
     unittest.main()
