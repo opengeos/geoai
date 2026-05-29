@@ -987,7 +987,7 @@ def dinov3_segment_geotiff(
             """Run inference on a batch and write each output window."""
             tensor = torch.from_numpy(np.stack(batch_imgs)).to(dev)
             logits = model_module(tensor)
-            probs = torch.softmax(logits, dim=1).cpu().numpy()
+            preds = torch.argmax(logits, dim=1).cpu().numpy().astype(np.uint8)
 
             for k, (rs, _re, cs, _ce, wrs, wre, wcs, wce, h, w) in enumerate(
                 batch_meta
@@ -996,7 +996,7 @@ def dinov3_segment_geotiff(
                 local_re = local_rs + (wre - wrs)
                 local_cs = wcs - cs
                 local_ce = local_cs + (wce - wcs)
-                pred = np.argmax(probs[k, :, :h, :w], axis=0).astype(np.uint8)
+                pred = preds[k, :h, :w]
                 pred = pred[local_rs:local_re, local_cs:local_ce]
                 out_window = Window(wcs, wrs, wce - wcs, wre - wrs)
                 dst.write(pred, 1, window=out_window)

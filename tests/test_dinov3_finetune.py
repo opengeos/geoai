@@ -847,6 +847,10 @@ class TestSegmentGeotiffFunction(unittest.TestCase):
                 raise AssertionError(f"full-raster allocation attempted: {shape_tuple}")
             return original_zeros(shape, *args, **kwargs)
 
+        def fail_softmax(*args, **kwargs):
+            """Fail if streaming inference materializes class probabilities."""
+            raise AssertionError("streaming inference should use logits argmax")
+
         with (
             patch.object(
                 dinov3_finetune.DINOv3Segmenter,
@@ -855,6 +859,7 @@ class TestSegmentGeotiffFunction(unittest.TestCase):
             ),
             patch("rasterio.open", side_effect=fake_open),
             patch("geoai.dinov3_finetune.np.zeros", side_effect=guarded_zeros),
+            patch("geoai.dinov3_finetune.torch.softmax", side_effect=fail_softmax),
         ):
             dinov3_finetune.dinov3_segment_geotiff(
                 input_path="input.tif",
