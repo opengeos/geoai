@@ -342,6 +342,113 @@ class TestInferenceReturnStructure:
 
 
 # ---------------------------------------------------------------------------
+# train_MaskRCNN_model: DataLoader worker defaults
+# ---------------------------------------------------------------------------
+
+
+class TestMaskRCNNTrainingWorkers:
+    """Ensure Mask R-CNN training uses safe DataLoader worker defaults."""
+
+    def _make_training_dirs(self, tmp_path):
+        """Create matching image and label directories for training setup."""
+        rasterio = pytest.importorskip("rasterio")
+
+        images_dir = tmp_path / "images"
+        labels_dir = tmp_path / "labels"
+        images_dir.mkdir()
+        labels_dir.mkdir()
+
+        image = np.zeros((3, 16, 16), dtype=np.uint8)
+        label = np.zeros((16, 16), dtype=np.uint8)
+
+        for idx in range(2):
+            filename = f"chip_{idx}.tif"
+            with rasterio.open(
+                images_dir / filename,
+                "w",
+                driver="GTiff",
+                height=image.shape[1],
+                width=image.shape[2],
+                count=image.shape[0],
+                dtype=image.dtype,
+            ) as dst:
+                dst.write(image)
+            with rasterio.open(
+                labels_dir / filename,
+                "w",
+                driver="GTiff",
+                height=label.shape[0],
+                width=label.shape[1],
+                count=1,
+                dtype=label.dtype,
+            ) as dst:
+                dst.write(label, 1)
+
+        return images_dir, labels_dir
+
+    def _run_training_with_captured_workers(self, monkeypatch, tmp_path, **kwargs):
+        """Run a mocked training pass and return DataLoader worker counts."""
+        import torch
+
+        import geoai.train as train_module
+
+        captured_workers = []
+
+        class FakeDataLoader:
+            """Capture DataLoader construction without iterating over data."""
+
+            def __init__(self, dataset, **loader_kwargs):
+                self.dataset = dataset
+                captured_workers.append(loader_kwargs["num_workers"])
+
+            def __len__(self):
+                return 1
+
+        monkeypatch.setattr(train_module, "DataLoader", FakeDataLoader)
+        monkeypatch.setattr(
+            train_module,
+            "train_one_epoch",
+            lambda *args, **kwargs: 0.1,
+        )
+        monkeypatch.setattr(
+            train_module,
+            "evaluate",
+            lambda *args, **kwargs: {"loss": 0.2, "IoU": 0.5},
+        )
+
+        images_dir, labels_dir = self._make_training_dirs(tmp_path)
+
+        train_module.train_MaskRCNN_model(
+            images_dir=str(images_dir),
+            labels_dir=str(labels_dir),
+            output_dir=str(tmp_path / "output"),
+            model=torch.nn.Linear(1, 1),
+            batch_size=1,
+            num_epochs=1,
+            pretrained=False,
+            device=torch.device("cpu"),
+            verbose=False,
+            **kwargs,
+        )
+
+        return captured_workers
+
+    def test_default_num_workers_is_zero(self, monkeypatch, tmp_path):
+        """Default DataLoader workers avoid rasterio multiprocessing hangs."""
+        workers = self._run_training_with_captured_workers(monkeypatch, tmp_path)
+
+        assert workers == [0, 0]
+
+    def test_explicit_num_workers_is_preserved(self, monkeypatch, tmp_path):
+        """An explicit worker count is passed through to both DataLoaders."""
+        workers = self._run_training_with_captured_workers(
+            monkeypatch, tmp_path, num_workers=2
+        )
+
+        assert workers == [2, 2]
+
+
+# ---------------------------------------------------------------------------
 # Multiclass ObjectDetectionDataset
 # ---------------------------------------------------------------------------
 
