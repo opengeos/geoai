@@ -2448,21 +2448,46 @@ def _is_torch_related_verify_failure(message: str) -> bool:
     return any(marker in msg for marker in torch_markers)
 
 
-def _is_optional_verify_package(package_name: str) -> bool:
+def _is_optional_verify_package(
+    package_name: str, platform_name: Optional[str] = None
+) -> bool:
     """Return True if verification failure for this package can be non-fatal.
 
     Some packages are installed as optional feature backends and may fail to
     import on specific platforms due to upstream native dependency issues
     without breaking the core plugin functionality.
+
+    Args:
+        package_name: Distribution name to check.
+        platform_name: Target platform name. Defaults to the current platform.
+
+    Returns:
+        True if verification failure for the package should be non-fatal.
     """
-    if sys.platform == "win32" and package_name in ("sam3", "triton-windows"):
+    target_platform = platform_name or sys.platform
+    if target_platform == "win32" and package_name in ("sam3", "triton-windows"):
+        return True
+    if target_platform == "darwin" and package_name == "sam3":
         return True
     return False
 
 
-def _is_optional_install_package(package_name: str) -> bool:
-    """Return True if install failure for this package can be non-fatal."""
-    if sys.platform == "win32" and package_name == "triton-windows":
+def _is_optional_install_package(
+    package_name: str, platform_name: Optional[str] = None
+) -> bool:
+    """Return True if install failure for this package can be non-fatal.
+
+    Args:
+        package_name: Distribution name to check.
+        platform_name: Target platform name. Defaults to the current platform.
+
+    Returns:
+        True if installation failure for the package should be non-fatal.
+    """
+    target_platform = platform_name or sys.platform
+    if target_platform == "win32" and package_name == "triton-windows":
+        return True
+    if target_platform == "darwin" and package_name == "sam3":
         return True
     return False
 

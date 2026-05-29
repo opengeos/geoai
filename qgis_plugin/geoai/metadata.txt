@@ -62,6 +62,7 @@ changelog=
     1.4.4
         - Improve built-in dependency installer SSL fallback for PyPI, PyTorch, and uv certificate errors (#786)
         - Improve Windows/Python 3.12 dependency resolution diagnostics for the QGIS managed environment
+        - Allow macOS QGIS dependency verification to continue when optional SAM3 import fails (#797)
     1.4.3
         - Bump patch release for GeoAI package and QGIS plugin
     1.4.2

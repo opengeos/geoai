@@ -1,3 +1,5 @@
+import subprocess
+
 from geoai.core import venv_manager
 
 
@@ -201,3 +203,44 @@ def test_omniwatermask_verification_bootstraps_torch_before_import():
 
     assert "add_dll_directory" in code
     assert "import torch; import omniwatermask" in code
+
+
+def test_verify_venv_treats_macos_sam3_import_failure_as_optional(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        package_name = cmd[-1]
+        calls.append(package_name)
+        if package_name == "sam3":
+            return subprocess.CompletedProcess(
+                cmd,
+                1,
+                stdout="",
+                stderr="ModuleNotFoundError: No module named 'triton'",
+            )
+        return subprocess.CompletedProcess(cmd, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(venv_manager.sys, "platform", "darwin")
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_required_packages",
+        lambda: [("torch", ""), ("sam3", ""), ("geoai-py", "")],
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_verification_code",
+        lambda package_name: package_name,
+    )
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    ready, message = venv_manager.verify_venv("/tmp/geoai-test-venv")
+
+    assert ready is True
+    assert message == "Virtual environment ready (optional packages unavailable: sam3)"
+    assert calls == ["torch", "sam3", "geoai-py"]
