@@ -5380,8 +5380,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1358</span>
-<span class="normal">1359</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1359</span>
 <span class="normal">1360</span>
 <span class="normal">1361</span>
 <span class="normal">1362</span>
@@ -5617,7 +5616,8 @@
 <span class="normal">1592</span>
 <span class="normal">1593</span>
 <span class="normal">1594</span>
-<span class="normal">1595</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CatalogAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">1595</span>
+<span class="normal">1596</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CatalogAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AI agent for searching data catalogs with natural language queries.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -5655,7 +5655,7 @@
                 <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;minimax&quot;</span><span class="p">):</span>
-            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M2.7&quot;, &quot;MiniMax-M2.5-highspeed&quot;)</span>
+            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M3&quot;, &quot;MiniMax-M2.7&quot;)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_minimax_model</span><span class="p">(</span>
                 <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
@@ -5999,8 +5999,7 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1361</span>
-<span class="normal">1362</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1362</span>
 <span class="normal">1363</span>
 <span class="normal">1364</span>
 <span class="normal">1365</span>
@@ -6179,7 +6178,8 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 <span class="normal">1538</span>
 <span class="normal">1539</span>
 <span class="normal">1540</span>
-<span class="normal">1541</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1541</span>
+<span class="normal">1542</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -6214,7 +6214,7 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
                 <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;minimax&quot;</span><span class="p">):</span>
-            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M2.7&quot;, &quot;MiniMax-M2.5-highspeed&quot;)</span>
+            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M3&quot;, &quot;MiniMax-M2.7&quot;)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_minimax_model</span><span class="p">(</span>
                 <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
@@ -6436,8 +6436,7 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1543</span>
-<span class="normal">1544</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1544</span>
 <span class="normal">1545</span>
 <span class="normal">1546</span>
 <span class="normal">1547</span>
@@ -6447,7 +6446,8 @@ Example: "https://raw.githubusercontent.com/opengeos/Earth-Engine-Catalog/refs/h
 <span class="normal">1551</span>
 <span class="normal">1552</span>
 <span class="normal">1553</span>
-<span class="normal">1554</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1554</span>
+<span class="normal">1555</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -6598,8 +6598,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1556</span>
-<span class="normal">1557</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1557</span>
 <span class="normal">1558</span>
 <span class="normal">1559</span>
 <span class="normal">1560</span>
@@ -6637,7 +6636,8 @@ for ds in datasets:
 <span class="normal">1592</span>
 <span class="normal">1593</span>
 <span class="normal">1594</span>
-<span class="normal">1595</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_datasets</span><span class="p">(</span>
+<span class="normal">1595</span>
+<span class="normal">1596</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_datasets</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">keywords</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dataset_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6719,8 +6719,7 @@ for ds in datasets:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">289</span>
-<span class="normal">290</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">290</span>
 <span class="normal">291</span>
 <span class="normal">292</span>
 <span class="normal">293</span>
@@ -7141,7 +7140,8 @@ for ds in datasets:
 <span class="normal">708</span>
 <span class="normal">709</span>
 <span class="normal">710</span>
-<span class="normal">711</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GeoAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">711</span>
+<span class="normal">712</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GeoAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Geospatial AI agent with interactive mapping capabilities.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -7174,7 +7174,7 @@ for ds in datasets:
                 <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;minimax&quot;</span><span class="p">):</span>
-            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M2.7&quot;, &quot;MiniMax-M2.5-highspeed&quot;)</span>
+            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M3&quot;, &quot;MiniMax-M2.7&quot;)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_minimax_model</span><span class="p">(</span>
                 <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
@@ -7675,8 +7675,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">292</span>
-<span class="normal">293</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
@@ -7810,7 +7809,8 @@ for ds in datasets:
 <span class="normal">424</span>
 <span class="normal">425</span>
 <span class="normal">426</span>
-<span class="normal">427</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">427</span>
+<span class="normal">428</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -7840,7 +7840,7 @@ for ds in datasets:
             <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;minimax&quot;</span><span class="p">):</span>
-        <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M2.7&quot;, &quot;MiniMax-M2.5-highspeed&quot;)</span>
+        <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M3&quot;, &quot;MiniMax-M2.7&quot;)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_minimax_model</span><span class="p">(</span>
             <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
         <span class="p">)</span>
@@ -8022,8 +8022,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">429</span>
-<span class="normal">430</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">430</span>
 <span class="normal">431</span>
 <span class="normal">432</span>
 <span class="normal">433</span>
@@ -8033,7 +8032,8 @@ for ds in datasets:
 <span class="normal">437</span>
 <span class="normal">438</span>
 <span class="normal">439</span>
-<span class="normal">440</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">440</span>
+<span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -8098,8 +8098,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">442</span>
-<span class="normal">443</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">443</span>
 <span class="normal">444</span>
 <span class="normal">445</span>
 <span class="normal">446</span>
@@ -8367,7 +8366,8 @@ for ds in datasets:
 <span class="normal">708</span>
 <span class="normal">709</span>
 <span class="normal">710</span>
-<span class="normal">711</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">711</span>
+<span class="normal">712</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display an interactive UI with map and chat interface.</span>
 
 <span class="sd">    Args:</span>
@@ -8841,8 +8841,7 @@ for ds in datasets:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 714</span>
-<span class="normal"> 715</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 715</span>
 <span class="normal"> 716</span>
 <span class="normal"> 717</span>
 <span class="normal"> 718</span>
@@ -9482,7 +9481,8 @@ for ds in datasets:
 <span class="normal">1352</span>
 <span class="normal">1353</span>
 <span class="normal">1354</span>
-<span class="normal">1355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">STACAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+<span class="normal">1355</span>
+<span class="normal">1356</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">STACAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;AI agent for searching and interacting with STAC catalogs.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -9518,7 +9518,7 @@ for ds in datasets:
                 <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;minimax&quot;</span><span class="p">):</span>
-            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M2.7&quot;, &quot;MiniMax-M2.5-highspeed&quot;)</span>
+            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M3&quot;, &quot;MiniMax-M2.7&quot;)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_minimax_model</span><span class="p">(</span>
                 <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
@@ -10267,8 +10267,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">717</span>
-<span class="normal">718</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">718</span>
 <span class="normal">719</span>
 <span class="normal">720</span>
 <span class="normal">721</span>
@@ -10404,7 +10403,8 @@ for ds in datasets:
 <span class="normal">851</span>
 <span class="normal">852</span>
 <span class="normal">853</span>
-<span class="normal">854</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">854</span>
+<span class="normal">855</span></pre></div></td><td class="code"><div><pre><span></span><code>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;llama3.1&quot;</span><span class="p">,</span>
@@ -10437,7 +10437,7 @@ for ds in datasets:
                 <span class="n">host</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;minimax&quot;</span><span class="p">):</span>
-            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M2.7&quot;, &quot;MiniMax-M2.5-highspeed&quot;)</span>
+            <span class="c1"># MiniMax models (e.g., &quot;MiniMax-M3&quot;, &quot;MiniMax-M2.7&quot;)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_model_factory</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">m</span><span class="o">=</span><span class="n">model</span><span class="p">:</span> <span class="n">create_minimax_model</span><span class="p">(</span>
                 <span class="n">model_id</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="o">**</span><span class="n">model_args</span>
             <span class="p">)</span>
@@ -10618,8 +10618,7 @@ for ds in datasets:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">912</span>
-<span class="normal">913</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">913</span>
 <span class="normal">914</span>
 <span class="normal">915</span>
 <span class="normal">916</span>
@@ -10641,7 +10640,8 @@ for ds in datasets:
 <span class="normal">932</span>
 <span class="normal">933</span>
 <span class="normal">934</span>
-<span class="normal">935</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">935</span>
+<span class="normal">936</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Send a single-turn prompt to the agent.</span>
 
 <span class="sd">    Args:</span>
@@ -10780,8 +10780,7 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 937</span>
-<span class="normal"> 938</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 938</span>
 <span class="normal"> 939</span>
 <span class="normal"> 940</span>
 <span class="normal"> 941</span>
@@ -10847,7 +10846,8 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 <span class="normal">1001</span>
 <span class="normal">1002</span>
 <span class="normal">1003</span>
-<span class="normal">1004</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_and_get_first_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="normal">1004</span>
+<span class="normal">1005</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">search_and_get_first_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prompt</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Search for imagery and return the first item as a structured dict.</span>
 
 <span class="sd">    This method sends a search query to the agent, extracts the search results</span>
@@ -10968,8 +10968,7 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>geoai/agents/geo_agents.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1072</span>
-<span class="normal">1073</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1073</span>
 <span class="normal">1074</span>
 <span class="normal">1075</span>
 <span class="normal">1076</span>
@@ -11251,7 +11250,8 @@ print(item['assets'][0]['key'])    # or 'title'</p>
 <span class="normal">1352</span>
 <span class="normal">1353</span>
 <span class="normal">1354</span>
-<span class="normal">1355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">1355</span>
+<span class="normal">1356</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">show_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">700</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Display an interactive UI with map and chat interface for STAC searches.</span>
 
 <span class="sd">    Args:</span>
@@ -12353,7 +12353,7 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
 
 
 <h2 id="geoai.agents.geo_agents.create_minimax_model" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">create_minimax_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="s1">&#39;MiniMax-M2.7&#39;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">create_minimax_model</span><span class="p">(</span><span class="n">model_id</span><span class="o">=</span><span class="s1">&#39;MiniMax-M3&#39;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">client_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#geoai.agents.geo_agents.create_minimax_model" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -12361,9 +12361,10 @@ aws bedrock list-foundation-models | jq -r '.modelSummaries[].modelId'</p>
     <div class="doc doc-contents ">
 
         <p>Create a MiniMax model via OpenAI-compatible API.</p>
-<p>MiniMax provides large language models including MiniMax-M2.7 and
-MiniMax-M2.5-highspeed, accessible through an OpenAI-compatible
-chat completions endpoint at https://api.minimax.io/v1.</p>
+<p>MiniMax provides large language models including MiniMax-M3 (the latest
+flagship model with 512K context window) and MiniMax-M2.7, accessible
+through an OpenAI-compatible chat completions endpoint at
+https://api.minimax.io/v1.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -12386,13 +12387,13 @@ chat completions endpoint at https://api.minimax.io/v1.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>MiniMax model ID. Defaults to "MiniMax-M2.7".
+                <p>MiniMax model ID. Defaults to "MiniMax-M3".
 For a complete list of supported models,
 see https://platform.minimaxi.com/document/models.</p>
               </div>
             </td>
             <td>
-                  <code>&#39;MiniMax-M2.7&#39;</code>
+                  <code>&#39;MiniMax-M3&#39;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -12515,20 +12516,22 @@ see https://platform.minimaxi.com/document/models.</p>
 <span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
-<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_minimax_model</span><span class="p">(</span>
-    <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;MiniMax-M2.7&quot;</span><span class="p">,</span>
+<span class="normal">286</span>
+<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_minimax_model</span><span class="p">(</span>
+    <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;MiniMax-M3&quot;</span><span class="p">,</span>
     <span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">client_args</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OpenAIModel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a MiniMax model via OpenAI-compatible API.</span>
 
-<span class="sd">    MiniMax provides large language models including MiniMax-M2.7 and</span>
-<span class="sd">    MiniMax-M2.5-highspeed, accessible through an OpenAI-compatible</span>
-<span class="sd">    chat completions endpoint at https://api.minimax.io/v1.</span>
+<span class="sd">    MiniMax provides large language models including MiniMax-M3 (the latest</span>
+<span class="sd">    flagship model with 512K context window) and MiniMax-M2.7, accessible</span>
+<span class="sd">    through an OpenAI-compatible chat completions endpoint at</span>
+<span class="sd">    https://api.minimax.io/v1.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        model_id: MiniMax model ID. Defaults to &quot;MiniMax-M2.7&quot;.</span>
+<span class="sd">        model_id: MiniMax model ID. Defaults to &quot;MiniMax-M3&quot;.</span>
 <span class="sd">            For a complete list of supported models,</span>
 <span class="sd">            see https://platform.minimaxi.com/document/models.</span>
 <span class="sd">        api_key: MiniMax API key.</span>
