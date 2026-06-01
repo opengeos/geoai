@@ -79,9 +79,9 @@ class TestCreateMinimaxModelExists(unittest.TestCase):
         else:
             self.fail("create_minimax_model function not found")
 
-    def test_default_model_id_is_m27(self):
-        """Test that default model_id is MiniMax-M2.7."""
-        self.assertIn('model_id: str = "MiniMax-M2.7"', self.source)
+    def test_default_model_id_is_m3(self):
+        """Test that default model_id is MiniMax-M3."""
+        self.assertIn('model_id: str = "MiniMax-M3"', self.source)
 
     def test_uses_minimax_base_url(self):
         """Test that create_minimax_model sets MiniMax API base URL."""
@@ -145,10 +145,10 @@ class TestMinimaxStringRouting(unittest.TestCase):
     def test_minimax_string_detection_logic(self):
         """Test that MiniMax string detection correctly identifies MiniMax models."""
         minimax_models = [
+            "MiniMax-M3",
             "MiniMax-M2.7",
             "MiniMax-M2.7-highspeed",
-            "MiniMax-M2.5",
-            "MiniMax-M2.5-highspeed",
+            "minimax-m3",
             "minimax-m2.7",
         ]
         for model_str in minimax_models:
@@ -214,6 +214,7 @@ class TestMinimaxDocstring(unittest.TestCase):
                 and node.name == "create_minimax_model"
             ):
                 docstring = ast.get_docstring(node)
+                self.assertIn("MiniMax-M3", docstring)
                 self.assertIn("MiniMax-M2.7", docstring)
                 break
 
@@ -302,20 +303,20 @@ class TestMinimaxModelIntegration(unittest.TestCase):
             from geoai.agents.geo_agents import create_minimax_model
             from strands.models.openai import OpenAIModel
 
-            model = create_minimax_model(model_id="MiniMax-M2.7")
+            model = create_minimax_model(model_id="MiniMax-M3")
             self.assertIsInstance(model, OpenAIModel)
-            self.assertEqual(model.config["model_id"], "MiniMax-M2.7")
+            self.assertEqual(model.config["model_id"], "MiniMax-M3")
         except ImportError:
             self.skipTest("strands-agents or geoai dependencies not installed")
 
     @unittest.skipUnless(os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set")
-    def test_create_minimax_m25_highspeed_live(self):
-        """Integration test: create MiniMax M2.5-highspeed model."""
+    def test_create_minimax_m27_live(self):
+        """Integration test: create MiniMax M2.7 model."""
         try:
             from geoai.agents.geo_agents import create_minimax_model
 
-            model = create_minimax_model(model_id="MiniMax-M2.5-highspeed")
-            self.assertEqual(model.config["model_id"], "MiniMax-M2.5-highspeed")
+            model = create_minimax_model(model_id="MiniMax-M2.7")
+            self.assertEqual(model.config["model_id"], "MiniMax-M2.7")
         except ImportError:
             self.skipTest("strands-agents or geoai dependencies not installed")
 
