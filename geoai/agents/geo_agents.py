@@ -241,19 +241,20 @@ def create_gemini_model(
 
 
 def create_minimax_model(
-    model_id: str = "MiniMax-M2.7",
+    model_id: str = "MiniMax-M3",
     api_key: str = None,
     client_args: dict = None,
     **kwargs: Any,
 ) -> OpenAIModel:
     """Create a MiniMax model via OpenAI-compatible API.
 
-    MiniMax provides large language models including MiniMax-M2.7 and
-    MiniMax-M2.5-highspeed, accessible through an OpenAI-compatible
-    chat completions endpoint at https://api.minimax.io/v1.
+    MiniMax provides large language models including MiniMax-M3 (the latest
+    flagship model with 512K context window) and MiniMax-M2.7, accessible
+    through an OpenAI-compatible chat completions endpoint at
+    https://api.minimax.io/v1.
 
     Args:
-        model_id: MiniMax model ID. Defaults to "MiniMax-M2.7".
+        model_id: MiniMax model ID. Defaults to "MiniMax-M3".
             For a complete list of supported models,
             see https://platform.minimaxi.com/document/models.
         api_key: MiniMax API key.
@@ -319,7 +320,7 @@ class GeoAgent(Agent):
                 host="http://localhost:11434", model_id=m, **model_args
             )
         elif isinstance(model, str) and model.lower().startswith("minimax"):
-            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            # MiniMax models (e.g., "MiniMax-M3", "MiniMax-M2.7")
             self._model_factory = lambda m=model: create_minimax_model(
                 model_id=m, **model_args
             )
@@ -747,7 +748,7 @@ class STACAgent(Agent):
                 host="http://localhost:11434", model_id=m, **model_args
             )
         elif isinstance(model, str) and model.lower().startswith("minimax"):
-            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            # MiniMax models (e.g., "MiniMax-M3", "MiniMax-M2.7")
             self._model_factory = lambda m=model: create_minimax_model(
                 model_id=m, **model_args
             )
@@ -1393,7 +1394,7 @@ class CatalogAgent(Agent):
                 host="http://localhost:11434", model_id=m, **model_args
             )
         elif isinstance(model, str) and model.lower().startswith("minimax"):
-            # MiniMax models (e.g., "MiniMax-M2.7", "MiniMax-M2.5-highspeed")
+            # MiniMax models (e.g., "MiniMax-M3", "MiniMax-M2.7")
             self._model_factory = lambda m=model: create_minimax_model(
                 model_id=m, **model_args
             )
