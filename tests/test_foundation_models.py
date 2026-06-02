@@ -203,6 +203,7 @@ class TestListFoundationModels(unittest.TestCase):
             "year",
             "publication",
             "terratorch_supported",
+            "terratorch_key",
             "huggingface_id",
         }
         result = self._list()

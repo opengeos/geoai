@@ -579,6 +579,7 @@ def list_foundation_models(
             "year": v["year"],
             "publication": v["publication"],
             "terratorch_supported": v["terratorch_supported"],
+            "terratorch_key": v["terratorch_key"] or "",
             "huggingface_id": v["huggingface_id"] or "",
         }
         for v in models.values()
