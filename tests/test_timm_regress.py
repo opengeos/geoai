@@ -225,8 +225,9 @@ class TestTrainPixelRegressor(unittest.TestCase):
 
         import tempfile
 
-        with tempfile.TemporaryDirectory() as tmpdir, patch.object(
-            timm_regress, "LIGHTNING_AVAILABLE", True
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch.object(timm_regress, "LIGHTNING_AVAILABLE", True),
         ):
             timm_regress.train_pixel_regressor(
                 train_image_paths=["train.tif"],
