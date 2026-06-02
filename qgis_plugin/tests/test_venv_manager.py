@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 
 from geoai.core import venv_manager
 
@@ -203,6 +204,99 @@ def test_omniwatermask_verification_bootstraps_torch_before_import():
 
     assert "add_dll_directory" in code
     assert "import torch; import omniwatermask" in code
+
+
+def test_write_constraints_file_writes_requested_constraints(tmp_path, monkeypatch):
+    monkeypatch.setattr(venv_manager, "CACHE_DIR", str(tmp_path))
+
+    path = venv_manager._write_constraints_file(
+        ["torch==2.12.0+cu128", "torchvision==0.27.0+cu128"]
+    )
+
+    assert path is not None
+    path_obj = Path(path)
+    assert path_obj.read_text(encoding="utf-8") == (
+        "torch==2.12.0+cu128\n" "torchvision==0.27.0+cu128\n"
+    )
+
+    venv_manager._remove_temp_file(path)
+    assert not path_obj.exists()
+
+
+def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypatch):
+    from geoai.core import uv_manager
+
+    calls = []
+    written_constraints = []
+    constraints_path = str(tmp_path / "torch-constraints.txt")
+
+    def fake_run(cmd, *args, **kwargs):
+        script = cmd[-1]
+        if "torch.version.cuda" in script:
+            return subprocess.CompletedProcess(cmd, 0, stdout="12.8\n", stderr="")
+        if "metadata.version('torch')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="2.12.0+cu128\n", stderr=""
+            )
+        if "metadata.version('torchvision')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="0.27.0+cu128\n", stderr=""
+            )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def fake_run_pip_install(**kwargs):
+        calls.append(kwargs)
+        return venv_manager._PipResult(0, "ok", "")
+
+    def fake_write_constraints(constraints):
+        written_constraints.extend(constraints)
+        return constraints_path
+
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: False)
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_required_packages",
+        lambda: [
+            ("torch", ">=2.0.0"),
+            ("torchvision", ">=0.15.0"),
+            ("geoai-py", ">=0.39.0"),
+            ("segment-geospatial", ""),
+        ],
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "detect_nvidia_gpu",
+        lambda: (True, {"compute_cap": 12.0, "driver_version": "572.76"}),
+    )
+    monkeypatch.setattr(venv_manager, "_select_cuda_index", lambda _gpu_info: "cu128")
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+    monkeypatch.setattr(venv_manager, "_write_constraints_file", fake_write_constraints)
+
+    ok, message = venv_manager.install_dependencies(
+        venv_dir=str(tmp_path / "venv"),
+        cuda_enabled=True,
+    )
+
+    assert ok is True
+    assert message == "All dependencies installed successfully"
+    assert written_constraints == [
+        "torch==2.12.0+cu128",
+        "torchvision==0.27.0+cu128",
+    ]
+    batch_cmd = calls[-1]["cmd"]
+    assert "--extra-index-url" in batch_cmd
+    assert "https://download.pytorch.org/whl/cu128" in batch_cmd
+    assert "--constraint" in batch_cmd
+    assert constraints_path in batch_cmd
+    assert "geoai-py>=0.39.0" in batch_cmd
+    assert "segment-geospatial" in batch_cmd
 
 
 def test_verify_venv_treats_macos_sam3_import_failure_as_optional(monkeypatch):
