@@ -534,17 +534,13 @@ def list_foundation_models(
         category = category.lower()
         if category not in _VALID_CATEGORIES:
             valid = ", ".join(sorted(_VALID_CATEGORIES))
-            raise ValueError(
-                f"Unknown category '{category}'. Valid options: {valid}"
-            )
+            raise ValueError(f"Unknown category '{category}'. Valid options: {valid}")
 
     if modality is not None:
         modality = modality.lower()
         if modality not in _VALID_MODALITIES:
             valid = ", ".join(sorted(_VALID_MODALITIES))
-            raise ValueError(
-                f"Unknown modality '{modality}'. Valid options: {valid}"
-            )
+            raise ValueError(f"Unknown modality '{modality}'. Valid options: {valid}")
 
     models = FOUNDATION_MODELS
 
@@ -696,12 +692,8 @@ def load_foundation_model(name: str, pretrained: bool = True, **kwargs: Any) -> 
         import terratorch.models.backbones  # noqa: F401 — triggers registry decoration
         from terratorch.models.backbones.registry import BACKBONE_REGISTRY
 
-        model = BACKBONE_REGISTRY.build(
-            backbone_key, pretrained=pretrained, **kwargs
-        )
-        logger.info(
-            "Loaded '%s' via TerraTorch backbone key '%s'.", name, backbone_key
-        )
+        model = BACKBONE_REGISTRY.build(backbone_key, pretrained=pretrained, **kwargs)
+        logger.info("Loaded '%s' via TerraTorch backbone key '%s'.", name, backbone_key)
         return model
     except Exception as exc:
         raise RuntimeError(
