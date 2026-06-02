@@ -41,6 +41,7 @@ class TestFoundationModelRegistry(unittest.TestCase):
             "huggingface_id",
             "license",
             "terratorch_supported",
+            "terratorch_key",
             "description",
         }
         registry = self._get_registry()
@@ -149,6 +150,16 @@ class TestFoundationModelRegistry(unittest.TestCase):
                 20,
                 msg=f"Entry '{key}': description is too short",
             )
+
+    def test_terratorch_key_set_when_supported(self):
+        """Every terratorch_supported=True entry must have a non-None terratorch_key."""
+        registry = self._get_registry()
+        for key, entry in registry.items():
+            if entry["terratorch_supported"]:
+                self.assertIsNotNone(
+                    entry["terratorch_key"],
+                    msg=f"Entry '{key}' is terratorch_supported but terratorch_key is None",
+                )
 
     def test_huggingface_id_format_when_set(self):
         """When huggingface_id is not None it must contain a '/' separator."""

@@ -64,6 +64,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M",
         "license": "Apache-2.0",
         "terratorch_supported": True,
+        "terratorch_key": "prithvi_eo_v2_300",
         "description": (
             "Prithvi EO 2.0 300M is a versatile multi-temporal vision transformer "
             "foundation model for Earth observation, pre-trained on 4.2M "
@@ -84,6 +85,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-600M",
         "license": "Apache-2.0",
         "terratorch_supported": True,
+        "terratorch_key": "prithvi_eo_v2_600",
         "description": (
             "Prithvi EO 2.0 600M is the large variant of the Prithvi EO 2.0 "
             "multi-temporal foundation model, offering higher capacity for "
@@ -104,6 +106,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "made-with-clay/Clay-v1",
         "license": "Apache-2.0",
         "terratorch_supported": True,
+        "terratorch_key": "clay_mae_large",
         "description": (
             "Clay v1 is an open-source foundation model trained on multi-sensor "
             "satellite imagery (Sentinel-1, Sentinel-2, Landsat) supporting "
@@ -124,6 +127,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "XShadow/DOFA",
         "license": "MIT",
         "terratorch_supported": True,
+        "terratorch_key": "dofa_large_patch16_224",
         "description": (
             "DOFA (Dynamic One-For-All) is a neural plasticity-inspired multimodal "
             "foundation model for Earth observation that adapts dynamically to "
@@ -147,6 +151,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "MIT",
         "terratorch_supported": True,
+        "terratorch_key": "ssl4eos12_vit_small_patch16_224_sentinel2_all_dino",
         "description": (
             "SatMAE pre-trains transformers for temporal and multi-spectral "
             "satellite imagery via masked autoencoders, achieving strong "
@@ -167,6 +172,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "Apache-2.0",
         "terratorch_supported": True,
+        "terratorch_key": "vit_large_patch16",
         "description": (
             "Scale-MAE is a scale-aware masked autoencoder for multiscale "
             "geospatial representation learning that explicitly encodes "
@@ -187,6 +193,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "Apache-2.0",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "RingMo is a remote sensing foundation model trained with masked "
             "image modeling on two million optical satellite images, supporting "
@@ -207,6 +214,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "Apache-2.0",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "RVSA advances plain vision transformers toward a remote sensing "
             "foundation model by introducing rotated varied-size window "
@@ -227,6 +235,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "allenai/satlas-pretrain",
         "license": "Apache-2.0",
         "terratorch_supported": True,
+        "terratorch_key": "satlas_swin_b_sentinel2_mi_ms",
         "description": (
             "SatlasPretrain is a large-scale dataset and pre-trained model for "
             "remote sensing image understanding across Sentinel-2 and NAIP "
@@ -247,6 +256,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "MIT",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "CROMA learns remote sensing representations via contrastive "
             "radar-optical masked autoencoders, leveraging complementary "
@@ -267,6 +277,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "wangyi111/SSL4EO-S12",
         "license": "MIT",
         "terratorch_supported": True,
+        "terratorch_key": "ssl4eos12_vit_small_patch16_224_sentinel2_all_dino",
         "description": (
             "SSL4EO-S12 provides a large-scale multi-modal self-supervised "
             "pre-training benchmark for Earth observation using Sentinel-1 "
@@ -287,6 +298,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "MIT",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "SpectralGPT is a spectral remote sensing foundation model trained "
             "with a 3D token approach to handle progressive spectral and spatial "
@@ -307,6 +319,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "whu-sigma/HyperSIGMA",
         "license": "Apache-2.0",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "HyperSIGMA is a hyperspectral intelligence comprehension foundation "
             "model that incorporates spatial-spectral decoupled attention and "
@@ -328,6 +341,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "nasaharvest/presto-geobench",
         "license": "Apache-2.0",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "Presto is a lightweight pre-trained transformer for remote sensing "
             "time-series data, designed for agricultural monitoring and crop "
@@ -348,6 +362,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "panopticon-fm/panopticon",
         "license": "Apache-2.0",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "Panopticon (CVPRW 2025 EarthVision Best Paper) advances any-sensor "
             "foundation models for Earth observation, handling arbitrary sensor "
@@ -368,6 +383,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "Apache-2.0",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "DynamicVis employs dynamic visual perception with selective state "
             "space models (Mamba) for efficient remote sensing foundation models, "
@@ -388,6 +404,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "MIT",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "FoMo is a multi-modal, multi-scale, and multi-task remote sensing "
             "foundation model purpose-built for global forest monitoring, "
@@ -408,6 +425,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": "vishalned/MMEarth-train",
         "license": "MIT",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "MMEarth explores multi-modal pretext tasks for geospatial "
             "representation learning using over one million globally distributed "
@@ -435,6 +453,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": None,
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "SkySense is a multi-modal remote sensing foundation model for "
             "universal interpretation of Earth observation imagery, combining "
@@ -455,6 +474,7 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "huggingface_id": None,
         "license": "Apache-2.0",
         "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "GeoRSAM adapts the Segment Anything Model (SAM) to remote sensing "
             "by introducing prompt-based learning strategies for automatic and "
@@ -607,38 +627,44 @@ def check_terratorch_available() -> bool:
         ...     model = geoai.load_foundation_model("prithvi-eo-2.0-300m")
     """
     try:
-        import terratorch  # noqa: F401
+        import terratorch.models.backbones  # noqa: F401
 
         return True
-    except ImportError:
+    except Exception:
         return False
 
 
-def load_foundation_model(name: str, **kwargs: Any) -> Any:
+def load_foundation_model(name: str, pretrained: bool = True, **kwargs: Any) -> Any:
     """Load a foundation model backbone via TerraTorch.
 
-    This function requires ``terratorch >= 1.0`` to be installed
-    (``pip install terratorch``) and is limited to models whose
-    ``terratorch_supported`` registry flag is True.
+    Downloads pre-trained weights from HuggingFace and returns a
+    ``torch.nn.Module`` ready for inference or fine-tuning. Requires
+    ``terratorch >= 1.0`` (``pip install terratorch``) and is limited to
+    models whose ``terratorch_supported`` flag is ``True``.
 
     Args:
         name: Registry key for the model (e.g. ``"prithvi-eo-2.0-300m"``).
+            Use :func:`list_foundation_models` with ``terratorch_only=True``
+            to discover loadable models.
+        pretrained: If True (default), download and load pre-trained weights
+            from HuggingFace. Set to False to get a randomly initialised
+            backbone with the correct architecture.
         **kwargs: Additional keyword arguments forwarded to the TerraTorch
-            backbone registry builder.
+            backbone constructor (e.g. ``num_frames``, ``in_chans``).
 
     Returns:
-        A PyTorch model (``torch.nn.Module``) loaded from the TerraTorch
-        backbone registry.
+        A ``torch.nn.Module`` backbone loaded from the TerraTorch registry.
 
     Raises:
         ValueError: If ``name`` is not in the registry.
         NotImplementedError: If the model does not yet have TerraTorch support.
         ImportError: If TerraTorch is not installed.
-        RuntimeError: If the TerraTorch registry lookup fails.
+        RuntimeError: If the TerraTorch backbone build fails.
 
     Example:
         >>> import geoai
         >>> model = geoai.load_foundation_model("prithvi-eo-2.0-300m")
+        >>> print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
     """
     if name not in FOUNDATION_MODELS:
         available = ", ".join(sorted(FOUNDATION_MODELS.keys()))
@@ -649,11 +675,10 @@ def load_foundation_model(name: str, **kwargs: Any) -> Any:
     info = FOUNDATION_MODELS[name]
 
     if not info["terratorch_supported"]:
+        ref = info["huggingface_id"] or info["code_url"] or "see paper"
         raise NotImplementedError(
             f"'{name}' ({info['name']}) does not yet have TerraTorch support. "
-            "Check https://github.com/IBM/terratorch for the latest supported "
-            "models, or use the model's HuggingFace ID directly: "
-            f"{info['huggingface_id'] or info['code_url']}"
+            f"Load it directly from: {ref}"
         )
 
     if not check_terratorch_available():
@@ -662,14 +687,23 @@ def load_foundation_model(name: str, **kwargs: Any) -> Any:
             "Install it with: pip install terratorch"
         )
 
+    backbone_key = info["terratorch_key"]
+
     try:
+        import terratorch.models.backbones  # noqa: F401 — triggers registry decoration
         from terratorch.models.backbones.registry import BACKBONE_REGISTRY
 
-        model = BACKBONE_REGISTRY.build(name.replace("-", "_"), **kwargs)
+        model = BACKBONE_REGISTRY.build(
+            backbone_key, pretrained=pretrained, **kwargs
+        )
+        logger.info(
+            "Loaded '%s' via TerraTorch backbone key '%s'.", name, backbone_key
+        )
         return model
     except Exception as exc:
         raise RuntimeError(
-            f"TerraTorch failed to load '{name}': {exc}. "
-            "Ensure the model name matches a TerraTorch backbone key and "
-            "that any required weights are downloadable."
+            f"TerraTorch failed to build backbone '{backbone_key}' for model "
+            f"'{name}': {exc}. "
+            "Check https://torchgeo.github.io/terratorch for supported "
+            "backbone configurations."
         ) from exc
