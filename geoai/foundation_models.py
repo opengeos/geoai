@@ -150,8 +150,8 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
         "code_url": "https://github.com/sustainlab-group/SatMAE",
         "huggingface_id": None,
         "license": "MIT",
-        "terratorch_supported": True,
-        "terratorch_key": "ssl4eos12_vit_small_patch16_224_sentinel2_all_dino",
+        "terratorch_supported": False,
+        "terratorch_key": None,
         "description": (
             "SatMAE pre-trains transformers for temporal and multi-spectral "
             "satellite imagery via masked autoencoders, achieving strong "
