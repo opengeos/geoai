@@ -759,14 +759,14 @@ def train_pixel_regressor(
         callbacks.append(_CompactProgressBar())
         model._prog_bar_metrics = False
 
-    logger = CSVLogger(model_dir, name="lightning_logs")
+    csv_logger = CSVLogger(model_dir, name="lightning_logs")
 
     trainer = pl.Trainer(
         max_epochs=num_epochs,
         accelerator=accelerator,
         devices=devices,
         callbacks=callbacks,
-        logger=logger,
+        logger=csv_logger,
         log_every_n_steps=10,
         enable_model_summary=verbose,
         **kwargs,

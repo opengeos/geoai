@@ -188,6 +188,68 @@ class TestTimmRegressFunctionSignatures(unittest.TestCase):
         self.assertIn("min_valid_ratio", sig.parameters)
 
 
+class TestTrainPixelRegressor(unittest.TestCase):
+    """Tests for train_pixel_regressor behavior."""
+
+    @patch("geoai.timm_regress._infer_preprocessing_params", return_value=None)
+    @patch("geoai.timm_regress.pl.Trainer")
+    @patch("geoai.timm_regress.CSVLogger")
+    @patch("geoai.timm_regress.EarlyStopping")
+    @patch("geoai.timm_regress.ModelCheckpoint")
+    @patch("geoai.timm_regress.DataLoader")
+    @patch("geoai.timm_regress.PixelRegressionDataset")
+    @patch("geoai.timm_regress.PixelRegressionModel")
+    @patch("geoai.timm_regress.logger")
+    def test_verbose_logging_uses_module_logger(
+        self,
+        mock_logger,
+        mock_model_class,
+        mock_dataset_class,
+        mock_data_loader,
+        mock_checkpoint_class,
+        mock_early_stopping,
+        mock_csv_logger_class,
+        mock_trainer_class,
+        mock_preprocessing,
+    ):
+        """Test verbose training messages use the module logger."""
+        from geoai import timm_regress
+
+        csv_logger = object()
+        trainer = MagicMock()
+        checkpoint = MagicMock(best_model_path="")
+
+        mock_csv_logger_class.return_value = csv_logger
+        mock_trainer_class.return_value = trainer
+        mock_checkpoint_class.return_value = checkpoint
+
+        import tempfile
+
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            patch.object(timm_regress, "LIGHTNING_AVAILABLE", True),
+        ):
+            timm_regress.train_pixel_regressor(
+                train_image_paths=["train.tif"],
+                train_target_paths=["target.tif"],
+                output_dir=tmpdir,
+                num_epochs=1,
+                encoder_weights=None,
+                verbose=True,
+            )
+
+        mock_trainer_class.assert_called_once()
+        self.assertIs(mock_trainer_class.call_args.kwargs["logger"], csv_logger)
+        mock_logger.info.assert_any_call(
+            "Training %s with %s encoder for %d epochs...",
+            "unet",
+            "resnet50",
+            1,
+        )
+        mock_logger.info.assert_any_call("Loss function: %s", "MSE")
+        trainer.fit.assert_called_once()
+
+
 class TestEvaluateRegression(unittest.TestCase):
     """Tests for evaluate_regression function behavior."""
 
