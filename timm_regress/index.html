@@ -10404,14 +10404,14 @@ and callback messages. Defaults to True.</p>
         <span class="n">callbacks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_CompactProgressBar</span><span class="p">())</span>
         <span class="n">model</span><span class="o">.</span><span class="n">_prog_bar_metrics</span> <span class="o">=</span> <span class="kc">False</span>
 
-    <span class="n">logger</span> <span class="o">=</span> <span class="n">CSVLogger</span><span class="p">(</span><span class="n">model_dir</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;lightning_logs&quot;</span><span class="p">)</span>
+    <span class="n">csv_logger</span> <span class="o">=</span> <span class="n">CSVLogger</span><span class="p">(</span><span class="n">model_dir</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;lightning_logs&quot;</span><span class="p">)</span>
 
     <span class="n">trainer</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">Trainer</span><span class="p">(</span>
         <span class="n">max_epochs</span><span class="o">=</span><span class="n">num_epochs</span><span class="p">,</span>
         <span class="n">accelerator</span><span class="o">=</span><span class="n">accelerator</span><span class="p">,</span>
         <span class="n">devices</span><span class="o">=</span><span class="n">devices</span><span class="p">,</span>
         <span class="n">callbacks</span><span class="o">=</span><span class="n">callbacks</span><span class="p">,</span>
-        <span class="n">logger</span><span class="o">=</span><span class="n">logger</span><span class="p">,</span>
+        <span class="n">logger</span><span class="o">=</span><span class="n">csv_logger</span><span class="p">,</span>
         <span class="n">log_every_n_steps</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
         <span class="n">enable_model_summary</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
