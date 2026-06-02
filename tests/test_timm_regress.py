@@ -223,11 +223,15 @@ class TestTrainPixelRegressor(unittest.TestCase):
         mock_trainer_class.return_value = trainer
         mock_checkpoint_class.return_value = checkpoint
 
-        with patch.object(timm_regress, "LIGHTNING_AVAILABLE", True):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir, patch.object(
+            timm_regress, "LIGHTNING_AVAILABLE", True
+        ):
             timm_regress.train_pixel_regressor(
                 train_image_paths=["train.tif"],
                 train_target_paths=["target.tif"],
-                output_dir="output",
+                output_dir=tmpdir,
                 num_epochs=1,
                 encoder_weights=None,
                 verbose=True,
