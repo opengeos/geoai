@@ -41,6 +41,7 @@ agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "s
 onnx = ["onnx>=1.21.0", "onnxruntime"]
 sr = ["opensr-model"]
 rfdetr = ["rfdetr"]
+terratorch = ["terratorch>=1.0"]
 networks = ["neatnet", "osmnx"]
 
 [tool.uv]
