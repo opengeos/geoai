@@ -26,7 +26,7 @@ class TestFoundationModelRegistry(unittest.TestCase):
         self.assertGreaterEqual(len(registry), 10)
 
     def test_all_entries_have_required_keys(self):
-        """Every registry entry must contain all 14 required keys."""
+        """Every registry entry must contain all 15 required keys."""
         required_keys = {
             "name",
             "abbreviation",

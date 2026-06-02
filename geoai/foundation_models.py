@@ -613,7 +613,9 @@ def get_foundation_model_info(name: str) -> Dict[str, Any]:
         raise ValueError(
             f"Unknown foundation model '{name}'. Available models: {available}"
         )
-    return FOUNDATION_MODELS[name].copy()
+    import copy
+
+    return copy.deepcopy(FOUNDATION_MODELS[name])
 
 
 def check_terratorch_available() -> bool:
@@ -640,7 +642,7 @@ def load_foundation_model(name: str, pretrained: bool = True, **kwargs: Any) -> 
 
     Downloads pre-trained weights from HuggingFace and returns a
     ``torch.nn.Module`` ready for inference or fine-tuning. Requires
-    ``terratorch >= 1.0`` (``pip install terratorch``) and is limited to
+    ``terratorch >= 1.0`` (``pip install geoai-py[terratorch]``) and is limited to
     models whose ``terratorch_supported`` flag is ``True``.
 
     Args:
@@ -685,7 +687,7 @@ def load_foundation_model(name: str, pretrained: bool = True, **kwargs: Any) -> 
     if not check_terratorch_available():
         raise ImportError(
             "TerraTorch is required to load foundation models. "
-            "Install it with: pip install terratorch"
+            "Install it with: pip install geoai-py[terratorch]"
         )
 
     backbone_key = info["terratorch_key"]

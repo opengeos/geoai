@@ -85,7 +85,7 @@ If you find GeoAI useful in your research, please consider citing the following 
 
 ### 🛰️ Remote Sensing Foundation Models
 
--   Curated catalog of 20+ remote sensing foundation models via `geoai.list_foundation_models()`
+-   Curated catalog of 20 remote sensing foundation models via `geoai.list_foundation_models()`
 -   Filter by category (vision, vision-language, generative), modality (multispectral, SAR, hyperspectral, multimodal), or downstream task
 -   Retrieve full metadata (paper, code, HuggingFace ID, license) with `geoai.get_foundation_model_info()`
 -   Load TerraTorch-supported model backbones directly with `geoai.load_foundation_model()`
