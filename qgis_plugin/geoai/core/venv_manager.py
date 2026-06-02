@@ -49,7 +49,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "10"
+_INSTALL_LOGIC_VERSION = "11"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -615,6 +615,8 @@ _INSECURE_PACKAGE_HOSTS = (
     "files.pythonhosted.org",
     "download.pytorch.org",
 )
+
+_TORCH_DISTRIBUTIONS = ("torch", "torchvision")
 
 
 def _is_ssl_error(stderr: str) -> bool:
@@ -2358,6 +2360,128 @@ def _reinstall_cpu_torch(
         progress_callback(98, "CPU torch installed, re-verifying...")
 
 
+def _get_installed_distribution_version(
+    python_path: str,
+    dist_name: str,
+    env: dict,
+    subprocess_kwargs: dict,
+) -> Optional[str]:
+    """Read an installed distribution version from the managed venv.
+
+    Args:
+        python_path: Path to the venv Python.
+        dist_name: Distribution name to query.
+        env: Environment dict for subprocess.
+        subprocess_kwargs: Platform-specific subprocess kwargs.
+
+    Returns:
+        Installed version string, or None if it cannot be read.
+    """
+    script = (
+        "import importlib.metadata as metadata; "
+        "print(metadata.version({!r}))".format(dist_name)
+    )
+    try:
+        result = subprocess.run(
+            [python_path, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+            **subprocess_kwargs,
+        )
+    except Exception as exc:
+        _log(
+            "Could not read installed {} version: {}".format(dist_name, exc),
+            Qgis.Warning,
+        )
+        return None
+
+    if result.returncode != 0:
+        output = (result.stderr or result.stdout or "").strip()
+        _log(
+            "Could not read installed {} version: {}".format(
+                dist_name, output[:200] or result.returncode
+            ),
+            Qgis.Warning,
+        )
+        return None
+
+    version = result.stdout.strip()
+    return version or None
+
+
+def _get_installed_torch_constraints(
+    python_path: str,
+    env: dict,
+    subprocess_kwargs: dict,
+) -> List[str]:
+    """Build constraints that preserve installed PyTorch wheel variants.
+
+    Args:
+        python_path: Path to the venv Python.
+        env: Environment dict for subprocess.
+        subprocess_kwargs: Platform-specific subprocess kwargs.
+
+    Returns:
+        Constraint lines for installed torch distributions.
+    """
+    constraints = []
+    for dist_name in _TORCH_DISTRIBUTIONS:
+        version = _get_installed_distribution_version(
+            python_path,
+            dist_name,
+            env,
+            subprocess_kwargs,
+        )
+        if version:
+            constraints.append("{}=={}".format(dist_name, version))
+    return constraints
+
+
+def _write_constraints_file(constraints: List[str]) -> Optional[str]:
+    """Write temporary pip constraints for dependency installation.
+
+    Args:
+        constraints: Requirement constraint lines.
+
+    Returns:
+        Path to the temporary constraints file, or None when no constraints
+        were written.
+    """
+    if not constraints:
+        return None
+
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        fd, path = tempfile.mkstemp(
+            prefix="geoai_torch_constraints_",
+            suffix=".txt",
+            dir=CACHE_DIR,
+            text=True,
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(constraints) + "\n")
+        return path
+    except Exception as exc:
+        _log(f"Failed to write torch constraints file: {exc}", Qgis.Warning)
+        return None
+
+
+def _remove_temp_file(path: Optional[str]) -> None:
+    """Remove a temporary file if it exists.
+
+    Args:
+        path: File path to remove.
+    """
+    if not path:
+        return
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def _verify_cuda_in_venv(venv_dir: str) -> bool:
     """Run a CUDA smoke test inside the venv.
 
@@ -2555,6 +2679,7 @@ def install_dependencies(
 
     # -- Phase A: CUDA packages (individual installs) -------------------------
     _force_cuda_reinstall = False
+    _cuda_index_for_batch = None
     if cuda_packages:
         _precheck_env = _get_clean_env_for_venv()
         _precheck_kwargs = _get_subprocess_kwargs()
@@ -2627,6 +2752,7 @@ def install_dependencies(
                 is_cuda_package = False
                 _driver_too_old = True
             else:
+                _cuda_index_for_batch = cuda_index
                 pip_args.extend(
                     [
                         "--index-url",
@@ -2971,6 +3097,30 @@ def install_dependencies(
             return False, "Installation cancelled"
 
         batch_specs = ["{}{}".format(name, ver) for name, ver in batch_packages]
+        constraint_args: List[str] = []
+        torch_index_args: List[str] = []
+        constraints_file = None
+        if cuda_enabled and not _cuda_fell_back and not _driver_too_old:
+            torch_constraints = _get_installed_torch_constraints(
+                python_path,
+                env,
+                subprocess_kwargs,
+            )
+            constraints_file = _write_constraints_file(torch_constraints)
+            if constraints_file:
+                constraint_args = ["--constraint", constraints_file]
+                if _cuda_index_for_batch:
+                    torch_index_args = [
+                        "--extra-index-url",
+                        "https://download.pytorch.org/whl/{}".format(
+                            _cuda_index_for_batch
+                        ),
+                    ]
+                _log(
+                    "Constraining batch install to existing PyTorch packages: "
+                    "{}".format(", ".join(torch_constraints)),
+                    Qgis.Info,
+                )
         _log(
             "Installing {} packages in batch: {}".format(
                 len(batch_specs), ", ".join(batch_specs)
@@ -2989,6 +3139,8 @@ def install_dependencies(
                 "--upgrade",
             ]
             pip_args.extend(_get_uv_ssl_flags())
+            pip_args.extend(torch_index_args)
+            pip_args.extend(constraint_args)
             pip_args.extend(batch_specs)
             base_cmd = [uv_path] + pip_args
         else:
@@ -3001,6 +3153,8 @@ def install_dependencies(
             ]
             pip_args.extend(_get_pip_ssl_flags())
             pip_args.extend(_get_pip_proxy_args())
+            pip_args.extend(torch_index_args)
+            pip_args.extend(constraint_args)
             pip_args.extend(batch_specs)
             base_cmd = [python_path, "-m", "pip"] + pip_args
 
@@ -3112,6 +3266,8 @@ def install_dependencies(
                                 "--upgrade",
                             ]
                             retry_args.extend(_get_uv_ssl_flags())
+                            retry_args.extend(torch_index_args)
+                            retry_args.extend(constraint_args)
                             retry_args.extend(retry_specs)
                             retry_cmd = [uv_path] + retry_args
                         else:
@@ -3124,6 +3280,8 @@ def install_dependencies(
                             ]
                             retry_args.extend(_get_pip_ssl_flags())
                             retry_args.extend(_get_pip_proxy_args())
+                            retry_args.extend(torch_index_args)
+                            retry_args.extend(constraint_args)
                             retry_args.extend(retry_specs)
                             retry_cmd = [
                                 python_path,
@@ -3229,6 +3387,8 @@ def install_dependencies(
         except Exception as e:
             _log("Exception during batch install: {}".format(e), Qgis.Critical)
             return False, "Error installing dependencies: {}".format(str(e)[:200])
+        finally:
+            _remove_temp_file(constraints_file)
 
     if progress_callback:
         progress_callback(100, "All dependencies installed")
