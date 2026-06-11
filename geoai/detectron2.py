@@ -244,7 +244,7 @@ def create_probability_mask(masks: np.ndarray, scores: np.ndarray) -> np.ndarray
         raise ValueError(f"Expected masks shape (N, H, W), got {masks.shape}")
 
     if scores.ndim != 1:
-        raise ValueError(f"Expected socres shape (N,) got {scores.shape}")
+        raise ValueError(f"Expected scores shape (N,) got {scores.shape}")
 
     num_instances = masks.shape[0]
 
