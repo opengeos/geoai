@@ -109,9 +109,7 @@ class TestFoundationModelRegistry(unittest.TestCase):
             self.assertIsInstance(
                 tasks, list, msg=f"Entry '{key}': tasks is not a list"
             )
-            self.assertGreater(
-                len(tasks), 0, msg=f"Entry '{key}': tasks list is empty"
-            )
+            self.assertGreater(len(tasks), 0, msg=f"Entry '{key}': tasks list is empty")
             for t in tasks:
                 self.assertIsInstance(
                     t, str, msg=f"Entry '{key}': task element is not a string"
@@ -127,9 +125,7 @@ class TestFoundationModelRegistry(unittest.TestCase):
             self.assertGreaterEqual(
                 entry["year"], 2018, msg=f"Entry '{key}': year < 2018"
             )
-            self.assertLessEqual(
-                entry["year"], 2030, msg=f"Entry '{key}': year > 2030"
-            )
+            self.assertLessEqual(entry["year"], 2030, msg=f"Entry '{key}': year > 2030")
 
     def test_terratorch_supported_is_strict_bool(self):
         """terratorch_supported must be a Python bool (not just truthy)."""
