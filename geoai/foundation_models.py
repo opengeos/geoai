@@ -567,10 +567,13 @@ def list_foundation_models(
         models = {k: v for k, v in models.items() if v["huggingface_id"] is not None}
 
     if not as_dataframe:
-        return models
+        import copy
+
+        return copy.deepcopy(models)
 
     rows = [
         {
+            "id": k,
             "name": v["name"],
             "abbreviation": v["abbreviation"],
             "category": v["category"],
@@ -582,7 +585,7 @@ def list_foundation_models(
             "terratorch_key": v["terratorch_key"] or "",
             "huggingface_id": v["huggingface_id"] or "",
         }
-        for v in models.values()
+        for k, v in models.items()
     ]
     df = pd.DataFrame(rows)
     if verbose and not df.empty:
@@ -631,10 +634,10 @@ def check_terratorch_available() -> bool:
     """
     try:
         import terratorch.models.backbones  # noqa: F401
-
-        return True
-    except Exception:
+    except Exception:  # noqa: BLE001 — catches broken installs (ABI mismatch, missing deps)
         return False
+    else:
+        return True
 
 
 def load_foundation_model(name: str, pretrained: bool = True, **kwargs: Any) -> Any:

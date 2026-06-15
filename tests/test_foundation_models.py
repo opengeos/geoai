@@ -195,6 +195,7 @@ class TestListFoundationModels(unittest.TestCase):
     def test_dataframe_has_expected_columns(self):
         """DataFrame must include key summary columns."""
         expected = {
+            "id",
             "name",
             "abbreviation",
             "category",
@@ -377,6 +378,65 @@ class TestLazyImport(unittest.TestCase):
         df = geoai.list_foundation_models(verbose=False)
         self.assertIsInstance(df, pd.DataFrame)
         self.assertGreater(len(df), 0)
+
+
+class TestLoadFoundationModel(unittest.TestCase):
+    """Tests for load_foundation_model error contract (mocked — no GPU required)."""
+
+    def test_unknown_model_raises_value_error(self):
+        """Unknown model name must raise ValueError before any import attempt."""
+        from geoai.foundation_models import load_foundation_model
+
+        with self.assertRaises(ValueError) as ctx:
+            load_foundation_model("no-such-model-xyz")
+        self.assertIn("no-such-model-xyz", str(ctx.exception))
+
+    def test_unsupported_model_raises_not_implemented(self):
+        """A model with terratorch_supported=False must raise NotImplementedError."""
+        from geoai.foundation_models import load_foundation_model
+
+        with self.assertRaises(NotImplementedError):
+            load_foundation_model("satmae-base")
+
+    def test_missing_terratorch_raises_import_error(self):
+        """When TerraTorch is unavailable, load must raise ImportError."""
+        from unittest.mock import patch
+
+        from geoai.foundation_models import load_foundation_model
+
+        with patch(
+            "geoai.foundation_models.check_terratorch_available", return_value=False
+        ):
+            with self.assertRaises(ImportError) as ctx:
+                load_foundation_model("prithvi-eo-2.0-300m")
+        self.assertIn("terratorch", str(ctx.exception).lower())
+
+    def test_registry_build_failure_raises_runtime_error(self):
+        """A TerraTorch registry build failure must be wrapped in RuntimeError."""
+        from unittest.mock import MagicMock, patch
+
+        from geoai.foundation_models import load_foundation_model
+
+        mock_registry = MagicMock()
+        mock_registry.build.side_effect = Exception("simulated registry error")
+
+        with patch(
+            "geoai.foundation_models.check_terratorch_available", return_value=True
+        ):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "terratorch": MagicMock(),
+                    "terratorch.models": MagicMock(),
+                    "terratorch.models.backbones": MagicMock(),
+                    "terratorch.models.backbones.registry": MagicMock(
+                        BACKBONE_REGISTRY=mock_registry
+                    ),
+                },
+            ):
+                with self.assertRaises(RuntimeError) as ctx:
+                    load_foundation_model("prithvi-eo-2.0-300m")
+        self.assertIn("simulated registry error", str(ctx.exception))
 
 
 if __name__ == "__main__":
