@@ -240,18 +240,32 @@ def create_probability_mask(masks: np.ndarray, scores: np.ndarray) -> np.ndarray
     Returns:
         Probability mask with maximum confidence score for each pixel
     """
-    if len(masks) == 0:
-        return np.zeros((masks.shape[1], masks.shape[2]), dtype=np.float32)
+    if masks.ndim != 3:
+        raise ValueError(f"Expected masks shape (N, H, W), got {masks.shape}")
 
-    probability_mask = np.zeros((masks.shape[1], masks.shape[2]), dtype=np.float32)
+    if scores.ndim != 1:
+        raise ValueError(f"Expected scores shape (N,) got {scores.shape}")
 
-    for i, (mask, score) in enumerate(zip(masks, scores)):
-        # Update probability mask with higher confidence scores
-        probability_mask = np.where(
-            mask & (score > probability_mask), score, probability_mask
+    num_instances = masks.shape[0]
+
+    if num_instances != scores.shape[0]:
+        raise ValueError(
+            "Number of masks and scores must match. "
+            f"Got {num_instances} masks and "
+            f"{scores.shape[0]} scores"
         )
 
-    return probability_mask
+    if num_instances == 0:
+        return np.zeros(
+            masks.shape[-2:],
+            dtype=np.float32,
+        )
+
+    weighted_masks = masks.astype(np.float32) * scores[:, np.newaxis, np.newaxis]
+
+    probability_mask = np.max(weighted_masks, axis=0)
+
+    return probability_mask.astype(np.float32)
 
 
 def save_geotiff_mask(
