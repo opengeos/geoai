@@ -197,6 +197,7 @@ nav:
           - examples/tessera.ipynb
           - examples/torchgeo_embeddings.ipynb
           - examples/google_satellite_embedding.ipynb
+          - examples/foundation_models.ipynb
           - examples/building_detection_whu.ipynb
           - examples/clip_classify_vector.ipynb
           - examples/impervious_surface_mapping.ipynb
@@ -227,6 +228,7 @@ nav:
           - download module: download.md
           - embeddings module: embeddings.md
           - extract module: extract.md
+          - foundation_models module: foundation_models.md
           - hf module: hf.md
           - inference module: inference.md
           - landcover_train module: landcover_train.md

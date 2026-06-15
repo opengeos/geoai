@@ -465,6 +465,12 @@ _LAZY_SYMBOL_MAP = {
     "Discriminator": ("esrgan", None),
     "VGGPerceptualLoss": ("esrgan", None),
     "NormalizeToVGG": ("esrgan", None),
+    # --- geoai.foundation_models ---
+    "FOUNDATION_MODELS": ("foundation_models", None),
+    "list_foundation_models": ("foundation_models", None),
+    "get_foundation_model_info": ("foundation_models", None),
+    "check_terratorch_available": ("foundation_models", None),
+    "load_foundation_model": ("foundation_models", None),
 }
 
 # Submodules that can be imported via `from geoai import <submodule>`
@@ -486,6 +492,7 @@ _LAZY_SUBMODULES = {
     "landcover_train",
     "dinov3_finetune",
     "esrgan",
+    "foundation_models",
 }
 
 
