@@ -641,6 +641,13 @@ _TORCH_DISTRIBUTIONS = ("torch", "torchvision")
 # consider all indexes lets the newest compatible version win (pulled from
 # PyPI) while ``torch``/``torchvision`` still come from the PyTorch index.
 # See https://github.com/opengeos/geoai/issues/829.
+#
+# Tradeoff: uv documents ``unsafe-best-match`` as relaxing its dependency-
+# confusion protection, since it lets any configured index supply the winning
+# version for a given package name. That is acceptable here because both
+# indexes (PyPI and download.pytorch.org) are official and trusted, and the
+# torch distributions themselves stay pinned to the installed build via the
+# ``--constraint`` file written alongside these args.
 _UV_MULTI_INDEX_STRATEGY = ("--index-strategy", "unsafe-best-match")
 
 
