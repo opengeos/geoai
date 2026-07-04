@@ -357,12 +357,15 @@ def get_overture_data(
 
     gdf.crs = "EPSG:4326"
 
-    out_dir = os.path.dirname(os.path.abspath(output))
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir, exist_ok=True)
-
     if output is not None:
-        gdf.to_file(output, **kwargs)
+        out_dir = os.path.dirname(os.path.abspath(output))
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
+        if output.lower().endswith(".parquet"):
+            gdf.to_parquet(output, **kwargs)
+        else:
+            gdf.to_file(output, **kwargs)
 
     return gdf
 
