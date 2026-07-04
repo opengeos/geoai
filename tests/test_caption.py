@@ -256,7 +256,7 @@ def _spacy_available():
 
         spacy.load("en_core_web_sm")
         return True
-    except OSError:
+    except (OSError, ImportError):
         return False
 
 
