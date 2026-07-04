@@ -35,6 +35,10 @@ jobs:
               run: |
                   python qgis_plugin/tools/check_dependency_resolution.py --platform win32 --python-version 3.12 --timeout 900
 
+            - name: Resolve with PyTorch CUDA index (mirrors GPU install, issue #829)
+              run: |
+                  python qgis_plugin/tools/check_dependency_resolution.py --platform win32 --python-version 3.12 --cuda-index cu126 --timeout 900
+
     diagnostics-unit-tests:
         name: Resolver diagnostics tests
         runs-on: ubuntu-latest

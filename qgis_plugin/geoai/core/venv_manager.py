@@ -49,7 +49,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "11"
+_INSTALL_LOGIC_VERSION = "12"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -331,6 +331,7 @@ def resolve_qgis_dependencies(
     platform_name: str = "win32",
     resolver: str = "uv",
     timeout: int = 600,
+    cuda_index: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """Dry-run dependency resolution for the QGIS plugin install environment.
 
@@ -342,6 +343,11 @@ def resolve_qgis_dependencies(
         platform_name: Target Python platform, e.g. ``win32``.
         resolver: Resolver backend. Currently only ``uv`` is supported.
         timeout: Subprocess timeout in seconds.
+        cuda_index: Optional PyTorch CUDA wheel index (e.g. ``cu126``). When
+            set, the resolve mirrors the real GPU install by adding the
+            PyTorch ``--extra-index-url`` and the multi-index strategy so CI
+            reproduces the index configuration users actually hit. See
+            https://github.com/opengeos/geoai/issues/829.
 
     Returns:
         Tuple of success flag and diagnostic message.
@@ -363,8 +369,16 @@ def resolve_qgis_dependencies(
         "--python-platform",
         _uv_platform_name(platform_name),
         "--quiet",
-        "-",
     ]
+    if cuda_index:
+        cmd.extend(
+            [
+                "--extra-index-url",
+                "https://download.pytorch.org/whl/{}".format(cuda_index),
+            ]
+        )
+        cmd.extend(_UV_MULTI_INDEX_STRATEGY)
+    cmd.append("-")
     requirements = "\n".join(package_specs) + "\n"
     try:
         result = subprocess.run(
@@ -617,6 +631,17 @@ _INSECURE_PACKAGE_HOSTS = (
 )
 
 _TORCH_DISTRIBUTIONS = ("torch", "torchvision")
+
+# When a uv install also points at the PyTorch wheel index via
+# ``--extra-index-url``, uv defaults to the "first-index" strategy and only
+# considers a package on the first index that lists it. The PyTorch index
+# hosts stale copies of common packages (e.g. ``requests==2.28.1``), which
+# makes geoai-py's transitive requirement of ``requests>=2.32.2`` (via
+# ``datasets``) unsatisfiable and aborts the whole install. Telling uv to
+# consider all indexes lets the newest compatible version win (pulled from
+# PyPI) while ``torch``/``torchvision`` still come from the PyTorch index.
+# See https://github.com/opengeos/geoai/issues/829.
+_UV_MULTI_INDEX_STRATEGY = ("--index-strategy", "unsafe-best-match")
 
 
 def _is_ssl_error(stderr: str) -> bool:
@@ -3140,6 +3165,8 @@ def install_dependencies(
             ]
             pip_args.extend(_get_uv_ssl_flags())
             pip_args.extend(torch_index_args)
+            if torch_index_args:
+                pip_args.extend(_UV_MULTI_INDEX_STRATEGY)
             pip_args.extend(constraint_args)
             pip_args.extend(batch_specs)
             base_cmd = [uv_path] + pip_args
@@ -3267,6 +3294,8 @@ def install_dependencies(
                             ]
                             retry_args.extend(_get_uv_ssl_flags())
                             retry_args.extend(torch_index_args)
+                            if torch_index_args:
+                                retry_args.extend(_UV_MULTI_INDEX_STRATEGY)
                             retry_args.extend(constraint_args)
                             retry_args.extend(retry_specs)
                             retry_cmd = [uv_path] + retry_args
