@@ -53,6 +53,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Target Python platform to resolve for.",
     )
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument(
+        "--cuda-index",
+        default=None,
+        help=(
+            "PyTorch CUDA wheel index to mirror a GPU install, e.g. 'cu126'. "
+            "When set, the resolve adds the PyTorch --extra-index-url and the "
+            "multi-index strategy, reproducing the real install (issue #829)."
+        ),
+    )
     args = parser.parse_args(argv)
 
     _install_qgis_stub()
@@ -76,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         python_version=args.python_version,
         platform_name=args.platform,
         timeout=args.timeout,
+        cuda_index=args.cuda_index,
     )
     print(message)
     return 0 if success else 1

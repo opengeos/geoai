@@ -73,3 +73,62 @@ def test_dependency_resolver_dry_run_uses_uv_compile(monkeypatch):
     assert requirements is not None
     assert "transformers>=4.56.2" in requirements
     assert "triton-windows" in requirements
+
+
+def test_dependency_resolver_adds_pytorch_index_and_strategy_for_cuda(monkeypatch):
+    """CUDA resolve must mirror the real install: PyTorch extra index + strategy.
+
+    Regression guard for issue #829: without the multi-index strategy, uv only
+    considers the (stale) PyTorch index for shared packages like ``requests``,
+    making geoai-py's ``datasets`` requirement unsatisfiable.
+    """
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append({"cmd": cmd})
+        return subprocess.CompletedProcess(
+            cmd, 0, stdout="Resolved 10 packages", stderr=""
+        )
+
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    ok, _ = venv_manager.resolve_qgis_dependencies(
+        python_version="3.12",
+        platform_name="win32",
+        resolver="uv",
+        timeout=5,
+        cuda_index="cu126",
+    )
+
+    assert ok is True
+    cmd = calls[0]["cmd"]
+    assert "--extra-index-url" in cmd
+    assert "https://download.pytorch.org/whl/cu126" in cmd
+    assert "--index-strategy" in cmd
+    assert "unsafe-best-match" in cmd
+    # The strategy flags must come before the trailing "-" stdin marker.
+    assert cmd[-1] == "-"
+
+
+def test_dependency_resolver_omits_pytorch_index_without_cuda(monkeypatch):
+    """The default (CPU) resolve must not add the PyTorch index or strategy."""
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append({"cmd": cmd})
+        return subprocess.CompletedProcess(
+            cmd, 0, stdout="Resolved 10 packages", stderr=""
+        )
+
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    venv_manager.resolve_qgis_dependencies(
+        python_version="3.12",
+        platform_name="win32",
+        resolver="uv",
+        timeout=5,
+    )
+
+    cmd = calls[0]["cmd"]
+    assert "--extra-index-url" not in cmd
+    assert "--index-strategy" not in cmd
