@@ -1,6 +1,7 @@
 """Change detection module for remote sensing imagery using torchange."""
 
 import logging
+import math
 import os
 import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -20,6 +21,38 @@ except ImportError:
     show_change_masks = None
 
 from .utils import download_file
+
+
+def _normalize_change_confidence(
+    change_confidence: float, threshold_degrees: float = 145.0
+) -> float:
+    """Normalize a torchange change confidence value to the [0, 1] range.
+
+    torchange's AnyChange scores each mask with the negative cosine similarity
+    between its two temporal mask embeddings, so raw values lie in [-1, 1]
+    (-1 = identical embeddings / no change, 1 = opposite embeddings / maximal
+    change). Masks are kept when the raw value exceeds
+    ``cos(radians(threshold_degrees))``. This maps the raw cosine value to
+    [0, 1] so that the decision threshold lands at 0.5: values below the
+    threshold fall in [0, 0.5) and values above it fall in (0.5, 1].
+
+    Args:
+        change_confidence (float): Raw change confidence (negative cosine
+            similarity) reported by torchange, in [-1, 1].
+        threshold_degrees (float): Change confidence threshold angle in
+            degrees, matching torchange's ``change_confidence_threshold``
+            hyperparameter. Defaults to 145.0.
+
+    Returns:
+        float: Normalized confidence in [0, 1].
+    """
+    conf = float(np.clip(change_confidence, -1.0, 1.0))
+    # Clamp the angle away from 0/180 degrees so both branches below have a
+    # nonzero denominator.
+    threshold_cos = math.cos(math.radians(min(max(threshold_degrees, 1.0), 179.0)))
+    if conf > threshold_cos:
+        return 0.5 + 0.5 * (conf - threshold_cos) / (1.0 - threshold_cos)
+    return 0.5 * (conf + 1.0) / (threshold_cos + 1.0)
 
 
 class ChangeDetection:
@@ -62,6 +95,19 @@ class ChangeDetection:
             use_normalized_feature=True,
             bitemporal_match=True,
         )
+
+    def _get_change_confidence_threshold(self) -> float:
+        """Get the model's change confidence threshold angle in degrees.
+
+        torchange stores the threshold on the model (updating it when
+        ``auto_threshold`` is enabled), so read it from there rather than
+        tracking a separate copy.
+
+        Returns:
+            float: Threshold angle in degrees. Falls back to 145.0 if the
+                model does not expose one.
+        """
+        return float(getattr(self.model, "change_confidence_threshold", 145.0))
 
     def set_hyperparameters(
         self,
@@ -479,14 +525,13 @@ class ChangeDetection:
                     else:
                         prob_components.append(("stability", 0.8))
 
-                    # Change confidence (normalize based on threshold)
+                    # Change confidence (raw value is a negative cosine
+                    # similarity in [-1, 1]; normalize against the threshold)
                     if change_confidence is not None and i < len(change_confidence):
                         conf = float(change_confidence[i])
-                        # Normalize confidence: threshold is 145, values above indicate higher confidence
-                        if conf >= 145:
-                            conf_normalized = 0.5 + min(0.5, (conf - 145) / 145)
-                        else:
-                            conf_normalized = max(0.0, conf / 145 * 0.5)
+                        conf_normalized = _normalize_change_confidence(
+                            conf, self._get_change_confidence_threshold()
+                        )
                         prob_components.append(("confidence", conf_normalized))
                     else:
                         prob_components.append(("confidence", 0.5))
@@ -1011,7 +1056,7 @@ class ChangeDetection:
                 x=stats["change_confidence"]["mean"],
                 color="red",
                 linestyle="--",
-                label=f"Mean: {stats['change_confidence']['mean']:.1f}",
+                label=f"Mean: {stats['change_confidence']['mean']:.3f}",
             )
             axes[0, 2].set_xlabel("Change Confidence")
             axes[0, 2].set_ylabel("Count")
@@ -1087,8 +1132,8 @@ Stability Scores:
         if "change_confidence" in stats:
             summary_text += f"""
 Change Confidence:
-  Mean: {stats['change_confidence']['mean']:.1f}
-  Range: {stats['change_confidence']['min']:.1f} - {stats['change_confidence']['max']:.1f}"""
+  Mean: {stats['change_confidence']['mean']:.3f}
+  Range: {stats['change_confidence']['min']:.3f} - {stats['change_confidence']['max']:.3f}"""
 
         if "areas" in stats:
             summary_text += f"""
@@ -1344,9 +1389,9 @@ Areas:
                                 change_confidence
                             ):
                                 change_conf = float(change_confidence[instance_id])
-                                # Normalize change confidence (typically around 145 threshold)
-                                change_conf_norm = max(
-                                    0.0, min(1.0, abs(change_conf) / 200.0)
+                                change_conf_norm = _normalize_change_confidence(
+                                    change_conf,
+                                    self._get_change_confidence_threshold(),
                                 )
 
                                 # Weighted combination of scores
@@ -1542,8 +1587,10 @@ Areas:
                     mask_info["change_confidence"],
                 ]
             ):
-                # Normalize change confidence (145 is typical threshold)
-                conf_norm = max(0.0, min(1.0, mask_info["change_confidence"] / 145.0))
+                conf_norm = _normalize_change_confidence(
+                    mask_info["change_confidence"],
+                    self._get_change_confidence_threshold(),
+                )
                 combined_score = (
                     0.3 * mask_info["iou_pred"]
                     + 0.3 * mask_info["stability_score"]
