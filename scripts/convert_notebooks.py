@@ -78,6 +78,9 @@ def _insert_download_badge(markdown: str, notebook_name: str) -> str:
 def convert_all(docs_dir: Path) -> int:
     """Convert all notebooks under a docs directory to Markdown files.
 
+    Files whose rendered content is unchanged are left untouched so their
+    mtimes stay stable and Zensical's incremental builds stay fast.
+
     Args:
         docs_dir: Root directory to search for ``.ipynb`` files.
 
@@ -88,8 +91,10 @@ def convert_all(docs_dir: Path) -> int:
     for notebook in sorted(docs_dir.rglob("*.ipynb")):
         if ".ipynb_checkpoints" in notebook.parts:
             continue
+        markdown = notebook_to_markdown(notebook)
         target = notebook.with_suffix(".md")
-        target.write_text(notebook_to_markdown(notebook), encoding="utf-8")
+        if not target.exists() or target.read_text(encoding="utf-8") != markdown:
+            target.write_text(markdown, encoding="utf-8")
         count += 1
     return count
 
