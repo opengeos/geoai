@@ -3,6 +3,8 @@ on:
     push:
         branches:
             - main
+permissions:
+    contents: write
 jobs:
     deploy:
         runs-on: ubuntu-latest
@@ -51,7 +53,15 @@ jobs:
                   export PYTHONPATH=$(pwd)
                   uv run pytest tests --verbose
 
-            - name: Install mkdocs
+            - name: Build docs with Zensical
               run: |
                   uv pip install -r requirements_docs.txt
-                  uv run mkdocs gh-deploy --force
+                  uv run python scripts/convert_notebooks.py
+                  uv run zensical build
+
+            - name: Deploy to GitHub Pages
+              uses: peaceiris/actions-gh-pages@v4
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./site
+                  force_orphan: true
