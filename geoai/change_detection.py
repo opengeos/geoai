@@ -50,7 +50,7 @@ def _normalize_change_confidence(
     # Clamp the angle away from 0/180 degrees so both branches below have a
     # nonzero denominator.
     threshold_cos = math.cos(math.radians(min(max(threshold_degrees, 1.0), 179.0)))
-    if conf >= threshold_cos:
+    if conf > threshold_cos:
         return 0.5 + 0.5 * (conf - threshold_cos) / (1.0 - threshold_cos)
     return 0.5 * (conf + 1.0) / (threshold_cos + 1.0)
 

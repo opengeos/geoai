@@ -515,13 +515,13 @@ class TestGetChangeConfidenceThreshold(unittest.TestCase):
     @patch("geoai.change_detection.AnyChange")
     def test_reads_threshold_from_model(self, mock_anychange, mock_download):
         mock_model = MagicMock()
-        mock_model.change_confidence_threshold = 155
         mock_anychange.return_value = mock_model
         mock_download.return_value = "/fake/ckpt.pth"
 
         from geoai.change_detection import ChangeDetection
 
         detector = ChangeDetection()
+        detector.model.change_confidence_threshold = 155
         self.assertEqual(detector._get_change_confidence_threshold(), 155.0)
 
     @patch("geoai.change_detection.download_checkpoint")
