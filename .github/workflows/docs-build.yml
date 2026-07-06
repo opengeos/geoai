@@ -53,10 +53,11 @@ jobs:
                   export PYTHONPATH=$(pwd)
                   .venv/bin/python -m pytest tests --verbose
 
-            - name: Install mkdocs
+            - name: Build docs with Zensical
               run: |
                   uv pip install -r requirements_docs.txt
-                  .venv/bin/python -m mkdocs build
+                  .venv/bin/python scripts/convert_notebooks.py
+                  .venv/bin/zensical build
 
             - name: Deploy to Netlify
               uses: nwtgck/actions-netlify@v4.0

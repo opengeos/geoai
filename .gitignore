@@ -146,3 +146,6 @@ ENV/
 CLAUDE.md
 lightning_logs working
 scratch/
+# Markdown files generated from notebooks by scripts/convert_notebooks.py
+docs/examples/**/*.md
+docs/workshops/**/*.md
