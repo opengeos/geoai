@@ -452,5 +452,91 @@ class TestComprehensiveReport(unittest.TestCase):
         self.detector.create_comprehensive_report({"other_key": 42})
 
 
+# ---------------------------------------------------------------------------
+# Change confidence normalization (issue #840)
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeChangeConfidence(unittest.TestCase):
+    """Raw change confidence is a negative cosine similarity in [-1, 1]."""
+
+    def test_threshold_maps_to_half(self):
+        import math
+
+        from geoai.change_detection import _normalize_change_confidence
+
+        for threshold in [60.0, 145.0, 155.0]:
+            threshold_cos = math.cos(math.radians(threshold))
+            self.assertAlmostEqual(
+                _normalize_change_confidence(threshold_cos, threshold), 0.5
+            )
+
+    def test_endpoints(self):
+        from geoai.change_detection import _normalize_change_confidence
+
+        self.assertAlmostEqual(_normalize_change_confidence(-1.0, 145.0), 0.0)
+        self.assertAlmostEqual(_normalize_change_confidence(1.0, 145.0), 1.0)
+
+    def test_monotonic_over_full_range(self):
+        from geoai.change_detection import _normalize_change_confidence
+
+        values = [
+            _normalize_change_confidence(c, 145.0) for c in np.linspace(-1, 1, 41)
+        ]
+        self.assertTrue(all(a < b for a, b in zip(values, values[1:])))
+        self.assertTrue(all(0.0 <= v <= 1.0 for v in values))
+
+    def test_kept_masks_score_above_half(self):
+        """Masks surviving torchange's filter (conf > cos(threshold)) map above 0.5."""
+        from geoai.change_detection import _normalize_change_confidence
+
+        # cos(145 degrees) is about -0.819; kept masks exceed it
+        for conf in [-0.8, -0.5, 0.0, 0.5, 0.9]:
+            self.assertGreater(_normalize_change_confidence(conf, 145.0), 0.5)
+
+    def test_out_of_range_input_clamped(self):
+        from geoai.change_detection import _normalize_change_confidence
+
+        self.assertAlmostEqual(_normalize_change_confidence(-2.0, 145.0), 0.0)
+        self.assertAlmostEqual(_normalize_change_confidence(2.0, 145.0), 1.0)
+
+    def test_degenerate_threshold_angles(self):
+        """Threshold angles at 0/180 degrees must not divide by zero."""
+        from geoai.change_detection import _normalize_change_confidence
+
+        for threshold in [0.0, 180.0]:
+            for conf in [-1.0, 0.0, 1.0]:
+                value = _normalize_change_confidence(conf, threshold)
+                self.assertTrue(0.0 <= value <= 1.0)
+
+
+class TestGetChangeConfidenceThreshold(unittest.TestCase):
+    @patch("geoai.change_detection.download_checkpoint")
+    @patch("geoai.change_detection.AnyChange")
+    def test_reads_threshold_from_model(self, mock_anychange, mock_download):
+        mock_model = MagicMock()
+        mock_model.change_confidence_threshold = 155
+        mock_anychange.return_value = mock_model
+        mock_download.return_value = "/fake/ckpt.pth"
+
+        from geoai.change_detection import ChangeDetection
+
+        detector = ChangeDetection()
+        self.assertEqual(detector._get_change_confidence_threshold(), 155.0)
+
+    @patch("geoai.change_detection.download_checkpoint")
+    @patch("geoai.change_detection.AnyChange")
+    def test_falls_back_to_default(self, mock_anychange, mock_download):
+        mock_model = MagicMock(spec=[])  # no change_confidence_threshold attribute
+        mock_anychange.return_value = mock_model
+        mock_download.return_value = "/fake/ckpt.pth"
+
+        from geoai.change_detection import ChangeDetection
+
+        detector = ChangeDetection.__new__(ChangeDetection)
+        detector.model = mock_model
+        self.assertEqual(detector._get_change_confidence_threshold(), 145.0)
+
+
 if __name__ == "__main__":
     unittest.main()
