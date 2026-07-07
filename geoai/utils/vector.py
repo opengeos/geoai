@@ -99,22 +99,22 @@ def print_vector_info(
         info = get_vector_info(vector_path)
 
         # Print basic information
-        logger.info(f"===== VECTOR INFORMATION: {vector_path} =====")
-        logger.info(f"Driver: {info['driver']}")
-        logger.info(f"Feature count: {info['feature_count']}")
-        logger.info(f"Geometry types: {info['geometry_type']}")
-        logger.info(f"Coordinate Reference System: {info['crs']}")
-        logger.info(f"Bounds: {info['bounds']}")
-        logger.info(f"Number of attributes: {info['attribute_count']}")
-        logger.info(f"Attribute names: {', '.join(info['attribute_names'])}")
+        print(f"===== VECTOR INFORMATION: {vector_path} =====")
+        print(f"Driver: {info['driver']}")
+        print(f"Feature count: {info['feature_count']}")
+        print(f"Geometry types: {info['geometry_type']}")
+        print(f"Coordinate Reference System: {info['crs']}")
+        print(f"Bounds: {info['bounds']}")
+        print(f"Number of attributes: {info['attribute_count']}")
+        print(f"Attribute names: {', '.join(info['attribute_names'])}")
 
         # Print attribute statistics
         if info["attribute_stats"]:
-            logger.info("----- Attribute Statistics -----")
+            print("----- Attribute Statistics -----")
             for attr, stats in info["attribute_stats"].items():
-                logger.info(f"Attribute: {attr}")
+                print(f"Attribute: {attr}")
                 for stat_name, stat_value in stats.items():
-                    logger.info(
+                    print(
                         f"  {stat_name}: {stat_value:.4f}"
                         if isinstance(stat_value, float)
                         else f"  {stat_name}: {stat_value}"
