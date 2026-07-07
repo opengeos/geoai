@@ -55,6 +55,19 @@ def _normalize_change_confidence(
     return 0.5 * (conf + 1.0) / (threshold_cos + 1.0)
 
 
+# Maps ChangeDetection.set_hyperparameters() argument names to the attribute
+# names torchange's AnyChange stores them under.
+_HYPERPARAMETER_ATTRS = {
+    "change_confidence_threshold": "change_confidence_threshold",
+    "auto_threshold": "auto_threshold",
+    "use_normalized_feature": "use_normalized_feature",
+    "area_thresh": "area_thresh",
+    "match_hist": "match_hist",
+    "object_sim_thresh": "object_sim_thresh",
+    "bitemporal_match": "use_bitemporal_match",
+}
+
+
 class ChangeDetection:
     """A class for change detection on geospatial imagery using torchange and SAM."""
 
@@ -111,39 +124,64 @@ class ChangeDetection:
 
     def set_hyperparameters(
         self,
-        change_confidence_threshold: int = 155,
-        auto_threshold: bool = False,
-        use_normalized_feature: bool = True,
-        area_thresh: float = 0.8,
-        match_hist: bool = False,
-        object_sim_thresh: int = 60,
-        bitemporal_match: bool = True,
+        change_confidence_threshold: Optional[int] = None,
+        auto_threshold: Optional[bool] = None,
+        use_normalized_feature: Optional[bool] = None,
+        area_thresh: Optional[float] = None,
+        match_hist: Optional[bool] = None,
+        object_sim_thresh: Optional[int] = None,
+        bitemporal_match: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
         """
-        Set hyperparameters for the change detection model.
+        Update hyperparameters for the change detection model.
+
+        Only the parameters explicitly provided (not None) are changed; all
+        other hyperparameters keep their current values on the model.
 
         Args:
-            change_confidence_threshold (int): Change confidence threshold for SAM
-            auto_threshold (bool): Whether to use auto threshold for SAM
-            use_normalized_feature (bool): Whether to use normalized feature for SAM
-            area_thresh (float): Area threshold for SAM
-            match_hist (bool): Whether to use match hist for SAM
-            object_sim_thresh (int): Object similarity threshold for SAM
-            bitemporal_match (bool): Whether to use bitemporal match for SAM
-            **kwargs: Keyword arguments for model hyperparameters
+            change_confidence_threshold (int, optional): Change confidence
+                threshold angle in degrees for SAM. Defaults to None (keep
+                current value; 145 after initialization).
+            auto_threshold (bool, optional): Whether to use auto threshold for
+                SAM. Defaults to None (keep current value).
+            use_normalized_feature (bool, optional): Whether to use normalized
+                feature for SAM. Defaults to None (keep current value).
+            area_thresh (float, optional): Area threshold for SAM. Defaults to
+                None (keep current value).
+            match_hist (bool, optional): Whether to use match hist for SAM.
+                Defaults to None (keep current value).
+            object_sim_thresh (int, optional): Object similarity threshold for
+                SAM. Defaults to None (keep current value).
+            bitemporal_match (bool, optional): Whether to use bitemporal match
+                for SAM. Defaults to None (keep current value).
+            **kwargs: Additional keyword arguments for model hyperparameters.
         """
-        if self.model:
-            self.model.set_hyperparameters(
-                change_confidence_threshold=change_confidence_threshold,
-                auto_threshold=auto_threshold,
-                use_normalized_feature=use_normalized_feature,
-                area_thresh=area_thresh,
-                match_hist=match_hist,
-                object_sim_thresh=object_sim_thresh,
-                bitemporal_match=bitemporal_match,
-                **kwargs,
+        if not self.model:
+            return
+
+        updates = {
+            name: value
+            for name, value in (
+                ("change_confidence_threshold", change_confidence_threshold),
+                ("auto_threshold", auto_threshold),
+                ("use_normalized_feature", use_normalized_feature),
+                ("area_thresh", area_thresh),
+                ("match_hist", match_hist),
+                ("object_sim_thresh", object_sim_thresh),
+                ("bitemporal_match", bitemporal_match),
             )
+            if value is not None
+        }
+        # torchange's AnyChange.set_hyperparameters() assigns every argument
+        # unconditionally, so forward the model's current values for anything
+        # not being updated to avoid resetting it to torchange defaults.
+        current = {
+            name: getattr(self.model, attr)
+            for name, attr in _HYPERPARAMETER_ATTRS.items()
+            if hasattr(self.model, attr)
+        }
+        self.model.set_hyperparameters(**{**current, **updates, **kwargs})
 
     def set_mask_generator_params(
         self,
