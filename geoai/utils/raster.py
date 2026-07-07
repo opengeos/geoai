@@ -247,26 +247,24 @@ def print_raster_info(
         info = get_raster_info(raster_path)
 
         # Print basic information
-        logger.info("===== RASTER INFORMATION: %s =====", raster_path)
-        logger.info("Driver: %s", info["driver"])
-        logger.info("Dimensions: %s x %s pixels", info["width"], info["height"])
-        logger.info("Number of bands: %s", info["count"])
-        logger.info("Data type: %s", info["dtype"])
-        logger.info("Coordinate Reference System: %s", info["crs"])
-        logger.info("Georeferenced Bounds: %s", info["bounds"])
-        logger.info(
-            "Pixel Resolution: %s, %s", info["resolution"][0], info["resolution"][1]
-        )
-        logger.info("NoData Value: %s", info["nodata"])
+        print(f"===== RASTER INFORMATION: {raster_path} =====")
+        print(f"Driver: {info['driver']}")
+        print(f"Dimensions: {info['width']} x {info['height']} pixels")
+        print(f"Number of bands: {info['count']}")
+        print(f"Data type: {info['dtype']}")
+        print(f"Coordinate Reference System: {info['crs']}")
+        print(f"Georeferenced Bounds: {info['bounds']}")
+        print(f"Pixel Resolution: {info['resolution'][0]}, {info['resolution'][1]}")
+        print(f"NoData Value: {info['nodata']}")
 
         # Print band statistics
-        logger.info("----- Band Statistics -----")
+        print("----- Band Statistics -----")
         for band_stat in info["band_stats"]:
-            logger.info("Band %s:", band_stat["band"])
-            logger.info("  Min: %.2f", band_stat["min"])
-            logger.info("  Max: %.2f", band_stat["max"])
-            logger.info("  Mean: %.2f", band_stat["mean"])
-            logger.info("  Std Dev: %.2f", band_stat["std"])
+            print(f"Band {band_stat['band']}:")
+            print(f"  Min: {band_stat['min']:.2f}")
+            print(f"  Max: {band_stat['max']:.2f}")
+            print(f"  Mean: {band_stat['mean']:.2f}")
+            print(f"  Std Dev: {band_stat['std']:.2f}")
 
         # Show a preview if requested
         if show_preview:
