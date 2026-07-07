@@ -236,6 +236,11 @@ class TestSetHyperparametersPreservesUnspecified(unittest.TestCase):
         self.detector.set_hyperparameters()
         self.assertEqual(self.detector.model.change_confidence_threshold, 170)
 
+    def test_noop_without_model_even_with_args(self):
+        self.detector.model = None
+        # Should not raise
+        self.detector.set_hyperparameters(area_thresh=0.9)
+
     def test_bitemporal_match_maps_to_model_attribute(self):
         self.detector.set_hyperparameters(bitemporal_match=False)
         self.assertFalse(self.detector.model.use_bitemporal_match)

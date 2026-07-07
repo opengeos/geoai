@@ -157,22 +157,20 @@ class ChangeDetection:
                 for SAM. Defaults to None (keep current value).
             **kwargs: Additional keyword arguments for model hyperparameters.
         """
+        # Snapshot the arguments before any other locals are created, so the
+        # parameter names in _HYPERPARAMETER_ATTRS stay the single source of
+        # truth for which hyperparameters exist.
+        provided = locals()
         if not self.model:
             return
 
         updates = {
-            name: value
-            for name, value in (
-                ("change_confidence_threshold", change_confidence_threshold),
-                ("auto_threshold", auto_threshold),
-                ("use_normalized_feature", use_normalized_feature),
-                ("area_thresh", area_thresh),
-                ("match_hist", match_hist),
-                ("object_sim_thresh", object_sim_thresh),
-                ("bitemporal_match", bitemporal_match),
-            )
-            if value is not None
+            name: provided[name]
+            for name in _HYPERPARAMETER_ATTRS
+            if provided[name] is not None
         }
+        if not updates and not kwargs:
+            return
         # torchange's AnyChange.set_hyperparameters() assigns every argument
         # unconditionally, so forward the model's current values for anything
         # not being updated to avoid resetting it to torchange defaults.
