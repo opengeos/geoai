@@ -15,6 +15,39 @@ import numpy as np
 # ---------------------------------------------------------------------------
 
 
+class _FakeAnyChange:
+    """Mimics torchange's AnyChange hyperparameter storage.
+
+    ``set_hyperparameters`` assigns every argument unconditionally, exactly
+    like the upstream implementation, and ``bitemporal_match`` is stored as
+    ``use_bitemporal_match``.
+    """
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def make_mask_generator(self, **kwargs):
+        pass
+
+    def set_hyperparameters(
+        self,
+        change_confidence_threshold=155,
+        auto_threshold=False,
+        use_normalized_feature=True,
+        area_thresh=0.8,
+        match_hist=False,
+        object_sim_thresh=60,
+        bitemporal_match=True,
+    ):
+        self.area_thresh = area_thresh
+        self.match_hist = match_hist
+        self.change_confidence_threshold = change_confidence_threshold
+        self.auto_threshold = auto_threshold
+        self.use_normalized_feature = use_normalized_feature
+        self.object_sim_thresh = object_sim_thresh
+        self.use_bitemporal_match = bitemporal_match
+
+
 def _create_test_geotiff(path, width=64, height=64, bands=3, dtype="uint8"):
     """Create a minimal GeoTIFF for testing."""
     import rasterio
@@ -169,6 +202,57 @@ class TestSetHyperparameters(unittest.TestCase):
     def test_set_mask_generator_params_noop_without_model(self):
         self.detector.model = None
         self.detector.set_mask_generator_params()
+
+
+class TestSetHyperparametersPreservesUnspecified(unittest.TestCase):
+    """Regression tests for issue #844: set_hyperparameters() must not reset
+    parameters the caller did not pass."""
+
+    @patch("geoai.change_detection.download_checkpoint")
+    @patch("geoai.change_detection.AnyChange", _FakeAnyChange)
+    def setUp(self, mock_download):
+        mock_download.return_value = "/fake/ckpt.pth"
+
+        from geoai.change_detection import ChangeDetection
+
+        self.detector = ChangeDetection()
+
+    def test_init_defaults_applied(self):
+        self.assertEqual(self.detector.model.change_confidence_threshold, 145)
+        self.assertTrue(self.detector.model.use_normalized_feature)
+        self.assertTrue(self.detector.model.use_bitemporal_match)
+
+    def test_updating_one_param_preserves_others(self):
+        self.detector.set_hyperparameters(area_thresh=0.9)
+        self.assertEqual(self.detector.model.area_thresh, 0.9)
+        # Threshold must stay at the init value (145), not reset to
+        # torchange's default (155).
+        self.assertEqual(self.detector.model.change_confidence_threshold, 145)
+        self.assertEqual(self.detector.model.object_sim_thresh, 60)
+        self.assertTrue(self.detector.model.use_bitemporal_match)
+
+    def test_no_args_is_a_noop(self):
+        self.detector.set_hyperparameters(change_confidence_threshold=170)
+        self.detector.set_hyperparameters()
+        self.assertEqual(self.detector.model.change_confidence_threshold, 170)
+
+    def test_noop_without_model_even_with_args(self):
+        self.detector.model = None
+        # Should not raise
+        self.detector.set_hyperparameters(area_thresh=0.9)
+
+    def test_bitemporal_match_maps_to_model_attribute(self):
+        self.detector.set_hyperparameters(bitemporal_match=False)
+        self.assertFalse(self.detector.model.use_bitemporal_match)
+        self.detector.set_hyperparameters(match_hist=True)
+        self.assertFalse(self.detector.model.use_bitemporal_match)
+
+    def test_false_and_zero_values_are_forwarded(self):
+        self.detector.set_hyperparameters(
+            use_normalized_feature=False, object_sim_thresh=0
+        )
+        self.assertFalse(self.detector.model.use_normalized_feature)
+        self.assertEqual(self.detector.model.object_sim_thresh, 0)
 
 
 # ---------------------------------------------------------------------------
