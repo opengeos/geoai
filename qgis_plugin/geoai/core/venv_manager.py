@@ -3080,13 +3080,11 @@ def install_dependencies(
                         or "Return code {}".format(result.returncode)
                     )
                     _log(
-                        "Failed to install {}: {}".format(
-                            package_spec, error_msg[:500]
-                        ),
+                        "Failed to install {}: {}".format(package_spec, error_msg),
                         Qgis.Critical,
                     )
                     install_failed = True
-                    install_error_msg = error_msg
+                    install_error_msg = _truncate_error(error_msg)
                     last_returncode = result.returncode
 
             except subprocess.TimeoutExpired:
@@ -3200,7 +3198,7 @@ def install_dependencies(
 
             if install_failed:
                 _log(
-                    "pip error output: {}".format(install_error_msg[:500]),
+                    "pip error output: {}".format(install_error_msg),
                     Qgis.Critical,
                 )
                 if _looks_like_resolution_conflict(install_error_msg):
@@ -3499,7 +3497,7 @@ def install_dependencies(
                     _classify_batch_error(error_output, batch_specs) or "dependencies"
                 )
                 _log(
-                    "Batch install failed: {}".format(error_output[:500]),
+                    "Batch install failed: {}".format(error_output),
                     Qgis.Critical,
                 )
                 if _looks_like_resolution_conflict(error_output):

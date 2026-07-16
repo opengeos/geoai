@@ -539,3 +539,43 @@ def test_venv_python_works_false_when_interpreter_cannot_launch(tmp_path, monkey
     monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
 
     assert venv_manager.venv_python_works(str(tmp_path)) is False
+
+
+def test_single_package_install_failure_message_is_bounded(tmp_path, monkeypatch):
+    """Raw installer output must not reach the UI dialog unbounded."""
+    from geoai.core import uv_manager
+
+    huge_stderr = "error: could not build wheel\n" + ("y" * 50000) + "\nCaused by: boom"
+
+    def fake_run_pip_install(**_kwargs):
+        return venv_manager._PipResult(1, "", huge_stderr)
+
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: False)
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(
+        venv_manager, "_get_required_packages", lambda: [("torch", ">=2.0.0")]
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "detect_nvidia_gpu",
+        lambda: (True, {"compute_cap": 3.0, "driver_version": "390.00"}),
+    )
+    # Driver too old: torch installs as a plain package, so a failure returns
+    # the raw stderr directly instead of going through the CPU fallback.
+    monkeypatch.setattr(venv_manager, "_select_cuda_index", lambda _gpu_info: None)
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+
+    ok, message = venv_manager.install_dependencies(
+        venv_dir=str(tmp_path / "venv"),
+        cuda_enabled=True,
+    )
+
+    assert ok is False
+    assert len(message) < 2000
+    assert "could not build wheel" in message
+    assert message.endswith("Caused by: boom")
