@@ -29,6 +29,7 @@ Example usage:
 
 import logging
 import os
+import uuid
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -1312,7 +1313,9 @@ def download_google_satellite_embedding(
             response.raise_for_status()
             # Write to a temporary path first so an interrupted download
             # cannot leave a truncated index cached for every later call.
-            tmp_path = f"{index_path}.part"
+            # The unique suffix keeps concurrent downloads from interleaving
+            # chunks into a shared temporary file.
+            tmp_path = f"{index_path}.{uuid.uuid4().hex}.part"
             try:
                 with open(tmp_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=1024 * 1024):
