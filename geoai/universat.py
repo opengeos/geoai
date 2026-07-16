@@ -20,11 +20,18 @@ UNIVERSAT_CACHE_DIR = os.path.expanduser("~/.cache/geoai/UniverSat")
 _src = os.path.join(UNIVERSAT_CACHE_DIR, "src")
 if not os.path.exists(UNIVERSAT_CACHE_DIR):
     subprocess.run(
-        ["git", "clone", "https://github.com/gastruc/UniverSat.git", UNIVERSAT_CACHE_DIR],
+        [
+            "git",
+            "clone",
+            "https://github.com/gastruc/UniverSat.git",
+            UNIVERSAT_CACHE_DIR,
+        ],
         check=True,
         timeout=300,
     )
-sys.path = [UNIVERSAT_CACHE_DIR, _src] + [p for p in sys.path if p not in (UNIVERSAT_CACHE_DIR, _src)]
+sys.path = [UNIVERSAT_CACHE_DIR, _src] + [
+    p for p in sys.path if p not in (UNIVERSAT_CACHE_DIR, _src)
+]
 
 try:
     import torch._dynamo
@@ -136,8 +143,7 @@ class UniverSatProcessor:
                 ),
                 dtype=torch.long,
             )
-            if mod in TIME_SERIES_MODALITIES
-            or sample.get(f"{mod}_dates") is not None
+            if mod in TIME_SERIES_MODALITIES or sample.get(f"{mod}_dates") is not None
             else None
         )
         return t_val, d_val
