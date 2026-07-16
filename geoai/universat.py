@@ -16,14 +16,15 @@ __all__ = [
 ]
 
 # Auto-clone UniverSat repo and setup environment
-_path = os.path.expanduser("~/.cache/geoai/UniverSat")
-_src = os.path.join(_path, "src")
-if not os.path.exists(_path):
+UNIVERSAT_CACHE_DIR = os.path.expanduser("~/.cache/geoai/UniverSat")
+_src = os.path.join(UNIVERSAT_CACHE_DIR, "src")
+if not os.path.exists(UNIVERSAT_CACHE_DIR):
     subprocess.run(
-        ["git", "clone", "https://github.com/gastruc/UniverSat.git", _path],
+        ["git", "clone", "https://github.com/gastruc/UniverSat.git", UNIVERSAT_CACHE_DIR],
         check=True,
+        timeout=300,
     )
-sys.path = [_path, _src] + [p for p in sys.path if p not in (_path, _src)]
+sys.path = [UNIVERSAT_CACHE_DIR, _src] + [p for p in sys.path if p not in (UNIVERSAT_CACHE_DIR, _src)]
 
 try:
     import torch._dynamo
@@ -82,6 +83,8 @@ class UniverSatProcessor:
         model_name_or_path: str = "g-astruc/UniverSat",
         device=None,
         eval_mode=True,
+        pretrained: bool = True,
+        size: str = "base",
     ):
         self.device = device or get_device()
         self.model = (
@@ -91,6 +94,8 @@ class UniverSatProcessor:
                 device=self.device,
                 eval_mode=eval_mode,
                 model_name_or_path=model_name_or_path,
+                pretrained=pretrained,
+                size=size,
             )
         )
         self.registry_wavelengths = WAVELENGTHS
@@ -117,7 +122,9 @@ class UniverSatProcessor:
             img, _ = self.read_geotiff(val)
             t_val = self.preprocess_image(img, mod, scale)
         elif isinstance(val, torch.Tensor):
-            t_val = val.float()
+            t_val = val.float() / (scale or 1.0)
+            if mod in TIME_SERIES_MODALITIES and t_val.ndim == 3:
+                t_val = t_val.unsqueeze(0)
         else:
             t_val = self.preprocess_image(val, mod, scale)
         d_val = (
@@ -130,6 +137,7 @@ class UniverSatProcessor:
                 dtype=torch.long,
             )
             if mod in TIME_SERIES_MODALITIES
+            or sample.get(f"{mod}_dates") is not None
             else None
         )
         return t_val, d_val
@@ -219,7 +227,7 @@ def universat_train(
     overrides: Optional[List[str]] = None,
     project_root: Optional[str] = None,
 ):
-    if not os.path.exists(p := os.path.expanduser("~/.cache/geoai/UniverSat")):
+    if not os.path.exists(p := UNIVERSAT_CACHE_DIR):
         raise FileNotFoundError("UniverSat repo not found.")
     subprocess.run(
         [sys.executable, os.path.join("src", "train.py"), f"exp={experiment}"]
