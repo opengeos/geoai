@@ -338,3 +338,204 @@ def test_verify_venv_treats_macos_sam3_import_failure_as_optional(monkeypatch):
     assert ready is True
     assert message == "Virtual environment ready (optional packages unavailable: sam3)"
     assert calls == ["torch", "sam3", "geoai-py"]
+
+
+def test_build_constraint_args_uses_relative_path_for_uv(tmp_path):
+    """uv splits --constraint on whitespace, so the value must have none."""
+    cache_dir = tmp_path / "CPDO USER" / ".qgis_geoai"
+    cache_dir.mkdir(parents=True)
+    constraints_file = str(cache_dir / "geoai_torch_constraints_ab.txt")
+
+    args = venv_manager._build_constraint_args(
+        constraints_file,
+        {"cwd": str(cache_dir)},
+        use_uv=True,
+    )
+
+    assert args == ["--constraint", "geoai_torch_constraints_ab.txt"]
+    assert not any(c.isspace() for c in args[1])
+
+
+def test_build_constraint_args_keeps_absolute_path_for_pip(tmp_path):
+    """pip does not split the value, so it keeps the unambiguous path."""
+    cache_dir = tmp_path / "Louis Roy" / ".qgis_geoai"
+    cache_dir.mkdir(parents=True)
+    constraints_file = str(cache_dir / "constraints.txt")
+
+    args = venv_manager._build_constraint_args(
+        constraints_file,
+        {"cwd": str(cache_dir)},
+        use_uv=False,
+    )
+
+    assert args == ["--constraint", constraints_file]
+
+
+def test_build_constraint_args_drops_constraint_when_path_has_space(tmp_path):
+    """A value uv would mis-split is worse than no constraint at all."""
+    constraints_file = str(tmp_path / "Louis Roy" / "constraints.txt")
+
+    args = venv_manager._build_constraint_args(
+        constraints_file,
+        {"cwd": str(tmp_path / "elsewhere dir")},
+        use_uv=True,
+    )
+
+    assert args == []
+
+
+def test_cuda_batch_install_constraint_arg_is_whitespace_free_for_uv(
+    tmp_path, monkeypatch
+):
+    """Regression test for issue #853: home directories containing a space."""
+    from geoai.core import uv_manager
+
+    calls = []
+    cache_dir = tmp_path / "Louis Roy Byaruhanga" / ".qgis_geoai"
+    cache_dir.mkdir(parents=True)
+    constraints_path = str(cache_dir / "geoai_torch_constraints_xy.txt")
+
+    def fake_run(cmd, *args, **kwargs):
+        script = cmd[-1]
+        if "torch.version.cuda" in script:
+            return subprocess.CompletedProcess(cmd, 0, stdout="12.8\n", stderr="")
+        if "metadata.version('torch')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="2.12.0+cu128\n", stderr=""
+            )
+        if "metadata.version('torchvision')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="0.27.0+cu128\n", stderr=""
+            )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def fake_run_pip_install(**kwargs):
+        calls.append(kwargs)
+        return venv_manager._PipResult(0, "ok", "")
+
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: True)
+    monkeypatch.setattr(uv_manager, "get_uv_path", lambda: "uv")
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(
+        venv_manager, "_get_subprocess_kwargs", lambda: {"cwd": str(cache_dir)}
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_required_packages",
+        lambda: [("torch", ">=2.0.0"), ("geoai-py", ">=0.39.0")],
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "detect_nvidia_gpu",
+        lambda: (True, {"compute_cap": 12.0, "driver_version": "572.76"}),
+    )
+    monkeypatch.setattr(venv_manager, "_select_cuda_index", lambda _gpu_info: "cu128")
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+    monkeypatch.setattr(
+        venv_manager, "_write_constraints_file", lambda _c: constraints_path
+    )
+
+    ok, _message = venv_manager.install_dependencies(
+        venv_dir=str(tmp_path / "venv"),
+        cuda_enabled=True,
+    )
+
+    assert ok is True
+    batch_cmd = calls[-1]["cmd"]
+    assert "--constraint" in batch_cmd
+    value = batch_cmd[batch_cmd.index("--constraint") + 1]
+    assert not any(c.isspace() for c in value)
+    assert value == "geoai_torch_constraints_xy.txt"
+
+
+def test_truncate_error_keeps_head_and_tail():
+    """uv nests the real cause at the end, so a head-only slice loses it."""
+    output = "headline error\n" + ("x" * 5000) + "\nCaused by: exit status 1"
+
+    truncated = venv_manager._truncate_error(output, limit=200)
+
+    assert len(truncated) <= 200
+    assert truncated.startswith("headline error")
+    assert truncated.endswith("Caused by: exit status 1")
+
+
+def test_truncate_error_returns_short_output_unchanged():
+    assert venv_manager._truncate_error("  boom  ") == "boom"
+
+
+def test_venv_python_works_false_when_interpreter_fails(tmp_path, monkeypatch):
+    """Regression test for issue #850: an unrunnable interpreter is not healthy."""
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir=None: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(
+        venv_manager.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a[0], 1, stdout="", stderr="boom"),
+    )
+
+    assert venv_manager.venv_python_works(str(tmp_path)) is False
+
+
+def test_venv_python_works_false_when_interpreter_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: False)
+
+    assert venv_manager.venv_python_works(str(tmp_path)) is False
+
+
+def test_venv_python_works_true_when_interpreter_runs(tmp_path, monkeypatch):
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir=None: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(
+        venv_manager.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a[0], 0, stdout="", stderr=""),
+    )
+
+    assert venv_manager.venv_python_works(str(tmp_path)) is True
+
+
+def test_venv_python_works_true_on_timeout(tmp_path, monkeypatch):
+    """A slow launch must not trigger deletion of a multi-GB healthy venv."""
+
+    def fake_run(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="python", timeout=60)
+
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir=None: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    assert venv_manager.venv_python_works(str(tmp_path)) is True
+
+
+def test_venv_python_works_false_when_interpreter_cannot_launch(tmp_path, monkeypatch):
+    """OSError is how a missing python3XX.dll surfaces (issue #850)."""
+
+    def fake_run(*_args, **_kwargs):
+        raise OSError("dll load failed")
+
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir=None: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    assert venv_manager.venv_python_works(str(tmp_path)) is False

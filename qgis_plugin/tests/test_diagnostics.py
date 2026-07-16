@@ -245,3 +245,41 @@ def test_diagnostics_torch_runtime_probe_bootstraps_windows_torch_dll_dirs():
 
     assert "add_dll_directory" in script
     assert "import torch" in script
+
+
+def test_qgis_numpy_version_reports_already_loaded_module(monkeypatch):
+    """The package table shows the venv's NumPy, so QGIS's must be separate."""
+    import sys
+    import types
+
+    fake_numpy = types.ModuleType("numpy")
+    fake_numpy.__version__ = "1.26.4"
+    monkeypatch.setitem(sys.modules, "numpy", fake_numpy)
+
+    assert diagnostics._get_qgis_numpy_version() == "1.26.4"
+
+
+def test_qgis_numpy_version_when_numpy_is_absent(monkeypatch):
+    import builtins
+    import sys
+
+    monkeypatch.delitem(sys.modules, "numpy", raising=False)
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "numpy":
+            raise ImportError("no numpy")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    assert diagnostics._get_qgis_numpy_version() == "Not loaded"
+
+
+def test_diagnostics_report_includes_qgis_numpy(monkeypatch):
+    """Regression test for issue #854: the NumPy skew must be visible."""
+    monkeypatch.setattr(diagnostics, "_get_qgis_numpy_version", lambda: "1.26.4")
+
+    report = diagnostics.generate_diagnostics_report()
+
+    assert "- NumPy loaded in QGIS: `1.26.4`" in report
