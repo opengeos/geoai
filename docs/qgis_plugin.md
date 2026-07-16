@@ -178,6 +178,17 @@ If you have a NVIDIA GPU with CUDA, run `nvidia-smi` to check the CUDA version.
 > 3.42.2 Windows installer with the fix, but conda-forge builds 3.42.2 from the
 > original release, so the broken code is what you get. The bug is in QGIS itself
 > and is unrelated to this plugin.
+>
+> If you already created the environment and hit this, update QGIS in place:
+>
+> ```bash
+> cd geo
+> pixi update qgis
+> ```
+>
+> Check **Help → About** to confirm you are off 3.42.2. Until you can update,
+> save with *Save As* → **QGIS Project File (\*.qgs)**; `.qgs` is uncompressed
+> XML and never touches the zip path, so it is unaffected.
 
 - For GPU with CUDA 12.x:
 
