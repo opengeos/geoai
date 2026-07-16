@@ -381,6 +381,13 @@ _LAZY_SYMBOL_MAP = {
     "get_available_prithvi_models": ("prithvi", None),
     "load_prithvi_model": ("prithvi", None),
     "prithvi_inference": ("prithvi", None),
+    # --- geoai.universat ---
+    "UniverSatProcessor": ("universat", None),
+    "load_universat_model": ("universat", None),
+    "universat_inference": ("universat", None),
+    "get_tile_embedding": ("universat", None),
+    "get_pca_rgb": ("universat", None),
+    "universat_train": ("universat", None),
     # --- geoai.change_detection ---
     "ChangeStarDetection": ("change_detection", None),
     "changestar_detect": ("change_detection", None),
@@ -493,6 +500,7 @@ _LAZY_SUBMODULES = {
     "dinov3_finetune",
     "esrgan",
     "foundation_models",
+    "universat",
 }
 
 
