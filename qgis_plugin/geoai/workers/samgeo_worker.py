@@ -148,12 +148,50 @@ def _supported_methods_for(sam) -> set[str]:
     return methods
 
 
+def _resolve_device(device: Any) -> Any:
+    """Pick an accelerator for automatic device selection.
+
+    The QGIS process used to choose the device, but it can only inspect its own
+    torch, which may be missing or a different build from the venv's. This
+    process owns the torch that actually runs the model, so resolve here. MPS
+    is checked before CUDA to match the previous in-process behavior.
+
+    Args:
+        device: Requested device, or None/"auto" to detect one.
+
+    Returns:
+        A concrete device string, or the caller's value if it was explicit.
+    """
+    if device and device != "auto":
+        return device
+
+    try:
+        import torch
+    except Exception:
+        return None
+
+    try:
+        mps = getattr(torch.backends, "mps", None)
+        if mps is not None and mps.is_available():
+            return "mps"
+    except Exception:
+        pass
+
+    try:
+        if torch.cuda.is_available():
+            return "cuda"
+    except Exception:
+        pass
+
+    return "cpu"
+
+
 def _handle_init(req: dict) -> Any:
     shim_installed = _ensure_pkg_resources_shim()
 
     model_version = str(req.get("model_version") or "")
     backend = req.get("backend")
-    device = req.get("device")
+    device = _resolve_device(req.get("device"))
     confidence = req.get("confidence")
     enable_interactive = bool(req.get("enable_interactive", False))
 

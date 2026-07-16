@@ -72,6 +72,7 @@ def generate_diagnostics_report() -> str:
         f"- Python version: `{_value(qgis_info.get('python_version'))}`",
         f"- Python executable: `{_value(qgis_info.get('python_executable'))}`",
         f"- Python prefix: `{_value(qgis_info.get('python_prefix'))}`",
+        f"- NumPy loaded in QGIS: `{_value(qgis_info.get('numpy_version'))}`",
         "",
         "## Operating System",
         "",
@@ -127,6 +128,27 @@ def _get_plugin_info() -> Dict[str, str]:
     return {"path": plugin_dir, "version": version}
 
 
+def _get_qgis_numpy_version() -> str:
+    """Report the NumPy already loaded in the QGIS process.
+
+    The package table is collected with the venv's Python, so it only ever
+    shows the venv's NumPy. When QGIS bundles an older NumPy, that one wins
+    ``sys.modules`` and breaks in-process imports of venv packages (issues
+    #688 and #854) while the report still looks healthy. Record it separately
+    so the skew is visible.
+
+    Returns:
+        The NumPy version string, "Not loaded", or "Unknown".
+    """
+    numpy_module = sys.modules.get("numpy")
+    if numpy_module is None:
+        try:
+            import numpy as numpy_module
+        except Exception:
+            return "Not loaded"
+    return str(getattr(numpy_module, "__version__", "Unknown"))
+
+
 def _get_qgis_info() -> Dict[str, str]:
     try:
         from qgis.core import Qgis
@@ -140,6 +162,7 @@ def _get_qgis_info() -> Dict[str, str]:
         "python_version": sys.version.replace("\n", " "),
         "python_executable": sys.executable,
         "python_prefix": sys.prefix,
+        "numpy_version": _get_qgis_numpy_version(),
     }
 
 

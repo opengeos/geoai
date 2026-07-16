@@ -60,8 +60,34 @@ from .._pkg_resources_compat import ensure_pkg_resources
 
 
 def _use_samgeo_subprocess() -> bool:
-    """Use subprocess SamGeo on Windows to avoid QGIS/PyTorch DLL conflicts."""
-    return os.name == "nt"
+    """Decide whether to run SamGeo in the managed venv subprocess.
+
+    Importing the managed venv's packages into the QGIS process is unsafe on
+    every platform, not just Windows. QGIS ships its own NumPy and imports it
+    at startup, so prepending the venv's site-packages to ``sys.path`` cannot
+    displace it: the venv's SciPy/scikit stack (built for NumPy 2) then runs
+    against QGIS's NumPy 1.x and fails on NumPy-2-only names --
+    ``numpy.lib.array_utils`` (issue #688) and ``np.long`` reached via
+    ``scipy.sparse`` (issue #854). This was gated to Windows, where the
+    subprocess is also required for an unrelated PyTorch DLL conflict, which
+    left macOS and Linux exposed to the skew.
+
+    Windows always uses the subprocess because of that DLL conflict. Elsewhere
+    it is used whenever the managed venv exists, which is exactly when the
+    version skew is possible. Without a managed venv there is nothing to skew
+    against -- SamGeo can only come from the interpreter running QGIS -- so the
+    in-process path stays available for users who launch QGIS from an
+    environment that already provides SamGeo.
+
+    Returns:
+        True if model loading and inference should run in a subprocess.
+    """
+    if os.name == "nt":
+        return True
+
+    from ..core.venv_manager import venv_exists
+
+    return venv_exists()
 
 
 class SamGeoModelLoadWorker(QThread):

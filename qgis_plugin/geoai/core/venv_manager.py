@@ -632,6 +632,11 @@ _INSECURE_PACKAGE_HOSTS = (
 
 _TORCH_DISTRIBUTIONS = ("torch", "torchvision")
 
+# Characters of installer output kept in a user-facing error message. Large
+# enough that uv's nested "Caused by:" chain survives; the message is also
+# written to the QGIS log in full.
+_ERROR_DETAIL_LIMIT = 1200
+
 # When a uv install also points at the PyTorch wheel index via
 # ``--extra-index-url``, uv defaults to the "first-index" strategy and only
 # considers a package on the first index that lists it. The PyTorch index
@@ -675,6 +680,31 @@ def _is_hash_mismatch(output: str) -> bool:
     """
     output_lower = output.lower()
     return "do not match the hashes" in output_lower or "hash mismatch" in output_lower
+
+
+def _truncate_error(output: str, limit: int = _ERROR_DETAIL_LIMIT) -> str:
+    """Shorten installer output while keeping both ends of the message.
+
+    Installer failures put the headline at the start and the actual cause at
+    the end (uv nests it under ``Caused by:``). A plain head slice drops the
+    cause, so keep a head and a tail when the output is too long.
+
+    Args:
+        output: Raw stdout/stderr from the installer.
+        limit: Maximum number of characters to keep.
+
+    Returns:
+        The output, elided in the middle if it exceeds ``limit``.
+    """
+    text = (output or "").strip()
+    if len(text) <= limit:
+        return text
+
+    marker = "\n[...]\n"
+    keep = limit - len(marker)
+    head = keep // 2
+    tail = keep - head
+    return text[:head].rstrip() + marker + text[-tail:].lstrip()
 
 
 def _get_pip_ssl_flags() -> List[str]:
@@ -1101,6 +1131,58 @@ def venv_exists(venv_dir: str = None) -> bool:
         venv_dir = VENV_DIR
     python_path = get_venv_python_path(venv_dir)
     return os.path.exists(python_path)
+
+
+def venv_python_works(venv_dir: str = None) -> bool:
+    """Check that the venv interpreter exists *and* actually runs.
+
+    ``venv_exists`` only stats the executable, so a venv left half-created by
+    an interrupted install (or with its interpreter quarantined by antivirus)
+    looks healthy and is reused forever. uv then fails with "Failed to inspect
+    Python interpreter", which no reinstall can clear. See issue #850.
+
+    Args:
+        venv_dir: Optional venv directory path. Uses VENV_DIR if None.
+
+    Returns:
+        True if the interpreter runs successfully.
+    """
+    if not venv_exists(venv_dir):
+        return False
+
+    python_path = get_venv_python_path(venv_dir)
+    try:
+        result = subprocess.run(
+            [python_path, "-c", "import sys; sys.exit(0)"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=_get_clean_env_for_venv(),
+            **_get_subprocess_kwargs(),
+        )
+    except subprocess.TimeoutExpired:
+        # A slow first launch (antivirus scanning a fresh interpreter) is not
+        # proof of breakage, and the caller reacts by deleting the venv. Keep
+        # it: a real fault resurfaces as an install error with full output.
+        _log(
+            "Venv interpreter check timed out; assuming it is usable",
+            Qgis.Warning,
+        )
+        return True
+    except (OSError, subprocess.SubprocessError) as e:
+        _log("Venv interpreter is not runnable: {}".format(e), Qgis.Warning)
+        return False
+
+    if result.returncode != 0:
+        _log(
+            "Venv interpreter exited with code {}: {}".format(
+                result.returncode,
+                _truncate_error(result.stderr or result.stdout or ""),
+            ),
+            Qgis.Warning,
+        )
+        return False
+    return True
 
 
 def ensure_venv_packages_available() -> bool:
@@ -1938,7 +2020,7 @@ def create_venv(
             )
             _log(f"Failed to create venv: {error_msg}", Qgis.Critical)
             _cleanup_partial_venv(venv_dir)
-            return False, f"Failed to create venv: {error_msg[:200]}"
+            return False, f"Failed to create venv: {_truncate_error(error_msg)}"
 
     except subprocess.TimeoutExpired:
         _log("Virtual environment creation timed out", Qgis.Critical)
@@ -2471,6 +2553,56 @@ def _get_installed_torch_constraints(
     return constraints
 
 
+def _build_constraint_args(
+    constraints_file: str,
+    subprocess_kwargs: dict,
+    use_uv: bool,
+) -> List[str]:
+    """Build the ``--constraint`` flag for an installer command.
+
+    uv splits the value of ``--constraint`` on whitespace so that
+    ``UV_CONSTRAINT`` can name several files, which shreds an absolute path
+    under a home directory containing a space (``C:\\Users\\Louis Roy\\...``)
+    into separate, bogus file names. See issue #853.
+
+    The constraints file is written into ``CACHE_DIR`` and installs run with
+    ``cwd=CACHE_DIR``, so the bare file name resolves and can never contain a
+    space. pip does not split, so it keeps the unambiguous absolute path.
+
+    Args:
+        constraints_file: Absolute path to the constraints file.
+        subprocess_kwargs: Kwargs the installer runs with; supplies ``cwd``.
+        use_uv: True when the command is a uv invocation.
+
+    Returns:
+        Constraint flag and value, or an empty list if no safe value exists.
+    """
+    if not use_uv:
+        return ["--constraint", constraints_file]
+
+    cwd = (subprocess_kwargs or {}).get("cwd")
+    if cwd:
+        try:
+            relative = os.path.relpath(constraints_file, cwd)
+        except ValueError:  # Different drive on Windows.
+            relative = None
+        if relative and not any(c.isspace() for c in relative):
+            return ["--constraint", relative]
+
+    if not any(c.isspace() for c in constraints_file):
+        return ["--constraint", constraints_file]
+
+    # Constraints only pin already-installed torch builds, so dropping them is
+    # a resolution risk, not a failure; passing a value uv would mis-split is.
+    _log(
+        "Skipping torch constraints: no whitespace-free path for {}".format(
+            constraints_file
+        ),
+        Qgis.Warning,
+    )
+    return []
+
+
 def _write_constraints_file(constraints: List[str]) -> Optional[str]:
     """Write temporary pip constraints for dependency installation.
 
@@ -2948,13 +3080,11 @@ def install_dependencies(
                         or "Return code {}".format(result.returncode)
                     )
                     _log(
-                        "Failed to install {}: {}".format(
-                            package_spec, error_msg[:500]
-                        ),
+                        "Failed to install {}: {}".format(package_spec, error_msg),
                         Qgis.Critical,
                     )
                     install_failed = True
-                    install_error_msg = error_msg
+                    install_error_msg = _truncate_error(error_msg)
                     last_returncode = result.returncode
 
             except subprocess.TimeoutExpired:
@@ -2971,7 +3101,7 @@ def install_dependencies(
                 )
                 install_failed = True
                 install_error_msg = "Error installing {}: {}".format(
-                    package_name, str(e)[:200]
+                    package_name, _truncate_error(str(e))
                 )
 
             # CUDA -> CPU fallback
@@ -3048,27 +3178,45 @@ def install_dependencies(
                         _cuda_fell_back = True
                     else:
                         cpu_err = cpu_result.stderr or cpu_result.stdout or ""
+                        _log(
+                            "Failed to install {} (CPU fallback): {}".format(
+                                package_spec, cpu_err
+                            ),
+                            Qgis.Critical,
+                        )
                         install_error_msg = (
                             "CUDA and CPU install both failed for {}: {}".format(
-                                package_name, cpu_err[:200]
+                                package_name, _truncate_error(cpu_err)
                             )
                         )
                 except subprocess.TimeoutExpired:
+                    _log(
+                        "Installation of {} (CPU fallback) timed out".format(
+                            package_spec
+                        ),
+                        Qgis.Critical,
+                    )
                     install_error_msg = (
                         "CUDA and CPU install both timed out for {}".format(
                             package_name
                         )
                     )
                 except Exception as e:
+                    _log(
+                        "Exception installing {} (CPU fallback): {}".format(
+                            package_spec, e
+                        ),
+                        Qgis.Critical,
+                    )
                     install_error_msg = (
                         "CUDA and CPU install both failed for {}: {}".format(
-                            package_name, str(e)[:200]
+                            package_name, _truncate_error(str(e))
                         )
                     )
 
             if install_failed:
                 _log(
-                    "pip error output: {}".format(install_error_msg[:500]),
+                    "pip error output: {}".format(install_error_msg),
                     Qgis.Critical,
                 )
                 if _looks_like_resolution_conflict(install_error_msg):
@@ -3117,9 +3265,7 @@ def install_dependencies(
                     )
                 return (
                     False,
-                    "Failed to install {}: {}".format(
-                        package_name, install_error_msg[:200]
-                    ),
+                    "Failed to install {}: {}".format(package_name, install_error_msg),
                 )
 
     # -- Phase B: Batch install remaining packages ----------------------------
@@ -3140,7 +3286,9 @@ def install_dependencies(
             )
             constraints_file = _write_constraints_file(torch_constraints)
             if constraints_file:
-                constraint_args = ["--constraint", constraints_file]
+                constraint_args = _build_constraint_args(
+                    constraints_file, subprocess_kwargs, use_uv
+                )
                 if _cuda_index_for_batch:
                     torch_index_args = [
                         "--extra-index-url",
@@ -3148,11 +3296,12 @@ def install_dependencies(
                             _cuda_index_for_batch
                         ),
                     ]
-                _log(
-                    "Constraining batch install to existing PyTorch packages: "
-                    "{}".format(", ".join(torch_constraints)),
-                    Qgis.Info,
-                )
+                if constraint_args:
+                    _log(
+                        "Constraining batch install to existing PyTorch packages: "
+                        "{}".format(", ".join(torch_constraints)),
+                        Qgis.Info,
+                    )
         _log(
             "Installing {} packages in batch: {}".format(
                 len(batch_specs), ", ".join(batch_specs)
@@ -3366,7 +3515,7 @@ def install_dependencies(
                     _classify_batch_error(error_output, batch_specs) or "dependencies"
                 )
                 _log(
-                    "Batch install failed: {}".format(error_output[:500]),
+                    "Batch install failed: {}".format(error_output),
                     Qgis.Critical,
                 )
                 if _looks_like_resolution_conflict(error_output):
@@ -3414,7 +3563,9 @@ def install_dependencies(
                     )
                 return (
                     False,
-                    "Failed to install {}: {}".format(failed_pkg, error_output[:200]),
+                    "Failed to install {}: {}".format(
+                        failed_pkg, _truncate_error(error_output)
+                    ),
                 )
 
         except subprocess.TimeoutExpired:
@@ -3422,7 +3573,9 @@ def install_dependencies(
             return False, "Dependency installation timed out"
         except Exception as e:
             _log("Exception during batch install: {}".format(e), Qgis.Critical)
-            return False, "Error installing dependencies: {}".format(str(e)[:200])
+            return False, "Error installing dependencies: {}".format(
+                _truncate_error(str(e))
+            )
         finally:
             _remove_temp_file(constraints_file)
 
@@ -3560,9 +3713,7 @@ def verify_venv(
             )
 
             if result.returncode != 0:
-                error_detail = (
-                    result.stderr[:300] if result.stderr else result.stdout[:300]
-                )
+                error_detail = _truncate_error(result.stderr or result.stdout or "")
                 _log(
                     "Package {} verification failed: {}".format(
                         package_name, error_detail
@@ -3578,7 +3729,7 @@ def verify_venv(
                     optional_failures.append(package_name)
                     continue
                 return False, "Package {} is broken: {}".format(
-                    package_name, error_detail[:200]
+                    package_name, error_detail
                 )
 
         except subprocess.TimeoutExpired:
@@ -3598,9 +3749,7 @@ def verify_venv(
                     **subprocess_kwargs,
                 )
                 if result.returncode != 0:
-                    error_detail = (
-                        result.stderr[:300] if result.stderr else result.stdout[:300]
-                    )
+                    error_detail = _truncate_error(result.stderr or result.stdout or "")
                     if _is_optional_verify_package(package_name):
                         _log(
                             "Package {} verification failed on retry but is optional "
@@ -3610,7 +3759,7 @@ def verify_venv(
                         optional_failures.append(package_name)
                         continue
                     return False, "Package {} is broken: {}".format(
-                        package_name, error_detail[:200]
+                        package_name, error_detail
                     )
             except subprocess.TimeoutExpired:
                 if _is_optional_verify_package(package_name):
@@ -4160,11 +4309,25 @@ def create_venv_and_install(
             progress_callback(13, "uv package installer ready")
 
     # Step 2: Create venv (13-18%)
+    reusable_venv = False
     if venv_exists():
-        _log("Virtual environment already exists", Qgis.Info)
         if progress_callback:
-            progress_callback(18, "Virtual environment ready")
-    else:
+            progress_callback(15, "Checking virtual environment...")
+        reusable_venv = venv_python_works()
+        if reusable_venv:
+            _log("Virtual environment already exists", Qgis.Info)
+            if progress_callback:
+                progress_callback(18, "Virtual environment ready")
+        else:
+            _log(
+                "Existing virtual environment is broken; recreating it",
+                Qgis.Warning,
+            )
+            if progress_callback:
+                progress_callback(15, "Repairing virtual environment...")
+            _cleanup_partial_venv(VENV_DIR)
+
+    if not reusable_venv:
         success, msg = create_venv(progress_callback=progress_callback)
         if not success:
             return False, msg
