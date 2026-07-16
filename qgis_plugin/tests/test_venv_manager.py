@@ -579,3 +579,52 @@ def test_single_package_install_failure_message_is_bounded(tmp_path, monkeypatch
     assert len(message) < 2000
     assert "could not build wheel" in message
     assert message.endswith("Caused by: boom")
+
+
+def test_cpu_fallback_failure_logs_full_output(tmp_path, monkeypatch):
+    """The CPU fallback is issue #850's path, so its raw output must be logged."""
+    from geoai.core import uv_manager
+
+    logged = []
+    huge_stderr = "error: no matching distribution\n" + ("z" * 40000) + "\nCaused by: 1"
+
+    def fake_run_pip_install(**kwargs):
+        # CUDA attempt fails, then the CPU fallback fails too.
+        return venv_manager._PipResult(1, "", huge_stderr)
+
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: False)
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(
+        venv_manager, "_get_required_packages", lambda: [("torch", ">=2.0.0")]
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "detect_nvidia_gpu",
+        lambda: (True, {"compute_cap": 12.0, "driver_version": "572.76"}),
+    )
+    monkeypatch.setattr(venv_manager, "_select_cuda_index", lambda _gpu_info: "cu128")
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+    monkeypatch.setattr(
+        venv_manager.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a[0], 0, stdout="", stderr=""),
+    )
+    monkeypatch.setattr(venv_manager, "_log", lambda msg, *a, **k: logged.append(msg))
+
+    ok, message = venv_manager.install_dependencies(
+        venv_dir=str(tmp_path / "venv"),
+        cuda_enabled=True,
+    )
+
+    assert ok is False
+    # The user-facing message stays bounded...
+    assert len(message) < 2000
+    assert "CUDA and CPU install both failed for torch" in message
+    # ...but the log keeps the CPU fallback output in full for diagnosis.
+    fallback_logs = [m for m in logged if "(CPU fallback)" in m]
+    assert any(huge_stderr in m for m in fallback_logs), "full CPU output not logged"

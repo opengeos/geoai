@@ -3178,18 +3178,36 @@ def install_dependencies(
                         _cuda_fell_back = True
                     else:
                         cpu_err = cpu_result.stderr or cpu_result.stdout or ""
+                        _log(
+                            "Failed to install {} (CPU fallback): {}".format(
+                                package_spec, cpu_err
+                            ),
+                            Qgis.Critical,
+                        )
                         install_error_msg = (
                             "CUDA and CPU install both failed for {}: {}".format(
                                 package_name, _truncate_error(cpu_err)
                             )
                         )
                 except subprocess.TimeoutExpired:
+                    _log(
+                        "Installation of {} (CPU fallback) timed out".format(
+                            package_spec
+                        ),
+                        Qgis.Critical,
+                    )
                     install_error_msg = (
                         "CUDA and CPU install both timed out for {}".format(
                             package_name
                         )
                     )
                 except Exception as e:
+                    _log(
+                        "Exception installing {} (CPU fallback): {}".format(
+                            package_spec, e
+                        ),
+                        Qgis.Critical,
+                    )
                     install_error_msg = (
                         "CUDA and CPU install both failed for {}: {}".format(
                             package_name, _truncate_error(str(e))
