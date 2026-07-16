@@ -1104,7 +1104,13 @@ def embedding_to_geotiff(
 
 _AEF_BASE_URL = "https://data.source.coop/tge-labs/aef/v1/annual"
 _AEF_INDEX_URL = f"{_AEF_BASE_URL}/aef_index.parquet"
-_AEF_AVAILABLE_YEARS = list(range(2018, 2025))
+
+# Years present in aef_index.parquet. This guard only catches typos early; the
+# index itself is the source of truth, and a year with no tiles is reported per
+# year further down. Verify with:
+#   SELECT DISTINCT year FROM read_parquet('<_AEF_INDEX_URL>') ORDER BY year
+_AEF_AVAILABLE_YEARS = list(range(2017, 2026))
+_AEF_LATEST_YEAR = max(_AEF_AVAILABLE_YEARS)
 
 
 def _merge_tiles(
@@ -1215,7 +1221,7 @@ def download_google_satellite_embedding(
     Downloads pre-computed 64-D satellite embedding vectors at 10 m
     resolution from `Source Cooperative
     <https://source.coop/tge-labs/aef>`_. The embeddings are annual
-    composites available from 2018 to 2024 and cover the entire globe.
+    composites available from 2017 to 2025 and cover the entire globe.
 
     The function uses the spatial index to identify which Cloud-Optimized
     GeoTIFF tiles intersect the bounding box, performs windowed reads
@@ -1228,7 +1234,7 @@ def download_google_satellite_embedding(
         output_dir: Directory to save downloaded GeoTIFF files.
             Created if it does not exist.
         years: Year or list of years to download. Available years are
-            2018-2024. If ``None``, downloads only the latest year (2024).
+            2017-2025. If ``None``, downloads only the latest year (2025).
         bands: List of band names to download (e.g., ``["A00", "A01"]``).
             If ``None``, all 64 bands (A00-A63) are downloaded.
         resolution: Output pixel resolution in CRS units. Defaults to
@@ -1265,7 +1271,7 @@ def download_google_satellite_embedding(
 
     # --- Validate years ---
     if years is None:
-        years = [2024]
+        years = [_AEF_LATEST_YEAR]
     elif isinstance(years, int):
         years = [years]
     for y in years:
@@ -1293,9 +1299,29 @@ def download_google_satellite_embedding(
 
     if not os.path.exists(index_path):
         logger.info("Downloading spatial index (aef_index.parquet, ~68 MB)...")
-        import urllib.request
+        import requests
 
-        urllib.request.urlretrieve(_AEF_INDEX_URL, index_path)
+        # Send an explicit User-Agent: data.source.coop rejects urllib's
+        # default "Python-urllib/x.y" with HTTP 403.
+        with requests.get(
+            _AEF_INDEX_URL,
+            stream=True,
+            timeout=60,
+            headers={"User-Agent": "geoai"},
+        ) as response:
+            response.raise_for_status()
+            # Write to a temporary path first so an interrupted download
+            # cannot leave a truncated index cached for every later call.
+            tmp_path = f"{index_path}.part"
+            try:
+                with open(tmp_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        f.write(chunk)
+                os.replace(tmp_path, index_path)
+            except BaseException:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                raise
         logger.info(f"Spatial index saved to {index_path}")
 
     # --- Load index and find intersecting tiles ---
