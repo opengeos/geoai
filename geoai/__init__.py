@@ -8,7 +8,7 @@ only when a specific symbol is first accessed.
 
 __author__ = """Qiusheng Wu"""
 __email__ = "giswqs@gmail.com"
-__version__ = "0.41.1"
+__version__ = "0.41.2"
 
 
 import importlib
