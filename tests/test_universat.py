@@ -49,28 +49,24 @@ class TestUniverSatBasics(unittest.TestCase):
 
 
 class TestUniverSatProcessor(unittest.TestCase):
+    @patch("geoai.universat._setup")
     @patch("geoai.universat.load_universat_model")
-    def setUp(self, mock_load_model):
+    def setUp(self, mock_load_model, mock_ensure_repo):
         self.mock_model = MagicMock(spec=nn.Module, n_registers=4)
         mock_load_model.return_value = self.mock_model
-        self.patcher = patch.dict(
-            "sys.modules",
+        # Patch WAVELENGTHS directly on the module since it's lazily populated
+        self.wavelengths_patcher = patch(
+            "geoai.universat.WAVELENGTHS",
             {
-                "modality_registry": MagicMock(
-                    INPUT_RES={"s2": 10.0, "spot": 1.0},
-                    SUBPATCHES={"s2": 1, "spot": 10},
-                    WAVELENGTHS={
-                        "s2": [0.49, 0.56, 0.665],
-                        "spot": [0.665, 0.56, 0.49],
-                    },
-                )
+                "s2": [0.49, 0.56, 0.665],
+                "spot": [0.665, 0.56, 0.49],
             },
         )
-        self.patcher.start()
+        self.wavelengths_patcher.start()
         self.processor = UniverSatProcessor(device="cpu")
 
     def tearDown(self):
-        self.patcher.stop()
+        self.wavelengths_patcher.stop()
 
     def test_preprocess_image(self):
         t1 = self.processor.preprocess_image(

@@ -1,6 +1,6 @@
 """UniverSat integration module for GeoAI."""
 
-import os, sys, subprocess, logging
+import os, sys, subprocess, shutil
 from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np, torch, torch.nn as nn, rasterio
 from sklearn.decomposition import PCA
@@ -15,27 +15,55 @@ __all__ = [
     "universat_train",
 ]
 
-# Auto-clone UniverSat repo and setup environment
+# UniverSat repo cache and setup
 UNIVERSAT_CACHE_DIR = os.path.expanduser("~/.cache/geoai/UniverSat")
 _src = os.path.join(UNIVERSAT_CACHE_DIR, "src")
-if not os.path.exists(UNIVERSAT_CACHE_DIR):
-    subprocess.run(
-        ["git", "clone", "https://github.com/gastruc/UniverSat.git", UNIVERSAT_CACHE_DIR],
-        check=True,
-        timeout=300,
-    )
-sys.path = [UNIVERSAT_CACHE_DIR, _src] + [p for p in sys.path if p not in (UNIVERSAT_CACHE_DIR, _src)]
+_repo_ready = False
 
-try:
-    import torch._dynamo
 
-    torch._dynamo.config.disable = True
-except ImportError:
-    pass
+def _setup():
+    global _repo_ready
+    if _repo_ready:
+        return
 
-from hubconf import UniverSat
-import hubconf
-from modality_registry import INPUT_RES, SUBPATCHES, WAVELENGTHS
+    git = shutil.which("git")
+    if not git:
+        raise FileNotFoundError("git not found on PATH")
+
+    if not os.path.exists(UNIVERSAT_CACHE_DIR):
+        subprocess.run(
+            [git, "clone", "--single-branch",
+             "https://github.com/gastruc/UniverSat.git", UNIVERSAT_CACHE_DIR],
+            check=True, timeout=300,
+        )
+        # pin to known working commit
+        subprocess.run(
+            [git, "-C", UNIVERSAT_CACHE_DIR, "checkout",
+             "f6df2eec54955b0f7524cc95fe21a5e80c0239d9"],
+            check=True, timeout=60,
+        )
+
+    sys.path = [UNIVERSAT_CACHE_DIR, _src] + [
+        p for p in sys.path if p not in (UNIVERSAT_CACHE_DIR, _src)
+    ]
+
+    try:
+        import torch._dynamo
+        torch._dynamo.config.disable = True
+    except ImportError:
+        pass
+
+    global UniverSat, hubconf, WAVELENGTHS
+    from hubconf import UniverSat  # noqa: F811
+    import hubconf  # noqa: F811
+    from modality_registry import WAVELENGTHS  # noqa: F811
+
+    _repo_ready = True
+
+
+UniverSat = None
+hubconf = None
+WAVELENGTHS = None
 
 TIME_SERIES_MODALITIES = {
     "s1",
@@ -65,6 +93,7 @@ def load_universat_model(
     **kwargs,
 ) -> nn.Module:
     """Load UniverSat model backbone."""
+    _setup()
     model = (
         UniverSat.from_pretrained(model_name_or_path, **kwargs)
         if pretrained
@@ -86,6 +115,7 @@ class UniverSatProcessor:
         pretrained: bool = True,
         size: str = "base",
     ):
+        _setup()
         self.device = device or get_device()
         self.model = (
             (model.to(self.device).eval() if eval_mode else model.to(self.device))
@@ -155,7 +185,7 @@ class UniverSatProcessor:
                 self._process_sample(s, mod, (scales or {}).get(mod)) for s in samples
             ]
             batch[mod] = torch.stack([p[0] for p in processed]).to(self.device)
-            if processed[0][1] is not None:
+            if any(p[1] is not None for p in processed):
                 batch[f"{mod}_dates"] = torch.stack([p[1] for p in processed]).to(
                     self.device
                 )
@@ -205,8 +235,8 @@ def get_pca_rgb(tokens: torch.Tensor) -> np.ndarray:
         else np.asarray(tokens)
     )
 
-    def _proj(x, g):
-        p = PCA(3).fit_transform(x.reshape(-1, x.shape[-1])).reshape(g, g, 3)
+    def _norm(p, g):
+        p = p.reshape(g, g, 3)
         return (
             (p - p.min()) / (p.max() - p.min())
             if p.max() > p.min()
@@ -214,12 +244,18 @@ def get_pca_rgb(tokens: torch.Tensor) -> np.ndarray:
         )
 
     if t.ndim == 2:
-        return _proj(t, int(t.shape[0] ** 0.5))
+        g = int(t.shape[0] ** 0.5)
+        return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), g)
     if t.ndim == 3 and t.shape[0] == t.shape[1]:
-        return _proj(t, t.shape[0])
-    return np.stack(
-        [_proj(s, int(s.shape[0] ** 0.5) if s.ndim == 2 else s.shape[0]) for s in t]
-    )
+        return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), t.shape[0])
+
+    # batch: fit one PCA across all tiles for consistent colors
+    grids = [int(s.shape[0] ** 0.5) if s.ndim == 2 else s.shape[0] for s in t]
+    flat = np.concatenate([s.reshape(-1, s.shape[-1]) for s in t])
+    pca = PCA(3).fit(flat)
+    splits = np.cumsum([g * g for g in grids])[:-1]
+    projected = np.split(pca.transform(flat), splits)
+    return np.stack([_norm(p, g) for p, g in zip(projected, grids)])
 
 
 def universat_train(
@@ -227,6 +263,7 @@ def universat_train(
     overrides: Optional[List[str]] = None,
     project_root: Optional[str] = None,
 ):
+    _setup()
     if not os.path.exists(p := UNIVERSAT_CACHE_DIR):
         raise FileNotFoundError("UniverSat repo not found.")
     subprocess.run(
