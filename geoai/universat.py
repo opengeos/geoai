@@ -32,15 +32,27 @@ def _setup():
 
     if not os.path.exists(UNIVERSAT_CACHE_DIR):
         subprocess.run(
-            [git, "clone", "--single-branch",
-             "https://github.com/gastruc/UniverSat.git", UNIVERSAT_CACHE_DIR],
-            check=True, timeout=300,
+            [
+                git,
+                "clone",
+                "--single-branch",
+                "https://github.com/gastruc/UniverSat.git",
+                UNIVERSAT_CACHE_DIR,
+            ],
+            check=True,
+            timeout=300,
         )
         # pin to known working commit
         subprocess.run(
-            [git, "-C", UNIVERSAT_CACHE_DIR, "checkout",
-             "f6df2eec54955b0f7524cc95fe21a5e80c0239d9"],
-            check=True, timeout=60,
+            [
+                git,
+                "-C",
+                UNIVERSAT_CACHE_DIR,
+                "checkout",
+                "f6df2eec54955b0f7524cc95fe21a5e80c0239d9",
+            ],
+            check=True,
+            timeout=60,
         )
 
     sys.path = [UNIVERSAT_CACHE_DIR, _src] + [
@@ -49,6 +61,7 @@ def _setup():
 
     try:
         import torch._dynamo
+
         torch._dynamo.config.disable = True
     except ImportError:
         pass
@@ -166,8 +179,7 @@ class UniverSatProcessor:
                 ),
                 dtype=torch.long,
             )
-            if mod in TIME_SERIES_MODALITIES
-            or sample.get(f"{mod}_dates") is not None
+            if mod in TIME_SERIES_MODALITIES or sample.get(f"{mod}_dates") is not None
             else None
         )
         return t_val, d_val
