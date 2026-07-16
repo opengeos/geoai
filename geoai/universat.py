@@ -19,13 +19,18 @@ __all__ = [
 _path = os.path.expanduser("~/.cache/geoai/UniverSat")
 _src = os.path.join(_path, "src")
 if not os.path.exists(_path):
-    subprocess.check_call(
-        ["git", "clone", "https://github.com/gastruc/UniverSat.git", _path]
+    subprocess.run(
+        ["git", "clone", "https://github.com/gastruc/UniverSat.git", _path],
+        check=True,
     )
 sys.path = [_path, _src] + [p for p in sys.path if p not in (_path, _src)]
-import torch._dynamo
 
-torch._dynamo.config.disable = True
+try:
+    import torch._dynamo
+
+    torch._dynamo.config.disable = True
+except ImportError:
+    pass
 
 from hubconf import UniverSat
 import hubconf
@@ -108,13 +113,13 @@ class UniverSatProcessor:
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         if (val := sample.get(mod)) is None:
             raise ValueError(f"Missing modality '{mod}'")
-        t_val = (
-            self.preprocess_image(
-                self.read_geotiff(val)[0] if isinstance(val, str) else val, mod, scale
-            )
-            if not isinstance(val, torch.Tensor)
-            else val.float()
-        )
+        if isinstance(val, str):
+            img, _ = self.read_geotiff(val)
+            t_val = self.preprocess_image(img, mod, scale)
+        elif isinstance(val, torch.Tensor):
+            t_val = val.float()
+        else:
+            t_val = self.preprocess_image(val, mod, scale)
         d_val = (
             torch.tensor(
                 (
@@ -169,7 +174,9 @@ def universat_inference(
 ):
     model_kwargs = {k: v for k, v in kwargs.items() if k in ["pretrained", "size"]}
     with torch.no_grad():
-        return UniverSatProcessor(device=device, eval_mode=True).encode_raster(
+        return UniverSatProcessor(
+            device=device, eval_mode=True, **model_kwargs
+        ).encode_raster(
             samples,
             patch_size=patch_size,
             output_grid=output_grid,
@@ -215,7 +222,7 @@ def universat_train(
     if not os.path.exists(p := os.path.expanduser("~/.cache/geoai/UniverSat")):
         raise FileNotFoundError("UniverSat repo not found.")
     subprocess.run(
-        ["python", os.path.join("src", "train.py"), f"exp={experiment}"]
+        [sys.executable, os.path.join("src", "train.py"), f"exp={experiment}"]
         + (overrides or []),
         cwd=p,
         env={**os.environ, "PROJECT_ROOT": os.path.abspath(project_root or ".")},
