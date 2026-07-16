@@ -1,6 +1,6 @@
 """UniverSat integration module for GeoAI."""
 
-import os, sys, subprocess, shutil
+import os, sys, subprocess, shutil, threading
 from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np, torch, torch.nn as nn, rasterio
 from sklearn.decomposition import PCA
@@ -19,12 +19,16 @@ __all__ = [
 UNIVERSAT_CACHE_DIR = os.path.expanduser("~/.cache/geoai/UniverSat")
 _src = os.path.join(UNIVERSAT_CACHE_DIR, "src")
 _repo_ready = False
+_setup_lock = threading.Lock()
 
 
 def _setup():
     global _repo_ready
     if _repo_ready:
         return
+    with _setup_lock:
+        if _repo_ready:
+            return
 
     git = shutil.which("git")
     if not git:
