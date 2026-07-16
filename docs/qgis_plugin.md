@@ -169,6 +169,16 @@ Open `pixi.toml` in the `geo` directory and replace its contents with the follow
 
 If you have a NVIDIA GPU with CUDA, run `nvidia-smi` to check the CUDA version.
 
+> **Note:** QGIS is pinned to `3.44.*` on purpose. Do not lower it to `3.42.*`:
+> with the dependencies below, that pin resolves to QGIS 3.42.2 (3.42.3 conflicts
+> with the rest of the stack), and 3.42.2 shipped a Windows regression that makes
+> saving any `.qgz` project fail with "Unable to perform zip"
+> ([QGIS #61560](https://github.com/qgis/QGIS/issues/61560), fixed by
+> [QGIS #61567](https://github.com/qgis/QGIS/pull/61567)). qgis.org reissued its
+> 3.42.2 Windows installer with the fix, but conda-forge builds 3.42.2 from the
+> original release, so the broken code is what you get. The bug is in QGIS itself
+> and is unrelated to this plugin.
+
 - For GPU with CUDA 12.x:
 
 ```toml
@@ -183,7 +193,7 @@ cuda = "12.0"
 [dependencies]
 python = "3.12.*"
 pytorch-gpu = ">=2.7.1,<3"
-qgis = "3.42.*"
+qgis = "3.44.*"
 pyqt = "5.15.*"
 geoai = ">=0.27.0"
 segment-geospatial = ">=1.2.0"
@@ -205,7 +215,7 @@ cuda = "13.0"
 [dependencies]
 python = "3.12.*"
 pytorch-gpu = ">=2.7.1,<3"
-qgis = "3.42.*"
+qgis = "3.44.*"
 pyqt = "5.15.*"
 geoai = ">=0.27.0"
 segment-geospatial = ">=1.2.0"
@@ -224,7 +234,7 @@ platforms = ["linux-64", "win-64"]
 [dependencies]
 python = "3.12.*"
 pytorch-cpu = ">=2.7.1,<3"
-qgis = "3.42.*"
+qgis = "3.44.*"
 pyqt = "5.15.*"
 geoai = ">=0.27.0"
 segment-geospatial = ">=1.2.0"
