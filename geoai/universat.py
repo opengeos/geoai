@@ -1,8 +1,16 @@
 """UniverSat integration module for GeoAI."""
 
-import os, sys, subprocess, shutil, threading
-from typing import Any, Dict, List, Optional, Tuple, Union
-import numpy as np, torch, torch.nn as nn, rasterio
+import os
+import shutil
+import subprocess
+import sys
+import threading
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import rasterio
+import torch
+import torch.nn as nn
 from sklearn.decomposition import PCA
 from .utils import get_device
 
@@ -30,52 +38,62 @@ def _setup():
         if _repo_ready:
             return
 
-    git = shutil.which("git")
-    if not git:
-        raise FileNotFoundError("git not found on PATH")
+        git = shutil.which("git")
+        if not git:
+            raise FileNotFoundError("git not found on PATH")
 
-    if not os.path.exists(UNIVERSAT_CACHE_DIR):
-        subprocess.run(
-            [
-                git,
-                "clone",
-                "--single-branch",
-                "https://github.com/gastruc/UniverSat.git",
-                UNIVERSAT_CACHE_DIR,
-            ],
-            check=True,
-            timeout=300,
-        )
-        # pin to known working commit
-        subprocess.run(
-            [
-                git,
-                "-C",
-                UNIVERSAT_CACHE_DIR,
-                "checkout",
-                "f6df2eec54955b0f7524cc95fe21a5e80c0239d9",
-            ],
-            check=True,
-            timeout=60,
-        )
+        if not os.path.exists(UNIVERSAT_CACHE_DIR):
+            # Clone into a temporary sibling dir and atomically rename into
+            # place, so an interrupted or failed clone never wedges the cache.
+            tmp_dir = UNIVERSAT_CACHE_DIR + ".tmp"
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            os.makedirs(os.path.dirname(UNIVERSAT_CACHE_DIR), exist_ok=True)
+            try:
+                subprocess.run(
+                    [
+                        git,
+                        "clone",
+                        "--single-branch",
+                        "https://github.com/gastruc/UniverSat.git",
+                        tmp_dir,
+                    ],
+                    check=True,
+                    timeout=300,
+                )
+                # pin to known working commit
+                subprocess.run(
+                    [
+                        git,
+                        "-C",
+                        tmp_dir,
+                        "checkout",
+                        "f6df2eec54955b0f7524cc95fe21a5e80c0239d9",
+                    ],
+                    check=True,
+                    timeout=60,
+                )
+                os.rename(tmp_dir, UNIVERSAT_CACHE_DIR)
+            except BaseException:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise
 
-    sys.path = [UNIVERSAT_CACHE_DIR, _src] + [
-        p for p in sys.path if p not in (UNIVERSAT_CACHE_DIR, _src)
-    ]
+        sys.path = [UNIVERSAT_CACHE_DIR, _src] + [
+            p for p in sys.path if p not in (UNIVERSAT_CACHE_DIR, _src)
+        ]
 
-    try:
-        import torch._dynamo
+        try:
+            import torch._dynamo
 
-        torch._dynamo.config.disable = True
-    except ImportError:
-        pass
+            torch._dynamo.config.disable = True
+        except ImportError:
+            pass
 
-    global UniverSat, hubconf, WAVELENGTHS
-    from hubconf import UniverSat  # noqa: F811
-    import hubconf  # noqa: F811
-    from modality_registry import WAVELENGTHS  # noqa: F811
+        global UniverSat, hubconf, WAVELENGTHS
+        from hubconf import UniverSat  # noqa: F811
+        import hubconf  # noqa: F811
+        from modality_registry import WAVELENGTHS  # noqa: F811
 
-    _repo_ready = True
+        _repo_ready = True
 
 
 UniverSat = None
@@ -154,7 +172,7 @@ class UniverSatProcessor:
     def preprocess_image(
         self, img: np.ndarray, mod: str, scale: Optional[float] = None
     ) -> torch.Tensor:
-        scale = scale or 1.0
+        scale = scale if scale is not None else 1.0
         img_norm = img.astype(np.float32) / scale
         if mod in TIME_SERIES_MODALITIES and img_norm.ndim == 3:
             img_norm = np.expand_dims(img_norm, axis=0)
@@ -169,7 +187,7 @@ class UniverSatProcessor:
             img, _ = self.read_geotiff(val)
             t_val = self.preprocess_image(img, mod, scale)
         elif isinstance(val, torch.Tensor):
-            t_val = val.float() / (scale or 1.0)
+            t_val = val.float() / (scale if scale is not None else 1.0)
             if mod in TIME_SERIES_MODALITIES and t_val.ndim == 3:
                 t_val = t_val.unsqueeze(0)
         else:
@@ -259,11 +277,12 @@ def get_pca_rgb(tokens: torch.Tensor) -> np.ndarray:
             else np.zeros_like(p)
         )
 
+    # A single tile is an unambiguous 2D (N, D) tensor; anything with a leading
+    # batch dimension is treated as a batch to avoid the (B, N, D) vs (G, G, D)
+    # ambiguity when B == N.
     if t.ndim == 2:
         g = int(t.shape[0] ** 0.5)
         return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), g)
-    if t.ndim == 3 and t.shape[0] == t.shape[1]:
-        return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), t.shape[0])
 
     # batch: fit one PCA across all tiles for consistent colors
     grids = [int(s.shape[0] ** 0.5) if s.ndim == 2 else s.shape[0] for s in t]
