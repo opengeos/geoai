@@ -277,12 +277,11 @@ def get_pca_rgb(tokens: torch.Tensor) -> np.ndarray:
             else np.zeros_like(p)
         )
 
-    # A single tile is an unambiguous 2D (N, D) tensor; anything with a leading
-    # batch dimension is treated as a batch to avoid the (B, N, D) vs (G, G, D)
-    # ambiguity when B == N.
     if t.ndim == 2:
         g = int(t.shape[0] ** 0.5)
         return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), g)
+    if t.ndim == 3 and t.shape[0] == t.shape[1]:
+        return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), t.shape[0])
 
     # batch: fit one PCA across all tiles for consistent colors
     grids = [int(s.shape[0] ** 0.5) if s.ndim == 2 else s.shape[0] for s in t]
