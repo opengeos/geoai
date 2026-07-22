@@ -280,7 +280,9 @@ def get_pca_rgb(tokens: torch.Tensor, is_batch: Optional[bool] = None) -> np.nda
     if t.ndim == 2:
         g = int(t.shape[0] ** 0.5)
         return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), g)
-    if t.ndim == 3 and (is_batch is False or (is_batch is None and t.shape[0] == t.shape[1])):
+    if t.ndim == 3 and (
+        is_batch is False or (is_batch is None and t.shape[0] == t.shape[1])
+    ):
         return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), t.shape[0])
 
     # batch: fit one PCA across all tiles for consistent colors
