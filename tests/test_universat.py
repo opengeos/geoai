@@ -207,8 +207,12 @@ class TestUniverSatHelpers(unittest.TestCase):
             ((4, 4, 128), (4, 4, 3)),
             ((2, 16, 128), (2, 4, 4, 3)),
             ((2, 4, 4, 128), (2, 4, 4, 3)),
+            ((9, 9, 128), (9, 9, 3)),
         ]:
             self.assertEqual(get_pca_rgb(torch.randn(*shape)).shape, res)
+        self.assertEqual(
+            get_pca_rgb(torch.randn(9, 9, 128), is_batch=True).shape, (9, 3, 3, 3)
+        )
 
 
 if __name__ == "__main__":

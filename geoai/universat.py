@@ -262,7 +262,7 @@ def get_tile_embedding(tokens: torch.Tensor) -> torch.Tensor:
     return tokens.mean(dim=1 if tokens.ndim == 3 else 0)
 
 
-def get_pca_rgb(tokens: torch.Tensor) -> np.ndarray:
+def get_pca_rgb(tokens: torch.Tensor, is_batch: Optional[bool] = None) -> np.ndarray:
     t = (
         tokens.detach().cpu().numpy()
         if isinstance(tokens, torch.Tensor)
@@ -280,7 +280,7 @@ def get_pca_rgb(tokens: torch.Tensor) -> np.ndarray:
     if t.ndim == 2:
         g = int(t.shape[0] ** 0.5)
         return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), g)
-    if t.ndim == 3 and t.shape[0] == t.shape[1]:
+    if t.ndim == 3 and (is_batch is False or (is_batch is None and t.shape[0] == t.shape[1])):
         return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), t.shape[0])
 
     # batch: fit one PCA across all tiles for consistent colors
