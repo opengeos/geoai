@@ -376,6 +376,12 @@ _LAZY_SYMBOL_MAP = {
     "moondream_query_sliding_window": ("moondream", None),
     "moondream_detect_sliding_window": ("moondream", None),
     "moondream_point_sliding_window": ("moondream", None),
+    # --- geoai.vllm_geo ---
+    "VLLMGeo": ("vllm_geo", None),
+    "vllm_caption": ("vllm_geo", None),
+    "vllm_query": ("vllm_geo", None),
+    "vllm_detect": ("vllm_geo", None),
+    "check_vllm_available": ("vllm_geo", None),
     # --- geoai.prithvi ---
     "PrithviProcessor": ("prithvi", None),
     "get_available_prithvi_models": ("prithvi", None),
