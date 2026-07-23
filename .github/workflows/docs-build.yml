@@ -78,6 +78,15 @@ jobs:
                   find ./site -name .gitignore -print -delete
                   echo "preview size: $(du -sh ./site | cut -f1)"
 
+            # TEMPORARY diagnostic -- remove once the preview deploys.
+            - name: Check the deploy token is visible to this job
+              if: github.event.pull_request.head.repo.full_name == github.repository
+              env:
+                  TOK: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+              run: |
+                  echo "PREVIEW_DEPLOY_TOKEN length: ${#TOK}"
+                  echo "starts with github_pat_: $(case "$TOK" in github_pat_*) echo yes;; *) echo no;; esac)"
+
             # Publishes to opengeos/pages-preview under geoai/pr-<N>/, rebuilt on
             # every push and removed when the PR closes (see docs-preview-cleanup).
             #
