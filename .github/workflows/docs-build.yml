@@ -26,6 +26,13 @@ jobs:
             - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
+                  # Required by the preview deploy below. Left on, checkout
+                  # writes an http.https://github.com/.extraheader auth header
+                  # carrying GITHUB_TOKEN into the local git config, and that
+                  # header overrides the PAT embedded in the push URL -- so the
+                  # push to pages-preview authenticates as github-actions[bot]
+                  # and 403s no matter how well-scoped PREVIEW_DEPLOY_TOKEN is.
+                  persist-credentials: false
 
             # - name: Install GDAL system dependencies
             #   run: sudo apt-get update && sudo apt-get install -y gdal-bin libgdal-dev
@@ -77,15 +84,6 @@ jobs:
                   set -euo pipefail
                   find ./site -name .gitignore -print -delete
                   echo "preview size: $(du -sh ./site | cut -f1)"
-
-            # TEMPORARY diagnostic -- remove once the preview deploys.
-            - name: Check the deploy token is visible to this job
-              if: github.event.pull_request.head.repo.full_name == github.repository
-              env:
-                  TOK: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
-              run: |
-                  echo "PREVIEW_DEPLOY_TOKEN length: ${#TOK}"
-                  echo "starts with github_pat_: $(case "$TOK" in github_pat_*) echo yes;; *) echo no;; esac)"
 
             # Publishes to opengeos/pages-preview under geoai/pr-<N>/, rebuilt on
             # every push and removed when the PR closes (see docs-preview-cleanup).
