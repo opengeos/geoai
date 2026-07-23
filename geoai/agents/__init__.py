@@ -10,6 +10,7 @@ from .geo_agents import (
     create_gemini_model,
     create_bedrock_model,
     create_minimax_model,
+    create_vllm_model,
 )
 from .map_tools import MapTools
 from .stac_tools import STACTools

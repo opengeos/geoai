@@ -287,6 +287,46 @@ def create_minimax_model(
     return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
 
 
+def create_vllm_model(
+    base_url: str = "http://localhost:8000/v1",
+    model_id: str = "meta-llama/Llama-3.1-8B-Instruct",
+    api_key: str = "EMPTY",
+    client_args: dict = None,
+    **kwargs: Any,
+) -> OpenAIModel:
+    """Create a model served by a local or remote vLLM server.
+
+    vLLM (https://docs.vllm.ai) exposes an OpenAI-compatible chat
+    completions API, so this wraps the strands ``OpenAIModel`` with a
+    custom ``base_url``. Start a server with, e.g.::
+
+        vllm serve meta-llama/Llama-3.1-8B-Instruct
+
+    Args:
+        base_url: Base URL of the vLLM server. Defaults to
+            "http://localhost:8000/v1".
+        model_id: HuggingFace model ID served by vLLM. Defaults to
+            "meta-llama/Llama-3.1-8B-Instruct".
+        api_key: API key for the server. vLLM does not require
+            authentication by default, so this defaults to "EMPTY".
+            Set it if the server was started with ``--api-key``.
+        client_args: Client arguments for the OpenAI-compatible client.
+        **kwargs: Additional keyword arguments for the model.
+
+    Returns:
+        OpenAIModel: An OpenAI-compatible model configured for vLLM.
+    """
+    if client_args is None:
+        client_args = kwargs.get("client_args", {}) or {}
+
+    if "api_key" not in client_args:
+        client_args["api_key"] = api_key
+    if "base_url" not in client_args:
+        client_args["base_url"] = base_url
+
+    return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
+
+
 class GeoAgent(Agent):
     """Geospatial AI agent with interactive mapping capabilities."""
 
