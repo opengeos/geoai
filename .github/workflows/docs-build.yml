@@ -9,8 +9,11 @@ permissions:
     # Needed for the sticky preview comment on the PR.
     pull-requests: write
 
+# Shared with docs-preview-cleanup so the two cannot run against the same PR at
+# once: closing a PR mid-build would otherwise remove the preview and then let
+# the finishing build publish it right back, orphaning the directory.
 concurrency:
-    group: docs-build-${{ github.event.pull_request.number }}
+    group: docs-preview-${{ github.event.pull_request.number }}
     cancel-in-progress: true
 
 jobs:
