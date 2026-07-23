@@ -1,0 +1,6371 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A Python package for using Artificial Intelligence (AI) with geospatial data">
+      
+      
+        <meta name="author" content="opengeos">
+      
+      
+        <link rel="canonical" href="https://opengeoai.org/qgis_plugin/">
+      
+      
+        <link rel="prev" href="../installation/">
+      
+      
+        <link rel="next" href="../citations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.ico">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>QGIS Plugin for GeoAI - GeoAI</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#qgis-plugin-for-geoai" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="GeoAI" class="md-header__button md-logo" aria-label="GeoAI" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="GeoAI">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GeoAI
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              QGIS Plugin for GeoAI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/opengeos/geoai" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="GeoAI" class="md-nav__button md-logo" aria-label="GeoAI" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="GeoAI">
+
+    </a>
+    GeoAI
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/opengeos/geoai" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://book.opengeoai.org" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Book
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  QGIS Plugin
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  QGIS Plugin
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Quick Start
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#video-tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Video Tutorials
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Video Tutorials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Installation Tutorial
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Usage Tutorial
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tree-segmentation-panel-deepforest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tree Segmentation Panel (DeepForest)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#water-segmentation-panel-omniwatermask" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Water Segmentation Panel (OmniWaterMask)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Moondream Vision-Language Model Panel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segment-anything-panel-samgeo" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Segment Anything Panel (SamGeo)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantic-segmentation-panel-combined-training-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Semantic Segmentation Panel (Combined Training &amp; Inference)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instance-segmentation-panel-mask-r-cnn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Instance Segmentation Panel (Mask R-CNN)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-memory-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GPU Memory Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Installation
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#built-in-dependency-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Built-in Dependency Installer
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-set-up-the-environment-with-pixi" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Set up the environment with Pixi
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Set up the environment with Pixi">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-install-pixi" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1) Install Pixi
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linuxmacos-bashzsh" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Linux/macOS (bash/zsh)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows-powershell" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Windows (PowerShell)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-create-a-pixi-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2) Create a Pixi project
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-configure-pixitoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3) Configure <code>pixi.toml</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-install-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4) Install the environment
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-verify-pytorch-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5) Verify PyTorch + CUDA
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-install-deepforest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6) Install DeepForest
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#request-access-to-sam-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Request access to SAM 3
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-install-the-qgis-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Install the QGIS plugin
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-enable-in-qgis" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Enable in QGIS
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Usage
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tree-segmentation-panel-deepforest_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tree Segmentation Panel (DeepForest)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tree Segmentation Panel (DeepForest)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-pretrained-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported Pretrained Models
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#water-segmentation-panel-omniwatermask_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Water Segmentation Panel (OmniWaterMask)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Moondream Vision-Language Model
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segment-anything-panel-samgeo_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Segment Anything Panel (SamGeo)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantic-segmentation-panel-create-data-train-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Semantic Segmentation Panel (Create Data, Train, Inference)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instance-segmentation-panel-mask-r-cnn_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Instance Segmentation Panel (Mask R-CNN)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-gpu-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Clear GPU Memory
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-update-checker" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Plugin Update Checker
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnostics-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Diagnostics Report
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-model-architectures-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported Model Architectures (Segmentation)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-encoders-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported Encoders (Segmentation)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-sam-models-segment-anything" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported SAM Models (Segment Anything)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        License
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Links
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../citations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Citations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Contributing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/opengeos/geoai/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Changelog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/opengeos/geoai/issues" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Report Issues
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Examples
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Examples
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/download_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Download Data
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/download_sentinel2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Download Sentinel-2 Data from Planetary Computer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/download_naip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Download NAIP Imagery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/planetary_computer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Download Data from Planetary Computer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/view_metadata/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  View Metadata
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/create_vector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Create vector labels for training deep learning models
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/edit_vector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Edit vector labels for training deep learning models
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/image_chips/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generate Image Chips
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/image_tiling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generate Image Chips From Folders of Images and Masks
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/create_training_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Creating Training Data for Deep Learning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/export_training_data_formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Export Training Data in Multiple Formats (PASCAL VOC, COCO, YOLO)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/data_augmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data Augmentation for Geospatial Training
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/flipnslide_augmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Flip-n-Slide Data Augmentation for Geospatial Tiling
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_footprints_usa/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Building Footprint Extraction for the USA
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_footprints_africa/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Building Footprint Extraction for Africa
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_footprints_china/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Building Footprint Extraction for China
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_regularization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Building Regularization
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/geometric_properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Geometric Properties
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/car_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Car Detection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/ship_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ship Detection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/solar_panel_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Solar Panel Detection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/text_prompt_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Text Prompt Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/parking_spot_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parking Spot Detection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/data_visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data visualization
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_object_detection_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train an Object Detection Model with GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_segmentation_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Semantic Segmentation Model using Segmentation-Models-PyTorch
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_instance_segmentation_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train an Instance Segmentation Model using Mask R-CNN
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_landcover_classification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Land Cover Classification Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/loss_functions_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Loss Functions for Semantic Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_building_footprints_usa/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Building Footprints Detection Model for the USA
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_solar_panel_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Model for Detecting Solar Panels
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_car_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Model for Detecting Cars
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_ship_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Model for Detecting Ships
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_water_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Model for Detecting Surface Water
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/object_detection_nwpu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Multi-Class Object Detection with NWPU-VHR-10
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/water_dynamics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Mapping Water Dynamics with NAIP Imagery and GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/wetland_mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Wetland Mapping with GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/wetland_dynamics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Wetland Mapping with GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/wetland_sam3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Wetland Segmentation with SAM3
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/regularization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Regularization
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/globe_projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Globe projection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/samgeo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic Segmentation with SAM and GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/grounded_sam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Image Segmentation with Grounded SAM
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/load_model_checkpoint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Load Checkpoint and Resume Training for Semantic Segmentation Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/water_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Semantic Segmentation Model for Water Detection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/water_detection_s2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Water Detection with Sentinel-2 Imagery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/water_detection_s2_hf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Water Detection with Sentinel-2 Pre-trained Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/water_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Water Segmentation with OmniWaterMask
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/batch_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Batch Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_detection_lidar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Building Detection from Aerial Imagery and LiDAR Data
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/instance_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Instance Segmentation with GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/change_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Change Detection with Instance Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/changestar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Building Change Detection with ChangeStar
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/JPEG2000/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Semantic Segmentation Model with JPEG-2000 Images
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/DINOv3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Find similar patches with DINOv3
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/DINOv3_visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  DINOv3 Similarity Visualization
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/DINOv3_wetlands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Find similar patches with DINOv3
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/dinov3_finetune_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fine-Tune DINOv3 for Semantic Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/torchgeo_sampling_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  TorchGeo Sampling for Semantic Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/torchgeo_segmentation_simple/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Simplified TorchGeo Semantic Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/AlphaEarth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  AlphaEarth
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/AI_agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  AI agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/STAC_agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  STAC agents
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/catalog_search_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Catalog Search Agent - Find Datasets with Natural Language
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_timm_classifier/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train an Image Classifier with TIMM Models
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/image_recognition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Image Recognition with EuroSAT Dataset
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_timm_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Train a Semantic Segmentation Model with TIMM Encoders
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/lightly_train_self_supervised/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Self-Supervised Learning with Lightly Train
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/clean_segmentation_results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Cleaning Segmentation Results with MultiClean
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/cloud_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Cloud and Cloud Shadow Detection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/moondream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Geospatial Image Analysis with Moondream Vision Language Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/moondream_gui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Interactive Moondream GUI with Leafmap
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/moondream_sliding_window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Moondream Vision Language Model - Sliding Window for Large Images
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/AutoModel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Using Hugging Face Auto Modules with GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/onnx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ONNX Model Support for Geospatial Inference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/smooth_vector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Smooth Vector
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/road_network_simplification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Road network simplification
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/timelapse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Create Timelapse from Satellite and Aerial Imagery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/prithvi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Prithvi Models Usage
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/train_timm_regressor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pixel-Level Regression with Deep Learning for Remote Sensing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/canopy_height/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Canopy Height Estimation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/smooth_inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Smooth Tiled Inference on GeoTIFF
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/tessera/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  TESSERA Embeddings Usage
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/torchgeo_embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Geospatial Embedding Datasets with TorchGeo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/google_satellite_embedding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Google Satellite Embedding with TorchGeo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/foundation_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Remote Sensing Foundation Models
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/building_detection_whu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Building Detection with WHU Pre-trained Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/clip_classify_vector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Zero-Shot CLIP Classification for Vector Features
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/impervious_surface_mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Impervious Surface Mapping
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/field_boundary_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Field Boundary Detection with Instance Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/super_resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Sentinel-2 Super-Resolution with Latent Diffusion
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/rfdetr_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  RF-DETR - Object Detection on Geospatial Imagery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/rfdetr_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  RF-DETR-Seg - Instance Segmentation on Geospatial Imagery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/image_captioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Image Captioning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Workshops
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Workshops
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workshops/GeoAI_Workshop_2025/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Object Detection from Remote Sensing Imagery with GeoAI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workshops/AWS_2025/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Automating surface water mapping with AI tools
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workshops/TNView_2025/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Unlocking the Power of GeoAI with Python
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workshops/CANVAS_2025/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CANVAS 2025
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workshops/AGU_2025/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🤖 3 - Integrating artificial intelligence with geospatial data analysis and visualization
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  API Reference
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  auto module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../canopy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  canopy module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../caption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  caption module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  change_detection module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../classify/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  classify module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cli module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../detectron2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  detectron2 module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dinov3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  DINOv3 module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../esrgan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ESRGAN module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ftw/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ftw module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geo_agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  geo_agents module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geoai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  geoai module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  download module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  embeddings module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  extract module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../foundation_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  foundation_models module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  hf module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  inference module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../landcover_train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  landcover_train module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../landcover_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  landcover_utils module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../object_detect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  object_detect module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../map_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  map_tools module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../map_widgets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  map_widgets module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../moondream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  moondream module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  networks module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../onnx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  onnx module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prithvi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  prithvi module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recognize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  recognize module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rfdetr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  rfdetr module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  sam module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../segment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  segment module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  segmentation module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tessera/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tessera module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timm_regress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timm_regress module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timm_segment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timm_segment module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timm_train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timm_train module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../train/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  train module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  utils module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  water module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11_40" >
+        
+          
+          <label class="md-nav__link" for="__nav_11_40" id="__nav_11_40_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tools
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_40_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_40">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  tools
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  sr module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloudmask/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cloudmask module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multiclean/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  multiclean module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timeseries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timeseries module
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Quick Start
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#video-tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Video Tutorials
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Video Tutorials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installation-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Installation Tutorial
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Usage Tutorial
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tree-segmentation-panel-deepforest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tree Segmentation Panel (DeepForest)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#water-segmentation-panel-omniwatermask" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Water Segmentation Panel (OmniWaterMask)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Moondream Vision-Language Model Panel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segment-anything-panel-samgeo" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Segment Anything Panel (SamGeo)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantic-segmentation-panel-combined-training-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Semantic Segmentation Panel (Combined Training &amp; Inference)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instance-segmentation-panel-mask-r-cnn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Instance Segmentation Panel (Mask R-CNN)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-memory-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GPU Memory Management
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Installation
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#built-in-dependency-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Built-in Dependency Installer
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-set-up-the-environment-with-pixi" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Set up the environment with Pixi
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Set up the environment with Pixi">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-install-pixi" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1) Install Pixi
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linuxmacos-bashzsh" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Linux/macOS (bash/zsh)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows-powershell" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Windows (PowerShell)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-create-a-pixi-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2) Create a Pixi project
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-configure-pixitoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3) Configure <code>pixi.toml</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-install-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4) Install the environment
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-verify-pytorch-cuda" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5) Verify PyTorch + CUDA
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-install-deepforest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6) Install DeepForest
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#request-access-to-sam-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Request access to SAM 3
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-install-the-qgis-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Install the QGIS plugin
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-enable-in-qgis" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Enable in QGIS
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Usage
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tree-segmentation-panel-deepforest_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tree Segmentation Panel (DeepForest)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tree Segmentation Panel (DeepForest)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-pretrained-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported Pretrained Models
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#water-segmentation-panel-omniwatermask_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Water Segmentation Panel (OmniWaterMask)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#moondream-vision-language-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Moondream Vision-Language Model
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segment-anything-panel-samgeo_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Segment Anything Panel (SamGeo)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantic-segmentation-panel-create-data-train-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Semantic Segmentation Panel (Create Data, Train, Inference)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instance-segmentation-panel-mask-r-cnn_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Instance Segmentation Panel (Mask R-CNN)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-gpu-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Clear GPU Memory
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-update-checker" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Plugin Update Checker
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnostics-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Diagnostics Report
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-model-architectures-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported Model Architectures (Segmentation)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-encoders-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported Encoders (Segmentation)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-sam-models-segment-anything" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Supported SAM Models (Segment Anything)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        License
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Links
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="qgis-plugin-for-geoai">QGIS Plugin for GeoAI<a class="headerlink" href="#qgis-plugin-for-geoai" title="Permanent link">&para;</a></h1>
+<p><a href="https://plugins.qgis.org/plugins/geoai"><img alt="QGIS" src="https://img.shields.io/badge/QGIS-plugin-orange.svg" /></a>
+<a href="https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE"><img alt="image" src="https://img.shields.io/badge/YouTube-Tutorials-red" /></a>
+<a href="https://doi.org/10.21105/joss.09605"><img alt="DOI" src="https://joss.theoj.org/papers/10.21105/joss.09605/status.svg" /></a></p>
+<p>A <a href="https://plugins.qgis.org/plugins/geoai">QGIS plugin</a> that brings the <a href="https://github.com/opengeos/geoai">geoai</a> models into dockable panels (Tree Segmentation, Water Segmentation, Moondream VLM, Segment Anything, Semantic Segmentation, Instance Segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.</p>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Install the QGIS plugin from the QGIS Plugin Manager. Alternatively, you can download the plugin from <a href="https://qgis.gishub.org/plugins/geoai.zip">here</a> and install it manually.</li>
+<li>Enable the GeoAI plugin in QGIS.</li>
+<li>Open any GeoAI toolbar panel — the built-in installer will guide you through dependency setup (one-click).</li>
+<li>Try the sample datasets below.</li>
+</ul>
+<h2 id="video-tutorials">Video Tutorials<a class="headerlink" href="#video-tutorials" title="Permanent link">&para;</a></h2>
+<h3 id="installation-tutorial">Installation Tutorial<a class="headerlink" href="#installation-tutorial" title="Permanent link">&para;</a></h3>
+<p>You can follow this <a href="https://youtu.be/L90id_ESQME">video tutorial</a> to install the GeoAI QGIS Plugin on Linux and Windows:</p>
+<p><a href="https://youtu.be/L90id_ESQME"><img alt="installation" src="https://github.com/user-attachments/assets/3cda92c0-4de9-4cad-81c8-ddb3c790be91" /></a></p>
+<h3 id="usage-tutorial">Usage Tutorial<a class="headerlink" href="#usage-tutorial" title="Permanent link">&para;</a></h3>
+<p>Check out this <a href="https://youtu.be/Esr_e6_P1is">short video demo</a> and <a href="https://youtu.be/8-OhlqeoyiY">full video tutorial</a> on how to use the GeoAI plugin in QGIS.</p>
+<p><a href="https://youtu.be/8-OhlqeoyiY"><img alt="demo" src="https://github.com/user-attachments/assets/5aabc3d3-efd1-4011-ab31-2b3f11aab3ed" /></a></p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>QGIS 3.28 or later</li>
+<li>Python 3.10+ (Pixi recommended)</li>
+<li>PyTorch (CUDA if you want GPU acceleration)</li>
+<li><code>geoai</code>, <code>samgeo</code>, <code>deepforest</code>, and <code>omniwatermask</code> packages</li>
+</ul>
+<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
+<p>Each tool lives inside a dockable panel that can be attached to either side of the QGIS interface, so you can keep layers, maps, and models visible simultaneously.</p>
+<h3 id="tree-segmentation-panel-deepforest">Tree Segmentation Panel (DeepForest)<a class="headerlink" href="#tree-segmentation-panel-deepforest" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model Tab</strong>: Load pretrained <a href="https://deepforest.readthedocs.io">DeepForest</a> models from Hugging Face for tree crown, bird, livestock, nest, and dead tree detection</li>
+<li><strong>Predict Tab</strong>: Run predictions on single images or large geospatial tiles with configurable patch size, overlap, IoU threshold, and score filtering</li>
+<li><strong>Output Tab</strong>: Save detection results as georeferenced vector (GeoPackage, Shapefile, GeoJSON) or raster (GeoTIFF), and export training data in COCO or YOLO format</li>
+</ul>
+<h3 id="water-segmentation-panel-omniwatermask">Water Segmentation Panel (OmniWaterMask)<a class="headerlink" href="#water-segmentation-panel-omniwatermask" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Water Body Detection</strong>: Automated water body segmentation from satellite and aerial imagery using the <a href="https://github.com/NikolasEnt/OmniWaterMask">OmniWaterMask</a> model</li>
+<li><strong>Band Configuration</strong>: Configurable band ordering for multispectral images (RGBN, BGRN, etc.)</li>
+<li><strong>Patch-based Inference</strong>: Sliding window inference with configurable patch size, overlap, and batch size</li>
+<li><strong>OSM Integration</strong>: Optional OpenStreetMap data for refinement (water features, buildings, roads)</li>
+<li><strong>Output Options</strong>: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional smoothing and minimum polygon size filtering</li>
+</ul>
+<h3 id="moondream-vision-language-model-panel">Moondream Vision-Language Model Panel<a class="headerlink" href="#moondream-vision-language-model-panel" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Caption</strong>: Generate descriptions of geospatial imagery (short, normal, or long)</li>
+<li><strong>Query</strong>: Ask questions about images using natural language</li>
+<li><strong>Detect</strong>: Detect and locate objects with bounding boxes</li>
+<li><strong>Point</strong>: Locate specific objects with point markers</li>
+</ul>
+<h3 id="segment-anything-panel-samgeo">Segment Anything Panel (SamGeo)<a class="headerlink" href="#segment-anything-panel-samgeo" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model Tab</strong>: Load SAM3 with configurable backend and device settings</li>
+<li><strong>Text Tab</strong>: Segment objects using text prompts (e.g., "tree", "building", "road")</li>
+<li><strong>Interactive Tab</strong>: Segment using point prompts (foreground/background) or box prompts drawn on the map</li>
+<li><strong>Batch Tab</strong>: Process multiple points interactively or from vector files/layers</li>
+<li><strong>Output Tab</strong>: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)</li>
+</ul>
+<h3 id="semantic-segmentation-panel-combined-training-inference">Semantic Segmentation Panel (Combined Training &amp; Inference)<a class="headerlink" href="#semantic-segmentation-panel-combined-training-inference" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Tab 1 - Create Training Data</strong>: Export GeoTIFF tiles from raster and vector data</li>
+<li><strong>Tab 2 - Train Models</strong>: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)</li>
+<li><strong>Tab 3 - Run Inference</strong>: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.</li>
+</ul>
+<h3 id="instance-segmentation-panel-mask-r-cnn">Instance Segmentation Panel (Mask R-CNN)<a class="headerlink" href="#instance-segmentation-panel-mask-r-cnn" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Tab 1 - Create Training Data</strong>: Export GeoTIFF tiles from raster and vector data with instance-level masks in PASCAL_VOC format, with configurable tile size, stride, and buffer radius</li>
+<li><strong>Tab 2 - Train Models</strong>: Train Mask R-CNN instance segmentation models with configurable number of channels, classes, batch size, epochs, learning rate, and validation split</li>
+<li><strong>Tab 3 - Run Inference</strong>: Apply trained Mask R-CNN models to new imagery and vectorize results with optional smoothing</li>
+</ul>
+<h3 id="gpu-memory-management">GPU Memory Management<a class="headerlink" href="#gpu-memory-management" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Clear GPU Memory</strong>: Release GPU memory and clear CUDA cache for all loaded models</li>
+</ul>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
+<p>There are two ways to set up the GeoAI plugin dependencies:</p>
+<ul>
+<li><strong>Option A - Built-in Dependency Installer</strong> (simple, recommended for most users): The plugin includes a one-click installer that automatically creates an isolated Python environment at <code>~/.qgis_geoai/</code> and installs all required AI packages. See <a href="#built-in-dependency-installer">Built-in Dependency Installer</a> below.</li>
+<li><strong>Option B - Pixi Environment</strong> (advanced, recommended for GPU/CUDA users): Manually create a Pixi environment with full control over PyTorch and CUDA versions. See <a href="#1-set-up-the-environment-with-pixi">Set up the environment with Pixi</a> below.</li>
+</ul>
+<h3 id="built-in-dependency-installer">Built-in Dependency Installer<a class="headerlink" href="#built-in-dependency-installer" title="Permanent link">&para;</a></h3>
+<p>Starting with v1.0.0, the GeoAI plugin includes a built-in dependency installer that handles all setup automatically. When you first open any GeoAI panel, the plugin detects whether the required AI packages are installed. If not, it shows a setup panel that:</p>
+<ul>
+<li>Detects your GPU (NVIDIA CUDA or Apple MPS) and configures PyTorch accordingly</li>
+<li>Creates an isolated Python virtual environment at <code>~/.qgis_geoai/</code></li>
+<li>Installs all required packages (PyTorch, geoai, samgeo, deepforest, omniwatermask, transformers) with a single click</li>
+<li>Shows real-time progress during installation</li>
+</ul>
+<p><img alt="dependency installer" src="https://github.com/user-attachments/assets/d9021180-2ed6-461c-a30e-3b796dea9317" /></p>
+<p>Simply click <strong>Install Dependencies</strong> and wait for the installation to complete. Once finished, the GeoAI panels will be ready to use. This is a one-time setup.</p>
+<p><strong>Custom installation location:</strong> If you cannot write to <code>~/.qgis_geoai/</code> (e.g., in corporate environments with restricted home directories), set the <code>GEOAI_CACHE_DIR</code> environment variable to a writable directory before launching QGIS:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span>
+<span class="normal">6</span>
+<span class="normal">7</span>
+<span class="normal">8</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1"># Linux/macOS</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">GEOAI_CACHE_DIR</span><span class="o">=</span>/path/to/writable/directory
+
+<span class="c1"># Windows (Command Prompt)</span>
+<span class="nb">set</span><span class="w"> </span><span class="nv">GEOAI_CACHE_DIR</span><span class="o">=</span>D:<span class="se">\g</span>eoai_cache
+
+<span class="c1"># Windows (PowerShell)</span>
+<span class="nv">$env</span>:GEOAI_CACHE_DIR<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;D:\geoai_cache&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p><strong>Note:</strong> If you need precise control over CUDA versions or want to use the latest PyTorch builds, use the Pixi-based installation below instead.</p>
+<h3 id="1-set-up-the-environment-with-pixi">1. Set up the environment with Pixi<a class="headerlink" href="#1-set-up-the-environment-with-pixi" title="Permanent link">&para;</a></h3>
+<p>Installing the GeoAI QGIS plugin can be challenging due to the complicated pytorch/cuda dependencies. Conda or mamba might take a while to resolve the dependencies, while pip might fail to install the dependencies properly. It is recommended to use <a href="https://pixi.prefix.dev/latest">pixi</a> to install the dependencies to avoid these issues.</p>
+<h4 id="1-install-pixi">1) Install Pixi<a class="headerlink" href="#1-install-pixi" title="Permanent link">&para;</a></h4>
+<h4 id="linuxmacos-bashzsh">Linux/macOS (bash/zsh)<a class="headerlink" href="#linuxmacos-bashzsh" title="Permanent link">&para;</a></h4>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://pixi.sh/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+</code></pre></div></td></tr></table></div>
+<p>Close and re-open your terminal (or reload your shell) so <code>pixi</code> is on your <code>PATH</code>. Then confirm:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pixi<span class="w"> </span>--version
+</code></pre></div></td></tr></table></div>
+<h4 id="windows-powershell">Windows (PowerShell)<a class="headerlink" href="#windows-powershell" title="Permanent link">&para;</a></h4>
+<p>Open <strong>PowerShell</strong> (preferably as a normal user, Admin not required), then run:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="n">powershell</span> <span class="n">-ExecutionPolicy</span> <span class="n">Bypass</span> <span class="n">-c</span> <span class="s2">&quot;irm -useb https://pixi.sh/install.ps1 | iex&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p>Close and re-open PowerShell, then confirm:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="n">pixi</span> <span class="p">-</span><span class="n">-version</span>
+</code></pre></div></td></tr></table></div>
+<hr />
+<h4 id="2-create-a-pixi-project">2) Create a Pixi project<a class="headerlink" href="#2-create-a-pixi-project" title="Permanent link">&para;</a></h4>
+<p>Navigate to a directory where you want to create the project and run:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="n">pixi</span> <span class="n">init</span> <span class="n">geo</span>
+<span class="nb">cd </span><span class="n">geo</span>
+</code></pre></div></td></tr></table></div>
+<hr />
+<h4 id="3-configure-pixitoml">3) Configure <code>pixi.toml</code><a class="headerlink" href="#3-configure-pixitoml" title="Permanent link">&para;</a></h4>
+<p>Open <code>pixi.toml</code> in the <code>geo</code> directory and replace its contents with the following depending on your system.</p>
+<p>If you have a NVIDIA GPU with CUDA, run <code>nvidia-smi</code> to check the CUDA version.</p>
+<blockquote>
+<p><strong>Note:</strong> QGIS is pinned to <code>3.44.*</code> on purpose. Do not lower it to <code>3.42.*</code>:
+with the dependencies below, that pin resolves to QGIS 3.42.2 (3.42.3 conflicts
+with the rest of the stack), and 3.42.2 shipped a Windows regression that makes
+saving any <code>.qgz</code> project fail with "Unable to perform zip"
+(<a href="https://github.com/qgis/QGIS/issues/61560">QGIS #61560</a>, fixed by
+<a href="https://github.com/qgis/QGIS/pull/61567">QGIS #61567</a>). qgis.org reissued its
+3.42.2 Windows installer with the fix, but conda-forge builds 3.42.2 from the
+original release, so the broken code is what you get. The bug is in QGIS itself
+and is unrelated to this plugin.</p>
+<p>If you already created the environment and hit this, update QGIS in place:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>geo
+pixi<span class="w"> </span>update<span class="w"> </span>qgis
+</code></pre></div></td></tr></table></div>
+<p>Check <strong>Help → About</strong> to confirm you are off 3.42.2. Until you can update,
+save with <em>Save As</em> → <strong>QGIS Project File (*.qgs)</strong>; <code>.qgs</code> is uncompressed
+XML and never touches the zip path, so it is unaffected.</p>
+</blockquote>
+<ul>
+<li>For GPU with CUDA 12.x:</li>
+</ul>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
+<span class="n">channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;geo&quot;</span>
+<span class="n">platforms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;linux-64&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;win-64&quot;</span><span class="p">]</span>
+
+<span class="k">[system-requirements]</span>
+<span class="n">cuda</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;12.0&quot;</span>
+
+<span class="k">[dependencies]</span>
+<span class="n">python</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.12.*&quot;</span>
+<span class="n">pytorch-gpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=2.7.1,&lt;3&quot;</span>
+<span class="n">qgis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.44.*&quot;</span>
+<span class="n">pyqt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;5.15.*&quot;</span>
+<span class="n">geoai</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.27.0&quot;</span>
+<span class="n">segment-geospatial</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=1.2.0&quot;</span>
+<span class="n">sam3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.1.0.20251211&quot;</span>
+<span class="n">libopenblas</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.3.30&quot;</span>
+</code></pre></div></td></tr></table></div>
+<ul>
+<li>For GPU with CUDA 13.x:</li>
+</ul>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
+<span class="n">channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;geo&quot;</span>
+<span class="n">platforms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;linux-64&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;win-64&quot;</span><span class="p">]</span>
+
+<span class="k">[system-requirements]</span>
+<span class="n">cuda</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;13.0&quot;</span>
+
+<span class="k">[dependencies]</span>
+<span class="n">python</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.12.*&quot;</span>
+<span class="n">pytorch-gpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=2.7.1,&lt;3&quot;</span>
+<span class="n">qgis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.44.*&quot;</span>
+<span class="n">pyqt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;5.15.*&quot;</span>
+<span class="n">geoai</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.27.0&quot;</span>
+<span class="n">segment-geospatial</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=1.2.0&quot;</span>
+<span class="n">sam3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.1.0.20251211&quot;</span>
+<span class="n">libopenblas</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.3.30&quot;</span>
+</code></pre></div></td></tr></table></div>
+<ul>
+<li>For CPU:</li>
+</ul>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">[workspace]</span>
+<span class="n">channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;geo&quot;</span>
+<span class="n">platforms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;linux-64&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;win-64&quot;</span><span class="p">]</span>
+
+<span class="k">[dependencies]</span>
+<span class="n">python</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.12.*&quot;</span>
+<span class="n">pytorch-cpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=2.7.1,&lt;3&quot;</span>
+<span class="n">qgis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;3.44.*&quot;</span>
+<span class="n">pyqt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;5.15.*&quot;</span>
+<span class="n">geoai</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.27.0&quot;</span>
+<span class="n">segment-geospatial</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=1.2.0&quot;</span>
+<span class="n">sam3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.1.0.20251211&quot;</span>
+<span class="n">libopenblas</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=0.3.30&quot;</span>
+</code></pre></div></td></tr></table></div>
+<hr />
+<h4 id="4-install-the-environment">4) Install the environment<a class="headerlink" href="#4-install-the-environment" title="Permanent link">&para;</a></h4>
+<p>From the <code>geo</code> folder:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="n">pixi</span> <span class="n">install</span>
+</code></pre></div></td></tr></table></div>
+<p>This step may take several minutes on first install depending on your internet connection and system.</p>
+<hr />
+<h4 id="5-verify-pytorch-cuda">5) Verify PyTorch + CUDA<a class="headerlink" href="#5-verify-pytorch-cuda" title="Permanent link">&para;</a></h4>
+<p>If you have a NVIDIA GPU with CUDA, run the following command to verify the PyTorch + CUDA installation:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="n">pixi</span> <span class="n">run</span> <span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import torch; print(&#39;PyTorch:&#39;, torch.__version__); print(&#39;CUDA available:&#39;, torch.cuda.is_available()); print(&#39;GPU:&#39;, (torch.cuda.get_device_name(0) if torch.cuda.is_available() else &#39;None&#39;))&quot;</span>
+</code></pre></div></td></tr></table></div>
+<p>Expected output should be like this:</p>
+<ul>
+<li><code>PyTorch: 2.9.1</code></li>
+<li><code>CUDA available: True</code></li>
+<li><code>GPU: NVIDIA RTX 4090</code></li>
+</ul>
+<p>If CUDA is <code>False</code>, check:</p>
+<ul>
+<li><code>nvidia-smi</code> works in PowerShell</li>
+<li>NVIDIA driver is up to date</li>
+</ul>
+<hr />
+<h4 id="6-install-deepforest">6) Install DeepForest<a class="headerlink" href="#6-install-deepforest" title="Permanent link">&para;</a></h4>
+<p>DeepForest is not included in the GeoAI package, so you need to install it manually.</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pixi<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>deepforest
+</code></pre></div></td></tr></table></div>
+<p>DeepForest might downgrade numpy to 1.26.4. You can use the following command to upgrade numpy to the latest version:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pixi<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>numpy<span class="w"> </span>transformers
+</code></pre></div></td></tr></table></div>
+<h4 id="request-access-to-sam-3">Request access to SAM 3<a class="headerlink" href="#request-access-to-sam-3" title="Permanent link">&para;</a></h4>
+<p>To use SAM 3, you will need to request access by filling out this form on Hugging Face at <a href="https://huggingface.co/facebook/sam3">https://huggingface.co/facebook/sam3</a>. Once your request has been approved, run the following command in the terminal to authenticate:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pixi<span class="w"> </span>run<span class="w"> </span>hf<span class="w"> </span>auth<span class="w"> </span>login
+</code></pre></div></td></tr></table></div>
+<p>After authentication, you can download the SAM 3 model from Hugging Face:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pixi<span class="w"> </span>run<span class="w"> </span>hf<span class="w"> </span>download<span class="w"> </span>facebook/sam3
+</code></pre></div></td></tr></table></div>
+<p><strong>Important Note</strong>: SAM 3 currently requires a NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU only system (<a href="https://github.com/facebookresearch/sam3/issues/164">source</a>). You will get an error message like this: <code>Failed to load model: Torch not compiled with CUDA enabled</code>.</p>
+<h3 id="2-install-the-qgis-plugin">2. Install the QGIS plugin<a class="headerlink" href="#2-install-the-qgis-plugin" title="Permanent link">&para;</a></h3>
+<p>Option A — use QGIS Plugin Manager (recommended):</p>
+<p>GeoAI is available as a QGIS plugin in the official <a href="https://plugins.qgis.org/plugins/geoai">QGIS plugin repository</a>. To install:</p>
+<ol>
+<li>Launch QGIS: <code>pixi run qgis</code></li>
+<li>Go to <code>Plugins</code> → <code>Manage and Install Plugins...</code></li>
+<li>Switch to the <code>All</code> tab, search for <code>GeoAI</code>, select it, and click <code>Install Plugin</code></li>
+</ol>
+<p><img alt="" src="https://github.com/user-attachments/assets/b31d1d13-27ff-420a-84ab-9cc82ade9a8e" /></p>
+<p>If you encounter an error message like this after installing the plugin, click <strong>Close</strong> to dismiss the dialog. Next, in the QGIS Plugin Manager on the <strong>Installed</strong> tab, toggle the checkbox next to the <strong>GeoAI</strong> plugin to enable it. If the error dialog appears again, close it once more, then restart QGIS to reload the plugin. After restarting, the GeoAI plugin should appear in the QGIS toolbar.</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/cb1be4f9-eaba-4c0c-9c48-f209d39b2d71" /></p>
+<p>Option B — use the helper script:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span></pre></div></td><td class="code"><div><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/opengeos/geoai.git
+<span class="nb">cd</span><span class="w"> </span>geoai/qgis_plugin
+python<span class="w"> </span>install.py
+</code></pre></div></td></tr></table></div>
+<p>This links/copies the plugin into your active QGIS profile. Re-run after pulling updates. Remove with:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>python<span class="w"> </span>install.py<span class="w"> </span>--remove
+</code></pre></div></td></tr></table></div>
+<p>Option C — manual copy:</p>
+<ul>
+<li>Copy the <code>qgis_plugin</code> folder to your QGIS plugins directory:<ul>
+<li>Linux: <code>~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+<li>Windows: <code>C:\Users\&lt;username&gt;\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\</code></li>
+<li>macOS: <code>~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="3-enable-in-qgis">3. Enable in QGIS<a class="headerlink" href="#3-enable-in-qgis" title="Permanent link">&para;</a></h3>
+<p>Launch QGIS: <code>pixi run qgis</code></p>
+<p>QGIS → <code>Plugins</code> → <code>Manage and Install Plugins...</code> → enable <code>GeoAI</code>. After updates, toggle the plugin off/on or restart QGIS to reload.</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/1b6dab14-311d-4f62-85aa-1faed73ead5b" /></p>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="tree-segmentation-panel-deepforest_1">Tree Segmentation Panel (DeepForest)<a class="headerlink" href="#tree-segmentation-panel-deepforest_1" title="Permanent link">&para;</a></h3>
+<p>The Tree Segmentation panel provides object detection in remote sensing imagery using pretrained deep learning models from the <a href="https://deepforest.readthedocs.io">DeepForest</a> library.</p>
+<h4 id="supported-pretrained-models">Supported Pretrained Models<a class="headerlink" href="#supported-pretrained-models" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Hugging Face ID</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tree Crown Detection</td>
+<td><code>weecology/deepforest-tree</code></td>
+<td>Detect individual tree crowns in RGB imagery</td>
+</tr>
+<tr>
+<td>Bird Detection</td>
+<td><code>weecology/deepforest-bird</code></td>
+<td>Detect birds in aerial/satellite imagery</td>
+</tr>
+<tr>
+<td>Livestock Detection</td>
+<td><code>weecology/deepforest-livestock</code></td>
+<td>Detect livestock in aerial imagery</td>
+</tr>
+<tr>
+<td>Nest Detection</td>
+<td><code>weecology/everglades-nest-detection</code></td>
+<td>Detect bird nests in Everglades imagery</td>
+</tr>
+<tr>
+<td>Dead Tree Detection</td>
+<td><code>weecology/cropmodel-deadtrees</code></td>
+<td>Detect dead trees in forest imagery</td>
+</tr>
+</tbody>
+</table>
+<p>Sample dataset:
+    - <a href="https://data.source.coop/opengeos/geoai/OSBS-029.tif">OSBS-029.tif</a></p>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>Tree Segmentation</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Tree Segmentation</code>)</li>
+<li>
+<p>In the <strong>Model</strong> tab:</p>
+<ul>
+<li>Select a pretrained model from the dropdown (e.g., Tree Crown Detection)</li>
+<li>Configure device (auto, cuda, cpu)</li>
+<li>Click "Load Model" to download and initialize the model</li>
+<li>Select a raster layer or browse for an image file and click "Set Image from Layer" or "Set Image from File"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/a4b0c1d2-85e0-442d-9574-919f4bc59c67" /></p>
+</li>
+<li>
+<p>In the <strong>Predict</strong> tab:</p>
+<ul>
+<li>Choose prediction mode:<ul>
+<li><strong>Single Image</strong>: Predict on the entire image at once (best for small images)</li>
+<li><strong>Large Tile</strong>: Split large geospatial tiles into overlapping patches for prediction</li>
+</ul>
+</li>
+<li>When a large image is selected, the panel shows the pixel dimensions and recommends <strong>Large Tile</strong> mode for high-resolution imagery.</li>
+<li>For Large Tile mode, configure:<ul>
+<li><strong>Patch Size</strong>: Size of each prediction window (default 400px; experiment with 400-800 for 0.1m data)</li>
+<li><strong>Patch Overlap</strong>: Overlap between adjacent patches (default 0.25)</li>
+<li><strong>IoU Threshold</strong>: Overlap threshold for suppressing duplicate detections (default 0.15)</li>
+<li><strong>Dataloader Strategy</strong>: Memory management strategy (single, batch, or window)</li>
+</ul>
+</li>
+<li>Set the <strong>Score Threshold</strong> to filter low-confidence detections (default 0.3)</li>
+<li>Click "Run Prediction"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/200782fe-290d-4882-9b8d-4dcaeafad1b0" /></p>
+<p><img alt="" src="https://github.com/user-attachments/assets/3523f9d7-a8d4-4b9e-839b-6616730dd452" /></p>
+</li>
+<li>
+<p>In the <strong>Output</strong> tab:</p>
+<ul>
+<li>Select output format:<ul>
+<li><strong>Vector</strong>: GeoPackage, Shapefile, or GeoJSON (saves bounding boxes as polygons with score and label attributes)</li>
+<li><strong>Raster</strong>: GeoTIFF (rasterizes bounding boxes onto the source raster)</li>
+</ul>
+</li>
+<li>Click "Save Results" to export</li>
+<li>To export training data for model fine-tuning:<ul>
+<li>Select <strong>PASCAL_VOC</strong>, <strong>COCO</strong>, or <strong>YOLO</strong> format</li>
+<li>Choose an output directory</li>
+<li>Click "Export Training Data"</li>
+</ul>
+</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/4a0ef60a-fb1f-4084-a65c-34b886c9ef01" /></p>
+</li>
+</ol>
+<h3 id="water-segmentation-panel-omniwatermask_1">Water Segmentation Panel (OmniWaterMask)<a class="headerlink" href="#water-segmentation-panel-omniwatermask_1" title="Permanent link">&para;</a></h3>
+<p>The Water Segmentation panel provides water body segmentation using <a href="https://github.com/DPIRD-DMA/OmniWaterMask">OmniWaterMask</a>, a sensor-agnostic tool that combines deep learning, NDWI calculations, and OpenStreetMap reference data to detect water bodies in satellite and aerial imagery.</p>
+<p>Sample dataset: <a href="https://data.source.coop/opengeos/geoai/S2A-L2A-20190318-N0211-R061-6Bands-S2.tif">S2A-L2A-20190318-N0211-R061-6Bands-S2.tif</a></p>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>Water Segmentation</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Water Segmentation</code>)</li>
+<li>Select a raster layer or browse for an image file</li>
+<li>Configure band ordering to match your imagery (e.g., RGBN for 4-band imagery)</li>
+<li>Configure inference parameters:<ul>
+<li><strong>Patch Size</strong>: Size of the sliding window for inference (default 512)</li>
+<li><strong>Overlap Size</strong>: Overlap between adjacent patches (default 256)</li>
+<li><strong>Batch Size</strong>: Number of patches to process in parallel</li>
+<li><strong>Device</strong>: auto, cuda, cpu, or mps</li>
+<li><strong>Precision</strong>: Inference precision (float32, float16, bfloat16)</li>
+</ul>
+</li>
+<li>Optionally enable OSM integration:<ul>
+<li><strong>Use OSM Water</strong>: Incorporate OpenStreetMap water features</li>
+<li><strong>Use OSM Buildings</strong>: Use building footprints to refine results</li>
+<li><strong>Use OSM Roads</strong>: Use road data to refine results</li>
+</ul>
+</li>
+<li>Configure output options:<ul>
+<li><strong>Output Raster</strong>: Path for the water mask GeoTIFF</li>
+<li><strong>Output Vector</strong>: Path for vectorized water polygons (GeoPackage or Shapefile)</li>
+<li><strong>Min Size</strong>: Minimum polygon area in pixels to filter small artifacts</li>
+<li><strong>Smooth</strong>: Enable polygon smoothing with configurable iterations</li>
+</ul>
+</li>
+<li>Click "Run" to start water segmentation</li>
+</ol>
+<h3 id="moondream-vision-language-model">Moondream Vision-Language Model<a class="headerlink" href="#moondream-vision-language-model" title="Permanent link">&para;</a></h3>
+<p>The Moondream Vision-Language Model panel provides image captioning, question-answering, object detection, and point localization using the <a href="https://huggingface.co/vikhyatk/moondream2">Moondream</a> model.</p>
+<p>Sample dataset: <a href="https://data.source.coop/opengeos/geoai/parking-lot.tif">parking-lot.tif</a></p>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>Moondream</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Moondream VLM</code>)</li>
+<li>Load a Moondream model (default: vikhyatk/moondream2)</li>
+<li>Select a raster layer or browse for an image file</li>
+<li>Choose a mode:<ul>
+<li><strong>Caption</strong>: Generate a description of the image</li>
+<li><strong>Query</strong>: Ask a question about the image</li>
+<li><strong>Detect</strong>: Detect objects by type (e.g., "building", "car")</li>
+<li><strong>Point</strong>: Locate specific objects</li>
+</ul>
+</li>
+<li>Click "Run"</li>
+<li>
+<p>Results are displayed and optionally added to the map. You can drag the panel to any side of QGIS to keep it out of the way while browsing results. Save the output table or vector layer if you want to reuse detections later.</p>
+<p><img alt="moondream" src="https://github.com/user-attachments/assets/bb800a04-b7c4-4fdd-a628-a48842d7eac5" /></p>
+</li>
+</ol>
+<h3 id="segment-anything-panel-samgeo_1">Segment Anything Panel (SamGeo)<a class="headerlink" href="#segment-anything-panel-samgeo_1" title="Permanent link">&para;</a></h3>
+<p>The Segment Anything panel provides object segmentation using the <a href="https://github.com/facebookresearch/segment-anything">Segment Anything</a> model.</p>
+<p>Sample dataset:</p>
+<ul>
+<li><a href="https://data.source.coop/opengeos/geoai/uc-berkeley.tif">uc-berkeley.tif</a></li>
+<li><a href="https://data.source.coop/opengeos/geoai/wa-building-image.tif">wa-building-image.tif</a></li>
+<li><a href="https://data.source.coop/opengeos/geoai/wa-building-centroids.geojson">wa-building-centroids.geojson</a></li>
+<li><a href="https://data.source.coop/opengeos/geoai/wa-building-bboxes.geojson">wa-building-bboxes.geojson</a></li>
+</ul>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>Segment Anything</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Segment Anything</code>)</li>
+<li>
+<p>In the <strong>Model</strong> tab:</p>
+<ul>
+<li>Select the SAM model version (SamGeo3/SAM3, SamGeo2/SAM2, or SamGeo/SAM1)</li>
+<li>Configure backend (meta or transformers) and device (auto, cuda, cpu)</li>
+<li>Click "Load Model" to initialize the model</li>
+<li>Select a raster layer or browse for an image file and click "Set Image"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/600b0879-f851-4423-b668-cb9e8df28425" /></p>
+</li>
+<li>
+<p>Choose a segmentation method:</p>
+<ul>
+<li>
+<p><strong>Text Tab</strong>: Enter text prompts describing objects to segment (e.g., "tree, building")</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/da2c17fc-4633-488d-ba44-00f1cd97555c" /></p>
+</li>
+<li>
+<p><strong>Interactive Tab</strong>:</p>
+<ul>
+<li>Click "Add Foreground Points" or "Add Background Points" and click on the map</li>
+<li>Or click "Draw Box" and drag a rectangle on the map</li>
+<li>Click "Segment by Points" or "Segment by Box"</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/6730737d-62fc-438a-bff5-cffb685d391e" /></p>
+</li>
+<li>
+<p><strong>Batch Tab</strong>: Add multiple points interactively or load from a vector file/layer</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/104ec741-44cc-404a-9213-36cf78456171" /></p>
+</li>
+</ul>
+</li>
+<li>
+<p>In the <strong>Output</strong> tab:</p>
+<ul>
+<li>Select output format (Raster GeoTIFF, Vector GeoPackage, or Vector Shapefile)</li>
+<li>For vector output, optionally enable regularization:<ul>
+<li>Check "Regularize polygons (orthogonalize)"</li>
+<li>Set Epsilon (simplification tolerance) and Min Area (filter small polygons)</li>
+</ul>
+</li>
+<li>Click "Save Masks" to export results</li>
+</ul>
+<p><img alt="" src="https://github.com/user-attachments/assets/5c80cc57-3870-4a20-bb74-73e394ef22a6" /></p>
+</li>
+</ol>
+<h3 id="semantic-segmentation-panel-create-data-train-inference">Semantic Segmentation Panel (Create Data, Train, Inference)<a class="headerlink" href="#semantic-segmentation-panel-create-data-train-inference" title="Permanent link">&para;</a></h3>
+<p>Sample datasets:</p>
+<ul>
+<li><a href="https://data.source.coop/opengeos/geoai/naip-rgb-train.tif">naip-rgb-train.tif</a></li>
+<li><a href="https://data.source.coop/opengeos/geoai/naip-test.tif">naip-test.tif</a></li>
+<li><a href="https://data.source.coop/opengeos/geoai/naip-train-buildings.geojson">naip-train-buildings.geojson</a></li>
+</ul>
+<p>Steps:</p>
+<ol>
+<li>Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to pixi project.</li>
+<li>Click the <strong>Semantic Segmentation</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Semantic Segmentation</code>)</li>
+<li>
+<p>Use the tabs at the top of the panel to switch between:</p>
+<ul>
+<li><strong>Create Training Data</strong>: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.</li>
+<li><strong>Train Model</strong>: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.</li>
+<li><strong>Run Inference</strong>: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.</li>
+</ul>
+<p><img alt="data" src="https://github.com/user-attachments/assets/121fcfa8-6f9b-4413-9419-af666698c053" /></p>
+<p><img alt="train" src="https://github.com/user-attachments/assets/dfeefb86-ebf7-467c-a5ff-794cde80a7cb" /></p>
+<p><img alt="inference" src="https://github.com/user-attachments/assets/f0945c01-0fcb-4607-9226-4a3b2bcb05e1" /></p>
+</li>
+</ol>
+<h3 id="instance-segmentation-panel-mask-r-cnn_1">Instance Segmentation Panel (Mask R-CNN)<a class="headerlink" href="#instance-segmentation-panel-mask-r-cnn_1" title="Permanent link">&para;</a></h3>
+<p>Sample datasets:</p>
+<ul>
+<li><a href="https://data.source.coop/opengeos/geoai/field-boundaries.zip">field boundaries</a></li>
+</ul>
+<p>Steps:</p>
+<ol>
+<li>Click the <strong>Instance Segmentation</strong> button in the GeoAI toolbar (or <code>GeoAI</code> menu → <code>Instance Segmentation</code>)</li>
+<li>Use the tabs at the top of the panel to switch between:<ul>
+<li><strong>Create Training Data</strong>: Select input raster and vector labels, configure tile size, stride, and buffer radius, choose metadata format (PASCAL_VOC), and export instance segmentation tiles to a directory.</li>
+<li><strong>Train Model</strong>: Select the images and labels directories, configure model parameters (number of channels, number of classes, batch size, epochs, learning rate, validation split), and start Mask R-CNN training.</li>
+<li><strong>Run Inference</strong>: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results with smoothing.</li>
+</ul>
+</li>
+</ol>
+<h3 id="clear-gpu-memory">Clear GPU Memory<a class="headerlink" href="#clear-gpu-memory" title="Permanent link">&para;</a></h3>
+<p>Click the <strong>GPU</strong> button in the GeoAI toolbar to release GPU memory from all loaded models and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/76c9dd8a-581c-4975-9ecb-4bfe301447bd" /></p>
+<h3 id="plugin-update-checker">Plugin Update Checker<a class="headerlink" href="#plugin-update-checker" title="Permanent link">&para;</a></h3>
+<p>Go to <code>GeoAI</code> menu → <code>Check for Updates...</code> to see if a newer version of the GeoAI plugin is available. Click on the <code>Check for Updates</code> button to fetch the latest version info from GitHub. If an update is found, click the <code>Download and Install Update</code> button to download and install the latest version automatically. Restart QGIS to apply the update.</p>
+<p><img alt="" src="https://github.com/user-attachments/assets/cc0dfd38-9b41-4735-9af0-c49b7aa71b72" /></p>
+<h3 id="diagnostics-report">Diagnostics Report<a class="headerlink" href="#diagnostics-report" title="Permanent link">&para;</a></h3>
+<p>Go to <code>GeoAI</code> menu → <code>Generate Diagnostics Report...</code> to create a Markdown report that can be copied directly into a GitHub issue. The report includes the plugin version, QGIS/Python runtime, operating system, managed virtual environment path, CUDA availability, GPU details, and versions/import status for key packages such as <code>geoai-py</code>, PyTorch, SAM3, Transformers, and <code>segment-geospatial</code>.</p>
+<h2 id="supported-model-architectures-segmentation">Supported Model Architectures (Segmentation)<a class="headerlink" href="#supported-model-architectures-segmentation" title="Permanent link">&para;</a></h2>
+<p>The QGIS plugin supports any models supported by <a href="https://smp.readthedocs.io/en/latest/models.html">Pytorch Segmentation Models</a>, including:</p>
+<ul>
+<li>U-Net</li>
+<li>U-Net++</li>
+<li>DeepLabV3</li>
+<li>DeepLabV3+</li>
+<li>FPN (Feature Pyramid Network)</li>
+<li>PSPNet</li>
+<li>LinkNet</li>
+<li>MANet</li>
+<li>PAN</li>
+<li>UperNet</li>
+<li>SegFormer</li>
+<li>DPT</li>
+</ul>
+<h2 id="supported-encoders-segmentation">Supported Encoders (Segmentation)<a class="headerlink" href="#supported-encoders-segmentation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>ResNet (34, 50, 101, 152)</li>
+<li>EfficientNet (b0-b4)</li>
+<li>MobileNetV2</li>
+<li>VGG (16, 19)</li>
+</ul>
+<h2 id="supported-sam-models-segment-anything">Supported SAM Models (Segment Anything)<a class="headerlink" href="#supported-sam-models-segment-anything" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>SamGeo3 (SAM3)</strong>: Latest version with text prompts, point prompts, and box prompts</li>
+<li><strong>SamGeo2 (SAM2)</strong>: Improved version with better performance</li>
+<li><strong>SamGeo (SAM1)</strong>: Original Segment Anything Model</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<ul>
+<li>If you report a plugin issue on GitHub, include the Markdown from <code>GeoAI</code> menu → <code>Generate Diagnostics Report...</code>.</li>
+<li>Dependency installer shows <code>Failed to install geoai-py: SSL certificate error</code>:</li>
+<li>Update the GeoAI plugin to v1.5.0 or newer.</li>
+<li>Click <strong>Reinstall Dependencies</strong>, and restart QGIS.</li>
+<li>Recent plugin versions retry package installs with native TLS plus trusted package hosts for PyPI, PyTorch, and uv certificate errors.</li>
+<li>If the error persists on a managed network, confirm that QGIS can access <code>pypi.org</code>, <code>files.pythonhosted.org</code>, and <code>download.pytorch.org</code>.</li>
+<li>Configure the QGIS proxy settings before reinstalling.</li>
+<li>Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.</li>
+<li>CUDA OOM: use the <strong>GPU</strong> button to clear cache, lower batch sizes, or switch to CPU for smaller runs.</li>
+<li>Model download failures: check network/firewall, then retry loading models from the panel.</li>
+</ul>
+<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
+<p>MIT License - see <a href="../../LICENSE">LICENSE</a> for details.</p>
+<h2 id="links">Links<a class="headerlink" href="#links" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://opengeoai.org">GeoAI Documentation</a></li>
+<li><a href="https://samgeo.gishub.org">SamGeo Documentation</a></li>
+<li><a href="https://github.com/opengeos/geoai">GitHub Repository</a></li>
+<li><a href="https://github.com/opengeos/geoai/issues">Report Issues</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../installation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Installation">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Installation
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../citations/" class="md-footer__link md-footer__link--next" aria-label="Next: Citations">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Citations
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 - 2026 Qiusheng Wu
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.footer","navigation.instant","navigation.top","navigation.tracking","search.highlight","search.share"],"search":"../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>
