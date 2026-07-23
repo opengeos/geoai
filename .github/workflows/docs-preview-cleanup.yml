@@ -1,0 +1,47 @@
+# Removes the per-PR docs preview that docs-build published to
+# opengeos/pages-preview under geoai/pr-<N>/, and updates the sticky comment.
+#
+# This lives apart from docs-build so closing a pull request does not drag the
+# whole install-test-build chain along just to delete a directory.
+name: docs-preview-cleanup
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - main
+
+permissions:
+    contents: read
+    pull-requests: write
+
+concurrency:
+    group: docs-preview-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    cleanup:
+        runs-on: ubuntu-latest
+        # Fork pull requests never got a preview (no secrets on `pull_request`),
+        # so there is nothing to remove.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        steps:
+            # The publish action runs `git config` in the workspace root, so
+            # that root has to be a git repository even when only removing.
+            - uses: actions/checkout@v7
+              with:
+                  persist-credentials: false
+                  fetch-depth: 1
+
+            - name: Remove preview
+              # Pinned to a SHA rather than the mutable tag: this is a
+              # third-party action that receives PREVIEW_DEPLOY_TOKEN, so a
+              # moved tag would hand that token to unreviewed code.
+              uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1.8.1
+              with:
+                  deploy-repository: opengeos/pages-preview
+                  token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+                  pages-base-url: opengeos.org/pages-preview
+                  preview-branch: gh-pages
+                  umbrella-dir: geoai
+                  action: remove

@@ -4,6 +4,18 @@ on:
         branches:
             - main
 
+permissions:
+    contents: read
+    # Needed for the sticky preview comment on the PR.
+    pull-requests: write
+
+# Shared with docs-preview-cleanup so the two cannot run against the same PR at
+# once: closing a PR mid-build would otherwise remove the preview and then let
+# the finishing build publish it right back, orphaning the directory.
+concurrency:
+    group: docs-preview-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
 jobs:
     docs-build:
         runs-on: ubuntu-latest
@@ -17,6 +29,13 @@ jobs:
             - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
+                  # Required by the preview deploy below. Left on, checkout
+                  # writes an http.https://github.com/.extraheader auth header
+                  # carrying GITHUB_TOKEN into the local git config, and that
+                  # header overrides the PAT embedded in the push URL -- so the
+                  # push to pages-preview authenticates as github-actions[bot]
+                  # and 403s no matter how well-scoped PREVIEW_DEPLOY_TOKEN is.
+                  persist-credentials: false
 
             # - name: Install GDAL system dependencies
             #   run: sudo apt-get update && sudo apt-get install -y gdal-bin libgdal-dev
@@ -59,19 +78,50 @@ jobs:
                   .venv/bin/python scripts/convert_notebooks.py
                   .venv/bin/zensical build
 
-            - name: Deploy to Netlify
-              uses: nwtgck/actions-netlify@v4.0
+            # Publishing happens through `git add`, which honors any .gitignore
+            # inside the payload: a stray one silently drops files from the
+            # preview while the build still reports success.
+            - name: Strip .gitignore files from the build output
+              if: github.event.pull_request.head.repo.full_name == github.repository
+              run: |
+                  set -euo pipefail
+                  find ./site -name .gitignore -print -delete
+                  echo "preview size: $(du -sh ./site | cut -f1)"
+
+            # Publishes to opengeos/pages-preview under geoai/pr-<N>/, rebuilt on
+            # every push and removed when the PR closes (see docs-preview-cleanup).
+            #
+            #   https://opengeos.org/pages-preview/geoai/pr-<N>/
+            #
+            # Skipped for fork pull requests: `pull_request` grants them no
+            # secrets, so PREVIEW_DEPLOY_TOKEN would be empty. Building a fork's
+            # docs with that token available would mean running unreviewed code
+            # with write access to the preview repository.
+            #
+            # SETUP (one time): secret PREVIEW_DEPLOY_TOKEN, a fine-grained PAT
+            # scoped to opengeos/pages-preview ONLY, with Contents: Read and
+            # write (push to gh-pages) and Pages: Read (poll the Pages build so
+            # the comment is only posted once the URL resolves). Pages read is
+            # not optional with wait-for-pages-deployment; without it the job
+            # burns its timeout and fails with a misleading "Timed out waiting
+            # for build to start". The token needs no access to this repository.
+            - name: Deploy preview to GitHub Pages
+              if: github.event.pull_request.head.repo.full_name == github.repository
+              # Pinned to a SHA rather than the mutable tag: this is a
+              # third-party action that receives PREVIEW_DEPLOY_TOKEN, so a
+              # moved tag would hand that token to unreviewed code.
+              uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1.8.1
               with:
-                  publish-dir: "./site"
-                  production-branch: master
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
-                  deploy-message: "Deploy from GitHub Actions"
-                  enable-pull-request-comment: true
-                  enable-commit-comment: false
-                  overwrites-pull-request-comment: true
-              env:
-                  NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-                  NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+                  source-dir: ./site
+                  deploy-repository: opengeos/pages-preview
+                  token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+                  pages-base-url: opengeos.org/pages-preview
+                  preview-branch: gh-pages
+                  # pages-preview is shared across opengeos repositories and the
+                  # action composes the path as "<umbrella-dir>/pr-<number>", so
+                  # this is what keeps our pr-42 off another repository's pr-42.
+                  umbrella-dir: geoai
+                  wait-for-pages-deployment: true
 
             - name: Cleanup
               if: always()
