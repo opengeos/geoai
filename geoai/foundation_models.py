@@ -432,6 +432,28 @@ FOUNDATION_MODELS: Dict[str, Dict[str, Any]] = {
             "Sentinel-1/2 paired samples with 12 auxiliary modalities."
         ),
     },
+    "universat": {
+        "name": "UniverSat",
+        "abbreviation": "UniverSat",
+        "category": "vision",
+        "modality": "multimodal",
+        "tasks": ["segmentation", "classification"],
+        "backbone": "ViT-B",
+        "publication": "Arxiv2026",
+        "year": 2026,
+        "paper_url": "https://arxiv.org/abs/2606.23503",
+        "code_url": "https://github.com/gastruc/UniverSat",
+        "huggingface_id": "g-astruc/UniverSat",
+        "license": "MIT",
+        "terratorch_supported": False,
+        "terratorch_key": None,
+        "description": (
+            "Resolution- and Modality-Agnostic Transformers for Earth Observation. "
+            "A ViT-style backbone built around a Universal Patch Encoder (UPE) that maps "
+            "patches of arbitrary spatial, spectral, and temporal shape into a shared "
+            "embedding space without input resampling or channel selection."
+        ),
+    },
     # ------------------------------------------------------------------
     # Vision-language foundation models
     # ------------------------------------------------------------------

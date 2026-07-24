@@ -102,6 +102,7 @@ nav = [
     "examples/torchgeo_embeddings.md",
     "examples/google_satellite_embedding.md",
     "examples/foundation_models.md",
+    "examples/universat.md",
     "examples/building_detection_whu.md",
     "examples/clip_classify_vector.md",
     "examples/impervious_surface_mapping.md",
