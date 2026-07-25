@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 import rasterio
 from PIL import Image
-from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForMaskedImageModeling, pipeline
+from .progress import tqdm
 
 __all__ = [
     "get_model_config",

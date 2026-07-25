@@ -45,7 +45,7 @@ from PIL import Image
 from rasterio.features import shapes
 from rasterio.windows import Window
 from shapely.geometry import shape
-from tqdm import tqdm
+from .progress import tqdm
 
 
 def _check_onnx_deps() -> None:

@@ -881,7 +881,7 @@ def dinov3_segment_geotiff(
     """
     import rasterio
     from rasterio.windows import Window
-    from tqdm import tqdm
+    from .progress import tqdm
 
     if overlap >= window_size:
         raise ValueError(

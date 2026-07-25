@@ -30,7 +30,7 @@ from rasterio import features
 from rasterio.windows import Window
 from skimage.filters import threshold_multiotsu
 from sklearn.linear_model import LinearRegression
-from tqdm import tqdm
+from .progress import tqdm
 
 __all__ = [
     "export_landcover_tiles",
