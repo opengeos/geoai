@@ -146,6 +146,7 @@ nav = [
     { "networks module" = "networks.md" },
     { "onnx module" = "onnx.md" },
     { "prithvi module" = "prithvi.md" },
+    { "progress module" = "progress.md" },
     { "recognize module" = "recognize.md" },
     { "rfdetr module" = "rfdetr.md" },
     { "sam module" = "sam.md" },

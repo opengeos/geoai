@@ -15,8 +15,8 @@ import rioxarray as rxr
 import xarray as xr
 from rasterio import features
 from shapely.geometry import Polygon
-from tqdm import tqdm
 
+from ..progress import tqdm
 from .device import install_package, temp_file_path
 
 __all__ = [

@@ -19,7 +19,7 @@ import rioxarray as rxr
 import xarray as xr
 from pystac_client import Client
 from shapely.geometry import box
-from tqdm import tqdm
+from .progress import tqdm
 
 logger = logging.getLogger(__name__)
 

@@ -336,7 +336,7 @@ def rfdetr_detect(
     from PIL import Image
     from rasterio.windows import Window
     from shapely.geometry import Polygon
-    from tqdm import tqdm
+    from .progress import tqdm
 
     check_rfdetr_available()
 
