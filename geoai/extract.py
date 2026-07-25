@@ -1133,7 +1133,7 @@ class ObjectDetector:
 
         # Print parameters being used
         if verbose:
-            logger.info(f"Processing masks with parameters:")
+            logger.info("Processing masks with parameters:")
             logger.info(f"- Confidence threshold: {confidence_threshold}")
             logger.info(f"- Chip size: {chip_size}")
             logger.info(f"- Mask threshold: {mask_threshold}")
