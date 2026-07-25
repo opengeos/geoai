@@ -27,7 +27,7 @@ from rasterio import features
 from rasterio.plot import show
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box, shape
-from tqdm import tqdm
+from ..progress import tqdm
 
 logger = logging.getLogger(__name__)
 

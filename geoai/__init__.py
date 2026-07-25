@@ -203,6 +203,11 @@ _LAZY_SYMBOL_MAP = {
     "DETECTION_MODELS": ("train", None),
     "get_detection_model": ("train", None),
     "model_has_masks": ("train", None),
+    # --- geoai.progress ---
+    "disable_progress_bars": ("progress", None),
+    "enable_progress_bars": ("progress", None),
+    "set_progress_bars": ("progress", None),
+    "progress_bars_disabled": ("progress", None),
     # --- geoai.utils ---
     "clean_instance_mask": ("utils", None),
     "orthogonalize": ("utils", None),
@@ -493,6 +498,7 @@ _LAZY_SUBMODULES = {
     "dinov3_finetune",
     "esrgan",
     "foundation_models",
+    "progress",
 }
 
 

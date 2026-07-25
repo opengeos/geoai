@@ -21,7 +21,6 @@ from skimage.exposure import match_histograms
 from torch.amp import GradScaler
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, Dataset, random_split, SubsetRandomSampler
-from tqdm import tqdm
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -31,6 +30,7 @@ import torch.optim as optim
 import torch.utils.data
 import torchvision.models as models
 
+from .progress import tqdm
 from .utils.device import get_device
 
 

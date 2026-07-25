@@ -352,7 +352,7 @@ def predict_geotiff(
     import torch
     import rasterio
     from rasterio.windows import Window
-    from tqdm.auto import tqdm
+    from .progress import tqdm
 
     from geoai.utils import get_device
 
@@ -604,7 +604,7 @@ def predict_geotiff_superres(
     import torch
     import rasterio
     from rasterio.windows import Window
-    from tqdm.auto import tqdm
+    from .progress import tqdm
 
     from geoai.utils import get_device
 

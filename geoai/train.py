@@ -28,8 +28,8 @@ from torchvision.models.detection import (
 )
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
-from tqdm import tqdm
 
+from .progress import tqdm
 from .utils import download_model_from_hf, get_device
 
 logger = logging.getLogger(__name__)

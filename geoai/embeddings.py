@@ -1413,7 +1413,7 @@ def download_google_satellite_embedding(
 
                     # Read bands with progress bar
                     try:
-                        from tqdm import tqdm
+                        from .progress import tqdm
 
                         band_arrays = []
                         desc = f"Year {year}"

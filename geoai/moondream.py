@@ -21,9 +21,9 @@ import rasterio
 import torch
 from PIL import Image
 from shapely.geometry import Point, box
-from tqdm import tqdm
 from transformers.utils import logging as hf_logging
 
+from .progress import tqdm
 from .utils import get_device
 
 hf_logging.set_verbosity_error()  # silence HF load reports

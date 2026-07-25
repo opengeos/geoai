@@ -25,8 +25,8 @@ import rasterio
 import torch
 from PIL import Image
 from rasterio.windows import Window, from_bounds as window_from_bounds
-from tqdm import tqdm
 from transformers import CLIPModel, CLIPProcessor
+from .progress import tqdm
 
 logger = logging.getLogger(__name__)
 

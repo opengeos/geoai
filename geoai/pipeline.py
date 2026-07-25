@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-from tqdm import tqdm
+from .progress import tqdm
 
 logger = logging.getLogger(__name__)
 
