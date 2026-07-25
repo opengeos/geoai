@@ -291,7 +291,7 @@ def create_vllm_model(
     base_url: str = "http://localhost:8000/v1",
     model_id: str = "meta-llama/Llama-3.1-8B-Instruct",
     api_key: str = "EMPTY",
-    client_args: dict = None,
+    client_args: Optional[dict] = None,
     **kwargs: Any,
 ) -> OpenAIModel:
     """Create a model served by a local or remote vLLM server.

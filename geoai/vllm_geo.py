@@ -798,8 +798,18 @@ class VLLMGeo:
         image, metadata = self.load_image(source, bands)
         width, height = image.size
 
+        prompt = DETECT_PROMPT_TEMPLATE.format(object_type=object_type)
+
         if width <= window_size and height <= window_size:
-            return self.detect(image, object_type, output_path=output_path, **kwargs)
+            answer = self._chat(prompt, image, **kwargs)
+            result = {"objects": self._parse_detections(answer)}
+
+            if metadata and metadata.get("crs") and metadata.get("transform"):
+                result = self._georef_detections(result, metadata)
+                if output_path:
+                    self._save_vector(result["gdf"], output_path)
+
+            return result
 
         windows = self._create_sliding_windows(width, height, window_size, overlap)
         all_detections = []
@@ -807,8 +817,6 @@ class VLLMGeo:
         iterator = (
             tqdm(windows, desc=f"Detecting {object_type}") if show_progress else windows
         )
-
-        prompt = DETECT_PROMPT_TEMPLATE.format(object_type=object_type)
 
         for x_start, y_start, x_end, y_end in iterator:
             window_img = image.crop((x_start, y_start, x_end, y_end))
