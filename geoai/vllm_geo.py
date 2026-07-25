@@ -34,7 +34,8 @@ import rasterio
 import requests
 from PIL import Image
 from shapely.geometry import box
-from tqdm import tqdm
+
+from .progress import tqdm
 
 logger = logging.getLogger(__name__)
 
