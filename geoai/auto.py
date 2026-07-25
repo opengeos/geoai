@@ -34,7 +34,6 @@ from PIL import Image
 from rasterio.features import shapes
 from rasterio.windows import Window
 from shapely.geometry import box, shape
-from tqdm import tqdm
 from transformers import (
     AutoConfig,
     AutoImageProcessor,
@@ -52,6 +51,7 @@ from transformers import (
 
 from transformers.utils import logging as hf_logging
 
+from .progress import tqdm
 from .utils import get_device
 
 hf_logging.set_verbosity_error()  # silence HF load reports

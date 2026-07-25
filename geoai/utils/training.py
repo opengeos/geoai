@@ -25,7 +25,7 @@ from rasterio.windows import Window
 from shapely.affinity import rotate
 from shapely.geometry import box
 from torchvision.transforms import RandomRotation
-from tqdm import tqdm
+from ..progress import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -1504,6 +1504,7 @@ def export_geotiff_tiles(
             total=min(total_tiles, max_tiles),
             desc="Generating tiles",
             bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+            disable=quiet,
         )
 
         # Track statistics for summary
@@ -1779,11 +1780,14 @@ def export_geotiff_tiles(
                             label_dir,
                         )
 
-                # Update progress bar
-                pbar.update(1)
+                # Update progress bar. refresh=False lets tqdm throttle the
+                # redraws; otherwise every tile forces a redraw, which floods
+                # notebook front ends (e.g., Colab) and can freeze the tab.
                 pbar.set_description(
-                    f"Generated: {stats['total_tiles']}, With features: {stats['tiles_with_features']}"
+                    f"Generated: {stats['total_tiles']}, With features: {stats['tiles_with_features']}",
+                    refresh=False,
                 )
+                pbar.update(1)
 
                 tile_index += 1
                 if tile_index >= max_tiles:
@@ -2978,6 +2982,7 @@ def export_training_data(
             total=total_tiles,
             desc=f"Generating tiles (with features: 0)",
             bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+            disable=quiet,
         )
 
         # Generate tiles
@@ -3434,11 +3439,12 @@ def export_training_data(
                             }
                         )
 
-                # Update progress bar
-                pbar.update(1)
+                # Update progress bar (refresh=False so tqdm throttles redraws)
                 pbar.set_description(
-                    f"Generated: {stats['total_tiles']}, With features: {stats['tiles_with_features']}"
+                    f"Generated: {stats['total_tiles']}, With features: {stats['tiles_with_features']}",
+                    refresh=False,
                 )
+                pbar.update(1)
 
                 chip_index += 1
 

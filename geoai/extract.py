@@ -20,9 +20,9 @@ from torchvision.models.detection import (
     fasterrcnn_resnet50_fpn_v2,
     maskrcnn_resnet50_fpn,
 )
-from tqdm import tqdm
 
 # Local Imports
+from .progress import tqdm
 from .utils import get_raster_stats
 
 logger = logging.getLogger(__name__)
@@ -163,16 +163,19 @@ class CustomDataset(NonGeoDataset):
             self.rows = len(self.row_starts)
             self.cols = len(self.col_starts)
 
-            logger.info(
-                f"Dataset initialized with {self.rows} rows and {self.cols} columns of chips"
-            )
-            logger.info(f"Image dimensions: {self.width} x {self.height} pixels")
-            logger.info(f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels")
-            logger.info(
-                f"Overlap: {overlap*100}% (stride_x={self.stride_x}, stride_y={self.stride_y})"
-            )
-            if src.crs:
-                logger.info(f"CRS: {src.crs}")
+            if self.verbose:
+                logger.info(
+                    f"Dataset initialized with {self.rows} rows and {self.cols} columns of chips"
+                )
+                logger.info(f"Image dimensions: {self.width} x {self.height} pixels")
+                logger.info(
+                    f"Chip size: {self.chip_size[1]} x {self.chip_size[0]} pixels"
+                )
+                logger.info(
+                    f"Overlap: {overlap*100}% (stride_x={self.stride_x}, stride_y={self.stride_y})"
+                )
+                if src.crs:
+                    logger.info(f"CRS: {src.crs}")
 
         # Get raster stats
         self.raster_stats = get_raster_stats(raster_path, divide_by=255)
@@ -1129,10 +1132,11 @@ class ObjectDetector:
             output_path = os.path.splitext(raster_path)[0] + "_masks.tif"
 
         # Print parameters being used
-        logger.info(f"Processing masks with parameters:")
-        logger.info(f"- Confidence threshold: {confidence_threshold}")
-        logger.info(f"- Chip size: {chip_size}")
-        logger.info(f"- Mask threshold: {mask_threshold}")
+        if verbose:
+            logger.info("Processing masks with parameters:")
+            logger.info(f"- Confidence threshold: {confidence_threshold}")
+            logger.info(f"- Chip size: {chip_size}")
+            logger.info(f"- Mask threshold: {mask_threshold}")
 
         # Create dataset
         dataset = CustomDataset(
@@ -1201,8 +1205,9 @@ class ObjectDetector:
                 )
 
                 # Process batches
-                logger.info(f"Processing raster with {len(dataloader)} batches")
-                for batch in tqdm(dataloader):
+                if verbose:
+                    logger.info(f"Processing raster with {len(dataloader)} batches")
+                for batch in tqdm(dataloader, disable=not verbose):
                     # Move images to device
                     images = batch["image"].to(self.device)
                     coords = batch["coords"]  # (i, j) coordinates in pixels
@@ -1329,7 +1334,8 @@ class ObjectDetector:
                 # Write the final mask to the output file
                 dst.write(mask_array, 1)
 
-        logger.info(f"Object masks saved to {output_path}")
+        if verbose:
+            logger.info(f"Object masks saved to {output_path}")
         return output_path
 
     def regularize_objects(
@@ -1360,7 +1366,7 @@ class ObjectDetector:
         import numpy as np
         from shapely.affinity import rotate, translate
         from shapely.geometry import MultiPolygon, Polygon, box
-        from tqdm import tqdm
+        from .progress import tqdm
 
         def get_angle(
             p1: Tuple[float, float], p2: Tuple[float, float], p3: Tuple[float, float]
@@ -2076,8 +2082,9 @@ class ObjectDetector:
             )
 
             # Process batches
-            logger.info(f"Processing raster with {len(dataloader)} batches")
-            for batch in tqdm(dataloader):
+            if verbose:
+                logger.info(f"Processing raster with {len(dataloader)} batches")
+            for batch in tqdm(dataloader, disable=not verbose):
                 # Move images to device
                 images = batch["image"].to(self.device)
                 coords = batch["coords"]  # Tensor of shape [batch_size, 2]
@@ -2163,7 +2170,8 @@ class ObjectDetector:
                 dst.write(mask_array, 1)
                 dst.write(conf_array, 2)
 
-            logger.info(f"Masks with confidence values saved to {output_path}")
+            if verbose:
+                logger.info(f"Masks with confidence values saved to {output_path}")
             return output_path
 
     def vectorize_masks(

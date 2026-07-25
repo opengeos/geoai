@@ -13,7 +13,6 @@ from PIL import Image
 from rasterio.warp import transform_bounds
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box
-from tqdm import tqdm
 from transformers import (
     AutoModelForMaskGeneration,
     AutoProcessor,
@@ -21,6 +20,7 @@ from transformers import (
     CLIPSegProcessor,
     pipeline,
 )
+from .progress import tqdm
 
 __all__ = [
     "BoundingBox",

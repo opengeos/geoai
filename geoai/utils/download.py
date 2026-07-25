@@ -34,7 +34,7 @@ def download_file(
 
     import zipfile
 
-    from tqdm import tqdm
+    from ..progress import tqdm
 
     if output_path is None:
         output_path = os.path.basename(url)

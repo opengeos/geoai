@@ -42,6 +42,7 @@ onnx = ["onnx>=1.21.0", "onnxruntime"]
 sr = ["opensr-model"]
 rfdetr = ["rfdetr"]
 terratorch = ["terratorch>=1.0"]
+vllm = ["vllm"]
 networks = ["neatnet", "osmnx"]
 
 [tool.uv]

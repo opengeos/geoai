@@ -394,7 +394,7 @@ def _classify_image(
     from torchgeo.datasets import RasterDataset, stack_samples
     from torchgeo.samplers import GridGeoSampler
     from torchgeo.trainers import SemanticSegmentationTask
-    from tqdm import tqdm
+    from .progress import tqdm
 
     # Set default output path if not provided
     if output_path is None:
@@ -870,7 +870,7 @@ def classify_images(
     # Import required libraries
     import glob
 
-    from tqdm import tqdm
+    from .progress import tqdm
 
     # Process directory input
     if isinstance(image_paths, str) and os.path.isdir(image_paths):
