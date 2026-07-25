@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -263,6 +264,24 @@ def get_tile_embedding(tokens: torch.Tensor) -> torch.Tensor:
 
 
 def get_pca_rgb(tokens: torch.Tensor, is_batch: Optional[bool] = None) -> np.ndarray:
+    """Project token embeddings onto their first three principal components as RGB.
+
+    Args:
+        tokens: Token embeddings. Accepted layouts are a single tile as
+            ``(N, D)`` or ``(G, G, D)``, or a batch of tiles as ``(B, N, D)``
+            or ``(B, G, G, D)``.
+        is_batch: Disambiguates a 3D input, which is otherwise interpreted by
+            comparing the first two dimensions. Pass ``False`` to force a
+            single ``(G, G, D)`` tile or ``True`` to force a ``(B, N, D)``
+            batch. When ``None`` (the default) a 3D tensor whose first two
+            dimensions are equal is treated as a single tile, and a warning is
+            emitted because ``(B, N, D)`` with ``B == N`` is equally plausible.
+
+    Returns:
+        Array of RGB values normalized to ``[0, 1]``, shaped ``(G, G, 3)`` for a
+        single tile or ``(B, G, G, 3)`` for a batch. A batch is fitted with a
+        single shared PCA so colors are comparable across tiles.
+    """
     t = (
         tokens.detach().cpu().numpy()
         if isinstance(tokens, torch.Tensor)
@@ -283,6 +302,15 @@ def get_pca_rgb(tokens: torch.Tensor, is_batch: Optional[bool] = None) -> np.nda
     if t.ndim == 3 and (
         is_batch is False or (is_batch is None and t.shape[0] == t.shape[1])
     ):
+        if is_batch is None:
+            warnings.warn(
+                f"Ambiguous 3D input {t.shape}: treating it as a single "
+                f"({t.shape[0]}, {t.shape[0]}, {t.shape[-1]}) tile, but it could "
+                f"equally be a batch of {t.shape[0]} tiles. Pass is_batch=False "
+                "or is_batch=True to select explicitly.",
+                UserWarning,
+                stacklevel=2,
+            )
         return _norm(PCA(3).fit_transform(t.reshape(-1, t.shape[-1])), t.shape[0])
 
     # batch: fit one PCA across all tiles for consistent colors

@@ -1,4 +1,4 @@
-import unittest, numpy as np, torch, torch.nn as nn
+import unittest, warnings, numpy as np, torch, torch.nn as nn
 from unittest.mock import MagicMock, patch, ANY
 import geoai
 from geoai.foundation_models import FOUNDATION_MODELS
@@ -204,15 +204,27 @@ class TestUniverSatHelpers(unittest.TestCase):
     def test_get_pca_rgb(self):
         for shape, res in [
             ((16, 128), (4, 4, 3)),
-            ((4, 4, 128), (4, 4, 3)),
             ((2, 16, 128), (2, 4, 4, 3)),
             ((2, 4, 4, 128), (2, 4, 4, 3)),
-            ((9, 9, 128), (9, 9, 3)),
         ]:
             self.assertEqual(get_pca_rgb(torch.randn(*shape)).shape, res)
-        self.assertEqual(
-            get_pca_rgb(torch.randn(9, 9, 128), is_batch=True).shape, (9, 3, 3, 3)
-        )
+        # A 3D tensor with equal leading dims is ambiguous; is_batch selects.
+        for shape, is_batch, res in [
+            ((4, 4, 128), False, (4, 4, 3)),
+            ((9, 9, 128), False, (9, 9, 3)),
+            ((9, 9, 128), True, (9, 3, 3, 3)),
+        ]:
+            self.assertEqual(
+                get_pca_rgb(torch.randn(*shape), is_batch=is_batch).shape, res
+            )
+
+    def test_get_pca_rgb_warns_on_ambiguous_shape(self):
+        with self.assertWarns(UserWarning):
+            get_pca_rgb(torch.randn(9, 9, 128))
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            get_pca_rgb(torch.randn(2, 16, 128))
+            get_pca_rgb(torch.randn(9, 9, 128), is_batch=False)
 
 
 if __name__ == "__main__":
