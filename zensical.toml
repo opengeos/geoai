@@ -110,6 +110,7 @@ nav = [
     "examples/rfdetr_detection.md",
     "examples/rfdetr_segmentation.md",
     "examples/image_captioning.md",
+    "examples/mining_footprint_mapping.md",
   ] },
   { "Workshops" = [
     "workshops/GeoAI_Workshop_2025.md",
