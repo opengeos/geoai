@@ -52,13 +52,13 @@ jobs:
             - name: Running pytest
               run: |
                   export PYTHONPATH=$(pwd)
-                  uv run pytest tests --verbose
+                  .venv/bin/python -m pytest tests --verbose
 
             - name: Build docs with Zensical
               run: |
                   uv pip install -r requirements_docs.txt
-                  uv run python scripts/convert_notebooks.py
-                  uv run zensical build
+                  .venv/bin/python scripts/convert_notebooks.py
+                  .venv/bin/zensical build
 
             - name: Deploy to GitHub Pages
               uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
