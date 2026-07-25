@@ -246,6 +246,75 @@ class TestQuietFlags(unittest.TestCase):
             self.assertTrue(created, "expected a progress bar to be created")
             self.assertTrue(all(created), "expected every progress bar to be disabled")
 
+    @staticmethod
+    def _stub_detector(chip_size=(128, 128)):
+        """Build an ObjectDetector that runs without downloading model weights.
+
+        Args:
+            chip_size (tuple): Chip size used by the inference dataset.
+
+        Returns:
+            ObjectDetector: An instance whose model returns no detections.
+        """
+        import torch
+
+        from geoai.extract import ObjectDetector
+
+        def stub_model(images):
+            """Return an empty prediction for every image in the batch."""
+            return [
+                {
+                    "masks": torch.zeros((0, 1, *chip_size)),
+                    "scores": torch.zeros(0),
+                }
+                for _ in images
+            ]
+
+        detector = ObjectDetector.__new__(ObjectDetector)
+        detector.device = torch.device("cpu")
+        detector.model = stub_model
+        detector.chip_size = chip_size
+        detector.confidence_threshold = 0.5
+        detector.mask_threshold = 0.5
+        return detector
+
+    def test_generate_masks_quiet_when_not_verbose(self):
+        """generate_masks(verbose=False) creates no visible progress bar."""
+        import tempfile
+
+        detector = self._stub_detector()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            raster_path, _ = self._create_data(tmp_dir)
+            with self._record_bars() as created:
+                with self.assertNoLogs("geoai.extract", level="INFO"):
+                    detector.generate_masks(
+                        raster_path=raster_path,
+                        output_path=os.path.join(tmp_dir, "masks.tif"),
+                        verbose=False,
+                    )
+
+            self.assertTrue(created, "expected a progress bar to be created")
+            self.assertTrue(all(created), "expected every progress bar to be disabled")
+
+    def test_generate_masks_progress_shown_when_verbose(self):
+        """generate_masks(verbose=True) still shows the progress bar."""
+        import tempfile
+
+        detector = self._stub_detector()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            raster_path, _ = self._create_data(tmp_dir)
+            with self._record_bars() as created:
+                detector.generate_masks(
+                    raster_path=raster_path,
+                    output_path=os.path.join(tmp_dir, "masks.tif"),
+                    verbose=True,
+                )
+
+            self.assertTrue(
+                any(not flag for flag in created),
+                "expected at least one visible progress bar",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

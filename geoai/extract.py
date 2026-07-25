@@ -1132,10 +1132,11 @@ class ObjectDetector:
             output_path = os.path.splitext(raster_path)[0] + "_masks.tif"
 
         # Print parameters being used
-        logger.info(f"Processing masks with parameters:")
-        logger.info(f"- Confidence threshold: {confidence_threshold}")
-        logger.info(f"- Chip size: {chip_size}")
-        logger.info(f"- Mask threshold: {mask_threshold}")
+        if verbose:
+            logger.info(f"Processing masks with parameters:")
+            logger.info(f"- Confidence threshold: {confidence_threshold}")
+            logger.info(f"- Chip size: {chip_size}")
+            logger.info(f"- Mask threshold: {mask_threshold}")
 
         # Create dataset
         dataset = CustomDataset(
@@ -1333,7 +1334,8 @@ class ObjectDetector:
                 # Write the final mask to the output file
                 dst.write(mask_array, 1)
 
-        logger.info(f"Object masks saved to {output_path}")
+        if verbose:
+            logger.info(f"Object masks saved to {output_path}")
         return output_path
 
     def regularize_objects(
@@ -2168,7 +2170,8 @@ class ObjectDetector:
                 dst.write(mask_array, 1)
                 dst.write(conf_array, 2)
 
-            logger.info(f"Masks with confidence values saved to {output_path}")
+            if verbose:
+                logger.info(f"Masks with confidence values saved to {output_path}")
             return output_path
 
     def vectorize_masks(
