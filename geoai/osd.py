@@ -52,10 +52,12 @@ def classify_optically_shallow_deep(
     except ImportError:
         keras_modules = [keras, tf.keras]
 
+    original_getters = []
+    patched_targets = set()
     for m in keras_modules:
         if m is None:
             continue
-        if hasattr(m, "get"):
+        if hasattr(m, "get") and (id(m), "get") not in patched_targets:
             orig_get = m.get
 
             def patched_get(identifier, orig=orig_get):
@@ -63,8 +65,10 @@ def classify_optically_shallow_deep(
                     return orig("leaky_relu")
                 return orig(identifier)
 
+            original_getters.append((m, "get", orig_get))
+            patched_targets.add((id(m), "get"))
             m.get = patched_get
-        if hasattr(m, "activations") and hasattr(m.activations, "get"):
+        if hasattr(m, "activations") and hasattr(m.activations, "get") and (id(m.activations), "get") not in patched_targets:
             orig_get = m.activations.get
 
             def patched_get(identifier, orig=orig_get):
@@ -72,6 +76,8 @@ def classify_optically_shallow_deep(
                     return orig("leaky_relu")
                 return orig(identifier)
 
+            original_getters.append((m.activations, "get", orig_get))
+            patched_targets.add((id(m.activations), "get"))
             m.activations.get = patched_get
 
     original_imread = tifffile.imread
@@ -87,23 +93,27 @@ def classify_optically_shallow_deep(
         "tensorflow.device", return_value=unittest.mock.MagicMock()
     )
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with (
-            unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
-            tf_device_patch,
-        ):
-            osd_run(
-                file_L1C=str(image_path),
-                folder_out=temp_dir,
-                file_L2R=str(l2r_path) if l2r_path else None,
-                to_log=to_log,
-            )
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
+                tf_device_patch,
+            ):
+                osd_run(
+                    file_L1C=str(image_path),
+                    folder_out=temp_dir,
+                    file_L2R=str(l2r_path) if l2r_path else None,
+                    to_log=to_log,
+                )
 
-        generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
-        if not generated:
-            raise RuntimeError("opticallyshallowdeep failed to generate output.")
+            generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
+            if not generated:
+                raise RuntimeError("opticallyshallowdeep failed to generate output.")
 
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(generated[0], out_path)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(generated[0], out_path)
+    finally:
+        for target_obj, attr_name, orig_func in original_getters:
+            setattr(target_obj, attr_name, orig_func)
 
     return str(out_path)

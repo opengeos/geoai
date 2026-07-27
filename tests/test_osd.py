@@ -80,14 +80,16 @@ class TestOSDClassification(unittest.TestCase):
             "opticallyshallowdeep.run": mock_module,
             "tensorflow": MagicMock(),
             "keras": MagicMock(),
+            "tifffile": MagicMock(),
         }
         with patch.dict(sys.modules, sys_patch):
-            classify_optically_shallow_deep(
+            res = classify_optically_shallow_deep(
                 image=self.input_dir,
                 output=out_prob,
             )
 
-        # Verify probability output exists and values are correct
+        # Verify probability output exists, return value matches out_prob, and values are correct
+        self.assertEqual(res, str(out_prob))
         self.assertTrue(out_prob.exists())
         with rasterio.open(out_prob) as src:
             data = src.read([1])[0]
@@ -148,14 +150,60 @@ class TestOSDClassification(unittest.TestCase):
             "opticallyshallowdeep.run": mock_module,
             "tensorflow": MagicMock(),
             "keras": MagicMock(),
+            "tifffile": MagicMock(),
+        }
+        with patch.dict(sys.modules, sys_patch):
+            res = classify_optically_shallow_deep(
+                image=self.input_dir,
+                output=out_prob,
+                acolite_l2r=dummy_l2r,
+            )
+        self.assertEqual(res, str(out_prob))
+        self.assertEqual(mock_run.call_args.kwargs.get("file_L2R"), str(dummy_l2r))
+        self.assertTrue(out_prob.exists())
+
+    def test_keras_patch_restoration(self):
+        mock_keras = MagicMock()
+        original_get = MagicMock(name="original_get")
+        mock_keras.get = original_get
+
+        mock_tf = MagicMock()
+        mock_tf.keras = mock_keras
+
+        mock_run = MagicMock()
+
+        def side_effect(file_L1C, folder_out, file_L2R=None, to_log=False):
+            out_file = Path(folder_out) / "dummy_OSW_ODW.tif"
+            with rasterio.open(
+                out_file,
+                "w",
+                driver="GTiff",
+                width=10,
+                height=10,
+                count=1,
+                dtype=rasterio.uint8,
+                crs="EPSG:32654",
+                transform=rasterio.transform.from_origin(0, 10, 1, 1),
+                nodata=255,
+            ) as dst:
+                dst.write(np.full((10, 10), 255, dtype=np.uint8), 1)
+
+        mock_run.side_effect = side_effect
+        out_prob = Path(self.temp_dir.name) / "prob_restored.tif"
+
+        sys_patch = {
+            "opticallyshallowdeep": MagicMock(),
+            "opticallyshallowdeep.run": MagicMock(run=mock_run),
+            "tensorflow": mock_tf,
+            "keras": mock_keras,
+            "tifffile": MagicMock(),
         }
         with patch.dict(sys.modules, sys_patch):
             classify_optically_shallow_deep(
                 image=self.input_dir,
                 output=out_prob,
-                acolite_l2r=dummy_l2r,
             )
-        self.assertTrue(out_prob.exists())
+            self.assertIs(mock_keras.get, original_get)
 
 
 if __name__ == "__main__":

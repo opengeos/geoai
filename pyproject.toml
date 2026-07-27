@@ -35,7 +35,8 @@ exclude = ["docs*"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "quackosm", "smoothify", "localtileserver==0.11.0", "opticallyshallowdeep"]
+extra = ["overturemaps", "torchange", "lightly-train", "multiclean", "omnicloudmask", "omniwatermask", "quackosm", "smoothify", "localtileserver==0.11.0"]
+osd = ["opticallyshallowdeep"]
 building = ["buildingregulariser"]
 agents = ["strands-agents", "strands-agents-tools", "strands-agents[ollama]", "strands-agents[anthropic]", "strands-agents[openai]"]
 onnx = ["onnx>=1.21.0", "onnxruntime"]
