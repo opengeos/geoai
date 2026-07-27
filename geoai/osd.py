@@ -96,7 +96,9 @@ def classify_optically_shallow_deep(
             _original_getters.append((tifffile, "imread", tifffile.imread))
             _original_getters.append((tf, "device", tf.device))
 
-            def patched_imread(*args: Any, orig: Any = tifffile.imread, **kwargs: Any) -> Any:
+            def patched_imread(
+                *args: Any, orig: Any = tifffile.imread, **kwargs: Any
+            ) -> Any:
                 dtype = kwargs.pop("dtype", None)
                 img = orig(*args, **kwargs)
                 return img.astype(dtype) if dtype is not None else img
