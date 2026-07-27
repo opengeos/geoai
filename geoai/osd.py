@@ -68,7 +68,11 @@ def classify_optically_shallow_deep(
             original_getters.append((m, "get", orig_get))
             patched_targets.add((id(m), "get"))
             m.get = patched_get
-        if hasattr(m, "activations") and hasattr(m.activations, "get") and (id(m.activations), "get") not in patched_targets:
+        if (
+            hasattr(m, "activations")
+            and hasattr(m.activations, "get")
+            and (id(m.activations), "get") not in patched_targets
+        ):
             orig_get = m.activations.get
 
             def patched_get(identifier, orig=orig_get):
