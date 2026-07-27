@@ -3,11 +3,9 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 import tempfile
 import sys
-import importlib
 import numpy as np
 import rasterio
 
-# Add geoai to path if needed
 import geoai
 from geoai.osd import classify_optically_shallow_deep
 
@@ -48,40 +46,39 @@ class TestOSDClassification(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def test_classify_success(self):
-        mock_run = MagicMock()
+    def _mock_side_effect(self, file_L1C, folder_out, file_L2R=None, to_log=False):
+        out_file = Path(folder_out) / "dummy_OSW_ODW.tif"
+        with rasterio.open(
+            out_file,
+            "w",
+            driver="GTiff",
+            width=10,
+            height=10,
+            count=1,
+            dtype=rasterio.uint8,
+            crs="EPSG:32654",
+            transform=rasterio.transform.from_origin(0, 10, 1, 1),
+            nodata=255,
+        ) as dst:
+            prob = np.full((10, 10), 255, dtype=np.uint8)
+            prob[2:5, 2:5] = 80
+            prob[5:8, 5:8] = 20
+            dst.write(prob, 1)
 
-        def side_effect(file_L1C, folder_out, file_L2R=None, to_log=False):
-            out_file = Path(folder_out) / "dummy_OSW_ODW.tif"
-            with rasterio.open(
-                out_file,
-                "w",
-                driver="GTiff",
-                width=10,
-                height=10,
-                count=1,
-                dtype=rasterio.uint8,
-                crs="EPSG:32654",
-                transform=rasterio.transform.from_origin(0, 10, 1, 1),
-                nodata=255,
-            ) as dst:
-                prob = np.full((10, 10), 255, dtype=np.uint8)
-                prob[2:5, 2:5] = 80
-                prob[5:8, 5:8] = 20
-                dst.write(prob, 1)
-
-        mock_run.side_effect = side_effect
-
-        out_prob = Path(self.temp_dir.name) / "prob.tif"
-
-        mock_module = MagicMock(run=mock_run)
-        sys_patch = {
+    def _get_sys_patch(self, mock_run, keras_mock=None, tf_mock=None):
+        return {
             "opticallyshallowdeep": MagicMock(),
-            "opticallyshallowdeep.run": mock_module,
-            "tensorflow": MagicMock(),
-            "keras": MagicMock(),
+            "opticallyshallowdeep.run": MagicMock(run=mock_run),
+            "tensorflow": tf_mock or MagicMock(),
+            "keras": keras_mock or MagicMock(),
             "tifffile": MagicMock(),
         }
+
+    def test_classify_success(self):
+        mock_run = MagicMock(side_effect=self._mock_side_effect)
+        out_prob = Path(self.temp_dir.name) / "prob.tif"
+
+        sys_patch = self._get_sys_patch(mock_run)
         with patch.dict(sys.modules, sys_patch):
             res = classify_optically_shallow_deep(
                 image=self.input_dir,
@@ -120,38 +117,10 @@ class TestOSDClassification(unittest.TestCase):
         )
         dummy_l2r.write_text("dummy netcdf content")
 
-        mock_run = MagicMock()
-
-        def side_effect(file_L1C, folder_out, file_L2R=None, to_log=False):
-            out_file = Path(folder_out) / "dummy_OSW_ODW.tif"
-            with rasterio.open(
-                out_file,
-                "w",
-                driver="GTiff",
-                width=10,
-                height=10,
-                count=1,
-                dtype=rasterio.uint8,
-                crs="EPSG:32654",
-                transform=rasterio.transform.from_origin(0, 10, 1, 1),
-                nodata=255,
-            ) as dst:
-                prob = np.full((10, 10), 255, dtype=np.uint8)
-                prob[2:5, 2:5] = 80
-                dst.write(prob, 1)
-
-        mock_run.side_effect = side_effect
-
+        mock_run = MagicMock(side_effect=self._mock_side_effect)
         out_prob = Path(self.temp_dir.name) / "prob_l2r.tif"
 
-        mock_module = MagicMock(run=mock_run)
-        sys_patch = {
-            "opticallyshallowdeep": MagicMock(),
-            "opticallyshallowdeep.run": mock_module,
-            "tensorflow": MagicMock(),
-            "keras": MagicMock(),
-            "tifffile": MagicMock(),
-        }
+        sys_patch = self._get_sys_patch(mock_run)
         with patch.dict(sys.modules, sys_patch):
             res = classify_optically_shallow_deep(
                 image=self.input_dir,
@@ -170,40 +139,66 @@ class TestOSDClassification(unittest.TestCase):
         mock_tf = MagicMock()
         mock_tf.keras = mock_keras
 
-        mock_run = MagicMock()
-
-        def side_effect(file_L1C, folder_out, file_L2R=None, to_log=False):
-            out_file = Path(folder_out) / "dummy_OSW_ODW.tif"
-            with rasterio.open(
-                out_file,
-                "w",
-                driver="GTiff",
-                width=10,
-                height=10,
-                count=1,
-                dtype=rasterio.uint8,
-                crs="EPSG:32654",
-                transform=rasterio.transform.from_origin(0, 10, 1, 1),
-                nodata=255,
-            ) as dst:
-                dst.write(np.full((10, 10), 255, dtype=np.uint8), 1)
-
-        mock_run.side_effect = side_effect
+        mock_run = MagicMock(side_effect=self._mock_side_effect)
         out_prob = Path(self.temp_dir.name) / "prob_restored.tif"
 
-        sys_patch = {
-            "opticallyshallowdeep": MagicMock(),
-            "opticallyshallowdeep.run": MagicMock(run=mock_run),
-            "tensorflow": mock_tf,
-            "keras": mock_keras,
-            "tifffile": MagicMock(),
-        }
+        sys_patch = self._get_sys_patch(
+            mock_run, keras_mock=mock_keras, tf_mock=mock_tf
+        )
         with patch.dict(sys.modules, sys_patch):
             classify_optically_shallow_deep(
                 image=self.input_dir,
                 output=out_prob,
             )
             self.assertIs(mock_keras.get, original_get)
+
+    def test_osd_lock_used(self):
+        from geoai.osd import _osd_lock
+
+        self.assertTrue(hasattr(_osd_lock, "acquire"))
+        self.assertTrue(hasattr(_osd_lock, "release"))
+
+    def test_concurrent_invocations(self):
+        import threading
+
+        mock_keras = MagicMock()
+        original_get = MagicMock(name="original_get")
+        mock_keras.get = original_get
+
+        mock_tf = MagicMock()
+        mock_tf.keras = mock_keras
+
+        mock_run = MagicMock(side_effect=self._mock_side_effect)
+
+        out_prob_1 = Path(self.temp_dir.name) / "prob_concurrent_1.tif"
+        out_prob_2 = Path(self.temp_dir.name) / "prob_concurrent_2.tif"
+
+        sys_patch = self._get_sys_patch(
+            mock_run, keras_mock=mock_keras, tf_mock=mock_tf
+        )
+        errors = []
+
+        def run_classify(out_p):
+            try:
+                classify_optically_shallow_deep(
+                    image=self.input_dir,
+                    output=out_p,
+                )
+            except Exception as e:
+                errors.append(e)
+
+        with patch.dict(sys.modules, sys_patch):
+            t1 = threading.Thread(target=run_classify, args=(out_prob_1,))
+            t2 = threading.Thread(target=run_classify, args=(out_prob_2,))
+            t1.start()
+            t2.start()
+            t1.join()
+            t2.join()
+
+        self.assertEqual(len(errors), 0, f"Concurrent execution errors: {errors}")
+        self.assertTrue(out_prob_1.exists())
+        self.assertTrue(out_prob_2.exists())
+        self.assertIs(mock_keras.get, original_get)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,11 @@
 import os
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 from typing import Optional, Union
+
+_osd_lock = threading.Lock()
 
 
 def classify_optically_shallow_deep(
@@ -52,72 +55,75 @@ def classify_optically_shallow_deep(
     except ImportError:
         keras_modules = [keras, tf.keras]
 
-    original_getters = []
-    patched_targets = set()
-    for m in keras_modules:
-        if m is None:
-            continue
-        if hasattr(m, "get") and (id(m), "get") not in patched_targets:
-            orig_get = m.get
+    with _osd_lock:
+        original_getters = []
+        patched_targets = set()
+        for m in keras_modules:
+            if m is None:
+                continue
+            if hasattr(m, "get") and (id(m), "get") not in patched_targets:
+                orig_get = m.get
 
-            def patched_get(identifier, orig=orig_get):
-                if identifier == "LeakyReLU":
-                    return orig("leaky_relu")
-                return orig(identifier)
+                def patched_get(identifier, orig=orig_get):
+                    if identifier == "LeakyReLU":
+                        return orig("leaky_relu")
+                    return orig(identifier)
 
-            original_getters.append((m, "get", orig_get))
-            patched_targets.add((id(m), "get"))
-            m.get = patched_get
-        if (
-            hasattr(m, "activations")
-            and hasattr(m.activations, "get")
-            and (id(m.activations), "get") not in patched_targets
-        ):
-            orig_get = m.activations.get
-
-            def patched_get(identifier, orig=orig_get):
-                if identifier == "LeakyReLU":
-                    return orig("leaky_relu")
-                return orig(identifier)
-
-            original_getters.append((m.activations, "get", orig_get))
-            patched_targets.add((id(m.activations), "get"))
-            m.activations.get = patched_get
-
-    original_imread = tifffile.imread
-
-    def patched_imread(*args, **kwargs):
-        dtype = kwargs.pop("dtype", None)
-        img = original_imread(*args, **kwargs)
-        if dtype is not None:
-            return img.astype(dtype)
-        return img
-
-    tf_device_patch = unittest.mock.patch(
-        "tensorflow.device", return_value=unittest.mock.MagicMock()
-    )
-
-    try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with (
-                unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
-                tf_device_patch,
+                original_getters.append((m, "get", orig_get))
+                patched_targets.add((id(m), "get"))
+                m.get = patched_get
+            if (
+                hasattr(m, "activations")
+                and hasattr(m.activations, "get")
+                and (id(m.activations), "get") not in patched_targets
             ):
-                osd_run(
-                    file_L1C=str(image_path),
-                    folder_out=temp_dir,
-                    file_L2R=str(l2r_path) if l2r_path else None,
-                    to_log=to_log,
-                )
+                orig_get = m.activations.get
 
-            generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
-            if not generated:
-                raise RuntimeError("opticallyshallowdeep failed to generate output.")
+                def patched_get(identifier, orig=orig_get):
+                    if identifier == "LeakyReLU":
+                        return orig("leaky_relu")
+                    return orig(identifier)
 
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(generated[0], out_path)
-    finally:
-        for target_obj, attr_name, orig_func in original_getters:
-            setattr(target_obj, attr_name, orig_func)
+                original_getters.append((m.activations, "get", orig_get))
+                patched_targets.add((id(m.activations), "get"))
+                m.activations.get = patched_get
+
+        original_imread = tifffile.imread
+
+        def patched_imread(*args, **kwargs):
+            dtype = kwargs.pop("dtype", None)
+            img = original_imread(*args, **kwargs)
+            if dtype is not None:
+                return img.astype(dtype)
+            return img
+
+        tf_device_patch = unittest.mock.patch(
+            "tensorflow.device", return_value=unittest.mock.MagicMock()
+        )
+
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with (
+                    unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
+                    tf_device_patch,
+                ):
+                    osd_run(
+                        file_L1C=str(image_path),
+                        folder_out=temp_dir,
+                        file_L2R=str(l2r_path) if l2r_path else None,
+                        to_log=to_log,
+                    )
+
+                generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
+                if not generated:
+                    raise RuntimeError(
+                        "opticallyshallowdeep failed to generate output."
+                    )
+
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy(generated[0], out_path)
+        finally:
+            for target_obj, attr_name, orig_func in original_getters:
+                setattr(target_obj, attr_name, orig_func)
 
     return str(out_path)
