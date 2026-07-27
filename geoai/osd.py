@@ -92,33 +92,28 @@ def classify_optically_shallow_deep(
                     _original_getters.append((m.activations, "get", orig_get))
                     patched_targets.add((id(m.activations), "get"))
                     m.activations.get = patched_get
+
+            _original_getters.append((tifffile, "imread", tifffile.imread))
+            _original_getters.append((tf, "device", tf.device))
+
+            def patched_imread(*args, orig=tifffile.imread, **kwargs):
+                dtype = kwargs.pop("dtype", None)
+                img = orig(*args, **kwargs)
+                return img.astype(dtype) if dtype is not None else img
+
+            tifffile.imread = patched_imread
+            tf.device = lambda *a, **k: unittest.mock.MagicMock()
+
         _patch_ref_count += 1
-
-    original_imread = tifffile.imread
-
-    def patched_imread(*args, **kwargs):
-        dtype = kwargs.pop("dtype", None)
-        img = original_imread(*args, **kwargs)
-        if dtype is not None:
-            return img.astype(dtype)
-        return img
-
-    tf_device_patch = unittest.mock.patch(
-        "tensorflow.device", return_value=unittest.mock.MagicMock()
-    )
 
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with (
-                unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
-                tf_device_patch,
-            ):
-                osd_run(
-                    file_L1C=str(image_path),
-                    folder_out=temp_dir,
-                    file_L2R=str(l2r_path) if l2r_path else None,
-                    to_log=to_log,
-                )
+            osd_run(
+                file_L1C=str(image_path),
+                folder_out=temp_dir,
+                file_L2R=str(l2r_path) if l2r_path else None,
+                to_log=to_log,
+            )
 
             generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
             if not generated:
