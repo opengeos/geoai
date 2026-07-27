@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Optional, Union
 
 _osd_lock = threading.Lock()
+_patch_ref_count = 0
+_original_getters = []
 
 
 def classify_optically_shallow_deep(
@@ -27,6 +29,8 @@ def classify_optically_shallow_deep(
     Returns:
         Path to the output probability GeoTIFF as a string.
     """
+    global _patch_ref_count, _original_getters
+
     try:
         from opticallyshallowdeep.run import run as osd_run
     except ImportError:
@@ -56,74 +60,78 @@ def classify_optically_shallow_deep(
         keras_modules = [keras, tf.keras]
 
     with _osd_lock:
-        original_getters = []
-        patched_targets = set()
-        for m in keras_modules:
-            if m is None:
-                continue
-            if hasattr(m, "get") and (id(m), "get") not in patched_targets:
-                orig_get = m.get
+        if _patch_ref_count == 0:
+            _original_getters = []
+            patched_targets = set()
+            for m in keras_modules:
+                if m is None:
+                    continue
+                if hasattr(m, "get") and (id(m), "get") not in patched_targets:
+                    orig_get = m.get
 
-                def patched_get(identifier, orig=orig_get):
-                    if identifier == "LeakyReLU":
-                        return orig("leaky_relu")
-                    return orig(identifier)
+                    def patched_get(identifier, orig=orig_get):
+                        if identifier == "LeakyReLU":
+                            return orig("leaky_relu")
+                        return orig(identifier)
 
-                original_getters.append((m, "get", orig_get))
-                patched_targets.add((id(m), "get"))
-                m.get = patched_get
-            if (
-                hasattr(m, "activations")
-                and hasattr(m.activations, "get")
-                and (id(m.activations), "get") not in patched_targets
-            ):
-                orig_get = m.activations.get
-
-                def patched_get(identifier, orig=orig_get):
-                    if identifier == "LeakyReLU":
-                        return orig("leaky_relu")
-                    return orig(identifier)
-
-                original_getters.append((m.activations, "get", orig_get))
-                patched_targets.add((id(m.activations), "get"))
-                m.activations.get = patched_get
-
-        original_imread = tifffile.imread
-
-        def patched_imread(*args, **kwargs):
-            dtype = kwargs.pop("dtype", None)
-            img = original_imread(*args, **kwargs)
-            if dtype is not None:
-                return img.astype(dtype)
-            return img
-
-        tf_device_patch = unittest.mock.patch(
-            "tensorflow.device", return_value=unittest.mock.MagicMock()
-        )
-
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                with (
-                    unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
-                    tf_device_patch,
+                    _original_getters.append((m, "get", orig_get))
+                    patched_targets.add((id(m), "get"))
+                    m.get = patched_get
+                if (
+                    hasattr(m, "activations")
+                    and hasattr(m.activations, "get")
+                    and (id(m.activations), "get") not in patched_targets
                 ):
-                    osd_run(
-                        file_L1C=str(image_path),
-                        folder_out=temp_dir,
-                        file_L2R=str(l2r_path) if l2r_path else None,
-                        to_log=to_log,
-                    )
+                    orig_get = m.activations.get
 
-                generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
-                if not generated:
-                    raise RuntimeError(
-                        "opticallyshallowdeep failed to generate output."
-                    )
+                    def patched_get(identifier, orig=orig_get):
+                        if identifier == "LeakyReLU":
+                            return orig("leaky_relu")
+                        return orig(identifier)
 
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy(generated[0], out_path)
-        finally:
-            for target_obj, attr_name, orig_func in original_getters:
-                setattr(target_obj, attr_name, orig_func)
+                    _original_getters.append((m.activations, "get", orig_get))
+                    patched_targets.add((id(m.activations), "get"))
+                    m.activations.get = patched_get
+        _patch_ref_count += 1
+
+    original_imread = tifffile.imread
+
+    def patched_imread(*args, **kwargs):
+        dtype = kwargs.pop("dtype", None)
+        img = original_imread(*args, **kwargs)
+        if dtype is not None:
+            return img.astype(dtype)
+        return img
+
+    tf_device_patch = unittest.mock.patch(
+        "tensorflow.device", return_value=unittest.mock.MagicMock()
+    )
+
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
+                tf_device_patch,
+            ):
+                osd_run(
+                    file_L1C=str(image_path),
+                    folder_out=temp_dir,
+                    file_L2R=str(l2r_path) if l2r_path else None,
+                    to_log=to_log,
+                )
+
+            generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
+            if not generated:
+                raise RuntimeError("opticallyshallowdeep failed to generate output.")
+
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(generated[0], out_path)
+    finally:
+        with _osd_lock:
+            _patch_ref_count -= 1
+            if _patch_ref_count == 0:
+                for target_obj, attr_name, orig_func in _original_getters:
+                    setattr(target_obj, attr_name, orig_func)
+                _original_getters = []
 
     return str(out_path)
