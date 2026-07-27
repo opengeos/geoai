@@ -466,6 +466,8 @@ _LAZY_SYMBOL_MAP = {
     # --- geoai.water ---
     "segment_water": ("water", None),
     "BAND_ORDER_PRESETS": ("water", None),
+    # --- geoai.osd ---
+    "classify_optically_shallow_deep": ("osd", None),
     # --- geoai.clip_classify ---
     "CLIPVectorClassifier": ("clip_classify", None),
     "clip_classify_vector": ("clip_classify", None),
@@ -499,6 +501,7 @@ _LAZY_SUBMODULES = {
     "classify",
     "clip_classify",
     "download",
+    "osd",
     "extract",
     "hf",
     "inference",
