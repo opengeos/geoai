@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional, Union
 
+
 def classify_optically_shallow_deep(
     image: Union[str, Path],
     output: Union[str, Path],
@@ -46,6 +47,7 @@ def classify_optically_shallow_deep(
     # Patch Keras activation functions to support legacy camelCase LeakyReLU name in Keras 3
     try:
         import keras.src.activations
+
         keras_modules = [keras, tf.keras, keras.src.activations]
     except ImportError:
         keras_modules = [keras, tf.keras]
@@ -55,17 +57,21 @@ def classify_optically_shallow_deep(
             continue
         if hasattr(m, "get"):
             orig_get = m.get
+
             def patched_get(identifier, orig=orig_get):
-                if identifier == 'LeakyReLU':
-                    return orig('leaky_relu')
+                if identifier == "LeakyReLU":
+                    return orig("leaky_relu")
                 return orig(identifier)
+
             m.get = patched_get
         if hasattr(m, "activations") and hasattr(m.activations, "get"):
             orig_get = m.activations.get
+
             def patched_get(identifier, orig=orig_get):
-                if identifier == 'LeakyReLU':
-                    return orig('leaky_relu')
+                if identifier == "LeakyReLU":
+                    return orig("leaky_relu")
                 return orig(identifier)
+
             m.activations.get = patched_get
 
     original_imread = tifffile.imread
@@ -77,10 +83,15 @@ def classify_optically_shallow_deep(
             return img.astype(dtype)
         return img
 
-    tf_device_patch = unittest.mock.patch("tensorflow.device", return_value=unittest.mock.MagicMock())
+    tf_device_patch = unittest.mock.patch(
+        "tensorflow.device", return_value=unittest.mock.MagicMock()
+    )
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        with unittest.mock.patch("tifffile.imread", side_effect=patched_imread), tf_device_patch:
+        with (
+            unittest.mock.patch("tifffile.imread", side_effect=patched_imread),
+            tf_device_patch,
+        ):
             osd_run(
                 file_L1C=str(image_path),
                 folder_out=temp_dir,
