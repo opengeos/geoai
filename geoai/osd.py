@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import threading
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 _osd_lock = threading.Lock()
 _patch_ref_count = 0
@@ -96,13 +96,13 @@ def classify_optically_shallow_deep(
             _original_getters.append((tifffile, "imread", tifffile.imread))
             _original_getters.append((tf, "device", tf.device))
 
-            def patched_imread(*args, orig=tifffile.imread, **kwargs):
+            def patched_imread(*args: Any, orig: Any = tifffile.imread, **kwargs: Any) -> Any:
                 dtype = kwargs.pop("dtype", None)
                 img = orig(*args, **kwargs)
                 return img.astype(dtype) if dtype is not None else img
 
             tifffile.imread = patched_imread
-            tf.device = lambda *a, **k: unittest.mock.MagicMock()
+            tf.device = lambda *_args, **_kwargs: unittest.mock.MagicMock()
 
         _patch_ref_count += 1
 

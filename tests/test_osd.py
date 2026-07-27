@@ -65,13 +65,15 @@ class TestOSDClassification(unittest.TestCase):
             prob[5:8, 5:8] = 20
             dst.write(prob, 1)
 
-    def _get_sys_patch(self, mock_run, keras_mock=None, tf_mock=None):
+    def _get_sys_patch(
+        self, mock_run, keras_mock=None, tf_mock=None, tifffile_mock=None
+    ):
         return {
             "opticallyshallowdeep": MagicMock(),
             "opticallyshallowdeep.run": MagicMock(run=mock_run),
             "tensorflow": tf_mock or MagicMock(),
             "keras": keras_mock or MagicMock(),
-            "tifffile": MagicMock(),
+            "tifffile": tifffile_mock or MagicMock(),
         }
 
     def test_classify_success(self):
@@ -138,12 +140,21 @@ class TestOSDClassification(unittest.TestCase):
 
         mock_tf = MagicMock()
         mock_tf.keras = mock_keras
+        original_device = MagicMock(name="original_device")
+        mock_tf.device = original_device
+
+        mock_tifffile = MagicMock()
+        original_imread = MagicMock(name="original_imread")
+        mock_tifffile.imread = original_imread
 
         mock_run = MagicMock(side_effect=self._mock_side_effect)
         out_prob = Path(self.temp_dir.name) / "prob_restored.tif"
 
         sys_patch = self._get_sys_patch(
-            mock_run, keras_mock=mock_keras, tf_mock=mock_tf
+            mock_run,
+            keras_mock=mock_keras,
+            tf_mock=mock_tf,
+            tifffile_mock=mock_tifffile,
         )
         with patch.dict(sys.modules, sys_patch):
             classify_optically_shallow_deep(
@@ -151,6 +162,8 @@ class TestOSDClassification(unittest.TestCase):
                 output=out_prob,
             )
             self.assertIs(mock_keras.get, original_get)
+            self.assertIs(mock_tf.device, original_device)
+            self.assertIs(mock_tifffile.imread, original_imread)
 
     def test_osd_lock_used(self):
         from geoai.osd import _osd_lock
@@ -167,6 +180,12 @@ class TestOSDClassification(unittest.TestCase):
 
         mock_tf = MagicMock()
         mock_tf.keras = mock_keras
+        original_device = MagicMock(name="original_device")
+        mock_tf.device = original_device
+
+        mock_tifffile = MagicMock()
+        original_imread = MagicMock(name="original_imread")
+        mock_tifffile.imread = original_imread
 
         mock_run = MagicMock(side_effect=self._mock_side_effect)
 
@@ -174,7 +193,10 @@ class TestOSDClassification(unittest.TestCase):
         out_prob_2 = Path(self.temp_dir.name) / "prob_concurrent_2.tif"
 
         sys_patch = self._get_sys_patch(
-            mock_run, keras_mock=mock_keras, tf_mock=mock_tf
+            mock_run,
+            keras_mock=mock_keras,
+            tf_mock=mock_tf,
+            tifffile_mock=mock_tifffile,
         )
         errors = []
 
@@ -199,6 +221,8 @@ class TestOSDClassification(unittest.TestCase):
         self.assertTrue(out_prob_1.exists())
         self.assertTrue(out_prob_2.exists())
         self.assertIs(mock_keras.get, original_get)
+        self.assertIs(mock_tf.device, original_device)
+        self.assertIs(mock_tifffile.imread, original_imread)
 
 
 if __name__ == "__main__":
