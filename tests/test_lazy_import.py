@@ -122,6 +122,7 @@ class TestLazyImportInfrastructure(unittest.TestCase):
             # Data
             "download_naip",
             "segment_water",
+            "classify_optically_shallow_deep",
         ]
         geoai_dir = dir(geoai)
         for name in expected:

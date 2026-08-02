@@ -161,6 +161,7 @@ nav = [
     { "train module" = "train.md" },
     { "utils module" = "utils.md" },
     { "water module" = "water.md" },
+    { "osd module" = "osd.md" },
     { "tools" = [
       { "sr module" = "sr.md" },
       { "cloudmask module" = "cloudmask.md" },
