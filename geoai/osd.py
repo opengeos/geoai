@@ -1,4 +1,3 @@
-import os
 import shutil
 import tempfile
 import threading
@@ -8,6 +7,7 @@ from typing import Any, Optional, Union
 _osd_lock = threading.Lock()
 _patch_ref_count = 0
 _original_getters = []
+_osd_thread_state = threading.local()
 
 
 def classify_optically_shallow_deep(
@@ -62,51 +62,71 @@ def classify_optically_shallow_deep(
     with _osd_lock:
         if _patch_ref_count == 0:
             _original_getters = []
-            patched_targets = set()
-            for m in keras_modules:
-                if m is None:
-                    continue
-                if hasattr(m, "get") and (id(m), "get") not in patched_targets:
-                    orig_get = m.get
+            try:
+                patched_targets = set()
+                for m in keras_modules:
+                    if m is None:
+                        continue
+                    if hasattr(m, "get") and (id(m), "get") not in patched_targets:
+                        orig_get = m.get
 
-                    def patched_get(identifier, orig=orig_get):
-                        if identifier == "LeakyReLU":
-                            return orig("leaky_relu")
-                        return orig(identifier)
+                        def patched_get(identifier, orig=orig_get):
+                            if identifier == "LeakyReLU":
+                                return orig("leaky_relu")
+                            return orig(identifier)
 
-                    _original_getters.append((m, "get", orig_get))
-                    patched_targets.add((id(m), "get"))
-                    m.get = patched_get
-                if (
-                    hasattr(m, "activations")
-                    and hasattr(m.activations, "get")
-                    and (id(m.activations), "get") not in patched_targets
-                ):
-                    orig_get = m.activations.get
+                        _original_getters.append((m, "get", orig_get))
+                        patched_targets.add((id(m), "get"))
+                        m.get = patched_get
+                    if (
+                        hasattr(m, "activations")
+                        and hasattr(m.activations, "get")
+                        and (id(m.activations), "get") not in patched_targets
+                    ):
+                        orig_get = m.activations.get
 
-                    def patched_get(identifier, orig=orig_get):
-                        if identifier == "LeakyReLU":
-                            return orig("leaky_relu")
-                        return orig(identifier)
+                        def patched_get(identifier, orig=orig_get):
+                            if identifier == "LeakyReLU":
+                                return orig("leaky_relu")
+                            return orig(identifier)
 
-                    _original_getters.append((m.activations, "get", orig_get))
-                    patched_targets.add((id(m.activations), "get"))
-                    m.activations.get = patched_get
+                        _original_getters.append((m.activations, "get", orig_get))
+                        patched_targets.add((id(m.activations), "get"))
+                        m.activations.get = patched_get
 
-            _original_getters.append((tifffile, "imread", tifffile.imread))
-            _original_getters.append((tf, "device", tf.device))
+                _original_getters.append((tifffile, "imread", tifffile.imread))
+                _original_getters.append((tf, "device", tf.device))
 
-            def patched_imread(
-                *args: Any, orig: Any = tifffile.imread, **kwargs: Any
-            ) -> Any:
-                dtype = kwargs.pop("dtype", None)
-                img = orig(*args, **kwargs)
-                return img.astype(dtype) if dtype is not None else img
+                def patched_imread(
+                    *args: Any, orig: Any = tifffile.imread, **kwargs: Any
+                ) -> Any:
+                    dtype = kwargs.pop("dtype", None)
+                    img = orig(*args, **kwargs)
+                    return img.astype(dtype) if dtype is not None else img
 
-            tifffile.imread = patched_imread
-            tf.device = lambda *_args, **_kwargs: unittest.mock.MagicMock()
+                def patched_device(*args: Any, orig: Any = tf.device, **kwargs: Any):
+                    # opticallyshallowdeep pins prediction to `tf.device("/cpu:0")`,
+                    # which fails on some TensorFlow builds; neutralize it. Only
+                    # threads currently inside this function are affected, so
+                    # concurrent TensorFlow work elsewhere in the process keeps
+                    # real device placement.
+                    if getattr(_osd_thread_state, "depth", 0) > 0:
+                        return unittest.mock.MagicMock()
+                    return orig(*args, **kwargs)
+
+                tifffile.imread = patched_imread
+                tf.device = patched_device
+            except Exception:
+                # Undo any patches applied before the failure, otherwise the next
+                # call would capture an already-patched callable as the "original"
+                # and permanently corrupt global keras/tf state.
+                for target_obj, attr_name, orig_func in reversed(_original_getters):
+                    setattr(target_obj, attr_name, orig_func)
+                _original_getters = []
+                raise
 
         _patch_ref_count += 1
+        _osd_thread_state.depth = getattr(_osd_thread_state, "depth", 0) + 1
 
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -117,7 +137,9 @@ def classify_optically_shallow_deep(
                 to_log=to_log,
             )
 
-            generated = list(Path(temp_dir).glob("*_OSW_ODW.tif"))
+            # osd_run writes exactly one *_OSW_ODW.tif into this freshly created
+            # temp directory; sort so the choice is deterministic if that changes.
+            generated = sorted(Path(temp_dir).glob("*_OSW_ODW.tif"))
             if not generated:
                 raise RuntimeError("opticallyshallowdeep failed to generate output.")
 
@@ -125,6 +147,7 @@ def classify_optically_shallow_deep(
             shutil.copy(generated[0], out_path)
     finally:
         with _osd_lock:
+            _osd_thread_state.depth = max(0, getattr(_osd_thread_state, "depth", 0) - 1)
             _patch_ref_count -= 1
             if _patch_ref_count == 0:
                 for target_obj, attr_name, orig_func in _original_getters:
