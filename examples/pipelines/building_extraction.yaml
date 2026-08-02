@@ -1,0 +1,42 @@
+# Building Extraction Pipeline
+#
+# End-to-end building footprint extraction: segment buildings from
+# aerial imagery, then convert to GeoPackage vector format with
+# geometry simplification.
+#
+# Usage:
+#   geoai pipeline run building_extraction.yaml \
+#       -i ./naip_tiles -o ./building_footprints \
+#       -c ./checkpoints --max-workers 2
+
+name: building_extraction
+max_workers: 2
+executor_type: thread
+on_error: skip
+
+steps:
+  - type: GlobStep
+    name: find_tiles
+    extensions:
+      - ".tif"
+      - ".tiff"
+      - ".jp2"
+
+  - type: SemanticSegmentationStep
+    name: segment_buildings
+    model_path: "path/to/building_model.pth"
+    architecture: unet
+    encoder_name: resnet50
+    num_channels: 3
+    num_classes: 2
+    window_size: 512
+    overlap: 256
+    batch_size: 8
+    suffix: "_buildings"
+
+  - type: RasterToVectorStep
+    name: vectorize_buildings
+    output_format: ".gpkg"
+    simplify_tolerance: 1.0
+    input_key: output_path
+    output_key: vector_path
