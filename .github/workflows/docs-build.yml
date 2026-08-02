@@ -82,7 +82,7 @@ jobs:
             # inside the payload: a stray one silently drops files from the
             # preview while the build still reports success.
             - name: Strip .gitignore files from the build output
-              if: github.event.pull_request.head.repo.full_name == github.repository
+              if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
               run: |
                   set -euo pipefail
                   find ./site -name .gitignore -print -delete
@@ -98,6 +98,16 @@ jobs:
             # docs with that token available would mean running unreviewed code
             # with write access to the preview repository.
             #
+            # Skipped for Dependabot too. Its branches live in this repository,
+            # so the fork check above passes, but GitHub withholds repository
+            # secrets from Dependabot-triggered runs (they come from the separate
+            # Dependabot secret store) and downgrades GITHUB_TOKEN to read-only.
+            # PREVIEW_DEPLOY_TOKEN is therefore empty and the push to
+            # pages-preview dies on "Invalid username or token". Matching on
+            # pull_request.user rather than github.actor keeps the skip in place
+            # when a maintainer re-runs the job by hand -- the re-run still gets
+            # no secrets, but github.actor would then be the maintainer.
+            #
             # SETUP (one time): secret PREVIEW_DEPLOY_TOKEN, a fine-grained PAT
             # scoped to opengeos/pages-preview ONLY, with Contents: Read and
             # write (push to gh-pages) and Pages: Read (poll the Pages build so
@@ -106,7 +116,7 @@ jobs:
             # burns its timeout and fails with a misleading "Timed out waiting
             # for build to start". The token needs no access to this repository.
             - name: Deploy preview to GitHub Pages
-              if: github.event.pull_request.head.repo.full_name == github.repository
+              if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
               # Pinned to a SHA rather than the mutable tag: this is a
               # third-party action that receives PREVIEW_DEPLOY_TOKEN, so a
               # moved tag would hand that token to unreviewed code.
