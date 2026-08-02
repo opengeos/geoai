@@ -23,8 +23,10 @@ jobs:
     cleanup:
         runs-on: ubuntu-latest
         # Fork pull requests never got a preview (no secrets on `pull_request`),
-        # so there is nothing to remove.
-        if: github.event.pull_request.head.repo.full_name == github.repository
+        # and neither did Dependabot's (secrets are withheld from its runs), so
+        # there is nothing to remove -- and no token to remove it with. Keep this
+        # condition in step with the deploy guard in docs-build.
+        if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
         steps:
             # The publish action runs `git config` in the workspace root, so
             # that root has to be a git repository even when only removing.
