@@ -125,6 +125,25 @@ jobs:
           # it, and this job never installs deps or executes the checked-out code.
           # Combined with the prompt's read-scope guardrails, the untrusted head is
           # safe to have on disk here.
+          #
+          # actions/checkout v7 refuses to check out fork PR code from a
+          # pull_request_target workflow unless allow-unsafe-pr-checkout is set,
+          # because doing so is normally how "pwn request" vulnerabilities happen:
+          # the fork's code runs with the base repo's token and secrets. That is
+          # the flag's intended opt-in, and this job is the case it exists for —
+          # it only puts the head on disk for Read/Grep/Glob. Nothing in the
+          # checkout is ever executed: no dependency install, no build, no test,
+          # no setup-* action, and Claude has no Bash tool (see the header). The
+          # fork therefore controls bytes Claude reads, not code the runner runs.
+          #
+          # Without this flag every fork PR fails this check at the checkout step,
+          # which is exactly the population the review is most valuable for.
+          #
+          # If a future edit adds any step that EXECUTES the checked-out tree —
+          # `pip install .`, `npm ci`, a test run, a linter that loads project
+          # config/plugins — this opt-in becomes unsafe and must be removed (move
+          # such steps to a `pull_request` workflow, which has no secrets).
+          allow-unsafe-pr-checkout: true
           ref: ${{ steps.pr.outputs.sha }}
           persist-credentials: false
           fetch-depth: 1
