@@ -1475,6 +1475,8 @@ def train_MaskRCNN_model(
     model_name: str = "maskrcnn_resnet50_fpn",
     instance_labels: bool = False,
     multiclass: bool = False,
+    early_stopping_patience: Optional[int] = None,
+    early_stopping_min_delta: float = 0.0,
 ) -> torch.nn.Module:
     """Train and evaluate Mask R-CNN model for instance segmentation.
 
@@ -1541,6 +1543,10 @@ def train_MaskRCNN_model(
             (directory input format, no ``instance_labels``), a warning is
             emitted because every target would silently collapse to class 1.
             Defaults to False. Cannot be combined with ``instance_labels=True``.
+        early_stopping_patience (int, optional): Number of epochs to wait for 
+            improvement before stopping training. Defaults to None.
+        early_stopping_min_delta (float): Minimum change in the monitored metric 
+            (IoU) to qualify as an improvement. Defaults to 0.0.
     Returns:
         None: Model weights are saved to output_dir.
 
@@ -1834,6 +1840,9 @@ def train_MaskRCNN_model(
             raise RuntimeError(f"Failed to load pretrained model: {str(e)}")
 
     # Training loop
+    best_iou = -1.0
+    epochs_without_improvement = 0
+        
     for epoch in range(start_epoch, num_epochs):
         # Train one epoch
         train_loss = train_one_epoch(
@@ -1847,6 +1856,7 @@ def train_MaskRCNN_model(
         eval_metrics = evaluate(
             model, val_loader, device, use_mask_iou=model_has_masks(model_name)
         )
+        current_iou = eval_metrics["IoU"] #Save IoU to check improvement
 
         # Record training history
         training_history["train_loss"].append(train_loss)
@@ -1860,12 +1870,18 @@ def train_MaskRCNN_model(
             f"Epoch {epoch+1}/{num_epochs}: Train Loss: {train_loss:.4f}, Val Loss: {eval_metrics['loss']:.4f}, Val IoU: {eval_metrics['IoU']:.4f}"
         )
 
-        # Save best model
-        if eval_metrics["IoU"] > best_iou:
-            best_iou = eval_metrics["IoU"]
+        # Checking IoU improvement for earlystop and prevent overfitting
+        if current_iou > best_iou + early_stopping_min_delta:
+            best_iou = current_iou
+            epochs_without_improvement = 0
             logger.info(f"Saving best model with IoU: {best_iou:.4f}")
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
-
+            torch.save(training_history, os.path.join(output_dir, "training_history.pth"))
+        else:
+            epochs_without_improvement += 1
+            if early_stopping_patience is not None and epochs_without_improvement >= early_stopping_patience:
+                break
+            
     # Save final model
     torch.save(model.state_dict(), os.path.join(output_dir, "final_model.pth"))
 
@@ -5760,6 +5776,8 @@ def train_instance_segmentation_model(
     verbose: bool = True,
     instance_labels: bool = False,
     multiclass: bool = False,
+    early_stopping_patience: Optional[int] = None,
+    early_stopping_min_delta: float = 0.0,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -5805,6 +5823,10 @@ def train_instance_segmentation_model(
             in directory mode, every target is silently assigned label ``1``
             and the model will only learn the first foreground class; a
             warning is emitted in that case. Defaults to False.
+        early_stopping_patience (int, optional): Number of epochs to wait for 
+            improvement before stopping training. Defaults to None.
+        early_stopping_min_delta (float): Minimum change in the monitored metric 
+            (IoU) to qualify as an improvement. Defaults to 0.0.
         **kwargs: Additional arguments passed to train_MaskRCNN_model.
 
     Returns:
@@ -5833,6 +5855,8 @@ def train_instance_segmentation_model(
         verbose=verbose,
         instance_labels=instance_labels,
         multiclass=multiclass,
+        early_stopping_patience=early_stopping_patience,
+        early_stopping_min_delta=early_stopping_min_delta,
         **kwargs,
     )
 
