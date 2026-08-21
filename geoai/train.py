@@ -1840,7 +1840,6 @@ def train_MaskRCNN_model(
             raise RuntimeError(f"Failed to load pretrained model: {str(e)}")
 
     # Training loop
-    best_iou = -1.0
     epochs_without_improvement = 0
 
     for epoch in range(start_epoch, num_epochs):
