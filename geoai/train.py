@@ -1873,7 +1873,7 @@ def train_MaskRCNN_model(
         if current_iou > best_iou + early_stopping_min_delta:
             best_iou = current_iou
             epochs_without_improvement = 0
-            logger.info(f"Saving best model with IoU: {best_iou:.4f}")
+            logger.info("Saving best model with IoU: %.4f", best_iou)
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
             torch.save(
                 training_history, os.path.join(output_dir, "training_history.pth")
