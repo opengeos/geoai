@@ -326,6 +326,39 @@ class TestLoadCheckpoint(unittest.TestCase):
 
         self.assertTrue(torch.equal(actual["weight"], expected["weight"]))
 
+    def test_loads_lightning_wrapped_state_dict(self):
+        import torch
+
+        from geoai.canopy import _load_checkpoint
+
+        with tempfile.TemporaryDirectory() as td:
+            checkpoint_path = os.path.join(td, "weights.pth")
+            expected = {"weight": torch.tensor([1.0, 2.0])}
+            torch.save({"state_dict": expected, "epoch": 3}, checkpoint_path)
+
+            actual = _load_checkpoint(checkpoint_path, map_location="cpu")
+
+        self.assertEqual(actual["epoch"], 3)
+        self.assertTrue(torch.equal(actual["state_dict"]["weight"], expected["weight"]))
+
+    def test_loads_quantized_state_dict(self):
+        import torch
+        import torch.nn as nn
+
+        from geoai.canopy import _load_checkpoint
+
+        model = torch.quantization.quantize_dynamic(
+            nn.Sequential(nn.Linear(4, 2)), {nn.Linear}, dtype=torch.qint8
+        )
+        with tempfile.TemporaryDirectory() as td:
+            checkpoint_path = os.path.join(td, "weights.pth")
+            expected = model.state_dict()
+            torch.save(expected, checkpoint_path)
+
+            actual = _load_checkpoint(checkpoint_path, map_location="cpu")
+
+        self.assertEqual(actual.keys(), expected.keys())
+
     def test_rejects_objects_with_pickle_callbacks(self):
         import torch
 

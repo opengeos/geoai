@@ -863,8 +863,16 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
     return checkpoint_path
 
 
-def _load_checkpoint(checkpoint_path: str, map_location: str):
-    """Load a checkpoint without allowing arbitrary Python objects."""
+def _load_checkpoint(checkpoint_path: str, map_location: str) -> Dict:
+    """Load a checkpoint without allowing arbitrary Python objects.
+
+    Args:
+        checkpoint_path: Path to the checkpoint file on disk.
+        map_location: Device to which storage locations are mapped.
+
+    Returns:
+        The checkpoint state dictionary or wrapper dictionary.
+    """
     return torch.load(checkpoint_path, map_location=map_location, weights_only=True)
 
 
