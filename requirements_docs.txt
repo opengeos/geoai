@@ -11,7 +11,7 @@ nbconvert
 nbformat
 pip
 pre-commit
-pygments>=2.20.0
+pygments>=2.21.0
 pymdown-extensions
 sphinx
 tox
