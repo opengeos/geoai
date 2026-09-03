@@ -309,5 +309,45 @@ class TestDownloadCheckpoint(unittest.TestCase):
             self.assertEqual(path, ckpt_path)
 
 
+class TestLoadCheckpoint(unittest.TestCase):
+    """Tests for restricted checkpoint deserialization."""
+
+    def test_loads_tensor_state_dict(self):
+        import torch
+
+        from geoai.canopy import _load_checkpoint
+
+        with tempfile.TemporaryDirectory() as td:
+            checkpoint_path = os.path.join(td, "weights.pth")
+            expected = {"weight": torch.tensor([1.0, 2.0])}
+            torch.save(expected, checkpoint_path)
+
+            actual = _load_checkpoint(checkpoint_path, map_location="cpu")
+
+        self.assertTrue(torch.equal(actual["weight"], expected["weight"]))
+
+    def test_rejects_objects_with_pickle_callbacks(self):
+        import torch
+
+        from geoai.canopy import _load_checkpoint
+
+        class PickleCallback:
+            def __reduce__(self):
+                return (os.mkdir, (marker_path,))
+
+        with tempfile.TemporaryDirectory() as td:
+            checkpoint_path = os.path.join(td, "weights.pth")
+            marker_path = os.path.join(td, "callback-ran")
+            torch.save(
+                {"weight": torch.tensor([1.0]), "extra": PickleCallback()},
+                checkpoint_path,
+            )
+
+            with self.assertRaises(Exception):
+                _load_checkpoint(checkpoint_path, map_location="cpu")
+
+            self.assertFalse(os.path.exists(marker_path))
+
+
 if __name__ == "__main__":
     unittest.main()
