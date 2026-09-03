@@ -863,6 +863,19 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
     return checkpoint_path
 
 
+def _load_checkpoint(checkpoint_path: str, map_location: str) -> Dict:
+    """Load a checkpoint without allowing arbitrary Python objects.
+
+    Args:
+        checkpoint_path: Path to the checkpoint file on disk.
+        map_location: Device to which storage locations are mapped.
+
+    Returns:
+        The checkpoint state dictionary or wrapper dictionary.
+    """
+    return torch.load(checkpoint_path, map_location=map_location, weights_only=True)
+
+
 def _load_model(
     model_name: str, checkpoint_path: str, device: str = "cpu"
 ) -> nn.Module:
@@ -880,10 +893,7 @@ def _load_model(
     model = _SSLAE(classify=True, huge=info["huge"]).eval()
 
     if info["compressed"]:
-        # weights_only=False is required for quantized checkpoints which
-        # contain non-tensor objects (packed params, scales, zero points).
-        # Checkpoints are only loaded from trusted Meta S3 URLs.
-        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        ckpt = _load_checkpoint(checkpoint_path, map_location="cpu")
         # Compressed checkpoints store quantized state dicts.  Always load
         # into a quantized model on CPU first so keys match correctly.
         model_q = torch.quantization.quantize_dynamic(
@@ -924,9 +934,7 @@ def _load_model(
             model.load_state_dict(float_sd, strict=False)
             model = model.to(device)
     else:
-        # weights_only=False is needed because some checkpoints wrap
-        # state_dict in a Lightning-style dict.  Only trusted Meta URLs.
-        ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        ckpt = _load_checkpoint(checkpoint_path, map_location=device)
         state_dict = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
         # Remove 'chm_module_.' prefix if present (from SSLModule wrapper)
         cleaned = {}
