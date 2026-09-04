@@ -405,7 +405,7 @@ ls ~/.qgis_geoai            # e.g. venv_py3.12
 ~/.qgis_geoai/venv_py3.12/bin/hf auth login
 ```
 
-Paste your token when prompted, then restart QGIS.
+Depending on your `huggingface_hub` version and terminal, `hf auth login` either opens a browser authorization flow (it prints a URL and a short code to enter there) or prompts you to paste an access token. Either path saves the token to `~/.cache/huggingface/token`. Restart QGIS once it finishes.
 
 #### If you used the Pixi environment (Option B)
 
@@ -426,8 +426,8 @@ pixi run hf download facebook/sam3
 Both installation methods pass the QGIS process environment through to the model process, so you can skip the CLI by setting `HF_TOKEN`. The catch is that the variable must exist in the environment that *launches* QGIS:
 
 ```powershell
-# Windows (PowerShell) - persists for future sessions
-setx HF_TOKEN "hf_your_token_here"
+# Windows (PowerShell) - prompts for the token so it stays out of shell history
+setx HF_TOKEN (Read-Host "Paste your Hugging Face token")
 ```
 
 ```bash
@@ -438,7 +438,7 @@ export HF_TOKEN=hf_your_token_here
 - On Windows, launch QGIS *after* running `setx`; an already-running QGIS will not pick it up.
 - On Linux/macOS, exporting in `~/.bashrc` or `~/.zshrc` only covers QGIS started from a terminal in that shell. Desktop shortcuts and application launchers do not read shell startup files, so either start QGIS from that terminal or set the variable somewhere your desktop session reads it (for example `~/.profile` or `~/.config/environment.d/` on Linux, or `launchctl setenv HF_TOKEN <token>` on macOS).
 
-If that is awkward, prefer `hf auth login` above: it writes the token to `~/.cache/huggingface/token`, which is read no matter how QGIS was started.
+Treat the token like a password. A token typed directly into `setx` or `export` is recorded in your shell history, and `setx` also stores it in the Windows registry in plaintext, so avoid pasting it into a file you might commit or a terminal you might screenshot. Where either will do, prefer `hf auth login` above: it writes the token to `~/.cache/huggingface/token`, which is read no matter how QGIS was started.
 
 **Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`. Use SAM 1 or SAM 2 on CPU-only systems.
 
