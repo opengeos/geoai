@@ -479,7 +479,7 @@ class RasterToVectorStep(PipelineStep):
         os.makedirs(output_dir, exist_ok=True)
         vector_path = os.path.join(output_dir, f"{base_name}{self.output_format}")
 
-        gdf = raster_to_vector(raster_path, output=vector_path)
+        gdf = raster_to_vector(raster_path, output_path=vector_path)
         if self.simplify_tolerance and gdf is not None:
             gdf["geometry"] = gdf.geometry.simplify(self.simplify_tolerance)
             gdf.to_file(vector_path)
