@@ -318,7 +318,7 @@ pixi run hf download facebook/sam3
 
 See [Hugging Face Authentication (SAM 3)](#hugging-face-authentication-sam-3) for token requirements and troubleshooting.
 
-**Important Note**: SAM 3 currently requires a NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
+**Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
 
 ### 2. Install the QGIS plugin
 
@@ -423,7 +423,7 @@ pixi run hf download facebook/sam3
 
 #### Alternative: use an environment variable
 
-Both installation methods pass your environment through to the model process, so you can skip the CLI entirely by setting `HF_TOKEN` and restarting QGIS:
+Both installation methods pass the QGIS process environment through to the model process, so you can skip the CLI by setting `HF_TOKEN`. The catch is that the variable must exist in the environment that *launches* QGIS:
 
 ```powershell
 # Windows (PowerShell) - persists for future sessions
@@ -431,13 +431,16 @@ setx HF_TOKEN "hf_your_token_here"
 ```
 
 ```bash
-# Linux/macOS - add to ~/.bashrc or ~/.zshrc to persist
+# Linux/macOS
 export HF_TOKEN=hf_your_token_here
 ```
 
-On Windows, QGIS must be launched *after* running `setx` to inherit the variable.
+- On Windows, launch QGIS *after* running `setx`; an already-running QGIS will not pick it up.
+- On Linux/macOS, exporting in `~/.bashrc` or `~/.zshrc` only covers QGIS started from a terminal in that shell. Desktop shortcuts and application launchers do not read shell startup files, so either start QGIS from that terminal or set the variable somewhere your desktop session reads it (for example `~/.profile` or `~/.config/environment.d/` on Linux, or `launchctl setenv HF_TOKEN <token>` on macOS).
 
-**Important Note**: SAM 3 currently requires a NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`. Use SAM 1 or SAM 2 on CPU-only systems.
+If that is awkward, prefer `hf auth login` above: it writes the token to `~/.cache/huggingface/token`, which is read no matter how QGIS was started.
+
+**Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`. Use SAM 1 or SAM 2 on CPU-only systems.
 
 ## Usage
 
