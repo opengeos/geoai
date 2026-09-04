@@ -242,6 +242,8 @@ To use SAM 3, you will need to request access by filling out this form on Huggin
 pixi run hf auth login
 ```
 
+If you installed the dependencies with the plugin's built-in installer instead of Pixi, `hf` is not on your `PATH` — see [Hugging Face Authentication (SAM 3)](https://opengeoai.org/qgis_plugin/#hugging-face-authentication-sam-3) for the full instructions.
+
 After authentication, you can download the SAM 3 model from Hugging Face:
 
 ```bash
