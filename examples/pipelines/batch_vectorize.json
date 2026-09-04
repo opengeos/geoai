@@ -1,0 +1,20 @@
+{
+  "name": "batch_vectorize",
+  "max_workers": 4,
+  "executor_type": "thread",
+  "on_error": "skip",
+  "steps": [
+    {
+      "type": "GlobStep",
+      "name": "find_masks",
+      "extensions": [".tif"]
+    },
+    {
+      "type": "RasterToVectorStep",
+      "name": "vectorize",
+      "output_format": ".gpkg",
+      "input_key": "input_path",
+      "output_key": "vector_path"
+    }
+  ]
+}
