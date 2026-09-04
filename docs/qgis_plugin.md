@@ -304,7 +304,7 @@ pixi run pip install -U numpy transformers
 
 #### Request access to SAM 3
 
-To use SAM 3, you will need to request access by filling out this form on Hugging Face at <https://huggingface.co/facebook/sam3>. Once your request has been approved, run the following command in the terminal to authenticate:
+SAM 3 is hosted in a gated Hugging Face repository. Request access at <https://huggingface.co/facebook/sam3>, then authenticate from the Pixi project folder:
 
 ```bash
 pixi run hf auth login
@@ -316,7 +316,9 @@ After authentication, you can download the SAM 3 model from Hugging Face:
 pixi run hf download facebook/sam3
 ```
 
-**Important Note**: SAM 3 currently requires a NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
+See [Hugging Face Authentication (SAM 3)](#hugging-face-authentication-sam-3) for token requirements and troubleshooting.
+
+**Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
 
 ### 2. Install the QGIS plugin
 
@@ -362,6 +364,83 @@ Launch QGIS: `pixi run qgis`
 QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`. After updates, toggle the plugin off/on or restart QGIS to reload.
 
 ![](https://github.com/user-attachments/assets/1b6dab14-311d-4f62-85aa-1faed73ead5b)
+
+## Hugging Face Authentication (SAM 3)
+
+SAM 3 lives in a [gated Hugging Face repository](https://huggingface.co/facebook/sam3), so the plugin cannot download it until you authenticate. If you try to load SAM 3 without doing so, the model fails with an error saying you do not have access to the gated repo. SAM 1 and SAM 2 are not gated and need no authentication.
+
+### Request access
+
+Fill out the access form at <https://huggingface.co/facebook/sam3> while logged in to your Hugging Face account. Approval is not instant. Before continuing, revisit that page and confirm you see a banner stating that you have been granted access rather than the request form — having a token is not the same as having access.
+
+### Create an access token
+
+Go to <https://huggingface.co/settings/tokens> and create a token:
+
+- A token of type **Read** works as-is.
+- If you create a **Fine-grained** token instead, you must check **Read access to contents of all public gated repos you can access**. Without that permission, the download fails with the same gated-repo error even after your access request is approved.
+
+### Authenticate
+
+The `hf` command is installed inside the plugin's Python environment, not on your system `PATH`. Running a bare `hf auth login` in a terminal fails with `'hf' is not recognized...` (Windows) or `command not found` (Linux/macOS) no matter which directory you are in. Use the method that matches how you installed the dependencies.
+
+#### If you used the built-in dependency installer (Option A)
+
+Call `hf` by its full path inside the managed environment at `~/.qgis_geoai/`. The environment folder is named after your QGIS Python version (for example, `venv_py3.12`); to see the exact path, use `GeoAI` menu → `Generate Diagnostics Report...` and look for **Virtual environment path**.
+
+Windows (PowerShell — any directory):
+
+```powershell
+# List the environment folder name (e.g. venv_py3.12)
+Get-ChildItem "$env:USERPROFILE\.qgis_geoai" -Filter "venv_py*"
+
+# Authenticate, substituting the folder name from above
+& "$env:USERPROFILE\.qgis_geoai\venv_py3.12\Scripts\hf.exe" auth login
+```
+
+Linux/macOS:
+
+```bash
+ls ~/.qgis_geoai            # e.g. venv_py3.12
+~/.qgis_geoai/venv_py3.12/bin/hf auth login
+```
+
+Paste your token when prompted, then restart QGIS.
+
+#### If you used the Pixi environment (Option B)
+
+Run this from the Pixi project folder (the `geo` directory you created):
+
+```bash
+pixi run hf auth login
+```
+
+Optionally pre-download the model so the first run does not stall:
+
+```bash
+pixi run hf download facebook/sam3
+```
+
+#### Alternative: use an environment variable
+
+Both installation methods pass the QGIS process environment through to the model process, so you can skip the CLI by setting `HF_TOKEN`. The catch is that the variable must exist in the environment that *launches* QGIS:
+
+```powershell
+# Windows (PowerShell) - persists for future sessions
+setx HF_TOKEN "hf_your_token_here"
+```
+
+```bash
+# Linux/macOS
+export HF_TOKEN=hf_your_token_here
+```
+
+- On Windows, launch QGIS *after* running `setx`; an already-running QGIS will not pick it up.
+- On Linux/macOS, exporting in `~/.bashrc` or `~/.zshrc` only covers QGIS started from a terminal in that shell. Desktop shortcuts and application launchers do not read shell startup files, so either start QGIS from that terminal or set the variable somewhere your desktop session reads it (for example `~/.profile` or `~/.config/environment.d/` on Linux, or `launchctl setenv HF_TOKEN <token>` on macOS).
+
+If that is awkward, prefer `hf auth login` above: it writes the token to `~/.cache/huggingface/token`, which is read no matter how QGIS was started.
+
+**Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`. Use SAM 1 or SAM 2 on CPU-only systems.
 
 ## Usage
 
@@ -613,6 +692,7 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 - Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
 - CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
 - Model download failures: check network/firewall, then retry loading models from the panel.
+- SAM 3 fails to load with a gated-repo access error, or `hf` is not recognized as a command: see [Hugging Face Authentication (SAM 3)](#hugging-face-authentication-sam-3). The `hf` command is not on your system `PATH`; it lives inside the plugin's Python environment.
 
 ## License
 

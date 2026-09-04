@@ -236,11 +236,13 @@ If CUDA is `False`, check:
 
 #### Request access to SAM 3
 
-To use SAM 3, you will need to request access by filling out this form on Hugging Face at <https://huggingface.co/facebook/sam3>. Once your request has been approved, run the following command in the terminal to authenticate:
+SAM 3 is hosted in a gated Hugging Face repository. Request access at <https://huggingface.co/facebook/sam3>, then authenticate from the Pixi project folder:
 
 ```bash
 pixi run hf auth login
 ```
+
+If you installed the dependencies with the plugin's built-in installer instead of Pixi, `hf` is not on your `PATH` — see [Hugging Face Authentication (SAM 3)](https://opengeoai.org/qgis_plugin/#hugging-face-authentication-sam-3) for the full instructions.
 
 After authentication, you can download the SAM 3 model from Hugging Face:
 
@@ -248,7 +250,7 @@ After authentication, you can download the SAM 3 model from Hugging Face:
 pixi run hf download facebook/sam3
 ```
 
-**Important Note**: SAM 3 currently requires a NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
+**Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
 
 ### 2. Install the QGIS plugin
 
