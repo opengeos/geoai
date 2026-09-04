@@ -236,7 +236,7 @@ If CUDA is `False`, check:
 
 #### Request access to SAM 3
 
-To use SAM 3, you will need to request access by filling out this form on Hugging Face at <https://huggingface.co/facebook/sam3>. Once your request has been approved, run the following command in the terminal to authenticate:
+SAM 3 is hosted in a gated Hugging Face repository. Request access at <https://huggingface.co/facebook/sam3>, then authenticate from the Pixi project folder:
 
 ```bash
 pixi run hf auth login

@@ -369,18 +369,18 @@ QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`. After
 
 SAM 3 lives in a [gated Hugging Face repository](https://huggingface.co/facebook/sam3), so the plugin cannot download it until you authenticate. If you try to load SAM 3 without doing so, the model fails with an error saying you do not have access to the gated repo. SAM 1 and SAM 2 are not gated and need no authentication.
 
-### 1. Request access
+### Request access
 
 Fill out the access form at <https://huggingface.co/facebook/sam3> while logged in to your Hugging Face account. Approval is not instant. Before continuing, revisit that page and confirm you see a banner stating that you have been granted access rather than the request form — having a token is not the same as having access.
 
-### 2. Create an access token
+### Create an access token
 
 Go to <https://huggingface.co/settings/tokens> and create a token:
 
 - A token of type **Read** works as-is.
 - If you create a **Fine-grained** token instead, you must check **Read access to contents of all public gated repos you can access**. Without that permission, the download fails with the same gated-repo error even after your access request is approved.
 
-### 3. Authenticate
+### Authenticate
 
 The `hf` command is installed inside the plugin's Python environment, not on your system `PATH`. Running a bare `hf auth login` in a terminal fails with `'hf' is not recognized...` (Windows) or `command not found` (Linux/macOS) no matter which directory you are in. Use the method that matches how you installed the dependencies.
 
@@ -438,7 +438,6 @@ export HF_TOKEN=hf_your_token_here
 On Windows, QGIS must be launched *after* running `setx` to inherit the variable.
 
 **Important Note**: SAM 3 currently requires a NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`. Use SAM 1 or SAM 2 on CPU-only systems.
-
 
 ## Usage
 
