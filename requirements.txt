@@ -22,7 +22,7 @@ scikit-learn
 smoothify
 timm
 tokenizers>=0.22.2
-torch>=2.10.0
+torch>=2.14.0
 # torchange
 torchgeo
 torchinfo
