@@ -16,6 +16,7 @@ pyarrow
 pystac-client
 rasterio
 rioxarray
+safetensors
 scikit-image
 scikit-learn
 # segment-geospatial

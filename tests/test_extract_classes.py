@@ -3,7 +3,9 @@
 """Tests for `geoai.extract` module classes and exports."""
 
 import inspect
+import os
 import unittest
+from unittest import mock
 
 
 class TestExtractImport(unittest.TestCase):
@@ -52,11 +54,36 @@ class TestExtractImport(unittest.TestCase):
 
         self.assertTrue(callable(SolarPanelDetector))
 
-    def test_parking_splot_detector_exists(self):
-        """Test that ParkingSplotDetector class exists and is callable."""
-        from geoai.extract import ParkingSplotDetector
+    def test_parking_spot_detector_exists(self):
+        """Test that ParkingSpotDetector class exists and is callable."""
+        from geoai.extract import ParkingSpotDetector
 
-        self.assertTrue(callable(ParkingSplotDetector))
+        self.assertTrue(callable(ParkingSpotDetector))
+
+    def test_parking_splot_detector_alias(self):
+        """Test that the deprecated ParkingSplotDetector alias still works."""
+        from geoai.extract import ParkingSplotDetector, ParkingSpotDetector
+
+        self.assertTrue(issubclass(ParkingSplotDetector, ParkingSpotDetector))
+
+    def test_parking_splot_detector_alias_signature(self):
+        """Test that the deprecated alias keeps the canonical constructor signature."""
+        from geoai.extract import ParkingSplotDetector, ParkingSpotDetector
+
+        self.assertEqual(
+            inspect.signature(ParkingSplotDetector.__init__),
+            inspect.signature(ParkingSpotDetector.__init__),
+        )
+
+    def test_parking_splot_detector_alias_warns(self):
+        """Test that instantiating the deprecated alias emits a DeprecationWarning."""
+        from geoai.extract import ObjectDetector, ParkingSplotDetector
+
+        with mock.patch.object(ObjectDetector, "__init__", return_value=None):
+            with self.assertWarns(DeprecationWarning) as ctx:
+                ParkingSplotDetector()
+
+        self.assertIn("ParkingSpotDetector", str(ctx.warning))
 
     def test_agriculture_field_delineator_exists(self):
         """Test that AgricultureFieldDelineator class exists and is callable."""
@@ -85,6 +112,7 @@ class TestExtractAllExports(unittest.TestCase):
             "CarDetector",
             "ShipDetector",
             "SolarPanelDetector",
+            "ParkingSpotDetector",
             "ParkingSplotDetector",
             "AgricultureFieldDelineator",
         ]
@@ -112,7 +140,7 @@ class TestExtractDetectorInheritance(unittest.TestCase):
             BuildingFootprintExtractor,
             CarDetector,
             ObjectDetector,
-            ParkingSplotDetector,
+            ParkingSpotDetector,
             ShipDetector,
             SolarPanelDetector,
         )
@@ -122,7 +150,7 @@ class TestExtractDetectorInheritance(unittest.TestCase):
             CarDetector,
             ShipDetector,
             SolarPanelDetector,
-            ParkingSplotDetector,
+            ParkingSpotDetector,
             AgricultureFieldDelineator,
         ]
         for cls in subclasses:
@@ -167,14 +195,74 @@ class TestExtractSignatures(unittest.TestCase):
         self.assertIn("band_selection", sig.parameters)
         self.assertIn("use_ndvi", sig.parameters)
 
-    def test_parking_splot_detector_init_params(self):
-        """Test ParkingSplotDetector.__init__ has expected parameters."""
-        from geoai.extract import ParkingSplotDetector
+    def test_parking_spot_detector_init_params(self):
+        """Test ParkingSpotDetector.__init__ has expected parameters."""
+        from geoai.extract import ParkingSpotDetector
 
-        sig = inspect.signature(ParkingSplotDetector.__init__)
+        sig = inspect.signature(ParkingSpotDetector.__init__)
         self.assertIn("model_path", sig.parameters)
         self.assertIn("num_classes", sig.parameters)
         self.assertIn("device", sig.parameters)
+
+
+class TestSafetensorsWeights(unittest.TestCase):
+    """Tests for loading ``.safetensors`` checkpoints."""
+
+    def setUp(self):
+        """Create a temporary .safetensors checkpoint for a small linear model."""
+        import tempfile
+
+        import torch
+        from safetensors.torch import save_file
+
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+        self.path = os.path.join(self.tmpdir.name, "weights.safetensors")
+        self.state_dict = {
+            "weight": torch.arange(4, dtype=torch.float32).reshape(2, 2),
+            "bias": torch.zeros(2, dtype=torch.float32),
+        }
+        save_file(self.state_dict, self.path, metadata={"num_classes": "2"})
+
+    def test_load_safetensors_returns_state_dict(self):
+        """Test that _load_safetensors reads tensors back unchanged."""
+        import torch
+
+        from geoai.extract import ObjectDetector
+
+        stub = mock.Mock(device=torch.device("cpu"))
+        loaded = ObjectDetector._load_safetensors(stub, self.path)
+
+        self.assertEqual(set(loaded), set(self.state_dict))
+        for key, value in self.state_dict.items():
+            self.assertTrue(torch.equal(value, loaded[key]))
+
+    def test_load_weights_dispatches_on_safetensors_extension(self):
+        """Test that load_weights loads .safetensors files into the model."""
+        import torch
+
+        from geoai.extract import ObjectDetector
+
+        model = torch.nn.Linear(2, 2)
+        stub = mock.Mock(device=torch.device("cpu"), model=model)
+        stub._load_safetensors = ObjectDetector._load_safetensors.__get__(stub)
+
+        ObjectDetector.load_weights(stub, self.path)
+
+        self.assertTrue(torch.equal(model.weight.data, self.state_dict["weight"]))
+        self.assertTrue(torch.equal(model.bias.data, self.state_dict["bias"]))
+
+    def test_load_weights_missing_file_raises(self):
+        """Test that load_weights raises FileNotFoundError for a missing file."""
+        import torch
+
+        from geoai.extract import ObjectDetector
+
+        stub = mock.Mock(device=torch.device("cpu"))
+        with self.assertRaises(FileNotFoundError):
+            ObjectDetector.load_weights(
+                stub, os.path.join(self.tmpdir.name, "nope.safetensors")
+            )
 
 
 if __name__ == "__main__":

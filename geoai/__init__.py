@@ -163,6 +163,7 @@ _LAZY_SYMBOL_MAP = {
     "CarDetector": ("extract", None),
     "ShipDetector": ("extract", None),
     "SolarPanelDetector": ("extract", None),
+    "ParkingSpotDetector": ("extract", None),
     "ParkingSplotDetector": ("extract", None),
     "AgricultureFieldDelineator": ("extract", None),
     # --- geoai.hf ---
