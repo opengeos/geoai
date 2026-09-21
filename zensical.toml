@@ -39,6 +39,7 @@ nav = [
     "examples/solar_panel_detection.md",
     "examples/text_prompt_segmentation.md",
     "examples/parking_spot_detection.md",
+    "examples/parking_spot_sam3.md",
     "examples/data_visualization.md",
     "examples/train_object_detection_model.md",
     "examples/train_segmentation_model.md",
