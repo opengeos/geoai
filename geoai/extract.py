@@ -303,7 +303,7 @@ class ObjectDetector:
         Initialize the object extractor.
 
         Args:
-            model_path: Path to the .pth model file.
+            model_path: Path to the model weights file (.pth or .safetensors).
             repo_id: Hugging Face repository ID for model download.
             model: Pre-initialized model object (optional).
             num_classes: Number of classes for detection (default: 2).
@@ -405,6 +405,34 @@ class ObjectDetector:
         model.to(self.device)
         return model
 
+    def _load_safetensors(self, model_path: str) -> Dict[str, torch.Tensor]:
+        """Load a state dict from a ``.safetensors`` checkpoint.
+
+        Args:
+            model_path: Path to the .safetensors weights file.
+
+        Returns:
+            Mapping of parameter names to tensors, placed on ``self.device``.
+
+        Raises:
+            ImportError: If the ``safetensors`` package is not installed.
+        """
+        try:
+            from safetensors import safe_open
+            from safetensors.torch import load_file
+        except ImportError as e:
+            raise ImportError(
+                "Loading .safetensors weights requires the safetensors package. "
+                "Install it with 'pip install safetensors'."
+            ) from e
+
+        with safe_open(model_path, framework="pt") as f:
+            metadata = f.metadata()
+        if metadata:
+            logger.info(f"Checkpoint metadata: {metadata}")
+
+        return load_file(model_path, device=str(self.device))
+
     def load_weights(self, model_path: str) -> None:
         """
         Load weights from file with error handling for different formats.
@@ -416,7 +444,10 @@ class ObjectDetector:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
         try:
-            state_dict = torch.load(model_path, map_location=self.device)
+            if model_path.endswith(".safetensors"):
+                state_dict = self._load_safetensors(model_path)
+            else:
+                state_dict = torch.load(model_path, map_location=self.device)
 
             # Handle different state dict formats
             if isinstance(state_dict, dict):
@@ -2432,7 +2463,7 @@ class BuildingFootprintExtractor(ObjectDetector):
         Initialize the object extractor.
 
         Args:
-            model_path: Path to the .pth model file.
+            model_path: Path to the model weights file (.pth or .safetensors).
             repo_id: Repo ID for loading models from the Hub.
             model: Custom model to use for inference.
             device: Device to use for inference ('cuda:0', 'cpu', etc.).
@@ -2489,7 +2520,7 @@ class CarDetector(ObjectDetector):
         Initialize the object extractor.
 
         Args:
-            model_path: Path to the .pth model file.
+            model_path: Path to the model weights file (.pth or .safetensors).
             repo_id: Repo ID for loading models from the Hub.
             model: Custom model to use for inference.
             device: Device to use for inference ('cuda:0', 'cpu', etc.).
@@ -2518,7 +2549,7 @@ class ShipDetector(ObjectDetector):
         Initialize the object extractor.
 
         Args:
-            model_path: Path to the .pth model file.
+            model_path: Path to the model weights file (.pth or .safetensors).
             repo_id: Repo ID for loading models from the Hub.
             model: Custom model to use for inference.
             device: Device to use for inference ('cuda:0', 'cpu', etc.).
@@ -2547,7 +2578,7 @@ class SolarPanelDetector(ObjectDetector):
         Initialize the object extractor.
 
         Args:
-            model_path: Path to the .pth model file.
+            model_path: Path to the model weights file (.pth or .safetensors).
             repo_id: Repo ID for loading models from the Hub.
             model: Custom model to use for inference.
             device: Device to use for inference ('cuda:0', 'cpu', etc.).
@@ -2567,7 +2598,7 @@ class ParkingSpotDetector(ObjectDetector):
 
     def __init__(
         self,
-        model_path: str = "parking_spot_detection.pth",
+        model_path: str = "parking_spot_detection.safetensors",
         repo_id: Optional[str] = None,
         model: Optional[Any] = None,
         num_classes: int = 3,
@@ -2577,7 +2608,7 @@ class ParkingSpotDetector(ObjectDetector):
         Initialize the object extractor.
 
         Args:
-            model_path: Path to the .pth model file.
+            model_path: Path to the model weights file (.pth or .safetensors).
             repo_id: Repo ID for loading models from the Hub.
             model: Custom model to use for inference.
             num_classes: Number of classes for the model. Default: 3
@@ -2641,7 +2672,7 @@ class AgricultureFieldDelineator(ObjectDetector):
         Initialize the field boundary delineator.
 
         Args:
-            model_path: Path to the .pth model file.
+            model_path: Path to the model weights file (.pth or .safetensors).
             repo_id: Repo ID for loading models from the Hub.
             model: Custom model to use for inference.
             device: Device to use for inference ('cuda:0', 'cpu', etc.).

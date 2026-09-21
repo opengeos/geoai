@@ -3,6 +3,7 @@
 """Tests for `geoai.extract` module classes and exports."""
 
 import inspect
+import os
 import unittest
 from unittest import mock
 
@@ -193,6 +194,66 @@ class TestExtractSignatures(unittest.TestCase):
         self.assertIn("model_path", sig.parameters)
         self.assertIn("num_classes", sig.parameters)
         self.assertIn("device", sig.parameters)
+
+
+class TestSafetensorsWeights(unittest.TestCase):
+    """Tests for loading ``.safetensors`` checkpoints."""
+
+    def setUp(self):
+        """Create a temporary .safetensors checkpoint for a small linear model."""
+        import tempfile
+
+        import torch
+        from safetensors.torch import save_file
+
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+        self.path = os.path.join(self.tmpdir.name, "weights.safetensors")
+        self.state_dict = {
+            "weight": torch.arange(4, dtype=torch.float32).reshape(2, 2),
+            "bias": torch.zeros(2, dtype=torch.float32),
+        }
+        save_file(self.state_dict, self.path, metadata={"num_classes": "2"})
+
+    def test_load_safetensors_returns_state_dict(self):
+        """Test that _load_safetensors reads tensors back unchanged."""
+        import torch
+
+        from geoai.extract import ObjectDetector
+
+        stub = mock.Mock(device=torch.device("cpu"))
+        loaded = ObjectDetector._load_safetensors(stub, self.path)
+
+        self.assertEqual(set(loaded), set(self.state_dict))
+        for key, value in self.state_dict.items():
+            self.assertTrue(torch.equal(value, loaded[key]))
+
+    def test_load_weights_dispatches_on_safetensors_extension(self):
+        """Test that load_weights loads .safetensors files into the model."""
+        import torch
+
+        from geoai.extract import ObjectDetector
+
+        model = torch.nn.Linear(2, 2)
+        stub = mock.Mock(device=torch.device("cpu"), model=model)
+        stub._load_safetensors = ObjectDetector._load_safetensors.__get__(stub)
+
+        ObjectDetector.load_weights(stub, self.path)
+
+        self.assertTrue(torch.equal(model.weight.data, self.state_dict["weight"]))
+        self.assertTrue(torch.equal(model.bias.data, self.state_dict["bias"]))
+
+    def test_load_weights_missing_file_raises(self):
+        """Test that load_weights raises FileNotFoundError for a missing file."""
+        import torch
+
+        from geoai.extract import ObjectDetector
+
+        stub = mock.Mock(device=torch.device("cpu"))
+        with self.assertRaises(FileNotFoundError):
+            ObjectDetector.load_weights(
+                stub, os.path.join(self.tmpdir.name, "nope.safetensors")
+            )
 
 
 if __name__ == "__main__":
