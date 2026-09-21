@@ -4,6 +4,7 @@
 
 import inspect
 import unittest
+from unittest import mock
 
 
 class TestExtractImport(unittest.TestCase):
@@ -63,6 +64,16 @@ class TestExtractImport(unittest.TestCase):
         from geoai.extract import ParkingSplotDetector, ParkingSpotDetector
 
         self.assertTrue(issubclass(ParkingSplotDetector, ParkingSpotDetector))
+
+    def test_parking_splot_detector_alias_warns(self):
+        """Test that instantiating the deprecated alias emits a DeprecationWarning."""
+        from geoai.extract import ObjectDetector, ParkingSplotDetector
+
+        with mock.patch.object(ObjectDetector, "__init__", return_value=None):
+            with self.assertWarns(DeprecationWarning) as ctx:
+                ParkingSplotDetector()
+
+        self.assertIn("ParkingSpotDetector", str(ctx.warning))
 
     def test_agriculture_field_delineator_exists(self):
         """Test that AgricultureFieldDelineator class exists and is callable."""
