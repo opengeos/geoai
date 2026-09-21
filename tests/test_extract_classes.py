@@ -52,11 +52,17 @@ class TestExtractImport(unittest.TestCase):
 
         self.assertTrue(callable(SolarPanelDetector))
 
-    def test_parking_splot_detector_exists(self):
-        """Test that ParkingSplotDetector class exists and is callable."""
-        from geoai.extract import ParkingSplotDetector
+    def test_parking_spot_detector_exists(self):
+        """Test that ParkingSpotDetector class exists and is callable."""
+        from geoai.extract import ParkingSpotDetector
 
-        self.assertTrue(callable(ParkingSplotDetector))
+        self.assertTrue(callable(ParkingSpotDetector))
+
+    def test_parking_splot_detector_alias(self):
+        """Test that the deprecated ParkingSplotDetector alias still works."""
+        from geoai.extract import ParkingSplotDetector, ParkingSpotDetector
+
+        self.assertTrue(issubclass(ParkingSplotDetector, ParkingSpotDetector))
 
     def test_agriculture_field_delineator_exists(self):
         """Test that AgricultureFieldDelineator class exists and is callable."""
@@ -85,6 +91,7 @@ class TestExtractAllExports(unittest.TestCase):
             "CarDetector",
             "ShipDetector",
             "SolarPanelDetector",
+            "ParkingSpotDetector",
             "ParkingSplotDetector",
             "AgricultureFieldDelineator",
         ]
@@ -112,7 +119,7 @@ class TestExtractDetectorInheritance(unittest.TestCase):
             BuildingFootprintExtractor,
             CarDetector,
             ObjectDetector,
-            ParkingSplotDetector,
+            ParkingSpotDetector,
             ShipDetector,
             SolarPanelDetector,
         )
@@ -122,7 +129,7 @@ class TestExtractDetectorInheritance(unittest.TestCase):
             CarDetector,
             ShipDetector,
             SolarPanelDetector,
-            ParkingSplotDetector,
+            ParkingSpotDetector,
             AgricultureFieldDelineator,
         ]
         for cls in subclasses:
@@ -167,11 +174,11 @@ class TestExtractSignatures(unittest.TestCase):
         self.assertIn("band_selection", sig.parameters)
         self.assertIn("use_ndvi", sig.parameters)
 
-    def test_parking_splot_detector_init_params(self):
-        """Test ParkingSplotDetector.__init__ has expected parameters."""
-        from geoai.extract import ParkingSplotDetector
+    def test_parking_spot_detector_init_params(self):
+        """Test ParkingSpotDetector.__init__ has expected parameters."""
+        from geoai.extract import ParkingSpotDetector
 
-        sig = inspect.signature(ParkingSplotDetector.__init__)
+        sig = inspect.signature(ParkingSpotDetector.__init__)
         self.assertIn("model_path", sig.parameters)
         self.assertIn("num_classes", sig.parameters)
         self.assertIn("device", sig.parameters)

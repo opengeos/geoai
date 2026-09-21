@@ -4,6 +4,7 @@
 import logging
 import os
 import time
+import warnings
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 # Third-Party Libraries
@@ -41,6 +42,7 @@ __all__ = [
     "CarDetector",
     "ShipDetector",
     "SolarPanelDetector",
+    "ParkingSpotDetector",
     "ParkingSplotDetector",
     "AgricultureFieldDelineator",
 ]
@@ -2555,11 +2557,12 @@ class SolarPanelDetector(ObjectDetector):
         )
 
 
-class ParkingSplotDetector(ObjectDetector):
+class ParkingSpotDetector(ObjectDetector):
     """
-    Car detection using a pre-trained Mask R-CNN model.
+    Parking spot detection using a pre-trained Mask R-CNN model.
 
-    This class extends the `ObjectDetector` class with additional methods for car detection.
+    This class extends the `ObjectDetector` class with additional methods for
+    parking spot detection.
     """
 
     def __init__(
@@ -2587,6 +2590,29 @@ class ParkingSplotDetector(ObjectDetector):
             num_classes=num_classes,
             device=device,
         )
+
+
+class ParkingSplotDetector(ParkingSpotDetector):
+    """Deprecated alias for :class:`ParkingSpotDetector`.
+
+    Kept for backward compatibility with the misspelled class name. Use
+    :class:`ParkingSpotDetector` instead.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the detector and warn about the deprecated name.
+
+        Args:
+            *args: Positional arguments forwarded to `ParkingSpotDetector`.
+            **kwargs: Keyword arguments forwarded to `ParkingSpotDetector`.
+        """
+        warnings.warn(
+            "ParkingSplotDetector is deprecated due to a typo in the class name; "
+            "use ParkingSpotDetector instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 class AgricultureFieldDelineator(ObjectDetector):
