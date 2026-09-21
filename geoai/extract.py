@@ -419,19 +419,17 @@ class ObjectDetector:
         """
         try:
             from safetensors import safe_open
-            from safetensors.torch import load_file
         except ImportError as e:
             raise ImportError(
                 "Loading .safetensors weights requires the safetensors package. "
                 "Install it with 'pip install safetensors'."
             ) from e
 
-        with safe_open(model_path, framework="pt") as f:
+        with safe_open(model_path, framework="pt", device=str(self.device)) as f:
             metadata = f.metadata()
-        if metadata:
-            logger.info(f"Checkpoint metadata: {metadata}")
-
-        return load_file(model_path, device=str(self.device))
+            if metadata:
+                logger.info(f"Checkpoint metadata: {metadata}")
+            return {key: f.get_tensor(key) for key in f.keys()}
 
     def load_weights(self, model_path: str) -> None:
         """
@@ -2630,12 +2628,22 @@ class ParkingSplotDetector(ParkingSpotDetector):
     :class:`ParkingSpotDetector` instead.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        model_path: str = "parking_spot_detection.safetensors",
+        repo_id: Optional[str] = None,
+        model: Optional[Any] = None,
+        num_classes: int = 3,
+        device: Optional[str] = None,
+    ) -> None:
         """Initialize the detector and warn about the deprecated name.
 
         Args:
-            *args: Positional arguments forwarded to `ParkingSpotDetector`.
-            **kwargs: Keyword arguments forwarded to `ParkingSpotDetector`.
+            model_path: Path to the model weights file (.pth or .safetensors).
+            repo_id: Repo ID for loading models from the Hub.
+            model: Custom model to use for inference.
+            num_classes: Number of classes for the model. Default: 3
+            device: Device to use for inference ('cuda:0', 'cpu', etc.).
         """
         warnings.warn(
             "ParkingSplotDetector is deprecated due to a typo in the class name; "
@@ -2643,7 +2651,13 @@ class ParkingSplotDetector(ParkingSpotDetector):
             DeprecationWarning,
             stacklevel=2,
         )
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            model_path=model_path,
+            repo_id=repo_id,
+            model=model,
+            num_classes=num_classes,
+            device=device,
+        )
 
 
 class AgricultureFieldDelineator(ObjectDetector):

@@ -66,6 +66,15 @@ class TestExtractImport(unittest.TestCase):
 
         self.assertTrue(issubclass(ParkingSplotDetector, ParkingSpotDetector))
 
+    def test_parking_splot_detector_alias_signature(self):
+        """Test that the deprecated alias keeps the canonical constructor signature."""
+        from geoai.extract import ParkingSplotDetector, ParkingSpotDetector
+
+        self.assertEqual(
+            inspect.signature(ParkingSplotDetector.__init__),
+            inspect.signature(ParkingSpotDetector.__init__),
+        )
+
     def test_parking_splot_detector_alias_warns(self):
         """Test that instantiating the deprecated alias emits a DeprecationWarning."""
         from geoai.extract import ObjectDetector, ParkingSplotDetector
