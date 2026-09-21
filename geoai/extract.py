@@ -1399,9 +1399,12 @@ class ObjectDetector:
             mean = np.mean(coords, axis=0)
             centered_coords = coords - mean
 
-            # Calculate covariance matrix and its eigenvalues/eigenvectors
+            # Calculate covariance matrix and its eigenvalues/eigenvectors.
+            # The covariance matrix is symmetric, so use eigh: it always returns
+            # real-valued output, whereas np.linalg.eig returns complex arrays
+            # on NumPy >= 2.5, which breaks np.arctan2 below.
             cov_matrix = np.cov(centered_coords.T)
-            eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
+            eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
 
             # Get the index of the largest eigenvalue
             largest_idx = np.argmax(eigenvalues)
