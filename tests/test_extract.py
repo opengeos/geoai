@@ -61,5 +61,34 @@ class TestExtractModule(unittest.TestCase):
             self.fail(f"Failed to import geoai.extract: {e}")
 
 
+class TestRegularizeObjects(unittest.TestCase):
+    """Tests for ObjectDetector.regularize_objects (no model weights needed)."""
+
+    def test_regularize_objects_rectangle(self):
+        """Rotated rectangles regularize without complex-dtype errors.
+
+        Regression test: NumPy >= 2.5 makes np.linalg.eig always return complex
+        arrays, which broke the PCA-based dominant-direction calculation with
+        "ufunc 'arctan2' not supported for the input types".
+        """
+        import geopandas as gpd
+        from shapely.affinity import rotate
+        from shapely.geometry import Polygon, box
+
+        polygons = [
+            box(0, 0, 20, 10),
+            rotate(box(0, 0, 20, 10), 30, origin="centroid"),
+            Polygon([(0, 0), (10, 0), (10, 10), (0, 10)]),
+        ]
+        gdf = gpd.GeoDataFrame({"geometry": polygons}, crs="EPSG:32610")
+
+        result = extract.ObjectDetector.regularize_objects(None, gdf)
+
+        self.assertEqual(len(result), len(gdf))
+        self.assertTrue(all(result.geometry.is_valid))
+        self.assertTrue(all(result.geometry.area > 0))
+        self.assertTrue((result["regularized"] == "rectangle").all())
+
+
 if __name__ == "__main__":
     unittest.main()
