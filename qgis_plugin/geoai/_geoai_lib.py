@@ -297,6 +297,9 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
         if hasattr(module, "__path__"):
             if plugin_dir not in module.__path__:
                 module.__path__.append(plugin_dir)
+        # Preserve classFactory so QGIS can reload the plugin
+        if "geoai" in saved and hasattr(saved["geoai"], "classFactory"):
+            module.classFactory = saved["geoai"].classFactory
         return module
 
     try:
