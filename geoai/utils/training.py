@@ -809,11 +809,13 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
         Tuple[dict, int]: ``(class_to_id, unclassified_id)`` where *class_to_id*
         maps each class value to a 1-based integer class ID, and
         *unclassified_id* is the ID to assign to features that carry no usable
-        class value. *class_to_id* falls back to ``{1: 1}`` when no class values
+        class value, whether because the mask has no *class_value_field* column
+        or because the value is null. *class_to_id* falls back to ``{1: 1}`` when no class values
         could be collected.
     """
     class_values = set()
     missing_field = []
+    has_null_values = False
 
     for mask_file in mask_files:
         if mask_file is None:
@@ -833,9 +835,12 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
             else:
                 gdf = gpd.read_file(mask_file)
                 if class_value_field in gdf.columns:
-                    class_values.update(
-                        gdf[class_value_field].dropna().unique().tolist()
-                    )
+                    column = gdf[class_value_field]
+                    # Null values cannot be used as a class, so they need the
+                    # same dedicated ID as features with no class field at all.
+                    if column.isna().any():
+                        has_null_values = True
+                    class_values.update(column.dropna().unique().tolist())
                 else:
                     missing_field.append(mask_file)
         except Exception as e:
@@ -854,7 +859,7 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
     class_to_id = {cls: i + 1 for i, cls in enumerate(sorted_values)}
     unclassified_id = 1
 
-    if missing_field:
+    if missing_field or has_null_values:
         # ID 1 now belongs to a real class, so features with no class value need
         # an ID of their own instead of silently joining the first class.
         unclassified_id = len(class_to_id) + 1
@@ -863,9 +868,15 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
             unclassified_name += "_"
         class_to_id[unclassified_name] = unclassified_id
         if not quiet:
+            if missing_field:
+                logger.warning(
+                    f"'{class_value_field}' not found in {len(missing_field)} "
+                    "mask file(s)."
+                )
+            if has_null_values:
+                logger.warning(f"Some features have no '{class_value_field}' value.")
             logger.warning(
-                f"'{class_value_field}' not found in {len(missing_field)} mask "
-                f"file(s). Their features are assigned class ID {unclassified_id} "
+                f"Those features are assigned class ID {unclassified_id} "
                 f"('{unclassified_name}')."
             )
 

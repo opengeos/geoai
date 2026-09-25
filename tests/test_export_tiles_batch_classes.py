@@ -214,6 +214,23 @@ class TestCollectBatchClassMapping(unittest.TestCase):
         self.assertEqual(unclassified, 3)
         self.assertEqual(mapping["unclassified"], 3)
 
+    def test_null_class_values_get_the_unclassified_id(self):
+        # The column exists but some rows are null, so those features must not
+        # land on whichever real class sorts to ID 1.
+        gdf = gpd.GeoDataFrame(
+            {"name": ["car", None, "bus"], "geometry": _class_boxes(0, 100, 3)},
+            crs=CRS,
+        )
+        path = os.path.join(self.root, "nulls.geojson")
+        gdf.to_file(path, driver="GeoJSON")
+
+        mapping, unclassified = _collect_batch_class_mapping([path], "name", quiet=True)
+
+        self.assertEqual(mapping["bus"], 1)
+        self.assertEqual(mapping["car"], 2)
+        self.assertEqual(unclassified, 3)
+        self.assertEqual(mapping["unclassified"], 3)
+
     def test_unclassified_name_avoids_collision(self):
         path = _write_vector(self.root, "a", 0, 100, ["unclassified", "car"])
         unlabelled = _write_vector(self.root, "b", 200, 100, ["x"], field="other")
@@ -462,6 +479,34 @@ class TestExportGeotiffTilesBatchClassIds(unittest.TestCase):
         self.assertEqual(by_base["a"], [1, 2])
         # The unlabelled mask gets its own ID instead of colliding with "bus".
         self.assertEqual(by_base["b"], [3])
+
+    def test_null_class_values_do_not_borrow_a_real_class_id(self):
+        vectors = os.path.join(self.root, "vectors")
+        _write_image(self.images, "a", 0, 1000)
+        os.makedirs(vectors, exist_ok=True)
+        gdf = gpd.GeoDataFrame(
+            {"name": ["car", None, "bus"], "geometry": _class_boxes(0, 1000, 3)},
+            crs=CRS,
+        )
+        gdf.to_file(os.path.join(vectors, "a.geojson"), driver="GeoJSON")
+
+        export_geotiff_tiles_batch(
+            images_folder=self.images,
+            masks_folder=vectors,
+            output_folder=self.output,
+            match_by_name=True,
+            class_value_field="name",
+            tile_size=TILE,
+            stride=TILE,
+            skip_empty_tiles=True,
+            metadata_format="COCO",
+            quiet=True,
+        )
+
+        categories = {c["id"]: c["name"] for c in self._read_coco()["categories"]}
+        self.assertEqual(categories, {1: "bus", 2: "car", 3: "unclassified"})
+        # bus, car and the null feature each keep a distinct ID.
+        self.assertEqual(list(_mask_values(self.output).values())[0], [1, 2, 3])
 
     def test_images_only_mode_is_unaffected(self):
         _write_image(self.images, "a", 0, 1000)
