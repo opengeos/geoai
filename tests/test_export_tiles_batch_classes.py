@@ -551,6 +551,38 @@ class TestExportGeotiffTilesBatchClassIds(unittest.TestCase):
         # bus, car and the null feature each keep a distinct ID.
         self.assertEqual(list(_mask_values(self.output).values())[0], [1, 2, 3])
 
+    def test_mixed_raster_and_vector_masks_share_one_id_space(self):
+        # A masks folder may legally hold both kinds. The raster remap compares
+        # its integer pixels against every mapping key, including the string
+        # keys contributed by the vector masks, so check they stay disjoint.
+        masks = os.path.join(self.root, "masks")
+        _write_image(self.images, "a", 0, 1000)
+        _write_vector(masks, "a", 0, 1000, ["car", "bus"])
+        _write_image(self.images, "b", 1000, 1000)
+        _write_raster_mask(masks, "b", 1000, 1000, [7, 8])
+
+        export_geotiff_tiles_batch(
+            images_folder=self.images,
+            masks_folder=masks,
+            output_folder=self.output,
+            match_by_name=True,
+            class_value_field="name",
+            tile_size=TILE,
+            stride=TILE,
+            skip_empty_tiles=True,
+            metadata_format="COCO",
+            quiet=True,
+        )
+
+        categories = {c["id"]: c["name"] for c in self._read_coco()["categories"]}
+        self.assertEqual(categories, {1: "7", 2: "8", 3: "bus", 4: "car"})
+
+        by_base = {
+            name.split("_")[0]: ids for name, ids in _mask_values(self.output).items()
+        }
+        self.assertEqual(by_base["b"], [1, 2])
+        self.assertEqual(by_base["a"], [3, 4])
+
     def test_images_only_mode_is_unaffected(self):
         _write_image(self.images, "a", 0, 1000)
 

@@ -814,8 +814,8 @@ def _collect_batch_class_mapping(
         maps each class value to a 1-based integer class ID, and
         *unclassified_id* is the ID to assign to features that carry no usable
         class value, whether because the mask has no *class_value_field* column
-        or because the value is null. *class_to_id* falls back to ``{1: 1}`` when no class values
-        could be collected.
+        or because the value is null. *class_to_id* falls back to ``{1: 1}``
+        when no class values could be collected.
     """
     preloaded = preloaded or {}
     class_values = set()
