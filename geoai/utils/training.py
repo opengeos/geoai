@@ -806,8 +806,11 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
         quiet: If True, suppress log messages.
 
     Returns:
-        dict: Mapping from class value to a 1-based integer class ID. Falls back
-        to ``{1: 1}`` when no class values could be collected.
+        Tuple[dict, int]: ``(class_to_id, unclassified_id)`` where *class_to_id*
+        maps each class value to a 1-based integer class ID, and
+        *unclassified_id* is the ID to assign to features that carry no usable
+        class value. *class_to_id* falls back to ``{1: 1}`` when no class values
+        could be collected.
     """
     class_values = set()
     missing_field = []
@@ -817,19 +820,16 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
             continue
         try:
             if _detect_class_data_type(mask_file, quiet=True):
+                # Scan at full resolution, block by block. A decimated read can
+                # miss a class that only covers a few pixels, and any value
+                # missing from the mapping is burned as 0 (i.e. dropped) later.
                 with rasterio.open(mask_file) as class_src:
-                    sample_data = class_src.read(
-                        1,
-                        out_shape=(
-                            1,
-                            min(class_src.height, 1000),
-                            min(class_src.width, 1000),
-                        ),
-                    )
-                unique_classes = np.unique(sample_data)
-                class_values.update(
-                    int(cls) for cls in unique_classes[unique_classes > 0]
-                )
+                    for _, window in class_src.block_windows(1):
+                        block = class_src.read(1, window=window)
+                        unique_classes = np.unique(block)
+                        class_values.update(
+                            int(cls) for cls in unique_classes[unique_classes > 0]
+                        )
             else:
                 gdf = gpd.read_file(mask_file)
                 if class_value_field in gdf.columns:
@@ -842,14 +842,8 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
             if not quiet:
                 logger.warning(f"Could not scan classes in {mask_file}: {e}")
 
-    if missing_field and not quiet:
-        logger.warning(
-            f"'{class_value_field}' not found in {len(missing_field)} mask file(s). "
-            "Their features will be assigned class ID 1."
-        )
-
     if not class_values:
-        return {1: 1}
+        return {1: 1}, 1
 
     try:
         sorted_values = sorted(class_values)
@@ -858,6 +852,22 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
         sorted_values = sorted(class_values, key=str)
 
     class_to_id = {cls: i + 1 for i, cls in enumerate(sorted_values)}
+    unclassified_id = 1
+
+    if missing_field:
+        # ID 1 now belongs to a real class, so features with no class value need
+        # an ID of their own instead of silently joining the first class.
+        unclassified_id = len(class_to_id) + 1
+        unclassified_name = "unclassified"
+        while unclassified_name in class_to_id:
+            unclassified_name += "_"
+        class_to_id[unclassified_name] = unclassified_id
+        if not quiet:
+            logger.warning(
+                f"'{class_value_field}' not found in {len(missing_field)} mask "
+                f"file(s). Their features are assigned class ID {unclassified_id} "
+                f"('{unclassified_name}')."
+            )
 
     if not quiet:
         logger.info(
@@ -865,7 +875,7 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
             f"{list(class_to_id.keys())}"
         )
 
-    return class_to_id
+    return class_to_id, unclassified_id
 
 
 def _compute_tile_window(x, y, stride_x, stride_y, tile_w, tile_h, src):
@@ -962,6 +972,7 @@ def _rasterize_label_from_vector(
     class_value_field,
     class_to_id,
     all_touched=True,
+    unclassified_id=1,
 ):
     """Rasterize vector features into a label mask for a single tile.
 
@@ -973,6 +984,7 @@ def _rasterize_label_from_vector(
         class_value_field: Field containing class values.
         class_to_id: Mapping from class values to integer IDs.
         all_touched: Whether to rasterize all touched pixels.
+        unclassified_id: Class ID for features with no usable class value.
 
     Returns:
         Tuple[np.ndarray, bool, gpd.GeoDataFrame, int]: A tuple of
@@ -989,9 +1001,9 @@ def _rasterize_label_from_vector(
     for idx, feature in window_features.iterrows():
         if class_value_field in feature:
             class_val = feature[class_value_field]
-            class_id = class_to_id.get(class_val, 1)
+            class_id = class_to_id.get(class_val, unclassified_id)
         else:
-            class_id = 1
+            class_id = unclassified_id
 
         geom = feature.geometry.intersection(window_bounds)
         if not geom.is_empty:
@@ -2230,13 +2242,14 @@ def export_geotiff_tiles_batch(
     # values and annotation category IDs stay consistent across every pair,
     # even when an individual mask is missing some of the classes.
     batch_class_to_id = None
+    batch_unclassified_id = 1
     if has_masks:
         scan_files = (
             [masks_file]
             if use_single_mask_file
             else sorted({pair[1] for pair in image_mask_pairs if pair[1] is not None})
         )
-        batch_class_to_id = _collect_batch_class_mapping(
+        batch_class_to_id, batch_unclassified_id = _collect_batch_class_mapping(
             scan_files,
             class_value_field=class_value_field,
             quiet=quiet,
@@ -2334,6 +2347,7 @@ def export_geotiff_tiles_batch(
                 mask_gdf=mask_gdf,  # Pass pre-loaded GeoDataFrame if using single mask
                 use_single_mask_file=use_single_mask_file,
                 class_to_id=batch_class_to_id,
+                unclassified_id=batch_unclassified_id,
                 metadata_format=metadata_format,
                 ann_dir=(
                     ann_dir
@@ -2484,6 +2498,7 @@ def _process_image_mask_pair(
     metadata_format="PASCAL_VOC",
     ann_dir=None,
     class_to_id=None,
+    unclassified_id=1,
 ):
     """
     Process a single image-mask pair and save tiles directly to output directories.
@@ -2494,6 +2509,7 @@ def _process_image_mask_pair(
         class_to_id (dict, optional): Batch-wide mapping from class value to class ID.
             When provided it is used as-is so that class IDs stay consistent across
             all pairs. When None, the mapping is derived from this pair's mask only.
+        unclassified_id (int): Class ID for vector features with no usable class value.
 
     Returns:
         dict: Statistics for this image-mask pair
@@ -2535,15 +2551,22 @@ def _process_image_mask_pair(
             class_to_id = {}
 
         if mask_file is not None and is_class_data_raster:
-            # Called even when a batch mapping is supplied so the CRS mismatch
-            # check still runs; only the per-pair mapping is discarded.
-            pair_class_to_id, _ = _load_class_data_raster(
-                mask_file,
-                src.crs,
-                quiet=True,
-            )
-            if not use_batch_class_to_id:
-                class_to_id = pair_class_to_id
+            if use_batch_class_to_id:
+                # The batch scan already collected the classes, so only the CRS
+                # check is still needed here.
+                with rasterio.open(mask_file) as class_src:
+                    if class_src.crs != src.crs:
+                        warnings.warn(
+                            f"CRS mismatch: Class raster ({class_src.crs}) doesn't "
+                            f"match input raster ({src.crs}). Results may be "
+                            "misaligned."
+                        )
+            else:
+                class_to_id, _ = _load_class_data_raster(
+                    mask_file,
+                    src.crs,
+                    quiet=True,
+                )
         elif mask_file is not None:
             # Load vector class data
             try:
@@ -2637,6 +2660,7 @@ def _process_image_mask_pair(
                             class_value_field,
                             class_to_id,
                             all_touched=all_touched,
+                            unclassified_id=unclassified_id,
                         )
                     )
                     stats["errors"] += errs

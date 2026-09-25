@@ -161,9 +161,10 @@ class TestCollectBatchClassMapping(unittest.TestCase):
         a = _write_vector(self.root, "a", 0, 100, ["car", "truck", "bus"])
         b = _write_vector(self.root, "b", 200, 100, ["truck", "bus"])
 
-        mapping = _collect_batch_class_mapping([a, b], "name", quiet=True)
+        mapping, unclassified = _collect_batch_class_mapping([a, b], "name", quiet=True)
 
         self.assertEqual(mapping, {"bus": 1, "car": 2, "truck": 3})
+        self.assertEqual(unclassified, 1)
 
     def test_mapping_is_order_independent(self):
         a = _write_vector(self.root, "a", 0, 100, ["car", "truck", "bus"])
@@ -174,26 +175,77 @@ class TestCollectBatchClassMapping(unittest.TestCase):
             _collect_batch_class_mapping([b, a], "name", quiet=True),
         )
 
+    def test_rare_raster_class_is_not_missed(self):
+        # A class covering a handful of pixels in a large raster is invisible to
+        # a decimated read but must still get an ID (issue #920 follow-up).
+        path = os.path.join(self.root, "rare.tif")
+        data = np.zeros((2048, 2048), dtype=np.uint8)
+        data[:1024, :] = 1
+        data[2040:2043, 2040:2043] = 2
+        with rasterio.open(
+            path,
+            "w",
+            driver="GTiff",
+            height=2048,
+            width=2048,
+            count=1,
+            dtype="uint8",
+            crs=CRS,
+            transform=from_origin(0, 2048, 1, 1),
+        ) as dst:
+            dst.write(data, 1)
+
+        mapping, _ = _collect_batch_class_mapping([path], quiet=True)
+
+        self.assertEqual(mapping, {1: 1, 2: 2})
+
+    def test_masks_without_class_field_get_their_own_id(self):
+        # ID 1 belongs to a real class, so field-less features must not silently
+        # be merged into it.
+        labelled = _write_vector(self.root, "a", 0, 100, ["car", "bus"])
+        unlabelled = _write_vector(self.root, "b", 200, 100, ["x"], field="other")
+
+        mapping, unclassified = _collect_batch_class_mapping(
+            [labelled, unlabelled], "name", quiet=True
+        )
+
+        self.assertEqual(mapping["bus"], 1)
+        self.assertEqual(mapping["car"], 2)
+        self.assertEqual(unclassified, 3)
+        self.assertEqual(mapping["unclassified"], 3)
+
+    def test_unclassified_name_avoids_collision(self):
+        path = _write_vector(self.root, "a", 0, 100, ["unclassified", "car"])
+        unlabelled = _write_vector(self.root, "b", 200, 100, ["x"], field="other")
+
+        mapping, unclassified = _collect_batch_class_mapping(
+            [path, unlabelled], "name", quiet=True
+        )
+
+        self.assertEqual(mapping["unclassified"], 2)
+        self.assertEqual(mapping["unclassified_"], unclassified)
+
     def test_raster_masks_use_union_of_pixel_values(self):
         a = _write_raster_mask(self.root, "a", 0, 100, [7, 8, 9])
         b = _write_raster_mask(self.root, "b", 200, 100, [8, 9])
 
-        mapping = _collect_batch_class_mapping([a, b], quiet=True)
+        mapping, _ = _collect_batch_class_mapping([a, b], quiet=True)
 
         self.assertEqual(mapping, {7: 1, 8: 2, 9: 3})
 
     def test_missing_class_field_falls_back_to_single_class(self):
         path = _write_vector(self.root, "a", 0, 100, ["car"], field="label")
 
-        mapping = _collect_batch_class_mapping([path], "name", quiet=True)
+        mapping, unclassified = _collect_batch_class_mapping([path], "name", quiet=True)
 
         self.assertEqual(mapping, {1: 1})
+        self.assertEqual(unclassified, 1)
 
     def test_unreadable_masks_are_skipped(self):
         good = _write_vector(self.root, "good", 0, 100, ["car"])
         missing = os.path.join(self.root, "missing.geojson")
 
-        mapping = _collect_batch_class_mapping(
+        mapping, _ = _collect_batch_class_mapping(
             [good, missing, None], "name", quiet=True
         )
 
@@ -205,7 +257,7 @@ class TestCollectBatchClassMapping(unittest.TestCase):
         vector = _write_vector(self.root, "a", 0, 100, ["car", "bus"])
         raster = _write_raster_mask(self.root, "b", 200, 100, [7, 8])
 
-        mapping = _collect_batch_class_mapping([vector, raster], "name", quiet=True)
+        mapping, _ = _collect_batch_class_mapping([vector, raster], "name", quiet=True)
 
         self.assertEqual(set(mapping.keys()), {"car", "bus", 7, 8})
         self.assertEqual(sorted(mapping.values()), [1, 2, 3, 4])
@@ -380,6 +432,36 @@ class TestExportGeotiffTilesBatchClassIds(unittest.TestCase):
 
         self.assertEqual(found["a"], ["bus", "car", "truck"])
         self.assertEqual(found["b"], ["bus", "truck"])
+
+    def test_unlabelled_mask_does_not_borrow_a_real_class_id(self):
+        vectors = os.path.join(self.root, "vectors")
+        _write_image(self.images, "a", 0, 1000)
+        _write_vector(vectors, "a", 0, 1000, ["car", "bus"])
+        _write_image(self.images, "b", 1000, 1000)
+        _write_vector(vectors, "b", 1000, 1000, ["x"], field="other")
+
+        export_geotiff_tiles_batch(
+            images_folder=self.images,
+            masks_folder=vectors,
+            output_folder=self.output,
+            match_by_name=True,
+            class_value_field="name",
+            tile_size=TILE,
+            stride=TILE,
+            skip_empty_tiles=True,
+            metadata_format="COCO",
+            quiet=True,
+        )
+
+        categories = {c["id"]: c["name"] for c in self._read_coco()["categories"]}
+        self.assertEqual(categories, {1: "bus", 2: "car", 3: "unclassified"})
+
+        by_base = {
+            name.split("_")[0]: ids for name, ids in _mask_values(self.output).items()
+        }
+        self.assertEqual(by_base["a"], [1, 2])
+        # The unlabelled mask gets its own ID instead of colliding with "bus".
+        self.assertEqual(by_base["b"], [3])
 
     def test_images_only_mode_is_unaffected(self):
         _write_image(self.images, "a", 0, 1000)
