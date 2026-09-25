@@ -73,6 +73,8 @@ def _is_plugin_module(mod: ModuleType) -> bool:
     Detection uses the ``classFactory`` function that every QGIS plugin exposes in its
     ``__init__.py``.
     """
+    if getattr(mod, "_is_external_geoai", False):
+        return False
     return callable(getattr(mod, "classFactory", None))
 
 
@@ -297,6 +299,12 @@ def _load_geoai_from_path(init_path: Path) -> Optional[ModuleType]:
         if hasattr(module, "__path__"):
             if plugin_dir not in module.__path__:
                 module.__path__.append(plugin_dir)
+        # Mark as external library so _is_plugin_module() will not misidentify it
+        module._is_external_geoai = True
+
+        # Preserve classFactory so QGIS can reload the plugin
+        if "geoai" in saved and hasattr(saved["geoai"], "classFactory"):
+            module.classFactory = saved["geoai"].classFactory
         return module
 
     try:

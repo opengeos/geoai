@@ -36,7 +36,7 @@ REQUIRED_PACKAGES = [
     ("geoai-py", ">=0.39.0"),
     ("segment-geospatial", ""),
     ("sam3", ""),
-    ("deepforest", ""),
+    ("deepforest", ">=2.1.0"),
     ("omniwatermask", ""),
     # Version is kept at or above the geoai-py runtime requirement so the
     # QGIS managed environment can resolve on Windows/Python 3.12.
@@ -49,7 +49,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "12"
+_INSTALL_LOGIC_VERSION = "13"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
