@@ -792,7 +792,9 @@ def _load_class_data_vector(
         raise ValueError(f"Error processing vector data: {e}")
 
 
-def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=False):
+def _collect_batch_class_mapping(
+    mask_files, class_value_field="class", quiet=False, preloaded=None
+):
     """Build a single class-to-ID mapping shared by every mask in a batch.
 
     Scanning every mask up front keeps mask pixel values and COCO/YOLO class
@@ -804,6 +806,8 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
         mask_files: Iterable of mask file paths (vector and/or raster).
         class_value_field: Field containing class values (vector masks only).
         quiet: If True, suppress log messages.
+        preloaded: Optional mapping of mask path to an already loaded
+            GeoDataFrame, used instead of re-reading that file from disk.
 
     Returns:
         Tuple[dict, int]: ``(class_to_id, unclassified_id)`` where *class_to_id*
@@ -813,6 +817,7 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
         or because the value is null. *class_to_id* falls back to ``{1: 1}`` when no class values
         could be collected.
     """
+    preloaded = preloaded or {}
     class_values = set()
     missing_field = []
     has_null_values = False
@@ -833,7 +838,9 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
                             int(cls) for cls in unique_classes[unique_classes > 0]
                         )
             else:
-                gdf = gpd.read_file(mask_file)
+                gdf = preloaded.get(mask_file)
+                if gdf is None:
+                    gdf = gpd.read_file(mask_file)
                 if class_value_field in gdf.columns:
                     column = gdf[class_value_field]
                     # Null values cannot be used as a class, so they need the
@@ -848,6 +855,11 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
                 logger.warning(f"Could not scan classes in {mask_file}: {e}")
 
     if not class_values:
+        if not quiet and missing_field:
+            logger.warning(
+                f"'{class_value_field}' not found in {len(missing_field)} mask "
+                "file(s). Using default class ID 1."
+            )
         return {1: 1}, 1
 
     try:
@@ -879,6 +891,16 @@ def _collect_batch_class_mapping(mask_files, class_value_field="class", quiet=Fa
                 f"Those features are assigned class ID {unclassified_id} "
                 f"('{unclassified_name}')."
             )
+
+    if len(class_to_id) > 255:
+        # Mask tiles are written as uint8, so IDs above 255 would wrap around
+        # and collide with other classes or with the 0 background.
+        warnings.warn(
+            f"Found {len(class_to_id)} classes across all masks, but mask tiles "
+            "are written as uint8, so class IDs above 255 cannot be represented. "
+            f"Check that '{class_value_field}' holds class labels rather than "
+            "per-feature identifiers."
+        )
 
     if not quiet:
         logger.info(
@@ -2264,6 +2286,7 @@ def export_geotiff_tiles_batch(
             scan_files,
             class_value_field=class_value_field,
             quiet=quiet,
+            preloaded=({masks_file: single_mask_gdf} if use_single_mask_file else None),
         )
 
         # Seed the aggregated annotation classes from the batch mapping so that

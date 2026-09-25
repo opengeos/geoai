@@ -11,6 +11,7 @@ import json
 import os
 import tempfile
 import unittest
+import unittest.mock
 
 import geopandas as gpd
 import numpy as np
@@ -257,6 +258,48 @@ class TestCollectBatchClassMapping(unittest.TestCase):
 
         self.assertEqual(mapping, {1: 1})
         self.assertEqual(unclassified, 1)
+
+    def test_missing_field_everywhere_warns(self):
+        # A typo in class_value_field should not fail silently.
+        path = _write_vector(self.root, "a", 0, 100, ["car"], field="label")
+
+        with self.assertLogs("geoai", level="WARNING") as captured:
+            mapping, unclassified = _collect_batch_class_mapping(
+                [path], "name", quiet=False
+            )
+
+        self.assertEqual(mapping, {1: 1})
+        self.assertEqual(unclassified, 1)
+        self.assertTrue(any("not found in 1 mask file" in m for m in captured.output))
+
+    def test_preloaded_geodataframe_is_reused(self):
+        path = _write_vector(self.root, "a", 0, 100, ["car", "bus"])
+        gdf = gpd.read_file(path)
+
+        with unittest.mock.patch(
+            "geopandas.read_file", side_effect=AssertionError("should not re-read")
+        ):
+            mapping, _ = _collect_batch_class_mapping(
+                [path], "name", quiet=True, preloaded={path: gdf}
+            )
+
+        self.assertEqual(mapping, {"bus": 1, "car": 2})
+
+    def test_too_many_classes_for_uint8_warns(self):
+        # Mask tiles are uint8, so more than 255 class IDs cannot be stored.
+        classes = [f"c{i:04d}" for i in range(300)]
+        gdf = gpd.GeoDataFrame(
+            {"name": classes, "geometry": _class_boxes(0, 100, len(classes))},
+            crs=CRS,
+        )
+        path = os.path.join(self.root, "many.geojson")
+        gdf.to_file(path, driver="GeoJSON")
+
+        with self.assertWarns(UserWarning) as captured:
+            mapping, _ = _collect_batch_class_mapping([path], "name", quiet=True)
+
+        self.assertEqual(len(mapping), 300)
+        self.assertIn("uint8", str(captured.warning))
 
     def test_unreadable_masks_are_skipped(self):
         good = _write_vector(self.root, "good", 0, 100, ["car"])
