@@ -270,7 +270,13 @@ class TestCollectBatchClassMapping(unittest.TestCase):
 
         self.assertEqual(mapping, {1: 1})
         self.assertEqual(unclassified, 1)
-        self.assertTrue(any("not found in 1 mask file" in m for m in captured.output))
+        self.assertTrue(
+            any(
+                "No 'name' values could be collected from 1 mask file" in m
+                for m in captured.output
+            ),
+            captured.output,
+        )
 
     def test_preloaded_geodataframe_is_reused(self):
         path = _write_vector(self.root, "a", 0, 100, ["car", "bus"])
@@ -301,15 +307,30 @@ class TestCollectBatchClassMapping(unittest.TestCase):
         self.assertEqual(len(mapping), 300)
         self.assertIn("uint8", str(captured.warning))
 
-    def test_unreadable_masks_are_skipped(self):
+    def test_unreadable_masks_reserve_the_unclassified_id(self):
+        # A mask that fails to scan but reads fine during tiling would supply
+        # values absent from the mapping, so ID 1 must not be a real class.
         good = _write_vector(self.root, "good", 0, 100, ["car"])
         missing = os.path.join(self.root, "missing.geojson")
 
-        mapping, _ = _collect_batch_class_mapping(
+        mapping, unclassified = _collect_batch_class_mapping(
             [good, missing, None], "name", quiet=True
         )
 
-        self.assertEqual(mapping, {"car": 1})
+        self.assertEqual(mapping, {"car": 1, "unclassified": 2})
+        self.assertEqual(unclassified, 2)
+
+    def test_scan_failure_is_logged_even_when_quiet(self):
+        missing = os.path.join(self.root, "missing.geojson")
+        good = _write_vector(self.root, "good", 0, 100, ["car"])
+
+        with self.assertLogs("geoai", level="WARNING") as captured:
+            _collect_batch_class_mapping([good, missing], "name", quiet=True)
+
+        self.assertTrue(
+            any("Could not scan classes" in m for m in captured.output),
+            captured.output,
+        )
 
     def test_mixed_raster_and_vector_masks_are_still_mapped(self):
         # Raster masks contribute int class values and vector masks contribute

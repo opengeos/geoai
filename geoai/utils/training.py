@@ -820,6 +820,7 @@ def _collect_batch_class_mapping(
     preloaded = preloaded or {}
     class_values = set()
     missing_field = []
+    scan_failures = []
     has_null_values = False
 
     for mask_file in mask_files:
@@ -851,14 +852,17 @@ def _collect_batch_class_mapping(
                 else:
                     missing_field.append(mask_file)
         except Exception as e:
-            if not quiet:
-                logger.warning(f"Could not scan classes in {mask_file}: {e}")
+            # Not gated on quiet: a mask that fails here but reads fine during
+            # tiling would otherwise contribute unmapped class values.
+            scan_failures.append(mask_file)
+            logger.warning(f"Could not scan classes in {mask_file}: {e}")
 
     if not class_values:
-        if not quiet and missing_field:
+        if not quiet and (missing_field or scan_failures):
             logger.warning(
-                f"'{class_value_field}' not found in {len(missing_field)} mask "
-                "file(s). Using default class ID 1."
+                f"No '{class_value_field}' values could be collected from "
+                f"{len(missing_field) + len(scan_failures)} mask file(s). "
+                "Using default class ID 1."
             )
         return {1: 1}, 1
 
@@ -871,9 +875,11 @@ def _collect_batch_class_mapping(
     class_to_id = {cls: i + 1 for i, cls in enumerate(sorted_values)}
     unclassified_id = 1
 
-    if missing_field or has_null_values:
+    if missing_field or has_null_values or scan_failures:
         # ID 1 now belongs to a real class, so features with no class value need
-        # an ID of their own instead of silently joining the first class.
+        # an ID of their own instead of silently joining the first class. A mask
+        # that failed to scan counts too: if it reads successfully during tiling
+        # its values are absent from the mapping and would fall back to this ID.
         unclassified_id = len(class_to_id) + 1
         unclassified_name = "unclassified"
         while unclassified_name in class_to_id:
@@ -887,6 +893,10 @@ def _collect_batch_class_mapping(
                 )
             if has_null_values:
                 logger.warning(f"Some features have no '{class_value_field}' value.")
+            if scan_failures:
+                logger.warning(
+                    f"{len(scan_failures)} mask file(s) could not be scanned."
+                )
             logger.warning(
                 f"Those features are assigned class ID {unclassified_id} "
                 f"('{unclassified_name}')."
