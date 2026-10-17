@@ -121,6 +121,9 @@ def set_proj_lib_path(verbose=False):
 #   submodule_path is relative to the geoai package (e.g. "utils" -> geoai.utils)
 #   original_attr_name is the attribute name on that module, or None if same as symbol_name
 _LAZY_SYMBOL_MAP = {
+    # --- geoai.cross_validation ---
+    "compute_fold_indices": ("cross_validation", None),
+    "run_kfold": ("cross_validation", None),
     # --- geoai.pipeline ---
     "Pipeline": ("pipeline", None),
     "PipelineStep": ("pipeline", None),
@@ -496,6 +499,7 @@ _LAZY_SYMBOL_MAP = {
 
 # Submodules that can be imported via `from geoai import <submodule>`
 _LAZY_SUBMODULES = {
+    "cross_validation",
     "pipeline",
     "tools",
     "utils",
