@@ -43,6 +43,7 @@ nav = [
     "examples/data_visualization.md",
     "examples/train_object_detection_model.md",
     "examples/train_segmentation_model.md",
+    "examples/kfold_cross_validation.md",
     "examples/train_instance_segmentation_model.md",
     "examples/train_landcover_classification.md",
     "examples/loss_functions_segmentation.md",

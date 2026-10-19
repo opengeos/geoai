@@ -4149,8 +4149,15 @@ def train_segmentation_model(
     class_weights: Optional[List[float]] = None,
     ignore_index: Optional[int] = -100,
     freeze_encoder: bool = False,
+    train_indices: Optional[List[int]] = None,
+    val_indices: Optional[List[int]] = None,
+    k_folds: Optional[int] = None,
+    fold_groups: Optional[List[str]] = None,
+    only_fold: Optional[int] = None,
+    overwrite: bool = False,
+    monitor: str = "val_iou",
     **kwargs: Any,
-) -> torch.nn.Module:
+) -> Optional[Dict[str, Any]]:
     """
     Train a semantic segmentation model for object detection using segmentation-models-pytorch.
 
@@ -4182,7 +4189,8 @@ def train_segmentation_model(
         learning_rate (float): Initial learning rate. Defaults to 0.001.
         weight_decay (float): Weight decay for optimizer. Defaults to 1e-4.
         seed (int): Random seed for reproducibility. Defaults to 42.
-        val_split (float): Fraction of data to use for validation (0-1). Defaults to 0.2.
+        val_split (float): Validation fraction for single-split training. Defaults
+            to 0.2. Ignored with k_folds or explicit train_indices/val_indices.
         print_freq (int): Frequency of printing training progress. Defaults to 10.
         verbose (bool): If True, prints detailed training progress. Defaults to True.
         save_best_only (bool): If True, only saves the best model. Otherwise saves all checkpoints.
@@ -4226,21 +4234,89 @@ def train_segmentation_model(
         freeze_encoder (bool): If True, freeze the encoder parameters so only the
             decoder is trained. Useful for fine-tuning on small datasets to prevent
             overfitting. Defaults to False.
+        train_indices (list of int, optional): Explicit training positions in the
+            discovered image/label lists. Provide together with val_indices to
+            bypass the random split. Directory-format lists are sorted. Subsets
+            must be non-empty, unique, in range, and disjoint; omitted positions
+            are unused, allowing a separate held-out test fold.
+        val_indices (list of int, optional): Explicit validation positions in the
+            same lists. When both index lists are supplied, val_split is ignored.
+        k_folds (int, optional): Run reproducible k-fold cross-validation instead
+            of one random split. Each fold gets a fresh model and its own output
+            directory. Train on K-1 folds and use the remaining fold for
+            validation, checkpoint selection, early stopping, and OOF scoring.
+            The held-out fraction is approximately 1/K; val_split is ignored.
+            Prints split counts per fold; verbose=True
+            also lists tile filenames and per-fold OOF metrics. Full image/mask
+            paths are recorded in each fold's split.json. Returns a summary
+            dictionary. Defaults to None.
+        fold_groups (list of str, optional): Site/scene identifiers in discovered
+            file order. Groups stay together in each train/validation split.
+            Requires k_folds. Directory-format images and masks must have matching
+            stems for built-in CV.
+        only_fold (int, optional): Train one zero-based fold in k-fold mode.
+            Compatible results from other folds are retained when overwrite=True.
+        overwrite (bool): Allow k-fold output in a non-empty experiment directory.
+            Changed experiment identities cannot be mixed during single-fold reruns.
+        monitor (str): Checkpoint and early-stopping criterion: 'val_iou' maximizes
+            validation IoU (default), while 'val_loss' minimizes validation loss.
+            In CV mode this metric is measured on the held-out validation fold,
+            which is also used for OOF scoring; this is not an independent test.
         **kwargs: Additional arguments passed to smp.create_model().
     Returns:
-        None: Model weights are saved to output_dir.
+        dict or None: K-fold summary when k_folds is supplied; otherwise None.
+            K-fold directories contain the usual best_model.pth,
+            training_history.pth, and held-out predictions/ files. The experiment
+            root contains kfold_manifest.json and kfold_summary.json.
+            When every fold completes, ensemble_model_paths contains each fold's
+            selected checkpoint for probability-averaged deployment inference.
 
     Raises:
         ImportError: If segmentation-models-pytorch is not installed.
         FileNotFoundError: If input directories don't exist or contain no matching files.
+        ValueError: If fold options, explicit splits, or monitor are invalid, or
+            k-fold training requests fewer than one epoch.
     """
+    # Capture the training recipe before local variables are introduced.
+    training_options = locals().copy()
+    for option in (
+        "k_folds",
+        "fold_groups",
+        "only_fold",
+        "overwrite",
+    ):
+        training_options.pop(option)
+
     import datetime
+    from pathlib import Path
+    from .cross_validation import _write_json
 
     if not SMP_AVAILABLE:
         raise ImportError(
             "segmentation-models-pytorch is not installed. "
             "Please install it with: pip install segmentation-models-pytorch"
         )
+
+    if monitor not in ("val_iou", "val_loss"):
+        raise ValueError("monitor must be 'val_iou' or 'val_loss'.")
+
+    if k_folds is None and (
+        fold_groups is not None or only_fold is not None or overwrite
+    ):
+        raise ValueError("fold_groups, only_fold, and overwrite require k_folds.")
+    if k_folds is not None:
+        if (
+            isinstance(num_epochs, bool)
+            or not isinstance(num_epochs, int)
+            or num_epochs < 1
+        ):
+            raise ValueError("num_epochs must be a positive integer in k-fold mode.")
+        if train_indices is not None or val_indices is not None:
+            raise ValueError("k_folds cannot be combined with explicit split indices.")
+        if resume_training:
+            raise ValueError(
+                "resume_training is not supported in k-fold mode; use only_fold to rerun a fold."
+            )
 
     # Set random seeds for reproducibility
     torch.manual_seed(seed)
@@ -4324,10 +4400,34 @@ def train_segmentation_model(
     if len(image_files) == 0:
         raise FileNotFoundError("No matching image and label files found")
 
-    # Split data into train and validation sets
-    train_imgs, val_imgs, train_labels, val_labels = train_test_split(
-        image_files, label_files, test_size=val_split, random_state=seed
-    )
+    if k_folds is not None:
+        return _train_segmentation_kfold(
+            image_files,
+            label_files,
+            training_options,
+            k_folds,
+            fold_groups,
+            only_fold,
+            overwrite,
+        )
+
+    # Respect caller-supplied folds instead of independently splitting again.
+    if (train_indices is None) != (val_indices is None):
+        raise ValueError("Provide both train_indices and val_indices, or neither.")
+    if train_indices is None:
+        train_imgs, val_imgs, train_labels, val_labels = train_test_split(
+            image_files, label_files, test_size=val_split, random_state=seed
+        )
+    else:
+        from .cross_validation import _validate_split_indices
+
+        train_indices, val_indices = _validate_split_indices(
+            len(image_files), train_indices, val_indices
+        )
+        train_imgs = [image_files[i] for i in train_indices]
+        train_labels = [label_files[i] for i in train_indices]
+        val_imgs = [image_files[i] for i in val_indices]
+        val_labels = [label_files[i] for i in val_indices]
 
     logger.info(
         f"Training on {len(train_imgs)} images, validating on {len(val_imgs)} images"
@@ -4502,8 +4602,11 @@ def train_segmentation_model(
         else:
             criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
 
-    # Initialize tracking variables
-    best_iou = 0
+    # Save the first finite validation score, including zero-valued fold reruns.
+    best_iou = float("-inf")
+    best_val_loss = float("inf")
+    best_score = float("inf") if monitor == "val_loss" else float("-inf")
+    best_epoch = None
     train_losses = []
     val_losses = []
     val_ious = []
@@ -4570,8 +4673,17 @@ def train_segmentation_model(
     # Resume training state from checkpoint if requested
     if resume_training and checkpoint_path is not None:
         if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            if checkpoint.get("monitor", "val_iou") != monitor:
+                raise ValueError(
+                    "Resuming training requires the same monitor as the checkpoint."
+                )
             start_epoch = checkpoint.get("epoch", 0) + 1
             best_iou = checkpoint.get("best_iou", 0)
+            best_val_loss = checkpoint.get("best_val_loss", float("inf"))
+            best_score = checkpoint.get(
+                "best_score", best_val_loss if monitor == "val_loss" else best_iou
+            )
+            best_epoch = checkpoint.get("best_epoch")
 
             # Load optimizer state if available
             if "optimizer_state_dict" in checkpoint:
@@ -4605,7 +4717,7 @@ def train_segmentation_model(
                 val_recalls = checkpoint["val_recalls"]
 
             logger.info(f"Resuming training from epoch {start_epoch}")
-            logger.info(f"Previous best IoU: {best_iou:.4f}")
+            logger.info("Previous best %s: %.4f", monitor, best_score)
         else:
             logger.warning(
                 "resume_training=True but checkpoint does not contain training "
@@ -4664,12 +4776,30 @@ def train_segmentation_model(
             f"Val Recall: {eval_metrics['Recall']:.4f}"
         )
 
-        # Save best model and check for early stopping
-        if eval_metrics["IoU"] > best_iou:
-            best_iou = eval_metrics["IoU"]
+        # The selected criterion controls both checkpointing and early stopping.
+        score = float(eval_metrics["loss" if monitor == "val_loss" else "IoU"])
+        if not np.isfinite(score):
+            raise RuntimeError(f"Non-finite validation metric: {monitor}={score}.")
+        best_iou = max(best_iou, eval_metrics["IoU"])
+        best_val_loss = min(best_val_loss, eval_metrics["loss"])
+        improved = score < best_score if monitor == "val_loss" else score > best_score
+        if improved:
+            best_score = score
+            best_epoch = epoch + 1
             epochs_without_improvement = 0
-            logger.info(f"Saving best model with IoU: {best_iou:.4f}")
+            logger.info("Saving best model with %s: %.4f", monitor, best_score)
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
+            _write_json(
+                Path(output_dir) / "model_selection.json",
+                {
+                    "monitor": monitor,
+                    "mode": "min" if monitor == "val_loss" else "max",
+                    "best_score": best_score,
+                    "best_epoch": best_epoch,
+                    "val_loss": float(eval_metrics["loss"]),
+                    "val_iou": float(eval_metrics["IoU"]),
+                },
+            )
         else:
             epochs_without_improvement += 1
             if (
@@ -4679,7 +4809,7 @@ def train_segmentation_model(
                 logger.info(
                     f"\nEarly stopping triggered after {epochs_without_improvement} epochs without improvement"
                 )
-                logger.info(f"Best validation IoU: {best_iou:.4f}")
+                logger.info("Best %s: %.4f (epoch %s)", monitor, best_score, best_epoch)
                 break
 
         # Save checkpoint every 10 epochs (if not save_best_only)
@@ -4691,6 +4821,10 @@ def train_segmentation_model(
                     "optimizer_state_dict": optimizer.state_dict(),
                     "scheduler_state_dict": lr_scheduler.state_dict(),
                     "best_iou": best_iou,
+                    "best_val_loss": best_val_loss,
+                    "monitor": monitor,
+                    "best_score": best_score,
+                    "best_epoch": best_epoch,
                     "architecture": architecture,
                     "encoder_name": encoder_name,
                     "num_channels": num_channels,
@@ -4716,6 +4850,9 @@ def train_segmentation_model(
         "val_f1s": val_f1s,
         "val_precisions": val_precisions,
         "val_recalls": val_recalls,
+        "monitor": monitor,
+        "best_score": best_score,
+        "best_epoch": best_epoch,
     }
     torch.save(history, os.path.join(output_dir, "training_history.pth"))
 
@@ -4730,13 +4867,19 @@ def train_segmentation_model(
         f.write(f"Encoder: {encoder_name}\n")
         f.write(f"Total epochs: {num_epochs}\n")
         f.write(f"Best validation IoU: {best_iou:.4f}\n")
+        f.write(f"Best validation loss: {best_val_loss:.4f}\n")
+        f.write(f"Checkpoint criterion: {monitor}\n")
+        f.write(f"Selected epoch: {best_epoch}\n")
+        f.write(f"Selected score: {best_score:.4f}\n")
         f.write(f"Final validation IoU: {val_ious[-1]:.4f}\n")
         f.write(f"Final validation F1: {val_f1s[-1]:.4f}\n")
         f.write(f"Final validation Precision: {val_precisions[-1]:.4f}\n")
         f.write(f"Final validation Recall: {val_recalls[-1]:.4f}\n")
         f.write(f"Final validation loss: {val_losses[-1]:.4f}\n")
 
-    logger.info(f"Training complete! Best IoU: {best_iou:.4f}")
+    logger.info(
+        "Training complete! Best %s: %.4f (epoch %s)", monitor, best_score, best_epoch
+    )
     logger.info(f"Models saved to {output_dir}")
 
     # Plot training curves
@@ -4781,6 +4924,232 @@ def train_segmentation_model(
             plt.close()
         except Exception as e:
             logger.info(f"Could not save training curves: {e}")
+
+
+def _train_segmentation_kfold(
+    image_files: List[str],
+    label_files: List[str],
+    training_options: Dict[str, Any],
+    k_folds: int,
+    groups: Optional[List[str]],
+    only_fold: Optional[int],
+    overwrite: bool,
+) -> Dict[str, Any]:
+    """Run the existing semantic trainer and public batch inference per fold."""
+    import copy
+    import gc
+    import json
+    import textwrap
+    from pathlib import Path
+
+    from .cross_validation import (
+        metrics_from_counts,
+        run_kfold,
+        update_counts,
+        validate_paired_files,
+    )
+
+    options = training_options
+    seed = options["seed"]
+    if options["num_classes"] < 2:
+        raise ValueError("k-fold segmentation requires num_classes >= 2.")
+    if options["input_format"].lower() == "directory":
+        validate_paired_files(
+            {"images": image_files, "labels": label_files},
+            index_fn=lambda p: Path(p).stem,
+        )
+
+    def serializable(value):
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, (list, tuple)):
+            return [serializable(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): serializable(item) for key, item in value.items()}
+        return str(value)
+
+    metadata = {
+        key: serializable(value)
+        for key, value in options.items()
+        if key not in ("output_dir", "train_indices", "val_indices", "val_split")
+    }
+    metadata["selection"] = f"best fold {options['monitor']}"
+    metadata["validation_strategy"] = "held_out_fold"
+
+    def train_fold(fold_idx, train_indices, val_indices, fold_dir):
+        split = {
+            "fit_indices": train_indices,
+            "held_out_indices": val_indices,
+        }
+        roles = (
+            ("fit", "Training (weight updates)", train_indices),
+            (
+                "held_out",
+                "Validation / OOF (checkpoint selection and evaluation)",
+                val_indices,
+            ),
+        )
+        for key, _, indices in roles:
+            split[f"{key}_indices"] = list(indices)
+            split[f"{key}_files"] = [
+                str(Path(image_files[i]).resolve()) for i in indices
+            ]
+            split[f"{key}_label_files"] = [
+                str(Path(label_files[i]).resolve()) for i in indices
+            ]
+            if groups is not None:
+                split[f"{key}_groups"] = [groups[i] for i in indices]
+        split_path = fold_dir / "split.json"
+        split_path.write_text(json.dumps(split, indent=2), encoding="utf-8")
+        print(f"\nFold {fold_idx + 1}/{k_folds} tile allocation:", flush=True)
+        print(
+            f"  Checkpoint criterion: {options['monitor']}; "
+            f"early-stopping patience: {options['early_stopping_patience']}",
+            flush=True,
+        )
+        for _, title, indices in roles:
+            print(
+                f"  {title}: {len(indices)}/{len(image_files)} tiles "
+                f"({100 * len(indices) / len(image_files):.1f}%)",
+                flush=True,
+            )
+            if options["verbose"]:
+                names = ", ".join(f"[{i}] {Path(image_files[i]).name}" for i in indices)
+                print(
+                    textwrap.indent(textwrap.fill(names, width=100), "    "), flush=True
+                )
+                if groups is not None:
+                    print(
+                        f"    Groups: {', '.join(sorted({groups[i] for i in indices}))}",
+                        flush=True,
+                    )
+        print(f"  Full image/mask paths and indices: {split_path}", flush=True)
+        fold_options = copy.deepcopy(options)
+        fold_options.update(fold_options.pop("kwargs"))
+        fold_options.update(
+            output_dir=str(fold_dir),
+            train_indices=train_indices,
+            val_indices=val_indices,
+            seed=seed + fold_idx,
+        )
+        train_segmentation_model(**fold_options)
+        model_path = fold_dir / "best_model.pth"
+        if not model_path.is_file():
+            raise RuntimeError(f"No best checkpoint was saved in {fold_dir}.")
+        prediction_dir = fold_dir / "predictions"
+        if options["verbose"]:
+            print(
+                f"\nFold {fold_idx + 1}/{k_folds}: predicting and scoring only the "
+                f"{len(val_indices)} held-out validation tiles with {model_path}",
+                flush=True,
+            )
+        semantic_segmentation_batch(
+            input_dir=options["images_dir"],
+            output_dir=str(prediction_dir),
+            input_files=split["held_out_files"],
+            model_path=str(model_path),
+            architecture=options["architecture"],
+            encoder_name=options["encoder_name"],
+            num_channels=options["num_channels"],
+            num_classes=options["num_classes"],
+            batch_size=options["batch_size"],
+            device=options["device"],
+            quiet=True,
+            model_kwargs=options["kwargs"],
+            raise_on_error=True,
+        )
+        targets = [1] if options["num_classes"] == 2 else range(options["num_classes"])
+        counts = {f"class_{c}": {} for c in targets}
+        normalizer = SemanticSegmentationDataset(
+            [],
+            [],
+            num_channels=options["num_channels"],
+            num_classes=options["num_classes"],
+            ignore_index=options["ignore_index"],
+        )
+        for i in val_indices:
+            extension = (
+                ".tif"
+                if Path(image_files[i]).suffix.lower() in (".tif", ".tiff")
+                else ".png"
+            )
+            prediction_path = (
+                prediction_dir / f"{Path(image_files[i]).stem}_mask{extension}"
+            )
+            if Path(label_files[i]).suffix.lower() in (".tif", ".tiff"):
+                with rasterio.open(label_files[i]) as src:
+                    raw_target = src.read(1)
+                    valid = (src.read_masks(1) > 0) & np.isfinite(raw_target)
+            else:
+                # Match the dataset's grayscale conversion, including palette
+                # and RGB masks; rasterio reads palette indices instead.
+                with Image.open(label_files[i]) as src:
+                    raw_target = np.asarray(src.convert("L"))
+                valid = np.isfinite(raw_target)
+            target = normalizer._normalize_label_mask(raw_target)
+            if options["ignore_index"] is not None:
+                valid &= target != options["ignore_index"]
+            with rasterio.open(prediction_path) as src:
+                prediction = src.read(1)
+            if options["num_classes"] == 2:
+                # Standard image inference writes 0/255 PNGs; GeoTIFFs use 0/1.
+                prediction = (prediction > 0).astype(np.uint8)
+            for c in targets:
+                update_counts(
+                    counts[f"class_{c}"], prediction == c, target == c, valid=valid
+                )
+        if options["verbose"]:
+            for target_name, target_counts in counts.items():
+                scores = metrics_from_counts(target_counts)
+                print(
+                    f"  Fold {fold_idx + 1}/{k_folds} OOF {target_name}: "
+                    f"IoU={scores['iou']:.4f}, F1={scores['f1']:.4f}, "
+                    f"precision={scores['precision']:.4f}, recall={scores['recall']:.4f}; "
+                    f"TP={scores['tp']}, FP={scores['fp']}, "
+                    f"FN={scores['fn']}, TN={scores['tn']}",
+                    flush=True,
+                )
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        result = {
+            "oof": counts,
+            "output_dir": str(fold_dir),
+            "model_path": str(model_path),
+            "prediction_dir": str(prediction_dir),
+            "monitor": options["monitor"],
+        }
+        selection_path = fold_dir / "model_selection.json"
+        if selection_path.is_file():
+            selection = json.loads(selection_path.read_text(encoding="utf-8"))
+            result.update({key: selection[key] for key in ("best_score", "best_epoch")})
+        return result
+
+    summary = run_kfold(
+        len(image_files),
+        k_folds,
+        seed,
+        options["output_dir"],
+        train_fold,
+        groups=groups,
+        sample_names=[str(Path(p).resolve()) for p in image_files],
+        metadata=metadata,
+        only_fold=only_fold,
+        overwrite=overwrite,
+    )
+    summary["monitor"] = options["monitor"]
+    summary["validation_strategy"] = "held_out_fold"
+    summary["ensemble_model_paths"] = (
+        [fold["model_path"] for fold in summary["per_fold"]]
+        if summary["complete"]
+        else []
+    )
+    from .cross_validation import SUMMARY_NAME, _write_json
+
+    _write_json(
+        Path(options["output_dir"]).expanduser().resolve() / SUMMARY_NAME, summary
+    )
+    return summary
 
 
 def semantic_inference_on_geotiff(
@@ -5439,10 +5808,80 @@ def semantic_inference_on_image(
         return output_path, inference_time
 
 
+class _ProbabilityEnsemble(torch.nn.Module):
+    """Average class probabilities while preserving the logits-style interface."""
+
+    def __init__(self, models: List[torch.nn.Module]) -> None:
+        super().__init__()
+        if not models:
+            raise ValueError("An ensemble must contain at least one model.")
+        self.models = torch.nn.ModuleList(models)
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        total = None
+        for model in self.models:
+            probabilities = model(images).float().softmax(dim=1)
+            if total is not None and probabilities.shape != total.shape:
+                raise ValueError("Ensemble models must produce the same output shape.")
+            total = probabilities if total is None else total + probabilities
+        mean = total / len(self.models)
+        # Existing window inference applies softmax, recovering the mean exactly
+        # up to floating-point precision, rather than averaging model logits.
+        return mean.clamp_min(torch.finfo(mean.dtype).tiny).log()
+
+
+def _load_segmentation_model(
+    model_path: Union[str, List[str]],
+    architecture: str,
+    encoder_name: str,
+    num_channels: int,
+    num_classes: int,
+    device: torch.device,
+    model_kwargs: Optional[Dict[str, Any]] = None,
+) -> torch.nn.Module:
+    """Load one checkpoint or a probability ensemble of compatible checkpoints."""
+    paths = list(model_path) if isinstance(model_path, (list, tuple)) else [model_path]
+    if not paths:
+        raise ValueError("model_path must contain at least one checkpoint.")
+    resolved = []
+    for path in paths:
+        path = os.fspath(path)
+        if not os.path.isfile(path):
+            try:
+                path = download_model_from_hf(path)
+            except Exception as exc:
+                raise FileNotFoundError(f"Model file not found: {path}") from exc
+        resolved.append(os.path.abspath(path))
+    if len({os.path.normcase(path) for path in resolved}) != len(resolved):
+        raise ValueError("model_path contains duplicate checkpoints.")
+
+    models = []
+    for path in resolved:
+        model = get_smp_model(
+            architecture=architecture,
+            encoder_name=encoder_name,
+            encoder_weights=None,
+            in_channels=num_channels,
+            classes=num_classes,
+            **(model_kwargs or {}),
+        )
+        state = torch.load(path, map_location="cpu", weights_only=True)
+        state = state.get("model_state_dict", state)
+        state = {key.removeprefix("module."): value for key, value in state.items()}
+        model.load_state_dict(state)
+        models.append(model)
+    model = models[0] if len(models) == 1 else _ProbabilityEnsemble(models)
+    model.to(device)
+    model.eval()
+    if len(models) > 1:
+        logger.info("Loaded probability ensemble of %s models", len(models))
+    return model
+
+
 def semantic_segmentation(
     input_path: str,
     output_path: str,
-    model_path: str,
+    model_path: Union[str, List[str]],
     architecture: str = "unet",
     encoder_name: str = "resnet34",
     num_channels: int = 3,
@@ -5466,7 +5905,10 @@ def semantic_segmentation(
     Args:
         input_path (str): Path to input image file (GeoTIFF, JPG, PNG, etc.).
         output_path (str): Path to save output mask file.
-        model_path (str): Path to trained model weights.
+        model_path (str or list of str): Checkpoint path, or a list of compatible
+            checkpoints to ensemble with equal-weight mean class probabilities.
+            For k-fold deployment, pass summary['ensemble_model_paths'] after all
+            folds complete. All models must share architecture and preprocessing.
         architecture (str): Model architecture used for training.
         encoder_name (str): Encoder backbone name used for training.
         num_channels (int): Number of channels in the input image and model.
@@ -5510,34 +5952,9 @@ def semantic_segmentation(
             f"Input file format: {formats[input_ext] if is_geotiff else 'Regular image'} ({input_ext})"
         )
 
-    # Load model
-    model = get_smp_model(
-        architecture=architecture,
-        encoder_name=encoder_name,
-        encoder_weights=None,  # We're loading trained weights
-        in_channels=num_channels,
-        classes=num_classes,
-        activation=None,
+    model = _load_segmentation_model(
+        model_path, architecture, encoder_name, num_channels, num_classes, device
     )
-
-    if not os.path.exists(model_path):
-        try:
-            model_path = download_model_from_hf(model_path)
-        except Exception as e:
-            raise FileNotFoundError(f"Model file not found: {model_path}")
-
-    # Load state dict and handle DataParallel module prefix
-    state_dict = torch.load(model_path, map_location=device)
-
-    # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith("module.") for key in state_dict.keys()):
-        state_dict = {
-            key.replace("module.", ""): value for key, value in state_dict.items()
-        }
-
-    model.load_state_dict(state_dict)
-    model.to(device)
-    model.eval()
 
     # Validate probability_threshold
     if probability_threshold is not None:
@@ -5592,7 +6009,7 @@ def semantic_segmentation(
 def semantic_segmentation_batch(
     input_dir: str,
     output_dir: str,
-    model_path: str,
+    model_path: Union[str, List[str]],
     architecture: str = "unet",
     encoder_name: str = "resnet34",
     num_channels: int = 3,
@@ -5603,6 +6020,10 @@ def semantic_segmentation_batch(
     device: Optional[torch.device] = None,
     filenames: Optional[List[str]] = None,
     quiet: bool = False,
+    input_files: Optional[List[str]] = None,
+    skip_existing: bool = False,
+    model_kwargs: Optional[Dict[str, Any]] = None,
+    raise_on_error: bool = False,
     **kwargs: Any,
 ) -> None:
     """
@@ -5616,7 +6037,10 @@ def semantic_segmentation_batch(
     Args:
         input_dir (str): Directory containing input image files to process.
         output_dir (str): Directory to save output mask files.
-        model_path (str): Path to trained model weights.
+        model_path (str or list of str): Checkpoint path, or compatible checkpoint
+            paths to ensemble by averaging class probabilities before thresholding
+            or argmax. Pass summary['ensemble_model_paths'] for k-fold deployment.
+            Ensemble predictions on training tiles are not OOF evaluation.
         architecture (str): Model architecture used for training. Defaults to "unet".
         encoder_name (str): Encoder backbone name used for training. Defaults to "resnet34".
         num_channels (int): Number of channels in the input image and model. Defaults to 3.
@@ -5629,6 +6053,17 @@ def semantic_segmentation_batch(
             "<input_filename>_mask.<ext>" for each input file where <ext> is "tif" for GeoTIFF
             inputs and "png" for other formats. If provided, must match the number of input files.
         quiet (bool): If True, suppress progress bar. Defaults to False.
+        input_files (list, optional): Explicit input paths (absolute or relative
+            to input_dir) to process, in the supplied order. Use a fold's held-out
+            files to avoid predicting its training images. Defaults to all
+            supported files in input_dir.
+        skip_existing (bool): Skip output files that already exist. Use only when
+            those outputs were generated with the intended model/settings.
+        model_kwargs (dict, optional): Additional architecture arguments matching
+            those supplied to train_segmentation_model, such as encoder_depth.
+        raise_on_error (bool): Raise immediately when an image fails inference.
+            Built-in CV enables this to prevent incomplete or stale OOF scores.
+            Defaults to False, preserving batch processing's log-and-continue behavior.
         **kwargs: Additional arguments passed to the inference functions.
 
     Returns:
@@ -5650,47 +6085,44 @@ def semantic_segmentation_batch(
 
     # Get all supported image files
     image_extensions = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
-    image_files = sorted(
-        [
+    if input_files is None:
+        image_files = sorted(
             os.path.join(input_dir, f)
             for f in os.listdir(input_dir)
             if f.lower().endswith(image_extensions)
+        )
+    else:
+        image_files = [
+            os.path.abspath(
+                os.fspath(path)
+                if os.path.isabs(path)
+                else os.path.join(input_dir, path)
+            )
+            for path in input_files
         ]
-    )
+        if len({os.path.normcase(path) for path in image_files}) != len(image_files):
+            raise ValueError("input_files contains duplicate paths.")
+        for path in image_files:
+            if not os.path.isfile(path):
+                raise FileNotFoundError(f"Input image not found: {path}")
+            if not path.lower().endswith(image_extensions):
+                raise ValueError(f"Unsupported input image: {path}")
 
     if len(image_files) == 0:
         raise FileNotFoundError(f"No supported image files found in {input_dir}")
 
     logger.info(f"Found {len(image_files)} image files to process")
 
-    # Load model once for all images
-    model = get_smp_model(
-        architecture=architecture,
-        encoder_name=encoder_name,
-        encoder_weights=None,  # We're loading trained weights
-        in_channels=num_channels,
-        classes=num_classes,
-        activation=None,
+    # Load each model once; window inference averages probabilities per batch.
+    model = _load_segmentation_model(
+        model_path,
+        architecture,
+        encoder_name,
+        num_channels,
+        num_classes,
+        device,
+        model_kwargs=model_kwargs,
     )
-
-    if not os.path.exists(model_path):
-        try:
-            model_path = download_model_from_hf(model_path)
-        except Exception as e:
-            raise FileNotFoundError(f"Model file not found: {model_path}")
-
-    # Load state dict and handle DataParallel module prefix
-    state_dict = torch.load(model_path, map_location=device)
-
-    # Remove 'module.' prefix if present (from DataParallel training)
-    if any(key.startswith("module.") for key in state_dict.keys()):
-        state_dict = {
-            key.replace("module.", ""): value for key, value in state_dict.items()
-        }
-
-    model.load_state_dict(state_dict)
-    model.to(device)
-    model.eval()
 
     # Generate output filenames if not provided
     if filenames is None:
@@ -5715,7 +6147,11 @@ def semantic_segmentation_batch(
             )
 
     # Process each image
+    if len({os.path.normcase(os.path.abspath(p)) for p in filenames}) != len(filenames):
+        raise ValueError("Output filenames must be unique.")
     for i, (input_path, output_path) in enumerate(zip(image_files, filenames)):
+        if skip_existing and os.path.isfile(output_path):
+            continue
         logger.info(
             f"Processing file {i + 1}/{len(image_files)}: {os.path.basename(input_path)}"
         )
@@ -5751,11 +6187,13 @@ def semantic_segmentation_batch(
                     num_channels=num_channels,
                     num_classes=num_classes,
                     device=device,
-                    binary_output=True,  # Convert to binary output for better visualization
+                    binary_output=num_classes == 2,
                     quiet=quiet,
                     **kwargs,
                 )
         except Exception as e:
+            if raise_on_error:
+                raise
             logger.error(f"Error processing {input_path}: {str(e)}")
             continue
 

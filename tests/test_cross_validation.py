@@ -25,6 +25,33 @@ def test_public_api():
     assert geoai.cross_validation.run_kfold is run_kfold
 
 
+@pytest.mark.parametrize(
+    "train,val",
+    [
+        ([], [1]),
+        ([0], []),
+        ([0, 0], [1]),
+        ([0], [1, 1]),
+        ([0], [0]),
+        ([-1], [1]),
+        ([0], [4]),
+        ([True], [1]),
+        ([0.5], [1]),
+    ],
+)
+def test_invalid_explicit_split_indices(train, val):
+    from geoai.cross_validation import _validate_split_indices
+
+    with pytest.raises(ValueError):
+        _validate_split_indices(4, train, val)
+
+
+def test_explicit_split_allows_excluded_test_samples():
+    from geoai.cross_validation import _validate_split_indices
+
+    assert _validate_split_indices(5, [np.int64(3), 0], [2]) == ([3, 0], [2])
+
+
 def test_fold_coverage_reproducibility_and_balance():
     folds = compute_fold_indices(11, 3, 42)
     assert folds == compute_fold_indices(11, 3, 42)

@@ -1,8 +1,7 @@
 """Generic k-fold cross-validation with pooled out-of-fold (OOF) metrics.
 
-Extracted from tree-crown-delineation-pipeline (``cli/train_kfold.py`` and
-``training/oof_metrics.py``) with the model, data and tracking code removed.
-Depends only on numpy.
+Provides reproducible folds, callback-based orchestration, and pooled pixel or
+instance counts. Depends only on NumPy; model training stays in the callback.
 
 How it works:
 
@@ -43,6 +42,7 @@ from __future__ import annotations
 
 import json
 import logging
+from numbers import Integral
 import os
 import tempfile
 import time
@@ -370,6 +370,30 @@ def summarize_oof(fold_oofs: list[dict[str, dict]]) -> dict:
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
+
+
+def _validate_split_indices(
+    n_samples: int, train_indices: list[int], val_indices: list[int]
+) -> tuple[list[int], list[int]]:
+    """Validate explicit disjoint subsets; omitted samples remain unused."""
+    cleaned = []
+    for name, indices in (
+        ("train_indices", train_indices),
+        ("val_indices", val_indices),
+    ):
+        values = list(indices)
+        if not values:
+            raise ValueError(f"{name} must not be empty.")
+        if any(isinstance(i, bool) or not isinstance(i, Integral) for i in values):
+            raise ValueError(f"{name} must contain integer indices.")
+        if any(i < 0 or i >= n_samples for i in values):
+            raise ValueError(f"{name} contains indices outside [0, {n_samples - 1}].")
+        if len(set(values)) != len(values):
+            raise ValueError(f"{name} contains duplicate indices.")
+        cleaned.append([int(i) for i in values])
+    if set(cleaned[0]) & set(cleaned[1]):
+        raise ValueError("train_indices and val_indices must be disjoint.")
+    return cleaned[0], cleaned[1]
 
 
 def _read_json(path: Path) -> Any | None:

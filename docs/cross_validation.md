@@ -5,6 +5,119 @@ stores its results, and pools out-of-fold (OOF) confusion counts. It depends onl
 on NumPy, so it works with custom tree-crown pipelines and different training
 frameworks. `geoai.run_kfold` and `geoai.compute_fold_indices` are also available.
 
+For an executable dataset walkthrough, open the
+[K-fold cross-validation notebook](examples/kfold_cross_validation.ipynb). It
+uses built-in U-Net training, performance plots, batch inference, and prediction
+comparisons. Configure your image/mask paths and select a Python environment
+with the local GeoAI checkout, PyTorch, and segmentation-models-pytorch installed.
+
+## Built-in semantic segmentation training
+
+Add `k_folds` to the usual training call; no callback is needed:
+
+```python
+import geoai
+from pathlib import Path
+import json
+
+summary = geoai.train_segmentation_model(
+    images_dir="data/img", labels_dir="data/mask", output_dir="runs/landslide_cv",
+    architecture="unet", encoder_name="resnet34", encoder_weights="imagenet",
+    num_channels=3, num_classes=2, batch_size=4, num_epochs=20,
+    learning_rate=0.001, k_folds=5, monitor="val_loss", plot_curves=True,
+)
+
+for fold in summary["per_fold"]:
+    directory = Path(fold["output_dir"])
+    geoai.plot_performance_metrics(str(directory / "training_history.pth"))
+    split = json.loads((directory / "split.json").read_text())
+    geoai.semantic_segmentation_batch(
+        input_dir="data/img", input_files=split["held_out_files"],
+        output_dir=fold["prediction_dir"], model_path=fold["model_path"],
+        architecture="unet", encoder_name="resnet34", num_channels=3, num_classes=2,
+        skip_existing=True,
+    )
+```
+
+Every fold initializes a fresh model, trains on K-1 folds, and validates on the
+remaining fold. K determines the held-out fraction (approximately 1/K): five
+folds use roughly 80% training / 20% validation, while two folds use 50% / 50%.
+There is no additional inner holdout, and `val_split` is ignored in k-fold mode.
+`fold_groups` keeps each supplied group in one fold; unequal group sizes can
+produce unequal tile counts.
+Directory-format inputs must have matching image/mask stems in sorted order.
+
+Before training each fold, GeoAI prints the tile counts and percentages for
+training and held-out validation/OOF evaluation. With `verbose=True`,
+it also lists every tile's filename and zero-based dataset index under its role,
+plus site/scene groups when supplied. Each fold's `split.json` saves the complete
+image paths, paired mask paths, indices, and optional groups for both sets:
+`fit_*` (training) and `held_out_*` (validation and OOF).
+After held-out inference, verbose output reports each class's fold OOF metrics
+and pixel confusion counts. The final summary still pools counts across folds.
+
+`monitor="val_loss"` minimizes held-out validation loss; `monitor="val_iou"`
+maximizes held-out validation IoU and remains the default. The selected criterion
+also controls early stopping. Each fold's `model_selection.json` records the
+criterion, score, and selected epoch; `best_model.pth` keeps the usual weights
+format. Choose the criterion before training. Changing it requires a new run;
+an existing IoU-selected checkpoint cannot be reclassified as loss-selected.
+
+The same held-out fold selects the checkpoint, controls early stopping and the
+learning-rate scheduler, and supplies OOF predictions. Its images are excluded
+from weight updates, but the reported OOF metrics are CV validation results,
+not an independent test of checkpoint selection. Use a separate test dataset
+for final performance assessment. The manifest records `held_out_fold` as the
+validation strategy; single-fold reruns cannot mix results from the previous
+inner-holdout strategy with this one. Start a new experiment for the new strategy.
+
+Training writes normal GeoAI checkpoints and histories in `fold_<i>/`, calls
+`semantic_segmentation_batch` on only its held-out files, and scores saved masks
+at native resolution. Binary OOF metrics are under `oof.micro.class_1` and
+`oof.macro.class_1`; multiclass mode reports one-versus-rest counts for every
+class. Binary scoring handles both 0/1 GeoTIFF predictions and 0/255 PNG
+predictions. These differ from training-history metrics averaged over classes.
+Held-out inference uses GeoAI's standard inference preprocessing; custom training
+transforms must produce inputs consistent with that inference pipeline.
+
+Without `k_folds`, the original random-split behavior and None return are
+preserved. `only_fold=0, overwrite=True` reruns one compatible fold. Full training
+state resumption is not supported in CV mode. Fold model paths are returned in
+`summary["per_fold"]`; no single deployment model is selected automatically.
+
+## Ensemble inference
+
+After all folds complete, `summary["ensemble_model_paths"]` contains each fold's
+selected checkpoint. Pass that list to either `semantic_segmentation` or
+`semantic_segmentation_batch` to average class probabilities with uniform model
+weights, then apply argmax or a probability threshold:
+
+```python
+geoai.semantic_segmentation_batch(
+    input_dir="data/new_images", output_dir="runs/landslide_cv/ensemble_predictions",
+    model_path=summary["ensemble_model_paths"],
+    architecture="unet", encoder_name="resnet34", num_channels=3, num_classes=2,
+    probability_threshold=0.5, raise_on_error=True,
+)
+```
+
+This averages probabilities, not logits or thresholded masks. Single checkpoint
+paths retain their previous behavior. All models must share architecture,
+channels, classes, and input preprocessing. Models are loaded once and processed
+sequentially per image batch; GPU memory includes every member's weights.
+
+Partial CV runs return an empty ensemble list until all folds are complete.
+OOF scoring continues to use only the model that held each image out. Applying
+the full ensemble to CV training imagery includes models that trained on those
+images, so those predictions must not replace OOF metrics. Evaluate the ensemble
+on independent test imagery for an unbiased ensemble assessment.
+
+Batch inference's `input_files` selects exact files. `skip_existing=True` reuses
+known outputs; set it to False to regenerate them. `model_kwargs` forwards extra
+architecture parameters. CV enables `raise_on_error=True` so a failed inference
+cannot silently produce incomplete OOF results; normal batch inference retains
+its log-and-continue default.
+
 ## Connect your training pipeline
 
 Keep your image and target lists in a fixed order. The callback receives
@@ -54,10 +167,14 @@ The default `validate_paired_files` key is the last underscore-separated token
 of the stem (`image_12.tif` pairs with `mask_12.tif`). Supply an `index_fn` for
 your naming convention; duplicate keys and misordered pairs raise errors.
 
-`run_kfold` orchestrates callbacks; existing GeoAI training functions keep their
-current interfaces and internal random splits. A callback must honor the supplied
-indices instead of making another random train/validation split. For a custom
-PyTorch loop, create `torch.utils.data.Subset` objects over separate training and
+`run_kfold` orchestrates callbacks. `geoai.train_segmentation_model` accepts
+`train_indices` and `val_indices` to bypass its internal random split; indices
+refer to its discovered file lists (sorted for directory input). Both lists must
+be non-empty, unique, in range, and disjoint. Positions in neither list are
+excluded from training, allowing an independent held-out fold. Without explicit
+indices or `k_folds`, its existing `val_split` behavior is preserved. A callback must honor
+the supplied indices instead of making another random train/validation split.
+For a custom PyTorch loop, create `torch.utils.data.Subset` objects over separate training and
 validation dataset views, using augmentation only for the training view. Set
 framework seeds inside the callback and save checkpoints under `fold_dir`.
 
