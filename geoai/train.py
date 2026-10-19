@@ -4931,11 +4931,13 @@ def _serialize_training_option(value: Any, _seen: Optional[set[int]] = None) -> 
 
     Functions record their qualified names, defaults, and closure values;
     callable instances record their qualified types and configuration fields.
+    Modules record only their names, without traversing package namespaces.
     Arrays/tensors retain their values and dtype. Unsupported or cyclic state
     raises rather than silently treating different recipes as identical.
     """
     import functools
     import inspect
+    import types
 
     if isinstance(value, np.generic):
         scalar = value.item()
@@ -4950,6 +4952,8 @@ def _serialize_training_option(value: Any, _seen: Optional[set[int]] = None) -> 
         return os.fspath(value)
     if isinstance(value, (torch.device, torch.dtype, np.dtype)):
         return str(value)
+    if isinstance(value, types.ModuleType):
+        return {"module": value.__name__}
 
     seen = set() if _seen is None else _seen
     if id(value) in seen:

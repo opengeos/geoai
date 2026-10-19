@@ -391,6 +391,47 @@ def test_metadata_rejects_cycles_and_unsupported_state():
         training._serialize_training_option(object())
 
 
+@pytest.mark.parametrize("location", ["closure", "default", "instance"])
+def test_metadata_records_modules_without_walking_their_namespace(location):
+    """Captured modules must not expose internal locks or cycles to serialization."""
+    import threading
+    import types
+
+    backend = types.ModuleType("transforms.backend")
+    backend.lock = threading.RLock()
+    backend.self_reference = backend
+
+    def closure(image, mask):
+        """Capture a backend module as an augmentation factory's lambda would."""
+        return backend, image, mask
+
+    def with_default(image, mask, module=backend):
+        """Hold the backend module in a default argument."""
+        return module, image, mask
+
+    class Transform:
+        """Hold a backend module as part of callable-instance configuration."""
+
+        def __init__(self):
+            """Store a module reference without copying its namespace."""
+            self.backend = backend
+
+        def __call__(self, image, mask):
+            """Return the configured backend and input pair."""
+            return self.backend, image, mask
+
+    options = {"closure": closure, "default": with_default, "instance": Transform()}
+    recorded = training._serialize_training_option(options[location])
+    if location == "closure":
+        module = recorded["closure"]["backend"]
+    elif location == "default":
+        module = recorded["defaults"][0]
+    else:
+        module = recorded["state"]["backend"]
+    assert module == {"module": "transforms.backend"}
+    assert json.loads(json.dumps(recorded)) == recorded
+
+
 @pytest.mark.parametrize(
     "options",
     [
