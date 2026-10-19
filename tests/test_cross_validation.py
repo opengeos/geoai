@@ -20,6 +20,7 @@ from geoai.cross_validation import (
 
 
 def test_public_api():
+    """Expose the same runner and fold splitter through lazy public imports."""
     assert geoai.run_kfold is run_kfold
     assert geoai.compute_fold_indices is compute_fold_indices
     assert geoai.cross_validation.run_kfold is run_kfold
@@ -40,6 +41,7 @@ def test_public_api():
     ],
 )
 def test_invalid_explicit_split_indices(train, val):
+    """Reject empty, duplicate, overlapping, noninteger, and out-of-range splits."""
     from geoai.cross_validation import _validate_split_indices
 
     with pytest.raises(ValueError):
@@ -47,12 +49,14 @@ def test_invalid_explicit_split_indices(train, val):
 
 
 def test_explicit_split_allows_excluded_test_samples():
+    """Keep omitted test samples out of both explicit training subsets."""
     from geoai.cross_validation import _validate_split_indices
 
     assert _validate_split_indices(5, [np.int64(3), 0], [2]) == ([3, 0], [2])
 
 
 def test_fold_coverage_reproducibility_and_balance():
+    """Assign every sample once with reproducible, balanced held-out folds."""
     folds = compute_fold_indices(11, 3, 42)
     assert folds == compute_fold_indices(11, 3, 42)
     assert folds != compute_fold_indices(11, 3, 43)
@@ -65,11 +69,13 @@ def test_fold_coverage_reproducibility_and_balance():
 
 @pytest.mark.parametrize("n,k", [(1, 2), (4, 1), (3, 4), (3.5, 2), (4, True)])
 def test_invalid_folds(n, k):
+    """Reject invalid sample counts and fold numbers before splitting."""
     with pytest.raises(ValueError):
         compute_fold_indices(n, k, 42)
 
 
 def test_grouped_folds():
+    """Keep scene groups intact and reject insufficient or misaligned groups."""
     groups = ["site_a", "site_a", "site_b", "site_c", "site_c", "site_d"]
     folds = compute_fold_indices(6, 3, 42, groups=groups)
     assert folds == compute_fold_indices(6, 3, 42, groups=groups)
@@ -83,6 +89,7 @@ def test_grouped_folds():
 
 
 def test_paired_files():
+    """Reject missing, misordered, or ambiguous image/mask sample keys."""
     validate_paired_files(
         {
             "images": ["image_1.tif", "image_a.tif"],
@@ -114,6 +121,7 @@ def test_paired_files():
 
 
 def test_pixel_counts_ignore_invalid_and_accumulate():
+    """Accumulate confusion counts while excluding invalid target pixels."""
     counts = update_counts({}, [0.5, 0.8, 0.2, 0.1, np.nan], [1, 0, 1, 0, np.nan])
     assert counts == {"tp": 1, "fp": 1, "fn": 1, "tn": 1}
     update_counts(counts, [0.8, 0.8], [1, 0], valid=[1, 0])
@@ -124,11 +132,13 @@ def test_pixel_counts_ignore_invalid_and_accumulate():
 
 @pytest.mark.parametrize("threshold", [0, 1, -0.1, np.nan, np.inf])
 def test_invalid_pixel_threshold(threshold):
+    """Reject thresholds outside the finite open probability interval."""
     with pytest.raises(ValueError):
         update_counts({}, [0.5], [1], threshold=threshold)
 
 
 def test_pixel_shapes():
+    """Require aligned prediction, target, and validity-mask shapes."""
     with pytest.raises(ValueError, match="shapes"):
         update_counts({}, [[0.5]], [1])
     with pytest.raises(ValueError, match="shapes"):
@@ -136,11 +146,13 @@ def test_pixel_shapes():
 
 
 def test_nonfinite_valid_pixels_are_excluded():
+    """Exclude nonfinite validity-mask pixels from confusion counts."""
     counts = update_counts({}, [np.nan, 0.8], [1, 1], valid=[np.inf, 1])
     assert counts == {"tp": 1, "fp": 0, "fn": 0, "tn": 0}
 
 
 def test_instance_metrics_pool_matched_iou_by_object_count():
+    """Pool matched-object IoU by object count rather than fold averages."""
     summary = summarize_oof(
         [
             {"crowns": {"tp": 1, "fp": 0, "fn": 0, "matched_iou_sum": 1.0}},
@@ -152,6 +164,7 @@ def test_instance_metrics_pool_matched_iou_by_object_count():
 
 
 def test_resume_rejects_tampered_assignment(tmp_path):
+    """Reject changed persisted fold assignments before restoring results."""
     run_kfold(6, 3, 42, tmp_path, perfect_fold)
     path = tmp_path / "kfold_manifest.json"
     manifest = json.loads(path.read_text())
@@ -162,6 +175,7 @@ def test_resume_rejects_tampered_assignment(tmp_path):
 
 
 def test_instance_sparse_ids_empty_and_no_overlap():
+    """Handle sparse object IDs, empty masks, and disjoint instances."""
     assert instance_counts_from_labels([7, 7, 0, 9000], [42, 42, 0, 1000000]) == {
         "tp": 2,
         "fp": 0,
@@ -180,6 +194,7 @@ def test_instance_sparse_ids_empty_and_no_overlap():
 
 
 def test_instance_merge_matches_once():
+    """Match a merged prediction to at most one ground-truth instance."""
     result = instance_counts_from_labels([1, 1, 2, 2], [5, 5, 5, 5])
     assert result == {"tp": 1, "fp": 0, "fn": 1, "matched_iou_sum": 0.5}
     assert instance_counts_from_labels([1, 1], [2, 2], 1)["tp"] == 1
@@ -197,11 +212,13 @@ def test_instance_merge_matches_once():
     ],
 )
 def test_invalid_instance_inputs(gt, pred, threshold):
+    """Reject unsupported IoU thresholds and malformed instance labels."""
     with pytest.raises(ValueError):
         instance_counts_from_labels(gt, pred, threshold)
 
 
 def test_metrics_pool_counts_before_scoring():
+    """Distinguish pooled micro scores from equally weighted fold macro scores."""
     summary = summarize_oof(
         [
             {"mask": {"tp": 1, "fp": 0, "fn": 0}},
@@ -216,12 +233,14 @@ def test_metrics_pool_counts_before_scoring():
 
 
 def perfect_fold(fold, train, val, directory):
+    """Return perfect held-out predictions while checking callback split isolation."""
     assert directory.is_dir()
     assert not set(train) & set(val)
     return {"oof": {"mask": {"tp": len(val), "fp": 0, "fn": 0}}, "loss": fold + 1}
 
 
 def test_run_writes_manifest_metrics_and_summary(tmp_path):
+    """Persist auditable assignments, per-fold metrics, and the pooled summary."""
     names = [f"tile_{i}" for i in range(7)]
     summary = run_kfold(7, 3, 42, tmp_path, perfect_fold, sample_names=names)
     assert summary["complete"]
@@ -241,6 +260,7 @@ def test_run_writes_manifest_metrics_and_summary(tmp_path):
 
 
 def test_only_fold_preserves_compatible_results(tmp_path):
+    """Complete a CV experiment through sequential single-fold reruns."""
     first = run_kfold(6, 3, 42, tmp_path, perfect_fold, only_fold=0)
     assert not first["complete"]
     second = run_kfold(6, 3, 42, tmp_path, perfect_fold, only_fold=1, overwrite=True)
@@ -248,6 +268,75 @@ def test_only_fold_preserves_compatible_results(tmp_path):
     last = run_kfold(6, 3, 42, tmp_path, perfect_fold, only_fold=2, overwrite=True)
     assert last["complete"]
     assert last["oof"]["micro"]["mask"]["tp"] == 6
+
+
+def test_numpy_callback_scalars_are_pooled_persisted_and_restored(tmp_path):
+    """Normalize NumPy counts and metrics before validation and fold averaging."""
+
+    def callback(fold, train, val, directory):
+        """Return NumPy scalar metrics as a typical model-training callback does."""
+        return {
+            "oof": {
+                "mask": {"tp": np.int64(len(val)), "fp": np.int32(1), "fn": np.int64(0)}
+            },
+            "loss": np.float32(fold + 0.25),
+            "epoch": np.int64(fold + 1),
+            "nested": {"scores": [np.float32(0.5), np.bool_(True)]},
+        }
+
+    run_kfold(6, 3, 42, tmp_path, callback, only_fold=0)
+    run_kfold(6, 3, 42, tmp_path, callback, only_fold=1, overwrite=True)
+    summary = run_kfold(6, 3, 42, tmp_path, callback, only_fold=2, overwrite=True)
+    assert summary["complete"]
+    assert summary["oof"]["micro"]["mask"]["tp"] == 6
+    assert summary["oof"]["micro"]["mask"]["fp"] == 3
+    assert summary["fold_means"]["loss"] == 1.25
+    assert summary["fold_means"]["epoch"] == 2
+    assert json.loads((tmp_path / "kfold_summary.json").read_text()) == summary
+    for result in summary["per_fold"]:
+        assert type(result["oof"]["mask"]["tp"]) is int
+        assert type(result["loss"]) is float
+        assert result["nested"] == {"scores": [0.5, True]}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        np.bool_(True),
+        np.float32(-1),
+        np.float32(0.5),
+        np.float64(np.nan),
+        np.float32(np.inf),
+    ],
+)
+def test_numpy_oof_counts_still_require_finite_nonnegative_integers(tmp_path, value):
+    """Scalar normalization must preserve strict confusion-count validation."""
+    with pytest.raises(ValueError):
+        run_kfold(
+            4,
+            2,
+            42,
+            tmp_path,
+            lambda *args: {"oof": {"mask": {"tp": value, "fp": 0, "fn": 0}}},
+        )
+
+
+@pytest.mark.parametrize("value", [object(), np.array([1, 2])])
+def test_non_json_callback_values_are_not_silently_stringified(tmp_path, value):
+    """Unsupported callback values fail without writing a completed fold result."""
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        run_kfold(
+            4,
+            2,
+            42,
+            tmp_path,
+            lambda *args: {
+                "oof": {"mask": {"tp": 1, "fp": 0, "fn": 0}},
+                "extra": value,
+            },
+        )
+    manifest = json.loads((tmp_path / "kfold_manifest.json").read_text())
+    assert "result" not in manifest["fold_assignment"]["fold_0"]
 
 
 @pytest.mark.parametrize(
@@ -260,6 +349,7 @@ def test_only_fold_preserves_compatible_results(tmp_path):
     ],
 )
 def test_resume_rejects_changed_experiment_without_writes(tmp_path, changed):
+    """Preserve existing artifacts when a rerun changes experiment identity."""
     settings = dict(
         n_samples=4,
         k=2,
@@ -278,9 +368,11 @@ def test_resume_rejects_changed_experiment_without_writes(tmp_path, changed):
 
 
 def test_failure_keeps_completed_results_and_removes_stale_summary(tmp_path):
+    """Keep completed folds after interruption without a stale success summary."""
     run_kfold(6, 3, 42, tmp_path, perfect_fold)
 
     def failing(fold, train, val, directory):
+        """Simulate an interrupted training run after the first completed fold."""
         if fold == 1:
             raise RuntimeError("training failed")
         return perfect_fold(fold, train, val, directory)
@@ -299,18 +391,23 @@ def test_failure_keeps_completed_results_and_removes_stale_summary(tmp_path):
         None,
         {},
         {"oof": {}},
+        {"oof": {1: {"tp": 1, "fp": 0, "fn": 0}}},
         {"oof": {"mask": {"tp": -1, "fp": 0, "fn": 0}}},
         {"oof": {"mask": {"tp": 1.5, "fp": 0, "fn": 0}}},
         {"oof": {"mask": {"tp": 1, "fp": 0, "fn": 0, "iou": 1}}},
     ],
 )
 def test_invalid_callback_results(tmp_path, result):
+    """Reject missing OOF results, ratios, and malformed confusion counts."""
     with pytest.raises(ValueError):
         run_kfold(4, 2, 42, tmp_path, lambda *args: result)
 
 
 def test_inconsistent_targets_rejected(tmp_path):
+    """Require every fold to report the same OOF target schema."""
+
     def callback(fold, *args):
+        """Return a different OOF target for each fold to exercise schema checks."""
         return {"oof": {str(fold): {"tp": 1, "fp": 0, "fn": 0}}}
 
     with pytest.raises(ValueError, match="same OOF targets"):
@@ -318,6 +415,7 @@ def test_inconsistent_targets_rejected(tmp_path):
 
 
 def test_atomic_json_preserves_original_on_serialization_failure(tmp_path):
+    """Preserve the previous JSON file when replacement serialization fails."""
     path = tmp_path / "manifest.json"
     _write_json(path, {"original": True})
     with pytest.raises(ValueError):
@@ -338,6 +436,7 @@ def test_atomic_json_preserves_original_on_serialization_failure(tmp_path):
     ],
 )
 def test_invalid_run_arguments_do_not_create_outputs(tmp_path, kwargs):
+    """Validate experiment arguments before creating any output artifacts."""
     output = tmp_path / "new"
     settings = dict(
         n_samples=4, k=2, seed=42, experiment_dir=output, train_fold=perfect_fold

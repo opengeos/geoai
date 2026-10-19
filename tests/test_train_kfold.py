@@ -1,7 +1,10 @@
 """Built-in semantic CV trains on K-1 folds and validates on the held-out fold."""
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -13,6 +16,7 @@ import geoai.train as training
 
 @pytest.fixture
 def paired_images(tmp_path):
+    """Create nine paired RGB tiles with binary masks for fold-allocation tests."""
     images, masks = tmp_path / "images", tmp_path / "masks"
     images.mkdir()
     masks.mkdir()
@@ -33,16 +37,19 @@ def paired_images(tmp_path):
 def test_builtin_kfold_isolates_samples_and_pools_native_predictions(
     paired_images, tmp_path, num_classes, monitor, only_fold, verbose, capsys
 ):
+    """Check split isolation, OOF pooling, reporting, and complete ensemble paths."""
     images, masks = paired_images
     original = training.train_segmentation_model
     calls = []
 
     def fake_train(**options):
+        """Record the recursive trainer options and create a checkpoint placeholder."""
         directory = Path(options["output_dir"])
         (directory / "best_model.pth").touch()
         calls.append(options)
 
     def fake_batch(**options):
+        """Save known held-out masks while checking architecture and strict-error options."""
         assert options["model_kwargs"] == {"decoder_channels": (32, 16)}
         assert options["raise_on_error"] is True
         output = Path(options["output_dir"])
@@ -133,6 +140,7 @@ def test_builtin_kfold_isolates_samples_and_pools_native_predictions(
 
 
 def test_builtin_kfold_keeps_groups_in_train_validation_split(paired_images, tmp_path):
+    """Keep supplied scene groups separate between training and held-out tiles."""
     images, masks = paired_images
     original = training.train_segmentation_model
     # Two groups suffice for two folds; no extra group is needed for an inner split.
@@ -140,6 +148,7 @@ def test_builtin_kfold_keeps_groups_in_train_validation_split(paired_images, tmp
     captured = []
 
     def stop(**options):
+        """Inspect recursive training options without fitting a segmentation model."""
         captured.append(options)
         raise RuntimeError("split inspected")
 
@@ -173,11 +182,13 @@ def test_builtin_kfold_keeps_groups_in_train_validation_split(paired_images, tmp
 def test_k_alone_controls_validation_size(
     paired_images, tmp_path, k, train_size, val_size, val_split
 ):
+    """Derive held-out fold sizes from K independently of val_split."""
     images, masks = paired_images
     original = training.train_segmentation_model
     captured = []
 
     def stop(**options):
+        """Inspect recursive training options without fitting a segmentation model."""
         captured.append(options)
         raise RuntimeError("split inspected")
 
@@ -205,11 +216,13 @@ def test_k_alone_controls_validation_size(
 def test_fold_rerun_ignores_val_split_but_rejects_old_validation_strategy(
     paired_images, tmp_path, legacy_inner_holdout
 ):
+    """Ignore unused val_split changes while rejecting legacy inner-holdout recipes."""
     images, masks = paired_images
     original = training.train_segmentation_model
     captured = []
 
     def stop(**options):
+        """Inspect recursive training options without fitting a segmentation model."""
         captured.append(options)
         raise RuntimeError("split inspected")
 
@@ -251,6 +264,133 @@ def test_fold_rerun_ignores_val_split_but_rejects_old_validation_strategy(
     assert len(captured) == (1 if legacy_inner_holdout else 2)
 
 
+def test_rerun_accepts_equivalent_transforms_and_rejects_changed_configuration(
+    paired_images, tmp_path
+):
+    """Re-created transform objects retain identity while changed settings fail."""
+    images, masks = paired_images
+    original = training.train_segmentation_model
+
+    def stop(**options):
+        """Stop after metadata validation so no model training is needed."""
+        raise RuntimeError("metadata accepted")
+
+    def options(prob):
+        """Build fresh transform/loss instances with identical configuration."""
+        return dict(
+            images_dir=str(images),
+            labels_dir=str(masks),
+            output_dir=str(tmp_path / "cv"),
+            k_folds=3,
+            device="cpu",
+            verbose=False,
+            train_transforms=training.SemanticTransforms(
+                [training.SemanticRandomHorizontalFlip(prob=prob)]
+            ),
+            loss_fn=training.torch.nn.CrossEntropyLoss(
+                weight=training.torch.tensor([0.25, 0.75])
+            ),
+        )
+
+    with patch.object(training, "train_segmentation_model", side_effect=stop):
+        with pytest.raises(RuntimeError, match="metadata accepted"):
+            original(**options(0.25), only_fold=0)
+        with pytest.raises(RuntimeError, match="metadata accepted"):
+            original(**options(0.25), only_fold=1, overwrite=True)
+        manifest_path = tmp_path / "cv/kfold_manifest.json"
+        before = manifest_path.read_bytes()
+        with pytest.raises(ValueError, match="manifest metadata differs"):
+            original(**options(0.75), only_fold=2, overwrite=True)
+        assert manifest_path.read_bytes() == before
+
+
+def test_training_option_metadata_is_identical_in_fresh_processes():
+    """Transform instances, callables, and weighted losses serialize reproducibly."""
+    script = """
+import json, os, sys
+from pathlib import Path
+dll_dir = Path(sys.prefix) / "Library/bin"
+if os.name == "nt" and dll_dir.is_dir():
+    dll_handle = os.add_dll_directory(str(dll_dir))
+from geoai.train import _serialize_training_option, SemanticTransforms, SemanticRandomHorizontalFlip
+import torch
+def transform(image, mask, probability=0.5):
+    return image, mask
+options = {
+    "transforms": SemanticTransforms([SemanticRandomHorizontalFlip(0.25), transform]),
+    "loss": torch.nn.CrossEntropyLoss(weight=torch.tensor([0.25, 0.75])),
+}
+print(json.dumps(_serialize_training_option(options), sort_keys=True))
+"""
+    root = Path(training.__file__).resolve().parent.parent
+    env = {**os.environ, "PYTHONPATH": str(root)}
+    results = [
+        subprocess.check_output(
+            [sys.executable, "-c", script], cwd=root, env=env, text=True
+        )
+        for _ in range(2)
+    ]
+    assert results[0] == results[1]
+    metadata = json.loads(results[0])
+    assert metadata["transforms"]["state"]["transforms"][0]["state"]["prob"] == 0.25
+    assert (
+        metadata["transforms"]["state"]["transforms"][1]["callable"]
+        == "__main__.transform"
+    )
+    assert metadata["loss"]["state"]["_buffers"]["weight"]["values"] == [0.25, 0.75]
+
+
+def test_callable_metadata_includes_partial_defaults_closure_and_instance_state():
+    """Different callable settings cannot silently share a rerun identity."""
+    from functools import partial
+
+    def factory(prob):
+        """Build closures with the same qualified name and different captured state."""
+        return lambda image, mask: (image * prob, mask)
+
+    def transform(image, mask, prob=0.5):
+        """Expose a default argument that influences preprocessing."""
+        return image * prob, mask
+
+    class SlotTransform:
+        """Represent configuration carried by a callable with slots."""
+
+        __slots__ = ("__prob",)
+
+        def __init__(self, prob):
+            """Store the transform setting without an instance dictionary."""
+            self.__prob = prob
+
+        def __call__(self, image, mask):
+            """Apply a deterministic gain to an image/mask pair."""
+            return image * self.__prob, mask
+
+    serialize = training._serialize_training_option
+    assert serialize(factory(0.25)) == serialize(factory(0.25))
+    assert serialize(factory(0.25)) != serialize(factory(0.75))
+    assert serialize(partial(transform, prob=0.25)) != serialize(
+        partial(transform, prob=0.75)
+    )
+    assert serialize(transform)["defaults"] == [0.5]
+    assert serialize(SlotTransform(0.25)) == serialize(SlotTransform(0.25))
+    assert serialize(SlotTransform(0.25)) != serialize(SlotTransform(0.75))
+    assert serialize(np.array([1, 2], dtype=np.int32))["values"] == [1, 2]
+    assert serialize(np.zeros((0, 2))) != serialize(np.zeros((0, 3)))
+    assert serialize({"b", "a"})["values"] == ["a", "b"]
+    assert serialize(Path("weights.pth")) == "weights.pth"
+    assert serialize(training.torch.device("cpu")) == "cpu"
+
+
+def test_metadata_rejects_cycles_and_unsupported_state():
+    """Unrecordable configuration fails clearly rather than using object addresses."""
+    cyclic = []
+    cyclic.append(cyclic)
+    with pytest.raises(ValueError, match="Cyclic training configuration"):
+        training._serialize_training_option(cyclic)
+    with pytest.raises(TypeError, match="Unsupported training configuration type"):
+        training._serialize_training_option(object())
+
+
 @pytest.mark.parametrize(
     "options",
     [
@@ -262,6 +402,7 @@ def test_fold_rerun_ignores_val_split_but_rejects_old_validation_strategy(
     ],
 )
 def test_invalid_mode_combinations(options, tmp_path):
+    """Reject CV-only options outside CV and incompatible resume or split options."""
     with pytest.raises(ValueError):
         training.train_segmentation_model(
             "missing", "missing", str(tmp_path), **options
@@ -271,6 +412,7 @@ def test_invalid_mode_combinations(options, tmp_path):
 def test_batch_selects_explicit_inputs_and_keeps_multiclass_labels(
     paired_images, tmp_path
 ):
+    """Preserve requested input order, model arguments, and multiclass output IDs."""
     images, _ = paired_images
     model = MagicMock()
     weights = tmp_path / "model.pth"
@@ -298,6 +440,7 @@ def test_batch_selects_explicit_inputs_and_keeps_multiclass_labels(
 
 
 def test_batch_skips_existing_outputs(paired_images, tmp_path):
+    """Avoid reinference only when the caller explicitly enables output reuse."""
     images, _ = paired_images
     output = tmp_path / "predictions"
     output.mkdir()
@@ -321,6 +464,7 @@ def test_batch_skips_existing_outputs(paired_images, tmp_path):
 
 
 def test_batch_rejects_duplicate_input_paths(paired_images, tmp_path):
+    """Reject repeated input paths before loading a model or writing predictions."""
     images, _ = paired_images
     with pytest.raises(ValueError, match="duplicate"):
         training.semantic_segmentation_batch(
@@ -334,6 +478,7 @@ def test_batch_rejects_duplicate_input_paths(paired_images, tmp_path):
 
 @pytest.mark.parametrize("strict", [False, True])
 def test_batch_failure_behavior_is_explicit(paired_images, tmp_path, strict):
+    """Preserve default log-and-continue behavior and support strict inference errors."""
     images, _ = paired_images
     weights = tmp_path / "model.pth"
     weights.touch()
@@ -367,6 +512,7 @@ def test_batch_failure_behavior_is_explicit(paired_images, tmp_path, strict):
 
 
 def test_single_split_saves_first_zero_iou_checkpoint(paired_images, tmp_path):
+    """Save the initial finite checkpoint even when validation IoU is zero."""
     images, masks = paired_images
     model = training.torch.nn.Conv2d(3, 2, kernel_size=1)
     scores = {"loss": 1.0, "IoU": 0.0, "F1": 0.0, "Precision": 0.0, "Recall": 0.0}
@@ -390,13 +536,16 @@ def test_single_split_saves_first_zero_iou_checkpoint(paired_images, tmp_path):
 
 
 def test_builtin_kfold_resolves_relative_inputs(paired_images, tmp_path, monkeypatch):
+    """Resolve held-out image paths before passing them to batch inference."""
     monkeypatch.chdir(tmp_path)
     original = training.train_segmentation_model
 
     def fake_train(**options):
+        """Record the recursive trainer options and create a checkpoint placeholder."""
         (Path(options["output_dir"]) / "best_model.pth").touch()
 
     def inspect_batch(**options):
+        """Check absolute held-out paths and stop before actual inference."""
         assert all(
             Path(p).is_absolute() and Path(p).is_file() for p in options["input_files"]
         )
@@ -414,6 +563,7 @@ def test_builtin_kfold_resolves_relative_inputs(paired_images, tmp_path, monkeyp
 
 @pytest.mark.parametrize("mask_mode", ["L", "RGB", "P"])
 def test_oof_scores_actual_binary_png_inference(paired_images, tmp_path, mask_mode):
+    """Score real 0/255 inference outputs consistently for grayscale, RGB, and palette labels."""
     images, masks = paired_images
     expected_tp = 0
     for path in masks.iterdir():
@@ -430,12 +580,14 @@ def test_oof_scores_actual_binary_png_inference(paired_images, tmp_path, mask_mo
     original_batch = training.semantic_segmentation_batch
 
     def save_foreground_model(**options):
+        """Write a constant foreground checkpoint for actual PNG inference."""
         training.torch.save(
             _ConstantSegmentationModel(0.9).state_dict(),
             Path(options["output_dir"]) / "best_model.pth",
         )
 
     def small_window_batch(**options):
+        """Run public inference with a window sized to the tiny test images."""
         original_batch(**options, window_size=8, overlap=4)
 
     with (
@@ -471,6 +623,7 @@ def test_oof_scores_actual_binary_png_inference(paired_images, tmp_path, mask_mo
 
 @pytest.mark.parametrize("num_epochs", [0, -1, True, 1.5])
 def test_kfold_rejects_empty_training_before_reusing_artifacts(tmp_path, num_epochs):
+    """Reject invalid epoch counts before existing fold artifacts can be reused."""
     with pytest.raises(ValueError, match="num_epochs"):
         training.train_segmentation_model(
             "missing",
@@ -487,6 +640,7 @@ class SplitReached(Exception):
 
 
 def test_trainer_uses_only_explicit_pairs(tmp_path):
+    """Use exactly the supplied image/mask subsets without another random split."""
     images, labels = tmp_path / "images", tmp_path / "labels"
     images.mkdir()
     labels.mkdir()
@@ -496,6 +650,7 @@ def test_trainer_uses_only_explicit_pairs(tmp_path):
     datasets = []
 
     def capture(image_files, label_files, **kwargs):
+        """Record constructed dataset pairs and stop once both subsets are observed."""
         datasets.append((image_files, label_files))
         if len(datasets) == 2:
             raise SplitReached
@@ -528,6 +683,7 @@ def test_trainer_uses_only_explicit_pairs(tmp_path):
 
 
 def test_trainer_requires_both_index_lists(tmp_path):
+    """Reject incomplete explicit split specifications."""
     images, labels = tmp_path / "images", tmp_path / "labels"
     images.mkdir()
     labels.mkdir()
@@ -552,11 +708,13 @@ def test_trainer_requires_both_index_lists(tmp_path):
 def test_checkpoint_selection_uses_chosen_criterion(
     paired_images, tmp_path, monitor, epoch, score
 ):
+    """Save weights from the epoch selected by the requested loss or IoU monitor."""
     images, masks = paired_images
     model = training.torch.nn.Conv2d(3, 2, kernel_size=1)
     trained = 0
 
     def fake_epoch(*args, **kwargs):
+        """Stamp the model weights with the epoch number for checkpoint verification."""
         nonlocal trained
         trained += 1
         with training.torch.no_grad():
@@ -600,6 +758,7 @@ def test_checkpoint_selection_uses_chosen_criterion(
 
 @pytest.mark.parametrize("monitor,epochs", [("val_loss", 3), ("val_iou", 4)])
 def test_early_stopping_uses_chosen_criterion(paired_images, tmp_path, monitor, epochs):
+    """Stop after the configured patience for the selected validation criterion."""
     images, masks = paired_images
     metrics = [
         {"loss": loss, "IoU": iou, "F1": 0.5, "Precision": 0.5, "Recall": 0.5}
@@ -629,6 +788,7 @@ def test_early_stopping_uses_chosen_criterion(paired_images, tmp_path, monitor, 
 
 
 def test_invalid_checkpoint_criterion_is_rejected(tmp_path):
+    """Reject unsupported checkpoint monitors before accessing the dataset."""
     with pytest.raises(ValueError, match="monitor"):
         training.train_segmentation_model(
             "unused", "unused", str(tmp_path), monitor="accuracy"
@@ -637,6 +797,7 @@ def test_invalid_checkpoint_criterion_is_rejected(tmp_path):
 
 class _ConstantSegmentationModel(training.torch.nn.Module):
     def __init__(self, foreground=0.5):
+        """Store fixed two-class logits for deterministic inference predictions."""
         super().__init__()
         self.register_buffer(
             "logits",
@@ -647,12 +808,14 @@ class _ConstantSegmentationModel(training.torch.nn.Module):
         )
 
     def forward(self, images):
+        """Expand constant logits to the input batch and image dimensions."""
         return self.logits.view(1, 2, 1, 1).expand(
             images.shape[0], 2, *images.shape[-2:]
         )
 
 
 def test_ensemble_averages_probabilities_instead_of_logits():
+    """Select the class implied by mean probabilities rather than mean logits."""
     models = [_ConstantSegmentationModel(p) for p in (0.99, 0.1, 0.1)]
     images = training.torch.zeros(1, 3, 8, 8)
     probabilities = training._ProbabilityEnsemble(models)(images).softmax(dim=1)
@@ -667,6 +830,7 @@ def test_ensemble_averages_probabilities_instead_of_logits():
 
 @pytest.mark.parametrize("batch", [False, True])
 def test_public_inference_accepts_checkpoint_ensemble(paired_images, tmp_path, batch):
+    """Exercise checkpoint ensembles through single-image and batch inference."""
     images, _ = paired_images
     paths = []
     for i, probability in enumerate((0.99, 0.1, 0.1)):
@@ -712,6 +876,7 @@ def test_public_inference_accepts_checkpoint_ensemble(paired_images, tmp_path, b
 
 @pytest.mark.parametrize("case", ["empty", "duplicate"])
 def test_ensemble_rejects_invalid_checkpoint_lists(tmp_path, case):
+    """Reject empty ensembles and duplicate checkpoint paths."""
     path = tmp_path / "model.pth"
     path.touch()
     paths = [] if case == "empty" else [str(path), str(path)]

@@ -205,6 +205,7 @@ def validate_paired_files(
 
 
 def validate_threshold(threshold: float) -> float:
+    """Return a finite probability threshold strictly between zero and one."""
     threshold = float(threshold)
     if not np.isfinite(threshold) or not 0 < threshold < 1:
         raise ValueError(f"Threshold must be between 0 and 1, got {threshold!r}.")
@@ -274,6 +275,7 @@ def instance_counts_from_labels(
             raise ValueError("Instance labels must be nonnegative integers.")
 
     def compact(labels):
+        """Map arbitrary positive instance IDs to contiguous count-array indices."""
         ids = np.unique(labels[labels > 0])
         return np.where(labels > 0, np.searchsorted(ids, labels) + 1, 0).ravel(), len(
             ids
@@ -397,6 +399,7 @@ def _validate_split_indices(
 
 
 def _read_json(path: Path) -> Any | None:
+    """Read persisted experiment state, or return None when no file exists."""
     if not path.exists():
         return None
     with open(path, "r", encoding="utf-8") as fh:
@@ -444,10 +447,20 @@ def _validate_oof(oof: Any) -> None:
 
 
 def _mean(values: list) -> float | None:
+    """Average numeric callback fields, excluding missing and boolean values."""
     vals = [
         v for v in values if isinstance(v, (int, float)) and not isinstance(v, bool)
     ]
     return sum(vals) / len(vals) if vals else None
+
+
+def _numpy_scalar_to_python(value: Any) -> Any:
+    """Convert NumPy scalars for JSON while rejecting unsupported result types."""
+    if isinstance(value, np.generic):
+        return value.item()
+    raise TypeError(
+        f"Callback result is not JSON serializable: {type(value).__name__}."
+    )
 
 
 def run_kfold(
@@ -469,7 +482,8 @@ def run_kfold(
     JSON-serialisable dict with an ``"oof"`` entry: ``{target: counts}``, where
     counts come from ``update_counts`` / ``instance_counts_from_labels`` summed
     over that fold's held-out samples. Other numeric entries (e.g.
-    ``best_val_loss``) are averaged across folds in the summary.
+    ``best_val_loss``) are averaged across folds in the summary. NumPy scalar
+    counts and metrics are converted to Python values before validation/storage.
 
     ``only_fold`` trains a single fold. Folds that an earlier run already
     finished with the same assignment are kept from the manifest, so the summary
@@ -595,6 +609,13 @@ def run_kfold(
             raise ValueError(
                 f"train_fold must return a dict with an 'oof' entry (fold {fold_idx})."
             )
+        if isinstance(result["oof"], dict) and any(
+            not isinstance(target, str) for target in result["oof"]
+        ):
+            raise ValueError("OOF target names must be strings.")
+        result = json.loads(
+            json.dumps(result, allow_nan=False, default=_numpy_scalar_to_python)
+        )
         _validate_oof(result["oof"])
         for entry in manifest["fold_assignment"].values():
             if "result" in entry:
@@ -606,7 +627,6 @@ def run_kfold(
                         "All folds must report the same OOF targets and count names."
                     )
         result = {**result, "minutes": round((time.monotonic() - fold_start) / 60.0, 2)}
-        json.dumps(result, allow_nan=False)
 
         _write_json(
             fold_dir / "oof_metrics.json",

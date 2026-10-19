@@ -4926,6 +4926,119 @@ def train_segmentation_model(
             logger.info(f"Could not save training curves: {e}")
 
 
+def _serialize_training_option(value: Any, _seen: Optional[set[int]] = None) -> Any:
+    """Describe training configuration without process-specific object addresses.
+
+    Functions record their qualified names, defaults, and closure values;
+    callable instances record their qualified types and configuration fields.
+    Arrays/tensors retain their values and dtype. Unsupported or cyclic state
+    raises rather than silently treating different recipes as identical.
+    """
+    import functools
+    import inspect
+
+    if isinstance(value, np.generic):
+        scalar = value.item()
+        if isinstance(scalar, np.generic):
+            raise TypeError(
+                f"Unsupported training configuration scalar: {value.dtype}."
+            )
+        return _serialize_training_option(scalar, _seen)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
+    if isinstance(value, (torch.device, torch.dtype, np.dtype)):
+        return str(value)
+
+    seen = set() if _seen is None else _seen
+    if id(value) in seen:
+        raise ValueError(
+            "Cyclic training configuration cannot be recorded for k-fold reruns."
+        )
+    seen.add(id(value))
+    try:
+
+        def serialize(item: Any) -> Any:
+            """Serialize one child while tracking the current ancestor chain."""
+            return _serialize_training_option(item, seen)
+
+        if isinstance(value, (list, tuple)):
+            return [serialize(item) for item in value]
+        if isinstance(value, dict):
+            if any(
+                key is not None and not isinstance(key, (str, int, float, bool))
+                for key in value
+            ):
+                raise TypeError(
+                    "Training configuration dictionaries require primitive keys."
+                )
+            return {str(key): serialize(item) for key, item in value.items()}
+        kind = type(value)
+        qualified_type = f"{kind.__module__}.{kind.__qualname__}"
+        if isinstance(value, (np.ndarray, torch.Tensor)):
+            array = value.detach().cpu() if isinstance(value, torch.Tensor) else value
+            return {
+                "type": qualified_type,
+                "dtype": str(value.dtype),
+                "shape": list(value.shape),
+                "values": serialize(array.tolist()),
+            }
+        if isinstance(value, (set, frozenset)):
+            import json
+
+            items = [serialize(item) for item in value]
+            return {
+                "type": qualified_type,
+                "values": sorted(
+                    items, key=lambda item: json.dumps(item, sort_keys=True)
+                ),
+            }
+        if isinstance(value, functools.partial):
+            return {
+                "type": qualified_type,
+                "function": serialize(value.func),
+                "args": serialize(value.args),
+                "keywords": serialize(value.keywords),
+            }
+        if inspect.isclass(value):
+            return {"type": f"{value.__module__}.{value.__qualname__}"}
+        if inspect.isroutine(value):
+            result = {"callable": f"{value.__module__}.{value.__qualname__}"}
+            for name, state in (
+                ("defaults", getattr(value, "__defaults__", None)),
+                ("kwdefaults", getattr(value, "__kwdefaults__", None)),
+            ):
+                if state is not None:
+                    result[name] = serialize(state)
+            closure = getattr(value, "__closure__", None)
+            if closure:
+                result["closure"] = {
+                    name: serialize(cell.cell_contents)
+                    for name, cell in zip(value.__code__.co_freevars, closure)
+                }
+            if inspect.ismethod(value):
+                result["self"] = serialize(value.__self__)
+            return result
+        state = dict(vars(value)) if hasattr(value, "__dict__") else {}
+        has_slots = False
+        for cls in kind.__mro__:
+            slots = cls.__dict__.get("__slots__", ())
+            has_slots |= bool(slots)
+            for name in (slots,) if isinstance(slots, str) else slots:
+                if name.startswith("__") and not name.endswith("__"):
+                    class_name = cls.__name__.lstrip("_")
+                    if class_name:
+                        name = f"_{class_name}{name}"
+                if name not in ("__dict__", "__weakref__") and hasattr(value, name):
+                    state[name] = getattr(value, name)
+        if hasattr(value, "__dict__") or has_slots:
+            return {"type": qualified_type, "state": serialize(state)}
+        raise TypeError(f"Unsupported training configuration type: {qualified_type}.")
+    finally:
+        seen.remove(id(value))
+
+
 def _train_segmentation_kfold(
     image_files: List[str],
     label_files: List[str],
@@ -4959,17 +5072,8 @@ def _train_segmentation_kfold(
             index_fn=lambda p: Path(p).stem,
         )
 
-    def serializable(value):
-        if value is None or isinstance(value, (str, int, float, bool)):
-            return value
-        if isinstance(value, (list, tuple)):
-            return [serializable(item) for item in value]
-        if isinstance(value, dict):
-            return {str(key): serializable(item) for key, item in value.items()}
-        return str(value)
-
     metadata = {
-        key: serializable(value)
+        key: _serialize_training_option(value)
         for key, value in options.items()
         if key not in ("output_dir", "train_indices", "val_indices", "val_split")
     }
@@ -4977,6 +5081,7 @@ def _train_segmentation_kfold(
     metadata["validation_strategy"] = "held_out_fold"
 
     def train_fold(fold_idx, train_indices, val_indices, fold_dir):
+        """Fit one fresh model, infer its held-out tiles, and return OOF counts."""
         split = {
             "fit_indices": train_indices,
             "held_out_indices": val_indices,
@@ -5812,12 +5917,14 @@ class _ProbabilityEnsemble(torch.nn.Module):
     """Average class probabilities while preserving the logits-style interface."""
 
     def __init__(self, models: List[torch.nn.Module]) -> None:
+        """Register compatible members and reject an empty ensemble."""
         super().__init__()
         if not models:
             raise ValueError("An ensemble must contain at least one model.")
         self.models = torch.nn.ModuleList(models)
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
+        """Return log mean probabilities for the existing softmax inference API."""
         total = None
         for model in self.models:
             probabilities = model(images).float().softmax(dim=1)

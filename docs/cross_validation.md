@@ -226,7 +226,9 @@ thresholds from 0.5 through 1 are supported. Instance `iou` is
 over matched objects. This is not COCO average precision or panoptic quality.
 
 Every fold must return the same target names and count fields. Return raw counts,
-not per-batch averages. The summary reports:
+not per-batch averages. NumPy scalar counts and metrics are converted to Python
+values before validation and persistence; unsupported non-JSON objects still
+raise an error. The summary reports:
 
 - **Micro:** sum the held-out counts across folds, then calculate IoU, precision,
   recall, F1, and (for instances) mean matched IoU.
@@ -260,6 +262,14 @@ only when the entire experiment identity matches: sample count, seed, fold
 assignments, sample names, groups, and metadata. Record your training recipe,
 thresholds, and dataset version in metadata, and supply stable, unique sample
 names. Without those, the runner cannot detect changes to your inputs or model.
+
+Built-in segmentation records custom transforms and losses using qualified
+callable/type names and recursively serialized configuration, including array
+and tensor values. Equivalent newly created objects can therefore be reused
+across processes, while changed configuration is rejected. Use a new experiment
+when changing callable implementations or other training code: qualified names
+alone cannot detect source-code changes. Cyclic or unsupported configuration
+raises an error instead of falling back to an object address.
 
 With `only_fold=None`, `overwrite=True` reruns every fold and discards old
 manifest results. Existing callback artifacts such as checkpoints are not
