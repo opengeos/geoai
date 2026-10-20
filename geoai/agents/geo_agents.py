@@ -207,7 +207,7 @@ def create_bedrock_model(
 
 
 def create_gemini_model(
-    model_id: str = "gemini-2.5-flash",
+    model_id: str = "gemini-3.8-flash",
     api_key: str = None,
     client_args: dict = None,
     **kwargs: Any,

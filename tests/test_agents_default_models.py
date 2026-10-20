@@ -46,6 +46,10 @@ class TestDefaultModelIds(unittest.TestCase):
             "global.anthropic.claude-sonnet-4-6",
         )
 
+    def test_gemini_default(self):
+        """New Gemini API keys get a 404 for gemini-2.5-flash."""
+        self.assertEqual(_default_model_id("create_gemini_model"), "gemini-3.8-flash")
+
 
 if __name__ == "__main__":
     unittest.main()
