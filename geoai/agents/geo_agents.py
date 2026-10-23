@@ -147,7 +147,7 @@ def create_openai_model(
 
 
 def create_anthropic_model(
-    model_id: str = "claude-sonnet-4-20250514",
+    model_id: str = "claude-sonnet-5-5",
     api_key: str = None,
     client_args: dict = None,
     **kwargs: Any,
@@ -155,7 +155,7 @@ def create_anthropic_model(
     """Create an Anthropic model.
 
     Args:
-        model_id: Anthropic model ID. Defaults to "claude-sonnet-4-20250514".
+        model_id: Anthropic model ID. Defaults to "claude-sonnet-5-5".
             For a complete list of supported models,
             see https://docs.claude.com/en/docs/about-claude/models/overview.
         api_key: Anthropic API key.
@@ -180,7 +180,7 @@ def create_anthropic_model(
 
 
 def create_bedrock_model(
-    model_id: str = "anthropic.claude-sonnet-4-20250514-v1:0",
+    model_id: str = "global.anthropic.claude-sonnet-4-6",
     region_name: str = None,
     boto_session: Optional[boto3.Session] = None,
     boto_client_config: Optional[BotocoreConfig] = None,
@@ -207,7 +207,7 @@ def create_bedrock_model(
 
 
 def create_gemini_model(
-    model_id: str = "gemini-2.5-flash",
+    model_id: str = "gemini-3.8-flash",
     api_key: str = None,
     client_args: dict = None,
     **kwargs: Any,
