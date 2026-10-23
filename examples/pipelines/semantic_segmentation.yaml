@@ -1,0 +1,40 @@
+# Semantic Segmentation Pipeline
+#
+# Finds all GeoTIFF files in an input directory, runs semantic
+# segmentation with a trained UNet model, then converts the raster
+# masks to GeoJSON vector features.
+#
+# Usage:
+#   geoai pipeline run semantic_segmentation.yaml \
+#       -i ./data/images -o ./data/results \
+#       -c ./checkpoints -w 4
+
+name: semantic_segmentation
+max_workers: 1
+executor_type: thread
+on_error: skip
+
+steps:
+  - type: GlobStep
+    name: find_images
+    extensions:
+      - ".tif"
+      - ".tiff"
+
+  - type: SemanticSegmentationStep
+    name: segment
+    model_path: "path/to/model.pth"
+    architecture: unet
+    encoder_name: resnet34
+    num_channels: 3
+    num_classes: 2
+    window_size: 512
+    overlap: 256
+    batch_size: 4
+    suffix: "_mask"
+
+  - type: RasterToVectorStep
+    name: vectorize
+    output_format: ".geojson"
+    input_key: output_path
+    output_key: vector_path
