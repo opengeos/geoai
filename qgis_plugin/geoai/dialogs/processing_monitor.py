@@ -32,8 +32,7 @@ class ProcessingMonitorDockWidget(QDockWidget):
         super().__init__("AI Processing Monitor", parent)
         self.setObjectName("GeoAIProcessingMonitorDock")
         self.setAllowedAreas(
-            Qt.DockWidgetArea.LeftDockWidgetArea
-            | Qt.DockWidgetArea.RightDockWidgetArea
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
         self._monitor = get_processing_monitor()
         self._selected_task_id: Optional[str] = None

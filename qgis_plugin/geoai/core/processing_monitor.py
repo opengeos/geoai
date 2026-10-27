@@ -223,7 +223,9 @@ class ProcessingMonitor:
             )
             logger.error("AI task failed: %s (%s): %s", task.name, task_id, error)
         else:
-            task.error_summary = f"{classify_error(error)}: {str(error).splitlines()[0]}"
+            task.error_summary = (
+                f"{classify_error(error)}: {str(error).splitlines()[0]}"
+            )
             task.error_details = str(error)
             logger.error("AI task failed: %s (%s): %s", task.name, task_id, error)
         self._finish(task_id, TaskStatus.FAILED)

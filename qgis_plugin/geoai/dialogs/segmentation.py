@@ -463,9 +463,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         worker.started.connect(lambda: monitor.start(task_id))
         if progress_signal is None:
             progress_signal = worker.progress
-        progress_signal.connect(
-            lambda message: monitor.progress(task_id, str(message))
-        )
+        progress_signal.connect(lambda message: monitor.progress(task_id, str(message)))
         worker.finished.connect(lambda _result: monitor.complete(task_id))
         worker.error.connect(lambda error: monitor.fail(task_id, str(error)))
         return task_id
