@@ -68,27 +68,65 @@ Open **GeoAI → AI Processing Monitor** to observe supported Semantic Segmentat
 tasks while they run. The monitor currently covers tile export, training, inference,
 vectorization, and vector smoothing started from the Segmentation panel.
 
-#### Before and after
+#### What changes for users
 
-The following illustrative mockups show the UI difference. They are documentation
-diagrams, not runtime screenshots; validate the final appearance in a QGIS
-installation.
+Before the monitor was introduced, each Semantic Segmentation operation reported
+information only through its source panel and log messages. Users had no single
+place to answer the following questions while a long-running operation was active:
 
-| Before | After |
-| --- | --- |
-| ![Before: no unified AI processing monitor](docs/ai-processing-monitor-before.svg) | ![After: AI Processing Monitor dock](docs/ai-processing-monitor-after.svg) |
+- Which AI operation is currently running?
+- Has the operation started, or is it still waiting to start?
+- How long has it been running?
+- Is reliable progress available?
+- Did the operation complete, fail, or stop?
+- What error category and technical details should be investigated?
+- Is GPU memory information available?
 
--   **States**: `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, and `CANCELLED` are shown when the corresponding lifecycle event is available. `IDLE` is reserved for the monitor model and is not normally shown for submitted work.
--   **Progress**: Training reports an epoch percentage. Operations that only expose start and finish events use an indeterminate progress bar; the monitor never invents a percentage.
--   **Timing**: Elapsed time uses a monotonic clock. Start and end timestamps are wall-clock values for display.
--   **Errors**: The monitor shows a concise category and preserves the technical traceback in the task details and plugin log. Categories are best-effort; unknown failures are reported as processing failures.
--   **GPU metrics**: When PyTorch and CUDA are available in the QGIS process, the monitor shows the device name, allocated memory, reserved memory, and peak allocated memory in MB. Allocated memory is active tensor memory; reserved memory is memory held by PyTorch's caching allocator. These values are not total GPU utilization.
--   **Unavailable metrics**: CPU-only installations, missing PyTorch, unavailable CUDA drivers, or unsupported backends are handled without disabling processing. For work executed in a managed subprocess, the displayed values may describe the QGIS process rather than the subprocess; subprocess GPU telemetry is not yet integrated.
+With the AI Processing Monitor enabled, open **GeoAI → AI Processing Monitor** to
+see a task entry for supported Semantic Segmentation operations. Each entry
+contains the task name and lifecycle status. While a task is running, the dock
+updates elapsed time without blocking the QGIS map canvas. When reliable progress
+is provided by the worker, the monitor shows a bounded percentage and progress bar.
+For operations that expose only progress messages or start/finish events, it shows
+an indeterminate progress bar instead of inventing a percentage.
 
-The monitor does not clear CUDA memory automatically. **Clear GPU Memory** remains a
-separate manual action and should not be used while an inference task is actively
-using the GPU. Cancellation is not exposed by the current segmentation workers, so
-the `CANCELLED` state is reserved for future cancellation integration.
+After a task finishes, the selected entry retains its final status, elapsed
+duration, start timestamp, end timestamp, progress message, and optional GPU
+metrics. Failed tasks show a concise user-facing error category and preserve
+technical traceback details for debugging. Finished entries can be removed with
+**Clear finished**; active tasks are retained.
+
+The monitor is currently connected to Semantic Segmentation tile export, model
+training, inference, vectorization, and vector smoothing. It does not claim
+coverage for the other GeoAI panels.
+
+Supported lifecycle states are `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, and
+`CANCELLED` when the underlying lifecycle event is available. `IDLE` is an
+internal initial state and is not normally shown for submitted work. Elapsed
+time uses a monotonic clock, while start and end timestamps are wall-clock values
+for display.
+
+Training reports epoch-based progress. Operations that expose only messages or
+start/finish events use an indeterminate progress bar. The monitor never
+fabricates a percentage. Error categories are best-effort and include missing
+input, missing dependency, GPU/CUDA, output-writing, and generic processing
+failures. The concise summary is shown in the dock while technical traceback
+details remain available for debugging.
+
+When PyTorch and CUDA metrics are accessible from the QGIS process, the monitor
+shows the device name, allocated memory, reserved memory, and peak allocated
+memory in MB. Allocated memory is active tensor memory; reserved memory is held
+by PyTorch's caching allocator. Neither value represents total GPU utilization.
+CPU-only installations, missing PyTorch, unavailable CUDA drivers, and
+unsupported backends do not prevent processing. For inference running in a
+managed subprocess, the displayed values may describe the QGIS process rather
+than the subprocess because subprocess GPU telemetry is not yet integrated.
+
+The monitor never invokes CUDA cache clearing automatically. **Clear GPU Memory**
+remains a separate manual action and should not be used while an inference task
+is actively using the GPU. Cancellation is not exposed by the current
+segmentation workers, so `CANCELLED` is reserved for future cancellation
+integration.
 
 ## Installation
 
