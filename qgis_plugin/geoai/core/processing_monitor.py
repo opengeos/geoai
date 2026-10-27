@@ -184,8 +184,8 @@ class ProcessingMonitor:
             reset_peak_memory_stats = getattr(cuda, "reset_peak_memory_stats", None)
             if reset_peak_memory_stats is not None:
                 reset_peak_memory_stats()
-        except (OSError, RuntimeError, AttributeError):
-            logger.info("GPU peak memory reset unavailable")
+        except Exception as exc:
+            logger.info("GPU peak memory reset unavailable: %s", exc)
 
     def progress(
         self, task_id: str, message: str = "", percent: Optional[float] = None
@@ -230,17 +230,16 @@ class ProcessingMonitor:
             TaskStatus.CANCELLED,
         ):
             return
+        error_text = str(error)
         if isinstance(error, BaseException):
-            error_text = str(error)
             task.error_details = "".join(
                 traceback.format_exception(type(error), error, error.__traceback__)
             )
-            logger.error("AI task failed: %s (%s): %s", task.name, task_id, error)
         else:
-            error_text = str(error)
             task.error_details = error_text
-            logger.error("AI task failed: %s (%s): %s", task.name, task_id, error)
-        summary_text = error_text.splitlines()[0] if error_text.splitlines() else ""
+        logger.error("AI task failed: %s (%s): %s", task.name, task_id, error)
+        summary_lines = error_text.splitlines()
+        summary_text = summary_lines[0] if summary_lines else ""
         category = classify_error(summary_text if isinstance(error, str) else error)
         task.error_summary = f"{category}: {summary_text}" if summary_text else category
         self._finish(task_id, TaskStatus.FAILED)

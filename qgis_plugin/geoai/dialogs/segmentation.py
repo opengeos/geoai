@@ -74,6 +74,7 @@ class TrainingWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
     epoch_progress = pyqtSignal(int, int, str)  # current_epoch, total_epochs, metrics
 
@@ -174,6 +175,7 @@ class TrainingWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class TileExportWorker(QThread):
@@ -181,6 +183,7 @@ class TileExportWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -228,6 +231,7 @@ class TileExportWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class InferenceWorker(QThread):
@@ -235,6 +239,7 @@ class InferenceWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -327,6 +332,7 @@ class InferenceWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
         finally:
             if temp_dir:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -337,6 +343,7 @@ class VectorizeWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -375,6 +382,7 @@ class VectorizeWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class SmoothVectorWorker(QThread):
@@ -382,6 +390,7 @@ class SmoothVectorWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -422,6 +431,7 @@ class SmoothVectorWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
@@ -465,7 +475,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             progress_signal = worker.progress
         progress_signal.connect(lambda message: monitor.progress(task_id, str(message)))
         worker.finished.connect(lambda _result: monitor.complete(task_id))
-        worker.error.connect(lambda error: monitor.fail(task_id, str(error)))
+        worker.exception.connect(lambda error: monitor.fail(task_id, error))
         worker._processing_monitor_task_id = task_id
         return task_id
 

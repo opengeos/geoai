@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.PyQt.QtGui import QTextCursor
 from qgis.PyQt.QtWidgets import QApplication
 
@@ -18,6 +19,12 @@ def isolated_processing_monitor(monkeypatch):
     monitor = ProcessingMonitor()
     monkeypatch.setattr(processing_monitor_core, "_monitor", monitor)
     yield monitor
+
+
+@pytest.fixture(scope="module", autouse=True)
+def qt_application():
+    app = QApplication.instance() or QApplication([])
+    yield app
 
 
 def _app():
@@ -136,6 +143,29 @@ def test_panel_shutdown_handles_missing_and_terminal_tasks():
     )
     assert monitor.get(task_id).status == TaskStatus.COMPLETED
     monitor.clear_finished()
+
+
+def test_worker_exception_signal_preserves_exception_for_monitor():
+    class Worker(QObject):
+        started = pyqtSignal()
+        progress = pyqtSignal(str)
+        finished = pyqtSignal(str)
+        error = pyqtSignal(str)
+        exception = pyqtSignal(object)
+
+    monitor = processing_monitor_core.get_processing_monitor()
+    worker = Worker()
+    panel = SimpleNamespace(_processing_monitor=monitor)
+    task_id = SegmentationDockWidget._monitor_worker(panel, worker, "Test task")
+
+    worker.started.emit()
+    worker.error.emit("missing input\n\ntraceback")
+    worker.exception.emit(FileNotFoundError("missing input"))
+
+    task = monitor.get(task_id)
+    assert task.status == TaskStatus.FAILED
+    assert task.error_summary == "Missing or invalid input file: missing input"
+    assert "FileNotFoundError: missing input" in task.error_details
 
 
 @pytest.mark.parametrize(

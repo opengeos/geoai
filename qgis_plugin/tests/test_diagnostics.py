@@ -6,7 +6,11 @@ from geoai.core import diagnostics
 
 
 def test_diagnostics_report_is_github_markdown(monkeypatch):
-    monkeypatch.setenv("HOME", "/home/testuser")
+    monkeypatch.setattr(
+        diagnostics.os.path,
+        "expanduser",
+        lambda value: "/home/testuser" if value == "~" else value,
+    )
     monkeypatch.setattr(
         diagnostics,
         "_get_nvidia_gpu_detection",

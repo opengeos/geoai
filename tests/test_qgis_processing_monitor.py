@@ -198,6 +198,44 @@ def test_error_categories_are_best_effort(error, category):
     assert monitor_module.classify_error(error) == category
 
 
+def test_listener_notifications_can_be_registered_and_removed():
+    monitor = monitor_module.ProcessingMonitor()
+    notifications = []
+
+    def listener():
+        notifications.append(True)
+
+    monitor.add_listener(listener)
+    monitor.submit("task-1", "Inference")
+    monitor.remove_listener(listener)
+    monitor.start("task-1")
+
+    assert notifications == [True]
+
+
+def test_permission_error_keeps_file_access_category():
+    monitor = monitor_module.ProcessingMonitor()
+    monitor.submit("task-1", "Output")
+    monitor.start("task-1")
+
+    monitor.fail("task-1", PermissionError("cannot save output"))
+
+    assert monitor.get("task-1").error_summary == (
+        "Output or file access failure: cannot save output"
+    )
+
+
+def test_whitespace_only_error_still_finishes_task():
+    monitor = monitor_module.ProcessingMonitor()
+    monitor.submit("task-1", "Inference")
+    monitor.start("task-1")
+
+    monitor.fail("task-1", "\n")
+
+    assert monitor.get("task-1").status == monitor_module.TaskStatus.FAILED
+    assert monitor.get("task-1").error_summary == "Processing failed"
+
+
 def test_gpu_metrics_are_optional_when_cuda_is_unavailable():
     class CpuCuda:
         @staticmethod
@@ -306,6 +344,27 @@ def test_peak_memory_reset_skips_uninitialized_cuda():
         monitor.start("task-1")
 
     assert reset_calls == []
+
+
+def test_peak_memory_reset_failure_does_not_block_task_start():
+    class Cuda:
+        @staticmethod
+        def is_available():
+            return True
+
+        @staticmethod
+        def reset_peak_memory_stats():
+            raise ValueError("reset failed")
+
+    class Torch:
+        cuda = Cuda()
+
+    with patch.dict("sys.modules", {"torch": Torch()}):
+        monitor = monitor_module.ProcessingMonitor()
+        monitor.submit("task-1", "Inference")
+        monitor.start("task-1")
+
+    assert monitor.get("task-1").status == monitor_module.TaskStatus.RUNNING
 
 
 def test_gpu_metrics_support_cuda_double_without_initialization_api():
