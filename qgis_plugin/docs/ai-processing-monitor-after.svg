@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <rect width="1400" height="900" fill="#202124"/>
+  <rect width="1400" height="46" fill="#303134"/>
+  <text x="24" y="30" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="18" font-weight="700">QGIS · GeoAI</text>
+  <text x="190" y="30" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">Project   Layer   Settings   Plugins   Help</text>
+  <rect x="0" y="46" width="270" height="854" fill="#292a2d"/>
+  <text x="22" y="82" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="19" font-weight="700">GeoAI panels</text>
+  <rect x="18" y="106" width="234" height="45" rx="4" fill="#3c4043"/>
+  <text x="35" y="135" fill="#e8eaed" font-family="Arial, sans-serif" font-size="15">Semantic Segmentation</text>
+  <rect x="18" y="164" width="234" height="45" rx="4" fill="#3c4043"/>
+  <text x="35" y="193" fill="#e8eaed" font-family="Arial, sans-serif" font-size="15">AI Processing Monitor</text>
+  <rect x="18" y="222" width="234" height="45" rx="4" fill="#3c4043"/>
+  <text x="35" y="251" fill="#e8eaed" font-family="Arial, sans-serif" font-size="15">Clear GPU Memory</text>
+  <rect x="270" y="46" width="730" height="854" fill="#d9e8ef"/>
+  <path d="M270 560 L620 300 L870 440 L1000 350 L1000 900 L270 900Z" fill="#a9c5a0"/>
+  <path d="M270 700 L500 610 L730 680 L970 550 L1000 600 L1000 900 L270 900Z" fill="#7fa7c9"/>
+  <path d="M300 190 C520 120 620 260 780 200 S900 220 995 170" fill="none" stroke="#f4c46b" stroke-width="8" opacity=".8"/>
+  <text x="630" y="480" text-anchor="middle" fill="#54707d" font-family="Arial, sans-serif" font-size="25" font-weight="700">QGIS map canvas remains responsive</text>
+  <rect x="1000" y="46" width="400" height="854" fill="#292a2d"/>
+  <text x="1024" y="83" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="19" font-weight="700">AI Processing Monitor</text>
+  <rect x="1018" y="103" width="364" height="76" rx="4" fill="#3c4043"/>
+  <text x="1034" y="130" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="14">Semantic segmentation training</text>
+  <text x="1034" y="157" fill="#81c995" font-family="Arial, sans-serif" font-size="14" font-weight="700">RUNNING</text>
+  <text x="1260" y="157" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">42%</text>
+  <rect x="1018" y="193" width="364" height="12" rx="6" fill="#45484d"/>
+  <rect x="1018" y="193" width="153" height="12" rx="6" fill="#4fc3f7"/>
+  <text x="1022" y="239" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">Elapsed</text>
+  <text x="1245" y="239" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="14">00:12:34</text>
+  <text x="1022" y="267" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">Start</text>
+  <text x="1120" y="267" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="13">2026-10-27 09:00:12</text>
+  <text x="1022" y="295" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">End</text>
+  <text x="1120" y="295" fill="#9aa0a6" font-family="Arial, sans-serif" font-size="13">-</text>
+  <rect x="1018" y="321" width="364" height="112" rx="4" fill="#34363a"/>
+  <text x="1034" y="348" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="14" font-weight="700">GPU: NVIDIA RTX (optional)</text>
+  <text x="1034" y="375" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="13">Allocated: 1,024 MB</text>
+  <text x="1034" y="398" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="13">Reserved: 1,536 MB</text>
+  <text x="1034" y="421" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="13">Peak allocated: 1,280 MB</text>
+  <rect x="1018" y="451" width="364" height="156" rx="4" fill="#34363a"/>
+  <text x="1034" y="479" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="14" font-weight="700">Task details</text>
+  <text x="1034" y="510" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="13">Epoch 21/50</text>
+  <text x="1034" y="537" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="13">Loss: 0.214 · IoU: 0.81</text>
+  <text x="1034" y="564" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="13">Technical errors remain in log.</text>
+  <rect x="1018" y="631" width="168" height="38" rx="4" fill="#4fc3f7"/>
+  <text x="1102" y="655" text-anchor="middle" fill="#172027" font-family="Arial, sans-serif" font-size="14" font-weight="700">Clear finished</text>
+  <rect x="1018" y="710" width="364" height="104" rx="8" fill="#3c4043" stroke="#81c995" stroke-width="2"/>
+  <text x="1038" y="741" fill="#81c995" font-family="Arial, sans-serif" font-size="17" font-weight="700">AFTER</text>
+  <text x="1038" y="768" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="14">Lifecycle, timing, progress, errors</text>
+  <text x="1038" y="791" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="14">and optional GPU metrics in one dock.</text>
+</svg>

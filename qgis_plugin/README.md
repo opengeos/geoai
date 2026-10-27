@@ -68,6 +68,16 @@ Open **GeoAI → AI Processing Monitor** to observe supported Semantic Segmentat
 tasks while they run. The monitor currently covers tile export, training, inference,
 vectorization, and vector smoothing started from the Segmentation panel.
 
+#### Before and after
+
+The following illustrative mockups show the UI difference. They are documentation
+diagrams, not runtime screenshots; validate the final appearance in a QGIS
+installation.
+
+| Before | After |
+| --- | --- |
+| ![Before: no unified AI processing monitor](docs/ai-processing-monitor-before.svg) | ![After: AI Processing Monitor dock](docs/ai-processing-monitor-after.svg) |
+
 -   **States**: `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, and `CANCELLED` are shown when the corresponding lifecycle event is available. `IDLE` is reserved for the monitor model and is not normally shown for submitted work.
 -   **Progress**: Training reports an epoch percentage. Operations that only expose start and finish events use an indeterminate progress bar; the monitor never invents a percentage.
 -   **Timing**: Elapsed time uses a monotonic clock. Start and end timestamps are wall-clock values for display.

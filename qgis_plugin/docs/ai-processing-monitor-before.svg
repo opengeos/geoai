@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <rect width="1400" height="900" fill="#202124"/>
+  <rect width="1400" height="46" fill="#303134"/>
+  <text x="24" y="30" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="18" font-weight="700">QGIS · GeoAI</text>
+  <text x="190" y="30" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">Project   Layer   Settings   Plugins   Help</text>
+  <rect x="0" y="46" width="270" height="854" fill="#292a2d"/>
+  <text x="22" y="82" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="19" font-weight="700">GeoAI panels</text>
+  <rect x="18" y="106" width="234" height="45" rx="4" fill="#3c4043"/>
+  <text x="35" y="135" fill="#e8eaed" font-family="Arial, sans-serif" font-size="15">Semantic Segmentation</text>
+  <rect x="18" y="164" width="234" height="45" rx="4" fill="#3c4043"/>
+  <text x="35" y="193" fill="#e8eaed" font-family="Arial, sans-serif" font-size="15">SamGeo</text>
+  <rect x="18" y="222" width="234" height="45" rx="4" fill="#3c4043"/>
+  <text x="35" y="251" fill="#e8eaed" font-family="Arial, sans-serif" font-size="15">Clear GPU Memory</text>
+  <text x="22" y="330" fill="#9aa0a6" font-family="Arial, sans-serif" font-size="14">During processing</text>
+  <text x="22" y="363" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="15">No task status panel</text>
+  <text x="22" y="394" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">• No central progress view</text>
+  <text x="22" y="422" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">• Elapsed time unavailable</text>
+  <text x="22" y="450" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">• Errors stay in source panel</text>
+  <rect x="270" y="46" width="1130" height="854" fill="#d9e8ef"/>
+  <path d="M270 560 L620 300 L870 440 L1100 180 L1400 350 L1400 900 L270 900Z" fill="#a9c5a0"/>
+  <path d="M270 700 L500 610 L730 680 L970 550 L1190 650 L1400 590 L1400 900 L270 900Z" fill="#7fa7c9"/>
+  <path d="M300 190 C520 120 620 260 780 200 S1060 250 1370 130" fill="none" stroke="#f4c46b" stroke-width="8" opacity=".8"/>
+  <text x="790" y="480" text-anchor="middle" fill="#54707d" font-family="Arial, sans-serif" font-size="28" font-weight="700">QGIS map canvas</text>
+  <rect x="0" y="850" width="1400" height="50" fill="#303134"/>
+  <text x="22" y="881" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="14">Ready</text>
+  <rect x="935" y="72" width="390" height="96" rx="8" fill="#3c4043" stroke="#fbbc04" stroke-width="2"/>
+  <text x="960" y="105" fill="#fbbc04" font-family="Arial, sans-serif" font-size="17" font-weight="700">BEFORE</text>
+  <text x="960" y="133" fill="#f1f3f4" font-family="Arial, sans-serif" font-size="15">No AI Processing Monitor dock</text>
+  <text x="960" y="155" fill="#bdc1c6" font-family="Arial, sans-serif" font-size="13">Users cannot see a unified task lifecycle.</text>
+</svg>
