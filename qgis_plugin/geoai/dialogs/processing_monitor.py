@@ -42,7 +42,6 @@ class ProcessingMonitorDockWidget(QDockWidget):
         self._timer = QTimer(self)
         self._timer.setInterval(500)
         self._timer.timeout.connect(self.refresh)
-        self._timer.start()
         self.refresh()
 
     def _build_ui(self):
@@ -80,23 +79,34 @@ class ProcessingMonitorDockWidget(QDockWidget):
     def refresh(self):
         tasks = self._monitor.snapshot()
         selected = self._selected_task_id
+        task_ids = {task.task_id for task in tasks}
         self.task_list.blockSignals(True)
-        self.task_list.clear()
-        self._items = {}
         for task in tasks:
-            item = QListWidgetItem(f"{task.name} - {task.status.value}")
-            item.setData(Qt.ItemDataRole.UserRole, task.task_id)
-            self.task_list.addItem(item)
-            self._items[task.task_id] = item
+            item = self._items.get(task.task_id)
+            if item is None:
+                item = QListWidgetItem()
+                item.setData(Qt.ItemDataRole.UserRole, task.task_id)
+                self.task_list.addItem(item)
+                self._items[task.task_id] = item
+            item.setText(f"{task.name} - {task.status.value}")
+        for task_id in tuple(self._items):
+            if task_id not in task_ids:
+                item = self._items.pop(task_id)
+                row = self.task_list.row(item)
+                if row >= 0:
+                    self.task_list.takeItem(row)
         self.task_list.blockSignals(False)
         if selected in self._items:
-            self.task_list.setCurrentItem(self._items[selected])
+            self._selected_task_id = selected
         elif tasks:
-            self.task_list.setCurrentRow(len(tasks) - 1)
+            self._selected_task_id = tasks[-1].task_id
         else:
             self._selected_task_id = None
             self._show_task(None)
-        if self._selected_task_id:
+        if self._selected_task_id is not None:
+            self.task_list.blockSignals(True)
+            self.task_list.setCurrentItem(self._items[self._selected_task_id])
+            self.task_list.blockSignals(False)
             self._show_task(self._monitor.get(self._selected_task_id))
 
     def _selection_changed(self, current, _previous):
@@ -141,7 +151,8 @@ class ProcessingMonitorDockWidget(QDockWidget):
             details = f"{details}\n\nError: {task.error_summary}".strip()
         if task.error_details:
             details = f"{details}\n\nTechnical details:\n{task.error_details}".strip()
-        self.details_text.setPlainText(details)
+        if self.details_text.toPlainText() != details:
+            self.details_text.setPlainText(details)
 
     @staticmethod
     def _format_timestamp(value) -> str:
@@ -158,3 +169,12 @@ class ProcessingMonitorDockWidget(QDockWidget):
     def closeEvent(self, event):
         self._timer.stop()
         super().closeEvent(event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.refresh()
+        self._timer.start()
+
+    def hideEvent(self, event):
+        self._timer.stop()
+        super().hideEvent(event)

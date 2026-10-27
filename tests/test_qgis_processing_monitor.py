@@ -70,6 +70,39 @@ def test_failure_preserves_error_details_and_terminal_state():
     assert task.status == monitor_module.TaskStatus.FAILED
 
 
+@pytest.mark.parametrize(
+    ("error", "summary"),
+    [
+        ("single line", "Processing failed: single line"),
+        ("first line\ntechnical detail", "Processing failed: first line"),
+        ("", "Processing failed"),
+    ],
+)
+def test_failure_summary_uses_first_line(error, summary):
+    monitor = monitor_module.ProcessingMonitor()
+    monitor.submit("task-1", "Inference")
+
+    monitor.fail("task-1", error)
+
+    task = monitor.get("task-1")
+    assert task.error_summary == summary
+    assert task.error_details == error
+
+
+def test_exception_summary_uses_first_line_and_preserves_category():
+    monitor = monitor_module.ProcessingMonitor()
+    monitor.submit("task-1", "Inference")
+
+    monitor.fail(
+        "task-1",
+        FileNotFoundError("missing.tif\nadditional diagnostic detail"),
+    )
+
+    task = monitor.get("task-1")
+    assert task.error_summary == "Missing or invalid input file: missing.tif"
+    assert "additional diagnostic detail" in task.error_details
+
+
 def test_repeated_terminal_callbacks_are_ignored():
     monitor = monitor_module.ProcessingMonitor()
     monitor.submit("task-1", "Inference")
@@ -186,6 +219,10 @@ def test_gpu_metrics_report_supported_cuda_values():
             return True
 
         @staticmethod
+        def is_initialized():
+            return True
+
+        @staticmethod
         def current_device():
             return 0
 
@@ -216,6 +253,134 @@ def test_gpu_metrics_report_supported_cuda_values():
     assert metrics.allocated_bytes == 10
     assert metrics.reserved_bytes == 20
     assert metrics.peak_allocated_bytes == 30
+
+
+def test_gpu_metrics_skip_uninitialized_cuda():
+    class Cuda:
+        @staticmethod
+        def is_available():
+            return True
+
+        @staticmethod
+        def is_initialized():
+            return False
+
+        @staticmethod
+        def current_device():
+            raise AssertionError("CUDA calls should be skipped")
+
+    class Torch:
+        cuda = Cuda()
+
+    with patch.dict("sys.modules", {"torch": Torch()}):
+        metrics = monitor_module.get_gpu_metrics()
+
+    assert metrics.available is False
+    assert metrics.unavailable_reason == "CUDA unavailable"
+
+
+def test_peak_memory_reset_skips_uninitialized_cuda():
+    reset_calls = []
+
+    class Cuda:
+        @staticmethod
+        def is_available():
+            return True
+
+        @staticmethod
+        def is_initialized():
+            return False
+
+        @staticmethod
+        def reset_peak_memory_stats():
+            reset_calls.append(True)
+
+    class Torch:
+        cuda = Cuda()
+
+    with patch.dict("sys.modules", {"torch": Torch()}):
+        monitor = monitor_module.ProcessingMonitor()
+        monitor.submit("task-1", "Inference")
+        monitor.start("task-1")
+
+    assert reset_calls == []
+
+
+def test_gpu_metrics_support_cuda_double_without_initialization_api():
+    class Cuda:
+        @staticmethod
+        def is_available():
+            return True
+
+        @staticmethod
+        def current_device():
+            return 0
+
+        @staticmethod
+        def get_device_name(_device):
+            return "Test GPU"
+
+        memory_allocated = staticmethod(lambda _device: 1)
+        memory_reserved = staticmethod(lambda _device: 2)
+        max_memory_allocated = staticmethod(lambda _device: 3)
+
+    class Torch:
+        cuda = Cuda()
+
+    with patch.dict("sys.modules", {"torch": Torch()}):
+        metrics = monitor_module.get_gpu_metrics()
+
+    assert metrics.available is True
+
+
+def test_gpu_metrics_do_not_access_torch_when_absent():
+    with patch.dict("sys.modules", {"torch": None}):
+        metrics = monitor_module.get_gpu_metrics()
+
+    assert metrics.available is False
+    assert metrics.unavailable_reason == "PyTorch unavailable"
+
+
+def test_peak_memory_reset_is_preserved_for_concurrent_tasks():
+    reset_calls = []
+
+    class Cuda:
+        @staticmethod
+        def is_available():
+            return True
+
+        @staticmethod
+        def is_initialized():
+            return True
+
+        @staticmethod
+        def reset_peak_memory_stats():
+            reset_calls.append(True)
+
+        @staticmethod
+        def current_device():
+            return 0
+
+        @staticmethod
+        def get_device_name(_device):
+            return "Test GPU"
+
+        memory_allocated = staticmethod(lambda _device: 1)
+        memory_reserved = staticmethod(lambda _device: 2)
+        max_memory_allocated = staticmethod(lambda _device: 3)
+
+    class Torch:
+        cuda = Cuda()
+
+    with patch.dict("sys.modules", {"torch": Torch()}):
+        monitor = monitor_module.ProcessingMonitor()
+        monitor.submit("first", "First")
+        monitor.start("first")
+        assert len(reset_calls) == 1
+        monitor.submit("second", "Second")
+        monitor.start("second")
+
+    assert len(reset_calls) == 1
 
 
 def test_gpu_metrics_do_not_clear_cuda_cache():

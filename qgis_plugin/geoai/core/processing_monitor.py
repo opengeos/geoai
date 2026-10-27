@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import sys
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -91,14 +92,16 @@ def classify_error(error: BaseException | str) -> str:
 
 def get_gpu_metrics() -> GPUMetrics:
     """Read optional CUDA metrics without making PyTorch a plugin dependency."""
-    try:
-        import torch
-    except (ImportError, OSError):
+    torch = sys.modules.get("torch")
+    if torch is None:
         return GPUMetrics(False, unavailable_reason="PyTorch unavailable")
 
     try:
         cuda = getattr(torch, "cuda", None)
         if cuda is None or not cuda.is_available():
+            return GPUMetrics(False, unavailable_reason="CUDA unavailable")
+        is_initialized = getattr(cuda, "is_initialized", None)
+        if is_initialized is not None and not is_initialized():
             return GPUMetrics(False, unavailable_reason="CUDA unavailable")
         device = cuda.current_device()
         return GPUMetrics(
@@ -161,16 +164,23 @@ class ProcessingMonitor:
     def _reset_gpu_peak_metrics(self, task_id: str) -> None:
         if any(
             item.status == TaskStatus.RUNNING and item.task_id != task_id
-            for task_id, item in self._tasks.items()
+            for item in self._tasks.values()
         ):
             return
+        torch = sys.modules.get("torch")
+        if torch is None:
+            return
         try:
-            import torch
-
             cuda = getattr(torch, "cuda", None)
-            if cuda is not None and cuda.is_available():
-                cuda.reset_peak_memory_stats()
-        except (ImportError, OSError, RuntimeError, AttributeError):
+            if cuda is None or not cuda.is_available():
+                return
+            is_initialized = getattr(cuda, "is_initialized", None)
+            if is_initialized is not None and not is_initialized():
+                return
+            reset_peak_memory_stats = getattr(cuda, "reset_peak_memory_stats", None)
+            if reset_peak_memory_stats is not None:
+                reset_peak_memory_stats()
+        except (OSError, RuntimeError, AttributeError):
             logger.info("GPU peak memory reset unavailable")
 
     def progress(
@@ -217,17 +227,20 @@ class ProcessingMonitor:
         ):
             return
         if isinstance(error, BaseException):
-            task.error_summary = f"{classify_error(error)}: {error}"
+            error_text = str(error)
             task.error_details = "".join(
                 traceback.format_exception(type(error), error, error.__traceback__)
             )
             logger.error("AI task failed: %s (%s): %s", task.name, task_id, error)
         else:
-            task.error_summary = (
-                f"{classify_error(error)}: {str(error).splitlines()[0]}"
-            )
-            task.error_details = str(error)
+            error_text = str(error)
+            task.error_details = error_text
             logger.error("AI task failed: %s (%s): %s", task.name, task_id, error)
+        summary_text = error_text.splitlines()[0] if error_text.splitlines() else ""
+        category = classify_error(summary_text if isinstance(error, str) else error)
+        task.error_summary = (
+            f"{category}: {summary_text}" if summary_text else category
+        )
         self._finish(task_id, TaskStatus.FAILED)
 
     def _finish(self, task_id: str, status: TaskStatus) -> None:

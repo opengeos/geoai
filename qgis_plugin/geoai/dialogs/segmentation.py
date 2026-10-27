@@ -466,6 +466,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         progress_signal.connect(lambda message: monitor.progress(task_id, str(message)))
         worker.finished.connect(lambda _result: monitor.complete(task_id))
         worker.error.connect(lambda error: monitor.fail(task_id, str(error)))
+        worker._processing_monitor_task_id = task_id
         return task_id
 
     def setup_ui(self):
@@ -1838,4 +1839,12 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             if worker and worker.isRunning():
                 worker.terminate()
                 worker.wait()
+            self._cancel_monitored_worker(worker)
         event.accept()
+
+    def _cancel_monitored_worker(self, worker):
+        if worker is None:
+            return
+        task_id = getattr(worker, "_processing_monitor_task_id", None)
+        if task_id:
+            self._processing_monitor.cancel(task_id)
