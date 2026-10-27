@@ -11,7 +11,7 @@ import tempfile
 import uuid
 from typing import Optional
 
-from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
+from qgis.PyQt.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
     QWidget,
@@ -434,6 +434,31 @@ class SmoothVectorWorker(QThread):
             self.exception.emit(e)
 
 
+class _MonitorSignalBridge(QObject):
+    """Deliver worker monitor callbacks on the dock widget's thread."""
+
+    def __init__(self, monitor, task_id, parent=None):
+        super().__init__(parent)
+        self._monitor = monitor
+        self._task_id = task_id
+
+    @pyqtSlot()
+    def started(self):
+        self._monitor.start(self._task_id)
+
+    @pyqtSlot(str)
+    def progress(self, message):
+        self._monitor.progress(self._task_id, str(message))
+
+    @pyqtSlot(str)
+    def finished(self, _result):
+        self._monitor.complete(self._task_id)
+
+    @pyqtSlot(object)
+    def exception(self, error):
+        self._monitor.fail(self._task_id, error)
+
+
 class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
     """Dockable widget for segmentation training and inference."""
 
@@ -470,12 +495,14 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         task_id = f"segmentation-{uuid.uuid4().hex}"
         monitor = self._processing_monitor
         monitor.submit(task_id, task_name)
-        worker.started.connect(lambda: monitor.start(task_id))
+        bridge = _MonitorSignalBridge(monitor, task_id, self)
+        worker.started.connect(bridge.started)
         if progress_signal is None:
             progress_signal = worker.progress
-        progress_signal.connect(lambda message: monitor.progress(task_id, str(message)))
-        worker.finished.connect(lambda _result: monitor.complete(task_id))
-        worker.exception.connect(lambda error: monitor.fail(task_id, error))
+        progress_signal.connect(bridge.progress)
+        worker.finished.connect(bridge.finished)
+        worker.exception.connect(bridge.exception)
+        worker._processing_monitor_bridge = bridge
         worker._processing_monitor_task_id = task_id
         return task_id
 
