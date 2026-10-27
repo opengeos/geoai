@@ -3,12 +3,21 @@
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from qgis.PyQt.QtGui import QTextCursor
 from qgis.PyQt.QtWidgets import QApplication
 
-from geoai.core.processing_monitor import TaskStatus, get_processing_monitor
+from geoai.core import processing_monitor as processing_monitor_core
+from geoai.core.processing_monitor import ProcessingMonitor, TaskStatus
 from geoai.dialogs.processing_monitor import ProcessingMonitorDockWidget
 from geoai.dialogs.segmentation import SegmentationDockWidget
+
+
+@pytest.fixture(autouse=True)
+def isolated_processing_monitor(monkeypatch):
+    monitor = ProcessingMonitor()
+    monkeypatch.setattr(processing_monitor_core, "_monitor", monitor)
+    yield monitor
 
 
 def _app():
@@ -21,7 +30,7 @@ def _task_id(prefix):
 
 def test_refresh_reuses_items_and_preserves_selection():
     _app()
-    monitor = get_processing_monitor()
+    monitor = processing_monitor_core.get_processing_monitor()
     first_id = _task_id("first")
     second_id = _task_id("second")
     monitor.submit(first_id, "First task")
@@ -56,7 +65,7 @@ def test_refresh_reuses_items_and_preserves_selection():
 
 def test_details_text_is_not_reset_when_content_is_unchanged():
     _app()
-    monitor = get_processing_monitor()
+    monitor = processing_monitor_core.get_processing_monitor()
     task_id = _task_id("details")
     monitor.submit(task_id, "Details task")
     monitor.progress(task_id, "Same details")
@@ -101,7 +110,7 @@ def test_timer_tracks_dock_visibility():
 
 
 def test_panel_shutdown_cancels_monitor_task():
-    monitor = get_processing_monitor()
+    monitor = processing_monitor_core.get_processing_monitor()
     task_id = _task_id("shutdown")
     monitor.submit(task_id, "Shutdown task")
     worker = SimpleNamespace(_processing_monitor_task_id=task_id)
@@ -114,7 +123,7 @@ def test_panel_shutdown_cancels_monitor_task():
 
 
 def test_panel_shutdown_handles_missing_and_terminal_tasks():
-    monitor = get_processing_monitor()
+    monitor = processing_monitor_core.get_processing_monitor()
     panel = SimpleNamespace(_processing_monitor=monitor)
     SegmentationDockWidget._cancel_monitored_worker(panel, None)
     SegmentationDockWidget._cancel_monitored_worker(panel, SimpleNamespace())
@@ -127,3 +136,51 @@ def test_panel_shutdown_handles_missing_and_terminal_tasks():
     )
     assert monitor.get(task_id).status == TaskStatus.COMPLETED
     monitor.clear_finished()
+
+
+@pytest.mark.parametrize(
+    ("status", "progress", "visible", "minimum", "maximum", "value"),
+    [
+        (TaskStatus.QUEUED, None, True, 0, 0, 0),
+        (TaskStatus.RUNNING, None, True, 0, 0, 0),
+        (TaskStatus.RUNNING, 42, True, 0, 100, 42),
+        (TaskStatus.COMPLETED, None, False, 0, 0, 0),
+        (TaskStatus.FAILED, None, False, 0, 0, 0),
+        (TaskStatus.CANCELLED, None, False, 0, 0, 0),
+        (TaskStatus.COMPLETED, 100, True, 0, 100, 100),
+    ],
+)
+def test_progress_bar_reflects_task_status_and_measurement(
+    status, progress, visible, minimum, maximum, value
+):
+    _app()
+    monitor = processing_monitor_core.get_processing_monitor()
+    task_id = _task_id("progress")
+    task = monitor.submit(task_id, "Progress task")
+    task.status = status
+    task.progress = progress
+
+    dock = ProcessingMonitorDockWidget()
+    try:
+        dock._show_task(task)
+        assert dock.progress_bar.isHidden() is not visible
+        assert dock.progress_bar.minimum() == minimum
+        assert dock.progress_bar.maximum() == maximum
+        if progress is not None:
+            assert dock.progress_bar.value() == value
+    finally:
+        dock.close()
+
+
+def test_no_selected_task_hides_progress_bar():
+    _app()
+    dock = ProcessingMonitorDockWidget()
+    try:
+        dock._show_task(None)
+        assert dock.progress_bar.isHidden()
+    finally:
+        dock.close()
+
+
+def test_processing_monitor_tests_use_an_isolated_singleton():
+    assert processing_monitor_core.get_processing_monitor().snapshot() == []

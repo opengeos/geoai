@@ -20,6 +20,7 @@ from qgis.PyQt.QtWidgets import (
 
 from ..core.processing_monitor import (
     ProcessingTask,
+    TaskStatus,
     format_elapsed,
     get_processing_monitor,
 )
@@ -57,6 +58,7 @@ class ProcessingMonitorDockWidget(QDockWidget):
         layout.addWidget(self.status_label)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
         self.elapsed_label = QLabel("Elapsed: 00:00:00")
         layout.addWidget(self.elapsed_label)
@@ -118,7 +120,7 @@ class ProcessingMonitorDockWidget(QDockWidget):
     def _show_task(self, task: Optional[ProcessingTask]):
         if task is None:
             self.status_label.setText("No task selected")
-            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setVisible(False)
             self.elapsed_label.setText("Elapsed: 00:00:00")
             self.time_label.setText("Start: -\nEnd: -")
             self.gpu_label.setText("GPU: unavailable")
@@ -127,8 +129,13 @@ class ProcessingMonitorDockWidget(QDockWidget):
 
         self.status_label.setText(f"Status: {task.status.value}")
         if task.progress is None:
-            self.progress_bar.setRange(0, 0)
+            if task.status in (TaskStatus.QUEUED, TaskStatus.RUNNING):
+                self.progress_bar.setVisible(True)
+                self.progress_bar.setRange(0, 0)
+            else:
+                self.progress_bar.setVisible(False)
         else:
+            self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(task.progress)
         self.elapsed_label.setText(f"Elapsed: {format_elapsed(task.elapsed_seconds)}")

@@ -124,9 +124,10 @@ than the subprocess because subprocess GPU telemetry is not yet integrated.
 
 The monitor never invokes CUDA cache clearing automatically. **Clear GPU Memory**
 remains a separate manual action and should not be used while an inference task
-is actively using the GPU. Cancellation is not exposed by the current
-segmentation workers, so `CANCELLED` is reserved for future cancellation
-integration.
+is actively using the GPU. There is no dedicated user-facing cancel control.
+Closing the Semantic Segmentation panel terminates running workers according to
+the panel shutdown lifecycle and can mark their associated monitor tasks as
+`CANCELLED`. Other task types are not claimed to support cancellation.
 
 ## Installation
 
