@@ -8,6 +8,7 @@ and running inference, combined in a single dockable panel.
 import os
 import shutil
 import tempfile
+import uuid
 from typing import Optional
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -38,6 +39,7 @@ from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
 
 from .inference_range import InferenceRangeMixin
+from ..core.processing_monitor import get_processing_monitor
 
 
 class OutputCapture:
@@ -445,12 +447,28 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.inference_bbox = None
         self.inference_bbox_crs = None
         self.inference_range_layer_source = None
+        self._processing_monitor = get_processing_monitor()
 
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
         self.setup_ui()
         self.connect_signals()
+
+    def _monitor_worker(self, worker, task_name, progress_signal=None):
+        """Connect an existing QThread worker to the AI Processing Monitor."""
+        task_id = f"segmentation-{uuid.uuid4().hex}"
+        monitor = self._processing_monitor
+        monitor.submit(task_id, task_name)
+        worker.started.connect(lambda: monitor.start(task_id))
+        if progress_signal is None:
+            progress_signal = worker.progress
+        progress_signal.connect(
+            lambda message: monitor.progress(task_id, str(message))
+        )
+        worker.finished.connect(lambda _result: monitor.complete(task_id))
+        worker.error.connect(lambda error: monitor.fail(task_id, str(error)))
+        return task_id
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -1384,6 +1402,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.tile_worker.finished.connect(self.on_tile_export_finished)
         self.tile_worker.error.connect(self.on_tile_export_error)
         self.tile_worker.progress.connect(self.log)
+        self._monitor_worker(self.tile_worker, "Semantic segmentation tile export")
         self.tile_worker.start()
 
     def on_tile_export_finished(self, output_dir: str):
@@ -1557,6 +1576,18 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.train_worker.error.connect(self.on_training_error)
         self.train_worker.progress.connect(self.log)
         self.train_worker.epoch_progress.connect(self.on_epoch_progress)
+        training_task_id = self._monitor_worker(
+            self.train_worker,
+            "Semantic segmentation model training",
+            progress_signal=self.train_worker.progress,
+        )
+        self.train_worker.epoch_progress.connect(
+            lambda current, total, _metrics: self._processing_monitor.progress(
+                training_task_id,
+                f"Epoch {current}/{total}",
+                round(current * 100 / total) if total else None,
+            )
+        )
         self.train_worker.start()
 
     def on_epoch_progress(self, current_epoch: int, total_epochs: int, metrics: str):
@@ -1686,6 +1717,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.inference_worker.finished.connect(self.on_inference_finished)
         self.inference_worker.error.connect(self.on_inference_error)
         self.inference_worker.progress.connect(self.log)
+        self._monitor_worker(self.inference_worker, "Semantic segmentation inference")
         self.inference_worker.start()
 
     def on_inference_finished(self, output_path: str):
@@ -1758,6 +1790,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.smooth_worker.finished.connect(self.on_vectorize_finished)
             self.smooth_worker.error.connect(self.on_vectorize_error)
             self.smooth_worker.progress.connect(self.log)
+            self._monitor_worker(self.smooth_worker, "Smooth segmentation vectors")
             self.smooth_worker.start()
         else:
             self.log("Regularizing vector (for buildings)...")
@@ -1770,6 +1803,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.vectorize_worker.finished.connect(self.on_vectorize_finished)
             self.vectorize_worker.error.connect(self.on_vectorize_error)
             self.vectorize_worker.progress.connect(self.log)
+            self._monitor_worker(self.vectorize_worker, "Vectorize segmentation mask")
             self.vectorize_worker.start()
 
     def on_vectorize_finished(self, output_path: str):

@@ -62,6 +62,24 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 -   **Clear GPU Memory**: Release GPU memory and clear CUDA cache for all loaded models
 
+### AI Processing Monitor
+
+Open **GeoAI → AI Processing Monitor** to observe supported Semantic Segmentation
+tasks while they run. The monitor currently covers tile export, training, inference,
+vectorization, and vector smoothing started from the Segmentation panel.
+
+-   **States**: `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, and `CANCELLED` are shown when the corresponding lifecycle event is available. `IDLE` is reserved for the monitor model and is not normally shown for submitted work.
+-   **Progress**: Training reports an epoch percentage. Operations that only expose start and finish events use an indeterminate progress bar; the monitor never invents a percentage.
+-   **Timing**: Elapsed time uses a monotonic clock. Start and end timestamps are wall-clock values for display.
+-   **Errors**: The monitor shows a concise category and preserves the technical traceback in the task details and plugin log. Categories are best-effort; unknown failures are reported as processing failures.
+-   **GPU metrics**: When PyTorch and CUDA are available in the QGIS process, the monitor shows the device name, allocated memory, reserved memory, and peak allocated memory in MB. Allocated memory is active tensor memory; reserved memory is memory held by PyTorch's caching allocator. These values are not total GPU utilization.
+-   **Unavailable metrics**: CPU-only installations, missing PyTorch, unavailable CUDA drivers, or unsupported backends are handled without disabling processing. For work executed in a managed subprocess, the displayed values may describe the QGIS process rather than the subprocess; subprocess GPU telemetry is not yet integrated.
+
+The monitor does not clear CUDA memory automatically. **Clear GPU Memory** remains a
+separate manual action and should not be used while an inference task is actively
+using the GPU. Cancellation is not exposed by the current segmentation workers, so
+the `CANCELLED` state is reserved for future cancellation integration.
+
 ## Installation
 
 ### 1. Set up the environment
