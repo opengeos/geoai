@@ -187,6 +187,8 @@ def test_error_categories_and_technical_logging(caplog):
     ("error", "category"),
     [
         (ImportError("model dependency"), "Missing Python dependency"),
+        (RuntimeError("input file does not exist"), "Missing or invalid input file"),
+        (RuntimeError("No module named 'torch'"), "Missing Python dependency"),
         (PermissionError("cannot save output"), "Output or file access failure"),
         (RuntimeError("failed to write output"), "Output writing failure"),
         (RuntimeError("unexpected failure"), "Processing failed"),

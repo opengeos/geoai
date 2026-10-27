@@ -118,9 +118,10 @@ shows the device name, allocated memory, reserved memory, and peak allocated
 memory in MB. Allocated memory is active tensor memory; reserved memory is held
 by PyTorch's caching allocator. Neither value represents total GPU utilization.
 CPU-only installations, missing PyTorch, unavailable CUDA drivers, and
-unsupported backends do not prevent processing. For inference running in a
-managed subprocess, the displayed values may describe the QGIS process rather
-than the subprocess because subprocess GPU telemetry is not yet integrated.
+unsupported backends do not prevent processing. For subprocess-backed Semantic
+Segmentation tasks, including training and inference, the displayed values may
+describe the QGIS process rather than the subprocess because subprocess GPU
+telemetry is not yet integrated.
 
 The monitor never invokes CUDA cache clearing automatically. **Clear GPU Memory**
 remains a separate manual action and should not be used while an inference task

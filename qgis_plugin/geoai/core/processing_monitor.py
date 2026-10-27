@@ -85,6 +85,10 @@ def classify_error(error: BaseException | str) -> str:
     message = str(error).lower()
     if any(token in message for token in ("cuda", "cudnn", "out of memory", "gpu")):
         return "GPU or CUDA error"
+    if any(token in message for token in ("no such file", "does not exist")):
+        return "Missing or invalid input file"
+    if any(token in message for token in ("no module named", "cannot import name")):
+        return "Missing Python dependency"
     if any(token in message for token in ("write", "save", "disk full", "output")):
         return "Output writing failure"
     return "Processing failed"
