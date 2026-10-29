@@ -161,7 +161,7 @@ class GeoAIPlugin:
             parent=self.iface.mainWindow(),
         )
 
-        monitor_icon = ":/images/themes/default/mActionTimer.svg"
+        monitor_icon = ":/images/themes/default/mActionRefresh.svg"
         self.processing_monitor_action = self.add_action(
             monitor_icon,
             "AI Processing Monitor",
