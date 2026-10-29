@@ -234,9 +234,11 @@ def test_worker_monitor_callbacks_are_delivered_to_dock_thread():
         progress = pyqtSignal(str)
         finished = pyqtSignal(str)
         exception = pyqtSignal(object)
+        epoch_progress = pyqtSignal(int, int, str)
 
         def run(self):
             self.progress.emit("Working")
+            self.epoch_progress.emit(1, 4, "metrics")
             self.exception.emit(FileNotFoundError("missing input"))
 
     monitor = Monitor()
@@ -247,7 +249,12 @@ def test_worker_monitor_callbacks_are_delivered_to_dock_thread():
     panel = Panel()
     panel._processing_monitor = monitor
     worker = Worker()
-    task_id = SegmentationDockWidget._monitor_worker(panel, worker, "Threaded task")
+    task_id = SegmentationDockWidget._monitor_worker(
+        panel,
+        worker,
+        "Threaded task",
+        epoch_progress_signal=worker.epoch_progress,
+    )
 
     worker.start()
     assert worker.wait(5000)
@@ -258,7 +265,8 @@ def test_worker_monitor_callbacks_are_delivered_to_dock_thread():
 
     task = monitor.get(task_id)
     assert task.status == TaskStatus.FAILED
-    assert task.progress_message == "Working"
+    assert task.progress_message == "Epoch 1/4"
+    assert task.progress == 25
     assert task.error_summary == "Missing or invalid input file: missing input"
     assert callback_threads
     assert all(thread == panel.thread() for thread in callback_threads)

@@ -450,6 +450,15 @@ class _MonitorSignalBridge(QObject):
     def progress(self, message):
         self._monitor.progress(self._task_id, str(message))
 
+    @pyqtSlot(int, int, str)
+    def epoch_progress(self, current, total, _metrics):
+        percent = round(current * 100 / total) if total else None
+        self._monitor.progress(
+            self._task_id,
+            f"Epoch {current}/{total}",
+            percent,
+        )
+
     @pyqtSlot(str)
     def finished(self, _result):
         self._monitor.complete(self._task_id)
@@ -490,7 +499,9 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.setup_ui()
         self.connect_signals()
 
-    def _monitor_worker(self, worker, task_name, progress_signal=None):
+    def _monitor_worker(
+        self, worker, task_name, progress_signal=None, epoch_progress_signal=None
+    ):
         """Connect an existing QThread worker to the AI Processing Monitor."""
         task_id = f"segmentation-{uuid.uuid4().hex}"
         monitor = self._processing_monitor
@@ -500,6 +511,8 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         if progress_signal is None:
             progress_signal = worker.progress
         progress_signal.connect(bridge.progress)
+        if epoch_progress_signal is not None:
+            epoch_progress_signal.connect(bridge.epoch_progress)
         worker.finished.connect(bridge.finished)
         worker.exception.connect(bridge.exception)
         worker._processing_monitor_bridge = bridge
@@ -1612,17 +1625,11 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.train_worker.error.connect(self.on_training_error)
         self.train_worker.progress.connect(self.log)
         self.train_worker.epoch_progress.connect(self.on_epoch_progress)
-        training_task_id = self._monitor_worker(
+        self._monitor_worker(
             self.train_worker,
             "Semantic segmentation model training",
             progress_signal=self.train_worker.progress,
-        )
-        self.train_worker.epoch_progress.connect(
-            lambda current, total, _metrics: self._processing_monitor.progress(
-                training_task_id,
-                f"Epoch {current}/{total}",
-                round(current * 100 / total) if total else None,
-            )
+            epoch_progress_signal=self.train_worker.epoch_progress,
         )
         self.train_worker.start()
 
