@@ -8,9 +8,10 @@ and running inference, combined in a single dockable panel.
 import os
 import shutil
 import tempfile
+import uuid
 from typing import Optional
 
-from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
+from qgis.PyQt.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
     QWidget,
@@ -38,6 +39,7 @@ from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
 
 from .inference_range import InferenceRangeMixin
+from ..core.processing_monitor import get_processing_monitor
 
 
 class OutputCapture:
@@ -72,6 +74,7 @@ class TrainingWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
     epoch_progress = pyqtSignal(int, int, str)  # current_epoch, total_epochs, metrics
 
@@ -172,6 +175,7 @@ class TrainingWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class TileExportWorker(QThread):
@@ -179,6 +183,7 @@ class TileExportWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -226,6 +231,7 @@ class TileExportWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class InferenceWorker(QThread):
@@ -233,6 +239,7 @@ class InferenceWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -325,6 +332,7 @@ class InferenceWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
         finally:
             if temp_dir:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -335,6 +343,7 @@ class VectorizeWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -373,6 +382,7 @@ class VectorizeWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class SmoothVectorWorker(QThread):
@@ -380,6 +390,7 @@ class SmoothVectorWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -420,6 +431,41 @@ class SmoothVectorWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
+
+
+class _MonitorSignalBridge(QObject):
+    """Deliver worker monitor callbacks on the dock widget's thread."""
+
+    def __init__(self, monitor, task_id, parent=None):
+        super().__init__(parent)
+        self._monitor = monitor
+        self._task_id = task_id
+
+    @pyqtSlot()
+    def started(self):
+        self._monitor.start(self._task_id)
+
+    @pyqtSlot(str)
+    def progress(self, message):
+        self._monitor.progress(self._task_id, str(message))
+
+    @pyqtSlot(int, int, str)
+    def epoch_progress(self, current, total, _metrics):
+        percent = round(current * 100 / total) if total else None
+        self._monitor.progress(
+            self._task_id,
+            f"Epoch {current}/{total}",
+            percent,
+        )
+
+    @pyqtSlot(str)
+    def finished(self, _result):
+        self._monitor.complete(self._task_id)
+
+    @pyqtSlot(object)
+    def exception(self, error):
+        self._monitor.fail(self._task_id, error)
 
 
 class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
@@ -445,12 +491,33 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.inference_bbox = None
         self.inference_bbox_crs = None
         self.inference_range_layer_source = None
+        self._processing_monitor = get_processing_monitor()
 
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
         self.setup_ui()
         self.connect_signals()
+
+    def _monitor_worker(
+        self, worker, task_name, progress_signal=None, epoch_progress_signal=None
+    ):
+        """Connect an existing QThread worker to the AI Processing Monitor."""
+        task_id = f"segmentation-{uuid.uuid4().hex}"
+        monitor = self._processing_monitor
+        monitor.submit(task_id, task_name)
+        bridge = _MonitorSignalBridge(monitor, task_id, self)
+        worker.started.connect(bridge.started)
+        if progress_signal is None:
+            progress_signal = worker.progress
+        progress_signal.connect(bridge.progress)
+        if epoch_progress_signal is not None:
+            epoch_progress_signal.connect(bridge.epoch_progress)
+        worker.finished.connect(bridge.finished)
+        worker.exception.connect(bridge.exception)
+        worker._processing_monitor_bridge = bridge
+        worker._processing_monitor_task_id = task_id
+        return task_id
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -1384,6 +1451,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.tile_worker.finished.connect(self.on_tile_export_finished)
         self.tile_worker.error.connect(self.on_tile_export_error)
         self.tile_worker.progress.connect(self.log)
+        self._monitor_worker(self.tile_worker, "Semantic segmentation tile export")
         self.tile_worker.start()
 
     def on_tile_export_finished(self, output_dir: str):
@@ -1557,6 +1625,12 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.train_worker.error.connect(self.on_training_error)
         self.train_worker.progress.connect(self.log)
         self.train_worker.epoch_progress.connect(self.on_epoch_progress)
+        self._monitor_worker(
+            self.train_worker,
+            "Semantic segmentation model training",
+            progress_signal=self.train_worker.progress,
+            epoch_progress_signal=self.train_worker.epoch_progress,
+        )
         self.train_worker.start()
 
     def on_epoch_progress(self, current_epoch: int, total_epochs: int, metrics: str):
@@ -1686,6 +1760,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.inference_worker.finished.connect(self.on_inference_finished)
         self.inference_worker.error.connect(self.on_inference_error)
         self.inference_worker.progress.connect(self.log)
+        self._monitor_worker(self.inference_worker, "Semantic segmentation inference")
         self.inference_worker.start()
 
     def on_inference_finished(self, output_path: str):
@@ -1758,6 +1833,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.smooth_worker.finished.connect(self.on_vectorize_finished)
             self.smooth_worker.error.connect(self.on_vectorize_error)
             self.smooth_worker.progress.connect(self.log)
+            self._monitor_worker(self.smooth_worker, "Smooth segmentation vectors")
             self.smooth_worker.start()
         else:
             self.log("Regularizing vector (for buildings)...")
@@ -1770,6 +1846,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.vectorize_worker.finished.connect(self.on_vectorize_finished)
             self.vectorize_worker.error.connect(self.on_vectorize_error)
             self.vectorize_worker.progress.connect(self.log)
+            self._monitor_worker(self.vectorize_worker, "Vectorize segmentation mask")
             self.vectorize_worker.start()
 
     def on_vectorize_finished(self, output_path: str):
@@ -1806,4 +1883,12 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             if worker and worker.isRunning():
                 worker.terminate()
                 worker.wait()
+            self._cancel_monitored_worker(worker)
         event.accept()
+
+    def _cancel_monitored_worker(self, worker):
+        if worker is None:
+            return
+        task_id = getattr(worker, "_processing_monitor_task_id", None)
+        if task_id:
+            self._processing_monitor.cancel(task_id)

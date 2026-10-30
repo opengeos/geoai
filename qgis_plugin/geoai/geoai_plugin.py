@@ -37,6 +37,7 @@ class GeoAIPlugin:
         self._samgeo_dock = None
         self._deepforest_dock = None
         self._water_segmentation_dock = None
+        self._processing_monitor_dock = None
 
         # Dependency installation state
         self._deps_available = False
@@ -156,6 +157,16 @@ class GeoAIPlugin:
             "Tree Segmentation",
             self.toggle_deepforest_dock,
             status_tip="Toggle Tree Segmentation panel (tree crown detection and forest analysis)",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        monitor_icon = ":/images/themes/default/mActionRefresh.svg"
+        self.processing_monitor_action = self.add_action(
+            monitor_icon,
+            "AI Processing Monitor",
+            self.toggle_processing_monitor_dock,
+            status_tip="Monitor GeoAI task status, progress, timing, errors, and GPU memory",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
@@ -399,6 +410,11 @@ class GeoAIPlugin:
             self._instance_segmentation_dock.deleteLater()
             self._instance_segmentation_dock = None
 
+        if self._processing_monitor_dock:
+            self.iface.removeDockWidget(self._processing_monitor_dock)
+            self._processing_monitor_dock.deleteLater()
+            self._processing_monitor_dock = None
+
         # Remove actions from menu
         for action in self.actions:
             self.iface.removePluginMenu("&GeoAI", action)
@@ -629,6 +645,43 @@ class GeoAIPlugin:
     def _on_segmentation_visibility_changed(self, visible):
         """Handle Semantic Segmentation dock visibility change."""
         self.segmentation_action.setChecked(visible)
+
+    def toggle_processing_monitor_dock(self):
+        """Toggle the AI Processing Monitor dock widget."""
+        if self._processing_monitor_dock is None:
+            try:
+                from .dialogs.processing_monitor import ProcessingMonitorDockWidget
+
+                self._processing_monitor_dock = ProcessingMonitorDockWidget(
+                    self.iface.mainWindow()
+                )
+                self._processing_monitor_dock.visibilityChanged.connect(
+                    self._on_processing_monitor_visibility_changed
+                )
+                self.iface.addDockWidget(
+                    Qt.DockWidgetArea.RightDockWidgetArea,
+                    self._processing_monitor_dock,
+                )
+                self._processing_monitor_dock.show()
+                self._processing_monitor_dock.raise_()
+                return
+            except Exception as e:
+                QMessageBox.critical(
+                    self.iface.mainWindow(),
+                    "Error",
+                    f"Failed to create AI Processing Monitor:\n{str(e)}",
+                )
+                self.processing_monitor_action.setChecked(False)
+                return
+
+        if self._processing_monitor_dock.isVisible():
+            self._processing_monitor_dock.hide()
+        else:
+            self._processing_monitor_dock.show()
+            self._processing_monitor_dock.raise_()
+
+    def _on_processing_monitor_visibility_changed(self, visible):
+        self.processing_monitor_action.setChecked(visible)
 
     def toggle_samgeo_dock(self):
         """Toggle the SamGeo dock widget visibility."""
