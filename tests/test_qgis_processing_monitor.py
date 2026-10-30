@@ -89,6 +89,17 @@ def test_failure_summary_uses_first_line(error, summary):
     assert task.error_details == error
 
 
+def test_error_classification_uses_first_line_only():
+    assert (
+        monitor_module.classify_error("ordinary failure\nCUDA out of memory")
+        == "Processing failed"
+    )
+    assert (
+        monitor_module.classify_error("CUDA out of memory\nordinary detail")
+        == "GPU or CUDA error"
+    )
+
+
 def test_exception_summary_uses_first_line_and_preserves_category():
     monitor = monitor_module.ProcessingMonitor()
     monitor.submit("task-1", "Inference")
@@ -101,6 +112,33 @@ def test_exception_summary_uses_first_line_and_preserves_category():
     task = monitor.get("task-1")
     assert task.error_summary == "Missing or invalid input file: missing.tif"
     assert "additional diagnostic detail" in task.error_details
+
+
+def test_exception_classification_uses_first_line_only():
+    monitor = monitor_module.ProcessingMonitor()
+    monitor.submit("task-1", "Inference")
+
+    monitor.fail(
+        "task-1",
+        RuntimeError("ordinary failure\nCUDA out of memory in a later detail"),
+    )
+
+    assert monitor.get("task-1").error_summary == "Processing failed: ordinary failure"
+
+
+def test_cancel_after_clear_finished_is_ignored():
+    monitor = monitor_module.ProcessingMonitor()
+    notifications = []
+    monitor.add_listener(lambda: notifications.append(True))
+    monitor.submit("task-1", "Inference")
+    monitor.complete("task-1")
+    monitor.clear_finished()
+    notifications.clear()
+
+    monitor.cancel("task-1")
+
+    assert monitor.get("task-1") is None
+    assert notifications == []
 
 
 def test_repeated_terminal_callbacks_are_ignored():

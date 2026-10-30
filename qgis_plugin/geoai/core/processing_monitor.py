@@ -82,7 +82,8 @@ def classify_error(error: BaseException | str) -> str:
         return "Missing Python dependency"
     if isinstance(error, PermissionError):
         return "Output or file access failure"
-    message = str(error).lower()
+    lines = str(error).splitlines()
+    message = (lines[0] if lines else "").lower()
     if any(token in message for token in ("cuda", "cudnn", "out of memory", "gpu")):
         return "GPU or CUDA error"
     if any(token in message for token in ("no such file", "does not exist")):
@@ -220,6 +221,8 @@ class ProcessingMonitor:
         self._finish(task_id, TaskStatus.COMPLETED)
 
     def cancel(self, task_id: str) -> None:
+        if task_id not in self._tasks:
+            return
         self._finish(task_id, TaskStatus.CANCELLED)
 
     def fail(self, task_id: str, error: BaseException | str) -> None:
