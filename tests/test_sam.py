@@ -54,6 +54,35 @@ class TestSamGeoMethods(unittest.TestCase):
         self.assertTrue(hasattr(SamGeo, "predict"))
 
 
+class TestSamGeoInitDeviceAndModel(unittest.TestCase):
+    """Regression tests: prompted mode must honor device and model arguments."""
+
+    def test_prompted_mode_loads_requested_model_with_explicit_device(self):
+        """automatic=False with an explicit device loads the requested model."""
+        with patch("geoai.sam.SamModel.from_pretrained") as mock_model, patch(
+            "geoai.sam.SamProcessor.from_pretrained"
+        ) as mock_processor:
+            sm = SamGeo(model="facebook/sam-vit-base", automatic=False, device="cpu")
+            mock_model.assert_called_once_with("facebook/sam-vit-base")
+            mock_processor.assert_called_once_with("facebook/sam-vit-base")
+            self.assertEqual(sm.device, "cpu")
+
+    def test_prompted_mode_without_device_loads_default_model(self):
+        """automatic=False without a device still loads the model."""
+        with patch("geoai.sam.SamModel.from_pretrained") as mock_model, patch(
+            "geoai.sam.SamProcessor.from_pretrained"
+        ) as mock_processor:
+            SamGeo(automatic=False)
+            mock_model.assert_called_once()
+            mock_processor.assert_called_once()
+
+    def test_automatic_mode_accepts_documented_cpu_string(self):
+        """The documented device='cpu' must not raise a TypeError."""
+        with patch("geoai.sam.pipeline") as mock_pipeline:
+            SamGeo(automatic=True, device="cpu")
+            mock_pipeline.assert_called_once()
+
+
 class TestSamGeoAttributes(unittest.TestCase):
     """Tests for SamGeo instance attributes via mocked init."""
 
