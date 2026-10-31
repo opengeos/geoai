@@ -65,6 +65,7 @@ class TestSamGeoInitDeviceAndModel(unittest.TestCase):
         ):
             sm = SamGeo(model="facebook/sam-vit-base", automatic=False, device="cpu")
             mock_model.assert_called_once_with("facebook/sam-vit-base")
+            mock_model.return_value.to.assert_called_once_with("cpu")
             mock_processor.assert_called_once_with("facebook/sam-vit-base")
             self.assertEqual(sm.device, "cpu")
 
@@ -75,8 +76,8 @@ class TestSamGeoInitDeviceAndModel(unittest.TestCase):
             patch("geoai.sam.SamProcessor.from_pretrained") as mock_processor,
         ):
             SamGeo(automatic=False)
-            mock_model.assert_called_once()
-            mock_processor.assert_called_once()
+            mock_model.assert_called_once_with("facebook/sam-vit-huge")
+            mock_processor.assert_called_once_with("facebook/sam-vit-huge")
 
     def test_automatic_mode_accepts_documented_cpu_string(self):
         """The documented device='cpu' must not raise a TypeError."""
