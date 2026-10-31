@@ -59,9 +59,10 @@ class TestSamGeoInitDeviceAndModel(unittest.TestCase):
 
     def test_prompted_mode_loads_requested_model_with_explicit_device(self):
         """automatic=False with an explicit device loads the requested model."""
-        with patch("geoai.sam.SamModel.from_pretrained") as mock_model, patch(
-            "geoai.sam.SamProcessor.from_pretrained"
-        ) as mock_processor:
+        with (
+            patch("geoai.sam.SamModel.from_pretrained") as mock_model,
+            patch("geoai.sam.SamProcessor.from_pretrained") as mock_processor,
+        ):
             sm = SamGeo(model="facebook/sam-vit-base", automatic=False, device="cpu")
             mock_model.assert_called_once_with("facebook/sam-vit-base")
             mock_processor.assert_called_once_with("facebook/sam-vit-base")
@@ -69,9 +70,10 @@ class TestSamGeoInitDeviceAndModel(unittest.TestCase):
 
     def test_prompted_mode_without_device_loads_default_model(self):
         """automatic=False without a device still loads the model."""
-        with patch("geoai.sam.SamModel.from_pretrained") as mock_model, patch(
-            "geoai.sam.SamProcessor.from_pretrained"
-        ) as mock_processor:
+        with (
+            patch("geoai.sam.SamModel.from_pretrained") as mock_model,
+            patch("geoai.sam.SamProcessor.from_pretrained") as mock_processor,
+        ):
             SamGeo(automatic=False)
             mock_model.assert_called_once()
             mock_processor.assert_called_once()
