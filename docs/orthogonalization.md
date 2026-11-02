@@ -38,6 +38,7 @@ Triangles, tiny regions and unsuitable outlines can remain unchanged. Use a suit
 Positive NoData values are excluded; holes, labels, CRS and empty masks are preserved.
 
 The public arguments and `value`/geometry output columns remain. Parameter validation
-now rejects nonfinite tolerances, nonpositive area ratios and segment counts below 4.
+now rejects nonfinite tolerances, `area_tolerance` values outside `(0, 1]` and
+segment counts below 4.
 OpenCV is no longer needed by this function. Review these behavior changes before
 adopting the replacement; it is not a reproduction of the former algorithm.
