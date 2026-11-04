@@ -220,8 +220,7 @@ def flipnslide_augmentation(
         new_width = (width // tile_size) * tile_size
         if new_height == 0 or new_width == 0:
             raise ValueError(
-                f"Image size ({height}x{width}) is smaller than "
-                f"tile_size ({tile_size})"
+                f"Image size ({height}x{width}) is smaller than tile_size ({tile_size})"
             )
         if new_height < height or new_width < width:
             image = image[:, :new_height, :new_width]
@@ -230,7 +229,7 @@ def flipnslide_augmentation(
     # Check if image is large enough for tiling
     if height < tile_size or width < tile_size:
         raise ValueError(
-            f"Image size ({height}x{width}) is smaller than " f"tile_size ({tile_size})"
+            f"Image size ({height}x{width}) is smaller than tile_size ({tile_size})"
         )
 
     tiles = []
@@ -511,7 +510,7 @@ def export_flipnslide_tiles(
 
         if not quiet:
             logger.info(
-                f"Generated {len(image_tiles)} tiles with " f"Flip-n-Slide augmentation"
+                f"Generated {len(image_tiles)} tiles with Flip-n-Slide augmentation"
             )
 
         # Determine cropped dimensions for geo-transform calculation
@@ -755,6 +754,8 @@ def _load_class_data_vector(
 
         if class_value_field in gdf.columns:
             unique_classes = gdf[class_value_field].unique()
+            unique_classes = sorted(unique_classes)
+
             if not quiet:
                 logger.info(
                     f"Found {len(unique_classes)} unique classes: {unique_classes}"
@@ -3530,9 +3531,9 @@ def export_training_data(
                     ET.SubElement(geo, "transform").text = str(
                         window_transform
                     ).replace("\n", "")
-                    ET.SubElement(geo, "bounds").text = (
-                        f"{minx}, {miny}, {maxx}, {maxy}"
-                    )
+                    ET.SubElement(
+                        geo, "bounds"
+                    ).text = f"{minx}, {miny}, {maxx}, {maxy}"
 
                     for _, feature in window_features.iterrows():
                         # Convert feature geometry to pixel coordinates
