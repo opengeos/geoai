@@ -427,12 +427,17 @@ class ChangeDetectionDockWidget(QDockWidget):
             os.path.normcase(os.path.abspath(layer.source()))
             for layer in (before, after)
         }
-        for path in (output_raster, output_vector):
-            if path and os.path.normcase(os.path.abspath(path)) in inputs:
-                self.show_error(
-                    "Output paths must differ from the before and after images."
-                )
-                return
+        outputs = [
+            os.path.normcase(os.path.abspath(path))
+            for path in (output_raster, output_vector)
+            if path
+        ]
+        if len(set(outputs)) < len(outputs) or inputs.intersection(outputs):
+            self.show_error(
+                "Output paths must differ from each other and from the before "
+                "and after images."
+            )
+            return
 
         params = {
             "before_path": before.source(),

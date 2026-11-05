@@ -1,5 +1,8 @@
+import os
 import sys
 import types
+
+import pytest
 
 from geoai.workers import geoai_task_worker
 
@@ -90,21 +93,20 @@ def test_detect_changes_vectorizes_when_requested(monkeypatch):
     )
 
     detect_kwargs = FakeChangeDetection.instances[0].detect_args[2]
+    instance_raster = detect_kwargs["instance_masks_output_path"]
     assert detect_kwargs["export_instance_masks"] is True
-    assert detect_kwargs["instance_masks_output_path"] == "changes_instances.tif"
+    assert os.path.basename(instance_raster) == "instances.tif"
     assert vectorized == [
-        ("changes_instances.tif", {"output_path": "changes.gpkg", "min_area": 50})
+        (instance_raster, {"output_path": "changes.gpkg", "min_area": 50})
     ]
+    assert not os.path.exists(os.path.dirname(instance_raster))
     assert result["output_vector"] == "changes.gpkg"
 
 
-def test_detect_changes_removes_intermediate_rasters(monkeypatch, tmp_path):
-    vectorized = []
-    _install_fakes(monkeypatch, vectorized)
-    instance_raster = tmp_path / "changes_instances.tif"
-    scores_raster = tmp_path / "changes_instances_scores.tif"
-    instance_raster.write_bytes(b"")
-    scores_raster.write_bytes(b"")
+def test_detect_changes_keeps_user_files_next_to_outputs(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, [])
+    user_file = tmp_path / "changes_instances.tif"
+    user_file.write_bytes(b"keep")
 
     geoai_task_worker._task_detect_changes(
         _params(
@@ -113,5 +115,22 @@ def test_detect_changes_removes_intermediate_rasters(monkeypatch, tmp_path):
         )
     )
 
-    assert not instance_raster.exists()
-    assert not scores_raster.exists()
+    assert user_file.read_bytes() == b"keep"
+
+
+def test_detect_changes_cleans_up_when_vectorization_fails(monkeypatch):
+    _install_fakes(monkeypatch, [])
+    instance_rasters = []
+
+    def failing_raster_to_vector(path, **kwargs):
+        instance_rasters.append(path)
+        raise RuntimeError("vectorization failed")
+
+    monkeypatch.setattr(
+        sys.modules["geoai.utils.raster"], "raster_to_vector", failing_raster_to_vector
+    )
+
+    with pytest.raises(RuntimeError, match="vectorization failed"):
+        geoai_task_worker._task_detect_changes(_params(output_vector="changes.gpkg"))
+
+    assert not os.path.exists(os.path.dirname(instance_rasters[0]))
