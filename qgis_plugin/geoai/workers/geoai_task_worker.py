@@ -242,6 +242,51 @@ def _task_segment_water(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_raster": final_raster, "output_vector": output_vector}
 
 
+def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
+    from geoai.change_detection import ChangeDetection
+    from geoai.utils.raster import raster_to_vector
+
+    output_raster = params["output_raster"]
+    output_vector = params["output_vector"]
+    # Each change instance has its own ID here, so it becomes its own polygon.
+    instance_raster = f"{os.path.splitext(output_raster)[0]}_instances.tif"
+
+    _progress(f"Loading AnyChange (SAM {params['sam_model_type']})...")
+    detector = _run_with_progress(
+        lambda: ChangeDetection(sam_model_type=params["sam_model_type"])
+    )
+    detector.set_hyperparameters(
+        change_confidence_threshold=params["change_confidence_threshold"],
+        auto_threshold=params["auto_threshold"],
+    )
+
+    _progress("Detecting changes...")
+    _run_with_progress(
+        lambda: detector.detect_changes(
+            params["before_path"],
+            params["after_path"],
+            output_path=output_raster,
+            return_results=False,
+            export_instance_masks=bool(output_vector),
+            instance_masks_output_path=instance_raster if output_vector else None,
+        )
+    )
+
+    if output_vector:
+        _progress("Converting change instances to polygons...")
+        raster_to_vector(
+            instance_raster,
+            output_path=output_vector,
+            min_area=params["min_area"],
+        )
+        # detect_changes also writes a per-instance score raster we do not use.
+        scores_raster = instance_raster.replace(".tif", "_scores.tif")
+        if os.path.exists(scores_raster):
+            os.remove(scores_raster)
+
+    return {"output_raster": output_raster, "output_vector": output_vector}
+
+
 _TASKS = {
     "train_segmentation_model": _task_train_segmentation_model,
     "train_instance_segmentation_model": _task_train_instance_segmentation_model,
@@ -253,6 +298,7 @@ _TASKS = {
     "vectorize_mask": _task_vectorize_mask,
     "smooth_vector": _task_smooth_vector,
     "segment_water": _task_segment_water,
+    "detect_changes": _task_detect_changes,
 }
 
 
