@@ -96,3 +96,22 @@ def test_detect_changes_vectorizes_when_requested(monkeypatch):
         ("changes_instances.tif", {"output_path": "changes.gpkg", "min_area": 50})
     ]
     assert result["output_vector"] == "changes.gpkg"
+
+
+def test_detect_changes_removes_intermediate_rasters(monkeypatch, tmp_path):
+    vectorized = []
+    _install_fakes(monkeypatch, vectorized)
+    instance_raster = tmp_path / "changes_instances.tif"
+    scores_raster = tmp_path / "changes_instances_scores.tif"
+    instance_raster.write_bytes(b"")
+    scores_raster.write_bytes(b"")
+
+    geoai_task_worker._task_detect_changes(
+        _params(
+            output_raster=str(tmp_path / "changes.tif"),
+            output_vector=str(tmp_path / "changes.gpkg"),
+        )
+    )
+
+    assert not instance_raster.exists()
+    assert not scores_raster.exists()
