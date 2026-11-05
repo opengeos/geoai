@@ -754,7 +754,10 @@ def _load_class_data_vector(
 
         if class_value_field in gdf.columns:
             unique_classes = gdf[class_value_field].unique()
-            unique_classes = sorted(unique_classes)
+            try:
+                unique_classes = sorted(unique_classes)
+            except TypeError:
+                unique_classes = sorted(unique_classes, key=str)
 
             if not quiet:
                 logger.info(
