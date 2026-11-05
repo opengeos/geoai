@@ -3534,9 +3534,9 @@ def export_training_data(
                     ET.SubElement(geo, "transform").text = str(
                         window_transform
                     ).replace("\n", "")
-                    ET.SubElement(
-                        geo, "bounds"
-                    ).text = f"{minx}, {miny}, {maxx}, {maxy}"
+                    ET.SubElement(geo, "bounds").text = (
+                        f"{minx}, {miny}, {maxx}, {maxy}"
+                    )
 
                     for _, feature in window_features.iterrows():
                         # Convert feature geometry to pixel coordinates
