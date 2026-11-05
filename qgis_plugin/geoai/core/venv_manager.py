@@ -49,7 +49,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "13"
+_INSTALL_LOGIC_VERSION = "14"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -879,6 +879,10 @@ def _get_clean_env_for_venv() -> dict:
     for var in (
         "PYTHONPATH",
         "PYTHONHOME",
+        "PYTHONEXECUTABLE",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
         "VIRTUAL_ENV",
         "QGIS_PREFIX_PATH",
         "QGIS_PLUGINPATH",
@@ -1153,7 +1157,11 @@ def venv_python_works(venv_dir: str = None) -> bool:
     python_path = get_venv_python_path(venv_dir)
     try:
         result = subprocess.run(
-            [python_path, "-c", "import sys; sys.exit(0)"],
+            [
+                python_path,
+                "-c",
+                "import sys; sys.exit(0 if sys.prefix != sys.base_prefix else 1)",
+            ],
             capture_output=True,
             text=True,
             timeout=60,
@@ -3655,7 +3663,15 @@ def _get_verification_code(package_name: str) -> str:
     elif package_name == "triton-windows":
         code = "import triton; print('ok')"
     elif package_name == "deepforest":
-        code = "import torch; from deepforest import main; print('ok')"
+        code = (
+            "import torch; "
+            "import deepforest; "
+            "from deepforest import main; "
+            "from packaging.version import parse as _v; "
+            "v = deepforest.__version__; "
+            "assert _v(v) >= _v('2.1.0'), f'Expected >=2.1.0, got {v}'; "
+            "print(v)"
+        )
     elif package_name == "omniwatermask":
         code = "import torch; import omniwatermask; print('ok')"
     else:
