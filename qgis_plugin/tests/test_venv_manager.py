@@ -1,5 +1,9 @@
 import subprocess
+import sys
+import types
 from pathlib import Path
+
+import pytest
 
 from geoai.core import venv_manager
 
@@ -204,6 +208,41 @@ def test_omniwatermask_verification_bootstraps_torch_before_import():
 
     assert "add_dll_directory" in code
     assert "import torch; import omniwatermask" in code
+
+
+def test_deepforest_verification_enforces_minimum_version():
+    """Regression test for issue #951: reject stale deepforest < 2.1.0."""
+    code = venv_manager._get_verification_code("deepforest")
+
+    assert "add_dll_directory" in code
+    assert "from deepforest import main" in code
+    assert "_v('2.1.0')" in code
+
+
+def _run_deepforest_verifier(monkeypatch, version: str) -> None:
+    """Execute the generated DeepForest verification snippet with stubbed modules."""
+    pytest.importorskip("packaging")
+    fake_torch = types.ModuleType("torch")
+    fake_main = types.ModuleType("deepforest.main")
+    fake_pkg = types.ModuleType("deepforest")
+    fake_pkg.__version__ = version
+    fake_pkg.main = fake_main
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "deepforest", fake_pkg)
+    monkeypatch.setitem(sys.modules, "deepforest.main", fake_main)
+    code = venv_manager._get_verification_code("deepforest")
+    exec(code, {"__name__": "__geoai_deepforest_verify__"})
+
+
+def test_deepforest_verifier_rejects_stale_version(monkeypatch):
+    """Regression test for issue #951: version < 2.1.0 raises an error."""
+    with pytest.raises(Exception, match=r"Expected >=2\.1\.0, got 2\.0\.0"):
+        _run_deepforest_verifier(monkeypatch, "2.0.0")
+
+
+def test_deepforest_verifier_accepts_minimum_version(monkeypatch):
+    """Regression test for issue #951: version >= 2.1.0 passes verification."""
+    _run_deepforest_verifier(monkeypatch, "2.1.0")
 
 
 def test_write_constraints_file_writes_requested_constraints(tmp_path, monkeypatch):
@@ -628,3 +667,66 @@ def test_cpu_fallback_failure_logs_full_output(tmp_path, monkeypatch):
     # ...but the log keeps the CPU fallback output in full for diagnosis.
     fallback_logs = [m for m in logged if "(CPU fallback)" in m]
     assert any(huge_stderr in m for m in fallback_logs), "full CPU output not logged"
+
+
+def test_clean_env_strips_pythonexecutable_and_pyvenv_launcher(monkeypatch):
+    """Regression test for issues #951 and #925 on Windows QGIS.
+
+    QGIS on Windows sets PYTHONEXECUTABLE to its own python3.exe. In CPython
+    Modules/getpath.py, ENV_PYTHONEXECUTABLE takes precedence over
+    ENV___PYVENV_LAUNCHER__, causing the managed venv interpreter and uv to
+    ignore pyvenv.cfg and install/import packages in python_standalone instead
+    of venv_py3.12.
+    """
+    from geoai.core import python_manager
+
+    for var in (
+        "PYTHONEXECUTABLE",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
+    ):
+        monkeypatch.setenv(var, "/fake/qgis/python")
+
+    venv_env = venv_manager._get_clean_env_for_venv()
+    py_env = python_manager._get_clean_env()
+
+    for var in (
+        "PYTHONEXECUTABLE",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
+    ):
+        assert var not in venv_env
+        assert var not in py_env
+
+
+def test_venv_python_works_verifies_venv_prefix_activation(tmp_path, monkeypatch):
+    """Regression test for issue #951: probe must require sys.prefix != sys.base_prefix."""
+    real_run = subprocess.run
+    captured_cmds = []
+
+    def fake_run(cmd, **_kwargs) -> subprocess.CompletedProcess:
+        captured_cmds.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir=None: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", dict)
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", dict)
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    assert venv_manager.venv_python_works(str(tmp_path)) is True
+    assert len(captured_cmds) == 1
+    assert "sys.prefix != sys.base_prefix" in captured_cmds[0][-1]
+
+    probe = captured_cmds[0][-1]
+
+    def run_probe(base_prefix: str) -> int:
+        code = f"import sys; sys.base_prefix = {base_prefix!r}; {probe}"
+        return real_run([sys.executable, "-c", code], check=False).returncode
+
+    assert run_probe(sys.prefix) != 0
+    assert run_probe(sys.prefix + "-base") == 0
