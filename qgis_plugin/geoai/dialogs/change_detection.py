@@ -423,6 +423,17 @@ class ChangeDetectionDockWidget(QDockWidget):
                 output_vector = f"{base}_changes.gpkg"
                 self.output_vector_edit.setText(output_vector)
 
+        inputs = {
+            os.path.normcase(os.path.abspath(layer.source()))
+            for layer in (before, after)
+        }
+        for path in (output_raster, output_vector):
+            if path and os.path.normcase(os.path.abspath(path)) in inputs:
+                self.show_error(
+                    "Output paths must differ from the before and after images."
+                )
+                return
+
         params = {
             "before_path": before.source(),
             "after_path": after.source(),

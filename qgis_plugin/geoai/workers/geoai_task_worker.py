@@ -274,15 +274,19 @@ def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
 
     if output_vector:
         _progress("Converting change instances to polygons...")
-        raster_to_vector(
-            instance_raster,
-            output_path=output_vector,
-            min_area=params["min_area"],
-        )
-        # detect_changes also writes a per-instance score raster we do not use.
-        scores_raster = instance_raster.replace(".tif", "_scores.tif")
-        if os.path.exists(scores_raster):
-            os.remove(scores_raster)
+        try:
+            raster_to_vector(
+                instance_raster,
+                output_path=output_vector,
+                min_area=params["min_area"],
+            )
+        finally:
+            # The instance raster and its per-instance score raster are
+            # intermediates; the polygons carry the same changes.
+            scores_raster = instance_raster.replace(".tif", "_scores.tif")
+            for path in (instance_raster, scores_raster):
+                if os.path.exists(path):
+                    os.remove(path)
 
     return {"output_raster": output_raster, "output_vector": output_vector}
 
