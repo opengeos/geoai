@@ -1,5 +1,9 @@
 import subprocess
+import sys
+import types
 from pathlib import Path
+
+import pytest
 
 from geoai.core import venv_manager
 
@@ -210,10 +214,35 @@ def test_deepforest_verification_enforces_minimum_version():
     """Regression test for issue #951: reject stale deepforest < 2.1.0."""
     code = venv_manager._get_verification_code("deepforest")
 
-    compile(code, "<geoai_deepforest_verify>", "exec")
     assert "add_dll_directory" in code
     assert "from deepforest import main" in code
-    assert ">= _v('2.1.0')" in code
+    assert "_v('2.1.0')" in code
+
+
+def _run_deepforest_verifier(monkeypatch, version: str) -> None:
+    """Execute the generated DeepForest verification snippet with stubbed modules."""
+    pytest.importorskip("packaging")
+    fake_torch = types.ModuleType("torch")
+    fake_main = types.ModuleType("deepforest.main")
+    fake_pkg = types.ModuleType("deepforest")
+    fake_pkg.__version__ = version
+    fake_pkg.main = fake_main
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "deepforest", fake_pkg)
+    monkeypatch.setitem(sys.modules, "deepforest.main", fake_main)
+    code = venv_manager._get_verification_code("deepforest")
+    exec(code, {"__name__": "__geoai_deepforest_verify__"})
+
+
+def test_deepforest_verifier_rejects_stale_version(monkeypatch):
+    """Regression test for issue #951: version < 2.1.0 raises an error."""
+    with pytest.raises(Exception, match=r"Expected >=2\.1\.0, got 2\.0\.0"):
+        _run_deepforest_verifier(monkeypatch, "2.0.0")
+
+
+def test_deepforest_verifier_accepts_minimum_version(monkeypatch):
+    """Regression test for issue #951: version >= 2.1.0 passes verification."""
+    _run_deepforest_verifier(monkeypatch, "2.1.0")
 
 
 def test_write_constraints_file_writes_requested_constraints(tmp_path, monkeypatch):
@@ -674,9 +703,10 @@ def test_clean_env_strips_pythonexecutable_and_pyvenv_launcher(monkeypatch):
 
 def test_venv_python_works_verifies_venv_prefix_activation(tmp_path, monkeypatch):
     """Regression test for issue #951: probe must require sys.prefix != sys.base_prefix."""
+    real_run = subprocess.run
     captured_cmds = []
 
-    def fake_run(cmd, *args, **kwargs):
+    def fake_run(cmd, **_kwargs) -> subprocess.CompletedProcess:
         captured_cmds.append(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
@@ -684,10 +714,19 @@ def test_venv_python_works_verifies_venv_prefix_activation(tmp_path, monkeypatch
     monkeypatch.setattr(
         venv_manager, "get_venv_python_path", lambda _venv_dir=None: "python"
     )
-    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
-    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", dict)
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", dict)
     monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
 
     assert venv_manager.venv_python_works(str(tmp_path)) is True
     assert len(captured_cmds) == 1
     assert "sys.prefix != sys.base_prefix" in captured_cmds[0][-1]
+
+    probe = captured_cmds[0][-1]
+
+    def run_probe(base_prefix: str) -> int:
+        code = f"import sys; sys.base_prefix = {base_prefix!r}; {probe}"
+        return real_run([sys.executable, "-c", code], check=False).returncode
+
+    assert run_probe(sys.prefix) != 0
+    assert run_probe(sys.prefix + "-base") == 0

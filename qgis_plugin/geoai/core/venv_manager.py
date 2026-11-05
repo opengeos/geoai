@@ -3663,14 +3663,17 @@ def _get_verification_code(package_name: str) -> str:
     elif package_name == "triton-windows":
         code = "import triton; print('ok')"
     elif package_name == "deepforest":
-        code = (
-            "import torch; "
-            "import deepforest; "
-            "from deepforest import main; "
-            "from packaging.version import parse as _v; "
-            "v = deepforest.__version__; "
-            "assert _v(v) >= _v('2.1.0'), f'Expected >=2.1.0, got {v}'; "
-            "print(v)"
+        code = "\n".join(
+            [
+                "import torch",
+                "import deepforest",
+                "from deepforest import main",
+                "from packaging.version import parse as _v",
+                "v = deepforest.__version__",
+                "if _v(v) < _v('2.1.0'):",
+                "    raise RuntimeError(f'Expected >=2.1.0, got {v}')",
+                "print(v)",
+            ]
         )
     elif package_name == "omniwatermask":
         code = "import torch; import omniwatermask; print('ok')"
