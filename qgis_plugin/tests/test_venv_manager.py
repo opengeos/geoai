@@ -628,3 +628,21 @@ def test_cpu_fallback_failure_logs_full_output(tmp_path, monkeypatch):
     # ...but the log keeps the CPU fallback output in full for diagnosis.
     fallback_logs = [m for m in logged if "(CPU fallback)" in m]
     assert any(huge_stderr in m for m in fallback_logs), "full CPU output not logged"
+
+
+def test_torchange_verification_imports_anychange():
+    code = venv_manager._get_verification_code("torchange")
+
+    assert "add_dll_directory" in code
+    assert "from torchange.models.segment_any_change import AnyChange" in code
+
+
+def test_clean_env_drops_qgis_python_variables(monkeypatch):
+    for var in ("PYTHONHOME", "PYTHONPATH", "PYTHONEXECUTABLE"):
+        monkeypatch.setenv(var, "C:/QGIS/apps/Python312")
+
+    env = venv_manager._get_clean_env_for_venv()
+
+    assert "PYTHONHOME" not in env
+    assert "PYTHONPATH" not in env
+    assert "PYTHONEXECUTABLE" not in env

@@ -38,6 +38,7 @@ REQUIRED_PACKAGES = [
     ("sam3", ""),
     ("deepforest", ">=2.1.0"),
     ("omniwatermask", ""),
+    ("torchange", ""),
     # Version is kept at or above the geoai-py runtime requirement so the
     # QGIS managed environment can resolve on Windows/Python 3.12.
     # Older exact pins caused impossible constraints when geoai-py required a
@@ -49,7 +50,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "13"
+_INSTALL_LOGIC_VERSION = "14"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -879,6 +880,9 @@ def _get_clean_env_for_venv() -> dict:
     for var in (
         "PYTHONPATH",
         "PYTHONHOME",
+        # Set by the OSGeo4W launcher; makes the venv Python resolve to its
+        # base install and load the user site-packages.
+        "PYTHONEXECUTABLE",
         "VIRTUAL_ENV",
         "QGIS_PREFIX_PATH",
         "QGIS_PLUGINPATH",
@@ -3658,6 +3662,12 @@ def _get_verification_code(package_name: str) -> str:
         code = "import torch; from deepforest import main; print('ok')"
     elif package_name == "omniwatermask":
         code = "import torch; import omniwatermask; print('ok')"
+    elif package_name == "torchange":
+        code = (
+            "import torch; "
+            "from torchange.models.segment_any_change import AnyChange; "
+            "print('ok')"
+        )
     else:
         import_name = package_name.replace("-", "_")
         code = f"import {import_name}"
