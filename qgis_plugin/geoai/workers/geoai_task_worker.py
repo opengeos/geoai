@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 import traceback
 from typing import Any, Callable, Dict
 
@@ -248,8 +249,6 @@ def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
 
     output_raster = params["output_raster"]
     output_vector = params["output_vector"]
-    # Each change instance has its own ID here, so it becomes its own polygon.
-    instance_raster = f"{os.path.splitext(output_raster)[0]}_instances.tif"
 
     _progress(f"Loading AnyChange (SAM {params['sam_model_type']})...")
     detector = _run_with_progress(
@@ -260,33 +259,33 @@ def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
         auto_threshold=params["auto_threshold"],
     )
 
-    _progress("Detecting changes...")
-    _run_with_progress(
-        lambda: detector.detect_changes(
-            params["before_path"],
-            params["after_path"],
-            output_path=output_raster,
-            return_results=False,
-            export_instance_masks=bool(output_vector),
-            instance_masks_output_path=instance_raster if output_vector else None,
+    # The instance raster (and the score raster detect_changes writes next to
+    # it) only feed the polygons, so keep them out of the user's folders.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        # Each change instance has its own ID here, so it becomes its own polygon.
+        instance_raster = (
+            os.path.join(tmp_dir, "instances.tif") if output_vector else None
         )
-    )
 
-    if output_vector:
-        _progress("Converting change instances to polygons...")
-        try:
+        _progress("Detecting changes...")
+        _run_with_progress(
+            lambda: detector.detect_changes(
+                params["before_path"],
+                params["after_path"],
+                output_path=output_raster,
+                return_results=False,
+                export_instance_masks=bool(output_vector),
+                instance_masks_output_path=instance_raster,
+            )
+        )
+
+        if output_vector:
+            _progress("Converting change instances to polygons...")
             raster_to_vector(
                 instance_raster,
                 output_path=output_vector,
                 min_area=params["min_area"],
             )
-        finally:
-            # The instance raster and its per-instance score raster are
-            # intermediates; the polygons carry the same changes.
-            scores_raster = instance_raster.replace(".tif", "_scores.tif")
-            for path in (instance_raster, scores_raster):
-                if os.path.exists(path):
-                    os.remove(path)
 
     return {"output_raster": output_raster, "output_vector": output_vector}
 
