@@ -30,5 +30,6 @@ def test_coarse_dropout_args_not_ignored():
         t = compat.make_coarse_dropout(max_holes=8, max_height=32, max_width=32, p=1.0)
     img = np.ones((256, 256, 3), dtype=np.uint8) * 255
     out = t(image=img)["image"]
-    # holes up to 32x32, 8 of them: far smaller than default 10-20% holes
-    assert (out == 0).mean() <= 8 * 32 * 32 / (256 * 256) + 1e-6
+    # 1.x behaviour: exactly 8 holes of 32x32 (<=12.5%, fewer if they overlap)
+    frac = (out == 0).mean()
+    assert 0.09 <= frac <= 8 * 32 * 32 / (256 * 256) + 1e-6

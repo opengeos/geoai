@@ -25,7 +25,6 @@ from rasterio.windows import Window
 from shapely.affinity import rotate
 from shapely.geometry import box
 from torchvision.transforms import RandomRotation
-from .._albu_compat import make_gauss_noise
 from ..progress import tqdm
 
 logger = logging.getLogger(__name__)
@@ -80,6 +79,8 @@ def get_default_augmentation_transforms(
             "albumentations is required for data augmentation. "
             "Install it with: pip install albumentations"
         )
+
+    from .._albu_compat import make_gauss_noise
 
     transforms_list = [
         # Geometric transforms

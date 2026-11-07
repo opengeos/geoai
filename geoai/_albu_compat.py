@@ -25,12 +25,12 @@ def make_gauss_noise(
 def make_coarse_dropout(
     max_holes: int = 8, max_height: int = 32, max_width: int = 32, p: float = 0.5
 ) -> "A.CoarseDropout":
-    """Create ``A.CoarseDropout`` with up to ``max_holes`` holes of fixed max size."""
+    """Create ``A.CoarseDropout`` matching the 1.x fixed-size behaviour."""
     if "num_holes_range" in inspect.signature(A.CoarseDropout.__init__).parameters:
         return A.CoarseDropout(
-            num_holes_range=(1, max_holes),
-            hole_height_range=(1, max_height),
-            hole_width_range=(1, max_width),
+            num_holes_range=(max_holes, max_holes),
+            hole_height_range=(max_height, max_height),
+            hole_width_range=(max_width, max_width),
             p=p,
         )
     return A.CoarseDropout(
