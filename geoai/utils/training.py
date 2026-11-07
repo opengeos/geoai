@@ -25,6 +25,7 @@ from rasterio.windows import Window
 from shapely.affinity import rotate
 from shapely.geometry import box
 from torchvision.transforms import RandomRotation
+from .._albu_compat import make_gauss_noise
 from ..progress import tqdm
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ def get_default_augmentation_transforms(
             val_shift_limit=10,
             p=0.3,
         ),
-        A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),
+        make_gauss_noise(var_limit=(10.0, 50.0), p=0.2),
         A.GaussianBlur(blur_limit=(3, 5), p=0.2),
     ]
 
