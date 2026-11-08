@@ -21,6 +21,7 @@ from shapely.geometry import box
 
 from geoai.utils.training import (
     _collect_batch_class_mapping,
+    _load_class_data_vector,
     export_geotiff_tiles_batch,
 )
 
@@ -596,6 +597,57 @@ class TestExportGeotiffTilesBatchClassIds(unittest.TestCase):
 
         self.assertEqual(stats["total_tiles"], 1)
         self.assertFalse(os.path.exists(os.path.join(self.output, "masks")))
+
+
+class TestLoadClassDataVectorOrder(unittest.TestCase):
+    """Class IDs from a single vector file must not depend on feature order."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = self.tmp.name
+
+    def test_null_numeric_class_has_fixed_position(self):
+        forward = _write_vector(self.root, "forward", 0, 100, [1.0, None, 2.0])
+        reverse = _write_vector(self.root, "reverse", 0, 100, [2.0, None, 1.0])
+
+        _, _, forward_categories = _load_class_data_vector(
+            forward, CRS, class_value_field="name", metadata_format="COCO", quiet=True
+        )
+        _, _, reverse_categories = _load_class_data_vector(
+            reverse, CRS, class_value_field="name", metadata_format="COCO", quiet=True
+        )
+
+        self.assertEqual(forward_categories, reverse_categories)
+        self.assertEqual(
+            [c["name"] for c in forward_categories], ["1.0", "2.0", "nan"]
+        )
+
+    def test_mixed_type_ties_are_order_independent(self):
+        def categories(values):
+            # Mixed types cannot be sorted directly, so the str() fallback runs.
+            gdf = gpd.GeoDataFrame(
+                {
+                    "name": np.array(values, dtype=object),
+                    "geometry": _class_boxes(0, 100, len(values)),
+                },
+                crs=CRS,
+            )
+            with unittest.mock.patch.object(gpd, "read_file", return_value=gdf):
+                _, _, coco = _load_class_data_vector(
+                    "unused.geojson",
+                    CRS,
+                    class_value_field="name",
+                    metadata_format="COCO",
+                    quiet=True,
+                )
+            return coco
+
+        forward = categories([None, "None"])
+        reverse = categories(["None", None])
+
+        self.assertEqual(forward, reverse)
+        self.assertEqual(len({c["id"] for c in forward}), 2)
 
 
 if __name__ == "__main__":

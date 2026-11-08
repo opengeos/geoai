@@ -755,9 +755,24 @@ def _load_class_data_vector(
         if class_value_field in gdf.columns:
             unique_classes = gdf[class_value_field].unique()
             try:
-                unique_classes = sorted(unique_classes)
+                # Sort NaN last so its position does not depend on feature order.
+                unique_classes = sorted(
+                    unique_classes,
+                    key=lambda value: (
+                        isinstance(value, (float, np.floating)) and np.isnan(value),
+                        value,
+                    ),
+                )
             except TypeError:
-                unique_classes = sorted(unique_classes, key=str)
+                # Ties in str() (e.g. None and "None") are broken by type.
+                unique_classes = sorted(
+                    unique_classes,
+                    key=lambda value: (
+                        type(value).__module__,
+                        type(value).__qualname__,
+                        str(value),
+                    ),
+                )
 
             if not quiet:
                 logger.info(
