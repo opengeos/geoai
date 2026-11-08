@@ -220,8 +220,7 @@ def flipnslide_augmentation(
         new_width = (width // tile_size) * tile_size
         if new_height == 0 or new_width == 0:
             raise ValueError(
-                f"Image size ({height}x{width}) is smaller than "
-                f"tile_size ({tile_size})"
+                f"Image size ({height}x{width}) is smaller than tile_size ({tile_size})"
             )
         if new_height < height or new_width < width:
             image = image[:, :new_height, :new_width]
@@ -230,7 +229,7 @@ def flipnslide_augmentation(
     # Check if image is large enough for tiling
     if height < tile_size or width < tile_size:
         raise ValueError(
-            f"Image size ({height}x{width}) is smaller than " f"tile_size ({tile_size})"
+            f"Image size ({height}x{width}) is smaller than tile_size ({tile_size})"
         )
 
     tiles = []
@@ -511,7 +510,7 @@ def export_flipnslide_tiles(
 
         if not quiet:
             logger.info(
-                f"Generated {len(image_tiles)} tiles with " f"Flip-n-Slide augmentation"
+                f"Generated {len(image_tiles)} tiles with Flip-n-Slide augmentation"
             )
 
         # Determine cropped dimensions for geo-transform calculation
@@ -755,6 +754,26 @@ def _load_class_data_vector(
 
         if class_value_field in gdf.columns:
             unique_classes = gdf[class_value_field].unique()
+            try:
+                # Sort NaN last so its position does not depend on feature order.
+                unique_classes = sorted(
+                    unique_classes,
+                    key=lambda value: (
+                        isinstance(value, (float, np.floating)) and np.isnan(value),
+                        value,
+                    ),
+                )
+            except TypeError:
+                # Ties in str() (e.g. None and "None") are broken by type.
+                unique_classes = sorted(
+                    unique_classes,
+                    key=lambda value: (
+                        type(value).__module__,
+                        type(value).__qualname__,
+                        str(value),
+                    ),
+                )
+
             if not quiet:
                 logger.info(
                     f"Found {len(unique_classes)} unique classes: {unique_classes}"
