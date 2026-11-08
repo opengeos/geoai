@@ -30,6 +30,8 @@ def test_coarse_dropout_args_not_ignored():
         t = compat.make_coarse_dropout(max_holes=8, max_height=32, max_width=32, p=1.0)
     img = np.ones((256, 256, 3), dtype=np.uint8) * 255
     out = t(image=img)["image"]
-    # 1.x behaviour: exactly 8 holes of 32x32 (<=12.5%, fewer if they overlap)
+    # 1.x behaviour: 8 holes of 32x32 at random positions. Each hole lies fully
+    # inside the image, so at least one hole is dropped; overlaps keep the total
+    # at or below 12.5%. Bounds are exact, so the test does not depend on the RNG.
     frac = (out == 0).mean()
-    assert 0.09 <= frac <= 8 * 32 * 32 / (256 * 256) + 1e-6
+    assert 32 * 32 / (256 * 256) <= frac <= 8 * 32 * 32 / (256 * 256) + 1e-6
