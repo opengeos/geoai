@@ -130,7 +130,7 @@ def create_openai_model(
         OpenAIModel: An OpenAI model.
     """
 
-    if api_key is None and (client_args is None or "api_key" not in client_args):
+    if api_key is None and not (client_args or {}).get("api_key"):
         try:
             api_key = os.getenv("OPENAI_API_KEY", None)
             if api_key is None:
@@ -140,7 +140,7 @@ def create_openai_model(
 
     if client_args is None:
         client_args = kwargs.get("client_args", {})
-    if "api_key" not in client_args and api_key is not None:
+    if not client_args.get("api_key") and api_key is not None:
         client_args["api_key"] = api_key
 
     return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
@@ -163,7 +163,7 @@ def create_anthropic_model(
         **kwargs: Additional keyword arguments for the Anthropic model.
     """
 
-    if api_key is None and (client_args is None or "api_key" not in client_args):
+    if api_key is None and not (client_args or {}).get("api_key"):
         try:
             api_key = os.getenv("ANTHROPIC_API_KEY", None)
             if api_key is None:
@@ -173,7 +173,7 @@ def create_anthropic_model(
 
     if client_args is None:
         client_args = kwargs.get("client_args", {})
-    if "api_key" not in client_args and api_key is not None:
+    if not client_args.get("api_key") and api_key is not None:
         client_args["api_key"] = api_key
 
     return AnthropicModel(client_args=client_args, model_id=model_id, **kwargs)

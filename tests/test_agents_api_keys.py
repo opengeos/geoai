@@ -79,6 +79,17 @@ class TestModelApiKeys(unittest.TestCase):
     def test_missing_key(self):
         self.check_keys({"client_args": {}})
 
+    def test_null_client_key_with_environment(self):
+        self.check_keys(
+            {"client_args": {"api_key": None}}, "env-key", environment="env-key"
+        )
+
+    def test_null_client_key_without_environment(self):
+        self.check_keys({"client_args": {"api_key": None}})
+
+    def test_empty_client_key_without_environment(self):
+        self.check_keys({"client_args": {"api_key": ""}})
+
 
 if __name__ == "__main__":
     unittest.main()
