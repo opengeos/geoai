@@ -134,6 +134,8 @@ def train_classifier(
     )
     from torchgeo.trainers import SemanticSegmentationTask
 
+    from ._albu_compat import make_coarse_dropout, make_gauss_noise
+
     # Create a wrapper class for albumentations to work with TorchGeo format
     class AlbumentationsWrapper:
         def __init__(self, transform):
@@ -180,8 +182,8 @@ def train_classifier(
                     p=0.5, brightness_limit=0.2, contrast_limit=0.2
                 ),
                 A.GaussianBlur(p=0.3),
-                A.GaussNoise(p=0.3),
-                A.CoarseDropout(p=0.3, max_holes=8, max_height=32, max_width=32),
+                make_gauss_noise(p=0.3),
+                make_coarse_dropout(p=0.3, max_holes=8, max_height=32, max_width=32),
             ]
         )
         # Wrap the albumentations transforms
