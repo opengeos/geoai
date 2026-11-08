@@ -72,6 +72,7 @@ If you find GeoAI useful in your research, please consider citing the following 
 ### 🖼️ Image Segmentation
 
 -   Integration with [PyTorch Segmentation Models](https://github.com/qubvel-org/segmentation_models.pytorch) for automatic feature extraction
+-   Reproducible k-fold segmentation training with optional site/scene grouping, loss- or IoU-based checkpoint selection, pooled out-of-fold metrics, and probability-averaged ensemble inference
 -   Specialized segmentation algorithms optimized for satellite and aerial imagery
 -   Streamlined workflows for segmenting buildings, water bodies, wetlands, solar panels, etc.
 -   Export capabilities to standard geospatial formats (GeoJSON, Shapefile, GeoPackage, GeoParquet)
