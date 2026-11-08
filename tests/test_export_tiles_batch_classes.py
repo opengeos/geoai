@@ -619,9 +619,7 @@ class TestLoadClassDataVectorOrder(unittest.TestCase):
         )
 
         self.assertEqual(forward_categories, reverse_categories)
-        self.assertEqual(
-            [c["name"] for c in forward_categories], ["1.0", "2.0", "nan"]
-        )
+        self.assertEqual([c["name"] for c in forward_categories], ["1.0", "2.0", "nan"])
 
     def test_mixed_type_ties_are_order_independent(self):
         def categories(values):
