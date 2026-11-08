@@ -130,7 +130,7 @@ def create_openai_model(
         OpenAIModel: An OpenAI model.
     """
 
-    if api_key is None:
+    if api_key is None and (client_args is None or "api_key" not in client_args):
         try:
             api_key = os.getenv("OPENAI_API_KEY", None)
             if api_key is None:
@@ -163,7 +163,7 @@ def create_anthropic_model(
         **kwargs: Additional keyword arguments for the Anthropic model.
     """
 
-    if api_key is None:
+    if api_key is None and (client_args is None or "api_key" not in client_args):
         try:
             api_key = os.getenv("ANTHROPIC_API_KEY", None)
             if api_key is None:
