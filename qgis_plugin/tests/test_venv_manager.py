@@ -730,3 +730,10 @@ def test_venv_python_works_verifies_venv_prefix_activation(tmp_path, monkeypatch
 
     assert run_probe(sys.prefix) != 0
     assert run_probe(sys.prefix + "-base") == 0
+
+
+def test_torchange_verification_imports_anychange():
+    code = venv_manager._get_verification_code("torchange")
+
+    assert "add_dll_directory" in code
+    assert "from torchange.models.segment_any_change import AnyChange" in code

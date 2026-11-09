@@ -46,6 +46,7 @@ def download_file(
         response = requests.get(url, stream=True, timeout=50)
         response.raise_for_status()
         total_size = int(response.headers.get("content-length", 0))
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
         with (
             open(output_path, "wb") as file,
