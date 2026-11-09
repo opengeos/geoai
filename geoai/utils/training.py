@@ -3369,12 +3369,8 @@ def export_training_data(
                             if class_value_field in feature
                             else 1
                         )
-                        if isinstance(class_val, str):
-                            # If class is a string, use its position in the unique classes list
-                            class_id = class_to_id.get(class_val, 1)
-                        else:
-                            # If class is already a number, use it directly
-                            class_id = int(class_val) if class_val > 0 else 1
+                        # Map class value through class_to_id for consistent IDs
+                        class_id = class_to_id.get(class_val, 1)
 
                         # Get the geometry in pixel coordinates
                         geom = feature.geometry.intersection(window_bounds)

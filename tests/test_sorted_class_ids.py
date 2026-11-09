@@ -1,16 +1,21 @@
-import unittest
-from unittest.mock import MagicMock
+import os
 import sys
+import tempfile
+import unittest
 
-# Mock torch dependencies if not installed
-for m in ["torch", "torchgeo", "torchvision", "torchvision.transforms"]:
-    if m not in sys.modules:
-        sys.modules[m] = MagicMock()
+try:
+    import torch
+    import torchgeo
+    import torchvision
+except ImportError:
+    from unittest.mock import MagicMock
+
+    for m in ["torch", "torchgeo", "torchvision", "torchvision.transforms"]:
+        if m not in sys.modules:
+            sys.modules[m] = MagicMock()
 
 import geopandas as gpd
 from shapely.geometry import box
-import tempfile
-import os
 
 from geoai.utils.training import _load_class_data_vector
 
@@ -82,6 +87,35 @@ class TestSortedClassIds(unittest.TestCase):
         coco_ids2 = {c["name"]: c["id"] for c in coco_cats2}
         self.assertEqual(coco_ids1, expected_mapping)
         self.assertEqual(coco_ids2, expected_mapping)
+
+    def test_load_class_data_vector_mixed_types_fallback(self):
+        """Verify sorting falls back to str conversion when types are unorderable together."""
+        gdf = gpd.GeoDataFrame(
+            {
+                "class": ["zebra", 10, "apple", 2],
+                "geometry": [
+                    box(0, 0, 1, 1),
+                    box(1, 1, 2, 2),
+                    box(2, 2, 3, 3),
+                    box(3, 3, 4, 4),
+                ],
+            },
+            crs="EPSG:4326",
+        )
+        vec_path = os.path.join(self.temp_dir.name, "mixed.geojson")
+        gdf.to_file(vec_path, driver="GeoJSON")
+
+        _, class_to_id, _ = _load_class_data_vector(
+            vector_path=vec_path,
+            src_crs="EPSG:4326",
+            class_value_field="class",
+            quiet=True,
+            metadata_format="COCO",
+        )
+
+        self.assertEqual(len(class_to_id), 4)
+        ids = list(class_to_id.values())
+        self.assertEqual(ids, [1, 2, 3, 4])
 
 
 if __name__ == "__main__":
