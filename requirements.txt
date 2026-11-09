@@ -25,7 +25,7 @@ smoothify
 spacy>=3.8.14
 timm
 tokenizers>=0.22.2
-torch>=2.10.0
+torch>=2.15.0
 # torchange
 torchgeo
 torchinfo
