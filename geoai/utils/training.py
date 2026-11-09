@@ -754,7 +754,10 @@ def _load_class_data_vector(
                 logger.info(f"Applied buffer of {buffer_radius} units")
 
         if class_value_field in gdf.columns:
-            unique_classes = gdf[class_value_field].unique()
+            try:
+                unique_classes = sorted(gdf[class_value_field].unique())
+            except TypeError:
+                unique_classes = sorted(gdf[class_value_field].unique(), key=str)
             if not quiet:
                 logger.info(
                     f"Found {len(unique_classes)} unique classes: {unique_classes}"
@@ -2642,7 +2645,10 @@ def _process_image_mask_pair(
                 # Check if class_value_field exists
                 if not use_batch_class_to_id:
                     if class_value_field in gdf.columns:
-                        unique_classes = gdf[class_value_field].unique()
+                        try:
+                            unique_classes = sorted(gdf[class_value_field].unique())
+                        except TypeError:
+                            unique_classes = sorted(gdf[class_value_field].unique(), key=str)
                         # Create class mapping
                         class_to_id = {
                             cls: i + 1 for i, cls in enumerate(unique_classes)
@@ -3086,7 +3092,10 @@ def export_training_data(
             unique_classes = [1]
         else:
             # Print unique classes for debugging
-            unique_classes = gdf[class_value_field].unique()
+            try:
+                unique_classes = sorted(gdf[class_value_field].unique())
+            except TypeError:
+                unique_classes = sorted(gdf[class_value_field].unique(), key=str)
             if not quiet:
                 logger.info(
                     f"Found {len(unique_classes)} unique classes: {unique_classes}"
