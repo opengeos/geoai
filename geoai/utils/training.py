@@ -2648,7 +2648,9 @@ def _process_image_mask_pair(
                         try:
                             unique_classes = sorted(gdf[class_value_field].unique())
                         except TypeError:
-                            unique_classes = sorted(gdf[class_value_field].unique(), key=str)
+                            unique_classes = sorted(
+                                gdf[class_value_field].unique(), key=str
+                            )
                         # Create class mapping
                         class_to_id = {
                             cls: i + 1 for i, cls in enumerate(unique_classes)

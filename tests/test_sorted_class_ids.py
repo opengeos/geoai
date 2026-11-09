@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import sys
 
 # Mock torch dependencies if not installed
-for m in ['torch', 'torchgeo', 'torchvision', 'torchvision.transforms']:
+for m in ["torch", "torchgeo", "torchvision", "torchvision.transforms"]:
     if m not in sys.modules:
         sys.modules[m] = MagicMock()
 
@@ -28,7 +28,12 @@ class TestSortedClassIds(unittest.TestCase):
         gdf1 = gpd.GeoDataFrame(
             {
                 "class": ["water", "building", "road", "water"],
-                "geometry": [box(0, 0, 10, 10), box(10, 10, 20, 20), box(20, 20, 30, 30), box(30, 30, 40, 40)],
+                "geometry": [
+                    box(0, 0, 10, 10),
+                    box(10, 10, 20, 20),
+                    box(20, 20, 30, 30),
+                    box(30, 30, 40, 40),
+                ],
             },
             crs="EPSG:4326",
         )
@@ -47,7 +52,12 @@ class TestSortedClassIds(unittest.TestCase):
         gdf2 = gpd.GeoDataFrame(
             {
                 "class": ["road", "water", "building", "road"],
-                "geometry": [box(0, 0, 10, 10), box(10, 10, 20, 20), box(20, 20, 30, 30), box(30, 30, 40, 40)],
+                "geometry": [
+                    box(0, 0, 10, 10),
+                    box(10, 10, 20, 20),
+                    box(20, 20, 30, 30),
+                    box(30, 30, 40, 40),
+                ],
             },
             crs="EPSG:4326",
         )
