@@ -128,22 +128,27 @@ class ProcessingMonitor:
     """
 
     def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        """Initialize the monitor with a monotonic elapsed-time clock."""
         self._clock = clock
         self._tasks: Dict[str, ProcessingTask] = {}
         self._listeners: List[Callable[[], None]] = []
 
     def add_listener(self, listener: Callable[[], None]) -> None:
+        """Register a callback invoked after monitor state changes."""
         self._listeners.append(listener)
 
     def remove_listener(self, listener: Callable[[], None]) -> None:
+        """Remove a previously registered state-change callback."""
         if listener in self._listeners:
             self._listeners.remove(listener)
 
     def _notify(self) -> None:
+        """Notify a snapshot of the registered listeners."""
         for listener in tuple(self._listeners):
             listener()
 
     def submit(self, task_id: str, name: str) -> ProcessingTask:
+        """Register a queued task and return its initial snapshot."""
         task = ProcessingTask(task_id=task_id, name=name, status=TaskStatus.QUEUED)
         self._tasks[task_id] = task
         logger.info("AI task submitted: %s (%s)", name, task_id)
@@ -151,6 +156,9 @@ class ProcessingMonitor:
         return task
 
     def start(self, task_id: str) -> None:
+        """Mark a registered task as running."""
+        if task_id not in self._tasks:
+            return
         task = self._tasks[task_id]
         if task.status in (
             TaskStatus.COMPLETED,
@@ -167,6 +175,7 @@ class ProcessingMonitor:
         self._notify()
 
     def _reset_gpu_peak_metrics(self, task_id: str) -> None:
+        """Reset CUDA peak metrics when no other task is running."""
         if any(
             item.status == TaskStatus.RUNNING and item.task_id != task_id
             for item in self._tasks.values()
@@ -191,6 +200,9 @@ class ProcessingMonitor:
     def progress(
         self, task_id: str, message: str = "", percent: Optional[float] = None
     ) -> None:
+        """Update a registered task's progress message and percentage."""
+        if task_id not in self._tasks:
+            return
         task = self._tasks[task_id]
         if task.status in (
             TaskStatus.COMPLETED,
@@ -218,14 +230,19 @@ class ProcessingMonitor:
         self._notify()
 
     def complete(self, task_id: str) -> None:
+        """Mark a registered task as completed."""
         self._finish(task_id, TaskStatus.COMPLETED)
 
     def cancel(self, task_id: str) -> None:
+        """Cancel a registered task, ignoring stale task IDs."""
         if task_id not in self._tasks:
             return
         self._finish(task_id, TaskStatus.CANCELLED)
 
     def fail(self, task_id: str, error: BaseException | str) -> None:
+        """Record an error and mark a registered task as failed."""
+        if task_id not in self._tasks:
+            return
         task = self._tasks[task_id]
         if task.status in (
             TaskStatus.COMPLETED,
@@ -248,6 +265,9 @@ class ProcessingMonitor:
         self._finish(task_id, TaskStatus.FAILED)
 
     def _finish(self, task_id: str, status: TaskStatus) -> None:
+        """Apply a terminal status to a registered task."""
+        if task_id not in self._tasks:
+            return
         task = self._tasks[task_id]
         if task.status in (
             TaskStatus.COMPLETED,
@@ -264,15 +284,18 @@ class ProcessingMonitor:
         self._notify()
 
     def snapshot(self) -> List[ProcessingTask]:
+        """Return current task snapshots with refreshed elapsed times."""
         now = self._clock()
         for task in self._tasks.values():
             task.update_elapsed(now)
         return list(self._tasks.values())
 
     def get(self, task_id: str) -> Optional[ProcessingTask]:
+        """Return a task by ID, or None when it is not registered."""
         return self._tasks.get(task_id)
 
     def clear_finished(self) -> None:
+        """Remove tasks in terminal states from the registry."""
         self._tasks = {
             key: task
             for key, task in self._tasks.items()

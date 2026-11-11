@@ -207,6 +207,23 @@ def test_progress_after_completion_does_not_change_terminal_task():
     assert task.progress_message == ""
 
 
+@pytest.mark.parametrize(
+    "operation",
+    [
+        lambda monitor: monitor.start("missing"),
+        lambda monitor: monitor.progress("missing", "stale"),
+        lambda monitor: monitor.fail("missing", "stale"),
+        lambda monitor: monitor.complete("missing"),
+    ],
+)
+def test_missing_task_callbacks_are_ignored(operation):
+    monitor = monitor_module.ProcessingMonitor()
+
+    operation(monitor)
+
+    assert monitor.snapshot() == []
+
+
 def test_error_categories_and_technical_logging(caplog):
     monitor = monitor_module.ProcessingMonitor()
     monitor.submit("task-1", "Inference")

@@ -674,13 +674,14 @@ class GeoAIPlugin:
                 self.processing_monitor_action.setChecked(False)
                 return
 
-        if self._processing_monitor_dock.isVisible():
+        if self.processing_monitor_action.isChecked():
             self._processing_monitor_dock.hide()
         else:
             self._processing_monitor_dock.show()
             self._processing_monitor_dock.raise_()
 
     def _on_processing_monitor_visibility_changed(self, visible):
+        """Synchronize the monitor action with dock visibility."""
         self.processing_monitor_action.setChecked(visible)
 
     def toggle_samgeo_dock(self):

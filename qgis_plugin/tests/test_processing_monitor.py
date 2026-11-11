@@ -145,6 +145,31 @@ def test_panel_shutdown_handles_missing_and_terminal_tasks():
     monitor.clear_finished()
 
 
+def test_panel_shutdown_preserves_finished_worker_with_queued_callback():
+    monitor = processing_monitor_core.get_processing_monitor()
+    task_id = _task_id("queued-completion")
+    monitor.submit(task_id, "Queued completion task")
+
+    class FinishedWorker:
+        _processing_monitor_task_id = task_id
+
+        @staticmethod
+        def isRunning():
+            return False
+
+        @staticmethod
+        def isFinished():
+            return True
+
+    panel = SimpleNamespace(_processing_monitor=monitor)
+    SegmentationDockWidget._cancel_monitored_worker(panel, FinishedWorker())
+
+    assert monitor.get(task_id).status == TaskStatus.QUEUED
+    monitor.complete(task_id)
+    assert monitor.get(task_id).status == TaskStatus.COMPLETED
+    monitor.clear_finished()
+
+
 def test_worker_exception_signal_preserves_exception_for_monitor():
     class Worker(QObject):
         started = pyqtSignal()
