@@ -484,5 +484,70 @@ class TestGetLastResult(unittest.TestCase):
         self.assertIsNone(result)
 
 
+# ---------------------------------------------------------------------------
+# Model revision pinning (issue #907)
+# ---------------------------------------------------------------------------
+
+
+class TestModelRevision(unittest.TestCase):
+    """The moondream2 revision must be pinned so results stay reproducible."""
+
+    def _load_kwargs(self, **init_kwargs):
+        """Build a MoondreamGeo and return the from_pretrained kwargs used."""
+        from geoai.moondream import MoondreamGeo
+
+        fake_auto_model = MagicMock()
+        with patch.dict(
+            "sys.modules",
+            {"transformers": MagicMock(AutoModelForCausalLM=fake_auto_model)},
+        ):
+            MoondreamGeo(**init_kwargs)
+        return fake_auto_model.from_pretrained.call_args.kwargs
+
+    def test_moondream2_revision_pinned_by_default(self):
+        from geoai.moondream import DEFAULT_MOONDREAM2_REVISION
+
+        kwargs = self._load_kwargs(device="cpu")
+        self.assertEqual(kwargs["revision"], DEFAULT_MOONDREAM2_REVISION)
+
+    def test_explicit_revision_wins(self):
+        kwargs = self._load_kwargs(device="cpu", revision="main")
+        self.assertEqual(kwargs["revision"], "main")
+
+    def test_moondream3_not_pinned(self):
+        kwargs = self._load_kwargs(
+            model_name="moondream/moondream3-preview", device="cpu"
+        )
+        self.assertNotIn("revision", kwargs)
+
+
+class TestIncompatibleTransformers(unittest.TestCase):
+    """An unloadable checkpoint must raise instead of returning a broken model.
+
+    Older moondream2 checkpoints raise AttributeError on transformers >= 5. They
+    used to be loaded anyway via a monkeypatch, which left the model's
+    non-persistent buffers unset and made inference return meaningless results.
+    """
+
+    def test_all_tied_weights_keys_raises_with_guidance(self):
+        from geoai.moondream import MoondreamGeo
+
+        fake_auto_model = MagicMock()
+        fake_auto_model.from_pretrained.side_effect = AttributeError(
+            "'HfMoondream' object has no attribute 'all_tied_weights_keys'"
+        )
+        with patch.dict(
+            "sys.modules",
+            {"transformers": MagicMock(AutoModelForCausalLM=fake_auto_model)},
+        ):
+            with self.assertRaises(RuntimeError) as ctx:
+                MoondreamGeo(device="cpu", revision="2025-06-21")
+
+        message = str(ctx.exception)
+        self.assertIn("2025-06-21", message)
+        self.assertIn("transformers", message)
+        self.assertEqual(fake_auto_model.from_pretrained.call_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
