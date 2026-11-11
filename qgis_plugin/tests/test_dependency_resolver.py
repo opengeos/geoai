@@ -8,6 +8,7 @@ def test_windows_dependency_specs_include_python_312_and_triton():
 
     assert "python==3.12.*" in specs
     assert "triton-windows" in specs
+    assert "deepforest>=2.1.0" in specs
     assert "transformers>=4.56.2" in specs
 
 
