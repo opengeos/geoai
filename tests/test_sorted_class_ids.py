@@ -407,10 +407,13 @@ class TestSortedClassIds(unittest.TestCase):
 
     def test_subprocess_isolated_mock_import_does_not_pollute_parent(self):
         """Run mocked torch imports in a child process without mutating parent."""
+        tracked = ("torch", "geoai.utils.training")
+        before = {name: sys.modules.get(name) for name in tracked}
         _run_in_isolated_subprocess("""
             from geoai.utils.training import _load_class_data_vector
             assert callable(_load_class_data_vector)
         """)
+        after = {name: sys.modules.get(name) for name in tracked}
+        self.assertEqual(after, before)
         if not _TRAINING_AVAILABLE:
-            self.assertNotIn("torch", sys.modules)
             self.assertNotIn("geoai.utils.training", sys.modules)
