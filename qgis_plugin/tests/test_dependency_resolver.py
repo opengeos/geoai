@@ -22,6 +22,13 @@ def test_macos_sam3_is_optional_without_triton_windows():
     assert venv_manager._is_optional_install_package("sam3", "darwin") is True
 
 
+def test_windows_sam3_is_required_to_verify():
+    assert venv_manager._is_optional_verify_package("sam3", "win32") is False
+    assert venv_manager._is_optional_verify_package("triton-windows", "win32") is True
+    assert venv_manager._is_optional_install_package("sam3", "win32") is False
+    assert venv_manager._is_optional_install_package("triton-windows", "win32") is True
+
+
 def test_resolution_failure_diagnostic_identifies_impossible_constraint():
     output = """
     Because transformers==4.57.6 has no wheels with a matching Python requirement
