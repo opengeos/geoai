@@ -92,15 +92,24 @@ def test_normalize_dist_name_strips_extras_before_comparison():
 
 def test_classify_batch_error_strips_extras_when_matching():
     specs = ["segment-geospatial[samgeo3]", "sam3", "triton-windows"]
-    assert venv_manager._classify_batch_error(
-        "ERROR: No matching distribution found for segment-geospatial", specs
-    ) == "segment-geospatial[samgeo3]"
-    assert venv_manager._classify_batch_error(
-        "ERROR: segment_geospatial is not compatible", specs
-    ) == "segment-geospatial[samgeo3]"
-    assert venv_manager._classify_batch_error(
-        "ERROR: No matching distribution found for sam3", specs
-    ) == "sam3"
+    assert (
+        venv_manager._classify_batch_error(
+            "ERROR: No matching distribution found for segment-geospatial", specs
+        )
+        == "segment-geospatial[samgeo3]"
+    )
+    assert (
+        venv_manager._classify_batch_error(
+            "ERROR: segment_geospatial is not compatible", specs
+        )
+        == "segment-geospatial[samgeo3]"
+    )
+    assert (
+        venv_manager._classify_batch_error(
+            "ERROR: No matching distribution found for sam3", specs
+        )
+        == "sam3"
+    )
 
 
 def test_pip_ssl_flags_trust_pytorch_wheel_host():
