@@ -34,7 +34,7 @@ REQUIRED_PACKAGES = [
     ("torch", ">=2.0.0"),
     ("torchvision", ">=0.15.0"),
     ("geoai-py", ">=0.39.0"),
-    ("segment-geospatial", ""),
+    ("segment-geospatial[samgeo3]", ""),
     ("sam3", ""),
     ("deepforest", ">=2.1.0"),
     ("omniwatermask", ""),
@@ -2761,7 +2761,7 @@ def _is_optional_verify_package(
         True if verification failure for the package should be non-fatal.
     """
     target_platform = platform_name or sys.platform
-    if target_platform == "win32" and package_name in ("sam3", "triton-windows"):
+    if target_platform == "win32" and package_name == "triton-windows":
         return True
     if target_platform == "darwin" and package_name == "sam3":
         return True
@@ -3622,6 +3622,7 @@ def _get_verification_timeout(package_name: str) -> int:
         "torchvision",
         "geoai-py",
         "segment-geospatial",
+        "segment-geospatial[samgeo3]",
         "triton-windows",
         "sam3",
         "transformers",
@@ -3648,10 +3649,12 @@ def _get_verification_code(package_name: str) -> str:
         code = "import torchvision; print(torchvision.__version__)"
     elif package_name == "geoai-py":
         code = "import geoai; print(geoai.__version__)"
-    elif package_name == "segment-geospatial":
+    elif package_name == "segment-geospatial" or package_name.startswith(
+        "segment-geospatial["
+    ):
         code = "import torch; import samgeo; print(samgeo.__version__)"
     elif package_name == "sam3":
-        code = "import torch; import sam3; print('ok')"
+        code = "import torch; import sam3; import sam3.model_builder; print('ok')"
     elif package_name == "transformers":
         code = (
             "import transformers; "

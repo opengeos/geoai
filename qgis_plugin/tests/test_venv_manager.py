@@ -203,6 +203,13 @@ def test_segment_geospatial_verification_bootstraps_torch_before_samgeo():
     assert "import torch; import samgeo" in code
 
 
+def test_samgeo3_extra_verification_bootstraps_torch_before_samgeo():
+    code = venv_manager._get_verification_code("segment-geospatial[samgeo3]")
+
+    assert "add_dll_directory" in code
+    assert "import torch; import samgeo" in code
+
+
 def test_omniwatermask_verification_bootstraps_torch_before_import():
     code = venv_manager._get_verification_code("omniwatermask")
 
@@ -305,7 +312,7 @@ def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypat
             ("torch", ">=2.0.0"),
             ("torchvision", ">=0.15.0"),
             ("geoai-py", ">=0.39.0"),
-            ("segment-geospatial", ""),
+            ("segment-geospatial[samgeo3]", ""),
         ],
     )
     monkeypatch.setattr(
@@ -335,7 +342,7 @@ def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypat
     assert "--constraint" in batch_cmd
     assert constraints_path in batch_cmd
     assert "geoai-py>=0.39.0" in batch_cmd
-    assert "segment-geospatial" in batch_cmd
+    assert "segment-geospatial[samgeo3]" in batch_cmd
 
 
 def test_verify_venv_treats_macos_sam3_import_failure_as_optional(monkeypatch):
