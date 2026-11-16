@@ -847,6 +847,10 @@ def _is_windows_process_crash(returncode: int) -> bool:
 def _classify_batch_error(error_output: str, package_specs: List[str]) -> Optional[str]:
     """Identify which package in a batch install caused the failure.
 
+    Extras are stripped before matching because resolver output typically
+    prints the base distribution name (e.g. ``segment-geospatial``) without
+    the extra (e.g. ``[samgeo3]``).
+
     Args:
         error_output: Combined stdout+stderr from the failed batch install.
         package_specs: List of package specifiers that were in the batch.
@@ -857,7 +861,8 @@ def _classify_batch_error(error_output: str, package_specs: List[str]) -> Option
     error_lower = error_output.lower()
     for spec in package_specs:
         name = re.split(r"[><=!]", spec)[0].strip()
-        if name.lower().replace("-", "_") in error_lower.replace("-", "_"):
+        base_name = re.sub(r"\[.*?\]", "", name)
+        if base_name.lower().replace("-", "_") in error_lower.replace("-", "_"):
             return name
     return None
 
