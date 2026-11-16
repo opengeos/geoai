@@ -3288,6 +3288,15 @@ def install_dependencies(
             return False, "Installation cancelled"
 
         batch_specs = ["{}{}".format(name, ver) for name, ver in batch_packages]
+        # On Linux CUDA, omit the [samgeo3] extra to avoid a triton conflict:
+        # torch 2.6.0+cu124 pins triton==3.2.0, but the samgeo3 extra requires
+        # triton>=3.5.1. Installing plain segment-geospatial + sam3 separately
+        # lets torch's triton satisfy the runtime without an impossible resolve.
+        if sys.platform == "linux" and cuda_enabled:
+            batch_specs = [
+                s.replace("segment-geospatial[samgeo3]", "segment-geospatial")
+                for s in batch_specs
+            ]
         constraint_args: List[str] = []
         torch_index_args: List[str] = []
         constraints_file = None

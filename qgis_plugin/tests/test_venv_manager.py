@@ -355,6 +355,7 @@ def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypat
     )
     monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
     monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(venv_manager.sys, "platform", "win32")
     monkeypatch.setattr(
         venv_manager,
         "_get_required_packages",
@@ -393,6 +394,75 @@ def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypat
     assert constraints_path in batch_cmd
     assert "geoai-py>=0.39.0" in batch_cmd
     assert "segment-geospatial[samgeo3]" in batch_cmd
+
+
+def test_linux_cuda_omits_samgeo3_extra_to_avoid_triton_conflict(tmp_path, monkeypatch):
+    """On Linux CUDA, the [samgeo3] extra must be omitted because torch 2.6.0+cu124
+    pins triton==3.2.0 while samgeo3 requires triton>=3.5.1, creating an impossible
+    resolution. Plain segment-geospatial + sam3 avoids the conflict."""
+    from geoai.core import uv_manager
+
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        script = cmd[-1]
+        if "torch.version.cuda" in script:
+            return subprocess.CompletedProcess(cmd, 0, stdout="12.4\n", stderr="")
+        if "metadata.version('torch')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="2.6.0+cu124\n", stderr=""
+            )
+        if "metadata.version('torchvision')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="0.21.0+cu124\n", stderr=""
+            )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def fake_run_pip_install(**kwargs):
+        calls.append(kwargs)
+        return venv_manager._PipResult(0, "ok", "")
+
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: False)
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(venv_manager.sys, "platform", "linux")
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_required_packages",
+        lambda: [
+            ("torch", ">=2.0.0"),
+            ("torchvision", ">=0.15.0"),
+            ("segment-geospatial[samgeo3]", ""),
+            ("sam3", ""),
+        ],
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "detect_nvidia_gpu",
+        lambda: (True, {"compute_cap": 8.9, "driver_version": "550.00"}),
+    )
+    monkeypatch.setattr(venv_manager, "_select_cuda_index", lambda _gpu_info: "cu124")
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+
+    ok, _message = venv_manager.install_dependencies(
+        venv_dir=str(tmp_path / "venv"),
+        cuda_enabled=True,
+    )
+
+    assert ok is True
+    batch_cmd = calls[-1]["cmd"]
+    # The extra must be omitted to avoid the triton conflict
+    assert "segment-geospatial[samgeo3]" not in batch_cmd
+    assert "segment-geospatial" in batch_cmd
+    # sam3 must still be installed separately
+    assert "sam3" in batch_cmd
+    # Torch constraints should still be applied (pinning torch/torchvision)
+    assert "--constraint" in batch_cmd
 
 
 def test_verify_venv_treats_macos_sam3_import_failure_as_optional(monkeypatch):
