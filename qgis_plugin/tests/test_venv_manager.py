@@ -81,6 +81,15 @@ def test_version_satisfies_fails_closed_for_unsupported_specifier():
     assert venv_manager._version_satisfies("0.39.0", "~=0.39.0") is False
 
 
+def test_normalize_dist_name_strips_extras_before_comparison():
+    assert venv_manager._normalize_dist_name("segment-geospatial[samgeo3]") == (
+        "segment-geospatial"
+    )
+    assert venv_manager._normalize_dist_name("segment-geospatial") == (
+        "segment-geospatial"
+    )
+
+
 def test_pip_ssl_flags_trust_pytorch_wheel_host():
     flags = venv_manager._get_pip_ssl_flags()
 
@@ -208,6 +217,34 @@ def test_samgeo3_extra_verification_bootstraps_torch_before_samgeo():
 
     assert "add_dll_directory" in code
     assert "import torch; import samgeo" in code
+
+
+def test_package_dir_name_strips_extras_before_marker_lookup():
+    assert venv_manager._package_dir_name("segment-geospatial[samgeo3]") == "samgeo"
+    assert venv_manager._package_dir_name("segment-geospatial") == "samgeo"
+
+
+def test_quick_check_accepts_samgeo3_extra_with_samgeo_dir(tmp_path, monkeypatch):
+    site_packages = tmp_path / "site-packages"
+    site_packages.mkdir()
+    (site_packages / "samgeo").mkdir()
+    _write_dist_metadata(site_packages, "segment-geospatial", "1.4.2")
+
+    monkeypatch.setattr(
+        venv_manager,
+        "get_venv_site_packages",
+        lambda _venv_dir=None: str(site_packages),
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_required_packages",
+        lambda: [("segment-geospatial[samgeo3]", "")],
+    )
+
+    ready, message = venv_manager._quick_check_packages(str(tmp_path / "venv"))
+
+    assert ready is True
+    assert message == "All packages found"
 
 
 def test_omniwatermask_verification_bootstraps_torch_before_import():

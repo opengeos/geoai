@@ -3444,9 +3444,16 @@ def install_dependencies(
                         "retrying without it...".format(failed_pkg),
                         Qgis.Warning,
                     )
-                    retry_specs = [
-                        s for s in batch_specs if not s.startswith(failed_pkg)
-                    ]
+                    # Strip only the failed package, keeping extras on remaining
+                    # specs. For example, dropping "sam3" must keep
+                    # "segment-geospatial[samgeo3]" intact.
+                    retry_specs = []
+                    for spec in batch_specs:
+                        spec_name = re.split(r"[><=!]", spec)[0].strip()
+                        spec_base = re.sub(r"\[.*?\]", "", spec_name)
+                        if spec_base == failed_pkg:
+                            continue
+                        retry_specs.append(spec)
                     if retry_specs:
                         if use_uv:
                             retry_args = [
@@ -3884,13 +3891,18 @@ def cleanup_old_venv_directories() -> List[str]:
 def _normalize_dist_name(name: str) -> str:
     """Normalize a Python distribution name for metadata comparisons.
 
+    Extras are stripped because the ``Name:`` field in ``METADATA`` never
+    includes them, so ``segment-geospatial[samgeo3]`` must compare equal to
+    the installed distribution ``segment-geospatial``.
+
     Args:
-        name: Distribution name.
+        name: Distribution name, optionally with extras.
 
     Returns:
         Normalized distribution name.
     """
-    return re.sub(r"[-_.]+", "-", name).lower()
+    base_name = re.sub(r"\[.*?\]", "", name)
+    return re.sub(r"[-_.]+", "-", base_name).lower()
 
 
 def _read_dist_version(site_packages: str, dist_name: str) -> Optional[str]:
@@ -4018,18 +4030,22 @@ def _version_satisfies(version: str, spec: str) -> bool:
 def _package_dir_name(package_name: str) -> str:
     """Return the import package directory expected in site-packages.
 
+    Extras are stripped before lookup so ``segment-geospatial[samgeo3]``
+    resolves to ``samgeo`` instead of ``segment_geospatial[samgeo3]``.
+
     Args:
-        package_name: Distribution name.
+        package_name: Distribution name, optionally with extras.
 
     Returns:
         Expected import package directory name.
     """
+    base_name = re.sub(r"\[.*?\]", "", package_name)
     package_markers = {
         "geoai-py": "geoai",
         "segment-geospatial": "samgeo",
         "triton-windows": "triton",
     }
-    return package_markers.get(package_name, package_name.replace("-", "_"))
+    return package_markers.get(base_name, base_name.replace("-", "_"))
 
 
 def _quick_check_packages(venv_dir: str = None) -> Tuple[bool, str]:
