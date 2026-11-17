@@ -51,6 +51,13 @@ class TestSlidingWindowStarts:
         with pytest.raises(ValueError, match="overlap"):
             _sliding_window_starts(1000, 512, overlap)
 
+    @pytest.mark.parametrize("overlap", [-1, -128])
+    def test_negative_overlap_is_rejected(self, overlap):
+        # A negative overlap steps further than the window (stride 640 for -128) and
+        # would leave rows [512, 640) and [1152, 1280) of a 2048-pixel axis uncovered.
+        with pytest.raises(ValueError, match="overlap"):
+            _sliding_window_starts(2048, 512, overlap)
+
 
 def _write_geotiff(path, height, width):
     data = (np.random.default_rng(0).random((3, height, width)) * 255).astype(np.uint8)
@@ -122,3 +129,22 @@ def test_image_inference_predicts_every_pixel(tmp_path, height, width):
     out = np.array(Image.open(dst))
     assert out.shape[:2] == (height, width)
     assert (out > 0).all(), f"{int((out == 0).sum())} pixels were not predicted"
+
+
+def test_negative_overlap_raises_instead_of_leaving_gaps(tmp_path):
+    src = os.path.join(tmp_path, "in.tif")
+    dst = os.path.join(tmp_path, "out.tif")
+    _write_geotiff(src, 2048, 600)
+    with pytest.raises(ValueError, match="overlap"):
+        semantic_inference_on_geotiff(
+            AlwaysClassOne(),
+            src,
+            dst,
+            window_size=512,
+            overlap=-128,
+            num_channels=3,
+            num_classes=2,
+            device=torch.device("cpu"),
+            quiet=True,
+        )
+    assert not os.path.exists(dst)

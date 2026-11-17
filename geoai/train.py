@@ -1974,13 +1974,15 @@ def _sliding_window_starts(length: int, window_size: int, overlap: int) -> List[
         Sorted list of window start offsets.
 
     Raises:
-        ValueError: If ``overlap`` is not smaller than ``window_size``.
+        ValueError: If ``overlap`` is negative or not smaller than ``window_size``.
+            A negative overlap would step past the window and leave pixels uncovered.
     """
-    stride = window_size - overlap
-    if stride <= 0:
+    if not 0 <= overlap < window_size:
         raise ValueError(
-            f"overlap ({overlap}) must be smaller than window_size ({window_size})"
+            "overlap must satisfy 0 <= overlap < window_size, "
+            f"got overlap={overlap} and window_size={window_size}"
         )
+    stride = window_size - overlap
     if length <= window_size:
         return [0]
     starts = list(range(0, length - window_size, stride))
