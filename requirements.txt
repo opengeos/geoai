@@ -2,7 +2,7 @@ albumentations
 click
 contextily
 datasets>=4.8.4
-einops>=0.8.0
+einops>=0.8.2
 geopandas
 huggingface_hub
 jupyter-server-proxy
