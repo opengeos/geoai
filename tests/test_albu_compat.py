@@ -28,6 +28,14 @@ def test_coarse_dropout_args_not_ignored():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         t = compat.make_coarse_dropout(max_holes=8, max_height=32, max_width=32, p=1.0)
+    if hasattr(t, "num_holes_range"):
+        assert t.num_holes_range == (8, 8)
+        assert t.hole_height_range == (32, 32)
+        assert t.hole_width_range == (32, 32)
+    else:
+        assert (t.min_holes, t.max_holes) == (8, 8)
+        assert (t.min_height, t.max_height) == (32, 32)
+        assert (t.min_width, t.max_width) == (32, 32)
     img = np.ones((256, 256, 3), dtype=np.uint8) * 255
     out = t(image=img)["image"]
     # 1.x behaviour: 8 holes of 32x32 at random positions. Each hole lies fully
