@@ -163,7 +163,8 @@ def create_anthropic_model(
         **kwargs: Additional keyword arguments for the Anthropic model.
     """
 
-    if api_key is None and not (client_args or {}).get("api_key"):
+    token_auth = (client_args or {}).get("auth_token")
+    if api_key is None and not (client_args or {}).get("api_key") and not token_auth:
         try:
             api_key = os.getenv("ANTHROPIC_API_KEY", None)
             if api_key is None:
@@ -173,7 +174,7 @@ def create_anthropic_model(
 
     if client_args is None:
         client_args = kwargs.get("client_args", {})
-    if not client_args.get("api_key") and api_key is not None:
+    if not client_args.get("api_key") and api_key is not None and not token_auth:
         client_args["api_key"] = api_key
 
     return AnthropicModel(client_args=client_args, model_id=model_id, **kwargs)
