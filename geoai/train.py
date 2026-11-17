@@ -1957,6 +1957,37 @@ def _pad_window(
     return window, actual_h, actual_w
 
 
+def _sliding_window_starts(length: int, window_size: int, overlap: int) -> List[int]:
+    """Return start offsets of sliding windows that cover ``[0, length)``.
+
+    Windows advance by ``window_size - overlap``. The last window is aligned with the
+    far edge so the whole extent is covered, and no window is repeated. When
+    ``length`` is not larger than ``window_size``, a single window starting at 0 is
+    returned and the caller pads it (see :func:`_pad_window`).
+
+    Args:
+        length: Size of the image along one axis, in pixels.
+        window_size: Size of the sliding window, in pixels.
+        overlap: Overlap between adjacent windows, in pixels.
+
+    Returns:
+        Sorted list of window start offsets.
+
+    Raises:
+        ValueError: If ``overlap`` is not smaller than ``window_size``.
+    """
+    stride = window_size - overlap
+    if stride <= 0:
+        raise ValueError(
+            f"overlap ({overlap}) must be smaller than window_size ({window_size})"
+        )
+    if length <= window_size:
+        return [0]
+    starts = list(range(0, length - window_size, stride))
+    starts.append(length - window_size)
+    return starts
+
+
 def inference_on_geotiff(
     model: torch.nn.Module,
     geotiff_path: str,
@@ -5326,13 +5357,12 @@ def semantic_inference_on_geotiff(
         prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
         count_accumulator = np.zeros((height, width), dtype=np.float32)
 
-        # Calculate steps
-        steps_y = math.ceil((height - overlap) / (window_size - overlap))
-        steps_x = math.ceil((width - overlap) / (window_size - overlap))
-        last_y = height - window_size
-        last_x = width - window_size
+        # Window origins that cover every pixel without repeating a window; an image
+        # smaller than the window gets one padded window at the origin.
+        y_starts = _sliding_window_starts(height, window_size, overlap)
+        x_starts = _sliding_window_starts(width, window_size, overlap)
 
-        total_windows = steps_y * steps_x
+        total_windows = len(y_starts) * len(x_starts)
         if not quiet:
             logger.info(f"Processing {total_windows} windows...")
 
@@ -5347,19 +5377,9 @@ def semantic_inference_on_geotiff(
 
         start_time = time.time()
 
-        for i in range(steps_y + 1):
-            y = min(i * (window_size - overlap), last_y)
-            y = max(0, y)
-
-            if y > last_y and i > 0:
-                continue
-
-            for j in range(steps_x + 1):
-                x = min(j * (window_size - overlap), last_x)
-                x = max(0, x)
-
-                if x > last_x and j > 0:
-                    continue
+        last_i, last_j = len(y_starts) - 1, len(x_starts) - 1
+        for i, y in enumerate(y_starts):
+            for j, x in enumerate(x_starts):
 
                 # Read window
                 window = src.read(window=Window(x, y, window_size, window_size))
@@ -5391,7 +5411,7 @@ def semantic_inference_on_geotiff(
                 batch_count += 1
 
                 # Process batch
-                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                if batch_count == batch_size or (i == last_i and j == last_j):
                     with torch.no_grad():
                         batch_tensor = torch.stack(batch_inputs)
                         outputs = model(batch_tensor)
@@ -5632,13 +5652,12 @@ def semantic_inference_on_image(
         prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
         count_accumulator = np.zeros((height, width), dtype=np.float32)
 
-        # Calculate steps
-        steps_y = math.ceil((height - overlap) / (window_size - overlap))
-        steps_x = math.ceil((width - overlap) / (window_size - overlap))
-        last_y = height - window_size
-        last_x = width - window_size
+        # Window origins that cover every pixel without repeating a window; an image
+        # smaller than the window gets one padded window at the origin.
+        y_starts = _sliding_window_starts(height, window_size, overlap)
+        x_starts = _sliding_window_starts(width, window_size, overlap)
 
-        total_windows = steps_y * steps_x
+        total_windows = len(y_starts) * len(x_starts)
         if not quiet:
             logger.info(f"Processing {total_windows} windows...")
 
@@ -5653,19 +5672,9 @@ def semantic_inference_on_image(
 
         start_time = time.time()
 
-        for i in range(steps_y + 1):
-            y = min(i * (window_size - overlap), last_y)
-            y = max(0, y)
-
-            if y > last_y and i > 0:
-                continue
-
-            for j in range(steps_x + 1):
-                x = min(j * (window_size - overlap), last_x)
-                x = max(0, x)
-
-                if x > last_x and j > 0:
-                    continue
+        last_i, last_j = len(y_starts) - 1, len(x_starts) - 1
+        for i, y in enumerate(y_starts):
+            for j, x in enumerate(x_starts):
 
                 # Extract window from image array
                 y_end = min(y + window_size, height)
@@ -5699,7 +5708,7 @@ def semantic_inference_on_image(
                 batch_count += 1
 
                 # Process batch
-                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                if batch_count == batch_size or (i == last_i and j == last_j):
                     with torch.no_grad():
                         batch_tensor = torch.stack(batch_inputs)
                         outputs = model(batch_tensor)
