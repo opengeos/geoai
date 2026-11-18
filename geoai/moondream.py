@@ -28,6 +28,16 @@ from .utils import get_device
 
 hf_logging.set_verbosity_error()  # silence HF load reports
 
+# Pinned moondream2 checkpoint used when no revision is requested.
+#
+# The Hugging Face repo's ``main`` branch moves, and because the model is
+# loaded with ``trust_remote_code=True`` a floating revision means the model
+# code itself can change underneath us. Revisions published before this one
+# (including the ``2025-06-21`` tag) are incompatible with transformers >= 5:
+# the model is built on the meta device, its non-persistent buffers are never
+# restored, and inference silently returns garbage instead of raising.
+DEFAULT_MOONDREAM2_REVISION = "5d6c926f44e26b07957b0dd315bbedcb4c17a5fe"
+
 
 class MoondreamGeo:
     """Moondream Vision Language Model processor with GeoTIFF support.
@@ -57,8 +67,12 @@ class MoondreamGeo:
             model_name: HuggingFace model name. Options:
                 - "vikhyatk/moondream2" (default)
                 - "moondream/moondream3-preview"
-            revision: Model revision/checkpoint date. For moondream2, recommended
-                to use a specific date like "2025-06-21" for reproducibility.
+            revision: Model revision/checkpoint. For moondream2 this defaults to
+                ``DEFAULT_MOONDREAM2_REVISION``, a pinned checkpoint that is
+                known to work with the installed transformers version. Pass
+                "main" to track the latest upstream checkpoint instead. Note
+                that moondream2 revisions published before the pinned one (such
+                as the "2025-06-21" tag) do not work with transformers >= 5.
             device: Device for inference ("cuda", "mps", or "cpu").
                 If None, automatically selects the best available device.
             compile_model: Whether to compile the model (recommended for
@@ -79,6 +93,11 @@ class MoondreamGeo:
             self.model_version = "moondream3"
         else:
             self.model_version = "moondream2"
+
+        # Pin moondream2 so an upstream change to `main` cannot silently alter
+        # (or break) results. Callers can still opt in with revision="main".
+        if revision is None and self.model_version == "moondream2":
+            revision = DEFAULT_MOONDREAM2_REVISION
 
         # Load the model
         self.model = self._load_model(revision, compile_model, **kwargs)
@@ -140,23 +159,10 @@ class MoondreamGeo:
 
             logger.info("Loading %s...", self.model_name)
 
-            # Try to load with potential transformers 5.0 compatibility fix
-            try:
-                model = AutoModelForCausalLM.from_pretrained(
-                    self.model_name,
-                    **load_kwargs,
-                )
-            except AttributeError as attr_err:
-                # Handle transformers 5.0 compatibility issue with custom models
-                if "all_tied_weights_keys" in str(attr_err):
-                    # print(
-                    #     "Note: Detected transformers 5.0+ compatibility issue. "
-                    #     "Attempting workaround..."
-                    # )
-                    # Try patching the model class
-                    model = self._load_with_patch(load_kwargs)
-                else:
-                    raise
+            model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                **load_kwargs,
+            )
 
             # Move model to device if accelerate wasn't used
             if not use_device_map:
@@ -184,49 +190,15 @@ class MoondreamGeo:
             error_msg = str(e)
             if "all_tied_weights_keys" in error_msg:
                 error_msg = (
-                    f"Failed to load Moondream model due to transformers version "
-                    f"incompatibility. The model's custom code may not be compatible "
-                    f"with your current transformers version. Try: "
-                    f"1) Wait for an updated model revision, or "
-                    f"2) Use a compatible transformers version. "
-                    f"Original error: {e}"
+                    f"Revision '{revision}' of {self.model_name} is not compatible "
+                    f"with transformers >= 5. Older moondream2 checkpoints are built "
+                    f"on the meta device by transformers 5, which leaves their "
+                    f"non-persistent buffers unset and makes inference return "
+                    f"meaningless results. Use the default revision "
+                    f"(DEFAULT_MOONDREAM2_REVISION) or a newer one, or pin "
+                    f"transformers < 5. Original error: {e}"
                 )
             raise RuntimeError(f"Failed to load Moondream model: {error_msg}") from e
-
-    def _load_with_patch(self, load_kwargs: Dict) -> Any:
-        """Load model with compatibility patch for transformers 5.0+.
-
-        Args:
-            load_kwargs: Keyword arguments for from_pretrained.
-
-        Returns:
-            Loaded model instance.
-        """
-        from transformers import AutoModelForCausalLM, PreTrainedModel
-
-        # Patch the PreTrainedModel class to add missing attribute
-        original_getattr = PreTrainedModel.__getattr__
-
-        def patched_getattr(self, name):
-            if name == "all_tied_weights_keys":
-                # Return empty dict to satisfy the check
-                if not hasattr(self, "_all_tied_weights_keys"):
-                    self._all_tied_weights_keys = {}
-                return self._all_tied_weights_keys
-            return original_getattr(self, name)
-
-        # Apply patch temporarily
-        PreTrainedModel.__getattr__ = patched_getattr
-
-        try:
-            model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                **load_kwargs,
-            )
-            return model
-        finally:
-            # Restore original
-            PreTrainedModel.__getattr__ = original_getattr
 
     def load_geotiff(
         self,
