@@ -1,5 +1,9 @@
 import subprocess
+import sys
+import types
 from pathlib import Path
+
+import pytest
 
 from geoai.core import venv_manager
 
@@ -75,6 +79,37 @@ def test_version_satisfies_rejects_prerelease_for_minimum_version():
 
 def test_version_satisfies_fails_closed_for_unsupported_specifier():
     assert venv_manager._version_satisfies("0.39.0", "~=0.39.0") is False
+
+
+def test_normalize_dist_name_strips_extras_before_comparison():
+    assert venv_manager._normalize_dist_name("segment-geospatial[samgeo3]") == (
+        "segment-geospatial"
+    )
+    assert venv_manager._normalize_dist_name("segment-geospatial") == (
+        "segment-geospatial"
+    )
+
+
+def test_classify_batch_error_strips_extras_when_matching():
+    specs = ["segment-geospatial[samgeo3]", "sam3", "triton-windows"]
+    assert (
+        venv_manager._classify_batch_error(
+            "ERROR: No matching distribution found for segment-geospatial", specs
+        )
+        == "segment-geospatial[samgeo3]"
+    )
+    assert (
+        venv_manager._classify_batch_error(
+            "ERROR: segment_geospatial is not compatible", specs
+        )
+        == "segment-geospatial[samgeo3]"
+    )
+    assert (
+        venv_manager._classify_batch_error(
+            "ERROR: No matching distribution found for sam3", specs
+        )
+        == "sam3"
+    )
 
 
 def test_pip_ssl_flags_trust_pytorch_wheel_host():
@@ -199,11 +234,81 @@ def test_segment_geospatial_verification_bootstraps_torch_before_samgeo():
     assert "import torch; import samgeo" in code
 
 
+def test_samgeo3_extra_verification_bootstraps_torch_before_samgeo():
+    code = venv_manager._get_verification_code("segment-geospatial[samgeo3]")
+
+    assert "add_dll_directory" in code
+    assert "import torch; import samgeo" in code
+
+
+def test_package_dir_name_strips_extras_before_marker_lookup():
+    assert venv_manager._package_dir_name("segment-geospatial[samgeo3]") == "samgeo"
+    assert venv_manager._package_dir_name("segment-geospatial") == "samgeo"
+
+
+def test_quick_check_accepts_samgeo3_extra_with_samgeo_dir(tmp_path, monkeypatch):
+    site_packages = tmp_path / "site-packages"
+    site_packages.mkdir()
+    (site_packages / "samgeo").mkdir()
+    _write_dist_metadata(site_packages, "segment-geospatial", "1.4.2")
+
+    monkeypatch.setattr(
+        venv_manager,
+        "get_venv_site_packages",
+        lambda _venv_dir=None: str(site_packages),
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_required_packages",
+        lambda: [("segment-geospatial[samgeo3]", "")],
+    )
+
+    ready, message = venv_manager._quick_check_packages(str(tmp_path / "venv"))
+
+    assert ready is True
+    assert message == "All packages found"
+
+
 def test_omniwatermask_verification_bootstraps_torch_before_import():
     code = venv_manager._get_verification_code("omniwatermask")
 
     assert "add_dll_directory" in code
     assert "import torch; import omniwatermask" in code
+
+
+def test_deepforest_verification_enforces_minimum_version():
+    """Regression test for issue #951: reject stale deepforest < 2.1.0."""
+    code = venv_manager._get_verification_code("deepforest")
+
+    assert "add_dll_directory" in code
+    assert "from deepforest import main" in code
+    assert "_v('2.1.0')" in code
+
+
+def _run_deepforest_verifier(monkeypatch, version: str) -> None:
+    """Execute the generated DeepForest verification snippet with stubbed modules."""
+    pytest.importorskip("packaging")
+    fake_torch = types.ModuleType("torch")
+    fake_main = types.ModuleType("deepforest.main")
+    fake_pkg = types.ModuleType("deepforest")
+    fake_pkg.__version__ = version
+    fake_pkg.main = fake_main
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "deepforest", fake_pkg)
+    monkeypatch.setitem(sys.modules, "deepforest.main", fake_main)
+    code = venv_manager._get_verification_code("deepforest")
+    exec(code, {"__name__": "__geoai_deepforest_verify__"})
+
+
+def test_deepforest_verifier_rejects_stale_version(monkeypatch):
+    """Regression test for issue #951: version < 2.1.0 raises an error."""
+    with pytest.raises(Exception, match=r"Expected >=2\.1\.0, got 2\.0\.0"):
+        _run_deepforest_verifier(monkeypatch, "2.0.0")
+
+
+def test_deepforest_verifier_accepts_minimum_version(monkeypatch):
+    """Regression test for issue #951: version >= 2.1.0 passes verification."""
+    _run_deepforest_verifier(monkeypatch, "2.1.0")
 
 
 def test_write_constraints_file_writes_requested_constraints(tmp_path, monkeypatch):
@@ -259,6 +364,7 @@ def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypat
     )
     monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
     monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(venv_manager.sys, "platform", "win32")
     monkeypatch.setattr(
         venv_manager,
         "_get_required_packages",
@@ -266,7 +372,7 @@ def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypat
             ("torch", ">=2.0.0"),
             ("torchvision", ">=0.15.0"),
             ("geoai-py", ">=0.39.0"),
-            ("segment-geospatial", ""),
+            ("segment-geospatial[samgeo3]", ""),
         ],
     )
     monkeypatch.setattr(
@@ -296,7 +402,76 @@ def test_cuda_batch_install_constrains_existing_torch_wheels(tmp_path, monkeypat
     assert "--constraint" in batch_cmd
     assert constraints_path in batch_cmd
     assert "geoai-py>=0.39.0" in batch_cmd
+    assert "segment-geospatial[samgeo3]" in batch_cmd
+
+
+def test_linux_cuda_omits_samgeo3_extra_to_avoid_triton_conflict(tmp_path, monkeypatch):
+    """On Linux CUDA, the [samgeo3] extra must be omitted because torch 2.6.0+cu124
+    pins triton==3.2.0 while samgeo3 requires triton>=3.5.1, creating an impossible
+    resolution. Plain segment-geospatial + sam3 avoids the conflict."""
+    from geoai.core import uv_manager
+
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        script = cmd[-1]
+        if "torch.version.cuda" in script:
+            return subprocess.CompletedProcess(cmd, 0, stdout="12.4\n", stderr="")
+        if "metadata.version('torch')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="2.6.0+cu124\n", stderr=""
+            )
+        if "metadata.version('torchvision')" in script:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="0.21.0+cu124\n", stderr=""
+            )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def fake_run_pip_install(**kwargs):
+        calls.append(kwargs)
+        return venv_manager._PipResult(0, "ok", "")
+
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: False)
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", lambda: {})
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", lambda: {})
+    monkeypatch.setattr(venv_manager.sys, "platform", "linux")
+    monkeypatch.setattr(
+        venv_manager,
+        "_get_required_packages",
+        lambda: [
+            ("torch", ">=2.0.0"),
+            ("torchvision", ">=0.15.0"),
+            ("segment-geospatial[samgeo3]", ""),
+            ("sam3", ""),
+        ],
+    )
+    monkeypatch.setattr(
+        venv_manager,
+        "detect_nvidia_gpu",
+        lambda: (True, {"compute_cap": 8.9, "driver_version": "550.00"}),
+    )
+    monkeypatch.setattr(venv_manager, "_select_cuda_index", lambda _gpu_info: "cu124")
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+    monkeypatch.setattr(venv_manager, "_run_pip_install", fake_run_pip_install)
+
+    ok, _message = venv_manager.install_dependencies(
+        venv_dir=str(tmp_path / "venv"),
+        cuda_enabled=True,
+    )
+
+    assert ok is True
+    batch_cmd = calls[-1]["cmd"]
+    # The extra must be omitted to avoid the triton conflict
+    assert "segment-geospatial[samgeo3]" not in batch_cmd
     assert "segment-geospatial" in batch_cmd
+    # sam3 must still be installed separately
+    assert "sam3" in batch_cmd
+    # Torch constraints should still be applied (pinning torch/torchvision)
+    assert "--constraint" in batch_cmd
 
 
 def test_verify_venv_treats_macos_sam3_import_failure_as_optional(monkeypatch):
@@ -628,3 +803,66 @@ def test_cpu_fallback_failure_logs_full_output(tmp_path, monkeypatch):
     # ...but the log keeps the CPU fallback output in full for diagnosis.
     fallback_logs = [m for m in logged if "(CPU fallback)" in m]
     assert any(huge_stderr in m for m in fallback_logs), "full CPU output not logged"
+
+
+def test_clean_env_strips_pythonexecutable_and_pyvenv_launcher(monkeypatch):
+    """Regression test for issues #951 and #925 on Windows QGIS.
+
+    QGIS on Windows sets PYTHONEXECUTABLE to its own python3.exe. In CPython
+    Modules/getpath.py, ENV_PYTHONEXECUTABLE takes precedence over
+    ENV___PYVENV_LAUNCHER__, causing the managed venv interpreter and uv to
+    ignore pyvenv.cfg and install/import packages in python_standalone instead
+    of venv_py3.12.
+    """
+    from geoai.core import python_manager
+
+    for var in (
+        "PYTHONEXECUTABLE",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
+    ):
+        monkeypatch.setenv(var, "/fake/qgis/python")
+
+    venv_env = venv_manager._get_clean_env_for_venv()
+    py_env = python_manager._get_clean_env()
+
+    for var in (
+        "PYTHONEXECUTABLE",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
+    ):
+        assert var not in venv_env
+        assert var not in py_env
+
+
+def test_venv_python_works_verifies_venv_prefix_activation(tmp_path, monkeypatch):
+    """Regression test for issue #951: probe must require sys.prefix != sys.base_prefix."""
+    real_run = subprocess.run
+    captured_cmds = []
+
+    def fake_run(cmd, **_kwargs) -> subprocess.CompletedProcess:
+        captured_cmds.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+    monkeypatch.setattr(
+        venv_manager, "get_venv_python_path", lambda _venv_dir=None: "python"
+    )
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", dict)
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", dict)
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    assert venv_manager.venv_python_works(str(tmp_path)) is True
+    assert len(captured_cmds) == 1
+    assert "sys.prefix != sys.base_prefix" in captured_cmds[0][-1]
+
+    probe = captured_cmds[0][-1]
+
+    def run_probe(base_prefix: str) -> int:
+        code = f"import sys; sys.base_prefix = {base_prefix!r}; {probe}"
+        return real_run([sys.executable, "-c", code], check=False).returncode
+
+    assert run_probe(sys.prefix) != 0
+    assert run_probe(sys.prefix + "-base") == 0
