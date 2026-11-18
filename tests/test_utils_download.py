@@ -43,6 +43,20 @@ class TestDownloadFile(unittest.TestCase):
                     "https://example.com/nonexistent.bin", output=output
                 )
 
+    @patch("geoai.utils.download.requests.get")
+    def test_download_creates_missing_parent_directory(self, mock_get):
+        """Test download_file creates the output folder if it does not exist."""
+        mock_response = MagicMock()
+        mock_response.headers = {"content-length": "4"}
+        mock_response.iter_content = MagicMock(return_value=[b"data"])
+        mock_get.return_value = mock_response
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = os.path.join(tmpdir, "hub", "checkpoints", "model.pth")
+            utils.download_file("https://example.com/model.pth", output_path=output)
+            with open(output, "rb") as f:
+                self.assertEqual(f.read(), b"data")
+
     def test_download_file_callable(self):
         """Test that download_file is callable with expected signature."""
         self.assertTrue(callable(utils.download_file))

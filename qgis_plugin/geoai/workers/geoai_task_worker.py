@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 import traceback
 from typing import Any, Callable, Dict
 
@@ -242,6 +243,53 @@ def _task_segment_water(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_raster": final_raster, "output_vector": output_vector}
 
 
+def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
+    from geoai.change_detection import ChangeDetection
+    from geoai.utils.raster import raster_to_vector
+
+    output_raster = params["output_raster"]
+    output_vector = params["output_vector"]
+
+    _progress(f"Loading AnyChange (SAM {params['sam_model_type']})...")
+    detector = _run_with_progress(
+        lambda: ChangeDetection(sam_model_type=params["sam_model_type"])
+    )
+    detector.set_hyperparameters(
+        change_confidence_threshold=params["change_confidence_threshold"],
+        auto_threshold=params["auto_threshold"],
+    )
+
+    # The instance raster (and the score raster detect_changes writes next to
+    # it) only feed the polygons, so keep them out of the user's folders.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        # Each change instance has its own ID here, so it becomes its own polygon.
+        instance_raster = (
+            os.path.join(tmp_dir, "instances.tif") if output_vector else None
+        )
+
+        _progress("Detecting changes...")
+        _run_with_progress(
+            lambda: detector.detect_changes(
+                params["before_path"],
+                params["after_path"],
+                output_path=output_raster,
+                return_results=False,
+                export_instance_masks=bool(output_vector),
+                instance_masks_output_path=instance_raster,
+            )
+        )
+
+        if output_vector:
+            _progress("Converting change instances to polygons...")
+            raster_to_vector(
+                instance_raster,
+                output_path=output_vector,
+                min_area=params["min_area"],
+            )
+
+    return {"output_raster": output_raster, "output_vector": output_vector}
+
+
 _TASKS = {
     "train_segmentation_model": _task_train_segmentation_model,
     "train_instance_segmentation_model": _task_train_instance_segmentation_model,
@@ -253,6 +301,7 @@ _TASKS = {
     "vectorize_mask": _task_vectorize_mask,
     "smooth_vector": _task_smooth_vector,
     "segment_water": _task_segment_water,
+    "detect_changes": _task_detect_changes,
 }
 
 

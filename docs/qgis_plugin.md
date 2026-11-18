@@ -4,7 +4,7 @@
 [![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.09605/status.svg)](https://doi.org/10.21105/joss.09605)
 
-A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Tree Segmentation, Water Segmentation, Moondream VLM, Segment Anything, Semantic Segmentation, Instance Segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
+A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Tree Segmentation, Water Segmentation, Change Detection, Moondream VLM, Segment Anything, Semantic Segmentation, Instance Segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
 
 ## Quick Start
 
@@ -32,7 +32,7 @@ Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video 
 - QGIS 3.28 or later
 - Python 3.10+ (Pixi recommended)
 - PyTorch (CUDA if you want GPU acceleration)
-- `geoai`, `samgeo`, `deepforest`, and `omniwatermask` packages
+- `geoai`, `samgeo`, `deepforest`, `omniwatermask`, and `torchange` packages
 
 ## Features
 
@@ -51,6 +51,12 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 - **Patch-based Inference**: Sliding window inference with configurable patch size, overlap, and batch size
 - **OSM Integration**: Optional OpenStreetMap data for refinement (water features, buildings, roads)
 - **Output Options**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional smoothing and minimum polygon size filtering
+
+### Change Detection Panel (AnyChange)
+
+- **Change Detection**: Detect changes between two co-registered images with the training-free [AnyChange](https://github.com/Z-Zheng/pytorch-change-models) model, built on SAM
+- **Threshold Control**: Set the change angle manually or let AnyChange pick it automatically
+- **Output Options**: Save the change mask as raster (GeoTIFF) and, optionally, one polygon per detected change (GeoPackage, GeoJSON, Shapefile)
 
 ### Moondream Vision-Language Model Panel
 
@@ -96,7 +102,7 @@ Starting with v1.0.0, the GeoAI plugin includes a built-in dependency installer 
 
 - Detects your GPU (NVIDIA CUDA or Apple MPS) and configures PyTorch accordingly
 - Creates an isolated Python virtual environment at `~/.qgis_geoai/`
-- Installs all required packages (PyTorch, geoai, samgeo, deepforest, omniwatermask, transformers) with a single click
+- Installs all required packages (PyTorch, geoai, samgeo, deepforest, omniwatermask, torchange, transformers) with a single click
 - Shows real-time progress during installation
 
 ![dependency installer](https://github.com/user-attachments/assets/d9021180-2ed6-461c-a30e-3b796dea9317)
@@ -528,6 +534,23 @@ Steps:
     - **Min Size**: Minimum polygon area in pixels to filter small artifacts
     - **Smooth**: Enable polygon smoothing with configurable iterations
 7. Click "Run" to start water segmentation
+
+### Change Detection Panel (AnyChange)
+
+The Change Detection panel finds changes between a before and an after image using [AnyChange](https://github.com/Z-Zheng/pytorch-change-models), a zero-shot change detection model built on the Segment Anything Model (SAM).
+
+Sample datasets: [las_vegas_naip_2019_a.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/las_vegas_naip_2019_a.tif) and [las_vegas_naip_2022_a.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/las_vegas_naip_2022_a.tif)
+
+Steps:
+
+1. Click the **Change Detection** button in the GeoAI toolbar (or `GeoAI` menu → `Change Detection`)
+2. Select the **Before** and **After** raster layers. Both must use the same CRS; only the first three bands are used
+3. Choose the **SAM Model** (vit_b is the default and the fastest on CPU) and the **Change Angle** (default 145°), or enable **Auto threshold**
+4. Optionally enable **Generate change polygons** and set a minimum polygon area
+5. Set the output paths (by default the results are saved next to the after image)
+6. Click "Run Change Detection"
+
+AnyChange resizes the overlapping area of the two images to 1024×1024 pixels, so the panel warns before running on larger images. Because AnyChange is zero-shot, expect coarse change masks that suit screening better than precise mapping.
 
 ### Moondream Vision-Language Model
 
