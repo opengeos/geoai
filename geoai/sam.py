@@ -77,7 +77,7 @@ class SamGeo:
             # Use cuda if available
             if device is None:
                 device = 0 if torch.cuda.is_available() else -1
-            if device >= 0:
+            if isinstance(device, int) and device >= 0:
                 torch.cuda.empty_cache()
             self.device = device
 
@@ -91,14 +91,12 @@ class SamGeo:
         else:
             if device is None:
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                if device.type == "cuda":
-                    torch.cuda.empty_cache()
-                self.device = device
+            if isinstance(device, torch.device) and device.type == "cuda":
+                torch.cuda.empty_cache()
+            self.device = device
 
-                self.predictor = SamModel.from_pretrained("facebook/sam-vit-huge").to(
-                    device
-                )
-                self.processor = SamProcessor.from_pretrained("facebook/sam-vit-huge")
+            self.predictor = SamModel.from_pretrained(model).to(device)
+            self.processor = SamProcessor.from_pretrained(model)
 
     def generate(
         self,

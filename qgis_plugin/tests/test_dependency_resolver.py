@@ -8,6 +8,7 @@ def test_windows_dependency_specs_include_python_312_and_triton():
 
     assert "python==3.12.*" in specs
     assert "triton-windows" in specs
+    assert "deepforest>=2.1.0" in specs
     assert "transformers>=4.56.2" in specs
 
 
@@ -19,6 +20,13 @@ def test_macos_sam3_is_optional_without_triton_windows():
     assert "triton-windows" not in specs
     assert venv_manager._is_optional_verify_package("sam3", "darwin") is True
     assert venv_manager._is_optional_install_package("sam3", "darwin") is True
+
+
+def test_windows_sam3_is_required_to_verify():
+    assert venv_manager._is_optional_verify_package("sam3", "win32") is False
+    assert venv_manager._is_optional_verify_package("triton-windows", "win32") is True
+    assert venv_manager._is_optional_install_package("sam3", "win32") is False
+    assert venv_manager._is_optional_install_package("triton-windows", "win32") is True
 
 
 def test_resolution_failure_diagnostic_identifies_impossible_constraint():
