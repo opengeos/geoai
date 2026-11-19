@@ -8,9 +8,10 @@ and running inference, combined in a single dockable panel.
 import os
 import shutil
 import tempfile
+import uuid
 from typing import Optional
 
-from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
+from qgis.PyQt.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
     QWidget,
@@ -38,17 +39,20 @@ from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
 
 from .inference_range import InferenceRangeMixin
+from ..core.processing_monitor import get_processing_monitor
 
 
 class OutputCapture:
     """Capture stdout and emit lines to a callback in real-time."""
 
     def __init__(self, callback, original_stdout):
+        """Initialize output forwarding with a callback and original stream."""
         self.callback = callback
         self.original_stdout = original_stdout
         self.buffer = ""
 
     def write(self, text):
+        """Forward complete output lines to the callback."""
         # Also write to original stdout
         if self.original_stdout:
             self.original_stdout.write(text)
@@ -60,6 +64,7 @@ class OutputCapture:
                 self.callback(line)
 
     def flush(self):
+        """Flush buffered output and the original stream."""
         if self.original_stdout:
             self.original_stdout.flush()
         if self.buffer.strip():
@@ -72,6 +77,7 @@ class TrainingWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
     epoch_progress = pyqtSignal(int, int, str)  # current_epoch, total_epochs, metrics
 
@@ -95,6 +101,7 @@ class TrainingWorker(QThread):
         resume_training: bool = False,
         freeze_encoder: bool = False,
     ):
+        """Initialize the training worker configuration."""
         super().__init__()
         self.images_dir = images_dir
         self.labels_dir = labels_dir
@@ -172,6 +179,7 @@ class TrainingWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class TileExportWorker(QThread):
@@ -179,6 +187,7 @@ class TileExportWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -191,6 +200,7 @@ class TileExportWorker(QThread):
         buffer_radius: float,
         metadata_format: str = "PASCAL_VOC",
     ):
+        """Initialize the tile export worker configuration."""
         super().__init__()
         self.raster_path = raster_path
         self.vector_path = vector_path
@@ -226,6 +236,7 @@ class TileExportWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class InferenceWorker(QThread):
@@ -233,6 +244,7 @@ class InferenceWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -252,6 +264,7 @@ class InferenceWorker(QThread):
         inference_bbox: Optional[list] = None,
         inference_bbox_crs: Optional[str] = None,
     ):
+        """Initialize the inference worker configuration."""
         super().__init__()
         self.input_path = input_path
         self.output_path = output_path
@@ -325,6 +338,7 @@ class InferenceWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
         finally:
             if temp_dir:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -335,6 +349,7 @@ class VectorizeWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -344,6 +359,7 @@ class VectorizeWorker(QThread):
         epsilon: float = 2.0,
         min_area: Optional[float] = None,
     ):
+        """Initialize the vectorization worker configuration."""
         super().__init__()
         self.mask_path = mask_path
         self.output_path = output_path
@@ -373,6 +389,7 @@ class VectorizeWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
 
 
 class SmoothVectorWorker(QThread):
@@ -380,6 +397,7 @@ class SmoothVectorWorker(QThread):
 
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    exception = pyqtSignal(object)
     progress = pyqtSignal(str)
 
     def __init__(
@@ -390,6 +408,7 @@ class SmoothVectorWorker(QThread):
         min_area: Optional[float] = None,
         simplify_tolerance: Optional[float] = None,
     ):
+        """Initialize the smoothing worker configuration."""
         super().__init__()
         self.mask_path = mask_path
         self.output_path = output_path
@@ -420,6 +439,47 @@ class SmoothVectorWorker(QThread):
             import traceback
 
             self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            self.exception.emit(e)
+
+
+class _MonitorSignalBridge(QObject):
+    """Deliver worker monitor callbacks on the dock widget's thread."""
+
+    def __init__(self, monitor, task_id, parent=None):
+        """Initialize the bridge for queued monitor callbacks."""
+        super().__init__(parent)
+        self._monitor = monitor
+        self._task_id = task_id
+
+    @pyqtSlot()
+    def started(self):
+        """Forward worker start to the processing monitor."""
+        self._monitor.start(self._task_id)
+
+    @pyqtSlot(str)
+    def progress(self, message):
+        """Forward worker progress text to the processing monitor."""
+        self._monitor.progress(self._task_id, str(message))
+
+    @pyqtSlot(int, int, str)
+    def epoch_progress(self, current, total, _metrics):
+        """Forward epoch progress as a bounded percentage."""
+        percent = round(current * 100 / total) if total else None
+        self._monitor.progress(
+            self._task_id,
+            f"Epoch {current}/{total}",
+            percent,
+        )
+
+    @pyqtSlot(str)
+    def finished(self, _result):
+        """Forward successful worker completion to the monitor."""
+        self._monitor.complete(self._task_id)
+
+    @pyqtSlot(object)
+    def exception(self, error):
+        """Forward a worker exception to the monitor."""
+        self._monitor.fail(self._task_id, error)
 
 
 class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
@@ -445,12 +505,33 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.inference_bbox = None
         self.inference_bbox_crs = None
         self.inference_range_layer_source = None
+        self._processing_monitor = get_processing_monitor()
 
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
         self.setup_ui()
         self.connect_signals()
+
+    def _monitor_worker(
+        self, worker, task_name, progress_signal=None, epoch_progress_signal=None
+    ):
+        """Connect an existing QThread worker to the AI Processing Monitor."""
+        task_id = f"segmentation-{uuid.uuid4().hex}"
+        monitor = self._processing_monitor
+        monitor.submit(task_id, task_name)
+        bridge = _MonitorSignalBridge(monitor, task_id, self)
+        worker.started.connect(bridge.started)
+        if progress_signal is None:
+            progress_signal = worker.progress
+        progress_signal.connect(bridge.progress)
+        if epoch_progress_signal is not None:
+            epoch_progress_signal.connect(bridge.epoch_progress)
+        worker.finished.connect(bridge.finished)
+        worker.exception.connect(bridge.exception)
+        worker._processing_monitor_bridge = bridge
+        worker._processing_monitor_task_id = task_id
+        return task_id
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -1240,6 +1321,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
     # Browse methods
     def browse_raster(self):
+        """Choose the raster used for tile export."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)"
         )
@@ -1247,6 +1329,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.raster_path_edit.setText(file_path)
 
     def browse_vector(self):
+        """Choose the vector labels used for tile export."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp);;All (*)"
         )
@@ -1254,26 +1337,31 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.vector_path_edit.setText(file_path)
 
     def browse_tile_output(self):
+        """Choose the tile export output directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
             self.tile_output_dir_edit.setText(dir_path)
 
     def browse_images_dir(self):
+        """Choose the training images directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Images Directory")
         if dir_path:
             self.images_dir_edit.setText(dir_path)
 
     def browse_labels_dir(self):
+        """Choose the training labels directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Labels Directory")
         if dir_path:
             self.labels_dir_edit.setText(dir_path)
 
     def browse_model_output(self):
+        """Choose the model output directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
             self.model_output_dir_edit.setText(dir_path)
 
     def browse_checkpoint(self):
+        """Choose an optional checkpoint model."""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Pretrained Model",
@@ -1284,6 +1372,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.checkpoint_path_edit.setText(file_path)
 
     def browse_inf_raster(self):
+        """Choose the raster used for inference."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Raster", "", "GeoTIFF (*.tif *.tiff);;All (*)"
         )
@@ -1291,6 +1380,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.inf_raster_path_edit.setText(file_path)
 
     def browse_model(self):
+        """Choose the trained model used for inference."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Model", "", "PyTorch Model (*.pth *.pt);;All (*)"
         )
@@ -1298,6 +1388,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.model_path_edit.setText(file_path)
 
     def browse_output(self):
+        """Choose the inference raster output path."""
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Output", "", "GeoTIFF (*.tif)"
         )
@@ -1307,6 +1398,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.output_path_edit.setText(file_path)
 
     def browse_vector_output(self):
+        """Choose the vectorization output path."""
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Vector", "", "GeoJSON (*.geojson);;Shapefile (*.shp)"
         )
@@ -1337,6 +1429,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
                 self.probability_path_edit.setText(f"{base}_probability{ext}")
 
     def browse_probability(self):
+        """Choose the optional probability-map output path."""
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Probability Map", "", "GeoTIFF (*.tif)"
         )
@@ -1347,6 +1440,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
     # Export tiles
     def export_tiles(self):
+        """Start exporting training tiles from the selected inputs."""
         raster_layer = self.raster_layer_combo.currentLayer()
         raster_path = (
             raster_layer.source()
@@ -1384,9 +1478,11 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.tile_worker.finished.connect(self.on_tile_export_finished)
         self.tile_worker.error.connect(self.on_tile_export_error)
         self.tile_worker.progress.connect(self.log)
+        self._monitor_worker(self.tile_worker, "Semantic segmentation tile export")
         self.tile_worker.start()
 
     def on_tile_export_finished(self, output_dir: str):
+        """Update the UI after training tiles are exported."""
         self.tile_progress.setRange(0, 100)
         self.tile_progress.setValue(100)
         self.export_tiles_btn.setEnabled(True)
@@ -1413,6 +1509,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         )
 
     def on_tile_export_error(self, error: str):
+        """Display a tile export failure."""
         self.tile_progress.setRange(0, 100)
         self.tile_progress.setValue(0)
         self.export_tiles_btn.setEnabled(True)
@@ -1421,6 +1518,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
     # Training
     def start_training(self):
+        """Validate inputs and start model training."""
         images_dir = self.images_dir_edit.text()
         labels_dir = self.labels_dir_edit.text()
         output_dir = self.model_output_dir_edit.text()
@@ -1557,6 +1655,12 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.train_worker.error.connect(self.on_training_error)
         self.train_worker.progress.connect(self.log)
         self.train_worker.epoch_progress.connect(self.on_epoch_progress)
+        self._monitor_worker(
+            self.train_worker,
+            "Semantic segmentation model training",
+            progress_signal=self.train_worker.progress,
+            epoch_progress_signal=self.train_worker.epoch_progress,
+        )
         self.train_worker.start()
 
     def on_epoch_progress(self, current_epoch: int, total_epochs: int, metrics: str):
@@ -1565,6 +1669,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.log(f"Epoch {current_epoch}/{total_epochs}: {metrics}")
 
     def on_training_finished(self, model_path: str):
+        """Update the UI after model training completes."""
         self.train_progress.setValue(self.train_progress.maximum())
         self.train_progress.setFormat("Complete")
         self.train_btn.setEnabled(True)
@@ -1617,6 +1722,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         )
 
     def on_training_error(self, error: str):
+        """Display a model training failure."""
         self.train_progress.setRange(0, 100)
         self.train_progress.setValue(0)
         self.train_progress.setFormat("")
@@ -1626,6 +1732,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
     # Inference
     def run_inference(self):
+        """Validate inputs and start segmentation inference."""
         layer = self.inf_raster_layer_combo.currentLayer()
         input_path = (
             layer.source()
@@ -1686,9 +1793,11 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.inference_worker.finished.connect(self.on_inference_finished)
         self.inference_worker.error.connect(self.on_inference_error)
         self.inference_worker.progress.connect(self.log)
+        self._monitor_worker(self.inference_worker, "Semantic segmentation inference")
         self.inference_worker.start()
 
     def on_inference_finished(self, output_path: str):
+        """Update the UI after inference completes."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(100)
         self.run_inference_btn.setEnabled(True)
@@ -1717,6 +1826,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         QMessageBox.information(self, "Success", message)
 
     def on_inference_error(self, error: str):
+        """Display an inference failure."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(0)
         self.run_inference_btn.setEnabled(True)
@@ -1725,6 +1835,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
     # Vectorize
     def vectorize_mask(self):
+        """Start vectorization or smoothing for the latest mask."""
         mask_path = self.last_output_path or self.output_path_edit.text()
         vector_output = self.vector_output_edit.text()
 
@@ -1758,6 +1869,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.smooth_worker.finished.connect(self.on_vectorize_finished)
             self.smooth_worker.error.connect(self.on_vectorize_error)
             self.smooth_worker.progress.connect(self.log)
+            self._monitor_worker(self.smooth_worker, "Smooth segmentation vectors")
             self.smooth_worker.start()
         else:
             self.log("Regularizing vector (for buildings)...")
@@ -1770,9 +1882,11 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.vectorize_worker.finished.connect(self.on_vectorize_finished)
             self.vectorize_worker.error.connect(self.on_vectorize_error)
             self.vectorize_worker.progress.connect(self.log)
+            self._monitor_worker(self.vectorize_worker, "Vectorize segmentation mask")
             self.vectorize_worker.start()
 
     def on_vectorize_finished(self, output_path: str):
+        """Update the UI after vectorization completes."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(100)
         self.vectorize_btn.setEnabled(True)
@@ -1788,6 +1902,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         QMessageBox.information(self, "Success", f"Saved to:\n{output_path}")
 
     def on_vectorize_error(self, error: str):
+        """Display a vectorization failure."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(0)
         self.vectorize_btn.setEnabled(True)
@@ -1803,7 +1918,23 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.vectorize_worker,
             self.smooth_worker,
         ]:
-            if worker and worker.isRunning():
+            was_running = worker is not None and worker.isRunning()
+            if was_running:
                 worker.terminate()
                 worker.wait()
+            self._cancel_monitored_worker(worker, was_running)
         event.accept()
+
+    def _cancel_monitored_worker(self, worker, was_running=None):
+        """Cancel a worker task only when it stopped before completion."""
+        if worker is None:
+            return
+        task_id = getattr(worker, "_processing_monitor_task_id", None)
+        if not task_id:
+            return
+        if was_running is None:
+            is_running = getattr(worker, "isRunning", lambda: False)
+            was_running = is_running()
+        is_finished = getattr(worker, "isFinished", lambda: False)
+        if was_running or not is_finished():
+            self._processing_monitor.cancel(task_id)

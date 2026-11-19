@@ -62,6 +62,74 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 -   **Clear GPU Memory**: Release GPU memory and clear CUDA cache for all loaded models
 
+### AI Processing Monitor
+
+Open **GeoAI → AI Processing Monitor** to observe supported Semantic Segmentation
+tasks while they run. The monitor currently covers tile export, training, inference,
+vectorization, and vector smoothing started from the Segmentation panel.
+
+#### What changes for users
+
+Before the monitor was introduced, each Semantic Segmentation operation reported
+information only through its source panel and log messages. Users had no single
+place to answer the following questions while a long-running operation was active:
+
+- Which AI operation is currently running?
+- Has the operation started, or is it still waiting to start?
+- How long has it been running?
+- Is reliable progress available?
+- Did the operation complete, fail, or stop?
+- What error category and technical details should be investigated?
+- Is GPU memory information available?
+
+With the AI Processing Monitor enabled, open **GeoAI → AI Processing Monitor** to
+see a task entry for supported Semantic Segmentation operations. Each entry
+contains the task name and lifecycle status. While a task is running, the dock
+updates elapsed time without blocking the QGIS map canvas. When reliable progress
+is provided by the worker, the monitor shows a bounded percentage and progress bar.
+For operations that expose only progress messages or start/finish events, it shows
+an indeterminate progress bar instead of inventing a percentage.
+
+After a task finishes, the selected entry retains its final status, elapsed
+duration, start timestamp, end timestamp, progress message, and optional GPU
+metrics. Failed tasks show a concise user-facing error category and preserve
+technical traceback details for debugging. Finished entries can be removed with
+**Clear finished**; active tasks are retained.
+
+The monitor is currently connected to Semantic Segmentation tile export, model
+training, inference, vectorization, and vector smoothing. It does not claim
+coverage for the other GeoAI panels.
+
+Supported lifecycle states are `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, and
+`CANCELLED` when the underlying lifecycle event is available. `IDLE` is an
+internal initial state and is not normally shown for submitted work. Elapsed
+time uses a monotonic clock, while start and end timestamps are wall-clock values
+for display.
+
+Training reports epoch-based progress. Operations that expose only messages or
+start/finish events use an indeterminate progress bar. The monitor never
+fabricates a percentage. Error categories are best-effort and include missing
+input, missing dependency, GPU/CUDA, output-writing, and generic processing
+failures. The concise summary is shown in the dock while technical traceback
+details remain available for debugging.
+
+When PyTorch and CUDA metrics are accessible from the QGIS process, the monitor
+shows the device name, allocated memory, reserved memory, and peak allocated
+memory in MB. Allocated memory is active tensor memory; reserved memory is held
+by PyTorch's caching allocator. Neither value represents total GPU utilization.
+CPU-only installations, missing PyTorch, unavailable CUDA drivers, and
+unsupported backends do not prevent processing. For subprocess-backed Semantic
+Segmentation tasks, including training and inference, the displayed values may
+describe the QGIS process rather than the subprocess because subprocess GPU
+telemetry is not yet integrated.
+
+The monitor never invokes CUDA cache clearing automatically. **Clear GPU Memory**
+remains a separate manual action and should not be used while an inference task
+is actively using the GPU. There is no dedicated user-facing cancel control.
+Closing the Semantic Segmentation panel terminates running workers according to
+the panel shutdown lifecycle and can mark their associated monitor tasks as
+`CANCELLED`. Other task types are not claimed to support cancellation.
+
 ## Installation
 
 ### 1. Set up the environment
