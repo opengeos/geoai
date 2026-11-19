@@ -184,19 +184,29 @@ def download_with_progress(
 
     block_size = 1024  # 1 Kibibyte
 
-    with (
-        open(output_path, "wb") as file,
-        tqdm(
-            desc=os.path.basename(output_path),
-            total=total_size,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1024,
-        ) as bar,
-    ):
-        for data in response.iter_content(block_size):
-            size = file.write(data)
-            bar.update(size)
+    # Write to a temporary file and move it into place only once the download
+    # completes, so an interrupted transfer never leaves a truncated file that
+    # later runs would mistake for a finished download.
+    temp_path = output_path + ".part"
+    try:
+        with (
+            open(temp_path, "wb") as file,
+            tqdm(
+                desc=os.path.basename(output_path),
+                total=total_size,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as bar,
+        ):
+            for data in response.iter_content(block_size):
+                size = file.write(data)
+                bar.update(size)
+        os.replace(temp_path, output_path)
+    except BaseException:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise
 
 
 def preview_raster(data: Any, title: str = None) -> None:
