@@ -202,6 +202,18 @@ def _get_required_packages_for_platform(platform_name: str) -> List[Tuple[str, s
         Platform-aware dependency tuples of distribution name and specifier.
     """
     packages = list(REQUIRED_PACKAGES)
+    if platform_name == "darwin":
+        # Keep sam3 as a separate optional package on macOS. Installing the
+        # samgeo3 extra would make segment-geospatial require sam3 and block
+        # fallback when sam3 cannot be installed.
+        packages = [
+            (
+                ("segment-geospatial", ver)
+                if name == "segment-geospatial[samgeo3]"
+                else (name, ver)
+            )
+            for name, ver in packages
+        ]
     if platform_name == "win32":
         sam3_idx = next(
             (i for i, (name, _) in enumerate(packages) if name == "sam3"),
@@ -3690,12 +3702,26 @@ def _get_verification_code(package_name: str) -> str:
         code = "\n".join(
             [
                 "import torch",
-                "import deepforest",
-                "from deepforest import main",
+                "try:",
+                "    import deepforest",
+                "except Exception as e:",
+                "    try:",
+                "        from importlib.metadata import version as _dist_version",
+                "        v = _dist_version('deepforest')",
+                "    except Exception:",
+                "        raise",
+                "    from packaging.version import parse as _v",
+                "    if _v(v) < _v('2.1.0'):",
+                "        raise RuntimeError(f'Expected >=2.1.0, got {v}') from e",
+                "    raise",
                 "from packaging.version import parse as _v",
-                "v = deepforest.__version__",
+                "v = getattr(deepforest, '__version__', '0')",
                 "if _v(v) < _v('2.1.0'):",
                 "    raise RuntimeError(f'Expected >=2.1.0, got {v}')",
+                "try:",
+                "    from deepforest import main",
+                "except Exception as e:",
+                "    raise RuntimeError(f'DeepForest {v} import failed: {e}') from e",
                 "print(v)",
             ]
         )
