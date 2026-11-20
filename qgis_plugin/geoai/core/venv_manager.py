@@ -207,7 +207,11 @@ def _get_required_packages_for_platform(platform_name: str) -> List[Tuple[str, s
         # samgeo3 extra would make segment-geospatial require sam3 and block
         # fallback when sam3 cannot be installed.
         packages = [
-            ("segment-geospatial", ver) if name == "segment-geospatial[samgeo3]" else (name, ver)
+            (
+                ("segment-geospatial", ver)
+                if name == "segment-geospatial[samgeo3]"
+                else (name, ver)
+            )
             for name, ver in packages
         ]
     if platform_name == "win32":
