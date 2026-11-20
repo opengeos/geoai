@@ -2,7 +2,10 @@
 
 """Tests for URL validation and download safety in geoai.download."""
 
+import os
+import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 
 from geoai.download import _validate_url
 
@@ -41,6 +44,47 @@ class TestValidateUrl(unittest.TestCase):
 
     def test_url_with_port(self):
         _validate_url("https://example.com:8080/data.tif")
+
+
+class TestDownloadWithProgressAtomic(unittest.TestCase):
+    """A failed download must not leave a truncated file at the final path."""
+
+    def _failing_response(self):
+        response = MagicMock()
+        response.headers = {"content-length": "10"}
+
+        def chunks(_size):
+            yield b"abc"
+            raise ConnectionError("connection dropped")
+
+        response.iter_content.side_effect = chunks
+        return response
+
+    def test_failed_download_leaves_no_file(self):
+        from geoai.download import download_with_progress
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "img.tif")
+            with patch(
+                "geoai.download.requests.get", return_value=self._failing_response()
+            ):
+                with self.assertRaises(ConnectionError):
+                    download_with_progress("https://example.com/img.tif", out)
+            self.assertEqual(os.listdir(tmp), [])
+
+    def test_successful_download_writes_final_file(self):
+        from geoai.download import download_with_progress
+
+        response = MagicMock()
+        response.headers = {"content-length": "6"}
+        response.iter_content.return_value = [b"abc", b"def"]
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "img.tif")
+            with patch("geoai.download.requests.get", return_value=response):
+                download_with_progress("https://example.com/img.tif", out)
+            self.assertEqual(os.listdir(tmp), ["img.tif"])
+            with open(out, "rb") as f:
+                self.assertEqual(f.read(), b"abcdef")
 
 
 if __name__ == "__main__":
