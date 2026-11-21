@@ -866,8 +866,9 @@ def predict_raster(
         output_sum = np.zeros((height, width), dtype=np.float64)
         weight_sum = np.zeros((height, width), dtype=np.float64)
 
-        # Create weight mask for blending (higher weight in center)
-        weight_mask = _create_weight_mask(tile_size, overlap)
+        # Weight masks for blending (higher weight in center), keyed by
+        # which sides of a tile face another tile
+        weight_masks = {}
 
         # Read full input for nodata mask
         full_input = src.read(input_bands)
@@ -972,9 +973,21 @@ def predict_raster(
                 h = row_end - row_start
                 w = col_end - col_start
 
+                # Taper only the sides that face another tile
+                sides = (
+                    row_start > 0,
+                    row_end < height,
+                    col_start > 0,
+                    col_end < width,
+                )
+                if sides not in weight_masks:
+                    weight_masks[sides] = _create_weight_mask(
+                        tile_size, overlap, *sides
+                    )
+
                 # Get the relevant portion of prediction and weight
                 pred_crop = pred[:h, :w]
-                weight_crop = weight_mask[:h, :w]
+                weight_crop = weight_masks[sides][:h, :w]
 
                 # Accumulate
                 output_sum[row_start:row_end, col_start:col_end] += (
@@ -1025,18 +1038,33 @@ def predict_raster(
     return output_raster
 
 
-def _create_weight_mask(tile_size: int, overlap: int) -> np.ndarray:
-    """Create a weight mask for blending overlapping tiles."""
+def _create_weight_mask(
+    tile_size: int,
+    overlap: int,
+    top: bool = True,
+    bottom: bool = True,
+    left: bool = True,
+    right: bool = True,
+) -> np.ndarray:
+    """Create a weight mask for blending overlapping tiles.
+
+    Only the sides that face another tile are tapered. A side on the border
+    of the raster keeps full weight up to the edge, since tapering it would
+    give the raster's edge pixels a weight of zero.
+    """
     if overlap == 0:
         return np.ones((tile_size, tile_size), dtype=np.float32)
 
-    # Create 1D ramp
-    ramp = np.ones(tile_size, dtype=np.float32)
-    ramp[:overlap] = np.linspace(0, 1, overlap)
-    ramp[-overlap:] = np.linspace(1, 0, overlap)
+    def ramp_1d(taper_start: bool, taper_end: bool) -> np.ndarray:
+        ramp = np.ones(tile_size, dtype=np.float32)
+        if taper_start:
+            ramp[:overlap] = np.linspace(0, 1, overlap)
+        if taper_end:
+            ramp[-overlap:] = np.linspace(1, 0, overlap)
+        return ramp
 
     # Create 2D weight mask
-    weight_mask = np.outer(ramp, ramp)
+    weight_mask = np.outer(ramp_1d(top, bottom), ramp_1d(left, right))
     return weight_mask
 
 
