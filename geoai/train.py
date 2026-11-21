@@ -2818,6 +2818,8 @@ def evaluate_coco_metrics(
         return ap / 101.0
 
     results = {}
+    # Mean AP at each IoU threshold, averaged below for mAP@[0.5:0.95]
+    all_maps = []
 
     for iou_thresh in iou_thresholds:
         per_class_ap = []
@@ -2856,13 +2858,14 @@ def evaluate_coco_metrics(
                         all_tp.append(0)
                         continue
 
-                    iou_matrix = _compute_iou_matrix(pred_boxes[pi : pi + 1], gt_boxes)
-                    max_iou, max_idx = iou_matrix[0].max(dim=0)
+                    # As in COCO, match the best-overlapping ground truth
+                    # that is not already matched
+                    ious = _compute_iou_matrix(pred_boxes[pi : pi + 1], gt_boxes)[0]
+                    if matched_gt:
+                        ious[list(matched_gt)] = -1.0
+                    max_iou, max_idx = ious.max(dim=0)
 
-                    if (
-                        max_iou.item() >= iou_thresh
-                        and max_idx.item() not in matched_gt
-                    ):
+                    if max_iou.item() >= iou_thresh:
                         all_tp.append(1)
                         matched_gt.add(max_idx.item())
                     else:
@@ -2901,72 +2904,12 @@ def evaluate_coco_metrics(
                 results[f"AP@0.5/{name}"] = ap
 
         mean_ap = sum(per_class_ap) / len(per_class_ap) if per_class_ap else 0.0
+        all_maps.append(mean_ap)
 
         if abs(iou_thresh - 0.5) < 1e-6:
             results["mAP@0.5"] = mean_ap
         if abs(iou_thresh - 0.75) < 1e-6:
             results["mAP@0.75"] = mean_ap
-
-    # Compute mAP@[0.5:0.95]
-    all_maps = []
-    for iou_thresh in iou_thresholds:
-        per_class_ap = []
-        for class_id in all_class_ids:
-            all_scores = []
-            all_tp = []
-            total_gt = 0
-
-            for pred, gt in zip(all_predictions, all_targets):
-                pred_mask = pred["labels"] == class_id
-                pred_boxes = pred["boxes"][pred_mask]
-                pred_scores = pred["scores"][pred_mask]
-                gt_mask = gt["labels"] == class_id
-                gt_boxes = gt["boxes"][gt_mask]
-                total_gt += len(gt_boxes)
-
-                if len(pred_boxes) == 0:
-                    continue
-
-                sort_idx = torch.argsort(pred_scores, descending=True)
-                pred_boxes = pred_boxes[sort_idx]
-                pred_scores = pred_scores[sort_idx]
-                matched_gt = set()
-
-                for pi in range(len(pred_boxes)):
-                    all_scores.append(pred_scores[pi].item())
-                    if len(gt_boxes) == 0:
-                        all_tp.append(0)
-                        continue
-                    iou_matrix = _compute_iou_matrix(pred_boxes[pi : pi + 1], gt_boxes)
-                    max_iou, max_idx = iou_matrix[0].max(dim=0)
-                    if (
-                        max_iou.item() >= iou_thresh
-                        and max_idx.item() not in matched_gt
-                    ):
-                        all_tp.append(1)
-                        matched_gt.add(max_idx.item())
-                    else:
-                        all_tp.append(0)
-
-            if total_gt == 0 or len(all_scores) == 0:
-                per_class_ap.append(0.0)
-                continue
-
-            sort_idx = sorted(
-                range(len(all_scores)),
-                key=lambda k: all_scores[k],
-                reverse=True,
-            )
-            tp_sorted = torch.tensor([all_tp[i] for i in sort_idx])
-            tp_cumsum = torch.cumsum(tp_sorted, dim=0).float()
-            fp_cumsum = torch.cumsum(1 - tp_sorted, dim=0).float()
-            precision = tp_cumsum / (tp_cumsum + fp_cumsum)
-            recall = tp_cumsum / total_gt
-            ap = _compute_ap(precision, recall)
-            per_class_ap.append(ap)
-
-        mean_ap = sum(per_class_ap) / len(per_class_ap) if per_class_ap else 0.0
-        all_maps.append(mean_ap)
 
     results["mAP@[0.5:0.95]"] = sum(all_maps) / len(all_maps) if all_maps else 0.0
 

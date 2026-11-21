@@ -215,6 +215,10 @@ def _get_clean_env() -> dict:
     for var in (
         "PYTHONPATH",
         "PYTHONHOME",
+        "PYTHONEXECUTABLE",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
         "VIRTUAL_ENV",
         "QGIS_PREFIX_PATH",
         "QGIS_PLUGINPATH",

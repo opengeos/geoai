@@ -34,7 +34,7 @@ REQUIRED_PACKAGES = [
     ("torch", ">=2.0.0"),
     ("torchvision", ">=0.15.0"),
     ("geoai-py", ">=0.39.0"),
-    ("segment-geospatial", ""),
+    ("segment-geospatial[samgeo3]", ""),
     ("sam3", ""),
     ("deepforest", ">=2.1.0"),
     ("omniwatermask", ""),
@@ -49,7 +49,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "13"
+_INSTALL_LOGIC_VERSION = "14"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -202,6 +202,18 @@ def _get_required_packages_for_platform(platform_name: str) -> List[Tuple[str, s
         Platform-aware dependency tuples of distribution name and specifier.
     """
     packages = list(REQUIRED_PACKAGES)
+    if platform_name == "darwin":
+        # Keep sam3 as a separate optional package on macOS. Installing the
+        # samgeo3 extra would make segment-geospatial require sam3 and block
+        # fallback when sam3 cannot be installed.
+        packages = [
+            (
+                ("segment-geospatial", ver)
+                if name == "segment-geospatial[samgeo3]"
+                else (name, ver)
+            )
+            for name, ver in packages
+        ]
     if platform_name == "win32":
         sam3_idx = next(
             (i for i, (name, _) in enumerate(packages) if name == "sam3"),
@@ -847,6 +859,10 @@ def _is_windows_process_crash(returncode: int) -> bool:
 def _classify_batch_error(error_output: str, package_specs: List[str]) -> Optional[str]:
     """Identify which package in a batch install caused the failure.
 
+    Extras are stripped before matching because resolver output typically
+    prints the base distribution name (e.g. ``segment-geospatial``) without
+    the extra (e.g. ``[samgeo3]``).
+
     Args:
         error_output: Combined stdout+stderr from the failed batch install.
         package_specs: List of package specifiers that were in the batch.
@@ -857,7 +873,8 @@ def _classify_batch_error(error_output: str, package_specs: List[str]) -> Option
     error_lower = error_output.lower()
     for spec in package_specs:
         name = re.split(r"[><=!]", spec)[0].strip()
-        if name.lower().replace("-", "_") in error_lower.replace("-", "_"):
+        base_name = re.sub(r"\[.*?\]", "", name)
+        if base_name.lower().replace("-", "_") in error_lower.replace("-", "_"):
             return name
     return None
 
@@ -879,6 +896,10 @@ def _get_clean_env_for_venv() -> dict:
     for var in (
         "PYTHONPATH",
         "PYTHONHOME",
+        "PYTHONEXECUTABLE",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
         "VIRTUAL_ENV",
         "QGIS_PREFIX_PATH",
         "QGIS_PLUGINPATH",
@@ -1153,7 +1174,11 @@ def venv_python_works(venv_dir: str = None) -> bool:
     python_path = get_venv_python_path(venv_dir)
     try:
         result = subprocess.run(
-            [python_path, "-c", "import sys; sys.exit(0)"],
+            [
+                python_path,
+                "-c",
+                "import sys; sys.exit(0 if sys.prefix != sys.base_prefix else 1)",
+            ],
             capture_output=True,
             text=True,
             timeout=60,
@@ -2753,7 +2778,7 @@ def _is_optional_verify_package(
         True if verification failure for the package should be non-fatal.
     """
     target_platform = platform_name or sys.platform
-    if target_platform == "win32" and package_name in ("sam3", "triton-windows"):
+    if target_platform == "win32" and package_name == "triton-windows":
         return True
     if target_platform == "darwin" and package_name == "sam3":
         return True
@@ -3275,6 +3300,15 @@ def install_dependencies(
             return False, "Installation cancelled"
 
         batch_specs = ["{}{}".format(name, ver) for name, ver in batch_packages]
+        # On Linux CUDA, omit the [samgeo3] extra to avoid a triton conflict:
+        # torch 2.6.0+cu124 pins triton==3.2.0, but the samgeo3 extra requires
+        # triton>=3.5.1. Installing plain segment-geospatial + sam3 separately
+        # lets torch's triton satisfy the runtime without an impossible resolve.
+        if sys.platform == "linux" and cuda_enabled:
+            batch_specs = [
+                s.replace("segment-geospatial[samgeo3]", "segment-geospatial")
+                for s in batch_specs
+            ]
         constraint_args: List[str] = []
         torch_index_args: List[str] = []
         constraints_file = None
@@ -3436,9 +3470,16 @@ def install_dependencies(
                         "retrying without it...".format(failed_pkg),
                         Qgis.Warning,
                     )
-                    retry_specs = [
-                        s for s in batch_specs if not s.startswith(failed_pkg)
-                    ]
+                    # Strip only the failed package, keeping extras on remaining
+                    # specs. For example, dropping "sam3" must keep
+                    # "segment-geospatial[samgeo3]" intact.
+                    retry_specs = []
+                    for spec in batch_specs:
+                        spec_name = re.split(r"[><=!]", spec)[0].strip()
+                        spec_base = re.sub(r"\[.*?\]", "", spec_name)
+                        if spec_base == failed_pkg:
+                            continue
+                        retry_specs.append(spec)
                     if retry_specs:
                         if use_uv:
                             retry_args = [
@@ -3614,6 +3655,7 @@ def _get_verification_timeout(package_name: str) -> int:
         "torchvision",
         "geoai-py",
         "segment-geospatial",
+        "segment-geospatial[samgeo3]",
         "triton-windows",
         "sam3",
         "transformers",
@@ -3640,10 +3682,12 @@ def _get_verification_code(package_name: str) -> str:
         code = "import torchvision; print(torchvision.__version__)"
     elif package_name == "geoai-py":
         code = "import geoai; print(geoai.__version__)"
-    elif package_name == "segment-geospatial":
+    elif package_name == "segment-geospatial" or package_name.startswith(
+        "segment-geospatial["
+    ):
         code = "import torch; import samgeo; print(samgeo.__version__)"
     elif package_name == "sam3":
-        code = "import torch; import sam3; print('ok')"
+        code = "import torch; import sam3; import sam3.model_builder; print('ok')"
     elif package_name == "transformers":
         code = (
             "import transformers; "
@@ -3655,7 +3699,32 @@ def _get_verification_code(package_name: str) -> str:
     elif package_name == "triton-windows":
         code = "import triton; print('ok')"
     elif package_name == "deepforest":
-        code = "import torch; from deepforest import main; print('ok')"
+        code = "\n".join(
+            [
+                "import torch",
+                "try:",
+                "    import deepforest",
+                "except Exception as e:",
+                "    try:",
+                "        from importlib.metadata import version as _dist_version",
+                "        v = _dist_version('deepforest')",
+                "    except Exception:",
+                "        raise",
+                "    from packaging.version import parse as _v",
+                "    if _v(v) < _v('2.1.0'):",
+                "        raise RuntimeError(f'Expected >=2.1.0, got {v}') from e",
+                "    raise",
+                "from packaging.version import parse as _v",
+                "v = getattr(deepforest, '__version__', '0')",
+                "if _v(v) < _v('2.1.0'):",
+                "    raise RuntimeError(f'Expected >=2.1.0, got {v}')",
+                "try:",
+                "    from deepforest import main",
+                "except Exception as e:",
+                "    raise RuntimeError(f'DeepForest {v} import failed: {e}') from e",
+                "print(v)",
+            ]
+        )
     elif package_name == "omniwatermask":
         code = "import torch; import omniwatermask; print('ok')"
     else:
@@ -3862,13 +3931,18 @@ def cleanup_old_venv_directories() -> List[str]:
 def _normalize_dist_name(name: str) -> str:
     """Normalize a Python distribution name for metadata comparisons.
 
+    Extras are stripped because the ``Name:`` field in ``METADATA`` never
+    includes them, so ``segment-geospatial[samgeo3]`` must compare equal to
+    the installed distribution ``segment-geospatial``.
+
     Args:
-        name: Distribution name.
+        name: Distribution name, optionally with extras.
 
     Returns:
         Normalized distribution name.
     """
-    return re.sub(r"[-_.]+", "-", name).lower()
+    base_name = re.sub(r"\[.*?\]", "", name)
+    return re.sub(r"[-_.]+", "-", base_name).lower()
 
 
 def _read_dist_version(site_packages: str, dist_name: str) -> Optional[str]:
@@ -3996,18 +4070,22 @@ def _version_satisfies(version: str, spec: str) -> bool:
 def _package_dir_name(package_name: str) -> str:
     """Return the import package directory expected in site-packages.
 
+    Extras are stripped before lookup so ``segment-geospatial[samgeo3]``
+    resolves to ``samgeo`` instead of ``segment_geospatial[samgeo3]``.
+
     Args:
-        package_name: Distribution name.
+        package_name: Distribution name, optionally with extras.
 
     Returns:
         Expected import package directory name.
     """
+    base_name = re.sub(r"\[.*?\]", "", package_name)
     package_markers = {
         "geoai-py": "geoai",
         "segment-geospatial": "samgeo",
         "triton-windows": "triton",
     }
-    return package_markers.get(package_name, package_name.replace("-", "_"))
+    return package_markers.get(base_name, base_name.replace("-", "_"))
 
 
 def _quick_check_packages(venv_dir: str = None) -> Tuple[bool, str]:

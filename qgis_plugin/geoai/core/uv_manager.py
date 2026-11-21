@@ -264,8 +264,14 @@ def verify_uv():
 
     try:
         env = os.environ.copy()
-        env.pop("PYTHONPATH", None)
-        env.pop("PYTHONHOME", None)
+        for var in (
+            "PYTHONPATH",
+            "PYTHONHOME",
+            "PYTHONEXECUTABLE",
+            "__PYVENV_LAUNCHER__",
+            "VIRTUAL_ENV",
+        ):
+            env.pop(var, None)
 
         kwargs = {}
         if sys.platform == "win32":
