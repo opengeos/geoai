@@ -508,7 +508,7 @@ class TestNormalization(unittest.TestCase):
         # This is the exact code from predict_geotiff — must not raise
         output_array = np.where(
             valid,
-            output_sum / (weight_sum + 1e-8),
+            output_sum / np.where(valid, weight_sum, 1.0),
             -9999.0,
         ).astype(np.float32)
 
@@ -522,9 +522,151 @@ class TestNormalization(unittest.TestCase):
         weight_sum = np.zeros((1, 4, 4), dtype=np.float64)
 
         valid = weight_sum > 0
-        result = np.where(valid, output_sum / (weight_sum + 1e-8), nodata)
+        result = np.where(valid, output_sum / np.where(valid, weight_sum, 1.0), nodata)
 
         np.testing.assert_array_equal(result, np.full((1, 4, 4), nodata))
+
+    def test_small_weight_is_not_biased(self):
+        """Test that a pixel with a small total weight keeps its value."""
+        weight_sum = np.full((1, 2, 2), 1e-9)
+        output_sum = 5.0 * weight_sum
+
+        valid = weight_sum > 0
+        result = np.where(valid, output_sum / np.where(valid, weight_sum, 1.0), -9999.0)
+
+        np.testing.assert_allclose(result, 5.0)
+
+
+class TestTileWeightMask(unittest.TestCase):
+    """Tests for the per-tile weight masks used at the raster's border."""
+
+    MODES = ["none", "linear", "cosine", "spline"]
+
+    def test_all_sides_match_create_weight_mask(self):
+        """Test that a tile with neighbours on every side uses the full mask."""
+        from geoai.inference import _tile_weight_mask, create_weight_mask
+
+        for mode in self.MODES:
+            for overlap in (0, 1, 8, 16):
+                with self.subTest(mode=mode, overlap=overlap):
+                    np.testing.assert_array_equal(
+                        _tile_weight_mask(32, overlap, mode, 2, True, True, True, True),
+                        create_weight_mask(32, overlap, mode=mode),
+                    )
+
+    def test_no_neighbours_gives_ones(self):
+        """Test that a tile covering the whole raster is not tapered."""
+        from geoai.inference import _tile_weight_mask
+
+        for mode in self.MODES:
+            with self.subTest(mode=mode):
+                mask = _tile_weight_mask(32, 8, mode, 2, False, False, False, False)
+                np.testing.assert_array_equal(mask, np.ones((32, 32), np.float32))
+
+    def test_border_side_keeps_full_weight(self):
+        """Test that only the sides facing another tile are tapered."""
+        from geoai.inference import _tile_weight_mask
+
+        for mode in ["linear", "cosine", "spline"]:
+            with self.subTest(mode=mode):
+                # Top-left tile: neighbours below and to the right only.
+                mask = _tile_weight_mask(32, 8, mode, 2, False, True, False, True)
+                np.testing.assert_array_equal(mask[:24, :24], 1.0)
+                self.assertLess(mask[-1, -1], 0.1)
+                self.assertLess(mask[0, -1], 0.1)
+                self.assertLess(mask[-1, 0], 0.1)
+
+
+class TestPredictGeotiffBorder(unittest.TestCase):
+    """Tests that tiled inference returns the model output at the raster's edges."""
+
+    def _write_raster(self, path, data):
+        import rasterio
+        from rasterio.transform import from_origin
+
+        with rasterio.open(
+            path,
+            "w",
+            driver="GTiff",
+            height=data.shape[1],
+            width=data.shape[2],
+            count=data.shape[0],
+            dtype="float32",
+            crs="EPSG:32617",
+            transform=from_origin(500000, 4000000, 1, 1),
+        ) as dst:
+            dst.write(data)
+
+    def test_pointwise_model_is_reproduced_everywhere(self):
+        """Test that a per-pixel model gives back its output on every pixel."""
+        import tempfile
+
+        import rasterio
+        import torch
+
+        from geoai.inference import predict_geotiff
+
+        class FirstBand(torch.nn.Module):
+            def forward(self, x):
+                return x[:, :1] * 2.0 + 1.0
+
+        data = np.random.default_rng(0).uniform(0, 1, (3, 50, 70)).astype("float32")
+        with tempfile.TemporaryDirectory() as tmp:
+            src = f"{tmp}/in.tif"
+            self._write_raster(src, data)
+            for mode in ["none", "linear", "cosine", "spline"]:
+                with self.subTest(mode=mode):
+                    dst = f"{tmp}/out_{mode}.tif"
+                    predict_geotiff(
+                        FirstBand(),
+                        src,
+                        dst,
+                        tile_size=32,
+                        overlap=8,
+                        batch_size=4,
+                        blend_mode=mode,
+                        preprocess_fn=lambda tile: tile,
+                        device="cpu",
+                        verbose=False,
+                    )
+                    with rasterio.open(dst) as ds:
+                        out = ds.read(1)
+                    np.testing.assert_allclose(out, data[0] * 2.0 + 1.0, rtol=1e-6)
+
+    def test_superres_pointwise_model_is_reproduced_everywhere(self):
+        """Test that super-resolution keeps the model output at the edges."""
+        import tempfile
+
+        import rasterio
+        import torch
+
+        from geoai.inference import predict_geotiff_superres
+
+        class Upsample(torch.nn.Module):
+            def forward(self, x):
+                return x.repeat_interleave(2, dim=-1).repeat_interleave(2, dim=-2)
+
+        data = np.random.default_rng(1).uniform(0, 1, (3, 30, 45)).astype("float32")
+        expected = data.repeat(2, axis=1).repeat(2, axis=2)
+        with tempfile.TemporaryDirectory() as tmp:
+            src, dst = f"{tmp}/in.tif", f"{tmp}/out.tif"
+            self._write_raster(src, data)
+            predict_geotiff_superres(
+                Upsample(),
+                src,
+                dst,
+                scale=2,
+                tile_size=16,
+                overlap=4,
+                batch_size=4,
+                num_classes=3,
+                preprocess_fn=lambda tile: tile,
+                device="cpu",
+                verbose=False,
+            )
+            with rasterio.open(dst) as ds:
+                out = ds.read()
+        np.testing.assert_allclose(out, expected, rtol=1e-6)
 
 
 class TestLazyImport(unittest.TestCase):
