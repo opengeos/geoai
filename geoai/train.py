@@ -2046,15 +2046,12 @@ def inference_on_geotiff(
         # 2. For tracking how many predictions contribute to each pixel
         count_accumulator = np.zeros((height, width), dtype=np.float32)
 
-        # Calculate the number of windows needed to cover the entire image
-        steps_y = math.ceil((height - overlap) / (window_size - overlap))
-        steps_x = math.ceil((width - overlap) / (window_size - overlap))
+        # Window origins that cover every pixel without repeating a window; an image
+        # smaller than the window gets one padded window at the origin.
+        y_starts = _sliding_window_starts(height, window_size, overlap)
+        x_starts = _sliding_window_starts(width, window_size, overlap)
 
-        # Ensure we cover the entire image
-        last_y = height - window_size
-        last_x = width - window_size
-
-        total_windows = steps_y * steps_x
+        total_windows = len(y_starts) * len(x_starts)
         logger.info(
             f"Processing {total_windows} windows with size {window_size}x{window_size} and overlap {overlap}..."
         )
@@ -2070,21 +2067,9 @@ def inference_on_geotiff(
         start_time = time.time()
 
         # Slide window over the image - make sure we cover the entire image
-        for i in range(steps_y + 1):  # +1 to ensure we reach the edge
-            y = min(i * (window_size - overlap), last_y)
-            y = max(0, y)  # Prevent negative indices
-
-            if y > last_y and i > 0:  # Skip if we've already covered the entire height
-                continue
-
-            for j in range(steps_x + 1):  # +1 to ensure we reach the edge
-                x = min(j * (window_size - overlap), last_x)
-                x = max(0, x)  # Prevent negative indices
-
-                if (
-                    x > last_x and j > 0
-                ):  # Skip if we've already covered the entire width
-                    continue
+        last_i, last_j = len(y_starts) - 1, len(x_starts) - 1
+        for i, y in enumerate(y_starts):
+            for j, x in enumerate(x_starts):
 
                 # Read window
                 window = src.read(window=Window(x, y, window_size, window_size))
@@ -2124,7 +2109,7 @@ def inference_on_geotiff(
                 batch_count += 1
 
                 # Process batch when it reaches the batch size or at the end
-                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                if batch_count == batch_size or (i == last_i and j == last_j):
                     # Forward pass
                     with torch.no_grad():
                         outputs = model(batch_inputs)
@@ -2294,15 +2279,12 @@ def instance_segmentation_inference_on_geotiff(
         # Store all detections globally for NMS
         all_detections = []
 
-        # Calculate the number of windows needed to cover the entire image
-        steps_y = math.ceil((height - overlap) / (window_size - overlap))
-        steps_x = math.ceil((width - overlap) / (window_size - overlap))
+        # Window origins that cover every pixel without repeating a window; an image
+        # smaller than the window gets one padded window at the origin.
+        y_starts = _sliding_window_starts(height, window_size, overlap)
+        x_starts = _sliding_window_starts(width, window_size, overlap)
 
-        # Ensure we cover the entire image
-        last_y = height - window_size
-        last_x = width - window_size
-
-        total_windows = steps_y * steps_x
+        total_windows = len(y_starts) * len(x_starts)
         logger.info(
             f"Processing {total_windows} windows with size {window_size}x{window_size} and overlap {overlap}..."
         )
@@ -2318,21 +2300,9 @@ def instance_segmentation_inference_on_geotiff(
         start_time = time.time()
 
         # Slide window over the image
-        for i in range(steps_y + 1):  # +1 to ensure we reach the edge
-            y = min(i * (window_size - overlap), last_y)
-            y = max(0, y)  # Prevent negative indices
-
-            if y > last_y and i > 0:  # Skip if we've already covered the entire height
-                continue
-
-            for j in range(steps_x + 1):  # +1 to ensure we reach the edge
-                x = min(j * (window_size - overlap), last_x)
-                x = max(0, x)  # Prevent negative indices
-
-                if (
-                    x > last_x and j > 0
-                ):  # Skip if we've already covered the entire width
-                    continue
+        last_i, last_j = len(y_starts) - 1, len(x_starts) - 1
+        for i, y in enumerate(y_starts):
+            for j, x in enumerate(x_starts):
 
                 # Read window
                 window = src.read(window=Window(x, y, window_size, window_size))
@@ -2367,7 +2337,7 @@ def instance_segmentation_inference_on_geotiff(
                 batch_count += 1
 
                 # Process batch when it reaches the batch size or at the end
-                if batch_count == batch_size or (i == steps_y and j == steps_x):
+                if batch_count == batch_size or (i == last_i and j == last_j):
                     # Forward pass
                     with torch.no_grad():
                         outputs = model(batch_inputs)
