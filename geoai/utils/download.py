@@ -32,6 +32,7 @@ def download_file(
         str: The path to the downloaded file or the extracted directory.
     """
 
+    import uuid
     import zipfile
 
     from ..progress import tqdm
@@ -51,8 +52,9 @@ def download_file(
             os.makedirs(parent, exist_ok=True)
 
         # Write to a temporary file first, so a broken download never leaves
-        # a partial file at output_path that the next call would reuse.
-        temp_path = f"{output_path}.part"
+        # a partial file at output_path that the next call would reuse. Each
+        # call gets its own file, so parallel downloads don't clash.
+        temp_path = f"{output_path}.{uuid.uuid4().hex}.part"
         try:
             with (
                 open(temp_path, "wb") as file,
