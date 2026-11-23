@@ -250,6 +250,20 @@ def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
     output_raster = params["output_raster"]
     output_vector = params["output_vector"]
 
+    # Create missing folders now, so a bad path fails before the slow steps.
+    # geoai-py 0.43.1 and older don't create the SAM checkpoint folder before
+    # downloading, so make the one download_checkpoint() uses.
+    folders = [
+        os.environ.get(
+            "TORCH_HOME", os.path.expanduser("~/.cache/torch/hub/checkpoints")
+        ),
+        os.path.dirname(output_raster),
+        os.path.dirname(output_vector),
+    ]
+    for folder in folders:
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
     _progress(f"Loading AnyChange (SAM {params['sam_model_type']})...")
     detector = _run_with_progress(
         lambda: ChangeDetection(sam_model_type=params["sam_model_type"])

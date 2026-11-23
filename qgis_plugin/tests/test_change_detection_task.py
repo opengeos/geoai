@@ -7,6 +7,14 @@ import pytest
 from geoai.workers import geoai_task_worker
 
 
+@pytest.fixture(autouse=True)
+def torch_home(monkeypatch, tmp_path):
+    """Keep the SAM checkpoint folder the task creates inside tmp_path."""
+    path = tmp_path / "torch_checkpoints"
+    monkeypatch.setenv("TORCH_HOME", str(path))
+    return path
+
+
 class FakeChangeDetection:
     instances = []
 
@@ -134,3 +142,17 @@ def test_detect_changes_cleans_up_when_vectorization_fails(monkeypatch):
         geoai_task_worker._task_detect_changes(_params(output_vector="changes.gpkg"))
 
     assert not os.path.exists(os.path.dirname(instance_rasters[0]))
+
+
+def test_detect_changes_creates_missing_folders(monkeypatch, tmp_path, torch_home):
+    _install_fakes(monkeypatch, [])
+    output_raster = tmp_path / "new" / "changes.tif"
+    output_vector = tmp_path / "other" / "changes.gpkg"
+
+    geoai_task_worker._task_detect_changes(
+        _params(output_raster=str(output_raster), output_vector=str(output_vector))
+    )
+
+    assert torch_home.is_dir()
+    assert output_raster.parent.is_dir()
+    assert output_vector.parent.is_dir()

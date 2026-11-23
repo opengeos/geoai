@@ -375,6 +375,12 @@ class ChangeDetectionDockWidget(QDockWidget):
                     f"'{layer.name()}' is not a raster file on disk. "
                     "Export it to GeoTIFF first."
                 )
+            # The worker reads the files, so a CRS set only in QGIS is lost.
+            if layer.crs() != layer.dataProvider().crs():
+                raise ValueError(
+                    f"The CRS of '{layer.name()}' is set in QGIS but not saved "
+                    "in the file. Export it to GeoTIFF with that CRS first."
+                )
         if before.extent().intersect(after.extent()).isEmpty():
             raise ValueError("Before and after layers do not overlap.")
         return before, after
