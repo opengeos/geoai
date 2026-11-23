@@ -429,6 +429,11 @@ class ChangeDetectionDockWidget(QDockWidget):
                 output_vector = f"{base}_changes.gpkg"
                 self.output_vector_edit.setText(output_vector)
 
+        # The worker runs in another folder, so send it absolute paths.
+        output_raster = os.path.abspath(output_raster)
+        if output_vector:
+            output_vector = os.path.abspath(output_vector)
+
         inputs = {
             os.path.normcase(os.path.abspath(layer.source()))
             for layer in (before, after)
@@ -446,8 +451,8 @@ class ChangeDetectionDockWidget(QDockWidget):
             return
 
         params = {
-            "before_path": before.source(),
-            "after_path": after.source(),
+            "before_path": os.path.abspath(before.source()),
+            "after_path": os.path.abspath(after.source()),
             "output_raster": output_raster,
             "output_vector": output_vector,
             "sam_model_type": self.model_combo.currentText(),
