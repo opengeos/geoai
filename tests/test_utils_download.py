@@ -57,6 +57,25 @@ class TestDownloadFile(unittest.TestCase):
             with open(output, "rb") as f:
                 self.assertEqual(f.read(), b"data")
 
+    @patch("geoai.utils.download.requests.get")
+    def test_interrupted_download_leaves_no_file(self, mock_get):
+        """Test a failed download leaves nothing at the output path."""
+
+        def broken_stream(chunk_size):
+            yield b"part"
+            raise ConnectionError("connection lost")
+
+        mock_response = MagicMock()
+        mock_response.headers = {"content-length": "8"}
+        mock_response.iter_content = broken_stream
+        mock_get.return_value = mock_response
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = os.path.join(tmpdir, "model.pth")
+            with self.assertRaises(ConnectionError):
+                utils.download_file("https://example.com/model.pth", output_path=output)
+            self.assertEqual(os.listdir(tmpdir), [])
+
     def test_download_file_callable(self):
         """Test that download_file is callable with expected signature."""
         self.assertTrue(callable(utils.download_file))

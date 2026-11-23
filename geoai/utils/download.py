@@ -46,22 +46,32 @@ def download_file(
         response = requests.get(url, stream=True, timeout=50)
         response.raise_for_status()
         total_size = int(response.headers.get("content-length", 0))
-        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        parent = os.path.dirname(output_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
 
-        with (
-            open(output_path, "wb") as file,
-            tqdm(
-                desc=f"Downloading {os.path.basename(output_path)}",
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                unit_divisor=1024,
-            ) as progress_bar,
-        ):
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    file.write(chunk)
-                    progress_bar.update(len(chunk))
+        # Write to a temporary file first, so a broken download never leaves
+        # a partial file at output_path that the next call would reuse.
+        temp_path = f"{output_path}.part"
+        try:
+            with (
+                open(temp_path, "wb") as file,
+                tqdm(
+                    desc=f"Downloading {os.path.basename(output_path)}",
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                ) as progress_bar,
+            ):
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        file.write(chunk)
+                        progress_bar.update(len(chunk))
+            os.replace(temp_path, output_path)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     # If the file is a ZIP archive and unzip is True
     if unzip and zipfile.is_zipfile(output_path):
