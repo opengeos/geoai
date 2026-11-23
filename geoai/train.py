@@ -3993,11 +3993,10 @@ def evaluate_semantic(
     model.eval()
 
     total_loss = 0
-    f1_scores = []
-    iou_scores = []
-    precision_scores = []
-    recall_scores = []
     num_batches = len(data_loader)
+    # Pool counts over the whole loader (dataset-level mIoU) instead of
+    # averaging per-image scores, so empty tiles do not inflate the result.
+    confusion = torch.zeros(num_classes, num_classes, dtype=torch.long, device=device)
 
     with torch.no_grad():
         for images, targets in data_loader:
@@ -4010,45 +4009,36 @@ def evaluate_semantic(
             loss = criterion(outputs, targets)
             total_loss += loss.item()
 
-            # Calculate metrics for each sample in the batch
-            for pred, target in zip(outputs, targets):
-                f1 = f1_score(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
-                )
-                iou = iou_coefficient(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
-                )
-                precision = precision_score(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
-                )
-                recall = recall_score(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
-                )
-                f1_scores.append(f1)
-                iou_scores.append(iou)
-                precision_scores.append(precision)
-                recall_scores.append(recall)
+            pred_classes = torch.argmax(outputs, dim=1)
+            valid = (targets >= 0) & (targets < num_classes)
+            if ignore_index is not None:
+                valid &= targets != ignore_index
+            valid &= (pred_classes >= 0) & (pred_classes < num_classes)
+            idx = targets[valid].long() * num_classes + pred_classes[valid].long()
+            confusion += torch.bincount(idx, minlength=num_classes**2).reshape(
+                num_classes, num_classes
+            )
 
-    # Calculate metrics
+    # Calculate metrics from pooled per-class counts (rows: target, cols: pred)
+    confusion = confusion.double()
+    tp = confusion.diag()
+    fp = confusion.sum(dim=0) - tp
+    fn = confusion.sum(dim=1) - tp
+
+    def _mean_over_present(numerator: torch.Tensor, denominator: torch.Tensor) -> float:
+        present = denominator > 0
+        if ignore_index is not None and 0 <= ignore_index < num_classes:
+            # An in-range ignore_index is not a scored class (as in iou_coefficient)
+            present[ignore_index] = False
+        if not torch.any(present):
+            return 0.0
+        return (numerator[present] / denominator[present]).mean().item()
+
     avg_loss = total_loss / num_batches
-    avg_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0
-    avg_iou = sum(iou_scores) / len(iou_scores) if iou_scores else 0
-    avg_precision = (
-        sum(precision_scores) / len(precision_scores) if precision_scores else 0
-    )
-    avg_recall = sum(recall_scores) / len(recall_scores) if recall_scores else 0
+    avg_iou = _mean_over_present(tp, tp + fp + fn)
+    avg_f1 = _mean_over_present(2 * tp, 2 * tp + fp + fn)
+    avg_precision = _mean_over_present(tp, tp + fp)
+    avg_recall = _mean_over_present(tp, tp + fn)
 
     return {
         "loss": avg_loss,
