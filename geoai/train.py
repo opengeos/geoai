@@ -4020,7 +4020,8 @@ def evaluate_semantic(
             )
 
     # Calculate metrics from pooled per-class counts (rows: target, cols: pred)
-    confusion = confusion.double()
+    # Move to CPU first: MPS does not support float64
+    confusion = confusion.cpu().double()
     tp = confusion.diag()
     fp = confusion.sum(dim=0) - tp
     fn = confusion.sum(dim=1) - tp
@@ -4047,6 +4048,10 @@ def evaluate_semantic(
         "Precision": avg_precision,
         "Recall": avg_recall,
     }
+
+
+# Bumped when the validation IoU used for model selection changes meaning
+_VAL_IOU_VERSION = 2
 
 
 def train_segmentation_model(
@@ -4617,6 +4622,19 @@ def train_segmentation_model(
                 "best_score", best_val_loss if monitor == "val_loss" else best_iou
             )
             best_epoch = checkpoint.get("best_epoch")
+            if (
+                monitor == "val_iou"
+                and checkpoint.get("val_iou_version") != _VAL_IOU_VERSION
+            ):
+                # Older checkpoints stored a per-image mean IoU, which is not
+                # comparable with the pooled IoU used for selection now.
+                logger.warning(
+                    "Checkpoint predates pooled validation IoU; "
+                    "resetting the best-IoU baseline."
+                )
+                best_iou = float("-inf")
+                best_score = float("-inf")
+                best_epoch = None
 
             # Load optimizer state if available
             if "optimizer_state_dict" in checkpoint:
@@ -4756,6 +4774,7 @@ def train_segmentation_model(
                     "best_iou": best_iou,
                     "best_val_loss": best_val_loss,
                     "monitor": monitor,
+                    "val_iou_version": _VAL_IOU_VERSION,
                     "best_score": best_score,
                     "best_epoch": best_epoch,
                     "architecture": architecture,
