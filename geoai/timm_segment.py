@@ -868,7 +868,8 @@ def timm_semantic_segmentation(
         num_channels (int): Number of input channels.
         num_classes (int): Number of output classes.
         window_size (int): Size of sliding window for inference.
-        overlap (int): Overlap between adjacent windows.
+        overlap (int): Overlap between adjacent windows. Must satisfy
+            ``0 <= overlap < window_size``.
         batch_size (int): Batch size for inference.
         device (str, optional): Device to use. Auto-detected if None.
         quiet (bool): If True, suppress progress messages.
@@ -889,6 +890,14 @@ def timm_semantic_segmentation(
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # A stride of zero or less would divide by zero or produce no windows, and a
+    # stride larger than the window would leave gaps between windows.
+    if not 0 <= overlap < window_size:
+        raise ValueError(
+            "overlap must satisfy 0 <= overlap < window_size, "
+            f"got overlap={overlap} and window_size={window_size}"
+        )
 
     # Validate probability_threshold
     if probability_threshold is not None:
@@ -966,10 +975,11 @@ def timm_semantic_segmentation(
         meta = src.meta.copy()
         height, width = src.shape
 
-        # Calculate number of windows
+        # Calculate number of windows. A side no longer than the overlap still needs
+        # one window, which is padded to window_size below.
         stride = window_size - overlap
-        n_rows = int(np.ceil((height - overlap) / stride))
-        n_cols = int(np.ceil((width - overlap) / stride))
+        n_rows = max(1, int(np.ceil((height - overlap) / stride)))
+        n_cols = max(1, int(np.ceil((width - overlap) / stride)))
 
         if not quiet:
             logger.info(f"Processing {n_rows} x {n_cols} = {n_rows * n_cols} windows")
