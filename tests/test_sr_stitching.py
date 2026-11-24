@@ -10,6 +10,7 @@ from geoai.tools.sr import (
     _create_blend_weights,
     _process_patched,
     _process_patched_uncertainty,
+    _stitch_patches,
 )
 
 
@@ -86,3 +87,23 @@ def test_blend_weights_taper_only_the_requested_ends():
 
     # A one-pixel overlap has no room for a ramp and is not tapered.
     np.testing.assert_array_equal(_create_blend_weights(5, 1, 1), 1)
+
+
+@pytest.mark.parametrize("stacked", [False, True])
+def test_stitch_blends_only_across_the_shared_seam(stacked):
+    """Two disagreeing 6 x 6 patches that overlap by 3 pixels are blended
+    linearly across the seam, and only there: their sides on the image border
+    keep full weight. Uniform weights would give 1, 1, 1, 2, 2, 2, 3, 3, 3.
+    """
+    first = (np.ones((1, 6, 6), dtype=np.float32), 0, 0)
+    profile = np.array([1, 1, 1, 1, 2, 3, 3, 3, 3], dtype=np.float32)
+    if stacked:
+        second = (np.full((1, 6, 6), 3, dtype=np.float32), 3, 0)
+        h, w, expected = 9, 6, np.tile(profile[:, np.newaxis], (1, 6))
+    else:
+        second = (np.full((1, 6, 6), 3, dtype=np.float32), 0, 3)
+        h, w, expected = 6, 9, np.tile(profile, (6, 1))
+    out = _stitch_patches(
+        [first, second], h, w, channels=1, scale=1, overlap=3, patch_size=6
+    )
+    np.testing.assert_allclose(out, expected)
