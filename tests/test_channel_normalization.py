@@ -233,3 +233,74 @@ def test_train_and_inference_roundtrip_with_normalization_sidecar(tmp_path: Path
 
     with rasterio.open(prob_auto) as s1, rasterio.open(prob_explicit) as s2:
         np.testing.assert_allclose(s1.read(), s2.read(), rtol=1e-6, atol=1e-6)
+
+
+def test_compute_channel_stats_retains_inferred_channel_count(tmp_path: Path):
+    img_a = np.full((3, 16, 16), 10.0, dtype=np.float32)
+    img_b = np.full((5, 16, 16), 20.0, dtype=np.float32)
+    p_a = _write_multiband_geotiff(tmp_path / "a.tif", img_a)
+    p_b = _write_multiband_geotiff(tmp_path / "b.tif", img_b)
+
+    stats = geoai.compute_channel_stats([p_a, p_b], num_channels=None)
+    assert len(stats["means"]) == 3
+    assert stats["means"] == pytest.approx([15.0, 15.0, 15.0])
+
+
+def test_zscore_default_transform_does_not_clamp_negative_values():
+    tf = training.get_semantic_transform(train=True, include_photometric=False)
+    img = torch.tensor([[[-2.5, 3.5], [0.0, -1.0]]], dtype=torch.float32)
+    mask = torch.zeros((2, 2), dtype=torch.long)
+    out_img, _ = tf(img, mask)
+    assert out_img.min().item() == pytest.approx(-2.5)
+    assert out_img.max().item() == pytest.approx(3.5)
+
+
+def test_sidecar_preserved_on_failed_run_and_cleared_on_legacy_retrain(tmp_path: Path):
+    img_dir, lbl_dir = _make_float32_lidar_dataset(tmp_path, n_tiles=4)
+    out_dir = tmp_path / "model_out"
+    out_dir.mkdir()
+    norm_file = out_dir / "normalization.json"
+    original_cfg = {"mode": "minmax", "mins": [0.0] * 6, "maxs": [1.0] * 6}
+    norm_file.write_text(json.dumps(original_cfg), encoding="utf-8")
+
+    # Failed run (invalid architecture) must leave existing normalization.json intact
+    with pytest.raises((ValueError, KeyError)):
+        training.train_segmentation_model(
+            images_dir=str(img_dir),
+            labels_dir=str(lbl_dir),
+            output_dir=str(out_dir),
+            architecture="nonexistent_arch_xyz",
+            encoder_name="resnet18",
+            encoder_weights=None,
+            num_channels=6,
+            num_classes=2,
+            batch_size=2,
+            num_epochs=1,
+            num_workers=0,
+            device=torch.device("cpu"),
+            verbose=False,
+            channel_mins=[0.0] * 6,
+            channel_maxs=[255.0] * 6,
+        )
+    assert json.loads(norm_file.read_text(encoding="utf-8")) == original_cfg
+
+    # Successful legacy (/255.0) retrain into same directory clears stale normalization.json
+    training.train_segmentation_model(
+        images_dir=str(img_dir),
+        labels_dir=str(lbl_dir),
+        output_dir=str(out_dir),
+        architecture="unet",
+        encoder_name="resnet18",
+        encoder_weights=None,
+        num_channels=6,
+        num_classes=2,
+        batch_size=2,
+        num_epochs=1,
+        val_split=0.25,
+        save_best_only=True,
+        plot_curves=False,
+        num_workers=0,
+        device=torch.device("cpu"),
+        verbose=False,
+    )
+    assert not norm_file.exists()

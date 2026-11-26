@@ -3276,14 +3276,18 @@ def _normalize_image_array(
 def _save_normalization_sidecar(
     output_dir: str, norm_config: Optional[Dict[str, Any]]
 ) -> None:
-    """Persist per-channel normalization metadata next to trained checkpoints."""
+    """Persist or clear per-channel normalization metadata next to trained checkpoints."""
+    sidecar_path = os.path.join(output_dir, NORMALIZATION_FILENAME)
     if norm_config is None:
+        if os.path.isfile(sidecar_path):
+            os.remove(sidecar_path)
         return
     import json
 
-    sidecar_path = os.path.join(output_dir, NORMALIZATION_FILENAME)
-    with open(sidecar_path, "w", encoding="utf-8") as f:
+    tmp_path = f"{sidecar_path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(norm_config, f, indent=2)
+    os.replace(tmp_path, sidecar_path)
 
 
 def _resolve_inference_normalization(
@@ -3384,6 +3388,7 @@ def compute_channel_stats(
     counts: Optional[np.ndarray] = None
     mins: Optional[np.ndarray] = None
     maxs: Optional[np.ndarray] = None
+    target_channels: Optional[int] = num_channels
 
     for path in image_paths:
         if path.lower().endswith((".tif", ".tiff")):
@@ -3397,7 +3402,9 @@ def compute_channel_stats(
                 arr = np.transpose(np.asarray(img, dtype=np.float64), (2, 0, 1))
                 file_nodata = None
 
-        c_count = arr.shape[0] if num_channels is None else num_channels
+        if target_channels is None:
+            target_channels = int(arr.shape[0])
+        c_count = target_channels
         if sum_x is None:
             sum_x = np.zeros(c_count, dtype=np.float64)
             sum_x2 = np.zeros(c_count, dtype=np.float64)
@@ -3850,7 +3857,7 @@ class SemanticContrastAdjustment:
         return image, mask
 
 
-def get_semantic_transform(train: bool) -> Any:
+def get_semantic_transform(train: bool, include_photometric: bool = True) -> Any:
     """
     Get transforms for semantic segmentation data augmentation.
 
@@ -3861,8 +3868,11 @@ def get_semantic_transform(train: bool) -> Any:
 
     Args:
         train (bool): Whether to include training-specific transforms.
-            If True, applies augmentations (flips, rotations, brightness/contrast adjustments).
+            If True, applies augmentations (flips, rotations, and optionally brightness/contrast adjustments).
             If False, only converts to tensor (for validation).
+        include_photometric (bool): Whether to include ``[0, 1]``-clamping brightness and
+            contrast augmentations during training. Set to ``False`` when using unbounded
+            z-score normalization so negative or ``> 1`` values are preserved.
 
     Returns:
         SemanticTransforms: Composed transforms.
@@ -3880,13 +3890,14 @@ def get_semantic_transform(train: bool) -> Any:
         transforms.append(SemanticRandomVerticalFlip(0.5))
         transforms.append(SemanticRandomRotation90(0.5))
 
-        # Photometric transforms - improve model robustness
-        transforms.append(
-            SemanticBrightnessAdjustment(brightness_range=(0.8, 1.2), prob=0.5)
-        )
-        transforms.append(
-            SemanticContrastAdjustment(contrast_range=(0.8, 1.2), prob=0.5)
-        )
+        if include_photometric:
+            # Photometric transforms - improve model robustness for [0, 1] inputs
+            transforms.append(
+                SemanticBrightnessAdjustment(brightness_range=(0.8, 1.2), prob=0.5)
+            )
+            transforms.append(
+                SemanticContrastAdjustment(contrast_range=(0.8, 1.2), prob=0.5)
+            )
 
     return SemanticTransforms(transforms)
 
@@ -4764,19 +4775,6 @@ def train_segmentation_model(
                 logger.info(f"All sampled images have the same size: {image_sizes[0]}")
                 logger.info("No resizing needed.")
 
-    # Create datasets
-    # Use custom transforms if provided, otherwise use default transforms
-    train_transform = (
-        train_transforms
-        if train_transforms is not None
-        else get_semantic_transform(train=True)
-    )
-    val_transform = (
-        val_transforms
-        if val_transforms is not None
-        else get_semantic_transform(train=False)
-    )
-
     norm_config = _validate_channel_normalization(
         num_channels=num_channels,
         channel_means=channel_means,
@@ -4784,7 +4782,21 @@ def train_segmentation_model(
         channel_mins=channel_mins,
         channel_maxs=channel_maxs,
     )
-    _save_normalization_sidecar(output_dir, norm_config)
+
+    # Create datasets
+    # Use custom transforms if provided, otherwise use default transforms
+    # Omit [0, 1]-clamping photometric augmentations for unbounded z-score normalization
+    include_photometric = norm_config is None or norm_config["mode"] != "zscore"
+    train_transform = (
+        train_transforms
+        if train_transforms is not None
+        else get_semantic_transform(train=True, include_photometric=include_photometric)
+    )
+    val_transform = (
+        val_transforms
+        if val_transforms is not None
+        else get_semantic_transform(train=False)
+    )
 
     train_dataset = SemanticSegmentationDataset(
         train_imgs,
@@ -5092,6 +5104,7 @@ def train_segmentation_model(
             epochs_without_improvement = 0
             logger.info("Saving best model with %s: %.4f", monitor, best_score)
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
+            _save_normalization_sidecar(output_dir, norm_config)
             _write_json(
                 Path(output_dir) / "model_selection.json",
                 {
@@ -5144,6 +5157,7 @@ def train_segmentation_model(
 
     # Save final model
     torch.save(model.state_dict(), os.path.join(output_dir, "final_model.pth"))
+    _save_normalization_sidecar(output_dir, norm_config)
 
     # Save training history
     history = {
