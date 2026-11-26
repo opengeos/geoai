@@ -1,12 +1,12 @@
 albumentations
 click
 contextily
-datasets>=4.8.4
-einops>=0.8.0
+datasets>=5.2.0
+einops>=0.8.2
 geopandas
 huggingface_hub
 jupyter-server-proxy
-leafmap>=0.63.1
+leafmap>=0.64.7
 localtileserver
 mapclassify
 maplibre
@@ -22,12 +22,12 @@ scikit-image
 scikit-learn
 # segment-geospatial
 smoothify
-spacy>=3.8.14
+spacy>=3.8.18
 timm
 tokenizers>=0.22.2
-torch>=2.10.0
+torch>=2.15.0
 # torchange
 torchgeo
 torchinfo
 tqdm
-transformers>=4.56.2
+transformers>=5.23.0
