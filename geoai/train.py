@@ -3307,10 +3307,14 @@ def _resolve_inference_normalization(
 
     import json
 
-    paths = [model_path] if isinstance(model_path, (str, os.PathLike)) else list(model_path)
+    paths = (
+        [model_path] if isinstance(model_path, (str, os.PathLike)) else list(model_path)
+    )
     loaded: Optional[Dict[str, Any]] = None
     for p in paths:
-        sidecar = os.path.join(os.path.dirname(os.path.abspath(str(p))), NORMALIZATION_FILENAME)
+        sidecar = os.path.join(
+            os.path.dirname(os.path.abspath(str(p))), NORMALIZATION_FILENAME
+        )
         if not os.path.isfile(sidecar):
             continue
         with open(sidecar, "r", encoding="utf-8") as f:
