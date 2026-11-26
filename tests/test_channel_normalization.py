@@ -304,3 +304,25 @@ def test_sidecar_preserved_on_failed_run_and_cleared_on_legacy_retrain(tmp_path:
         verbose=False,
     )
     assert not norm_file.exists()
+
+
+def test_resolve_inference_normalization_rejects_mixed_legacy_and_sidecar(
+    tmp_path: Path,
+):
+    dir_legacy = tmp_path / "legacy"
+    dir_norm = tmp_path / "norm"
+    dir_legacy.mkdir()
+    dir_norm.mkdir()
+    ckpt_a = dir_legacy / "best_model.pth"
+    ckpt_b = dir_norm / "best_model.pth"
+    ckpt_a.write_bytes(b"")
+    ckpt_b.write_bytes(b"")
+    (dir_norm / "normalization.json").write_text(
+        json.dumps({"mode": "zscore", "means": [10.0, 20.0], "stds": [2.0, 4.0]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="conflicting normalization.json"):
+        training._resolve_inference_normalization(
+            model_path=[str(ckpt_a), str(ckpt_b)], num_channels=2
+        )

@@ -3314,12 +3314,13 @@ def _resolve_inference_normalization(
     paths = (
         [model_path] if isinstance(model_path, (str, os.PathLike)) else list(model_path)
     )
-    loaded: Optional[Dict[str, Any]] = None
+    configs: List[Optional[Dict[str, Any]]] = []
     for p in paths:
         sidecar = os.path.join(
             os.path.dirname(os.path.abspath(str(p))), NORMALIZATION_FILENAME
         )
         if not os.path.isfile(sidecar):
+            configs.append(None)
             continue
         with open(sidecar, "r", encoding="utf-8") as f:
             raw = json.load(f)
@@ -3338,13 +3339,17 @@ def _resolve_inference_normalization(
             )
         else:
             raise ValueError(f"Unsupported normalization mode in {sidecar}: {mode!r}")
-        if loaded is not None and cfg != loaded:
-            raise ValueError(
-                "Ensemble checkpoints have conflicting normalization.json sidecar configs; "
-                "pass explicit channel_means/channel_stds or channel_mins/channel_maxs."
-            )
-        loaded = cfg
-    return loaded
+        configs.append(cfg)
+    if not configs:
+        return None
+    first = configs[0]
+    if any(cfg != first for cfg in configs[1:]):
+        raise ValueError(
+            "Ensemble checkpoints have conflicting normalization.json sidecar configs "
+            "(including mixing legacy /255.0 checkpoints without a sidecar and normalized "
+            "checkpoints); pass explicit channel_means/channel_stds or channel_mins/channel_maxs."
+        )
+    return first
 
 
 def compute_channel_stats(
@@ -5700,10 +5705,9 @@ def semantic_inference_on_geotiff(
                 if window.shape[1] == 0 or window.shape[2] == 0:
                     continue
 
-                window, current_height, current_width = _pad_window(window, window_size)
-
-                # Normalize and prepare input
+                # Normalize real pixels first so zero-padded edge pixels remain 0.0
                 image = _normalize_image_array(window, num_channels, norm_config)
+                image, current_height, current_width = _pad_window(image, window_size)
 
                 # Convert to tensor
                 image_tensor = torch.tensor(image, device=device)
@@ -6010,10 +6014,9 @@ def semantic_inference_on_image(
                 if window.shape[1] == 0 or window.shape[2] == 0:
                     continue
 
-                window, current_height, current_width = _pad_window(window, window_size)
-
-                # Normalize and prepare input
+                # Normalize real pixels first so zero-padded edge pixels remain 0.0
                 image = _normalize_image_array(window, num_channels, norm_config)
+                image, current_height, current_width = _pad_window(image, window_size)
 
                 # Convert to tensor
                 image_tensor = torch.tensor(image, device=device)
