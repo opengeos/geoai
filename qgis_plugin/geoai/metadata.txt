@@ -3,7 +3,7 @@ name=GeoAI
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including tree segmentation (DeepForest), water segmentation (OmniWaterMask), Moondream vision-language model, Segment Anything (SAM1/SAM2/SAM3), semantic segmentation, instance segmentation (Mask R-CNN), and change detection (AnyChange).
-version=1.9.1
+version=1.9.2
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -63,6 +63,8 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.9.2
+        - Stop importing PyTorch into the QGIS process: panels no longer import it when they open, Clear GPU memory only uses it if already loaded, DeepForest runs in the managed environment's subprocess on every platform (not only Windows), and training-tile export from the Segment Anything and Moondream panels runs in the subprocess. Fixes QGIS aborting with "OMP: Error #15" when loading a DeepForest model or exporting training data in conda-forge QGIS on macOS (#1006)
     1.9.1
         - Fix security scan findings (hardcoded password false positives in the Hugging Face login check)
     1.9.0
