@@ -79,7 +79,7 @@ def validate_input_path(path: str | Path) -> Path:
 
 
 def validate_output_path(path: str | Path, config: Optional[Any] = None) -> Path:
-    """Validate that a path is within the allowed output directory.
+    """Validate that a path is strictly within the allowed output directory.
 
     Args:
         path: Path to validate (relative or absolute)
@@ -89,7 +89,7 @@ def validate_output_path(path: str | Path, config: Optional[Any] = None) -> Path
         Validated absolute Path
 
     Raises:
-        FileAccessError: If path is outside output directory
+        FileAccessError: If path is outside output directory or equals output directory
     """
     if config is None:
         config = get_config()
@@ -102,18 +102,82 @@ def validate_output_path(path: str | Path, config: Optional[Any] = None) -> Path
         full_path = path
 
     full_path = full_path.resolve()
+    output_dir_resolved = config.output_dir.resolve()
 
-    # Security check: ensure path is within output directory
-    if not _is_path_within_directory(full_path, config.output_dir):
-        logger.warning(f"Path traversal attempt blocked: {path}")
+    # Ensure path is strictly within output directory
+    if (
+        not _is_path_within_directory(full_path, output_dir_resolved)
+        or full_path == output_dir_resolved
+    ):
+        logger.warning(f"Output path validation blocked: {path}")
         raise FileAccessError(
-            message=f"Access denied: path is outside the allowed output directory",
+            message="Access denied: path must be strictly inside the allowed output directory",
             file_path=str(path),
             operation="access",
         )
 
     # Ensure parent directory exists
     full_path.parent.mkdir(parents=True, exist_ok=True)
+
+    return full_path
+
+
+def validate_output_subdir(subdir: str | Path, config: Optional[Any] = None) -> Path:
+    """Validate that a relative subdirectory path stays strictly within output_dir.
+
+    Args:
+        subdir: Relative subdirectory path within the output directory.
+        config: Optional configuration object (uses global config if not provided).
+
+    Returns:
+        Validated absolute Path for the subdirectory.
+
+    Raises:
+        InputValidationError: If subdir is empty, absolute, or contains '..'.
+        FileAccessError: If the resolved path is outside or equal to output_dir.
+    """
+    if config is None:
+        config = get_config()
+
+    subdir_str = str(subdir)
+    if not subdir_str.strip() or "\x00" in subdir_str:
+        raise InputValidationError(
+            message="Output subdirectory must be a non-empty relative path",
+            parameter_name="output_subdir",
+            received_value=subdir_str,
+            expected="A relative subdirectory path within the output directory",
+        )
+
+    subdir_path = Path(subdir_str)
+    if subdir_path.is_absolute() or subdir_str.startswith(("/", "\\")):
+        raise InputValidationError(
+            message="Output subdirectory must be a relative path",
+            parameter_name="output_subdir",
+            received_value=subdir_str,
+            expected="A relative subdirectory path within the output directory",
+        )
+
+    if ".." in subdir_path.parts or ".." in subdir_str:
+        raise InputValidationError(
+            message="Output subdirectory cannot contain '..'",
+            parameter_name="output_subdir",
+            received_value=subdir_str,
+            expected="A relative subdirectory path without '..'",
+        )
+
+    output_dir_resolved = config.output_dir.resolve()
+    full_path = (output_dir_resolved / subdir_path).resolve()
+
+    if (
+        not _is_path_within_directory(full_path, output_dir_resolved)
+        or full_path == output_dir_resolved
+    ):
+        logger.warning(f"Output subdirectory validation blocked: {subdir}")
+        raise FileAccessError(
+            message="Access denied: output subdirectory must be strictly inside the allowed output directory",
+            file_path=subdir_str,
+            operation="access",
+        )
 
     return full_path
 
@@ -165,18 +229,22 @@ def get_safe_input_path(filename: str, config: Optional[Any] = None) -> Path:
     return full_path
 
 
-def get_safe_output_path(filename: str, create_subdirs: bool = True) -> Path:
+def get_safe_output_path(
+    filename: str, create_subdirs: bool = True, config: Optional[Any] = None
+) -> Path:
     """Get a safe path for writing an output file.
 
     Args:
         filename: Filename or relative path within output directory
         create_subdirs: Whether to create subdirectories if needed
+        config: Optional configuration object (uses global config if not provided)
 
     Returns:
         Safe absolute path for the file
 
     Raises:
         InputValidationError: If filename contains path traversal
+        FileAccessError: If resolved path is outside or equal to output directory
     """
     # Check for traversal attempts
     if ".." in filename:
@@ -187,13 +255,18 @@ def get_safe_output_path(filename: str, create_subdirs: bool = True) -> Path:
             expected="A filename without directory traversal",
         )
 
-    config = get_config()
-    full_path = (config.output_dir / filename).resolve()
+    if config is None:
+        config = get_config()
+    output_dir_resolved = config.output_dir.resolve()
+    full_path = (output_dir_resolved / filename).resolve()
 
-    # Double-check the path is still within output dir
-    if not _is_path_within_directory(full_path, config.output_dir):
+    # Double-check the path is strictly within output dir
+    if (
+        not _is_path_within_directory(full_path, output_dir_resolved)
+        or full_path == output_dir_resolved
+    ):
         raise FileAccessError(
-            message="Output path is outside allowed directory",
+            message="Output path must be strictly inside the allowed directory",
             file_path=filename,
             operation="write",
         )

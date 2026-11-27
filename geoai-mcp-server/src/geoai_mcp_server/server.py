@@ -74,6 +74,7 @@ from .utils.error_handling import (
 from .utils.file_management import (
     validate_input_path,
     validate_output_path,
+    validate_output_subdir,
     get_safe_input_path,
     list_input_files,
     generate_output_filename,
@@ -572,6 +573,19 @@ async def classify_land_cover(
         )
         output_path = validate_output_path(out_name, config)
 
+        validated_model_path: Optional[str] = None
+        if model_path is not None:
+            if "://" in model_path or model_path.lower().startswith(
+                ("http:", "https:", "ftp:", "file:", "s3:", "gs:")
+            ):
+                raise InputValidationError(
+                    message="Model path must be a local file within the input directory, not a URL",
+                    parameter_name="model_path",
+                    received_value=model_path,
+                    expected="A local model file path within the input directory",
+                )
+            validated_model_path = str(get_safe_input_path(model_path, config))
+
         logger.info(f"Classifying land cover in {full_input_path}")
 
         classify_module = _get_geoai_module("classify")
@@ -580,7 +594,7 @@ async def classify_land_cover(
         result = classify_module.classify_image(
             str(full_input_path),
             output=str(output_path),
-            model_path=model_path,
+            model_path=validated_model_path,
             num_classes=num_classes,
         )
 
@@ -761,7 +775,7 @@ async def download_satellite_imagery(
         # Determine output directory
         output_dir = config.output_dir
         if output_subdir:
-            output_dir = output_dir / output_subdir
+            output_dir = validate_output_subdir(output_subdir, config)
             output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"Downloading {data_source} imagery for bbox: {bbox.to_tuple()}")
@@ -879,7 +893,7 @@ async def prepare_training_data(
 
         output_dir = config.output_dir
         if output_subdir:
-            output_dir = output_dir / output_subdir
+            output_dir = validate_output_subdir(output_subdir, config)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"Preparing training data: {images_path} + {labels_path}")

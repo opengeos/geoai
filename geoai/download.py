@@ -181,23 +181,44 @@ def _apply_output_permissions(temp_path: str, output_path: str) -> None:
     os.chmod(temp_path, mode)
 
 
+def _validate_filename_component(value: str, name: str) -> str:
+    """Validate a single filename component against path separators and traversal."""
+    if (
+        not value
+        or "\x00" in value
+        or "/" in value
+        or "\\" in value
+        or ".." in value
+        or value in (".", "..")
+    ):
+        raise ValueError(
+            f"Invalid {name} {value!r}: must not contain path separators or '..'."
+        )
+    return value
+
+
 def download_with_progress(
-    url: str, output_path: str, max_size: Optional[int] = None
+    url: str,
+    output_path: str,
+    max_size: Optional[int] = None,
+    timeout: Union[float, Tuple[float, float]] = (30, 300),
 ) -> None:
     """Download a file with a progress bar.
 
     Args:
         url: URL of the file to download.
         output_path: Path where the file will be saved.
-        max_size: Maximum allowed file size in bytes. If the server-reported
-            Content-Length exceeds this value, the download is aborted.
-            Defaults to None (no limit).
+        max_size: Maximum allowed file size in bytes. Enforced against both
+            the server-reported Content-Length header and cumulative bytes
+            streamed. Defaults to None (no limit).
+        timeout: Request timeout in seconds, or a (connect, read) timeout
+            tuple passed to ``requests.get``. Defaults to (30, 300).
 
     Raises:
         ValueError: If the URL is invalid or the file exceeds *max_size*.
     """
     _validate_url(url)
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, timeout=timeout)
     temp_path = None
     try:
         response.raise_for_status()
@@ -233,6 +254,13 @@ def download_with_progress(
             ) as bar,
         ):
             for data in response.iter_content(block_size):
+                if not data:
+                    continue
+                if max_size is not None and bytes_written + len(data) > max_size:
+                    raise ValueError(
+                        f"Downloaded data exceeds the maximum allowed size "
+                        f"({max_size} bytes)."
+                    )
                 size = file.write(data)
                 bytes_written += size
                 bar.update(size)
@@ -318,7 +346,7 @@ def get_overture_latest_release(patch=True) -> str:
     url = "https://labs.overturemaps.org/data/releases.json"
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=60)
         response.raise_for_status()  # Raise an exception for HTTP errors
 
         data = response.json()
@@ -1076,7 +1104,18 @@ def pc_stac_download(
             # Default extension based on the original URL
             ext = os.path.splitext(asset_url.split("?")[0])[1] or ".data"
 
-        output_path = os.path.join(output_dir, f"{item_id}_{asset_key}{ext}")
+        safe_item_id = _validate_filename_component(str(item_id), "item_id")
+        safe_asset_key = _validate_filename_component(str(asset_key), "asset_key")
+        if "\x00" in ext or "/" in ext or "\\" in ext or ".." in ext:
+            ext = ".data"
+
+        output_dir_real = os.path.realpath(output_dir)
+        output_path = os.path.join(output_dir, f"{safe_item_id}_{safe_asset_key}{ext}")
+        output_path_real = os.path.realpath(output_path)
+        if not output_path_real.startswith(output_dir_real + os.sep):
+            raise ValueError(
+                f"Resolved output path {output_path!r} is outside the output directory."
+            )
 
         # Skip if file exists and skip_existing is True
         if skip_existing and os.path.exists(output_path):
@@ -1085,7 +1124,7 @@ def pc_stac_download(
 
         try:
             # Download the asset with progress bar
-            with requests.get(asset_url, stream=True) as r:
+            with requests.get(asset_url, stream=True, timeout=(30, 300)) as r:
                 r.raise_for_status()
                 total_size = int(r.headers.get("content-length", 0))
                 with open(output_path, "wb") as f:
@@ -1152,6 +1191,8 @@ def pc_stac_download(
                     key, path = future.result()
                     if path:
                         item_assets[key] = path
+                except ValueError:
+                    raise
                 except Exception as e:
                     logger.error(
                         "Error processing asset %s for item %s: %s",

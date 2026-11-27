@@ -3,6 +3,7 @@
 from .file_management import (
     validate_input_path,
     validate_output_path,
+    validate_output_subdir,
     get_safe_input_path,
     get_safe_output_path,
     list_input_files,
@@ -28,6 +29,7 @@ __all__ = [
     # File management
     "validate_input_path",
     "validate_output_path",
+    "validate_output_subdir",
     "get_safe_input_path",
     "get_safe_output_path",
     "list_input_files",

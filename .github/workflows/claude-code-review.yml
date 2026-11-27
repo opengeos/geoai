@@ -237,6 +237,32 @@ jobs:
           rm -rf pr-context
           mkdir -p pr-context
 
+          # Reject symlinks pointing outside the checkout or into .git.
+          root=$(realpath .)
+          find . -path ./.git -prune -o -type l -print0 > "$RUNNER_TEMP/links.z"
+          while IFS= read -r -d '' l; do
+            t=$(realpath -m -- "$l") || { echo "::error::$(printf %q "$l") cannot be resolved; stopping review."; exit 1; }
+            case "$t" in
+              "$root" | "$root/.git" | "$root/.git/"*) ;;
+              "$root"/*) continue ;;
+            esac
+            echo "::error::$(printf %q "$l") links outside the checkout or into .git ($(printf %q "$t")); stopping review."
+            exit 1
+          done < "$RUNNER_TEMP/links.z"
+
+          # Move PR instruction and agent configuration files outside the
+          # repository before invoking Claude.
+          aside="$RUNNER_TEMP/instructions"
+          rm -rf "$aside"
+          mkdir -p "$aside"
+          find . \( -path ./.git -o -path ./pr-context -o -path ./.venv -o -name node_modules \) -prune \
+            -o -name .claude -prune -print0 \
+            -o \( -iname AGENTS.md -o -iname CLAUDE.md -o -name CLAUDE.local.md -o -path ./.mcp.json \) -print0 |
+            while IFS= read -r -d '' f; do
+              mkdir -p "$aside/$(dirname "$f")"
+              mv "$f" "$aside/$f"
+            done
+
           gh pr view "$PR_NUMBER" --repo "$REPO" \
             --json number,title,body,author,baseRefName,headRefName,additions,deletions,changedFiles \
             > pr-context/metadata.json
@@ -306,7 +332,7 @@ jobs:
             - Security issues such as injection, unsafe input handling, and leaked secrets
             - Performance problems and obvious inefficiencies
             - Code quality, readability, naming, and maintainability
-            - Adherence to any CLAUDE.md guidelines that apply to the changed files
+            - Adherence to repository conventions and style guidelines (PR-supplied instruction files are excluded from the workspace)
 
             Concentrate on the changed lines, but use repository context to judge whether they are correct. Report findings across a range of confidence levels, not only near-certain ones. It is fine to raise a well-reasoned concern even when you are not fully certain, as long as you state your confidence and reasoning. Skip pre-existing issues unrelated to this change.
 
@@ -314,7 +340,7 @@ jobs:
 
             After posting inline comments, end your run by writing the summary as your FINAL MESSAGE. Do not try to post it yourself — you have no tool that can, and a workflow step publishes your final message as the PR comment verbatim. So your final message must be the comment body and nothing else: no preamble, no "I've completed the review", no meta-commentary about the tools you used.
 
-            That final message must start with the heading "## Code review" and list the findings grouped by category (Bugs, Security, Performance, Quality, CLAUDE.md), each with a one-line description and confidence. If you genuinely find nothing worth raising, say so and note what you checked.
+            That final message must start with the heading "## Code review" and list the findings grouped by category (Bugs, Security, Performance, Quality, Conventions), each with a one-line description and confidence. If you genuinely find nothing worth raising, say so and note what you checked.
 
             Do not approve, merge, or modify any code. Only review and comment.
 
@@ -324,6 +350,7 @@ jobs:
           # comes from the checkout plus `pr-context/`; output goes through the
           # inline-comment MCP server and the final message. See the header.
           claude_args: |
+            --disallowedTools "Read(//proc/**),Read(//sys/**),Read(/${{ runner.temp }}/**),Read(~/.claude/**),Read(.git/**),Grep(//proc/**),Grep(//sys/**),Grep(/${{ runner.temp }}/**),Grep(~/.claude/**),Grep(.git/**),Glob(//proc/**),Glob(//sys/**),Glob(/${{ runner.temp }}/**),Glob(~/.claude/**),Glob(.git/**)"
             --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
@@ -336,6 +363,7 @@ jobs:
         if: ${{ steps.claude-review.outputs.execution_file != '' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           REPO: ${{ github.repository }}
           EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
@@ -355,6 +383,16 @@ jobs:
 
           jq -r '[.[] | select(.type == "result" and (.is_error | not)) | .result // empty] | last // ""' \
             "$EXECUTION_FILE" > "$summary_file"
+
+          # Check that the review summary does not contain workflow tokens.
+          if [ -n "${GH_TOKEN:-}" ] && grep -qaF -- "$GH_TOKEN" "$summary_file"; then
+            echo "::error::Review summary contained a restricted token; skipping comment"
+            exit 1
+          fi
+          if [ -n "${CLAUDE_TOKEN:-}" ] && grep -qaF -- "$CLAUDE_TOKEN" "$summary_file"; then
+            echo "::error::Review summary contained a restricted token; skipping comment"
+            exit 1
+          fi
 
           # A run that errored, hit a permission wall, or produced only
           # boilerplate should stay silent rather than post an empty comment.
