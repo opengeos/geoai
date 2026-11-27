@@ -596,13 +596,8 @@ def _select_cuda_index(gpu_info: dict) -> Optional[str]:
 # Keep these specific: a bare "ssl" substring also matches package names
 # such as ``pyopenssl`` and misreports resolver failures as TLS problems.
 _SSL_ERROR_PATTERNS = [
-    "ssl:",
-    "ssl error",
-    "ssl module",
-    "sslerror",
     "certificate verify failed",
     "CERTIFICATE_VERIFY_FAILED",
-    "SSLError",
     "SSLCertVerificationError",
     "tlsv1 alert",
     "tls error",
@@ -614,6 +609,11 @@ _SSL_ERROR_PATTERNS = [
     "unknown issuer",
     "certificate unknown",
 ]
+
+# "ssl:", "ssl error", "ssl module" and "sslerror" as a standalone word, so
+# that "[SSL: ...]" and "requests.exceptions.SSLError" match but a package
+# name such as "pyopenssl:" does not.
+_SSL_WORD_RE = re.compile(r"(?<![a-z0-9_-])ssl(?::| error| module|error)")
 
 _NETWORK_ERROR_PATTERNS = [
     "connectionreseterror",
@@ -684,6 +684,8 @@ def _is_ssl_error(stderr: str) -> bool:
         True if SSL errors detected.
     """
     stderr_lower = stderr.lower()
+    if _SSL_WORD_RE.search(stderr_lower):
+        return True
     return any(pattern.lower() in stderr_lower for pattern in _SSL_ERROR_PATTERNS)
 
 
@@ -3479,7 +3481,9 @@ def install_dependencies(
                         Qgis.Critical,
                     )
                     install_failed = True
-                    install_error_msg = _truncate_error(error_msg)
+                    # Keep the full output: _describe_install_failure()
+                    # classifies it before truncating what it displays.
+                    install_error_msg = error_msg
                     last_returncode = result.returncode
 
             except subprocess.TimeoutExpired:
@@ -3581,7 +3585,7 @@ def install_dependencies(
                         )
                         install_error_msg = (
                             "CUDA and CPU install both failed for {}: {}".format(
-                                package_name, _truncate_error(cpu_err)
+                                package_name, cpu_err
                             )
                         )
                 except subprocess.TimeoutExpired:

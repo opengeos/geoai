@@ -69,6 +69,27 @@ def test_ssl_certificate_error_message_keeps_installer_output():
     assert "UnknownIssuer" in message
 
 
+def test_package_name_followed_by_colon_is_not_a_tls_error():
+    output = "pyopenssl: no matching distribution for this platform"
+
+    assert venv_manager._is_ssl_error(output) is False
+
+
+def test_tls_error_in_the_middle_of_long_output_is_classified_first():
+    output = (
+        "Collecting torch\n"
+        + "x" * 5000
+        + "\nSSLError(SSLCertVerificationError(1, '[SSL: "
+        "CERTIFICATE_VERIFY_FAILED] certificate verify failed'))\n"
+        + "y" * 5000
+        + "\nERROR: No matching distribution found for torch>=2.0.0"
+    )
+    message = venv_manager._describe_install_failure("torch", output, ["torch>=2.0.0"])
+
+    assert "SSL certificate error" in message
+    assert len(message) < 2000
+
+
 def test_package_names_containing_ssl_are_not_tls_errors():
     output = (
         "No solution found when resolving dependencies:\n"
@@ -90,6 +111,9 @@ def test_package_names_containing_ssl_are_not_tls_errors():
         "SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED]'))",
         "invalid peer certificate: UnknownIssuer",
         "unable to get local issuer certificate",
+        "requests.exceptions.SSLError: HTTPSConnectionPool",
+        "pip is configured with locations that require TLS/SSL, however "
+        "the ssl module in Python is not available.",
     ],
 )
 def test_real_tls_errors_are_still_detected(output):
@@ -309,6 +333,10 @@ def test_installer_replaces_stale_standalone_and_its_venv(tmp_path, monkeypatch)
     monkeypatch.setattr(
         venv_manager, "create_venv", lambda **_kwargs: (False, "no python")
     )
+
+    # Linux is the platform whose download failure continues to a
+    # uv-managed Python; pin it so the test behaves the same on every host.
+    monkeypatch.setattr(venv_manager.sys, "platform", "linux")
 
     ok, message = venv_manager.create_venv_and_install()
 
