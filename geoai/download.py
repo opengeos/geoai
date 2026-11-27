@@ -1,10 +1,12 @@
 """This module provides functions to download data, including NAIP imagery and building data from Overture Maps."""
 
+import contextlib
 import datetime
 import json
 import logging
 import os
 import subprocess
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
@@ -172,25 +174,32 @@ def download_with_progress(
     """
     _validate_url(url)
     response = requests.get(url, stream=True)
-    response.raise_for_status()
-    total_size = int(response.headers.get("content-length", 0))
-
-    if max_size is not None and total_size > max_size:
-        response.close()
-        raise ValueError(
-            f"File size ({total_size} bytes) exceeds the maximum "
-            f"allowed size ({max_size} bytes)."
-        )
-
-    block_size = 1024  # 1 Kibibyte
-
-    # Write to a temporary file and move it into place only once the download
-    # completes, so an interrupted transfer never leaves a truncated file that
-    # later runs would mistake for a finished download.
-    temp_path = output_path + ".part"
+    temp_path = None
     try:
+        response.raise_for_status()
+        total_size = int(response.headers.get("content-length", 0))
+
+        if max_size is not None and total_size > max_size:
+            raise ValueError(
+                f"File size ({total_size} bytes) exceeds the maximum "
+                f"allowed size ({max_size} bytes)."
+            )
+
+        block_size = 1024  # 1 Kibibyte
+
+        # Write to an exclusively created temporary file in the destination
+        # directory and move it into place only once the download completes,
+        # so interrupted or concurrent transfers never clobber or leave a
+        # truncated file at the final path.
+        output_dir = os.path.dirname(os.path.abspath(output_path))
+        fd, temp_path = tempfile.mkstemp(
+            dir=output_dir,
+            prefix=f".{os.path.basename(output_path)}.",
+            suffix=".part",
+        )
+        bytes_written = 0
         with (
-            open(temp_path, "wb") as file,
+            os.fdopen(fd, "wb") as file,
             tqdm(
                 desc=os.path.basename(output_path),
                 total=total_size,
@@ -201,12 +210,27 @@ def download_with_progress(
         ):
             for data in response.iter_content(block_size):
                 size = file.write(data)
+                bytes_written += size
                 bar.update(size)
+
+        if (
+            total_size > 0
+            and not response.headers.get("content-encoding")
+            and bytes_written < total_size
+        ):
+            raise IOError(
+                f"Incomplete download: received {bytes_written} of "
+                f"{total_size} bytes from {url}."
+            )
+
         os.replace(temp_path, output_path)
     except BaseException:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        if temp_path is not None:
+            with contextlib.suppress(OSError):
+                os.remove(temp_path)
         raise
+    finally:
+        response.close()
 
 
 def preview_raster(data: Any, title: str = None) -> None:

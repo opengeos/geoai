@@ -63,14 +63,14 @@ class TestDownloadWithProgressAtomic(unittest.TestCase):
     def test_failed_download_leaves_no_file(self):
         from geoai.download import download_with_progress
 
+        response = self._failing_response()
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "img.tif")
-            with patch(
-                "geoai.download.requests.get", return_value=self._failing_response()
-            ):
+            with patch("geoai.download.requests.get", return_value=response):
                 with self.assertRaises(ConnectionError):
                     download_with_progress("https://example.com/img.tif", out)
             self.assertEqual(os.listdir(tmp), [])
+            response.close.assert_called_once()
 
     def test_successful_download_writes_final_file(self):
         from geoai.download import download_with_progress
@@ -85,6 +85,38 @@ class TestDownloadWithProgressAtomic(unittest.TestCase):
             self.assertEqual(os.listdir(tmp), ["img.tif"])
             with open(out, "rb") as f:
                 self.assertEqual(f.read(), b"abcdef")
+            response.close.assert_called_once()
+
+    def test_truncated_download_without_exception_raises_and_cleans_up(self):
+        from geoai.download import download_with_progress
+
+        response = MagicMock()
+        response.headers = {"content-length": "10"}
+        response.iter_content.return_value = [b"abc"]
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "img.tif")
+            with patch("geoai.download.requests.get", return_value=response):
+                with self.assertRaises(OSError):
+                    download_with_progress("https://example.com/img.tif", out)
+            self.assertEqual(os.listdir(tmp), [])
+            response.close.assert_called_once()
+
+    def test_existing_part_file_is_not_clobbered(self):
+        from geoai.download import download_with_progress
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "img.tif")
+            existing_part = out + ".part"
+            with open(existing_part, "wb") as f:
+                f.write(b"keep-me")
+            with patch(
+                "geoai.download.requests.get", return_value=self._failing_response()
+            ):
+                with self.assertRaises(ConnectionError):
+                    download_with_progress("https://example.com/img.tif", out)
+            self.assertEqual(os.listdir(tmp), ["img.tif.part"])
+            with open(existing_part, "rb") as f:
+                self.assertEqual(f.read(), b"keep-me")
 
 
 if __name__ == "__main__":
