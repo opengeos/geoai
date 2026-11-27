@@ -182,3 +182,17 @@ def test_export_tiles_without_geoai_raises(monkeypatch):
 
     with pytest.raises(RuntimeError, match="geoai package is not available"):
         gts.export_geotiff_tiles({"in_raster": "a.tif", "out_folder": "out"})
+
+
+def test_deepforest_loader_uses_the_panels_decision(monkeypatch):
+    """The loader must not re-decide; a changed venv state can't make it disagree."""
+    from geoai.dialogs import deepforest_panel
+
+    monkeypatch.setattr(deepforest_panel, "_use_deepforest_subprocess", lambda: True)
+    worker = deepforest_panel.DeepForestModelLoadWorker(
+        "m", "main", "cpu", use_subprocess=False
+    )
+    assert worker.use_subprocess is False
+
+    default = deepforest_panel.DeepForestModelLoadWorker("m", "main", "cpu")
+    assert default.use_subprocess is True

@@ -309,16 +309,35 @@ class DeepForestModelLoadWorker(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str)
 
-    def __init__(self, model_name: str, revision: str, device: str):
+    def __init__(
+        self,
+        model_name: str,
+        revision: str,
+        device: str,
+        use_subprocess: bool = None,
+    ):
+        """Create the loader.
+
+        Args:
+            model_name: DeepForest model name on Hugging Face.
+            revision: Model revision.
+            device: ``"auto"``, ``"cuda"`` or ``"cpu"``.
+            use_subprocess: Whether to load the model in the venv subprocess.
+                Pass the decision the panel already made so the two cannot
+                disagree; None decides here.
+        """
         super().__init__()
         self.model_name = model_name
         self.revision = revision
         self.device = device
+        if use_subprocess is None:
+            use_subprocess = _use_deepforest_subprocess()
+        self.use_subprocess = use_subprocess
 
     def run(self):
         """Load the DeepForest model in background."""
         try:
-            if _use_deepforest_subprocess():
+            if self.use_subprocess:
                 self.progress.emit("Starting DeepForest subprocess worker...")
                 from ..core.deepforest_subprocess import DeepForestSubprocessClient
 
@@ -1410,7 +1429,9 @@ class DeepForestDockWidget(QDockWidget):
                 QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
 
         # Create and start the model loading worker thread
-        self.model_load_worker = DeepForestModelLoadWorker(model_name, revision, device)
+        self.model_load_worker = DeepForestModelLoadWorker(
+            model_name, revision, device, use_subprocess=use_subprocess
+        )
         self.model_load_worker.finished.connect(self.on_model_loaded)
         self.model_load_worker.error.connect(self.on_model_load_error)
         self.model_load_worker.progress.connect(self.on_model_load_progress)

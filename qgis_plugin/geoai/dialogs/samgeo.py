@@ -2980,7 +2980,9 @@ class SamGeoDockWidget(QDockWidget):
             stride = self.export_stride_spin.value()
 
             # Runs in the venv subprocess when it exists, keeping the geoai
-            # library (and PyTorch) out of the QGIS process.
+            # library (and PyTorch) out of the QGIS process. It blocks until
+            # done without pumping events, so a second export cannot start
+            # while this one is still writing the same tiles.
             from ..core.geoai_task_subprocess import export_geotiff_tiles
 
             self.results_text.append(f"\nExporting tiles in {export_format} format...")
@@ -2996,7 +2998,6 @@ class SamGeoDockWidget(QDockWidget):
                     "metadata_format": export_format,
                     "skip_empty_tiles": True,
                 },
-                progress_callback=lambda _line: QCoreApplication.processEvents(),
             )
 
             self.results_text.append(f"Training data exported to: {output_dir}")

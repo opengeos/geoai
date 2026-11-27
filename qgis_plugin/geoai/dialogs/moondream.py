@@ -734,7 +734,9 @@ class MoondreamDockWidget(QDockWidget):
             tile_size = self.export_tile_size_spin.value()
 
             # Runs in the venv subprocess when it exists, keeping the geoai
-            # library (and PyTorch) out of the QGIS process.
+            # library (and PyTorch) out of the QGIS process. It blocks until
+            # done without pumping events, so a second export cannot start
+            # while this one is still writing the same tiles.
             from ..core.geoai_task_subprocess import export_geotiff_tiles
 
             export_geotiff_tiles(
@@ -747,7 +749,6 @@ class MoondreamDockWidget(QDockWidget):
                     "metadata_format": export_format,
                     "skip_empty_tiles": True,
                 },
-                progress_callback=lambda _line: QApplication.processEvents(),
             )
 
             self.progress_bar.setRange(0, 100)
