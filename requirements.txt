@@ -33,4 +33,4 @@ torch>=2.15.0
 torchgeo
 torchinfo
 tqdm
-transformers>=5.23.0
+transformers>=5.24.1
