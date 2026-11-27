@@ -498,22 +498,16 @@ def region_groups(
             )
 
     label_image = measure.label(array, connectivity=connectivity)
-    props = measure.regionprops_table(
-        label_image, properties=properties, intensity_image=intensity_image, **kwargs
-    )
 
-    df = pd.DataFrame(props)
-
-    # Get the labels of regions with area smaller than the threshold
-    small_regions = df[df["area"] < min_size]["label"].values
-    # Set the corresponding labels in the label_image to zero
-    for region_label in small_regions:
-        label_image[label_image == region_label] = 0
-
-    if max_size is not None:
-        large_regions = df[df["area"] > max_size]["label"].values
-        for region_label in large_regions:
-            label_image[label_image == region_label] = 0
+    # Filter regions by size using a vectorized boolean lookup table
+    unique_labels, counts = np.unique(label_image, return_counts=True)
+    if unique_labels.size > 0:
+        keep_lut = np.zeros(int(unique_labels.max()) + 1, dtype=bool)
+        keep_mask = (unique_labels != 0) & (counts >= min_size)
+        if max_size is not None:
+            keep_mask &= counts <= max_size
+        keep_lut[unique_labels[keep_mask]] = True
+        label_image = np.where(keep_lut[label_image], label_image, 0)
 
     # Find the background (holes) which are zeros
     holes = label_image == 0
@@ -562,7 +556,11 @@ def region_groups(
     )
 
     df = pd.DataFrame(props)
-    df["elongation"] = df["axis_major_length"] / df["axis_minor_length"]
+    if "axis_major_length" in df.columns and "axis_minor_length" in df.columns:
+        minor = df["axis_minor_length"].to_numpy(dtype=float)
+        major = df["axis_major_length"].to_numpy(dtype=float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            df["elongation"] = np.where(minor > 0, major / minor, np.nan)
 
     dtype = "uint8"
     if num_labels > 255 and num_labels <= 65535:
@@ -576,6 +574,7 @@ def region_groups(
     if isinstance(image, np.ndarray):
         return label_image, df
     else:
+        da = da.copy()
         da.values = label_image
         if out_image is not None:
             da.rio.to_raster(out_image, dtype=dtype)
@@ -592,7 +591,7 @@ def region_groups(
                         tmp_raster,
                         tmp_vector,
                         attribute_name="value",
-                        unique_attribute_value=True,
+                        unique_attribute_value=False,
                     )
                 else:
                     tmp_vector = temp_file_path(".gpkg")
@@ -600,7 +599,7 @@ def region_groups(
                         out_image,
                         tmp_vector,
                         attribute_name="value",
-                        unique_attribute_value=True,
+                        unique_attribute_value=False,
                     )
                 gdf = gpd.read_file(tmp_vector)
                 gdf["label"] = gdf["value"].astype(int)

@@ -15,6 +15,7 @@ Key Features:
 Date: November 2025
 """
 
+import contextlib
 import logging
 import os
 import warnings
@@ -156,8 +157,9 @@ def export_landcover_tiles(
         "output_dirs": {"images": str(images_dir), "labels": str(labels_dir)},
     }
 
-    # Open raster
-    with rasterio.open(in_raster) as src:
+    # Open raster (and optional raster class mask) with ExitStack for reliable cleanup
+    with contextlib.ExitStack() as stack:
+        src = stack.enter_context(rasterio.open(in_raster))
         height, width = src.shape
 
         # Detect if in_class_data is raster or vector
@@ -180,7 +182,7 @@ def export_landcover_tiles(
                 ]:
                     try:
                         # Try to open as raster
-                        class_src = rasterio.open(in_class_data)
+                        class_src = stack.enter_context(rasterio.open(in_class_data))
                         is_class_data_raster = True
 
                         # Verify CRS match
@@ -226,8 +228,8 @@ def export_landcover_tiles(
                         dtype=np.uint8,
                     )
             else:
-                # Assume GeoDataFrame passed directly
-                gdf = in_class_data
+                # Copy GeoDataFrame so buffering/reprojection never mutates caller input
+                gdf = in_class_data.copy()
 
                 # Reproject if needed
                 if gdf.crs != src.crs:
@@ -315,8 +317,8 @@ def export_landcover_tiles(
                 stats["tiles_skipped_empty"] += 1
                 continue
 
-            # Apply min_feature_ratio filtering if enabled
-            if skip_empty_tiles and has_features and min_feature_ratio is not False:
+            # Apply min_feature_ratio filtering independently of skip_empty_tiles
+            if mask_tile is not None and min_feature_ratio is not False:
                 # Calculate ratio of non-background pixels
                 total_pixels = mask_tile.size
                 feature_pixels = np.sum(mask_tile > 0)
@@ -373,10 +375,6 @@ def export_landcover_tiles(
                 pbar.set_description(
                     f"Exporting tiles ({stats['tiles_exported']}/{tile_idx + 1})"
                 )
-
-    # Close raster class source if opened
-    if class_src is not None:
-        class_src.close()
 
     # Print summary
     if not quiet:
@@ -482,11 +480,10 @@ def _compute_distances(
     idx_sub = np.argsort(np.abs(b1 - max_sub))
     sub_candidates = b1[idx_sub[:p_n]]
 
-    safe_indices = id_indices[
-        id_indices < min(len(sub_candidates), len(ref_candidates))
-    ]
+    min_len = min(len(sub_candidates), len(ref_candidates))
+    safe_indices = id_indices[id_indices < min_len]
     if len(safe_indices) == 0:
-        return sub_candidates, ref_candidates
+        return sub_candidates[:min_len], ref_candidates[:min_len]
     return sub_candidates[safe_indices], ref_candidates[safe_indices]
 
 
@@ -494,8 +491,10 @@ def _compute_sample(
     p_n: int,
     a1: np.ndarray,
     b1: np.ndarray,
-    id_indices: np.ndarray,
+    id_indices: Optional[np.ndarray],
     num_sampling_rounds: int = 3,
+    rng: Optional[np.random.Generator] = None,
+    subsample_ratio: float = 0.1,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Multiple rounds of distance-based sampling, concatenated (non-zero only).
 
@@ -503,15 +502,28 @@ def _compute_sample(
         p_n: Number of samples per round.
         a1: Non-zero reference pixel values (1-D).
         b1: Non-zero subject pixel values (1-D).
-        id_indices: Random subsample indices.
+        id_indices: Random subsample indices (used when *rng* is None).
         num_sampling_rounds: Number of sampling rounds.
+        rng: Optional numpy Generator used to draw fresh indices each round.
+        subsample_ratio: Fraction of candidates retained when drawing via *rng*.
 
     Returns:
         Tuple of (sub_combined, ref_combined).
     """
-    pairs = [
-        _compute_distances(p_n, a1, b1, id_indices) for _ in range(num_sampling_rounds)
-    ]
+    sample_size = (
+        len(id_indices)
+        if (id_indices is not None and np.ndim(id_indices) == 1)
+        else max(1, round(subsample_ratio * p_n))
+    )
+    pairs = []
+    for round_idx in range(num_sampling_rounds):
+        if rng is not None:
+            round_indices = rng.integers(0, p_n, size=sample_size)
+        elif id_indices is not None and np.ndim(id_indices) == 2:
+            round_indices = id_indices[round_idx]
+        else:
+            round_indices = id_indices
+        pairs.append(_compute_distances(p_n, a1, b1, round_indices))
     sub_combined = np.concatenate([s[s != 0] for s, _ in pairs])
     ref_combined = np.concatenate([r[r != 0] for _, r in pairs])
     return sub_combined, ref_combined
@@ -521,8 +533,10 @@ def _sample_selection(
     p_n: int,
     a: np.ndarray,
     b: np.ndarray,
-    id_indices: np.ndarray,
+    id_indices: Optional[np.ndarray],
     num_sampling_rounds: int = 3,
+    rng: Optional[np.random.Generator] = None,
+    subsample_ratio: float = 0.1,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Select representative sample pairs from a single quantization level.
 
@@ -530,8 +544,10 @@ def _sample_selection(
         p_n: Number of sample points.
         a: Flattened reference pixels (masked by quantization level; 0 = outside).
         b: Flattened subject pixels (masked by quantization level; 0 = outside).
-        id_indices: Random sub-sampling indices.
+        id_indices: Random sub-sampling indices (used when *rng* is None).
         num_sampling_rounds: Number of sampling rounds.
+        rng: Optional numpy Generator used to draw fresh indices each round.
+        subsample_ratio: Fraction of candidates retained when drawing via *rng*.
 
     Returns:
         Tuple of (sub_samples, ref_samples), each 1-D.
@@ -546,7 +562,15 @@ def _sample_selection(
         min_len = min(len(a1), len(b1))
         return b1[:min_len], a1[:min_len]
 
-    sub_1, ref_1 = _compute_sample(p_n, a1, b1, id_indices, num_sampling_rounds)
+    sub_1, ref_1 = _compute_sample(
+        p_n,
+        a1,
+        b1,
+        id_indices,
+        num_sampling_rounds,
+        rng=rng,
+        subsample_ratio=subsample_ratio,
+    )
 
     sub = np.concatenate([sub_1[sub_1 != 0], sub_1[sub_1 == 0]])
     ref = np.concatenate([ref_1[ref_1 != 0], ref_1[ref_1 == 0]])
@@ -634,8 +658,6 @@ def _lirrn(
 
     num_bands = sub_img.shape[2]
 
-    id_indices = rng.integers(0, p_n, size=max(1, round(subsample_ratio * p_n)))
-
     norm_img = np.zeros_like(sub_img, dtype=np.float64)
     rmse = np.zeros(num_bands)
     r_adj = np.zeros(num_bands)
@@ -663,7 +685,15 @@ def _lirrn(
         for level in range(1, num_quantisation_classes + 1):
             a = np.where(ref_labels[:, :, j] == level, ref_img[:, :, j], 0).ravel()
             b = np.where(sub_labels[:, :, j] == level, sub_img[:, :, j], 0).ravel()
-            sub_s, ref_s = _sample_selection(p_n, a, b, id_indices, num_sampling_rounds)
+            sub_s, ref_s = _sample_selection(
+                p_n,
+                a,
+                b,
+                None,
+                num_sampling_rounds,
+                rng=rng,
+                subsample_ratio=subsample_ratio,
+            )
             sub_list.append(sub_s)
             ref_list.append(ref_s)
 

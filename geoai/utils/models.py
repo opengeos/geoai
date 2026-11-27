@@ -2,6 +2,7 @@
 
 import logging
 import os
+import pickle
 from collections import OrderedDict
 from typing import Any, Dict, Optional
 
@@ -30,9 +31,30 @@ def inspect_pth_file(pth_path: str) -> None:
     if not os.path.exists(pth_path):
         raise FileNotFoundError(f"Model file not found: {pth_path}")
 
-    # Load the checkpoint
+    # Load the checkpoint safely with weights_only=True first
     try:
-        checkpoint = torch.load(pth_path, map_location=torch.device("cpu"))
+        try:
+            checkpoint = torch.load(
+                pth_path, map_location=torch.device("cpu"), weights_only=True
+            )
+        except TypeError:
+            checkpoint = torch.load(pth_path, map_location=torch.device("cpu"))
+        except (pickle.UnpicklingError, RuntimeError) as e:
+            if isinstance(
+                e, pickle.UnpicklingError
+            ) or "Weights only load failed" in str(e):
+                logger.warning(
+                    "weights_only=True failed for %s (%s); falling back to "
+                    "weights_only=False to inspect legacy checkpoint. Only inspect "
+                    "checkpoints from trusted sources.",
+                    pth_path,
+                    e,
+                )
+                checkpoint = torch.load(
+                    pth_path, map_location=torch.device("cpu"), weights_only=False
+                )
+            else:
+                raise
         logger.info("=" * 50)
         logger.info("Inspecting model file: %s", pth_path)
         logger.info("=" * 50)

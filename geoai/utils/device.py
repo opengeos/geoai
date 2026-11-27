@@ -2,7 +2,10 @@
 
 import logging
 import os
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
+
+if TYPE_CHECKING:
+    import torch
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,7 @@ def install_package(package: Union[str, List[str]]) -> None:
         package (str | list): The package name or a GitHub URL or a list of package names or GitHub URLs.
     """
     import subprocess
+    import sys
 
     if isinstance(package, str):
         packages = [package]
@@ -29,24 +33,31 @@ def install_package(package: Union[str, List[str]]) -> None:
     else:
         raise ValueError("The package argument must be a string or a list of strings.")
 
-    for package in packages:
-        if package.startswith("https"):
-            package = f"git+{package}"
+    for pkg in packages:
+        if not isinstance(pkg, str) or not pkg.strip():
+            raise ValueError("Each package name must be a non-empty string.")
+        pkg = pkg.strip()
+        if pkg.startswith(("http://", "https://")):
+            pkg = f"git+{pkg}"
 
-        # Execute pip install command and show output in real-time
-        command = f"pip install {package}"
-        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+        # Execute pip install using the active interpreter without shell/whitespace splitting
+        cmd = [sys.executable, "-m", "pip", "install", "--", pkg]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        try:
+            if process.stdout is not None:
+                while True:
+                    output = process.stdout.readline()
+                    if output == b"" and process.poll() is not None:
+                        break
+                    if output:
+                        logger.info(output.decode("utf-8", errors="replace").strip())
+            returncode = process.wait()
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
 
-        # Print output in real-time
-        while True:
-            output = process.stdout.readline()
-            if output == b"" and process.poll() is not None:
-                break
-            if output:
-                logger.info(output.decode("utf-8").strip())
-
-        # Wait for process to complete
-        process.wait()
+        if returncode != 0:
+            raise subprocess.CalledProcessError(returncode, cmd)
 
 
 def temp_file_path(ext: str) -> str:
@@ -73,9 +84,16 @@ def temp_file_path(ext: str) -> str:
 def get_device() -> "torch.device":
     """
     Returns the best available device for deep learning in the order:
-    CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU
+    CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU.
+
+    If the ``GEOAI_DEVICE`` environment variable is set, returns that device
+    directly (for example, ``"cpu"``, ``"cuda"``, or ``"mps"``).
     """
     import torch
+
+    env_device = os.environ.get("GEOAI_DEVICE", "").strip()
+    if env_device:
+        return torch.device(env_device)
 
     if torch.cuda.is_available():
         return torch.device("cuda")

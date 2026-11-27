@@ -1385,7 +1385,10 @@ def plot_performance_metrics(
     """
     if kwargs is None:
         kwargs = {}
-    history = torch.load(history_path)
+    try:
+        history = torch.load(history_path, map_location="cpu", weights_only=True)
+    except TypeError:
+        history = torch.load(history_path, map_location="cpu")
 
     # Handle different key naming conventions
     train_loss_key = "train_losses" if "train_losses" in history else "train_loss"

@@ -682,16 +682,13 @@ def _load_class_data_raster(
                 f"input raster ({src_crs}). Results may be misaligned."
             )
 
-        sample_data = class_src.read(
-            1,
-            out_shape=(
-                1,
-                min(class_src.height, 1000),
-                min(class_src.width, 1000),
-            ),
-        )
-        unique_classes = np.unique(sample_data)
-        unique_classes = unique_classes[unique_classes > 0]
+        # Scan at full resolution block by block so rare classes are not dropped
+        unique_set = set()
+        for _, window in class_src.block_windows(1):
+            block = class_src.read(1, window=window)
+            vals = np.unique(block)
+            unique_set.update(int(v) for v in vals[vals > 0])
+        unique_classes = np.array(sorted(unique_set), dtype=np.int64)
 
         if not quiet:
             logger.info(
@@ -943,9 +940,9 @@ def _compute_tile_window(x, y, stride_x, stride_y, tile_w, tile_h, src):
     window_y = y * stride_y
 
     if window_x + tile_w > src.width:
-        window_x = src.width - tile_w
+        window_x = max(0, src.width - tile_w)
     if window_y + tile_h > src.height:
-        window_y = src.height - tile_h
+        window_y = max(0, src.height - tile_h)
 
     window = Window(window_x, window_y, tile_w, tile_h)
     window_transform = src.window_transform(window)
@@ -1043,6 +1040,7 @@ def _rasterize_label_from_vector(
     if len(window_features) == 0:
         return label_mask, has_features, window_features, errors
 
+    shapes = []
     for idx, feature in window_features.iterrows():
         if class_value_field in feature:
             class_val = feature[class_value_field]
@@ -1050,22 +1048,33 @@ def _rasterize_label_from_vector(
         else:
             class_id = unclassified_id
 
-        geom = feature.geometry.intersection(window_bounds)
+        try:
+            geom = feature.geometry.intersection(window_bounds)
+        except Exception as e:
+            logger.error(f"Error intersecting feature {idx}: {e}")
+            errors += 1
+            continue
+
         if not geom.is_empty:
-            try:
-                feature_mask = features.rasterize(
-                    [(geom, class_id)],
-                    out_shape=(tile_size, tile_size),
-                    transform=window_transform,
-                    fill=0,
-                    all_touched=all_touched,
-                )
-                label_mask = np.maximum(label_mask, feature_mask)
-                if np.any(feature_mask):
-                    has_features = True
-            except Exception as e:
-                logger.error(f"Error rasterizing feature {idx}: {e}")
-                errors += 1
+            shapes.append((geom, int(class_id)))
+
+    if shapes:
+        # Sort ascending by class_id so higher class IDs overwrite lower ones
+        # in a single rasterize call (matching np.maximum precedence).
+        shapes.sort(key=lambda item: item[1])
+        try:
+            label_mask = features.rasterize(
+                shapes,
+                out_shape=(tile_size, tile_size),
+                transform=window_transform,
+                fill=0,
+                all_touched=all_touched,
+                dtype=np.uint8,
+            )
+            has_features = bool(np.any(label_mask > 0))
+        except Exception as e:
+            logger.error(f"Error rasterizing features: {e}")
+            errors += 1
 
     return label_mask, has_features, window_features, errors
 
@@ -1603,9 +1612,17 @@ def export_geotiff_tiles(
             logger.info(f"  Bands: {src.count}")
             logger.info(f"  Bounds: {src.bounds}")
 
-        # Calculate number of tiles
-        num_tiles_x = math.ceil((src.width - tile_size) / stride) + 1
-        num_tiles_y = math.ceil((src.height - tile_size) / stride) + 1
+        # Calculate number of tiles (always >= 1 even when raster is smaller than tile_size)
+        num_tiles_x = (
+            1
+            if src.width <= tile_size
+            else math.ceil((src.width - tile_size) / stride) + 1
+        )
+        num_tiles_y = (
+            1
+            if src.height <= tile_size
+            else math.ceil((src.height - tile_size) / stride) + 1
+        )
         total_tiles = num_tiles_x * num_tiles_y
 
         if max_tiles is None:
@@ -1673,9 +1690,9 @@ def export_geotiff_tiles(
                     window_x = x * stride
                     window_y = y * stride
                     if window_x + tile_size > src.width:
-                        window_x = src.width - tile_size
+                        window_x = max(0, src.width - tile_size)
                     if window_y + tile_size > src.height:
-                        window_y = src.height - tile_size
+                        window_y = max(0, src.height - tile_size)
                     stats["tile_coordinates"].append(
                         {
                             "index": tile_index,
@@ -1703,8 +1720,12 @@ def export_geotiff_tiles(
                             tile_size,
                             class_to_id,
                         )
-                        if has_features:
-                            stats["feature_pixels"] += np.count_nonzero(label_mask)
+                        if (
+                            has_features
+                            and create_overview
+                            and tile_index < len(stats["tile_coordinates"])
+                        ):
+                            stats["tile_coordinates"][tile_index]["has_features"] = True
                     except Exception as e:
                         pbar.write(f"Error reading class raster window: {e}")
                         stats["errors"] += 1
@@ -1735,8 +1756,8 @@ def export_geotiff_tiles(
                     tile_index += 1
                     continue
 
-                # Read image data
-                image_data = src.read(window=window)
+                # Read image data (boundless=True pads when raster is smaller than tile_size)
+                image_data = src.read(window=window, boundless=True)
 
                 # Helper function to save a single tile (original or augmented)
                 def save_tile(
@@ -2353,8 +2374,9 @@ def export_geotiff_tiles_batch(
         logger.info(f"Output folder: {output_folder}")
         logger.info("-" * 60)
 
-    # Global tile counter for unique naming
+    # Global counters for unique tile naming and COCO annotation IDs
     global_tile_counter = 0
+    global_coco_ann_id = 0
 
     # Process each image-mask pair
     for idx, (image_file, mask_file, mask_gdf) in enumerate(
@@ -2410,10 +2432,13 @@ def export_geotiff_tiles_batch(
                     and metadata_format in ["PASCAL_VOC", "COCO"]
                     else None
                 ),
+                coco_ann_id_start=global_coco_ann_id,
             )
 
             # Update counters
             global_tile_counter += tiles_generated["total_tiles"]
+            if "next_coco_ann_id" in tiles_generated:
+                global_coco_ann_id = tiles_generated["next_coco_ann_id"]
 
             # Update batch statistics
             batch_stats["processed_pairs"] += 1
@@ -2554,6 +2579,7 @@ def _process_image_mask_pair(
     ann_dir=None,
     class_to_id=None,
     unclassified_id=1,
+    coco_ann_id_start=0,
 ):
     """
     Process a single image-mask pair and save tiles directly to output directories.
@@ -2565,6 +2591,8 @@ def _process_image_mask_pair(
             When provided it is used as-is so that class IDs stay consistent across
             all pairs. When None, the mapping is derived from this pair's mask only.
         unclassified_id (int): Class ID for vector features with no usable class value.
+        coco_ann_id_start (int): Starting annotation ID for COCO annotations so IDs
+            stay globally unique across all image pairs in a batch.
 
     Returns:
         dict: Statistics for this image-mask pair
@@ -2584,15 +2612,23 @@ def _process_image_mask_pair(
     # Initialize COCO/YOLO tracking for this image
     if metadata_format == "COCO":
         stats["coco_data"] = {"images": [], "annotations": [], "categories": []}
-        coco_ann_id = 0
+        coco_ann_id = coco_ann_id_start
     if metadata_format == "YOLO":
         stats["yolo_classes"] = set()
 
     # Open the input raster
     with rasterio.open(image_file) as src:
-        # Calculate number of tiles
-        num_tiles_x = math.ceil((src.width - tile_size) / stride) + 1
-        num_tiles_y = math.ceil((src.height - tile_size) / stride) + 1
+        # Calculate number of tiles (always >= 1 even when raster is smaller than tile_size)
+        num_tiles_x = (
+            1
+            if src.width <= tile_size
+            else math.ceil((src.width - tile_size) / stride) + 1
+        )
+        num_tiles_y = (
+            1
+            if src.height <= tile_size
+            else math.ceil((src.height - tile_size) / stride) + 1
+        )
         total_tiles = num_tiles_x * num_tiles_y
 
         if max_tiles is None:
@@ -2733,8 +2769,8 @@ def _process_image_mask_pair(
                 # Generate unique tile name
                 tile_name = f"{base_name}_{global_tile_counter + tile_index:06d}"
 
-                # Read image data
-                image_data = src.read(window=window)
+                # Read image data (boundless=True pads when raster is smaller than tile_size)
+                image_data = src.read(window=window, boundless=True)
 
                 # Export image as GeoTIFF
                 image_path = os.path.join(output_images_dir, f"{tile_name}.tif")
@@ -2791,9 +2827,7 @@ def _process_image_mask_pair(
                     and metadata_format == "PASCAL_VOC"
                     and ann_dir
                 ):
-                    # Create PASCAL VOC XML annotation
-                    from lxml import etree as ET
-
+                    # Create PASCAL VOC XML annotation using stdlib ElementTree
                     annotation = ET.Element("annotation")
                     ET.SubElement(annotation, "folder").text = os.path.basename(
                         output_images_dir
@@ -2850,7 +2884,8 @@ def _process_image_mask_pair(
                     # Save XML file
                     xml_path = os.path.join(ann_dir, f"{tile_name}.xml")
                     tree = ET.ElementTree(annotation)
-                    tree.write(xml_path, pretty_print=True, encoding="utf-8")
+                    ET.indent(tree, space="  ")
+                    tree.write(xml_path, encoding="utf-8")
 
                 elif mask_file is not None and metadata_format == "COCO":
                     # Add COCO image entry
@@ -2987,6 +3022,9 @@ def _process_image_mask_pair(
             if tile_index >= max_tiles:
                 break
 
+    if metadata_format == "COCO":
+        stats["next_coco_ann_id"] = coco_ann_id
+
     return stats
 
 
@@ -3086,9 +3124,17 @@ def export_training_data(
         if stride_y is None:
             stride_y = tile_size_y
 
-        # Calculate number of tiles in x and y directions
-        num_tiles_x = math.ceil((src.width - tile_size_x) / stride_x) + 1
-        num_tiles_y = math.ceil((src.height - tile_size_y) / stride_y) + 1
+        # Calculate number of tiles in x and y directions (always >= 1)
+        num_tiles_x = (
+            1
+            if src.width <= tile_size_x
+            else math.ceil((src.width - tile_size_x) / stride_x) + 1
+        )
+        num_tiles_y = (
+            1
+            if src.height <= tile_size_y
+            else math.ceil((src.height - tile_size_y) / stride_y) + 1
+        )
         total_tiles = num_tiles_x * num_tiles_y
 
         # Read class data
@@ -3142,7 +3188,7 @@ def export_training_data(
                 )
                 logger.warning(f"Raster bounds: {src.bounds}")
                 logger.warning(f"Vector bounds: {gdf.total_bounds}")
-        else:
+        elif vector_bounds.area > 0:
             overlap = (
                 raster_bounds.intersection(vector_bounds).area / vector_bounds.area
             )
@@ -3220,9 +3266,9 @@ def export_training_data(
 
                 # Adjust for edge cases
                 if window_x + tile_size_x > src.width:
-                    window_x = src.width - tile_size_x
+                    window_x = max(0, src.width - tile_size_x)
                 if window_y + tile_size_y > src.height:
-                    window_y = src.height - tile_size_y
+                    window_y = max(0, src.height - tile_size_y)
 
                 # Adjust window based on crop_mode
                 if crop_mode == "CENTERED_ON_FEATURE" and len(gdf) > 0:
@@ -3237,7 +3283,7 @@ def export_training_data(
                     # Find nearest feature
                     distances = gdf.geometry.distance(center_point)
                     nearest_idx = distances.idxmin()
-                    nearest_feature = gdf.iloc[nearest_idx]
+                    nearest_feature = gdf.loc[nearest_idx]
 
                     # Get centroid of nearest feature
                     feature_centroid = nearest_feature.geometry.centroid
@@ -3249,10 +3295,18 @@ def export_training_data(
 
                     # Adjust window to center on feature
                     window_x = max(
-                        0, min(src.width - tile_size_x, feature_col - tile_size_x // 2)
+                        0,
+                        min(
+                            max(0, src.width - tile_size_x),
+                            feature_col - tile_size_x // 2,
+                        ),
                     )
                     window_y = max(
-                        0, min(src.height - tile_size_y, feature_row - tile_size_y // 2)
+                        0,
+                        min(
+                            max(0, src.height - tile_size_y),
+                            feature_row - tile_size_y // 2,
+                        ),
                     )
 
                 # Define window
@@ -3321,10 +3375,11 @@ def export_training_data(
                         pbar.update(1)  # Still update progress bar
                         continue
 
-                # Read image data - keep original for GeoTIFF export
-                orig_image_data = src.read(window=window)
+                # Read image data (boundless=True pads when raster is smaller than tile size)
+                orig_image_data = src.read(window=window, boundless=True)
+                geotiff_data = orig_image_data.copy()
 
-                # Create a copy for processing
+                # Create a normalized copy for regular image formats
                 image_data = orig_image_data.copy().astype(np.float32)
 
                 # Normalize image data for processing
@@ -3337,27 +3392,39 @@ def export_training_data(
 
                 # Read secondary image data if provided
                 if src2:
-                    image_data2 = src2.read(window=window)
+                    image_data2 = src2.read(window=window, boundless=True)
+                    common_dtype = np.result_type(geotiff_data.dtype, image_data2.dtype)
+                    geotiff_data = np.vstack(
+                        (
+                            geotiff_data.astype(common_dtype, copy=False),
+                            image_data2.astype(common_dtype, copy=False),
+                        )
+                    )
+                    image_data2_norm = image_data2.astype(np.float32)
+                    for band in range(image_data2_norm.shape[0]):
+                        bmin, bmax = np.percentile(image_data2_norm[band], (1, 99))
+                        if bmax > bmin:
+                            image_data2_norm[band] = np.clip(
+                                (image_data2_norm[band] - bmin) / (bmax - bmin), 0, 1
+                            )
                     # Stack the two images
-                    image_data = np.vstack((image_data, image_data2))
+                    image_data = np.vstack((image_data, image_data2_norm))
 
                 # Apply blacken_around_feature if needed
                 if blacken_around_feature and len(window_features) > 0:
-                    mask = np.zeros((tile_size_y, tile_size_x), dtype=bool)
-                    for _, feature in window_features.iterrows():
-                        # Project feature to pixel coordinates
-                        feature_pixels = features.rasterize(
-                            [(feature.geometry, 1)],
-                            out_shape=(tile_size_y, tile_size_x),
-                            transform=window_transform,
-                        )
-                        mask = np.logical_or(mask, feature_pixels.astype(bool))
+                    mask = features.rasterize(
+                        [
+                            (feature.geometry, 1)
+                            for _, feature in window_features.iterrows()
+                        ],
+                        out_shape=(tile_size_y, tile_size_x),
+                        transform=window_transform,
+                        fill=0,
+                    ).astype(bool)
 
-                    # Apply mask to image
-                    for band in range(image_data.shape[0]):
-                        temp = image_data[band, :, :]
-                        temp[~mask] = 0
-                        image_data[band, :, :] = temp
+                    # Apply mask to both processed and GeoTIFF image arrays
+                    image_data[:, ~mask] = 0
+                    geotiff_data[:, ~mask] = 0
 
                 # Apply rotation if specified
                 if augmentation:
@@ -3370,6 +3437,21 @@ def export_training_data(
                     image_data = (
                         augmented["image"].squeeze(0).numpy()
                     )  # Remove batch dimension
+
+                    geotiff_dtype = geotiff_data.dtype
+                    geo_tensor = torch.from_numpy(
+                        geotiff_data.astype(np.float32)
+                    ).unsqueeze(0)
+                    geo_aug = (
+                        augmentation({"image": geo_tensor})["image"].squeeze(0).numpy()
+                    )
+                    if np.issubdtype(geotiff_dtype, np.integer):
+                        info = np.iinfo(geotiff_dtype)
+                        geotiff_data = np.clip(
+                            np.rint(geo_aug), info.min, info.max
+                        ).astype(geotiff_dtype)
+                    else:
+                        geotiff_data = geo_aug.astype(geotiff_dtype)
 
                 # Create a processed version for regular image formats
                 processed_image = (image_data * 255).astype(np.uint8)
@@ -3423,21 +3505,22 @@ def export_training_data(
                     image_filename = f"tile_{chip_index:06d}.tif"
                     image_path = os.path.join(image_dir, image_filename)
 
-                    # Create profile for the GeoTIFF
+                    # Create profile for the GeoTIFF (updating count/dtype if transformed)
                     profile = src.profile.copy()
                     profile.update(
                         {
                             "height": tile_size_y,
                             "width": tile_size_x,
-                            "count": orig_image_data.shape[0],
+                            "count": geotiff_data.shape[0],
+                            "dtype": geotiff_data.dtype,
                             "transform": window_transform,
                         }
                     )
 
-                    # Save the GeoTIFF with original data
+                    # Save the GeoTIFF with transformed image data
                     try:
                         with rasterio.open(image_path, "w", **profile) as dst:
-                            dst.write(orig_image_data)
+                            dst.write(geotiff_data)
                         stats["total_tiles"] += 1
                     except Exception as e:
                         if not quiet:
