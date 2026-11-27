@@ -135,7 +135,8 @@ class ProcessingMonitor:
 
     def add_listener(self, listener: Callable[[], None]) -> None:
         """Register a callback invoked after monitor state changes."""
-        self._listeners.append(listener)
+        if listener not in self._listeners:
+            self._listeners.append(listener)
 
     def remove_listener(self, listener: Callable[[], None]) -> None:
         """Remove a previously registered state-change callback."""

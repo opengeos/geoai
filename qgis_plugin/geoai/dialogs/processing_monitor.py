@@ -175,13 +175,16 @@ class ProcessingMonitorDockWidget(QDockWidget):
 
     def closeEvent(self, event):
         self._timer.stop()
+        self._monitor.remove_listener(self.refresh)
         super().closeEvent(event)
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._monitor.add_listener(self.refresh)
         self.refresh()
         self._timer.start()
 
     def hideEvent(self, event):
         self._timer.stop()
+        self._monitor.remove_listener(self.refresh)
         super().hideEvent(event)

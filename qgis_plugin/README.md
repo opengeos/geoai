@@ -128,7 +128,10 @@ remains a separate manual action and should not be used while an inference task
 is actively using the GPU. There is no dedicated user-facing cancel control.
 Closing the Semantic Segmentation panel terminates running workers according to
 the panel shutdown lifecycle and can mark their associated monitor tasks as
-`CANCELLED`. Other task types are not claimed to support cancellation.
+`CANCELLED`. Note that forcefully terminating the worker thread does not
+guarantee subprocess cleanup, so an already-started subprocess may continue
+using GPU resources or writing output until it exits. Other task types are not
+claimed to support cancellation.
 
 ## Installation
 
