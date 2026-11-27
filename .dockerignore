@@ -1,11 +1,11 @@
-# Exclude everything under docs
-docs/*
+# Exclude documentation, paper, and non-library subprojects
+docs/
+paper/
+qgis_plugin/
+agent-harness/
+geoai-mcp-server/
 
-# But keep these two directories
-!docs/notebooks
-!docs/maplibre
-
-# Optionally exclude other common files
+# Exclude git, caches, secrets, tests, and build artifacts
 .git
 __pycache__/
 *.pyc
@@ -13,6 +13,7 @@ __pycache__/
 *.pyd
 *.ipynb_checkpoints
 .env
+.env.*
 .DS_Store
 tests/
 build/

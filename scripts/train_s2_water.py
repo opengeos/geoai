@@ -45,8 +45,16 @@ def download_dataset(data_dir="s2_water_dataset"):
             val_scene/, val_truth/.
     """
     url = "https://huggingface.co/datasets/giswqs/s2-water-dataset/resolve/main/dset-s2.zip"
+    created_dir = not os.path.exists(data_dir)
+    os.makedirs(data_dir, exist_ok=True)
+    zip_path = os.path.join(data_dir, "dset-s2.zip")
     print("Downloading Earth Surface Water Dataset...")
-    raw_path = geoai.download_file(url)
+    try:
+        raw_path = geoai.download_file(url, output_path=zip_path)
+    except BaseException:
+        if created_dir and os.path.isdir(data_dir) and not os.listdir(data_dir):
+            os.rmdir(data_dir)
+        raise
     print(f"Dataset downloaded to: {raw_path}")
 
     # Find the extracted directory containing tra_scene/val_scene
@@ -381,18 +389,19 @@ Binary classification:
 ```
 """
 
-    # Write README to a temp file and upload
-    readme_path = os.path.join(tempfile.gettempdir(), "README.md")
-    with open(readme_path, "w") as f:
-        f.write(readme_content)
+    # Write README to a secure temporary directory and upload
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme_path = os.path.join(tmpdir, "README.md")
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(readme_content)
 
-    api.upload_file(
-        path_or_fileobj=readme_path,
-        path_in_repo="README.md",
-        repo_id=repo_id,
-        repo_type="dataset",
-        commit_message="Add dataset card",
-    )
+        api.upload_file(
+            path_or_fileobj=readme_path,
+            path_in_repo="README.md",
+            repo_id=repo_id,
+            repo_type="dataset",
+            commit_message="Add dataset card",
+        )
 
     # Upload dataset directories
     print("Uploading dataset files (this may take a while)...")
@@ -505,6 +514,8 @@ def main():
     if not os.path.exists(args.data_dir):
         print("Downloading dataset...")
         args.data_dir = download_dataset(args.data_dir)
+    elif os.path.isdir(os.path.join(args.data_dir, "dset-s2")):
+        args.data_dir = os.path.join(args.data_dir, "dset-s2")
 
     # Step 2: Push dataset to HuggingFace Hub
     if args.push_dataset:

@@ -669,16 +669,38 @@ class PTv3Segmentor(nn.Module):
         return self.seg_head(point["feat"])
 
 
+def _load_checkpoint(
+    checkpoint_path: str | Path,
+    map_location: object = "cpu",
+) -> dict:
+    """Load a PyTorch checkpoint with ``weights_only=True`` first.
+
+    Falls back to ``weights_only=False`` when loading legacy checkpoints that
+    include pickled non-tensor objects (such as scheduler or numpy state).
+    """
+    try:
+        return torch.load(checkpoint_path, map_location=map_location, weights_only=True)
+    except Exception as exc:
+        logger.warning(
+            "weights_only=True load failed for %s (%s); falling back to weights_only=False",
+            checkpoint_path,
+            exc,
+        )
+        return torch.load(
+            checkpoint_path, map_location=map_location, weights_only=False
+        )
+
+
 def load_pretrained_backbone(
     model: PTv3Segmentor,
     checkpoint_path: str,
     device: str = "cpu",
 ) -> tuple[list[str], list[str]]:
-    """Load pre-trained *backbone* weights -- the seg-head is skipped.
+    """Load pre-trained *backbone* weights; the seg-head is skipped.
 
     Handles checkpoint key prefixes from both full-model and DDP saves.
     """
-    state = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    state = _load_checkpoint(checkpoint_path, map_location=device)
     if "model_state_dict" in state:
         state = state["model_state_dict"]
 
@@ -999,7 +1021,7 @@ def parse_args() -> argparse.Namespace:
     g.add_argument(
         "--hf_pretrained",
         action="store_true",
-        help="Download pre-trained DALES checkpoint from HuggingFace and resume",
+        help="Download pre-trained DALES checkpoint from HuggingFace and fine-tune",
     )
     g.add_argument(
         "--flash_attn",
@@ -1216,6 +1238,7 @@ def main() -> None:
         logger.info("Seg-head input channels (inferred): %d", out_ch)
 
     # -- auto-download from HuggingFace --------------------------------
+    hf_checkpoint_path: str | None = None
     if args.hf_pretrained and not args.resume and not args.pretrained:
         try:
             from huggingface_hub import hf_hub_download
@@ -1224,15 +1247,25 @@ def main() -> None:
                 logger.info(
                     "Downloading pre-trained checkpoint from %s ...", HF_REPO_ID
                 )
-            args.resume = hf_hub_download(
+            hf_checkpoint_path = hf_hub_download(
                 repo_id=HF_REPO_ID, filename=HF_CHECKPOINT_FILENAME
             )
             if is_main:
-                logger.info("  Downloaded: %s", args.resume)
+                logger.info("  Downloaded: %s", hf_checkpoint_path)
         except ImportError:
             raise SystemExit(
                 "huggingface_hub is required for --hf_pretrained. "
                 "Install with: pip install huggingface_hub"
+            )
+
+    if hf_checkpoint_path is not None and not args.eval_only:
+        ckpt = _load_checkpoint(hf_checkpoint_path, map_location=device)
+        state = ckpt.get("model_state_dict", ckpt)
+        model.load_state_dict(state)
+        if is_main:
+            logger.info(
+                "Loaded HuggingFace pre-trained weights for fine-tuning "
+                "(starting at epoch 1)"
             )
 
     if args.pretrained:
@@ -1281,7 +1314,7 @@ def main() -> None:
     best_epoch = 0
 
     if args.resume:
-        ckpt = torch.load(args.resume, map_location=device, weights_only=False)
+        ckpt = _load_checkpoint(args.resume, map_location=device)
         raw = model.module if isinstance(model, DDP) else model
         raw.load_state_dict(ckpt["model_state_dict"])
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
@@ -1299,20 +1332,28 @@ def main() -> None:
 
     # -- eval-only mode ------------------------------------------------
     if args.eval_only:
-        ckpt_path = args.checkpoint or args.resume
+        ckpt_path = args.checkpoint or args.resume or hf_checkpoint_path
         if ckpt_path is None:
-            raise SystemExit("Provide --checkpoint or --resume for --eval_only")
-        if args.checkpoint:
-            ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
+            raise SystemExit(
+                "Provide --checkpoint, --resume, or --hf_pretrained for --eval_only"
+            )
+        if args.checkpoint or (hf_checkpoint_path and not args.resume):
+            load_path = args.checkpoint or hf_checkpoint_path
+            ckpt = _load_checkpoint(load_path, map_location=device)
             raw = model.module if isinstance(model, DDP) else model
-            raw.load_state_dict(ckpt["model_state_dict"])
+            raw.load_state_dict(ckpt.get("model_state_dict", ckpt))
 
         for split in ("val", "test"):
             if not (data_root / split).exists():
                 continue
             ds = DALESDataset(data_root, split, eval_tf, args.grid_size)
+            eval_ds = (
+                torch.utils.data.Subset(ds, list(range(rank, len(ds), world_size)))
+                if world_size > 1
+                else ds
+            )
             ldr = DataLoader(
-                ds,
+                eval_ds,
                 batch_size=args.batch_size,
                 shuffle=False,
                 collate_fn=point_collate_fn,

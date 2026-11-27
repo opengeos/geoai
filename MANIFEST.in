@@ -5,7 +5,11 @@ include requirements.txt
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 
-prune docs
-prune paper
 prune .github
-
+prune agent-harness
+prune docs
+prune geoai-mcp-server
+prune paper
+prune qgis_plugin
+prune scripts
+prune tests

@@ -1,19 +1,22 @@
-FROM quay.io/jupyter/base-notebook:latest
+FROM quay.io/jupyter/base-notebook:python-3.12
 
 # -------------------------------------------------------
 # 1. Install system-level packages (minimal, just git)
 # -------------------------------------------------------
 USER root
 RUN apt-get update && \
-    apt-get install -y git && \
+    apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------------
-# 2. Install geospatial Python packages via conda (base env)
+# 2. Install binary geospatial dependencies via conda (base env)
 # -------------------------------------------------------
 RUN mamba install -n base -c conda-forge \
-    geoai \
+    gdal \
+    geopandas \
+    rasterio \
     overturemaps -y && \
+    mamba clean --all -f -y && \
     fix-permissions "${CONDA_DIR}"
 
 # -------------------------------------------------------
@@ -29,15 +32,11 @@ ENV LOCALTILESERVER_CLIENT_PREFIX='proxy/{port}'
 COPY . /home/jovyan/geoai
 WORKDIR /home/jovyan/geoai
 
-
 # -------------------------------------------------------
 # 5. Build and install geoai from source
 # -------------------------------------------------------
-# Prevent setuptools_scm issues if .git is missing
-ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_GEOAI=0.0.0
-
 RUN rm -rf /home/jovyan/geoai/geoai.egg-info && \
-    pip install . && \
+    pip install --no-cache-dir . && \
     mkdir -p /home/jovyan/work && \
     fix-permissions /home/jovyan
 
@@ -46,7 +45,6 @@ RUN rm -rf /home/jovyan/geoai/geoai.egg-info && \
 # -------------------------------------------------------
 WORKDIR /home/jovyan
 USER jovyan
-
 
 # -------------------------------------------------------
 # 7. Run the docker container

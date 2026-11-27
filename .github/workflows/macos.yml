@@ -7,15 +7,18 @@ on:
             - main
 
 name: macOS build
+
+permissions:
+    contents: read
+
 jobs:
     test-macOS:
-        runs-on: ${{ matrix.config.os }}
-        name: ${{ matrix.config.os }} (${{ matrix.config.py }})
+        runs-on: macos-latest
+        name: macOS (${{ matrix.python-version }})
         strategy:
             fail-fast: false
             matrix:
-                config:
-                    - { os: macOS-latest, py: "3.12" }
+                python-version: ["3.12", "3.13", "3.14"]
         env:
             SDKROOT: /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
         steps:
@@ -27,11 +30,19 @@ jobs:
                   version: ""
                   enable-cache: false
 
+            - name: Set up Python ${{ matrix.python-version }}
+              run: uv python install ${{ matrix.python-version }}
+
             - name: Install dependencies
               run: |
-                  uv venv --python ${{ matrix.config.py }}
-                  uv pip install .
+                  uv venv --python ${{ matrix.python-version }}
+                  uv pip install . pytest
 
-            - name: Test import
+            - name: Test import and CLI
               run: |
-                  .venv/bin/python -c "import geoai; print('geoai import successful')"
+                  .venv/bin/python -c "import geoai; print('geoai', geoai.__version__)"
+                  .venv/bin/geoai --help
+
+            - name: Run lightweight smoke tests
+              run: |
+                  .venv/bin/python -m pytest tests/test_lazy_import.py tests/test_cli.py -v
