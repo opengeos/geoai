@@ -157,7 +157,7 @@ def validate_output_subdir(subdir: str | Path, config: Optional[Any] = None) -> 
             expected="A relative subdirectory path within the output directory",
         )
 
-    if ".." in subdir_path.parts or ".." in subdir_str:
+    if ".." in subdir_path.parts:
         raise InputValidationError(
             message="Output subdirectory cannot contain '..'",
             parameter_name="output_subdir",

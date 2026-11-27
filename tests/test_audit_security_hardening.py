@@ -40,9 +40,20 @@ class TestFtwZipValidation(unittest.TestCase):
 
             self.assertFalse(os.path.exists(os.path.join(tmp, "_tmp_luxembourg")))
             self.assertFalse(os.path.exists(os.path.join(tmp, "luxembourg")))
-            self.assertFalse(
-                os.path.exists(os.path.join(os.path.dirname(tmp), "outside.txt"))
-            )
+            self.assertFalse(os.path.exists(os.path.join(tmp, "outside.txt")))
+
+    def test_allows_root_dir_entry_in_zip(self):
+        """A harmless './' directory entry in an FTW archive is accepted."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch(
+                "geoai.utils.download.download_file",
+                side_effect=self._mock_download_zip(
+                    [("./", ""), ("luxembourg/chip.txt", "ok")]
+                ),
+            ):
+                download_ftw(countries=["luxembourg"], output_dir=tmp)
+
+            self.assertTrue(os.path.isfile(os.path.join(tmp, "luxembourg", "chip.txt")))
 
     def test_rejects_absolute_member_and_cleans_tmp_dir(self):
         """Zip member with an absolute path raises ValueError and removes temp dir."""

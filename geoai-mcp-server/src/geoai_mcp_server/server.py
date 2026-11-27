@@ -593,7 +593,7 @@ async def classify_land_cover(
         # Perform classification
         result = classify_module.classify_image(
             str(full_input_path),
-            output=str(output_path),
+            output_path=str(output_path),
             model_path=validated_model_path,
             num_classes=num_classes,
         )

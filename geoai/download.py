@@ -188,7 +188,6 @@ def _validate_filename_component(value: str, name: str) -> str:
         or "\x00" in value
         or "/" in value
         or "\\" in value
-        or ".." in value
         or value in (".", "..")
     ):
         raise ValueError(

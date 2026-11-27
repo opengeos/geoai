@@ -136,6 +136,8 @@ def download_ftw(
                 with zipfile.ZipFile(zip_path, "r") as zf:
                     for member in zf.namelist():
                         member_path = os.path.realpath(os.path.join(tmp_dir, member))
+                        if member_path == tmp_real and member.endswith("/"):
+                            continue
                         if not member_path.startswith(tmp_real + os.sep):
                             raise ValueError(
                                 f"Zip member {member!r} would extract outside "
