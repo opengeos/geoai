@@ -30,10 +30,51 @@ try:
     import lightning.pytorch as pl
     from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
     from lightning.pytorch.loggers import CSVLogger
+    from torchmetrics import Metric
 
     LIGHTNING_AVAILABLE = True
 except ImportError:
     LIGHTNING_AVAILABLE = False
+
+
+class _PooledIoU(Metric):
+    """Mean IoU over all pixels seen since the last reset.
+
+    Per-class intersections and unions are summed over batches (and over
+    processes when training is distributed) before the IoU is taken, so the
+    result does not depend on how the data is split into batches. As in
+    ``TimmSegmentationModel._compute_iou``, a class that appears in neither
+    the predictions nor the targets is left out of the mean.
+    """
+
+    full_state_update = False
+
+    def __init__(self, num_classes: int):
+        super().__init__()
+        self.num_classes = num_classes
+        self.add_state(
+            "intersection",
+            default=torch.zeros(num_classes, dtype=torch.long),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "union",
+            default=torch.zeros(num_classes, dtype=torch.long),
+            dist_reduce_fx="sum",
+        )
+
+    def update(self, pred: torch.Tensor, target: torch.Tensor) -> None:
+        for cls in range(self.num_classes):
+            pred_cls = pred == cls
+            target_cls = target == cls
+            self.intersection[cls] += (pred_cls & target_cls).sum()
+            self.union[cls] += (pred_cls | target_cls).sum()
+
+    def compute(self) -> torch.Tensor:
+        present = self.union > 0
+        if not present.any():
+            return torch.tensor(0.0, device=self.union.device)
+        return (self.intersection[present].float() / self.union[present].float()).mean()
 
 
 class TimmSegmentationModel(pl.LightningModule):
@@ -161,6 +202,11 @@ class TimmSegmentationModel(pl.LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
 
+        # IoU metrics pool intersections and unions over the whole epoch.
+        self.train_iou = _PooledIoU(num_classes)
+        self.val_iou = _PooledIoU(num_classes)
+        self.test_iou = _PooledIoU(num_classes)
+
     def _freeze_encoder(self):
         """Freeze encoder weights."""
         if hasattr(self.model, "encoder"):
@@ -179,12 +225,14 @@ class TimmSegmentationModel(pl.LightningModule):
         logits = self(x)
         loss = self.loss_fn(logits, y)
 
-        # Calculate IoU
+        # Step value: IoU of this batch. Epoch value: IoU over the epoch.
         pred = torch.argmax(logits, dim=1)
-        iou = self._compute_iou(pred, y)
+        self.train_iou(pred, y)
 
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train_iou", iou, on_step=True, on_epoch=True, prog_bar=True)
+        self.log(
+            "train_iou", self.train_iou, on_step=True, on_epoch=True, prog_bar=True
+        )
 
         return loss
 
@@ -193,12 +241,12 @@ class TimmSegmentationModel(pl.LightningModule):
         logits = self(x)
         loss = self.loss_fn(logits, y)
 
-        # Calculate IoU
+        # IoU over the whole validation set, not a mean of per-batch IoUs
         pred = torch.argmax(logits, dim=1)
-        iou = self._compute_iou(pred, y)
+        self.val_iou.update(pred, y)
 
         self.log("val_loss", loss, on_epoch=True, prog_bar=True)
-        self.log("val_iou", iou, on_epoch=True, prog_bar=True)
+        self.log("val_iou", self.val_iou, on_epoch=True, prog_bar=True)
 
         return loss
 
@@ -207,17 +255,17 @@ class TimmSegmentationModel(pl.LightningModule):
         logits = self(x)
         loss = self.loss_fn(logits, y)
 
-        # Calculate IoU
+        # IoU over the whole test set, not a mean of per-batch IoUs
         pred = torch.argmax(logits, dim=1)
-        iou = self._compute_iou(pred, y)
+        self.test_iou.update(pred, y)
 
         self.log("test_loss", loss, on_epoch=True)
-        self.log("test_iou", iou, on_epoch=True)
+        self.log("test_iou", self.test_iou, on_epoch=True)
 
         return loss
 
     def _compute_iou(self, pred, target, smooth=1e-6):
-        """Compute mean IoU across all classes."""
+        """Compute mean IoU across all classes for a single batch."""
         num_classes = self.hparams.num_classes
         ious = []
 
