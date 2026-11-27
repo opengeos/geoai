@@ -3,7 +3,10 @@
 import logging
 import math
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+
+if TYPE_CHECKING:
+    import pyproj
 
 logger = logging.getLogger(__name__)
 
@@ -464,7 +467,7 @@ def region_groups(
             "axis_major_length",
             "axis_minor_length",
             "eccentricity",
-            "diameter_areagth",
+            "equivalent_diameter_area",
             "extent",
             "orientation",
             "perimeter",
