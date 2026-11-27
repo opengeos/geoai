@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import os
 from enum import Enum
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -56,7 +56,13 @@ class BlendMode(str, Enum):
     SPLINE = "spline"
 
 
-def _spline_window_1d(window_size: int, overlap: int, power: int = 2) -> np.ndarray:
+def _spline_window_1d(
+    window_size: int,
+    overlap: int,
+    power: int = 2,
+    taper_start: bool = True,
+    taper_end: bool = True,
+) -> np.ndarray:
     """Create a 1D spline window that tapers only in the overlap zones.
 
     The window is 1.0 in the non-overlapping centre and smoothly tapers
@@ -67,6 +73,8 @@ def _spline_window_1d(window_size: int, overlap: int, power: int = 2) -> np.ndar
         overlap: Number of pixels in the overlap zone at each edge.
         power: Exponent applied to the taper. Higher values produce
             steeper roll-off near the edges.
+        taper_start: Whether to taper the start of the window.
+        taper_end: Whether to taper the end of the window.
 
     Returns:
         numpy.ndarray: 1D float64 array of shape ``(window_size,)``.
@@ -81,10 +89,92 @@ def _spline_window_1d(window_size: int, overlap: int, power: int = 2) -> np.ndar
     ramp = np.linspace(0.0, 1.0, overlap + 1, endpoint=True)[1:]
     # Apply half-cosine shaping then power for smoothness
     ramp = (0.5 * (1.0 - np.cos(np.pi * ramp))) ** power
-    window[:overlap] = ramp
+    if taper_start:
+        window[:overlap] = ramp
     # Right taper: mirror of left
-    window[-overlap:] = ramp[::-1]
+    if taper_end:
+        window[-overlap:] = ramp[::-1]
     return window
+
+
+def _blend_weight_1d(
+    size: int,
+    overlap: int,
+    mode: BlendMode,
+    power: int,
+    taper_start: bool = True,
+    taper_end: bool = True,
+) -> np.ndarray:
+    """Create the 1D blending weights along one axis of a tile.
+
+    Args:
+        size: Length of the tile along this axis in pixels.
+        overlap: Number of pixels of overlap between adjacent tiles.
+        mode: Blending strategy.
+        power: Exponent for spline mode.
+        taper_start: Whether to taper the start of the axis.
+        taper_end: Whether to taper the end of the axis.
+
+    Returns:
+        numpy.ndarray: 1D float32 array of shape ``(size,)``.
+    """
+    if overlap == 0 or mode == BlendMode.NONE:
+        return np.ones(size, dtype=np.float32)
+
+    if mode in (BlendMode.LINEAR, BlendMode.COSINE):
+        # Compute per-pixel distance from nearest tapered edge, capped at
+        # overlap. np.minimum avoids write-order corruption when
+        # overlap > size // 2.
+        no_taper = np.full(size, overlap, dtype=np.float32)
+        left = np.arange(size, dtype=np.float32) if taper_start else no_taper
+        right = np.arange(size - 1, -1, -1, dtype=np.float32) if taper_end else no_taper
+        dist = np.minimum(np.minimum(left, right), overlap) / overlap
+        if mode == BlendMode.LINEAR:
+            return dist
+        # Raised-cosine taper of the same distance.
+        return (0.5 * (1.0 - np.cos(np.pi * dist))).astype(np.float32)
+
+    if mode == BlendMode.SPLINE:
+        return _spline_window_1d(
+            size, overlap, power=power, taper_start=taper_start, taper_end=taper_end
+        ).astype(np.float32)
+
+    raise ValueError(f"Unknown blend mode: {mode!r}")
+
+
+def _tile_weight_mask(
+    tile_size: int,
+    overlap: int,
+    mode: Union[str, BlendMode],
+    power: int,
+    top: bool,
+    bottom: bool,
+    left: bool,
+    right: bool,
+) -> np.ndarray:
+    """Create the weight mask of one tile, tapered only towards its neighbours.
+
+    A side on the border of the raster has no neighbouring tile to blend
+    with, so it keeps full weight up to the edge. Tapering it would give the
+    raster's edge pixels a weight of (almost) zero.
+
+    Args:
+        tile_size: Size of each square tile in pixels.
+        overlap: Number of pixels of overlap between adjacent tiles.
+        mode: Blending strategy.
+        power: Exponent for spline mode.
+        top: Whether another tile lies above this one.
+        bottom: Whether another tile lies below this one.
+        left: Whether another tile lies to the left of this one.
+        right: Whether another tile lies to the right of this one.
+
+    Returns:
+        numpy.ndarray: Float32 array of shape ``(tile_size, tile_size)``.
+    """
+    mode = BlendMode(mode)
+    rows = _blend_weight_1d(tile_size, overlap, mode, power, top, bottom)
+    cols = _blend_weight_1d(tile_size, overlap, mode, power, left, right)
+    return np.outer(rows, cols)
 
 
 def create_weight_mask(
@@ -124,36 +214,15 @@ def create_weight_mask(
 
     mode = BlendMode(mode)
 
-    if overlap == 0 or mode == BlendMode.NONE:
-        return np.ones((tile_size, tile_size), dtype=np.float32)
+    if mode == BlendMode.SPLINE and overlap > tile_size // 2:
+        raise ValueError(
+            f"For spline blending, overlap must be <= tile_size // 2 "
+            f"({tile_size // 2}), got {overlap}. Use 'linear' or "
+            f"'cosine' blending for larger overlaps."
+        )
 
-    if mode == BlendMode.LINEAR:
-        # Compute per-pixel distance from nearest edge, capped at overlap.
-        # np.minimum avoids write-order corruption when overlap > tile_size // 2.
-        left = np.arange(tile_size, dtype=np.float32)
-        right = np.arange(tile_size - 1, -1, -1, dtype=np.float32)
-        ramp = np.minimum(np.minimum(left, right), overlap) / overlap
-        return np.outer(ramp, ramp)
-
-    if mode == BlendMode.COSINE:
-        # Same edge-distance approach, then apply raised-cosine taper.
-        left = np.arange(tile_size, dtype=np.float32)
-        right = np.arange(tile_size - 1, -1, -1, dtype=np.float32)
-        dist = np.minimum(np.minimum(left, right), overlap) / overlap
-        w = (0.5 * (1.0 - np.cos(np.pi * dist))).astype(np.float32)
-        return np.outer(w, w)
-
-    if mode == BlendMode.SPLINE:
-        if overlap > tile_size // 2:
-            raise ValueError(
-                f"For spline blending, overlap must be <= tile_size // 2 "
-                f"({tile_size // 2}), got {overlap}. Use 'linear' or "
-                f"'cosine' blending for larger overlaps."
-            )
-        w1d = _spline_window_1d(tile_size, overlap, power=power).astype(np.float32)
-        return np.outer(w1d, w1d)
-
-    raise ValueError(f"Unknown blend mode: {mode!r}")
+    w1d = _blend_weight_1d(tile_size, overlap, mode, power)
+    return np.outer(w1d, w1d)
 
 
 # ---------------------------------------------------------------------------
@@ -385,10 +454,10 @@ def predict_geotiff(
     preprocess = preprocess_fn if preprocess_fn is not None else _default_preprocess
     stride = tile_size - overlap
 
-    # ---- compute weight mask once ----
-    weight_mask = create_weight_mask(
-        tile_size, overlap, mode=blend_mode, power=blend_power
-    )
+    # ---- validate the blending settings ----
+    create_weight_mask(tile_size, overlap, mode=blend_mode, power=blend_power)
+    # Weight masks keyed by which sides of a tile face another tile.
+    weight_masks: Dict[Tuple[bool, bool, bool, bool], np.ndarray] = {}
 
     model.to(device)
     model.eval()
@@ -493,9 +562,21 @@ def predict_geotiff(
                 actual_h, actual_w = batch_actual_sizes[i]
                 pred = preds[i]  # (num_classes, tile_size, tile_size)
 
+                # Taper only the sides that face another tile
+                sides = (
+                    row_start > 0,
+                    row_end < height,
+                    col_start > 0,
+                    col_end < width,
+                )
+                if sides not in weight_masks:
+                    weight_masks[sides] = _tile_weight_mask(
+                        tile_size, overlap, blend_mode, blend_power, *sides
+                    )
+
                 # Crop to actual tile dimensions
                 pred_crop = pred[:, :actual_h, :actual_w]
-                weight_crop = weight_mask[:actual_h, :actual_w]
+                weight_crop = weight_masks[sides][:actual_h, :actual_w]
 
                 # Accumulate weighted prediction and weights
                 output_sum[:, row_start:row_end, col_start:col_end] += (
@@ -506,11 +587,13 @@ def predict_geotiff(
                 ]
 
     # ---- normalize by weights ----
+    # No epsilon: it would pull pixels whose weights sum to a small value
+    # toward 0. Pixels without any weight get output_nodata.
     # valid mask is (1, H, W); NumPy broadcasts it against (num_classes, H, W)
     valid = weight_sum > 0  # (1, H, W)
     output_array = np.where(
         valid,
-        output_sum / (weight_sum + 1e-8),
+        output_sum / np.where(valid, weight_sum, 1.0),
         output_nodata,
     ).astype(np.float32)
 
@@ -640,9 +723,10 @@ def predict_geotiff_superres(
     hr_overlap = overlap * scale
     hr_stride = stride * scale
 
-    weight_mask_hr = create_weight_mask(
-        hr_tile_size, hr_overlap, mode=blend_mode, power=blend_power
-    ).astype(np.float64)
+    # Validate the blending settings on the HR grid.
+    create_weight_mask(hr_tile_size, hr_overlap, mode=blend_mode, power=blend_power)
+    # HR weight masks keyed by which sides of a tile face another tile.
+    weight_masks_hr: Dict[Tuple[bool, bool, bool, bool], np.ndarray] = {}
 
     model.to(device)
     model.eval()
@@ -759,9 +843,23 @@ def predict_geotiff_superres(
 
                 pred_tile = preds[i]
 
+                # Taper only the sides that face another tile
+                sides = (
+                    row_start > 0,
+                    row_start + actual_h < height,
+                    col_start > 0,
+                    col_start + actual_w < width,
+                )
+                if sides not in weight_masks_hr:
+                    weight_masks_hr[sides] = _tile_weight_mask(
+                        hr_tile_size, hr_overlap, blend_mode, blend_power, *sides
+                    ).astype(np.float64)
+
                 # Crop to the actual edge-tile size on HR grid
                 pred_crop = pred_tile[:, : actual_h * scale, : actual_w * scale]
-                weight_crop = weight_mask_hr[: actual_h * scale, : actual_w * scale]
+                weight_crop = weight_masks_hr[sides][
+                    : actual_h * scale, : actual_w * scale
+                ]
 
                 output_sum[:, hr_row_start:hr_row_end, hr_col_start:hr_col_end] += (
                     pred_crop * weight_crop[np.newaxis, :, :]
@@ -770,10 +868,12 @@ def predict_geotiff_superres(
                     :, hr_row_start:hr_row_end, hr_col_start:hr_col_end
                 ] += weight_crop[np.newaxis, :, :]
 
+    # No epsilon: it would pull pixels whose weights sum to a small value
+    # toward 0. Pixels without any weight get output_nodata.
     valid = weight_sum > 0
     output_array = np.where(
         valid,
-        output_sum / (weight_sum + 1e-8),
+        output_sum / np.where(valid, weight_sum, 1.0),
         output_nodata,
     ).astype(np.float32)
 

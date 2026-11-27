@@ -188,6 +188,7 @@ _LAZY_SYMBOL_MAP = {
     "CLIPSegmentation": ("segment", None),
     # --- geoai.train ---
     "COCODetectionDataset": ("train", None),
+    "compute_channel_stats": ("train", None),
     "evaluate_coco_metrics": ("train", None),
     "get_instance_segmentation_model": ("train", None),
     "instance_segmentation": ("train", None),

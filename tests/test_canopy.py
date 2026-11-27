@@ -234,6 +234,60 @@ class TestMakeWeightMap(unittest.TestCase):
         self.assertGreaterEqual(w.min(), 0.0)
         self.assertLessEqual(w.max(), 1.0)
 
+    def test_untapered_sides_keep_full_weight(self):
+        from geoai.canopy import CanopyHeightEstimation
+
+        # Top-left tile: neighbours below and to the right only.
+        w = CanopyHeightEstimation._make_weight_map(
+            128, 32, top=False, bottom=True, left=False, right=True
+        )
+        np.testing.assert_array_equal(w[:96, :96], 1.0)
+        self.assertLess(w[-1, -1], 0.01)
+
+
+class TestPredictBorder(unittest.TestCase):
+    """Tests that tiled canopy prediction keeps the model output at the edges."""
+
+    @patch("geoai.canopy._load_model")
+    @patch("geoai.canopy._download_checkpoint")
+    def test_pointwise_model_is_reproduced_everywhere(self, mock_download, mock_load):
+        import rasterio
+        from rasterio.transform import from_origin
+
+        mock_model = MagicMock()
+        mock_model.eval.return_value = mock_model
+        mock_load.return_value = mock_model
+        mock_download.return_value = "/fake/checkpoint.pth"
+
+        from geoai.canopy import CanopyHeightEstimation
+
+        estimator = CanopyHeightEstimation(device="cpu")
+        # A per-pixel "model": the height is the first band.
+        estimator.model = lambda batch: batch[:, :1]
+        estimator._normalize_image = lambda batch: batch
+
+        data = np.random.default_rng(0).uniform(0.1, 1, (3, 64, 75)).astype("float32")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rgb.tif")
+            with rasterio.open(
+                path,
+                "w",
+                driver="GTiff",
+                height=64,
+                width=75,
+                count=3,
+                dtype="float32",
+                crs="EPSG:32617",
+                transform=from_origin(500000, 4000000, 1, 1),
+            ) as dst:
+                dst.write(data)
+
+            heights = estimator.predict(
+                path, tile_size=32, overlap=16, batch_size=4, scale_factor=10.0
+            )
+
+        np.testing.assert_allclose(heights, data[0] * 10.0, rtol=1e-6)
+
 
 # ---------------------------------------------------------------------------
 # _normalize_image tests

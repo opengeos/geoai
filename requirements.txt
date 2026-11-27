@@ -6,7 +6,7 @@ einops>=0.8.2
 geopandas
 huggingface_hub
 jupyter-server-proxy
-leafmap>=0.64.3
+leafmap>=0.64.7
 localtileserver
 mapclassify
 maplibre
@@ -30,4 +30,4 @@ torch>=2.15.0
 torchgeo
 torchinfo
 tqdm
-transformers>=5.22.1
+transformers>=5.23.0
