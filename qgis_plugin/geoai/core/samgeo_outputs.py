@@ -39,7 +39,7 @@ _HF_CONTEXT_MARKERS = (
     "hf.co",
     "hf_hub",
     "facebook/sam3",
-    "gated",
+    "gatedrepoerror",
 )
 _HF_AUTH_MARKERS = (
     "gated repo",
@@ -432,96 +432,110 @@ def add_mask_attributes(
         return summary
 
     layer = QgsVectorLayer(path, "samgeo_attributes", "ogr")
-    if not layer.isValid():
-        _log(f"Could not open {path} to add attributes.")
-        return summary
-    provider = layer.dataProvider()
-    caps = provider.capabilities()
-    if not (caps & QgsVectorDataProvider.Capability.AddAttributes) or not (
-        caps & QgsVectorDataProvider.Capability.ChangeAttributeValues
-    ):
-        _log(f"{path} does not support adding attributes; skipping.")
-        return summary
-
-    is_shapefile = path.lower().endswith(".shp")
-    existing = [f.name() for f in provider.fields()]
-    id_field = find_mask_id_field(existing)
-
-    wanted = []  # (name, kind, value_or_None)
-    if scores:
-        if id_field is None:
-            _log(
-                "No mask id column (class/value) found in the output; "
-                "skipping the score field."
-            )
-        else:
-            wanted.append((field_name("score", is_shapefile), "double", None))
-    if source is not None:
-        wanted.append(
-            (field_name("source", is_shapefile), "string", _clip(source, is_shapefile))
-        )
-    if prompt is not None:
-        wanted.append(
-            (field_name("prompt", is_shapefile), "string", _clip(prompt, is_shapefile))
-        )
-    if not wanted:
-        return summary
-
-    # Read feature ids and mask ids before changing the schema: iterating a
-    # GeoJSON layer after addAttributes makes GDAL report "Invalid index".
-    id_idx = provider.fields().lookupField(id_field) if id_field else -1
-    request = QgsFeatureRequest()
-    request.setFlags(QgsFeatureRequest.Flag.NoGeometry)
-    if id_idx >= 0:
-        request.setSubsetOfAttributes([id_idx])
-    else:
-        request.setNoAttributes()
-    features = [
-        (f.id(), mask_id_from_value(f.attribute(id_idx)) if id_idx >= 0 else None)
-        for f in provider.getFeatures(request)
-    ]
-
-    existing_lower = {n.lower() for n in existing}
-    new_fields = [
-        _make_field(QgsField, name, kind)
-        for name, kind, _ in wanted
-        if name.lower() not in existing_lower
-    ]
-    if new_fields:
-        if not provider.addAttributes(new_fields):
-            _log(f"Failed to add fields to {path}.")
+    provider = None
+    try:
+        if not layer.isValid():
+            _log(f"Could not open {path} to add attributes.")
             return summary
-        layer.updateFields()
+        provider = layer.dataProvider()
+        caps = provider.capabilities()
+        if not (caps & QgsVectorDataProvider.Capability.AddAttributes) or not (
+            caps & QgsVectorDataProvider.Capability.ChangeAttributeValues
+        ):
+            _log(f"{path} does not support adding attributes; skipping.")
+            return summary
 
-    fields = provider.fields()
-    indices = {name: fields.lookupField(name) for name, _, _ in wanted}
-    if any(idx < 0 for idx in indices.values()):
-        _log(f"Could not find the new fields in {path}.")
-        return summary
-    changes = {}
-    scored = 0
-    for fid, mask_id in features:
-        attrs = {}
-        for name, kind, value in wanted:
-            idx = indices[name]
-            if kind == "double":
-                if mask_id is not None and mask_id in scores:
-                    attrs[idx] = float(scores[mask_id])
-                    scored += 1
+        is_shapefile = path.lower().endswith(".shp")
+        existing = [f.name() for f in provider.fields()]
+        id_field = find_mask_id_field(existing)
+
+        wanted = []  # (name, kind, value_or_None)
+        if scores:
+            if id_field is None:
+                _log(
+                    "No mask id column (class/value) found in the output; "
+                    "skipping the score field."
+                )
             else:
-                attrs[idx] = value
-        if attrs:
-            changes[fid] = attrs
+                wanted.append((field_name("score", is_shapefile), "double", None))
+        if source is not None:
+            wanted.append(
+                (
+                    field_name("source", is_shapefile),
+                    "string",
+                    _clip(source, is_shapefile),
+                )
+            )
+        if prompt is not None:
+            wanted.append(
+                (
+                    field_name("prompt", is_shapefile),
+                    "string",
+                    _clip(prompt, is_shapefile),
+                )
+            )
+        if not wanted:
+            return summary
 
-    if changes and not provider.changeAttributeValues(changes):
-        _log(f"Failed to write attribute values to {path}.")
-        return summary
+        # Read feature ids and mask ids before changing the schema: iterating a
+        # GeoJSON layer after addAttributes makes GDAL report "Invalid index".
+        id_idx = provider.fields().lookupField(id_field) if id_field else -1
+        request = QgsFeatureRequest()
+        request.setFlags(QgsFeatureRequest.Flag.NoGeometry)
+        if id_idx >= 0:
+            request.setSubsetOfAttributes([id_idx])
+        else:
+            request.setNoAttributes()
+        features = [
+            (f.id(), mask_id_from_value(f.attribute(id_idx)) if id_idx >= 0 else None)
+            for f in provider.getFeatures(request)
+        ]
 
-    summary["fields"] = [name for name, _, _ in wanted]
-    summary["scored"] = scored
-    if scores and id_field:
-        _log(f"Added confidence scores to {scored} feature(s).")
-    del layer
+        existing_lower = {n.lower() for n in existing}
+        new_fields = [
+            _make_field(QgsField, name, kind)
+            for name, kind, _ in wanted
+            if name.lower() not in existing_lower
+        ]
+        if new_fields:
+            if not provider.addAttributes(new_fields):
+                _log(f"Failed to add fields to {path}.")
+                return summary
+            layer.updateFields()
+
+        fields = provider.fields()
+        indices = {name: fields.lookupField(name) for name, _, _ in wanted}
+        if any(idx < 0 for idx in indices.values()):
+            _log(f"Could not find the new fields in {path}.")
+            return summary
+        changes = {}
+        scored = 0
+        for fid, mask_id in features:
+            attrs = {}
+            for name, kind, value in wanted:
+                idx = indices[name]
+                if kind == "double":
+                    if mask_id is not None and mask_id in scores:
+                        attrs[idx] = float(scores[mask_id])
+                        scored += 1
+                else:
+                    attrs[idx] = value
+            if attrs:
+                changes[fid] = attrs
+
+        if changes and not provider.changeAttributeValues(changes):
+            _log(f"Failed to write attribute values to {path}.")
+            return summary
+
+        summary["fields"] = [name for name, _, _ in wanted]
+        summary["scored"] = scored
+        if scores and id_field:
+            _log(f"Added confidence scores to {scored} feature(s).")
+    finally:
+        # Release the OGR handle on every path: on Windows a lingering
+        # handle can lock the file while the caller loads it into QGIS.
+        provider = None
+        layer = None
     return summary
 
 

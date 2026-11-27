@@ -367,8 +367,8 @@ def _mask_scores_of(sam) -> Any:
     for key, value in items:
         try:
             score = float(value)
-            mask_id = str(int(key))
-        except (TypeError, ValueError):
+            mask_id = str(int(float(key)))
+        except (TypeError, ValueError, OverflowError):
             continue
         if not math.isfinite(score):
             continue  # NaN/inf would make the JSON response invalid

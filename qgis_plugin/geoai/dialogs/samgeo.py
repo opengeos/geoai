@@ -2158,6 +2158,9 @@ class SamGeoDockWidget(QDockWidget):
                     "unique": unique,
                     "count": count,
                     "source": source_path,
+                    # The image this raster was segmented from; it can differ
+                    # from current_image_path when its full-image setup failed.
+                    "image": source,
                 }
             )
             self._last_prompt = format_prompt_label("text", prompt)
@@ -2912,7 +2915,9 @@ class SamGeoDockWidget(QDockWidget):
 
     def export_training_data(self):
         """Export image tiles with segmentation masks for training."""
-        if self.current_image_path is None:
+        tiled = self._tiled_result
+        tiled_image = tiled.get("image") if tiled is not None else None
+        if self.current_image_path is None and not tiled_image:
             self.show_error("Please set an image first.")
             return
 
@@ -2940,9 +2945,11 @@ class SamGeoDockWidget(QDockWidget):
 
             # Capture the image together with the staged mask: the
             # processEvents() calls below can change current_image_path.
+            # A tiled mask must be paired with the image it came from.
             image_path = self.current_image_path
-            if self._tiled_result is not None:
-                shutil.copyfile(self._tiled_result["raster"], temp_mask)
+            if tiled is not None:
+                image_path = tiled_image or image_path
+                shutil.copyfile(tiled["raster"], temp_mask)
             else:
                 unique = self.unique_check.isChecked()
                 self.sam.save_masks(output=temp_mask, unique=unique)

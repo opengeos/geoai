@@ -584,3 +584,29 @@ def test_hf_whoami_invalid_token_redacted(monkeypatch):
     assert result["logged_in"] is False
     assert result["token_found"] is True
     assert TOKEN not in json.dumps(result)
+
+
+def test_proxy_url_containing_gated_is_not_an_hf_access_error():
+    message = (
+        "403 Client Error: Forbidden for url: https://proxy.corp.local/gated/check"
+    )
+
+    assert so.is_hf_access_error(message) is False
+    assert so.hf_access_help(message) is None
+
+
+def test_hf_gated_repo_error_is_still_detected():
+    message = (
+        "huggingface_hub.errors.GatedRepoError: 401 Client Error. Cannot access "
+        "gated repo for url https://huggingface.co/facebook/sam3/resolve/main/x"
+    )
+
+    assert so.is_hf_access_error(message) is True
+
+
+def test_worker_skips_infinite_and_float_string_score_keys():
+    sam = types.SimpleNamespace(
+        mask_scores={float("inf"): 0.9, "2.0": 0.5, 3: 0.25, "x": 0.1}
+    )
+
+    assert samgeo_worker._mask_scores_of(sam) == {"2": 0.5, "3": 0.25}
