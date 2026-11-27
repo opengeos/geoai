@@ -86,14 +86,71 @@ def get_device() -> "torch.device":
     Returns the best available device for deep learning in the order:
     CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU.
 
-    If the ``GEOAI_DEVICE`` environment variable is set, returns that device
-    directly (for example, ``"cpu"``, ``"cuda"``, or ``"mps"``).
+    Environment Variables:
+        GEOAI_DEVICE: Optional device override string accepted by
+            ``torch.device`` (for example, ``"cpu"``, ``"cuda"``, ``"cuda:0"``,
+            ``"mps"``, or ``"xpu"``). When set, the requested device is
+            validated for syntax and accelerator availability.
+
+    Returns:
+        torch.device: The selected PyTorch device.
+
+    Raises:
+        ValueError: If ``GEOAI_DEVICE`` is not a valid PyTorch device string
+            or requests an accelerator (``cuda``, ``mps``, or ``xpu``) that is
+            not available in the current environment.
     """
     import torch
 
     env_device = os.environ.get("GEOAI_DEVICE", "").strip()
     if env_device:
-        return torch.device(env_device)
+        try:
+            device = torch.device(env_device)
+        except (RuntimeError, ValueError, TypeError) as e:
+            raise ValueError(f"Invalid GEOAI_DEVICE value {env_device!r}: {e}") from e
+
+        if device.type == "cuda":
+            if not torch.cuda.is_available():
+                raise ValueError(
+                    f"GEOAI_DEVICE={env_device!r} requested CUDA, "
+                    "but CUDA is not available."
+                )
+            if device.index is not None:
+                device_count = torch.cuda.device_count()
+                if device.index < 0 or (
+                    device_count > 0 and device.index >= device_count
+                ):
+                    raise ValueError(
+                        f"GEOAI_DEVICE={env_device!r} requested CUDA device "
+                        f"index {device.index}, but only {device_count} "
+                        "CUDA device(s) are available."
+                    )
+        elif device.type == "mps":
+            mps_backend = getattr(torch.backends, "mps", None)
+            if not (mps_backend and mps_backend.is_available()):
+                raise ValueError(
+                    f"GEOAI_DEVICE={env_device!r} requested MPS, "
+                    "but MPS is not available."
+                )
+        elif device.type == "xpu":
+            xpu_mod = getattr(torch, "xpu", None)
+            if not (xpu_mod and xpu_mod.is_available()):
+                raise ValueError(
+                    f"GEOAI_DEVICE={env_device!r} requested XPU, "
+                    "but XPU is not available."
+                )
+            if device.index is not None and hasattr(xpu_mod, "device_count"):
+                device_count = xpu_mod.device_count()
+                if device.index < 0 or (
+                    device_count > 0 and device.index >= device_count
+                ):
+                    raise ValueError(
+                        f"GEOAI_DEVICE={env_device!r} requested XPU device "
+                        f"index {device.index}, but only {device_count} "
+                        "XPU device(s) are available."
+                    )
+
+        return device
 
     if torch.cuda.is_available():
         return torch.device("cuda")

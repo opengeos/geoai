@@ -688,7 +688,7 @@ def _load_class_data_raster(
             block = class_src.read(1, window=window)
             vals = np.unique(block)
             unique_set.update(int(v) for v in vals[vals > 0])
-        unique_classes = np.array(sorted(unique_set), dtype=np.int64)
+        unique_classes = sorted(unique_set)
 
         if not quiet:
             logger.info(

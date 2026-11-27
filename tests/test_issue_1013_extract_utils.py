@@ -95,6 +95,44 @@ class TestExtractFixes(unittest.TestCase):
                 self.assertAlmostEqual(float(tensor[idx].mean()), 0.0, delta=0.5)
                 self.assertAlmostEqual(float(tensor[idx].std()), 1.0, delta=0.5)
 
+            # Non-monotonic / reversed 12-band selection must map each band to
+            # its own statistic, not positional order.
+            data12 = np.zeros((12, 8, 8), dtype=np.float32)
+            for b in range(12):
+                data12[b] = float(b * 10 + 5)
+            rev_bands = list(range(11, -1, -1))
+            delineator.sentinel_band_stats = {
+                "bands": list(range(12)),
+                "means": [float(b * 10 + 5) for b in range(12)],
+                "stds": [1.0] * 12,
+            }
+            t_rev = delineator.preprocess_sentinel_bands(
+                data12, band_selection=rev_bands, use_ndvi=False
+            )
+            np.testing.assert_allclose(t_rev.numpy(), 0.0, atol=1e-5)
+
+            # Even without "bands" metadata, matching list lengths must not
+            # switch to positional order unless explicitly opted in.
+            delineator.sentinel_band_stats = {
+                "means": [float(b * 10 + 5) for b in range(12)],
+                "stds": [1.0] * 12,
+            }
+            t_rev_legacy = delineator.preprocess_sentinel_bands(
+                data12, band_selection=rev_bands, use_ndvi=False
+            )
+            np.testing.assert_allclose(t_rev_legacy.numpy(), 0.0, atol=1e-5)
+
+            # Explicit positional contract uses selection order.
+            delineator.sentinel_band_stats = {
+                "means": [float(b * 10 + 5) for b in rev_bands],
+                "stds": [1.0] * 12,
+                "positional": True,
+            }
+            t_rev_pos = delineator.preprocess_sentinel_bands(
+                data12, band_selection=rev_bands, use_ndvi=False
+            )
+            np.testing.assert_allclose(t_rev_pos.numpy(), 0.0, atol=1e-5)
+
     def test_process_sentinel_raster_wires_sentinel2_dataset(self):
         from geoai.extract import AgricultureFieldDelineator
 
@@ -348,6 +386,40 @@ class TestExtractFixes(unittest.TestCase):
             self.assertEqual(len(filtered), 100)
             self.assertTrue((filtered["confidence"] >= 0.9).all())
 
+            # Dense nested polygons: suppressed candidates must be skipped
+            # without repeating sindex.query on every suppressed polygon.
+            nested_geoms = [
+                box(0, 0, 100.0 - 0.01 * k, 100.0 - 0.01 * k) for k in range(200)
+            ]
+            nested_confs = [1.0 - 0.001 * k for k in range(200)]
+            nested_gdf = gpd.GeoDataFrame(
+                {"geometry": nested_geoms, "confidence": nested_confs},
+                crs="EPSG:32617",
+            )
+            query_calls = [0]
+            orig_sindex_prop = gpd.GeoDataFrame.sindex
+
+            class CountingSindex:
+                def __init__(self, inner):
+                    self._inner = inner
+
+                def query(self, *args, **kwargs):
+                    query_calls[0] += 1
+                    return self._inner.query(*args, **kwargs)
+
+            with patch.object(
+                gpd.GeoDataFrame,
+                "sindex",
+                new=property(
+                    lambda self_gdf: CountingSindex(orig_sindex_prop.fget(self_gdf))
+                ),
+            ):
+                nested_filtered = detector.filter_overlapping_polygons(
+                    nested_gdf, nms_iou_threshold=0.5
+                )
+            self.assertEqual(len(nested_filtered), 1)
+            self.assertEqual(query_calls[0], 1)
+
     def test_load_weights_uses_weights_only_true(self):
         from geoai.extract import ObjectDetector
 
@@ -372,6 +444,49 @@ class TestExtractFixes(unittest.TestCase):
 
             self.assertEqual(len(seen_kwargs), 1)
             self.assertTrue(seen_kwargs[0].get("weights_only"))
+
+            # Restricted-load rejection must NOT auto-retry without opt-in
+            reject_calls = []
+
+            def rejecting_load(*args, **kwargs):
+                reject_calls.append(dict(kwargs))
+                if kwargs.get("weights_only") is True:
+                    raise pickle.UnpicklingError("legacy global")
+                return model.state_dict()
+
+            with (
+                patch.dict(os.environ, {}, clear=False),
+                patch("geoai.extract.torch.load", side_effect=rejecting_load),
+            ):
+                os.environ.pop("GEOAI_ALLOW_UNSAFE_TORCH_LOAD", None)
+                with self.assertRaises(RuntimeError) as ctx:
+                    detector.load_weights(ckpt)
+            self.assertIn("allow_unsafe=True", str(ctx.exception))
+            self.assertIn("GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1", str(ctx.exception))
+            self.assertEqual(len(reject_calls), 1)
+
+            # Explicit allow_unsafe=True opts in to fallback
+            reject_calls.clear()
+            with (
+                patch("geoai.extract.torch.load", side_effect=rejecting_load),
+                self.assertLogs("geoai.extract", level="WARNING"),
+            ):
+                detector.load_weights(ckpt, allow_unsafe=True)
+            self.assertEqual(len(reject_calls), 2)
+            self.assertIs(reject_calls[0].get("weights_only"), True)
+            self.assertIs(reject_calls[1].get("weights_only"), False)
+
+            # Explicit GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1 opts in to fallback
+            reject_calls.clear()
+            with (
+                patch.dict(os.environ, {"GEOAI_ALLOW_UNSAFE_TORCH_LOAD": "1"}),
+                patch("geoai.extract.torch.load", side_effect=rejecting_load),
+                self.assertLogs("geoai.extract", level="WARNING"),
+            ):
+                detector.load_weights(ckpt)
+            self.assertEqual(len(reject_calls), 2)
+            self.assertIs(reject_calls[0].get("weights_only"), True)
+            self.assertIs(reject_calls[1].get("weights_only"), False)
 
 
 class TestRasterUtilsFixes(unittest.TestCase):
@@ -428,6 +543,33 @@ class TestRasterUtilsFixes(unittest.TestCase):
                 self.assertAlmostEqual(dst.transform.a, 2.0, places=6)
                 self.assertAlmostEqual(dst.transform.e, -2.0, places=6)
 
+            # Bbox extending past west edge (-0.75..0.625 in pixel units)
+            # overlaps col 0 and must succeed rather than rounding away overlap.
+            unit_tif = _write_geotiff(
+                os.path.join(tmpdir, "unit.tif"),
+                np.arange(100, dtype=np.uint16).reshape(1, 10, 10),
+                origin=(0.0, 10.0),
+                pixel_size=1.0,
+            )
+            out_edge = os.path.join(tmpdir, "out_edge.tif")
+            clip_raster_by_bbox(
+                unit_tif, out_edge, (-0.75, 8.0, 0.625, 10.0), bbox_type="geo"
+            )
+            with rasterio.open(out_edge) as dst:
+                self.assertEqual(dst.width, 1)
+                self.assertEqual(dst.height, 2)
+                self.assertAlmostEqual(dst.transform.c, 0.0, places=6)
+                self.assertAlmostEqual(dst.transform.f, 10.0, places=6)
+
+            # Strictly non-overlapping bbox still raises ValueError
+            with self.assertRaises(ValueError):
+                clip_raster_by_bbox(
+                    unit_tif,
+                    os.path.join(tmpdir, "out_empty.tif"),
+                    (-2.0, 8.0, -0.5, 10.0),
+                    bbox_type="geo",
+                )
+
     def test_clean_instance_mask_and_masks_to_vector_tight_slices(self):
         from geoai.utils.raster import clean_instance_mask, masks_to_vector
 
@@ -470,6 +612,42 @@ class TestRasterUtilsFixes(unittest.TestCase):
             self.assertEqual(int(cleaned[250, 10]), 0)
             self.assertEqual(len(np.unique(cleaned)) - 1, 20)
 
+            # Float32 instance mask must use membership path & compact remap
+            # instead of indexing keep_lut with float32 values.
+            fmask = np.zeros((32, 32), dtype=np.float32)
+            fmask[4:20, 4:20] = 1.0  # 256 px
+            fmask[10:12, 10:12] = 0.0  # 4 px hole inside 1.0
+            fmask[28, 28] = 2.0  # 1 px small instance
+            fin_tif = _write_geotiff(os.path.join(tmpdir, "finst.tif"), fmask)
+            fout_nosmooth = os.path.join(tmpdir, "finst_nosmooth.tif")
+            clean_instance_mask(
+                fin_tif,
+                fout_nosmooth,
+                min_area=10,
+                fill_holes=False,
+                smooth=False,
+            )
+            with rasterio.open(fout_nosmooth) as src:
+                fcleaned = src.read(1)
+            self.assertFalse((fcleaned == 2.0).any())
+            self.assertTrue((fcleaned == 1.0).any())
+            self.assertEqual(float(fcleaned[10, 10]), 0.0)
+
+            fout_smooth = os.path.join(tmpdir, "finst_smooth.tif")
+            clean_instance_mask(
+                fin_tif,
+                fout_smooth,
+                min_area=10,
+                fill_holes=True,
+                max_hole_area=20,
+                smooth=True,
+                smooth_sigma=1.0,
+            )
+            with rasterio.open(fout_smooth) as src:
+                fcleaned2 = src.read(1)
+            self.assertFalse((fcleaned2 == 2.0).any())
+            self.assertEqual(float(fcleaned2[10, 10]), 1.0)
+
             # masks_to_vector in utils.raster with >50-vertex circle and simplify_tolerance=1.0
             yy, xx = np.ogrid[:128, :128]
             circle = (((yy - 64) ** 2 + (xx - 64) ** 2) <= 40**2).astype(np.uint8) * 255
@@ -505,6 +683,53 @@ class TestRasterUtilsFixes(unittest.TestCase):
                 self.assertIsNone(src.nodata)
                 self.assertGreater(int(src.read(1).sum()), 0)
 
+            # Float64 reference with out-of-range float32 nodata (1e100) is cleared
+            ref_f64_oob = _write_geotiff(
+                os.path.join(tmpdir, "ref_f64_oob.tif"),
+                np.ones((32, 32), dtype=np.float64),
+                origin=(0.0, 32.0),
+                nodata=1e100,
+            )
+            out_f32_oob = os.path.join(tmpdir, "out_f32_oob.tif")
+            vector_to_raster(
+                gdf,
+                output_path=out_f32_oob,
+                reference_raster=ref_f64_oob,
+                dtype=np.float32,
+            )
+            with rasterio.open(out_f32_oob) as src:
+                self.assertEqual(src.dtypes[0], "float32")
+                self.assertIsNone(src.nodata)
+
+            # Float64 reference with NaN nodata is preserved for float32
+            ref_f64_nan = _write_geotiff(
+                os.path.join(tmpdir, "ref_f64_nan.tif"),
+                np.ones((32, 32), dtype=np.float64),
+                origin=(0.0, 32.0),
+                nodata=float("nan"),
+            )
+            out_f32_nan = os.path.join(tmpdir, "out_f32_nan.tif")
+            vector_to_raster(
+                gdf,
+                output_path=out_f32_nan,
+                reference_raster=ref_f64_nan,
+                dtype=np.float32,
+            )
+            with rasterio.open(out_f32_nan) as src:
+                self.assertTrue(np.isnan(src.nodata))
+
+            # Explicit caller nodata is left untouched
+            out_f32_explicit = os.path.join(tmpdir, "out_f32_explicit.tif")
+            vector_to_raster(
+                gdf,
+                output_path=out_f32_explicit,
+                reference_raster=ref_f64_oob,
+                dtype=np.float32,
+                nodata=-1.0,
+            )
+            with rasterio.open(out_f32_explicit) as src:
+                self.assertEqual(src.nodata, -1.0)
+
     def test_calc_stats_empty_guard_and_context_manager(self):
         from geoai.utils.raster import calc_stats
 
@@ -513,6 +738,30 @@ class TestRasterUtilsFixes(unittest.TestCase):
         empty_ds.index.intersection.return_value = []
         with self.assertRaises(ValueError):
             calc_stats(empty_ds)
+
+        # Empty rtree index reporting get_size() == 0 raises ValueError before query
+        empty_sized = MagicMock()
+        empty_sized.index.get_size.return_value = 0
+        with self.assertRaises(ValueError):
+            calc_stats(empty_sized)
+        empty_sized.index.intersection.assert_not_called()
+
+        # Empty rtree index with inverted bounds raises ValueError before intersection
+        inverted_ds = MagicMock()
+        inverted_ds.index.bounds = (1e308, 1e308, -1e308, -1e308)
+        with self.assertRaises(ValueError):
+            calc_stats(inverted_ds)
+        inverted_ds.index.intersection.assert_not_called()
+
+        # Simulated RTreeError from empty index is converted to ValueError
+        class RTreeError(Exception):
+            pass
+
+        rtree_err_ds = MagicMock()
+        rtree_err_ds.index.bounds = (0, 0, 1, 1)
+        rtree_err_ds.index.intersection.side_effect = RTreeError("empty index")
+        with self.assertRaises(ValueError):
+            calc_stats(rtree_err_ds)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             arr = np.full((2, 16, 16), 100, dtype=np.uint8)
@@ -537,6 +786,50 @@ class TestRasterUtilsFixes(unittest.TestCase):
             np.testing.assert_allclose(mean, [10.0, 20.0])
             np.testing.assert_allclose(std, [0.0, 0.0])
             self.assertTrue(all(h.closed for h in opened_handles))
+
+    def test_mosaic_geotiffs_tempdir_under_output_dir(self):
+        from geoai.utils.raster import mosaic_geotiffs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            in_dir = os.path.join(tmpdir, "inputs")
+            out_dir = os.path.join(tmpdir, "outputs")
+            os.makedirs(in_dir)
+            _write_geotiff(
+                os.path.join(in_dir, "tile1.tif"), np.ones((16, 16), dtype=np.uint8)
+            )
+            out_tif = os.path.join(out_dir, "mosaic.tif")
+
+            fake_band = MagicMock()
+            fake_band.GetNoDataValue.return_value = None
+            fake_ds = MagicMock()
+            fake_ds.GetMetadata.return_value = {}
+            fake_ds.GetRasterBand.return_value = fake_band
+
+            fake_gdal = MagicMock()
+            fake_gdal.Open.return_value = fake_ds
+            fake_gdal.GA_Update = 1
+
+            fake_osgeo = MagicMock()
+            fake_osgeo.gdal = fake_gdal
+
+            seen_dirs = []
+            real_tempdir = tempfile.TemporaryDirectory
+
+            def spy_tempdir(*args, **kwargs):
+                seen_dirs.append(kwargs.get("dir"))
+                return real_tempdir(*args, **kwargs)
+
+            with (
+                patch.dict(sys.modules, {"osgeo": fake_osgeo, "osgeo.gdal": fake_gdal}),
+                patch(
+                    "geoai.utils.raster.tempfile.TemporaryDirectory",
+                    side_effect=spy_tempdir,
+                ),
+            ):
+                ok = mosaic_geotiffs(in_dir, out_tif)
+
+            self.assertTrue(ok)
+            self.assertEqual(seen_dirs, [os.path.abspath(out_dir)])
 
     def test_stack_bands_uses_tempdir_for_vrt(self):
         from geoai.utils.raster import stack_bands
@@ -563,6 +856,79 @@ class TestRasterUtilsFixes(unittest.TestCase):
             self.assertNotEqual(vrt_arg, "stack.vrt")
             self.assertTrue(os.path.isabs(vrt_arg))
             self.assertFalse(os.path.exists(vrt_arg))
+
+            # Explicit temp_vrt must NOT be deleted if _run_stack fails
+            existing_vrt = os.path.join(tmpdir, "caller.vrt")
+            with open(existing_vrt, "w") as fh:
+                fh.write("keep me")
+
+            with patch(
+                "geoai.utils.raster.subprocess.run",
+                side_effect=FileNotFoundError("gdalbuildvrt missing"),
+            ):
+                with self.assertRaises(FileNotFoundError):
+                    stack_bands([f1, f2], out_tif, temp_vrt=existing_vrt)
+            self.assertTrue(os.path.exists(existing_vrt))
+
+            # Explicit temp_vrt IS removed after _run_stack succeeds
+            with patch("geoai.utils.raster.subprocess.run", side_effect=fake_run):
+                stack_bands([f1, f2], out_tif, temp_vrt=existing_vrt)
+            self.assertFalse(os.path.exists(existing_vrt))
+
+    def test_masks_to_vector_nms_skips_suppressed_nested_polygons(self):
+        import cv2
+
+        from geoai.utils.raster import masks_to_vector
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mask = np.zeros((128, 128), dtype=np.uint8)
+            mask[10:110, 10:110] = 255
+            tif = _write_geotiff(os.path.join(tmpdir, "nested.tif"), mask)
+
+            # Return 50 nearly identical nested square contours to trigger dense NMS
+            nested_contours = [
+                np.array(
+                    [
+                        [[10, 10]],
+                        [[109 - (k % 2), 10]],
+                        [[109 - (k % 2), 109 - (k % 2)]],
+                        [[10, 109 - (k % 2)]],
+                    ],
+                    dtype=np.int32,
+                )
+                for k in range(50)
+            ]
+
+            query_calls = [0]
+            orig_sindex_prop = gpd.GeoDataFrame.sindex
+
+            class CountingSindex:
+                def __init__(self, inner):
+                    self._inner = inner
+
+                def query(self, *args, **kwargs):
+                    query_calls[0] += 1
+                    return self._inner.query(*args, **kwargs)
+
+            with (
+                patch.object(cv2, "findContours", return_value=(nested_contours, None)),
+                patch.object(
+                    gpd.GeoDataFrame,
+                    "sindex",
+                    new=property(
+                        lambda self_gdf: CountingSindex(orig_sindex_prop.fget(self_gdf))
+                    ),
+                ),
+            ):
+                gdf = masks_to_vector(
+                    tif,
+                    simplify_tolerance=0.0,
+                    min_object_area=10,
+                    nms_iou_threshold=0.5,
+                )
+
+            self.assertEqual(len(gdf), 1)
+            self.assertEqual(query_calls[0], 1)
 
 
 class TestGeometryFixes(unittest.TestCase):
@@ -603,6 +969,35 @@ class TestGeometryFixes(unittest.TestCase):
 
         _, df_custom = region_groups(line_arr, min_size=1, properties=["label", "area"])
         self.assertNotIn("elongation", df_custom.columns)
+
+        # With spacing=(2, 2), a 4-pixel region has measured area 16:
+        # kept when min_size=10, removed when max_size=12.
+        sp_arr = np.zeros((10, 10), dtype=np.uint8)
+        sp_arr[2:4, 2:4] = 1  # 4 pixels -> area 16 with spacing=(2, 2)
+        _, df_sp_keep = region_groups(
+            sp_arr, min_size=10, properties=["label", "area"], spacing=(2, 2)
+        )
+        self.assertEqual(len(df_sp_keep), 1)
+        self.assertAlmostEqual(float(df_sp_keep["area"].iloc[0]), 16.0)
+
+        _, df_sp_scalar = region_groups(
+            sp_arr, min_size=10, properties=["label", "area"], spacing=2
+        )
+        self.assertEqual(len(df_sp_scalar), 1)
+        self.assertAlmostEqual(float(df_sp_scalar["area"].iloc[0]), 16.0)
+
+        _, df_sp_max = region_groups(
+            sp_arr,
+            min_size=1,
+            max_size=12,
+            properties=["label", "area"],
+            spacing=(2, 2),
+        )
+        self.assertEqual(len(df_sp_max), 0)
+
+        # Without spacing, 4-pixel region is removed by min_size=10
+        _, df_no_sp = region_groups(sp_arr, min_size=10, properties=["label", "area"])
+        self.assertEqual(len(df_no_sp), 0)
 
 
 class TestTrainingUtilsFixes(unittest.TestCase):
@@ -725,6 +1120,20 @@ class TestTrainingUtilsFixes(unittest.TestCase):
             )
             self.assertIn(9, class_to_id)
             self.assertEqual(class_to_id, {1: 1, 9: 2})
+
+            # uint64 class values exceeding int64 max (2**63 - 1) must not overflow
+            big_val = (1 << 63) + 1
+            arr_u64 = np.zeros((16, 16), dtype=np.uint64)
+            arr_u64[2:4, 2:4] = np.uint64(big_val)
+            tif_u64 = _write_geotiff(os.path.join(tmpdir, "u64.tif"), arr_u64)
+            class_to_id_u64, cats_u64 = _load_class_data_raster(
+                tif_u64,
+                rasterio.crs.CRS.from_epsg(32617),
+                quiet=True,
+                metadata_format="COCO",
+            )
+            self.assertEqual(class_to_id_u64, {big_val: 1})
+            self.assertEqual(cats_u64[0]["name"], str(big_val))
 
     def test_rasterize_label_from_vector_single_call_and_precedence(self):
         from geoai.utils.training import _rasterize_label_from_vector
@@ -1020,6 +1429,39 @@ class TestDeviceModelsVisualizationFixes(unittest.TestCase):
         ):
             self.assertEqual(get_device(), torch.device("cpu"))
 
+        # Invalid device string raises a clear ValueError
+        with patch.dict(os.environ, {"GEOAI_DEVICE": "not_a_real_device"}):
+            with self.assertRaises(ValueError):
+                get_device()
+
+        # Unavailable CUDA accelerator raises ValueError
+        with (
+            patch.dict(os.environ, {"GEOAI_DEVICE": "cuda"}),
+            patch("torch.cuda.is_available", return_value=False),
+        ):
+            with self.assertRaises(ValueError):
+                get_device()
+
+        # Unavailable MPS accelerator raises ValueError
+        fake_mps = MagicMock()
+        fake_mps.is_available.return_value = False
+        with (
+            patch.dict(os.environ, {"GEOAI_DEVICE": "mps"}),
+            patch.object(torch.backends, "mps", fake_mps, create=True),
+        ):
+            with self.assertRaises(ValueError):
+                get_device()
+
+        # Unavailable XPU accelerator raises ValueError
+        fake_xpu = MagicMock()
+        fake_xpu.is_available.return_value = False
+        with (
+            patch.dict(os.environ, {"GEOAI_DEVICE": "xpu"}),
+            patch.object(torch, "xpu", fake_xpu, create=True),
+        ):
+            with self.assertRaises(ValueError):
+                get_device()
+
     def test_models_and_visualization_use_weights_only_true(self):
         import matplotlib
 
@@ -1048,7 +1490,7 @@ class TestDeviceModelsVisualizationFixes(unittest.TestCase):
             self.assertEqual(len(seen_models_kwargs), 1)
             self.assertTrue(seen_models_kwargs[0].get("weights_only"))
 
-            # 2) inspect_pth_file falls back with warning on UnpicklingError
+            # 2) inspect_pth_file does NOT auto-retry with weights_only=False without opt-in
             fallback_calls = []
 
             def failing_first_load(*args, **kwargs):
@@ -1058,18 +1500,48 @@ class TestDeviceModelsVisualizationFixes(unittest.TestCase):
                 return {"conv.weight": torch.zeros(2, 2)}
 
             with (
+                patch.dict(os.environ, {}, clear=False),
+                patch("geoai.utils.models.torch.load", side_effect=failing_first_load),
+                patch("geoai.utils.models.try_common_architectures"),
+            ):
+                os.environ.pop("GEOAI_ALLOW_UNSAFE_TORCH_LOAD", None)
+                with self.assertRaises(RuntimeError) as ctx:
+                    inspect_pth_file(pth_path)
+
+            self.assertEqual(len(fallback_calls), 1)
+            self.assertIs(fallback_calls[0].get("weights_only"), True)
+            self.assertIn("allow_unsafe=True", str(ctx.exception))
+            self.assertIn("GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1", str(ctx.exception))
+
+            # 3) Explicit allow_unsafe=True opts in to fallback with warning
+            fallback_calls.clear()
+            with (
                 patch("geoai.utils.models.torch.load", side_effect=failing_first_load),
                 patch("geoai.utils.models.try_common_architectures"),
                 self.assertLogs("geoai.utils.models", level="WARNING") as logs,
             ):
-                inspect_pth_file(pth_path)
+                inspect_pth_file(pth_path, allow_unsafe=True)
 
             self.assertEqual(len(fallback_calls), 2)
             self.assertIs(fallback_calls[0].get("weights_only"), True)
             self.assertIs(fallback_calls[1].get("weights_only"), False)
             self.assertTrue(any("weights_only=False" in m for m in logs.output))
 
-            # 3) plot_performance_metrics calls torch.load with weights_only=True
+            # 4) Explicit GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1 opts in to fallback
+            fallback_calls.clear()
+            with (
+                patch.dict(os.environ, {"GEOAI_ALLOW_UNSAFE_TORCH_LOAD": "1"}),
+                patch("geoai.utils.models.torch.load", side_effect=failing_first_load),
+                patch("geoai.utils.models.try_common_architectures"),
+                self.assertLogs("geoai.utils.models", level="WARNING"),
+            ):
+                inspect_pth_file(pth_path)
+
+            self.assertEqual(len(fallback_calls), 2)
+            self.assertIs(fallback_calls[0].get("weights_only"), True)
+            self.assertIs(fallback_calls[1].get("weights_only"), False)
+
+            # 5) plot_performance_metrics calls torch.load with weights_only=True
             hist_path = os.path.join(tmpdir, "history.pth")
             torch.save(
                 {

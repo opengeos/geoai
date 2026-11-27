@@ -3,6 +3,7 @@
 # Standard Library
 import logging
 import os
+import pickle
 import time
 import warnings
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
@@ -437,15 +438,24 @@ class ObjectDetector:
                 logger.info(f"Checkpoint metadata: {metadata}")
             return {key: f.get_tensor(key) for key in f.keys()}
 
-    def load_weights(self, model_path: str) -> None:
+    def load_weights(self, model_path: str, allow_unsafe: bool = False) -> None:
         """
         Load weights from file with error handling for different formats.
 
         Args:
-            model_path: Path to model weights
+            model_path: Path to model weights.
+            allow_unsafe: If True (or if the ``GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1``
+                environment variable is set), fall back to ``weights_only=False``
+                when restricted loading rejects a trusted legacy checkpoint.
+                Defaults to False.
         """
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
+
+        unsafe_allowed = allow_unsafe or (
+            os.environ.get("GEOAI_ALLOW_UNSAFE_TORCH_LOAD", "").strip().lower()
+            in {"1", "true", "yes"}
+        )
 
         try:
             if model_path.endswith(".safetensors"):
@@ -457,6 +467,28 @@ class ObjectDetector:
                     )
                 except TypeError:
                     state_dict = torch.load(model_path, map_location=self.device)
+                except (pickle.UnpicklingError, RuntimeError) as e:
+                    if isinstance(
+                        e, pickle.UnpicklingError
+                    ) or "Weights only load failed" in str(e):
+                        if not unsafe_allowed:
+                            raise RuntimeError(
+                                f"Restricted checkpoint loading (weights_only=True) "
+                                f"rejected '{model_path}': {e}. If this is a trusted "
+                                "legacy checkpoint, pass allow_unsafe=True or set "
+                                "GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1."
+                            ) from e
+                        logger.warning(
+                            "weights_only=True failed for %s (%s); loading with "
+                            "weights_only=False because unsafe loading was explicitly enabled.",
+                            model_path,
+                            e,
+                        )
+                        state_dict = torch.load(
+                            model_path, map_location=self.device, weights_only=False
+                        )
+                    else:
+                        raise
 
             # Handle different state dict formats
             if isinstance(state_dict, dict):
@@ -484,8 +516,12 @@ class ObjectDetector:
                 self.model.load_state_dict(new_state_dict)
                 logger.info("Model loaded successfully after key fixing")
 
+        except RuntimeError as e:
+            if "Restricted checkpoint loading (weights_only=True)" in str(e):
+                raise
+            raise RuntimeError(f"Failed to load model: {e}") from e
         except Exception as e:
-            raise RuntimeError(f"Failed to load model: {e}")
+            raise RuntimeError(f"Failed to load model: {e}") from e
 
     def mask_to_polygons(self, mask: np.ndarray, **kwargs: Any) -> List[Polygon]:
         """
@@ -574,37 +610,39 @@ class ObjectDetector:
 
         sindex = gdf.sindex
         keep_indices = []
-        kept_set = set()
         polygons = gdf.geometry.values
+        n_polys = len(polygons)
+        suppressed = np.zeros(n_polys, dtype=bool)
 
-        for i in range(len(polygons)):
+        for i in range(n_polys):
+            if suppressed[i]:
+                continue
+
+            keep_indices.append(i)
             poly_i = polygons[i]
-            keep = True
-            if poly_i is not None and not poly_i.is_empty and poly_i.is_valid:
-                candidates = sindex.query(poly_i, predicate="intersects")
-                for j in candidates:
-                    if j not in kept_set:
-                        continue
-                    poly_j = polygons[j]
-                    if not poly_j.is_valid:
-                        continue
+            if poly_i is None or poly_i.is_empty or not poly_i.is_valid:
+                continue
 
-                    # Calculate IoU
-                    try:
-                        intersection = poly_i.intersection(poly_j).area
-                        union = poly_i.area + poly_j.area - intersection
-                        iou = intersection / union if union > 0 else 0
+            poly_i_area = poly_i.area
+            candidates = sindex.query(poly_i, predicate="intersects")
+            for j in candidates:
+                if j <= i or suppressed[j]:
+                    continue
+                poly_j = polygons[j]
+                if poly_j is None or poly_j.is_empty or not poly_j.is_valid:
+                    continue
 
-                        if iou > iou_threshold:
-                            keep = False
-                            break
-                    except Exception:
-                        # Skip on topology exceptions
-                        continue
+                # Calculate IoU
+                try:
+                    intersection = poly_i.intersection(poly_j).area
+                    union = poly_i_area + poly_j.area - intersection
+                    iou = intersection / union if union > 0 else 0
 
-            if keep:
-                keep_indices.append(i)
-                kept_set.add(i)
+                    if iou > iou_threshold:
+                        suppressed[j] = True
+                except Exception:
+                    # Skip on topology exceptions
+                    continue
 
         return gdf.iloc[keep_indices]
 
@@ -2760,8 +2798,9 @@ class AgricultureFieldDelineator(ObjectDetector):
         )
 
         # Default Sentinel-2 band statistics (can be overridden with actual stats)
-        # Band order: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B10, B11, B12]
+        # Band order: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B11, B12]
         self.sentinel_band_stats = {
+            "bands": list(range(12)),
             "means": [
                 0.0975,
                 0.0476,
@@ -2912,21 +2951,30 @@ class AgricultureFieldDelineator(ObjectDetector):
         # Convert to tensor
         image_tensor = torch.from_numpy(selected_bands).float()
 
-        # Normalize using band statistics (matching loop position when stats
-        # were computed for band_selection, or mapped by band index otherwise)
+        # Normalize using band statistics: use explicit band identities when
+        # provided, positional indexing only when explicitly contracted, or
+        # band-index lookup otherwise.
         means = self.sentinel_band_stats["means"]
         stds = self.sentinel_band_stats["stds"]
         stats_bands = self.sentinel_band_stats.get("bands")
+        positional_stats = bool(self.sentinel_band_stats.get("positional", False))
+        band_to_pos = (
+            {b: idx for idx, b in enumerate(stats_bands)}
+            if stats_bands is not None
+            else None
+        )
         for i, band_idx in enumerate(band_selection):
-            if stats_bands is not None and band_idx in stats_bands:
-                stat_pos = stats_bands.index(band_idx)
-            elif len(means) == len(band_selection):
+            if band_to_pos is not None:
+                if band_idx not in band_to_pos:
+                    continue
+                stat_pos = band_to_pos[band_idx]
+            elif positional_stats:
                 stat_pos = i
             elif 0 <= band_idx < len(means):
                 stat_pos = band_idx
-            elif i < len(means):
-                stat_pos = i
             else:
+                continue
+            if stat_pos >= len(means) or stat_pos >= len(stds):
                 continue
             mean = means[stat_pos]
             std = stds[stat_pos]

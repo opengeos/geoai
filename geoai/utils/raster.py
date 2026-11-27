@@ -131,10 +131,34 @@ def calc_stats(dataset, divide_by: float = 1.0) -> Tuple[np.ndarray, np.ndarray]
 
     # To avoid loading the entire dataset in memory, we will loop through each img
     # The filenames will be retrieved from the dataset's rtree index
-    files = [
-        item.object
-        for item in dataset.index.intersection(dataset.index.bounds, objects=True)
-    ]
+    index = dataset.index
+    get_size = getattr(index, "get_size", None)
+    if callable(get_size):
+        size = get_size()
+        if isinstance(size, int) and size == 0:
+            raise ValueError("Dataset contains no raster files to compute statistics.")
+
+    try:
+        bounds = index.bounds
+        if (
+            bounds is None
+            or len(bounds) == 0
+            or (
+                len(bounds) % 2 == 0
+                and any(
+                    bounds[i] > bounds[i + len(bounds) // 2]
+                    for i in range(len(bounds) // 2)
+                )
+            )
+        ):
+            raise ValueError("Dataset contains no raster files to compute statistics.")
+        files = [item.object for item in index.intersection(bounds, objects=True)]
+    except Exception as e:
+        if type(e).__name__ == "RTreeError":
+            raise ValueError(
+                "Dataset contains no raster files to compute statistics."
+            ) from e
+        raise
 
     if not files:
         raise ValueError("Dataset contains no raster files to compute statistics.")
@@ -449,19 +473,32 @@ def clip_raster_by_bbox(
                         f"Failed to transform bbox from {bbox_crs} to {src_crs}: {str(e)}"
                     )
 
-            # Calculate the pixel window from geographic coordinates and snap
-            # to the integer pixel grid clamped to the raster extent so the
-            # read array shape always matches the output metadata and transform.
+            # Calculate the pixel window from geographic coordinates, clamp to
+            # the raster extent first, then snap the clamped edges outward
+            # (floor start, ceil stop) so partial edge overlaps are preserved
+            # and read shapes always match the output metadata and transform.
             window = src.window(minx, miny, maxx, maxy)
             full_window = Window(0, 0, src.width, src.height)
             try:
-                window = (
-                    window.round_offsets().round_lengths().intersection(full_window)
-                )
+                clamped = window.intersection(full_window)
             except rasterio.errors.WindowError as e:
                 raise ValueError(
                     "Bounding box does not intersect the raster extent"
                 ) from e
+
+            if clamped.width <= 0 or clamped.height <= 0:
+                raise ValueError("Bounding box does not intersect the raster extent")
+
+            col_start = max(0, int(math.floor(clamped.col_off)))
+            row_start = max(0, int(math.floor(clamped.row_off)))
+            col_stop = min(src.width, int(math.ceil(clamped.col_off + clamped.width)))
+            row_stop = min(src.height, int(math.ceil(clamped.row_off + clamped.height)))
+            window = Window(
+                col_start,
+                row_start,
+                col_stop - col_start,
+                row_stop - row_start,
+            )
 
         else:  # bbox_type == "pixel"
             min_row, min_col, max_row, max_col = bbox
@@ -891,7 +928,13 @@ def vector_to_raster(
                     ):
                         nodata = int(src.nodata)
                 elif np.issubdtype(out_dtype, np.floating):
-                    nodata = src.nodata
+                    finfo = np.finfo(out_dtype)
+                    if (
+                        np.isnan(src.nodata)
+                        or np.isinf(src.nodata)
+                        or (float(finfo.min) <= float(src.nodata) <= float(finfo.max))
+                    ):
+                        nodata = float(src.nodata)
     else:
         # Check if we have all required parameters
         if transform is None:
@@ -1309,37 +1352,39 @@ def masks_to_vector(
 
             sindex = gdf.sindex
             keep_indices = []
-            kept_set = set()
             polygons = gdf.geometry.values
+            n_polys = len(polygons)
+            suppressed = np.zeros(n_polys, dtype=bool)
 
-            for i in range(len(polygons)):
+            for i in range(n_polys):
+                if suppressed[i]:
+                    continue
+
+                keep_indices.append(i)
                 poly_i = polygons[i]
-                keep = True
-                if poly_i is not None and not poly_i.is_empty and poly_i.is_valid:
-                    candidates = sindex.query(poly_i, predicate="intersects")
-                    for j in candidates:
-                        if j not in kept_set:
-                            continue
-                        poly_j = polygons[j]
-                        if not poly_j.is_valid:
-                            continue
+                if poly_i is None or poly_i.is_empty or not poly_i.is_valid:
+                    continue
 
-                        # Calculate IoU
-                        try:
-                            intersection = poly_i.intersection(poly_j).area
-                            union = poly_i.area + poly_j.area - intersection
-                            iou = intersection / union if union > 0 else 0
+                poly_i_area = poly_i.area
+                candidates = sindex.query(poly_i, predicate="intersects")
+                for j in candidates:
+                    if j <= i or suppressed[j]:
+                        continue
+                    poly_j = polygons[j]
+                    if poly_j is None or poly_j.is_empty or not poly_j.is_valid:
+                        continue
 
-                            if iou > iou_threshold:
-                                keep = False
-                                break
-                        except (ValueError, TypeError):
-                            # Skip on topology exceptions
-                            continue
+                    # Calculate IoU
+                    try:
+                        intersection = poly_i.intersection(poly_j).area
+                        union = poly_i_area + poly_j.area - intersection
+                        iou = intersection / union if union > 0 else 0
 
-                if keep:
-                    keep_indices.append(i)
-                    kept_set.add(i)
+                        if iou > iou_threshold:
+                            suppressed[j] = True
+                    except (ValueError, TypeError):
+                        # Skip on topology exceptions
+                        continue
 
             return gdf.iloc[keep_indices]
 
@@ -1558,8 +1603,11 @@ def mosaic_geotiffs(
     # Close the dataset
     ds = None
 
-    # Create temporary intermediates inside an isolated temporary directory
-    with tempfile.TemporaryDirectory() as tmpdir:
+    output_dir = os.path.dirname(os.path.abspath(output_file))
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Create temporary intermediates inside an isolated directory on the output volume
+    with tempfile.TemporaryDirectory(dir=output_dir) as tmpdir:
         vrt_path = os.path.join(tmpdir, "temp_mosaic.vrt")
 
         # Build VRT from input files with proper nodata handling
@@ -1758,11 +1806,9 @@ def stack_bands(
         with tempfile.TemporaryDirectory() as tmpdir:
             _run_stack(os.path.join(tmpdir, "stack.vrt"))
     else:
-        try:
-            _run_stack(temp_vrt)
-        finally:
-            if os.path.exists(temp_vrt):
-                os.remove(temp_vrt)
+        _run_stack(temp_vrt)
+        if os.path.exists(temp_vrt):
+            os.remove(temp_vrt)
 
     return output_file
 
@@ -1845,9 +1891,11 @@ def clean_instance_mask(
         """Return mapping from non-zero instance ID to tight bounding-box slice."""
         if ids.size == 0:
             return {}
-        min_id = int(ids.min())
-        max_id = int(ids.max())
-        if min_id > 0 and max_id <= 1_000_000:
+        if (
+            np.issubdtype(label_arr.dtype, np.integer)
+            and int(ids.min()) > 0
+            and int(ids.max()) <= 1_000_000
+        ):
             raw_slices = ndimage.find_objects(label_arr)
             return {
                 uid: raw_slices[int(uid) - 1]
@@ -1855,12 +1903,17 @@ def clean_instance_mask(
                 if int(uid) - 1 < len(raw_slices)
                 and raw_slices[int(uid) - 1] is not None
             }
-        # Compact remap for sparse or very large IDs
+        # Compact remap for non-integer, sparse, or very large IDs
         sorted_ids = np.sort(ids)
         compact = np.zeros(label_arr.shape, dtype=np.int32)
         nz = label_arr != 0
-        pos = np.searchsorted(sorted_ids, label_arr[nz])
-        compact[nz] = pos + 1
+        nz_vals = label_arr[nz]
+        pos = np.searchsorted(sorted_ids, nz_vals)
+        in_bounds = pos < sorted_ids.size
+        matched = np.zeros(nz_vals.shape, dtype=bool)
+        matched[in_bounds] = sorted_ids[pos[in_bounds]] == nz_vals[in_bounds]
+        nz_indices = np.flatnonzero(nz)
+        compact.ravel()[nz_indices[matched]] = pos[matched] + 1
         raw_slices = ndimage.find_objects(compact)
         return {
             uid: raw_slices[idx]
@@ -1876,7 +1929,11 @@ def clean_instance_mask(
 
     small_ids = unique_ids[counts < min_area]
     if small_ids.size > 0:
-        if int(unique_ids.min()) > 0 and int(unique_ids.max()) <= 1_000_000:
+        if (
+            np.issubdtype(cleaned.dtype, np.integer)
+            and int(unique_ids.min()) > 0
+            and int(unique_ids.max()) <= 1_000_000
+        ):
             keep_lut = np.ones(int(unique_ids.max()) + 1, dtype=bool)
             keep_lut[small_ids.astype(np.int64)] = False
             cleaned = np.where(keep_lut[cleaned], cleaned, 0)
@@ -1949,7 +2006,11 @@ def clean_instance_mask(
                 neighbor_ids = neighbor_ids[neighbor_ids > 0]
                 if len(neighbor_ids) > 0:
                     # Assign to the most frequent neighbor
-                    fill_id = np.bincount(neighbor_ids).argmax()
+                    if np.issubdtype(neighbor_ids.dtype, np.integer):
+                        fill_id = np.bincount(neighbor_ids).argmax()
+                    else:
+                        vals, cnts = np.unique(neighbor_ids, return_counts=True)
+                        fill_id = vals[cnts.argmax()]
                     sub_cleaned = cleaned[r0:r1, c0:c1]
                     sub_cleaned[region] = fill_id
 

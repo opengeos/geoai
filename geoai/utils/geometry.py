@@ -502,10 +502,19 @@ def region_groups(
     # Filter regions by size using a vectorized boolean lookup table
     unique_labels, counts = np.unique(label_image, return_counts=True)
     if unique_labels.size > 0:
+        spacing = kwargs.get("spacing")
+        if spacing is not None:
+            spacing_arr = np.broadcast_to(
+                np.asarray(spacing, dtype=float), (label_image.ndim,)
+            )
+            pixel_area = float(np.prod(spacing_arr))
+            sizes = counts.astype(float) * pixel_area
+        else:
+            sizes = counts
         keep_lut = np.zeros(int(unique_labels.max()) + 1, dtype=bool)
-        keep_mask = (unique_labels != 0) & (counts >= min_size)
+        keep_mask = (unique_labels != 0) & (sizes >= min_size)
         if max_size is not None:
-            keep_mask &= counts <= max_size
+            keep_mask &= sizes <= max_size
         keep_lut[unique_labels[keep_mask]] = True
         label_image = np.where(keep_lut[label_image], label_image, 0)
 
