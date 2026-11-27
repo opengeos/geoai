@@ -23,7 +23,7 @@ SSL_MODULE_MISSING_OUTPUT = (
     "the ssl module in Python is not available.\n"
     "WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, "
     "status=None)) after connection broken by 'SSLError(\"Can't connect to "
-    'HTTPS URL because the SSL module is not available.")\': /simple/torch/\n'
+    "HTTPS URL because the SSL module is not available.\")': /simple/torch/\n"
     "ERROR: Could not find a version that satisfies the requirement "
     "torch>=2.0.0 (from versions: none)\n"
     "ERROR: No matching distribution found for torch>=2.0.0"
@@ -127,9 +127,7 @@ def test_clean_env_disables_user_site_and_strips_python_executable(monkeypatch):
         assert env["PYTHONNOUSERSITE"] == "1"
 
 
-def test_real_venv_activates_despite_inherited_python_executable(
-    tmp_path, monkeypatch
-):
+def test_real_venv_activates_despite_inherited_python_executable(tmp_path, monkeypatch):
     """QGIS sets PYTHONEXECUTABLE; it must not stop the venv from activating.
 
     With PYTHONEXECUTABLE pointing at QGIS's interpreter, a Windows venv
@@ -188,9 +186,7 @@ def test_pyvenv_cfg_version_is_read_from_uv_and_stdlib_venvs(tmp_path):
 
 def test_venv_with_stale_python_version_is_not_reused(tmp_path, monkeypatch):
     stale = (3, 8) if sys.version_info[:2] != (3, 8) else (3, 9)
-    _write_pyvenv_cfg(
-        tmp_path, "version_info = {}.{}.0\n".format(stale[0], stale[1])
-    )
+    _write_pyvenv_cfg(tmp_path, "version_info = {}.{}.0\n".format(stale[0], stale[1]))
     monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
 
     def fail_run(*_args, **_kwargs):
@@ -331,7 +327,9 @@ def test_ensure_venv_ssl_registers_qgis_dll_directories(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(venv_manager, "_qgis_dll_directories", lambda: [str(dll_dir)])
     monkeypatch.setattr(
-        venv_manager, "get_venv_site_packages", lambda _venv_dir=None: str(site_packages)
+        venv_manager,
+        "get_venv_site_packages",
+        lambda _venv_dir=None: str(site_packages),
     )
 
     ok, _message = venv_manager._ensure_venv_ssl(str(tmp_path / "venv"), {}, {})
