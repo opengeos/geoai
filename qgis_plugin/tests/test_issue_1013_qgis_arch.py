@@ -437,9 +437,13 @@ def test_moondream_and_deepforest_close_previous_client_and_abort_on_cleanup(
         source=lambda: f"{active_gpkg}|layername=trees"
     )
     monkeypatch.setattr(
-        deepforest_panel.QgsProject,
-        "instance",
-        lambda: types.SimpleNamespace(mapLayers=lambda: {"1": active_layer}),
+        deepforest_panel,
+        "QgsProject",
+        types.SimpleNamespace(
+            instance=lambda: types.SimpleNamespace(
+                mapLayers=lambda: {"1": active_layer}
+            )
+        ),
     )
 
     df_order = []
@@ -561,6 +565,13 @@ def test_moondream_save_vector_prefers_write_as_vector_format_v3(monkeypatch):
     fake_layer = types.SimpleNamespace(isValid=lambda: True, crs=lambda: "CRS")
     monkeypatch.setattr(moondream, "QgsVectorLayer", lambda *_a: fake_layer)
     monkeypatch.setattr(moondream, "QgsVectorFileWriter", FakeWriterV3)
+    monkeypatch.setattr(
+        moondream,
+        "QgsProject",
+        types.SimpleNamespace(
+            instance=lambda: types.SimpleNamespace(transformContext=lambda: "CTX")
+        ),
+    )
 
     dock = types.SimpleNamespace()
     moondream.MoondreamDockWidget._save_vector_result(dock, "in.geojson", "out.gpkg")
@@ -685,8 +696,13 @@ def test_deepforest_save_as_raster_uses_uint32_at_65535_and_image_dims_helper(
     fake_rasterio.open = fake_open
     fake_features = types.ModuleType("rasterio.features")
     fake_features.rasterize = fake_rasterize
+    fake_shapely = types.ModuleType("shapely")
+    fake_shapely_geom = types.ModuleType("shapely.geometry")
+    fake_shapely_geom.box = lambda *args: "BOX"
     monkeypatch.setitem(sys.modules, "rasterio", fake_rasterio)
     monkeypatch.setitem(sys.modules, "rasterio.features", fake_features)
+    monkeypatch.setitem(sys.modules, "shapely", fake_shapely)
+    monkeypatch.setitem(sys.modules, "shapely.geometry", fake_shapely_geom)
 
     class FakePreds:
         def __init__(self, count):

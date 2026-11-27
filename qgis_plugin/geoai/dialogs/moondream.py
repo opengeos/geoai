@@ -53,10 +53,6 @@ def _keep_thread_alive(thread: QThread) -> None:
                 pass
 
     def _drop(*_args):
-        try:
-            thread.wait()
-        except RuntimeError:
-            pass
         _LIVE_THREADS.discard(thread)
 
     _LIVE_THREADS.add(thread)

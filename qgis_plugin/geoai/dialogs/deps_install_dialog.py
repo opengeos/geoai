@@ -245,10 +245,19 @@ class DepsInstallDockWidget(QDockWidget):
         self._remove_worker.done.connect(self._on_venv_removed)
         self._remove_worker.start()
 
-    def _on_venv_removed(self, _ok: bool, _message: str):
+    def _on_venv_removed(self, ok: bool, message: str):
         """Proceed with dependency installation after venv removal completes."""
         self.progress_bar.setRange(0, 100)
         self._remove_worker = None
+        if not ok:
+            self.progress_frame.hide()
+            self.status_label.setText(
+                f"Failed to remove existing virtual environment: {message}"
+            )
+            self.status_label.show()
+            self.reinstall_button.show()
+            self.install_button.show()
+            return
         self.install_requested.emit()
 
     def closeEvent(self, event):
