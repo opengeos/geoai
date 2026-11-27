@@ -1,10 +1,13 @@
 """This module provides functions to download data, including NAIP imagery and building data from Overture Maps."""
 
+import contextlib
 import datetime
 import json
 import logging
 import os
+import stat
 import subprocess
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
@@ -155,6 +158,29 @@ def _validate_url(url: str) -> None:
         raise ValueError(f"URL is missing a host: {url!r}")
 
 
+def _apply_output_permissions(temp_path: str, output_path: str) -> None:
+    """Apply existing destination permissions or umask-default mode to *temp_path*."""
+    if os.name == "nt":
+        return
+    try:
+        mode = stat.S_IMODE(os.stat(output_path).st_mode)
+    except FileNotFoundError:
+        umask = None
+        try:
+            with open("/proc/self/status", encoding="utf-8") as status_file:
+                for line in status_file:
+                    if line.startswith("Umask:"):
+                        umask = int(line.split(":", 1)[1].strip(), 8)
+                        break
+        except OSError:
+            pass
+        if umask is None:
+            umask = os.umask(0o022)
+            os.umask(umask)
+        mode = 0o666 & ~umask
+    os.chmod(temp_path, mode)
+
+
 def download_with_progress(
     url: str, output_path: str, max_size: Optional[int] = None
 ) -> None:
@@ -172,31 +198,64 @@ def download_with_progress(
     """
     _validate_url(url)
     response = requests.get(url, stream=True)
-    response.raise_for_status()
-    total_size = int(response.headers.get("content-length", 0))
+    temp_path = None
+    try:
+        response.raise_for_status()
+        total_size = int(response.headers.get("content-length", 0))
 
-    if max_size is not None and total_size > max_size:
-        response.close()
-        raise ValueError(
-            f"File size ({total_size} bytes) exceeds the maximum "
-            f"allowed size ({max_size} bytes)."
+        if max_size is not None and total_size > max_size:
+            raise ValueError(
+                f"File size ({total_size} bytes) exceeds the maximum "
+                f"allowed size ({max_size} bytes)."
+            )
+
+        block_size = 1024  # 1 Kibibyte
+
+        # Write to an exclusively created temporary file in the destination
+        # directory and move it into place only once the download completes,
+        # so interrupted or concurrent transfers never clobber or leave a
+        # truncated file at the final path.
+        output_dir = os.path.dirname(os.path.abspath(output_path))
+        fd, temp_path = tempfile.mkstemp(
+            dir=output_dir,
+            prefix=".geoai_dl_",
+            suffix=".part",
         )
+        bytes_written = 0
+        with (
+            os.fdopen(fd, "wb") as file,
+            tqdm(
+                desc=os.path.basename(output_path),
+                total=total_size,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as bar,
+        ):
+            for data in response.iter_content(block_size):
+                size = file.write(data)
+                bytes_written += size
+                bar.update(size)
 
-    block_size = 1024  # 1 Kibibyte
+        if (
+            total_size > 0
+            and not response.headers.get("content-encoding")
+            and bytes_written < total_size
+        ):
+            raise IOError(
+                f"Incomplete download: received {bytes_written} of "
+                f"{total_size} bytes from {url}."
+            )
 
-    with (
-        open(output_path, "wb") as file,
-        tqdm(
-            desc=os.path.basename(output_path),
-            total=total_size,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1024,
-        ) as bar,
-    ):
-        for data in response.iter_content(block_size):
-            size = file.write(data)
-            bar.update(size)
+        _apply_output_permissions(temp_path, output_path)
+        os.replace(temp_path, output_path)
+    except BaseException:
+        if temp_path is not None:
+            with contextlib.suppress(OSError):
+                os.remove(temp_path)
+        raise
+    finally:
+        response.close()
 
 
 def preview_raster(data: Any, title: str = None) -> None:
