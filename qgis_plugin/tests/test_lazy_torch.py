@@ -19,8 +19,7 @@ TESTS_DIR = pathlib.Path(__file__).resolve().parent
 
 # Fails the import of torch (and records it) in a fresh interpreter, then
 # imports the panel modules with the same qgis stub as the test suite.
-_PROBE = textwrap.dedent(
-    """
+_PROBE = textwrap.dedent("""
     import importlib, sys
     sys.path.insert(0, {tests_dir!r})
 
@@ -39,8 +38,7 @@ _PROBE = textwrap.dedent(
     for mod in {modules!r}:
         importlib.import_module(mod)
     print("ATTEMPTS=" + ",".join(attempts))
-    """
-)
+    """)
 
 PANEL_MODULES = [
     "geoai.dialogs.samgeo",
