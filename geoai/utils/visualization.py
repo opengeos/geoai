@@ -1098,6 +1098,8 @@ def create_overview_image(
         str: Path to the saved overview image.
     """
     # Read a reduced version of the source image
+    from rasterio.enums import Resampling
+
     overview_scale = max(
         1, int(max(src.width, src.height) / 2000)
     )  # Scale to max ~2000px
@@ -1117,11 +1119,11 @@ def create_overview_image(
                     mask_data = class_src.read(
                         1,
                         out_shape=(overview_height, overview_width),
-                        resampling=rasterio.enums.Resampling.nearest,
+                        resampling=Resampling.nearest,
                     )
             else:
                 # Vector class data: rasterize at overview scale
-                import rasterio.features
+                from rasterio import features as rasterio_features
 
                 gdf = gpd.read_file(in_class_data)
                 if gdf.crs != src.crs:
@@ -1139,7 +1141,7 @@ def create_overview_image(
 
                 shapes = [(geom, 1) for geom in gdf.geometry if geom is not None]
                 if shapes:
-                    mask_data = rasterio.features.rasterize(
+                    mask_data = rasterio_features.rasterize(
                         shapes,
                         out_shape=(overview_height, overview_width),
                         transform=overview_transform,
@@ -1167,7 +1169,7 @@ def create_overview_image(
         # Read downsampled image
         overview_data = src.read(
             out_shape=(src.count, overview_height, overview_width),
-            resampling=rasterio.enums.Resampling.average,
+            resampling=Resampling.average,
         )
 
         # Create RGB image for display

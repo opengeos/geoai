@@ -518,7 +518,7 @@ def train_timm_classifier(
     callbacks.append(early_stop_callback)
 
     # Set up logger
-    logger = CSVLogger(model_dir, name="lightning_logs")
+    csv_logger = CSVLogger(model_dir, name="lightning_logs")
 
     # Create trainer
     trainer = pl.Trainer(
@@ -526,7 +526,7 @@ def train_timm_classifier(
         accelerator=accelerator,
         devices=devices,
         callbacks=callbacks,
-        logger=logger,
+        logger=csv_logger,
         log_every_n_steps=10,
         **kwargs,
     )

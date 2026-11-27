@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from glob import glob
-from typing import List, LiteralString, Tuple
+from typing import List, Literal, Tuple
 import math
 import os
 import sys
@@ -393,7 +393,7 @@ class ESRGANDataPreprocess:
         self,
         ds: "gdal.Dataset",
         band: int,
-        resample_method: LiteralString[
+        resample_method: Literal[
             "bilinear",
             "cubic",
             "average",
@@ -1289,12 +1289,12 @@ class ESRGAN:
         # Restart a previous epoch from a command line parameter
         if last_epoch >= 0:
             pts_file = os.path.join(self.model_path, "generator_checkpoint.pt")
-            state_dict = torch.load(pts_file, gen.state_dict())
+            state_dict = torch.load(pts_file, map_location=device, weights_only=True)
             result = gen.load_state_dict(state_dict)
             if str(result) != "<All keys matched successfully>":
                 raise ValueError("Mismatched weights on generator, check parameters.")
             pts_file = os.path.join(self.model_path, "discriminator_checkpoint.pt")
-            state_dict = torch.load(pts_file, dis.state_dict())
+            state_dict = torch.load(pts_file, map_location=device, weights_only=True)
             result = dis.load_state_dict(state_dict)
             if str(result) != "<All keys matched successfully>":
                 raise ValueError(

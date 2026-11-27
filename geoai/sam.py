@@ -143,9 +143,11 @@ class SamGeo:
 
             image = cv2.imread(source)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            generator_input = source
         elif isinstance(source, np.ndarray):
             image = source
             source = None
+            generator_input = Image.fromarray(image)
         else:
             raise ValueError("Input source must be either a path or a numpy array.")
 
@@ -156,7 +158,7 @@ class SamGeo:
         self.image = image  # Store the input image as a numpy array
         mask_generator = self.mask_generator  # The automatic mask generator
         # masks = mask_generator.generate(image)  # Segment the input image
-        result = mask_generator(source, **kwargs)
+        result = mask_generator(generator_input, **kwargs)
         masks = result["masks"] if "masks" in result else result  # Get the masks
         scores = result["scores"] if "scores" in result else None  # Get the scores
 
@@ -311,16 +313,19 @@ class SamGeo:
         if self.masks is None:
             raise ValueError("No masks found. Please run generate() first.")
 
+        masks = self.masks
+
         if self.image is None:
+            if not masks:
+                raise ValueError("No masks found and no image is set.")
             (
                 h,
                 w,
-            ) = self.masks[
+            ) = masks[
                 0
             ]["segmentation"].shape
         else:
-            h, w, _ = self.image.shape
-        masks = self.masks
+            h, w = self.image.shape[:2]
 
         # Set output image data type based on the number of objects
         if len(masks) < 255:
@@ -335,25 +340,34 @@ class SamGeo:
             # Sort the masks by area in descending order
             sorted_masks = sorted(masks, key=(lambda x: x["area"]), reverse=True)
 
-            # Create an output image with the same size as the input image
-            objects = np.zeros(
-                (
-                    sorted_masks[0]["segmentation"].shape[0],
-                    sorted_masks[0]["segmentation"].shape[1],
+            if not sorted_masks:
+                objects = np.zeros((h, w), dtype=dtype)
+            else:
+                # Create an output image with the same size as the input image
+                objects = np.zeros(
+                    (
+                        sorted_masks[0]["segmentation"].shape[0],
+                        sorted_masks[0]["segmentation"].shape[1],
+                    )
                 )
-            )
-            # Assign a unique value to each object
-            count = len(sorted_masks)
-            for index, ann in enumerate(sorted_masks):
-                m = ann["segmentation"]
-                if min_size > 0 and ann["area"] < min_size:
-                    continue
-                if max_size is not None and ann["area"] > max_size:
-                    continue
-                objects[m] = count - index
+                # Assign a unique value to each object
+                count = len(sorted_masks)
+                for index, ann in enumerate(sorted_masks):
+                    m = ann["segmentation"]
+                    if min_size > 0 and ann["area"] < min_size:
+                        continue
+                    if max_size is not None and ann["area"] > max_size:
+                        continue
+                    objects[m] = count - index
 
         # Generate a binary mask
         else:
+            if erosion_kernel is not None:
+                import cv2  # Lazy import to avoid QGIS opencv conflicts
+
+                if isinstance(erosion_kernel, tuple):
+                    erosion_kernel = np.ones(erosion_kernel, np.uint8)
+
             if foreground:  # Extract foreground objects only
                 resulting_mask = np.zeros((h, w), dtype=dtype)
             else:
@@ -622,12 +636,15 @@ class SamGeo:
         out_of_bounds = []
 
         if isinstance(boxes, str):
+            import geopandas as gpd
+
             gdf = gpd.read_file(boxes)
             if gdf.crs is not None:
                 gdf = gdf.to_crs("epsg:4326")
             boxes = gdf.geometry.bounds.values.tolist()
         elif isinstance(boxes, dict):
             import json
+            import geopandas as gpd
 
             geojson = json.dumps(boxes)
             gdf = gpd.read_file(geojson, driver="GeoJSON")

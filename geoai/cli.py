@@ -114,7 +114,7 @@ def download(source, bbox, output, year):
 
         click.echo(f"Downloading NAIP imagery for bbox={coords}...")
         try:
-            result = download_naip(bbox=coords, output=output, **kwargs)
+            result = download_naip(bbox=coords, output_dir=output, **kwargs)
             click.echo(f"Downloaded: {result}")
         except Exception as e:
             click.echo(f"Error downloading NAIP data: {e}", err=True)

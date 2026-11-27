@@ -595,33 +595,22 @@ def add_geometric_properties(
 
     # Area of convex hull
     if "area_convex" in properties or "convex_hull_area" in properties:
-        result["area_convex"] = result.geometry.convex_hull.area
+        convex_area = result.geometry.convex_hull.area
 
         # Convert to requested units
         if area_unit == "km2":
-            result["area_convex"] = result["area_convex"] / 1_000_000
-            result.rename(columns={"area_convex": "area_convex_km2"}, inplace=True)
+            convex_area = convex_area / 1_000_000
+            unit_suffix = "km2"
         elif area_unit == "ha":
-            result["area_convex"] = result["area_convex"] / 10_000
-            result.rename(columns={"area_convex": "area_convex_ha"}, inplace=True)
-        else:  # Default is m²
-            result.rename(columns={"area_convex": "area_convex_m2"}, inplace=True)
+            convex_area = convex_area / 10_000
+            unit_suffix = "ha"
+        else:  # Default is m2
+            unit_suffix = "m2"
 
-        # For backward compatibility
-        if "convex_hull_area" in properties and "area_convex" not in properties:
-            result["convex_hull_area"] = result["area_convex"]
-            if area_unit == "km2":
-                result.rename(
-                    columns={"convex_hull_area": "convex_hull_area_km2"}, inplace=True
-                )
-            elif area_unit == "ha":
-                result.rename(
-                    columns={"convex_hull_area": "convex_hull_area_ha"}, inplace=True
-                )
-            else:
-                result.rename(
-                    columns={"convex_hull_area": "convex_hull_area_m2"}, inplace=True
-                )
+        if "area_convex" in properties:
+            result[f"area_convex_{unit_suffix}"] = convex_area
+        if "convex_hull_area" in properties:
+            result[f"convex_hull_area_{unit_suffix}"] = convex_area
 
     # Area of filled geometry (no holes)
     if "area_filled" in properties:
@@ -890,22 +879,23 @@ def geojson_to_coords(
 
     import json
     import warnings
-
-    warnings.filterwarnings("ignore")
+    from rasterio.warp import transform as transform_coords
 
     if isinstance(geojson, dict):
         geojson = json.dumps(geojson)
-    gdf = gpd.read_file(geojson, driver="GeoJSON")
-    centroids = gdf.geometry.centroid
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        gdf = gpd.read_file(geojson, driver="GeoJSON")
+        centroids = gdf.geometry.centroid
     centroid_list = [[point.x, point.y] for point in centroids]
-    if src_crs != dst_crs:
-        centroid_list = transform_coords(
-            [x[0] for x in centroid_list],
-            [x[1] for x in centroid_list],
+    if src_crs != dst_crs and centroid_list:
+        xs, ys = transform_coords(
             src_crs,
             dst_crs,
+            [x[0] for x in centroid_list],
+            [x[1] for x in centroid_list],
         )
-        centroid_list = [[x, y] for x, y in zip(centroid_list[0], centroid_list[1])]
+        centroid_list = [[x, y] for x, y in zip(xs, ys)]
     return centroid_list
 
 

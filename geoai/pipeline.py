@@ -359,8 +359,17 @@ class SemanticSegmentationStep(PipelineStep):
         self.window_size = window_size
         self.overlap = overlap
         self.batch_size = batch_size
-        self.device_str = device
+        self.device = device
         self.suffix = suffix
+
+    @property
+    def device_str(self) -> Optional[str]:
+        """Backward-compatible alias for ``device``."""
+        return self.device
+
+    @device_str.setter
+    def device_str(self, value: Optional[str]) -> None:
+        self.device = value
 
     def setup(self) -> None:
         """Verify the segmentation dependency is importable.
@@ -392,10 +401,10 @@ class SemanticSegmentationStep(PipelineStep):
         output_path = os.path.join(output_dir, f"{base_name}{self.suffix}.tif")
 
         kwargs: Dict[str, Any] = {}
-        if self.device_str is not None:
+        if self.device is not None:
             import torch
 
-            kwargs["device"] = torch.device(self.device_str)
+            kwargs["device"] = torch.device(self.device)
 
         semantic_segmentation(
             input_path=input_path,
@@ -818,10 +827,30 @@ class Pipeline:
         """Initialize checkpoint manager if checkpoint_dir is set."""
         if not self.checkpoint_dir:
             return None
+        if (
+            not self.name
+            or "/" in self.name
+            or "\\" in self.name
+            or ".." in self.name
+            or "\x00" in self.name
+            or os.path.basename(self.name) != self.name
+        ):
+            raise ValueError(
+                f"Invalid pipeline name {self.name!r} for checkpoint filename: "
+                "must not contain path separators or parent directory references."
+            )
         os.makedirs(self.checkpoint_dir, exist_ok=True)
-        checkpoint_path = os.path.join(
-            self.checkpoint_dir, f"{self.name}_checkpoint.json"
+        checkpoint_dir_abs = os.path.abspath(self.checkpoint_dir)
+        checkpoint_path = os.path.abspath(
+            os.path.join(checkpoint_dir_abs, f"{self.name}_checkpoint.json")
         )
+        if (
+            os.path.commonpath([checkpoint_dir_abs, checkpoint_path])
+            != checkpoint_dir_abs
+        ):
+            raise ValueError(
+                f"Invalid pipeline name {self.name!r}: checkpoint path escapes checkpoint_dir."
+            )
         return CheckpointManager(checkpoint_path, self._config_hash())
 
     def _processing_steps(self) -> List[PipelineStep]:
