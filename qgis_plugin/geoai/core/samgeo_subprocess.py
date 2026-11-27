@@ -36,6 +36,17 @@ _HF_TOKEN_ENV_VARS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
 _PREFER_SAVED_HF_TOKEN = False
 
 
+def hf_token_env_overrides() -> tuple:
+    """Return the token variables new venv subprocesses should not inherit.
+
+    Returns:
+        The Hugging Face token variable names after a panel login, otherwise
+        an empty tuple. Used so the account-status check describes the same
+        credential that new SamGeo workers use.
+    """
+    return _HF_TOKEN_ENV_VARS if _PREFER_SAVED_HF_TOKEN else ()
+
+
 def prefer_saved_hf_token() -> list:
     """Make SamGeo workers started from now on use the saved HF token.
 

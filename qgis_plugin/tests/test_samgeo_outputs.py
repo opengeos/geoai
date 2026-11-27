@@ -648,3 +648,42 @@ def test_samgeo_worker_env_drops_hf_token_only_after_panel_login(monkeypatch):
     start()
     assert "HF_TOKEN" not in captured[-1]
     assert os.environ["HF_TOKEN"] == "hf_FromEnvironment"
+
+
+def test_hf_token_env_overrides_follow_the_panel_login(monkeypatch):
+    from geoai.core import samgeo_subprocess
+
+    monkeypatch.setattr(samgeo_subprocess, "_PREFER_SAVED_HF_TOKEN", False)
+    assert samgeo_subprocess.hf_token_env_overrides() == ()
+
+    monkeypatch.setattr(samgeo_subprocess, "_PREFER_SAVED_HF_TOKEN", True)
+    assert samgeo_subprocess.hf_token_env_overrides() == (
+        "HF_TOKEN",
+        "HUGGING_FACE_HUB_TOKEN",
+    )
+
+
+def test_run_geoai_task_drop_env_only_affects_the_worker(monkeypatch, tmp_path):
+    from geoai.core import geoai_task_subprocess as gts
+
+    captured = {}
+
+    class _Stop(Exception):
+        pass
+
+    def fake_popen(cmd, **kwargs):
+        captured["env"] = kwargs["env"]
+        raise _Stop()
+
+    monkeypatch.setenv("HF_TOKEN", "hf_FromEnvironment")
+    monkeypatch.setattr(gts, "venv_exists", lambda: True)
+    monkeypatch.setattr(gts, "get_venv_python_path", lambda: sys.executable)
+    monkeypatch.setattr(gts, "_get_clean_env_for_venv", lambda: dict(os.environ))
+    monkeypatch.setattr(gts, "_get_subprocess_kwargs", dict)
+    monkeypatch.setattr(gts.subprocess, "Popen", fake_popen)
+
+    with pytest.raises(_Stop):
+        gts.run_geoai_task("hf_whoami", {}, drop_env=("HF_TOKEN",))
+
+    assert "HF_TOKEN" not in captured["env"]
+    assert os.environ["HF_TOKEN"] == "hf_FromEnvironment"

@@ -592,8 +592,11 @@ class SamGeoDockWidget(QDockWidget):
 
         def _work():
             from ..core.geoai_task_subprocess import run_geoai_task
+            from ..core.samgeo_subprocess import hf_token_env_overrides
 
-            return run_geoai_task(action, params)
+            # Check the account with the same token policy as new SamGeo
+            # workers, so the status names the credential model loads use.
+            return run_geoai_task(action, params, drop_env=hf_token_env_overrides())
 
         self._hf_worker = SamGeoOperationWorker(_work)
         self._hf_worker.finished.connect(on_done)
