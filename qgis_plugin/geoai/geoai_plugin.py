@@ -37,6 +37,8 @@ class GeoAIPlugin:
         self._samgeo_dock = None
         self._deepforest_dock = None
         self._water_segmentation_dock = None
+        self._change_detection_dock = None
+        self._processing_monitor_dock = None
 
         # Dependency installation state
         self._deps_available = False
@@ -126,6 +128,10 @@ class GeoAIPlugin:
         if not os.path.exists(water_icon):
             water_icon = ":/images/themes/default/mIconPolygonLayer.svg"
 
+        change_icon = os.path.join(icon_base, "change_detection.svg")
+        if not os.path.exists(change_icon):
+            change_icon = ":/images/themes/default/mIconRaster.svg"
+
         moondream_icon = os.path.join(icon_base, "moondream.svg")
         if not os.path.exists(moondream_icon):
             moondream_icon = ":/images/themes/default/mIconRaster.svg"
@@ -160,12 +166,32 @@ class GeoAIPlugin:
             parent=self.iface.mainWindow(),
         )
 
+        monitor_icon = ":/images/themes/default/mActionRefresh.svg"
+        self.processing_monitor_action = self.add_action(
+            monitor_icon,
+            "AI Processing Monitor",
+            self.toggle_processing_monitor_dock,
+            status_tip="Monitor GeoAI task status, progress, timing, errors, and GPU memory",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
         # Add Water Segmentation action (checkable for dock toggle)
         self.water_segmentation_action = self.add_action(
             water_icon,
             "Water Segmentation",
             self.toggle_water_segmentation_dock,
             status_tip="Toggle Water Segmentation panel (OmniWaterMask water body detection)",
+            checkable=True,
+            parent=self.iface.mainWindow(),
+        )
+
+        # Add Change Detection action (checkable for dock toggle)
+        self.change_detection_action = self.add_action(
+            change_icon,
+            "Change Detection",
+            self.toggle_change_detection_dock,
+            status_tip="Toggle Change Detection panel (AnyChange bi-temporal change detection)",
             checkable=True,
             parent=self.iface.mainWindow(),
         )
@@ -380,6 +406,11 @@ class GeoAIPlugin:
             self._segmentation_dock = None
 
         if self._samgeo_dock:
+            try:
+                # Stops or detaches its worker threads before deletion.
+                self._samgeo_dock.cleanup()
+            except Exception:
+                pass
             self.iface.removeDockWidget(self._samgeo_dock)
             self._samgeo_dock.deleteLater()
             self._samgeo_dock = None
@@ -394,10 +425,20 @@ class GeoAIPlugin:
             self._water_segmentation_dock.deleteLater()
             self._water_segmentation_dock = None
 
+        if self._change_detection_dock:
+            self.iface.removeDockWidget(self._change_detection_dock)
+            self._change_detection_dock.deleteLater()
+            self._change_detection_dock = None
+
         if self._instance_segmentation_dock:
             self.iface.removeDockWidget(self._instance_segmentation_dock)
             self._instance_segmentation_dock.deleteLater()
             self._instance_segmentation_dock = None
+
+        if self._processing_monitor_dock:
+            self.iface.removeDockWidget(self._processing_monitor_dock)
+            self._processing_monitor_dock.deleteLater()
+            self._processing_monitor_dock = None
 
         # Remove actions from menu
         for action in self.actions:
@@ -531,6 +572,7 @@ class GeoAIPlugin:
                     "samgeo": self.toggle_samgeo_dock,
                     "deepforest": self.toggle_deepforest_dock,
                     "water_segmentation": self.toggle_water_segmentation_dock,
+                    "change_detection": self.toggle_change_detection_dock,
                 }
                 callback = action_map.get(self._pending_dock_action)
                 self._pending_dock_action = None
@@ -629,6 +671,44 @@ class GeoAIPlugin:
     def _on_segmentation_visibility_changed(self, visible):
         """Handle Semantic Segmentation dock visibility change."""
         self.segmentation_action.setChecked(visible)
+
+    def toggle_processing_monitor_dock(self):
+        """Toggle the AI Processing Monitor dock widget."""
+        if self._processing_monitor_dock is None:
+            try:
+                from .dialogs.processing_monitor import ProcessingMonitorDockWidget
+
+                self._processing_monitor_dock = ProcessingMonitorDockWidget(
+                    self.iface.mainWindow()
+                )
+                self._processing_monitor_dock.visibilityChanged.connect(
+                    self._on_processing_monitor_visibility_changed
+                )
+                self.iface.addDockWidget(
+                    Qt.DockWidgetArea.RightDockWidgetArea,
+                    self._processing_monitor_dock,
+                )
+                self._processing_monitor_dock.show()
+                self._processing_monitor_dock.raise_()
+                return
+            except Exception as e:
+                QMessageBox.critical(
+                    self.iface.mainWindow(),
+                    "Error",
+                    f"Failed to create AI Processing Monitor:\n{str(e)}",
+                )
+                self.processing_monitor_action.setChecked(False)
+                return
+
+        if self.processing_monitor_action.isChecked():
+            self._processing_monitor_dock.hide()
+        else:
+            self._processing_monitor_dock.show()
+            self._processing_monitor_dock.raise_()
+
+    def _on_processing_monitor_visibility_changed(self, visible):
+        """Synchronize the monitor action with dock visibility."""
+        self.processing_monitor_action.setChecked(visible)
 
     def toggle_samgeo_dock(self):
         """Toggle the SamGeo dock widget visibility."""
@@ -762,6 +842,49 @@ class GeoAIPlugin:
     def _on_water_segmentation_visibility_changed(self, visible):
         """Handle Water Segmentation dock visibility change."""
         self.water_segmentation_action.setChecked(visible)
+
+    def toggle_change_detection_dock(self):
+        """Toggle the Change Detection dock widget visibility."""
+        if not self._ensure_dependencies("change_detection"):
+            return
+
+        if self._change_detection_dock is None:
+            try:
+                from .dialogs.change_detection import ChangeDetectionDockWidget
+
+                self._change_detection_dock = ChangeDetectionDockWidget(
+                    self.iface, self.iface.mainWindow()
+                )
+                self._change_detection_dock.setObjectName("GeoAIChangeDetectionDock")
+                self._change_detection_dock.visibilityChanged.connect(
+                    self._on_change_detection_visibility_changed
+                )
+                self.iface.addDockWidget(
+                    Qt.DockWidgetArea.RightDockWidgetArea, self._change_detection_dock
+                )
+                self._change_detection_dock.show()
+                self._change_detection_dock.raise_()
+                return
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self.iface.mainWindow(),
+                    "Error",
+                    f"Failed to create Change Detection panel:\n{str(e)}",
+                )
+                self.change_detection_action.setChecked(False)
+                return
+
+        # Toggle visibility
+        if self._change_detection_dock.isVisible():
+            self._change_detection_dock.hide()
+        else:
+            self._change_detection_dock.show()
+            self._change_detection_dock.raise_()
+
+    def _on_change_detection_visibility_changed(self, visible):
+        """Handle Change Detection dock visibility change."""
+        self.change_detection_action.setChecked(visible)
 
     def toggle_instance_segmentation_dock(self):
         """Toggle the Instance Segmentation dock widget visibility."""
@@ -1134,6 +1257,7 @@ class GeoAIPlugin:
 <li><b>Segment Anything:</b> Segment Anything Model (SAM, SAM2, SAM3) for geospatial data with text, point, and box prompts</li>
 <li><b>Tree Segmentation:</b> Tree crown detection and forest analysis using pretrained DeepForest models</li>
 <li><b>Water Segmentation:</b> Water body detection from satellite/aerial imagery using OmniWaterMask</li>
+<li><b>Change Detection:</b> Bi-temporal change detection between two images using AnyChange</li>
 </ul>
 
 <h3>Links:</h3>

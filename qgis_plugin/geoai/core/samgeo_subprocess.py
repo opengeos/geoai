@@ -29,6 +29,36 @@ def _log(message: str, level=Qgis.Info) -> None:
     QgsMessageLog.logMessage(message, "GeoAI", level=level)
 
 
+# Hugging Face gives these variables priority over the token saved by
+# ``huggingface_hub.login``. After a panel login they are dropped from the
+# SamGeo worker's environment only, leaving the QGIS process untouched.
+_HF_TOKEN_ENV_VARS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
+_PREFER_SAVED_HF_TOKEN = False
+
+
+def hf_token_env_overrides() -> tuple:
+    """Return the token variables new venv subprocesses should not inherit.
+
+    Returns:
+        The Hugging Face token variable names after a panel login, otherwise
+        an empty tuple. Used so the account-status check describes the same
+        credential that new SamGeo workers use.
+    """
+    return _HF_TOKEN_ENV_VARS if _PREFER_SAVED_HF_TOKEN else ()
+
+
+def prefer_saved_hf_token() -> list:
+    """Make SamGeo workers started from now on use the saved HF token.
+
+    Returns:
+        Names of the token variables set in the QGIS environment that new
+        SamGeo workers will no longer inherit.
+    """
+    global _PREFER_SAVED_HF_TOKEN
+    _PREFER_SAVED_HF_TOKEN = True
+    return [name for name in _HF_TOKEN_ENV_VARS if os.environ.get(name)]
+
+
 class _MaskCountProxy:
     """Lightweight list-like placeholder so existing UI len()/truthiness checks work."""
 
@@ -72,6 +102,8 @@ class SamGeoSubprocessClient:
         self._stderr_file = None
         self._lock = threading.RLock()
         self.masks = None
+        self.mask_scores = None
+        self.objects = None
 
         plugin_root = Path(__file__).resolve().parents[1]
         self.worker_script = plugin_root / "workers" / "samgeo_worker.py"
@@ -96,6 +128,9 @@ class SamGeoSubprocessClient:
 
             cmd = [python_path, "-u", str(self.worker_script)]
             env = _get_clean_env_for_venv()
+            if _PREFER_SAVED_HF_TOKEN:
+                for name in _HF_TOKEN_ENV_VARS:
+                    env.pop(name, None)
             popen_kwargs = dict(_get_subprocess_kwargs())
 
             try:
@@ -222,7 +257,70 @@ class SamGeoSubprocessClient:
         self._set_mask_count(result.get("mask_count", 0))
         return result
 
+    def generate_masks_tiled(
+        self,
+        source: str,
+        prompt: str,
+        output: str,
+        tile_size: int = 1024,
+        overlap: int = 128,
+        min_size: int = 0,
+        max_size=None,
+        unique: bool = True,
+        bands=None,
+    ):
+        """Segment a large GeoTIFF tile by tile with a text prompt.
+
+        The worker's ``SamGeo3.generate_masks_tiled`` writes the merged mask
+        raster to ``output`` and keeps no masks in memory afterwards.
+
+        Args:
+            source: Path to the input GeoTIFF.
+            prompt: Text prompt describing the objects.
+            output: Path of the mask GeoTIFF to write.
+            tile_size: Tile size in pixels.
+            overlap: Overlap between tiles in pixels.
+            min_size: Minimum mask size in pixels.
+            max_size: Maximum mask size in pixels, or None for no limit.
+            unique: Give each object its own raster value.
+            bands: Optional 1-based RGB band indices.
+
+        Returns:
+            The worker result dict with ``output`` and ``object_count``.
+        """
+        result = self._request(
+            {
+                "action": "generate_masks_tiled",
+                "source": source,
+                "prompt": prompt,
+                "output": output,
+                "tile_size": int(tile_size),
+                "overlap": int(overlap),
+                "min_size": min_size,
+                "max_size": max_size,
+                "unique": bool(unique),
+                "bands": self._json_payload(bands),
+            },
+            timeout=max(self._TIMEOUT_REQUEST, 6 * 3600),
+        )
+        self._set_mask_count(result.get("mask_count", 0))
+        self.mask_scores = None
+        return result
+
     def save_masks(self, output: str, unique: bool = False):
+        """Save the current masks to a raster in the worker process.
+
+        Also stores the per-mask confidence scores the worker reports in
+        ``self.mask_scores`` (mask id -> SAM confidence), mirroring
+        ``SamGeo3.mask_scores``; None when unavailable or ``unique`` is False.
+
+        Args:
+            output: Path of the mask raster to write.
+            unique: Give each mask its own raster value.
+
+        Returns:
+            The worker result dict with ``mask_count`` and ``mask_scores``.
+        """
         result = self._request(
             {
                 "action": "save_masks",
@@ -232,6 +330,7 @@ class SamGeoSubprocessClient:
             timeout=max(self._TIMEOUT_REQUEST, 1800),
         )
         self._set_mask_count(result.get("mask_count", 0))
+        self.mask_scores = result.get("mask_scores") or None
         return result
 
     def close(self) -> None:

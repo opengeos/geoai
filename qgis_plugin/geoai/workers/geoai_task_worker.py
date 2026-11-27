@@ -7,7 +7,9 @@ import json
 import logging
 import os
 import sys
+import tempfile
 import traceback
+from contextlib import redirect_stdout
 from typing import Any, Callable, Dict
 
 _PROTO_STDOUT = sys.stdout
@@ -242,6 +244,233 @@ def _task_segment_water(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_raster": final_raster, "output_vector": output_vector}
 
 
+def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
+    from geoai.change_detection import ChangeDetection
+    from geoai.utils.raster import raster_to_vector
+
+    output_raster = params["output_raster"]
+    output_vector = params["output_vector"]
+
+    # Create missing folders now, so a bad path fails before the slow steps.
+    # geoai-py 0.43.1 and older don't create the SAM checkpoint folder before
+    # downloading, so make the one download_checkpoint() uses.
+    folders = [
+        os.environ.get(
+            "TORCH_HOME", os.path.expanduser("~/.cache/torch/hub/checkpoints")
+        ),
+        os.path.dirname(output_raster),
+        os.path.dirname(output_vector),
+    ]
+    for folder in folders:
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
+    _progress(f"Loading AnyChange (SAM {params['sam_model_type']})...")
+    detector = _run_with_progress(
+        lambda: ChangeDetection(sam_model_type=params["sam_model_type"])
+    )
+    detector.set_hyperparameters(
+        change_confidence_threshold=params["change_confidence_threshold"],
+        auto_threshold=params["auto_threshold"],
+    )
+
+    # The instance raster (and the score raster detect_changes writes next to
+    # it) only feed the polygons, so keep them out of the user's folders.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        # Each change instance has its own ID here, so it becomes its own polygon.
+        instance_raster = (
+            os.path.join(tmp_dir, "instances.tif") if output_vector else None
+        )
+
+        _progress("Detecting changes...")
+        _run_with_progress(
+            lambda: detector.detect_changes(
+                params["before_path"],
+                params["after_path"],
+                output_path=output_raster,
+                return_results=False,
+                export_instance_masks=bool(output_vector),
+                instance_masks_output_path=instance_raster,
+            )
+        )
+
+        if output_vector:
+            _progress("Converting change instances to polygons...")
+            raster_to_vector(
+                instance_raster,
+                output_path=output_vector,
+                min_area=params["min_area"],
+            )
+
+    return {"output_raster": output_raster, "output_vector": output_vector}
+
+
+def _redact(text: Any, secret: str) -> str:
+    """Replace every occurrence of ``secret`` in ``text`` with ``***``.
+
+    Args:
+        text: Message that might contain the secret.
+        secret: The secret (an access token).
+
+    Returns:
+        The redacted message.
+    """
+    text = "" if text is None else str(text)
+    return text.replace(secret, "***") if secret else text
+
+
+def _huggingface_hub():
+    """Import ``huggingface_hub`` from the plugin environment.
+
+    Returns:
+        The ``huggingface_hub`` module.
+
+    Raises:
+        RuntimeError: If the package is not installed.
+    """
+    try:
+        import huggingface_hub
+    except ImportError:
+        raise RuntimeError(
+            "huggingface_hub is not installed in the plugin environment. "
+            "Reinstall the plugin dependencies."
+        ) from None
+    return huggingface_hub
+
+
+def _hf_token_files(hub) -> list:
+    """List the files where ``huggingface_hub`` stores access tokens.
+
+    Args:
+        hub: The ``huggingface_hub`` module.
+
+    Returns:
+        Paths of the active token file and the stored-tokens file (those the
+        installed version defines, honoring ``HF_HOME``/``HF_TOKEN_PATH``).
+    """
+    paths = []
+    constants = getattr(hub, "constants", None)
+    for name in ("HF_TOKEN_PATH", "HF_STORED_TOKENS_PATH"):
+        value = getattr(constants, name, None) if constants is not None else None
+        if value:
+            paths.append(str(value))
+    return paths
+
+
+def _restrict_token_files(hub) -> None:
+    """Make the saved token files readable only by their owner (best effort).
+
+    Does nothing on Windows, where POSIX modes do not apply.
+
+    Args:
+        hub: The ``huggingface_hub`` module.
+    """
+    if os.name == "nt":
+        return
+    for path in _hf_token_files(hub):
+        try:
+            if os.path.isfile(path):
+                os.chmod(path, 0o600)
+        except OSError:
+            pass
+
+
+def _task_hf_login(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Save a Hugging Face access token for the plugin environment.
+
+    Equivalent to ``hf auth login`` (the token is written to the Hugging Face
+    token cache, not to git credentials). On POSIX systems the token files are
+    created with mode 0600 and tightened to 0600 if they already existed. The
+    token is never included in progress messages, results or errors.
+
+    Args:
+        params: ``{"token": <access token>}``.
+
+    Returns:
+        ``{"logged_in": True, "user": <user name or None>}``. ``user`` is None
+        when the token was saved but the account name could not be looked up.
+
+    Raises:
+        ValueError: If no token was given.
+        RuntimeError: If the token could not be validated or saved (message
+            redacted).
+    """
+    token = str(params.get("token") or "").strip()
+    if not token:
+        raise ValueError("No Hugging Face token was provided.")
+    hub = _huggingface_hub()
+    old_umask = os.umask(0o077) if os.name != "nt" else None
+    try:
+        # Libraries may print; stdout is the JSON protocol channel.
+        with redirect_stdout(sys.stderr):
+            hub.login(token=token, add_to_git_credential=False)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Hugging Face login failed: {_redact(exc, token)}"
+        ) from None
+    finally:
+        if old_umask is not None:
+            os.umask(old_umask)
+    _restrict_token_files(hub)
+
+    # The token is saved now; a failed name lookup is not a login failure.
+    user = None
+    try:
+        with redirect_stdout(sys.stderr):
+            info = hub.whoami(token=token)
+        if isinstance(info, dict):
+            user = info.get("name")
+    except Exception:
+        user = None
+    return {"logged_in": True, "user": user}
+
+
+def _task_hf_whoami(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Report which Hugging Face account the plugin environment uses.
+
+    Args:
+        params: Unused.
+
+    Returns:
+        ``{"logged_in": bool, "user": name or None, "token_found": bool,
+        "message": str}``. ``token_found`` is True when a token is stored or
+        set through ``HF_TOKEN`` even if it could not be verified.
+    """
+    hub = _huggingface_hub()
+    get_token = getattr(hub, "get_token", None)
+    token = None
+    if callable(get_token):
+        try:
+            token = get_token()
+        except Exception:
+            token = None
+    if not token:
+        return {
+            "logged_in": False,
+            "user": None,
+            "token_found": False,
+            "message": "Not logged in to Hugging Face.",
+        }
+    try:
+        with redirect_stdout(sys.stderr):
+            info = hub.whoami(token=token)
+    except Exception as exc:
+        return {
+            "logged_in": False,
+            "user": None,
+            "token_found": True,
+            "message": "A Hugging Face token is set but could not be verified: "
+            + _redact(exc, token),
+        }
+    user = info.get("name") if isinstance(info, dict) else None
+    return {
+        "logged_in": True,
+        "user": user,
+        "token_found": True,
+        "message": f"Logged in to Hugging Face as {user}.",
+    }
+
+
 _TASKS = {
     "train_segmentation_model": _task_train_segmentation_model,
     "train_instance_segmentation_model": _task_train_instance_segmentation_model,
@@ -253,6 +482,9 @@ _TASKS = {
     "vectorize_mask": _task_vectorize_mask,
     "smooth_vector": _task_smooth_vector,
     "segment_water": _task_segment_water,
+    "detect_changes": _task_detect_changes,
+    "hf_login": _task_hf_login,
+    "hf_whoami": _task_hf_whoami,
 }
 
 

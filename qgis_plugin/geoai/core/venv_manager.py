@@ -38,6 +38,7 @@ REQUIRED_PACKAGES = [
     ("sam3", ""),
     ("deepforest", ">=2.1.0"),
     ("omniwatermask", ""),
+    ("torchange", ""),
     # Version is kept at or above the geoai-py runtime requirement so the
     # QGIS managed environment can resolve on Windows/Python 3.12.
     # Older exact pins caused impossible constraints when geoai-py required a
@@ -49,7 +50,7 @@ DEPS_HASH_FILE = os.path.join(VENV_DIR, "deps_hash.txt")
 CUDA_FLAG_FILE = os.path.join(VENV_DIR, "cuda_installed.txt")
 
 # Bump when install logic changes significantly to force re-install.
-_INSTALL_LOGIC_VERSION = "14"
+_INSTALL_LOGIC_VERSION = "15"
 
 # Bump independently for CUDA-specific install logic changes.
 _CUDA_LOGIC_VERSION = "1"
@@ -202,6 +203,18 @@ def _get_required_packages_for_platform(platform_name: str) -> List[Tuple[str, s
         Platform-aware dependency tuples of distribution name and specifier.
     """
     packages = list(REQUIRED_PACKAGES)
+    if platform_name == "darwin":
+        # Keep sam3 as a separate optional package on macOS. Installing the
+        # samgeo3 extra would make segment-geospatial require sam3 and block
+        # fallback when sam3 cannot be installed.
+        packages = [
+            (
+                ("segment-geospatial", ver)
+                if name == "segment-geospatial[samgeo3]"
+                else (name, ver)
+            )
+            for name, ver in packages
+        ]
     if platform_name == "win32":
         sam3_idx = next(
             (i for i, (name, _) in enumerate(packages) if name == "sam3"),
@@ -276,7 +289,7 @@ def _extract_relevant_specs(output: str, package_specs: List[str]) -> List[str]:
     output_key = (output or "").lower().replace("_", "-")
     relevant = []
     for spec in package_specs:
-        name = re.split(r"[><=!]", spec, 1)[0].strip()
+        name = re.split(r"[><=!]", spec, maxsplit=1)[0].strip()
         if name and name.lower().replace("_", "-") in output_key:
             relevant.append(spec)
     return relevant
@@ -580,11 +593,11 @@ def _select_cuda_index(gpu_info: dict) -> Optional[str]:
 # Error detection helpers
 # ---------------------------------------------------------------------------
 
+# Keep these specific: a bare "ssl" substring also matches package names
+# such as ``pyopenssl`` and misreports resolver failures as TLS problems.
 _SSL_ERROR_PATTERNS = [
-    "ssl",
     "certificate verify failed",
     "CERTIFICATE_VERIFY_FAILED",
-    "SSLError",
     "SSLCertVerificationError",
     "tlsv1 alert",
     "tls error",
@@ -596,6 +609,11 @@ _SSL_ERROR_PATTERNS = [
     "unknown issuer",
     "certificate unknown",
 ]
+
+# "ssl:", "ssl error", "ssl module" and "sslerror" as a standalone word, so
+# that "[SSL: ...]" and "requests.exceptions.SSLError" match but a package
+# name such as "pyopenssl:" does not.
+_SSL_WORD_RE = re.compile(r"(?<![a-z0-9_-])ssl(?::| error| module|error)")
 
 _NETWORK_ERROR_PATTERNS = [
     "connectionreseterror",
@@ -637,6 +655,11 @@ _TORCH_DISTRIBUTIONS = ("torch", "torchvision")
 # written to the QGIS log in full.
 _ERROR_DETAIL_LIMIT = 1200
 
+# Characters of installer output kept for failure classification. Generous
+# enough that a TLS error in the middle of a long resolve survives, while a
+# runaway multi-megabyte log cannot flood the QGIS log or the dialog.
+_CLASSIFY_OUTPUT_LIMIT = 50000
+
 # When a uv install also points at the PyTorch wheel index via
 # ``--extra-index-url``, uv defaults to the "first-index" strategy and only
 # considers a package on the first index that lists it. The PyTorch index
@@ -666,6 +689,8 @@ def _is_ssl_error(stderr: str) -> bool:
         True if SSL errors detected.
     """
     stderr_lower = stderr.lower()
+    if _SSL_WORD_RE.search(stderr_lower):
+        return True
     return any(pattern.lower() in stderr_lower for pattern in _SSL_ERROR_PATTERNS)
 
 
@@ -867,6 +892,110 @@ def _classify_batch_error(error_output: str, package_specs: List[str]) -> Option
     return None
 
 
+def _is_ssl_module_missing(output: str) -> bool:
+    """Detect a Python interpreter that cannot import its ``ssl`` module.
+
+    pip prints this when the interpreter behind the venv cannot load
+    ``_ssl`` (for example a venv built on QGIS's own Python on Windows, whose
+    OpenSSL DLLs live outside the interpreter directory). See issue #911.
+
+    Args:
+        output: Installer output to check.
+
+    Returns:
+        True if the output reports that the ssl module is unavailable.
+    """
+    output_lower = (output or "").lower()
+    return (
+        "ssl module in python is not available" in output_lower
+        or "can't connect to https url because the ssl module" in output_lower
+    )
+
+
+def _describe_install_failure(
+    package_name: str,
+    output: str,
+    package_specs: List[str],
+    returncode: Optional[int] = None,
+) -> str:
+    """Turn installer output into a user-facing failure message.
+
+    Transport problems (TLS, proxy, network) are checked before resolver
+    conflicts: pip reports a download it could not make as "No matching
+    distribution found", which used to be shown as an impossible version
+    constraint (issue #911). Every message keeps a bounded copy of the
+    installer output so a support report contains the actual cause
+    (issue #977).
+
+    Args:
+        package_name: Package the failure is attributed to.
+        output: Combined stdout/stderr from the installer.
+        package_specs: Requirement specifiers in the failed install.
+        returncode: Installer exit code, if known.
+
+    Returns:
+        A message suitable for the install dialog.
+    """
+    output = output or ""
+    detail = _truncate_error(output)
+
+    if _is_ssl_module_missing(output):
+        return (
+            "Failed to install {}: the Python interpreter used for the GeoAI "
+            "environment cannot load its SSL module, so it cannot download "
+            "packages over HTTPS. This happens when the standalone Python "
+            "download failed and QGIS's own Python was used instead. Check "
+            "that github.com is reachable, delete the folder {} and click "
+            "Install Dependencies again.\n\nInstaller output:\n{}"
+        ).format(package_name, CACHE_DIR, detail)
+    if _is_ssl_error(output):
+        return (
+            "Failed to install {}: SSL certificate error. A proxy, VPN or "
+            "antivirus that inspects HTTPS traffic is the usual cause. Ask "
+            "your IT team for the root certificate and add it to the Windows "
+            "certificate store (or point SSL_CERT_FILE at it), then retry."
+            "\n\nInstaller output:\n{}"
+        ).format(package_name, detail)
+    if _is_proxy_auth_error(output):
+        return (
+            "Failed to install {}: proxy authentication required. Set the "
+            "proxy user and password in QGIS Settings > Options > Network."
+            "\n\nInstaller output:\n{}"
+        ).format(package_name, detail)
+    # pip prints retry warnings for transient connection drops and may still
+    # end in a genuine conflict; only blame the network when the resolver saw
+    # no versions at all or reported no conflict.
+    if _is_network_error(output) and (
+        not _looks_like_resolution_conflict(output)
+        or "from versions: none" in output.lower()
+    ):
+        return (
+            "Failed to install {}: network error. Check your internet "
+            "connection and retry; the installer resumes from its cache."
+            "\n\nInstaller output:\n{}"
+        ).format(package_name, detail)
+    if _looks_like_resolution_conflict(output):
+        return format_dependency_resolution_diagnostic(
+            output,
+            package_specs=package_specs,
+            python_version="{}.{}".format(
+                sys.version_info.major, sys.version_info.minor
+            ),
+            platform_name=sys.platform,
+        )
+    if _is_antivirus_error(output):
+        return (
+            "Failed to install {}: blocked by antivirus or security policy."
+            "\n\nInstaller output:\n{}"
+        ).format(package_name, detail)
+    if returncode is not None and _is_windows_process_crash(returncode):
+        return (
+            "Failed to install {}: process crashed (code {})"
+            "\n\nInstaller output:\n{}"
+        ).format(package_name, returncode, detail)
+    return "Failed to install {}: {}".format(package_name, detail)
+
+
 # ---------------------------------------------------------------------------
 # Subprocess helpers
 # ---------------------------------------------------------------------------
@@ -898,6 +1027,10 @@ def _get_clean_env_for_venv() -> dict:
     ):
         env.pop(var, None)
     env["PYTHONIOENCODING"] = "utf-8"
+    # Never let packages from the user site (e.g. %APPDATA%\Python\Python312)
+    # shadow the managed venv. Issue #977 had a stale geoai-py imported from
+    # there while the venv's own packages were invisible.
+    env["PYTHONNOUSERSITE"] = "1"
 
     # Ensure CUDA libraries are discoverable for GPU-accelerated torch.
     # QGIS desktop launchers may not inherit the user's shell profile,
@@ -1142,6 +1275,89 @@ def venv_exists(venv_dir: str = None) -> bool:
     return os.path.exists(python_path)
 
 
+def _read_pyvenv_cfg(venv_dir: str = None) -> dict:
+    """Parse a venv's ``pyvenv.cfg`` into a dict with lower-cased keys.
+
+    Args:
+        venv_dir: Optional venv directory path. Uses VENV_DIR if None.
+
+    Returns:
+        The key/value pairs, or an empty dict when the file is unreadable.
+    """
+    if venv_dir is None:
+        venv_dir = VENV_DIR
+    cfg_path = os.path.join(venv_dir, "pyvenv.cfg")
+    try:
+        with open(cfg_path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except OSError:
+        return {}
+
+    values = {}
+    for line in lines:
+        key, sep, value = line.partition("=")
+        if sep:
+            values[key.strip().lower()] = value.strip()
+    return values
+
+
+def _read_pyvenv_cfg_version(venv_dir: str = None) -> Optional[Tuple[int, int]]:
+    """Read the Python major/minor version recorded in ``pyvenv.cfg``.
+
+    uv writes ``version_info`` and the stdlib ``venv`` module writes
+    ``version``; either is accepted.
+
+    Args:
+        venv_dir: Optional venv directory path. Uses VENV_DIR if None.
+
+    Returns:
+        ``(major, minor)``, or None when the file or key is missing or
+        unparsable.
+    """
+    values = _read_pyvenv_cfg(venv_dir)
+    raw = values.get("version_info") or values.get("version")
+    if not raw:
+        return None
+    match = re.match(r"(\d+)\.(\d+)", raw)
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def venv_python_version_matches(venv_dir: str = None) -> bool:
+    """Check that the venv was built for the Python version QGIS runs.
+
+    The cache directory is shared across QGIS upgrades, so a venv (or the
+    standalone interpreter it points at) can be left over from an older
+    Python. uv trusts ``pyvenv.cfg`` and then installs wheels for the wrong
+    ABI, e.g. ``cp39`` wheels into a Python 3.12 venv, which crash on import.
+    See issue #964.
+
+    This only reads ``pyvenv.cfg``, so it is cheap enough for the main thread.
+
+    Args:
+        venv_dir: Optional venv directory path. Uses VENV_DIR if None.
+
+    Returns:
+        False when ``pyvenv.cfg`` records a different major/minor version
+        than the running QGIS Python, True otherwise (including when the
+        version cannot be read).
+    """
+    recorded = _read_pyvenv_cfg_version(venv_dir)
+    if recorded is None:
+        return True
+    expected = (sys.version_info.major, sys.version_info.minor)
+    if recorded != expected:
+        _log(
+            "Venv pyvenv.cfg records Python {}.{} but QGIS runs Python {}.{}".format(
+                recorded[0], recorded[1], expected[0], expected[1]
+            ),
+            Qgis.Warning,
+        )
+        return False
+    return True
+
+
 def venv_python_works(venv_dir: str = None) -> bool:
     """Check that the venv interpreter exists *and* actually runs.
 
@@ -1159,14 +1375,23 @@ def venv_python_works(venv_dir: str = None) -> bool:
     if not venv_exists(venv_dir):
         return False
 
+    if not venv_python_version_matches(venv_dir):
+        return False
+
+    # Exit 1: the interpreter runs but does not activate the venv (issue #951).
+    # Exit 2: it runs a different Python than QGIS, e.g. a standalone
+    # interpreter replaced under an older venv (issue #964).
+    expected = (sys.version_info.major, sys.version_info.minor)
+    probe = (
+        "import sys; venv_ok = sys.prefix != sys.base_prefix; "
+        "sys.exit(2 if tuple(sys.version_info[:2]) != {!r} "
+        "else (0 if venv_ok else 1))"
+    ).format(expected)
+
     python_path = get_venv_python_path(venv_dir)
     try:
         result = subprocess.run(
-            [
-                python_path,
-                "-c",
-                "import sys; sys.exit(0 if sys.prefix != sys.base_prefix else 1)",
-            ],
+            [python_path, "-c", probe],
             capture_output=True,
             text=True,
             timeout=60,
@@ -1714,8 +1939,8 @@ def _get_qgis_python() -> Optional[str]:
 def _get_linux_system_python() -> Optional[str]:
     """Get a suitable system Python on Linux for creating venvs.
 
-    Searches for python3 on PATH, verifies version >= 3.9 and
-    that the venv module is available.
+    Searches for python3 on PATH, verifies that its major/minor version
+    matches the QGIS Python and that the venv module is available.
 
     Returns:
         Path to a suitable Python executable, or None if not found.
@@ -1780,7 +2005,8 @@ def _get_linux_system_python() -> Optional[str]:
             parts = result.stdout.strip().split()
             if len(parts) == 3:
                 major, minor, micro = int(parts[0]), int(parts[1]), int(parts[2])
-                if (major, minor) >= (3, 9):
+                expected = (sys.version_info.major, sys.version_info.minor)
+                if (major, minor) == expected:
                     _log(
                         "System Python verified: {} ({}.{}.{})".format(
                             candidate, major, minor, micro
@@ -1789,10 +2015,13 @@ def _get_linux_system_python() -> Optional[str]:
                     )
                     return candidate
                 else:
+                    # A venv on another minor version is rejected by
+                    # venv_python_version_matches() and would be rebuilt on
+                    # every install, so only a matching Python qualifies.
                     _log(
-                        "System Python {} version {}.{}.{} "
-                        "is too old (need >= 3.9)".format(
-                            candidate, major, minor, micro
+                        "System Python {} version {}.{}.{} does not match "
+                        "QGIS Python {}.{}".format(
+                            candidate, major, minor, micro, expected[0], expected[1]
                         ),
                         Qgis.Warning,
                     )
@@ -1857,9 +2086,12 @@ def _get_system_python() -> str:
 
     if sys.platform.startswith("linux"):
         raise RuntimeError(
-            "Python standalone not installed and no suitable system Python found. "
+            "Python standalone not installed and no system Python {}.{} found. "
             "Please ensure python3 and python3-venv are installed "
-            "(e.g., sudo apt install python3-venv) and click 'Install Dependencies'."
+            "(e.g., sudo apt install python3-venv) and click "
+            "'Install Dependencies'.".format(
+                sys.version_info.major, sys.version_info.minor
+            )
         )
     raise RuntimeError(
         "Python standalone not installed. "
@@ -1884,6 +2116,128 @@ def _cleanup_partial_venv(venv_dir: str):
             _log(f"Cleaned up partial venv: {venv_dir}", Qgis.Info)
         except Exception:
             _log(f"Could not clean up partial venv: {venv_dir}", Qgis.Warning)
+
+
+def _is_qgis_fallback_python(python_path: Optional[str]) -> bool:
+    """Return True when ``python_path`` is QGIS's own Python on Windows.
+
+    Args:
+        python_path: Interpreter chosen as the venv base.
+
+    Returns:
+        True for the Windows QGIS-Python fallback.
+    """
+    if sys.platform != "win32" or not python_path:
+        return False
+    try:
+        return os.path.normcase(os.path.dirname(os.path.abspath(python_path))) == (
+            os.path.normcase(os.path.abspath(sys.prefix))
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _qgis_dll_directories() -> List[str]:
+    """Return QGIS directories that hold the DLLs its Python depends on.
+
+    OSGeo4W and the standalone QGIS installers keep ``libssl``/``libcrypto``
+    in ``<root>/bin`` while the interpreter lives in ``<root>/apps/PythonXY``.
+
+    Returns:
+        Existing candidate directories, most specific first.
+    """
+    candidates = [
+        os.path.dirname(sys.executable or ""),
+        os.path.join(sys.prefix, "DLLs"),
+    ]
+    # Only trust <root>/bin for the known <root>/apps/PythonXY layout, so an
+    # unrelated (possibly user-writable) directory is never added to the
+    # DLL search path.
+    apps_dir = os.path.dirname(os.path.abspath(sys.prefix))
+    if os.path.basename(apps_dir).lower() == "apps":
+        candidates.insert(1, os.path.join(os.path.dirname(apps_dir), "bin"))
+    seen = []
+    for path in candidates:
+        if path and os.path.isdir(path) and path not in seen:
+            seen.append(path)
+    return seen
+
+
+def _venv_can_import_ssl(venv_dir: str, env: dict, subprocess_kwargs: dict) -> bool:
+    """Check whether the venv interpreter can import ``ssl``.
+
+    Args:
+        venv_dir: The venv to probe.
+        env: Subprocess environment.
+        subprocess_kwargs: Extra subprocess keyword arguments.
+
+    Returns:
+        True if ``import ssl`` succeeds in the venv.
+    """
+    try:
+        result = subprocess.run(
+            [get_venv_python_path(venv_dir), "-c", "import ssl"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+            **subprocess_kwargs,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def _ensure_venv_ssl(
+    venv_dir: str, env: dict, subprocess_kwargs: dict
+) -> Tuple[bool, str]:
+    """Make ``ssl`` importable in a venv built on QGIS's Python (Windows).
+
+    Python 3.8+ no longer searches ``PATH`` for an extension module's DLLs,
+    so ``_ssl.pyd`` from QGIS's Python fails to find ``libssl`` in the QGIS
+    ``bin`` folder once it runs outside QGIS, and pip then refuses every
+    HTTPS index (issue #911). A ``.pth`` file that registers those
+    directories with ``os.add_dll_directory`` fixes the lookup.
+
+    Args:
+        venv_dir: The venv to repair.
+        env: Subprocess environment.
+        subprocess_kwargs: Extra subprocess keyword arguments.
+
+    Returns:
+        Tuple of (success, message).
+    """
+    if _venv_can_import_ssl(venv_dir, env, subprocess_kwargs):
+        return True, "ssl available"
+
+    dll_dirs = _qgis_dll_directories()
+    if dll_dirs:
+        pth_path = os.path.join(get_venv_site_packages(venv_dir), "geoai_qgis_dlls.pth")
+        line = (
+            "import os; [os.add_dll_directory(p) for p in {!r} "
+            "if hasattr(os, 'add_dll_directory') and os.path.isdir(p)]\n"
+        ).format(dll_dirs)
+        try:
+            os.makedirs(os.path.dirname(pth_path), exist_ok=True)
+            with open(pth_path, "w", encoding="utf-8") as f:
+                f.write(line)
+            _log(
+                "Registered QGIS DLL directories for venv ssl: {}".format(dll_dirs),
+                Qgis.Info,
+            )
+        except OSError as e:
+            _log("Could not write {}: {}".format(pth_path, e), Qgis.Warning)
+
+        if _venv_can_import_ssl(venv_dir, env, subprocess_kwargs):
+            return True, "ssl available"
+
+    return False, (
+        "The virtual environment was created from QGIS's Python because the "
+        "standalone Python download failed, but that Python cannot load its "
+        "SSL module outside QGIS, so packages cannot be downloaded. Check "
+        "that github.com is reachable (or configure the proxy in QGIS "
+        "Settings > Options > Network) and click Install Dependencies again."
+    )
 
 
 def create_venv(
@@ -1946,14 +2300,55 @@ def create_venv(
         env = _get_clean_env_for_venv()
         subprocess_kwargs = _get_subprocess_kwargs()
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
-            **subprocess_kwargs,
-        )
+        result = None
+        if use_uv and system_python and _is_qgis_fallback_python(system_python):
+            # QGIS's own Python makes a poor venv base on Windows: its
+            # OpenSSL DLLs sit outside the interpreter directory, so the
+            # venv cannot import ssl (issue #911). Let uv fetch a managed
+            # CPython first and only use QGIS's Python if that fails.
+            managed_cmd = [
+                uv_path,
+                "venv",
+                "--managed-python",
+                "--python",
+                "{}.{}".format(sys.version_info.major, sys.version_info.minor),
+                venv_dir,
+            ]
+            _log("Trying a uv-managed Python before QGIS's Python", Qgis.Info)
+            try:
+                result = subprocess.run(
+                    managed_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=600,
+                    env=env,
+                    **subprocess_kwargs,
+                )
+            except subprocess.TimeoutExpired:
+                result = subprocess.CompletedProcess(
+                    managed_cmd, 1, stdout="", stderr="timed out after 600s"
+                )
+            if result.returncode == 0:
+                system_python = None
+            else:
+                _log(
+                    "uv-managed Python unavailable ({}), using QGIS Python".format(
+                        _truncate_error(result.stderr or result.stdout or "", 300)
+                    ),
+                    Qgis.Warning,
+                )
+                _cleanup_partial_venv(venv_dir)
+                result = None
+
+        if result is None:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env=env,
+                **subprocess_kwargs,
+            )
 
         if result.returncode != 0 and use_uv and system_python:
             # uv venv failed; fall back to stdlib venv
@@ -2023,6 +2418,12 @@ def create_venv(
                             False,
                             f"Failed to bootstrap pip: {str(e)[:200]}",
                         )
+
+            if system_python and _is_qgis_fallback_python(system_python):
+                ssl_ok, ssl_msg = _ensure_venv_ssl(venv_dir, env, subprocess_kwargs)
+                if not ssl_ok:
+                    _cleanup_partial_venv(venv_dir)
+                    return False, ssl_msg
 
             if progress_callback:
                 progress_callback(15, "Virtual environment created")
@@ -3097,7 +3498,11 @@ def install_dependencies(
                         Qgis.Critical,
                     )
                     install_failed = True
-                    install_error_msg = _truncate_error(error_msg)
+                    # Keep the full output: _describe_install_failure()
+                    # classifies it before truncating what it displays.
+                    install_error_msg = _truncate_error(
+                        error_msg, _CLASSIFY_OUTPUT_LIMIT
+                    )
                     last_returncode = result.returncode
 
             except subprocess.TimeoutExpired:
@@ -3191,6 +3596,7 @@ def install_dependencies(
                         _cuda_fell_back = True
                     else:
                         cpu_err = cpu_result.stderr or cpu_result.stdout or ""
+                        last_returncode = cpu_result.returncode
                         _log(
                             "Failed to install {} (CPU fallback): {}".format(
                                 package_spec, cpu_err
@@ -3199,10 +3605,12 @@ def install_dependencies(
                         )
                         install_error_msg = (
                             "CUDA and CPU install both failed for {}: {}".format(
-                                package_name, _truncate_error(cpu_err)
+                                package_name,
+                                _truncate_error(cpu_err, _CLASSIFY_OUTPUT_LIMIT),
                             )
                         )
                 except subprocess.TimeoutExpired:
+                    last_returncode = None
                     _log(
                         "Installation of {} (CPU fallback) timed out".format(
                             package_spec
@@ -3215,6 +3623,7 @@ def install_dependencies(
                         )
                     )
                 except Exception as e:
+                    last_returncode = None
                     _log(
                         "Exception installing {} (CPU fallback): {}".format(
                             package_spec, e
@@ -3232,53 +3641,14 @@ def install_dependencies(
                     "pip error output: {}".format(install_error_msg),
                     Qgis.Critical,
                 )
-                if _looks_like_resolution_conflict(install_error_msg):
-                    return (
-                        False,
-                        format_dependency_resolution_diagnostic(
-                            install_error_msg,
-                            package_specs=[package_spec],
-                            python_version="{}.{}".format(
-                                sys.version_info.major, sys.version_info.minor
-                            ),
-                            platform_name=sys.platform,
-                        ),
-                    )
-                if _is_ssl_error(install_error_msg):
-                    return (
-                        False,
-                        "Failed to install {}: SSL certificate error".format(
-                            package_name
-                        ),
-                    )
-                if _is_proxy_auth_error(install_error_msg):
-                    return (
-                        False,
-                        "Failed to install {}: proxy authentication "
-                        "required".format(package_name),
-                    )
-                if _is_network_error(install_error_msg):
-                    return (
-                        False,
-                        "Failed to install {}: network error".format(package_name),
-                    )
-                if _is_antivirus_error(install_error_msg):
-                    return (
-                        False,
-                        "Failed to install {}: blocked by antivirus or "
-                        "security policy".format(package_name),
-                    )
-                if last_returncode is not None and _is_windows_process_crash(
-                    last_returncode
-                ):
-                    return (
-                        False,
-                        "Failed to install {}: process crashed "
-                        "(code {})".format(package_name, last_returncode),
-                    )
                 return (
                     False,
-                    "Failed to install {}: {}".format(package_name, install_error_msg),
+                    _describe_install_failure(
+                        package_name,
+                        install_error_msg,
+                        [package_spec],
+                        returncode=last_returncode,
+                    ),
                 )
 
     # -- Phase B: Batch install remaining packages ----------------------------
@@ -3547,53 +3917,13 @@ def install_dependencies(
                     "Batch install failed: {}".format(error_output),
                     Qgis.Critical,
                 )
-                if _looks_like_resolution_conflict(error_output):
-                    return (
-                        False,
-                        format_dependency_resolution_diagnostic(
-                            error_output,
-                            package_specs=batch_specs,
-                            python_version="{}.{}".format(
-                                sys.version_info.major, sys.version_info.minor
-                            ),
-                            platform_name=sys.platform,
-                        ),
-                    )
-                if _is_ssl_error(error_output):
-                    return (
-                        False,
-                        "Failed to install {}: SSL certificate "
-                        "error".format(failed_pkg),
-                    )
-                if _is_proxy_auth_error(error_output):
-                    return (
-                        False,
-                        "Failed to install {}: proxy authentication "
-                        "required".format(failed_pkg),
-                    )
-                if _is_network_error(error_output):
-                    return (
-                        False,
-                        "Failed to install {}: network error".format(failed_pkg),
-                    )
-                if _is_antivirus_error(error_output):
-                    return (
-                        False,
-                        "Failed to install {}: blocked by antivirus or "
-                        "security policy".format(failed_pkg),
-                    )
-                if result.returncode is not None and _is_windows_process_crash(
-                    result.returncode
-                ):
-                    return (
-                        False,
-                        "Failed to install {}: process crashed "
-                        "(code {})".format(failed_pkg, result.returncode),
-                    )
                 return (
                     False,
-                    "Failed to install {}: {}".format(
-                        failed_pkg, _truncate_error(error_output)
+                    _describe_install_failure(
+                        failed_pkg,
+                        error_output,
+                        batch_specs,
+                        returncode=result.returncode,
                     ),
                 )
 
@@ -3690,17 +4020,37 @@ def _get_verification_code(package_name: str) -> str:
         code = "\n".join(
             [
                 "import torch",
-                "import deepforest",
-                "from deepforest import main",
+                "try:",
+                "    import deepforest",
+                "except Exception as e:",
+                "    try:",
+                "        from importlib.metadata import version as _dist_version",
+                "        v = _dist_version('deepforest')",
+                "    except Exception:",
+                "        raise",
+                "    from packaging.version import parse as _v",
+                "    if _v(v) < _v('2.1.0'):",
+                "        raise RuntimeError(f'Expected >=2.1.0, got {v}') from e",
+                "    raise",
                 "from packaging.version import parse as _v",
-                "v = deepforest.__version__",
+                "v = getattr(deepforest, '__version__', '0')",
                 "if _v(v) < _v('2.1.0'):",
                 "    raise RuntimeError(f'Expected >=2.1.0, got {v}')",
+                "try:",
+                "    from deepforest import main",
+                "except Exception as e:",
+                "    raise RuntimeError(f'DeepForest {v} import failed: {e}') from e",
                 "print(v)",
             ]
         )
     elif package_name == "omniwatermask":
         code = "import torch; import omniwatermask; print('ok')"
+    elif package_name == "torchange":
+        code = (
+            "import torch; "
+            "from torchange.models.segment_any_change import AnyChange; "
+            "print('ok')"
+        )
     else:
         import_name = package_name.replace("-", "_")
         code = f"import {import_name}"
@@ -4154,6 +4504,13 @@ def get_venv_status() -> Tuple[bool, str]:
         _log(f"get_venv_status: venv not found at {VENV_DIR}", Qgis.Info)
         return False, "Virtual environment not configured"
 
+    if not venv_python_version_matches():
+        return (
+            False,
+            "Virtual environment was built for a different Python version; "
+            "please reinstall dependencies",
+        )
+
     is_present, msg = _quick_check_packages()
     if is_present:
         stored_hash = _read_deps_hash()
@@ -4233,7 +4590,10 @@ def create_venv_and_install(
     from .python_manager import (
         download_python_standalone,
         get_python_full_version,
+        remove_standalone_python,
+        standalone_has_installed_packages,
         standalone_python_exists,
+        standalone_python_matches_qgis,
     )
     from .uv_manager import download_uv
     from .uv_manager import uv_exists as _uv_exists
@@ -4264,6 +4624,31 @@ def create_venv_and_install(
     removed_venvs = cleanup_old_venv_directories()
     if removed_venvs:
         _log(f"Removed {len(removed_venvs)} old venv directories", Qgis.Info)
+
+    # Step 0: Replace a standalone Python that no longer fits. It is shared
+    # across QGIS upgrades (issue #964) and older plugin versions could
+    # install packages straight into it (issue #925). The venv points at the
+    # standalone, so it has to be rebuilt too.
+    if standalone_python_exists():
+        stale_reason = None
+        if not standalone_python_matches_qgis():
+            stale_reason = "it does not match the QGIS Python version"
+        elif standalone_has_installed_packages():
+            stale_reason = "packages were installed into it directly"
+        if stale_reason:
+            _log(
+                "Replacing standalone Python because {}".format(stale_reason),
+                Qgis.Warning,
+            )
+            if progress_callback:
+                progress_callback(1, "Replacing outdated Python runtime...")
+            removed, remove_msg = remove_standalone_python()
+            if not removed:
+                return False, (
+                    "Cannot replace the outdated Python runtime in {}: {}. "
+                    "Close QGIS, delete that folder and try again."
+                ).format(os.path.join(CACHE_DIR, "python_standalone"), remove_msg)
+            _cleanup_partial_venv(VENV_DIR)
 
     # Step 1: Download Python standalone (0-10%)
     if not standalone_python_exists():
@@ -4313,12 +4698,14 @@ def create_venv_and_install(
                     if progress_callback:
                         progress_callback(10, "Using system Python (fallback)...")
                 else:
-                    return False, (
-                        "Failed to download Python: {}\n"
-                        "No suitable system Python found. Please ensure python3 "
-                        "and python3-venv are installed "
-                        "(e.g., sudo apt install python3-venv)."
-                    ).format(msg)
+                    # No system Python matches QGIS; create_venv() can still
+                    # use a uv-managed Python of the right version.
+                    _log(
+                        "Standalone Python download failed and no system "
+                        "Python matches QGIS; will try a uv-managed Python: "
+                        "{}".format(msg),
+                        Qgis.Warning,
+                    )
             else:
                 return False, f"Failed to download Python: {msg}"
 
@@ -4366,6 +4753,22 @@ def create_venv_and_install(
         if progress_callback:
             progress_callback(15, "Checking virtual environment...")
         reusable_venv = venv_python_works()
+        home = _read_pyvenv_cfg(VENV_DIR).get("home", "")
+        if (
+            reusable_venv
+            and sys.platform == "win32"
+            and home
+            and os.path.normcase(os.path.abspath(home))
+            == os.path.normcase(os.path.abspath(sys.prefix))
+        ):
+            # A venv left by an earlier QGIS-Python fallback may lack ssl
+            # (issue #911); repair it before installing anything.
+            ssl_ok, ssl_msg = _ensure_venv_ssl(
+                VENV_DIR, _get_clean_env_for_venv(), _get_subprocess_kwargs()
+            )
+            if not ssl_ok:
+                _log(ssl_msg, Qgis.Warning)
+                reusable_venv = False
         if reusable_venv:
             _log("Virtual environment already exists", Qgis.Info)
             if progress_callback:

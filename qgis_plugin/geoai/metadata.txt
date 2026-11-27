@@ -2,7 +2,7 @@
 name=GeoAI
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
-description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including tree segmentation (DeepForest), water segmentation (OmniWaterMask), Moondream vision-language model, Segment Anything (SAM1/SAM2/SAM3), semantic segmentation, and instance segmentation (Mask R-CNN).
+description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including tree segmentation (DeepForest), water segmentation (OmniWaterMask), Moondream vision-language model, Segment Anything (SAM1/SAM2/SAM3), semantic segmentation, instance segmentation (Mask R-CNN), and change detection (AnyChange).
 version=1.8.1
 author=Qiusheng Wu
 email=giswqs@gmail.com
@@ -20,6 +20,10 @@ about=This plugin provides AI-powered geospatial analysis tools:
     Water Segmentation (OmniWaterMask):
     - Automated water body detection from satellite and aerial imagery
     - Output as raster or vector with optional OSM data integration
+
+    Change Detection (AnyChange):
+    - Detect changes between two co-registered images with the training-free AnyChange model (SAM)
+    - Output as raster mask or vector polygons
 
     Moondream Vision-Language Model:
     - Caption: Generate descriptions of geospatial imagery
@@ -49,7 +53,7 @@ repository=https://github.com/opengeos/geoai
 
 hasProcessingProvider=no
 
-tags=ai, deep learning, segmentation, object detection, moondream, vision language model, machine learning, remote sensing, geospatial, instance segmentation, water segmentation, deepforest, samgeo, mask rcnn
+tags=ai, deep learning, segmentation, object detection, moondream, vision language model, machine learning, remote sensing, geospatial, instance segmentation, water segmentation, change detection, deepforest, samgeo, mask rcnn
 
 homepage=https://opengeoai.org
 category=Analysis

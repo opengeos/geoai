@@ -6,7 +6,13 @@ import unittest
 
 import torch
 
-from geoai.train import f1_score, iou_coefficient, precision_score, recall_score
+from geoai.train import (
+    evaluate_coco_metrics,
+    f1_score,
+    iou_coefficient,
+    precision_score,
+    recall_score,
+)
 
 
 class TestF1Score(unittest.TestCase):
@@ -142,3 +148,76 @@ class TestRecallScore(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _ReplayDetector(torch.nn.Module):
+    """Stand-in detector that returns fixed predictions, indexed by image value."""
+
+    def __init__(self, outputs):
+        super().__init__()
+        self.outputs = outputs
+
+    def forward(self, images):
+        return [self.outputs[int(img[0, 0, 0])] for img in images]
+
+
+def _coco_metrics(gt, pred, **kwargs):
+    loader = [([torch.zeros(3, 8, 8)], [gt])]
+    return evaluate_coco_metrics(
+        _ReplayDetector([pred]), loader, torch.device("cpu"), verbose=False, **kwargs
+    )
+
+
+class TestEvaluateCocoMetrics(unittest.TestCase):
+    """Tests for the evaluate_coco_metrics function."""
+
+    def test_predicted_class_without_ground_truth_is_ignored(self):
+        """A class with no ground truth is left out of every mAP, as in COCO."""
+        gt = {
+            "boxes": torch.tensor([[10.0, 10.0, 50.0, 50.0]]),
+            "labels": torch.tensor([1]),
+        }
+        pred = {
+            "boxes": torch.tensor(
+                [[10.0, 10.0, 50.0, 50.0], [100.0, 100.0, 140.0, 140.0]]
+            ),
+            "labels": torch.tensor([1, 2]),
+            "scores": torch.tensor([0.9, 0.4]),
+        }
+        results = _coco_metrics(gt, pred)
+        self.assertAlmostEqual(results["mAP@0.5"], 1.0)
+        self.assertAlmostEqual(results["mAP@0.75"], 1.0)
+        self.assertAlmostEqual(results["mAP@[0.5:0.95]"], 1.0)
+
+    def test_match_best_unmatched_ground_truth(self):
+        """A detection matches another ground truth when the best one is taken."""
+        gt = {
+            "boxes": torch.tensor(
+                [[0.0, 0.0, 100.0, 100.0], [10.0, 0.0, 110.0, 100.0]]
+            ),
+            "labels": torch.tensor([1, 1]),
+        }
+        pred = {
+            "boxes": torch.tensor([[5.0, 0.0, 105.0, 100.0], [0.0, 0.0, 100.0, 100.0]]),
+            "labels": torch.tensor([1, 1]),
+            "scores": torch.tensor([0.9, 0.8]),
+        }
+        results = _coco_metrics(gt, pred)
+        self.assertAlmostEqual(results["mAP@0.5"], 1.0)
+        self.assertAlmostEqual(results["mAP@0.75"], 1.0)
+
+    def test_single_threshold_matches_map50(self):
+        """With one IoU threshold, mAP@[0.5:0.95] equals mAP@0.5."""
+        gt = {
+            "boxes": torch.tensor([[10.0, 10.0, 50.0, 50.0]]),
+            "labels": torch.tensor([1]),
+        }
+        pred = {
+            "boxes": torch.tensor(
+                [[12.0, 10.0, 52.0, 50.0], [100.0, 100.0, 140.0, 140.0]]
+            ),
+            "labels": torch.tensor([1, 2]),
+            "scores": torch.tensor([0.9, 0.4]),
+        }
+        results = _coco_metrics(gt, pred, iou_thresholds=[0.5])
+        self.assertAlmostEqual(results["mAP@[0.5:0.95]"], results["mAP@0.5"])

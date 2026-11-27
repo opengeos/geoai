@@ -408,23 +408,42 @@ def _create_patches(
     return patches
 
 
-def _create_blend_weights(size: int, overlap: int, scale: int) -> np.ndarray:
+def _create_blend_weights(
+    size: int,
+    overlap: int,
+    scale: int,
+    taper_start: bool = True,
+    taper_end: bool = True,
+) -> np.ndarray:
     """Create 1D linear blending weights for patch stitching.
+
+    A tapered end ramps from 0 to 1 over the overlap. Only an end that
+    overlaps a neighboring patch should be tapered: an end on the image
+    border has no other patch to blend with, so a zero weight there would
+    leave the border pixels empty.
 
     Args:
         size (int): Length of the 1D weight array (in SR pixel space).
         overlap (int): Overlap region in LR pixel space.
         scale (int): Super-resolution scale factor.
+        taper_start (bool): Whether to ramp the weights up at the start.
+            Default is True.
+        taper_end (bool): Whether to ramp the weights down at the end.
+            Default is True.
 
     Returns:
         np.ndarray: 1D array of blending weights in [0, 1].
     """
     sr_overlap = overlap * scale
     weights = np.ones(size, dtype=np.float32)
-    if sr_overlap > 0:
+    # A ramp needs at least two points (np.linspace(0, 1, 1) is [0]), so a
+    # one-pixel overlap is not tapered: the two patches are averaged there.
+    if sr_overlap > 1:
         ramp = np.linspace(0, 1, sr_overlap, dtype=np.float32)
-        weights[:sr_overlap] = ramp
-        weights[-sr_overlap:] = ramp[::-1]
+        if taper_start:
+            weights[:sr_overlap] = ramp
+        if taper_end:
+            weights[-sr_overlap:] = ramp[::-1]
     return weights
 
 
@@ -439,6 +458,9 @@ def _stitch_patches(
 ) -> np.ndarray:
     """Stitch super-resolved patches back into a full image with linear
     blending in overlap regions.
+
+    Patch sides on the image border are not tapered, so border pixels keep
+    the full weight of the patch that covers them.
 
     Args:
         patches (list): List of (sr_patch, lr_row_start, lr_col_start) tuples.
@@ -461,18 +483,31 @@ def _stitch_patches(
     output = np.zeros((channels, sr_h, sr_w), dtype=np.float32)
     weight_map = np.zeros((1, sr_h, sr_w), dtype=np.float32)
 
-    # Build 2D blending weights
-    w1d = _create_blend_weights(sr_patch_size, overlap, scale)
-    weight_2d = w1d[np.newaxis, :] * w1d[:, np.newaxis]  # (ps, ps)
-
     for sr_patch, lr_r, lr_c in patches:
         sr_r = lr_r * scale
         sr_c = lr_c * scale
         ph = sr_patch.shape[-2]
         pw = sr_patch.shape[-1]
 
-        # Trim weight_2d to match actual patch dimensions
-        w2d = weight_2d[:ph, :pw]
+        # Taper only the sides that overlap another patch of the grid from
+        # _create_patches; a side on the image border keeps full weight.
+        # Trim the weights to the actual patch size (smaller than patch_size
+        # along a side shorter than one patch, which is never tapered).
+        w_rows = _create_blend_weights(
+            sr_patch_size,
+            overlap,
+            scale,
+            taper_start=lr_r > 0,
+            taper_end=lr_r + patch_size < h,
+        )[:ph]
+        w_cols = _create_blend_weights(
+            sr_patch_size,
+            overlap,
+            scale,
+            taper_start=lr_c > 0,
+            taper_end=lr_c + patch_size < w,
+        )[:pw]
+        w2d = w_rows[:, np.newaxis] * w_cols[np.newaxis, :]
 
         output[:, sr_r : sr_r + ph, sr_c : sr_c + pw] += sr_patch * w2d[np.newaxis]
         weight_map[:, sr_r : sr_r + ph, sr_c : sr_c + pw] += w2d[np.newaxis]

@@ -7,7 +7,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from .venv_manager import (
     _get_clean_env_for_venv,
@@ -23,8 +23,20 @@ def run_geoai_task(
     action: str,
     params: Dict[str, Any],
     progress_callback: ProgressCallback = None,
+    drop_env: Tuple[str, ...] = (),
 ) -> Any:
-    """Run a geoai task in a subprocess and return its JSON-serializable result."""
+    """Run a geoai task in a subprocess and return its JSON-serializable result.
+
+    Args:
+        action: Name of the task in the worker's task table.
+        params: JSON-serializable task parameters.
+        progress_callback: Optional callable receiving progress lines.
+        drop_env: Environment variable names to remove from the worker's
+            environment only (the QGIS process environment is unchanged).
+
+    Returns:
+        The task's result.
+    """
     if not venv_exists():
         raise RuntimeError("GeoAI virtual environment not found. Install dependencies.")
 
@@ -40,6 +52,8 @@ def run_geoai_task(
 
     cmd = [python_path, "-u", str(worker_script)]
     env = _get_clean_env_for_venv()
+    for name in drop_env:
+        env.pop(name, None)
     popen_kwargs = dict(_get_subprocess_kwargs())
 
     stderr_file = None

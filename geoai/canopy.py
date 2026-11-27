@@ -16,7 +16,7 @@ import math
 import os
 import warnings
 from functools import partial
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1043,7 +1043,14 @@ class CanopyHeightEstimation:
         return (img_tensor - mean) / std
 
     @staticmethod
-    def _make_weight_map(tile_size: int, overlap: int) -> np.ndarray:
+    def _make_weight_map(
+        tile_size: int,
+        overlap: int,
+        top: bool = True,
+        bottom: bool = True,
+        left: bool = True,
+        right: bool = True,
+    ) -> np.ndarray:
         """Create a 2D raised-cosine weight map for smooth tile blending.
 
         Produces a weight map that is 1.0 in the non-overlapping centre and
@@ -1051,9 +1058,17 @@ class CanopyHeightEstimation:
         overlap region.  When multiple overlapping tiles are accumulated
         with these weights the result is seamless.
 
+        Only the sides that face another tile are tapered. A side on the
+        border of the image keeps full weight up to the edge, since tapering
+        it would give the image's edge pixels a weight of zero.
+
         Args:
             tile_size: Size of each square tile.
             overlap: Number of pixels that overlap between adjacent tiles.
+            top: Whether to taper the top side (another tile lies above).
+            bottom: Whether to taper the bottom side (another tile lies below).
+            left: Whether to taper the left side (another tile lies left).
+            right: Whether to taper the right side (another tile lies right).
 
         Returns:
             2D float32 array of shape (tile_size, tile_size).
@@ -1064,11 +1079,15 @@ class CanopyHeightEstimation:
         ramp = np.linspace(0.0, 1.0, overlap, dtype=np.float32)
         ramp = 0.5 * (1.0 - np.cos(np.pi * ramp))  # raised cosine
 
-        w = np.ones(tile_size, dtype=np.float32)
-        w[:overlap] = ramp
-        w[-overlap:] = ramp[::-1]
+        def taper(start: bool, end: bool) -> np.ndarray:
+            w = np.ones(tile_size, dtype=np.float32)
+            if start:
+                w[:overlap] = ramp
+            if end:
+                w[-overlap:] = ramp[::-1]
+            return w
 
-        return np.outer(w, w)
+        return np.outer(taper(top, bottom), taper(left, right))
 
     def predict(
         self,
@@ -1166,8 +1185,9 @@ class CanopyHeightEstimation:
         padded_img = np.zeros((3, padded_h, padded_w), dtype=np.float32)
         padded_img[:, :height, :width] = img
 
-        # Blending weight map (raised-cosine taper in overlap regions)
-        weight_map = self._make_weight_map(tile_size, overlap)
+        # Blending weight maps (raised-cosine taper in overlap regions),
+        # keyed by which sides of a tile face another tile
+        weight_maps = {}
 
         # Output arrays
         output = np.zeros((padded_h, padded_w), dtype=np.float32)
@@ -1176,6 +1196,7 @@ class CanopyHeightEstimation:
         # Process tiles in batches
         tiles = []
         positions = []
+        tile_weights = []
         for row in range(n_rows):
             for col in range(n_cols):
                 y = row * step
@@ -1184,17 +1205,26 @@ class CanopyHeightEstimation:
                 tiles.append(tile)
                 positions.append((y, x))
 
+                # Taper only the sides that face another tile
+                sides = (row > 0, row < n_rows - 1, col > 0, col < n_cols - 1)
+                if sides not in weight_maps:
+                    weight_maps[sides] = self._make_weight_map(
+                        tile_size, overlap, *sides
+                    )
+                tile_weights.append(weight_maps[sides])
+
                 if len(tiles) == batch_size:
                     self._process_batch(
-                        tiles, positions, output, count, scale_factor, weight_map
+                        tiles, positions, output, count, scale_factor, tile_weights
                     )
                     tiles = []
                     positions = []
+                    tile_weights = []
 
         # Process remaining tiles
         if tiles:
             self._process_batch(
-                tiles, positions, output, count, scale_factor, weight_map
+                tiles, positions, output, count, scale_factor, tile_weights
             )
 
         # Average overlapping regions
@@ -1230,7 +1260,7 @@ class CanopyHeightEstimation:
         output: np.ndarray,
         count: np.ndarray,
         scale_factor: float,
-        weight_map: Optional[np.ndarray] = None,
+        weight_map: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
     ):
         """Process a batch of tiles through the model.
 
@@ -1241,7 +1271,8 @@ class CanopyHeightEstimation:
             count: Count array for averaging overlapping tiles.
             scale_factor: Scale factor for model output.
             weight_map: Optional 2D weight array for blending overlapping
-                tiles.  If None, uniform weights (1.0) are used.
+                tiles, or a list with one such array per tile.  If None,
+                uniform weights (1.0) are used.
         """
         tile_size = tiles[0].shape[1]
         batch = torch.from_numpy(np.stack(tiles)).to(self.device)
@@ -1258,8 +1289,9 @@ class CanopyHeightEstimation:
             weight_map = np.ones((tile_size, tile_size), dtype=np.float32)
 
         for i, (y, x) in enumerate(positions):
-            output[y : y + tile_size, x : x + tile_size] += pred[i, 0] * weight_map
-            count[y : y + tile_size, x : x + tile_size] += weight_map
+            w = weight_map[i] if isinstance(weight_map, list) else weight_map
+            output[y : y + tile_size, x : x + tile_size] += pred[i, 0] * w
+            count[y : y + tile_size, x : x + tile_size] += w
 
     def visualize(
         self,
