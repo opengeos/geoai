@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import redirect_stdout
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -365,9 +366,13 @@ def _mask_scores_of(sam) -> Any:
     result = {}
     for key, value in items:
         try:
-            result[str(int(key))] = float(value)
+            score = float(value)
+            mask_id = str(int(key))
         except (TypeError, ValueError):
             continue
+        if not math.isfinite(score):
+            continue  # NaN/inf would make the JSON response invalid
+        result[mask_id] = score
     return result or None
 
 
@@ -394,25 +399,61 @@ def _handle_save_masks(req: dict) -> Any:
     }
 
 
-def _count_objects(array: Any, unique: bool) -> Any:
-    """Count the objects in a labelled mask array.
+def _iter_raster_blocks(path: str):
+    """Yield band 1 of a raster one internal block at a time.
 
     Args:
-        array: The mask array (``SamGeo3.objects``), or None.
+        path: Raster path.
+
+    Yields:
+        Arrays holding one block window each.
+    """
+    import rasterio
+
+    with rasterio.open(path) as src:
+        for _, window in src.block_windows(1):
+            yield src.read(1, window=window)
+
+
+def _unique_values(block: Any) -> set:
+    """Return the distinct values of one raster block.
+
+    Args:
+        block: A numpy array, or nested lists in tests.
+
+    Returns:
+        The set of values in the block.
+    """
+    if hasattr(block, "ravel"):
+        import numpy as np
+
+        return set(np.unique(block).tolist())
+    return {value for row in block for value in row}
+
+
+def _count_raster_labels(path: str, unique: bool) -> Any:
+    """Count the objects in a labelled mask raster without loading it whole.
+
+    Reads the raster block by block and collects the labels in a set, so
+    memory grows with the number of objects rather than the raster size.
+
+    Args:
+        path: Path to the mask raster written by ``generate_masks_tiled``.
         unique: Whether each object has its own label.
 
     Returns:
         The number of distinct non-zero labels when ``unique`` is True, None
-        for binary masks (objects cannot be told apart) or when the array is
-        missing.
+        for binary masks (objects cannot be told apart) or if the raster
+        cannot be read.
     """
-    if array is None or not unique:
+    if not unique:
         return None
     try:
-        import numpy as np
-
-        values = np.unique(np.asarray(array))
-        return int(np.count_nonzero(values))
+        labels = set()
+        for block in _iter_raster_blocks(path):
+            labels.update(_unique_values(block))
+        labels.discard(0)
+        return len(labels)
     except Exception:
         return None
 
@@ -448,10 +489,10 @@ def _handle_generate_masks_tiled(req: dict) -> Any:
     }
     if req.get("bands"):
         kwargs["bands"] = req.get("bands")
-    output = _run_quiet_stdout(sam.generate_masks_tiled, **kwargs)
+    output = _run_quiet_stdout(sam.generate_masks_tiled, **kwargs) or req["output"]
     return {
-        "output": output or req["output"],
-        "object_count": _count_objects(getattr(sam, "objects", None), unique),
+        "output": output,
+        "object_count": _count_raster_labels(output, unique),
         "mask_count": _mask_count(),
     }
 

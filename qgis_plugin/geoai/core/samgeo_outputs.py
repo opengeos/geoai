@@ -7,7 +7,9 @@ imports it lazily.
 
 from __future__ import annotations
 
+import math
 import os
+import re
 import tempfile
 from typing import Callable, Dict, Iterable, Mapping, Optional
 
@@ -27,7 +29,19 @@ DEFAULT_OUTPUT_SUFFIX = "_sam_masks"
 HF_SAM3_URL = "https://huggingface.co/facebook/sam3"
 HF_TOKENS_URL = "https://huggingface.co/settings/tokens"
 
-_GATED_MARKERS = (
+# An error counts as a Hugging Face access problem only when it mentions both
+# Hugging Face (or the SAM 3 repo) and an authentication failure, so that
+# unrelated 401/403 errors (for example from a proxy) do not trigger the
+# SAM 3 help dialog.
+_HF_CONTEXT_MARKERS = (
+    "huggingface",
+    "hugging face",
+    "hf.co",
+    "hf_hub",
+    "facebook/sam3",
+    "gated",
+)
+_HF_AUTH_MARKERS = (
     "gated repo",
     "gatedrepo",
     "gated repository",
@@ -43,6 +57,10 @@ _GATED_MARKERS = (
     "invalid user token",
     "unauthorized",
 )
+
+# ``GPKG:<path>.gpkg[:<layer>]``: the path ends at a ``.gpkg`` that is
+# followed by the layer separator or the end of the string.
+_GPKG_PREFIXED = re.compile(r"^(.*?\.gpkg)(?::[^/\\]*)?$", re.IGNORECASE)
 
 
 def output_extension(format_text: str) -> str:
@@ -82,11 +100,8 @@ def source_file_path(path: Optional[str]) -> Optional[str]:
     path = str(path).split("|", 1)[0]
     if path.upper().startswith("GPKG:"):
         rest = path[5:]
-        lower = rest.lower()
-        idx = lower.find(".gpkg")
-        if idx >= 0:
-            rest = rest[: idx + len(".gpkg")]
-        path = rest
+        match = _GPKG_PREFIXED.match(rest)
+        path = match.group(1) if match else rest
     return path
 
 
@@ -183,6 +198,35 @@ def temp_output_path(ext: str) -> str:
     return handle.name
 
 
+def count_raster_labels(path: str, unique: bool) -> Optional[int]:
+    """Count distinct non-zero labels in a mask raster, block by block.
+
+    Memory grows with the number of objects, not with the raster size.
+
+    Args:
+        path: Path to the mask raster.
+        unique: Whether each object has its own label.
+
+    Returns:
+        The label count, or None for binary masks or if the raster cannot be
+        read (for example when rasterio is not importable).
+    """
+    if not unique:
+        return None
+    try:
+        import numpy as np
+        import rasterio
+
+        labels = set()
+        with rasterio.open(path) as src:
+            for _, window in src.block_windows(1):
+                labels.update(np.unique(src.read(1, window=window)).tolist())
+        labels.discard(0)
+        return len(labels)
+    except Exception:
+        return None
+
+
 def field_name(name: str, is_shapefile: bool) -> str:
     """Return a field name valid for the output format.
 
@@ -217,7 +261,8 @@ def normalize_mask_scores(scores: Optional[Mapping]) -> Dict[int, float]:
     """Convert a mask-score mapping to ``{int mask id: float score}``.
 
     Scores arrive with string keys after a JSON round trip from the SamGeo
-    worker process; entries that cannot be converted are dropped.
+    worker process; entries that cannot be converted, and non-finite scores
+    (NaN, infinity), are dropped.
 
     Args:
         scores: Mapping of mask id to score, or None.
@@ -237,6 +282,8 @@ def normalize_mask_scores(scores: Optional[Mapping]) -> Dict[int, float]:
             mask_id = int(float(key))
             score = float(value)
         except (TypeError, ValueError):
+            continue
+        if not math.isfinite(score):
             continue
         result[mask_id] = score
     return result
@@ -299,10 +346,13 @@ def is_hf_access_error(message: Optional[str]) -> bool:
         message: The error message.
 
     Returns:
-        True for gated-repo, 401/403 and missing-token errors.
+        True for gated-repo, 401/403 and missing-token errors that mention
+        Hugging Face or the SAM 3 repository.
     """
     lower = (message or "").lower()
-    return any(marker in lower for marker in _GATED_MARKERS)
+    return any(marker in lower for marker in _HF_CONTEXT_MARKERS) and any(
+        marker in lower for marker in _HF_AUTH_MARKERS
+    )
 
 
 def hf_access_help(message: Optional[str]) -> Optional[str]:
@@ -476,7 +526,7 @@ def add_mask_attributes(
 
 
 def _clip(text: str, is_shapefile: bool) -> str:
-    """Trim text to the shapefile string limit when needed.
+    """Trim text to the shapefile string limit (254 UTF-8 bytes) when needed.
 
     Args:
         text: The value to store.
@@ -486,7 +536,12 @@ def _clip(text: str, is_shapefile: bool) -> str:
         The possibly truncated text.
     """
     text = str(text)
-    return text[:SHAPEFILE_STRING_MAX] if is_shapefile else text
+    if not is_shapefile:
+        return text
+    # The DBF field is 254 bytes wide; cut by UTF-8 bytes and drop any
+    # partial trailing character.
+    encoded = text.encode("utf-8")[:SHAPEFILE_STRING_MAX]
+    return encoded.decode("utf-8", errors="ignore")
 
 
 def _make_field(field_cls, name: str, kind: str):

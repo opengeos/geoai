@@ -167,3 +167,313 @@ def test_restore_image_after_tiled_run(dock):
     dock._restore_image_if_needed()
 
     sam.set_image.assert_called_once_with(dock.current_image_path, bands=[1, 2, 3])
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face login
+# ---------------------------------------------------------------------------
+
+TOKEN = "hf_PanelSecretToken0123456789"
+
+
+class _BusyWorker:
+    """Stand-in for a running Hugging Face worker thread."""
+
+    def __init__(self):
+        self.running = True
+
+    def isRunning(self):
+        """Report whether the fake thread is running.
+
+        Returns:
+            bool: The running flag.
+        """
+        return self.running
+
+    def wait(self, *_args):
+        """Pretend the thread finished.
+
+        Returns:
+            bool: Always True.
+        """
+        return True
+
+
+@pytest.fixture
+def hf_dock(dock, monkeypatch):
+    """A panel whose HF tasks are captured instead of run."""
+    monkeypatch.setattr(dock, "_hf_env_available", lambda: True)
+    errors = []
+    monkeypatch.setattr(dock, "show_error", errors.append)
+    dock._test_errors = errors
+    return dock
+
+
+def _capture_hf_tasks(dock, monkeypatch):
+    tasks = []
+    monkeypatch.setattr(dock, "_run_hf_task", lambda *args: tasks.append(args))
+    return tasks
+
+
+def test_login_is_queued_behind_running_status_check(hf_dock, monkeypatch):
+    hf_dock._hf_worker = _BusyWorker()
+    hf_dock.hf_token_edit.setText(TOKEN)
+
+    hf_dock.hf_login()
+
+    assert hf_dock._hf_queued is not None
+    assert hf_dock._hf_queued[0] == "hf_login"
+    assert not hf_dock.hf_login_btn.isEnabled()
+    assert hf_dock.hf_token_edit.isReadOnly()
+
+    # The status check finishes; the queued login runs and completes.
+    hf_dock._hf_worker.running = False
+    ran = []
+
+    def _run(action, params, on_done, on_error):
+        ran.append(action)
+        on_done({"logged_in": True, "user": "jdoe"})
+
+    monkeypatch.setattr(hf_dock, "_run_hf_task", _run)
+    hf_dock._start_queued_hf_task()
+
+    assert ran == ["hf_login"]
+    assert hf_dock._hf_queued is None
+    assert hf_dock.hf_login_btn.isEnabled()
+    assert not hf_dock.hf_token_edit.isReadOnly()
+    assert hf_dock.hf_token_edit.text() == ""
+    assert "jdoe" in hf_dock.hf_status_label.text()
+
+
+def test_login_success_clears_only_the_submitted_token(hf_dock, monkeypatch):
+    tasks = _capture_hf_tasks(hf_dock, monkeypatch)
+    hf_dock.hf_token_edit.setText(TOKEN)
+    hf_dock.hf_login()
+    hf_dock.hf_token_edit.setText("hf_SomethingElse")
+
+    tasks[0][2]({"logged_in": True, "user": "jdoe"})
+
+    assert hf_dock.hf_token_edit.text() == "hf_SomethingElse"
+
+
+def test_login_success_drops_inherited_hf_token(hf_dock, monkeypatch):
+    monkeypatch.setenv("HF_TOKEN", "hf_OldEnvironmentToken")
+    monkeypatch.setenv("HUGGING_FACE_HUB_TOKEN", "hf_OldLegacyToken")
+    tasks = _capture_hf_tasks(hf_dock, monkeypatch)
+    hf_dock.hf_token_edit.setText(TOKEN)
+    hf_dock.hf_login()
+
+    tasks[0][2]({"logged_in": True, "user": None})
+
+    assert "HF_TOKEN" not in os.environ
+    assert "HUGGING_FACE_HUB_TOKEN" not in os.environ
+    assert "unknown user" in hf_dock.hf_status_label.text()
+
+
+def test_login_failure_keeps_env_and_redacts(hf_dock, monkeypatch):
+    monkeypatch.setenv("HF_TOKEN", "hf_OldEnvironmentToken")
+    tasks = _capture_hf_tasks(hf_dock, monkeypatch)
+    hf_dock.hf_token_edit.setText(TOKEN)
+    hf_dock.hf_login()
+
+    tasks[0][3](f"Hugging Face login failed: bad token {TOKEN}")
+
+    assert os.environ["HF_TOKEN"] == "hf_OldEnvironmentToken"
+    assert hf_dock.hf_login_btn.isEnabled()
+    assert not hf_dock.hf_token_edit.isReadOnly()
+    assert TOKEN not in hf_dock._test_errors[0]
+    assert hf_dock.hf_token_edit.text() == TOKEN  # kept for a retry
+
+
+# ---------------------------------------------------------------------------
+# Save guard and temporary rasters
+# ---------------------------------------------------------------------------
+
+
+def test_second_save_is_rejected_while_one_runs(dock, monkeypatch):
+    shown = []
+    monkeypatch.setattr(
+        samgeo.QMessageBox, "information", lambda *args: shown.append(args)
+    )
+    dock.sam = FakeSam()
+    dock._save_busy = True
+
+    dock.save_masks()
+    dock._auto_show_results()
+
+    assert "vec" not in dock._test_calls
+    assert len(shown) == 1
+
+
+def test_save_re_enables_button_when_done(dock):
+    dock.sam = FakeSam()
+    dock.output_format_combo.setCurrentText("Vector (GeoJSON)")
+
+    dock.save_masks()
+
+    assert dock._save_busy is False
+    assert dock.save_btn.isEnabled()
+
+
+def test_superseded_tiled_raster_is_deleted_after_running_save(dock, tmp_path):
+    raster = tmp_path / "old_tiles.tif"
+    raster.write_bytes(b"t")
+    dock._temp_files.append(str(raster))
+    dock._set_tiled_result({"raster": str(raster), "unique": True})
+
+    dock._save_busy = True
+    dock._set_tiled_result(None)
+    assert raster.exists()  # a save may still be reading it
+
+    dock._end_save()
+    assert not raster.exists()
+    assert str(raster) not in dock._temp_files
+
+
+# ---------------------------------------------------------------------------
+# Tiled segmentation without a full-image setup
+# ---------------------------------------------------------------------------
+
+
+class TiledSam:
+    """Model stand-in that supports generate_masks_tiled."""
+
+    masks = None
+
+    def __init__(self, fail=False):
+        self.fail = fail
+        self.calls = []
+
+    def supports_method(self, name):
+        """Report support for tiled generation.
+
+        Args:
+            name: Method name.
+
+        Returns:
+            bool: True for ``generate_masks_tiled``.
+        """
+        return name == "generate_masks_tiled"
+
+    def generate_masks_tiled(self, **kwargs):
+        """Record the call and write the output raster.
+
+        Args:
+            **kwargs: Tiling arguments.
+
+        Returns:
+            dict: A worker-style result.
+        """
+        self.calls.append(kwargs)
+        if self.fail:
+            raise RuntimeError("CUDA out of memory")
+        with open(kwargs["output"], "wb") as handle:
+            handle.write(b"tiles")
+        return {"output": kwargs["output"], "object_count": 2}
+
+
+def _sync_runner(work, done, error):
+    try:
+        result = work()
+    except Exception as exc:
+        error(str(exc))
+        return
+    done(result)
+
+
+def test_tiled_text_runs_on_recorded_source_without_full_image(
+    dock, monkeypatch, tmp_path
+):
+    big = tmp_path / "big.tif"
+    big.write_bytes(b"x")
+    dock.current_image_path = None
+    dock.current_source_path = None
+    dock._tiled_source = {"image": str(big), "source": str(big), "bands": [3, 2, 1]}
+    dock.sam = TiledSam()
+    dock.tiled_check.setChecked(True)
+    dock.text_prompt_edit.setText("tree")
+    monkeypatch.setattr(dock, "_auto_show_results", lambda: None)
+
+    dock.segment_by_text()
+
+    call = dock.sam.calls[0]
+    assert call["source"] == str(big)
+    assert call["bands"] == [3, 2, 1]
+    assert dock._tiled_result["source"] == str(big)
+    assert dock._tiled_result["count"] == 2
+
+    # Saving names the output after the tiled source image.
+    dock.output_format_combo.setCurrentText("Vector (GeoPackage)")
+    dock.save_masks()
+    assert dock._test_calls["vec"][1] == str(tmp_path / "big_sam_masks.gpkg")
+    assert dock._test_calls["attrs"][1]["source"] == "big.tif"
+
+
+def test_untiled_text_still_needs_full_image(dock, monkeypatch, tmp_path):
+    errors = []
+    monkeypatch.setattr(dock, "show_error", errors.append)
+    dock.current_image_path = None
+    dock._tiled_source = {"image": str(tmp_path / "big.tif"), "source": None}
+    dock.sam = TiledSam()
+    dock.text_prompt_edit.setText("tree")
+
+    dock.segment_by_text()
+
+    assert errors == ["Please set an image first."]
+    assert dock.sam.calls == []
+
+
+def test_failed_tiled_run_removes_its_raster(dock, monkeypatch, tmp_path):
+    errors = []
+    monkeypatch.setattr(dock, "show_error", errors.append)
+    monkeypatch.setattr(dock, "_run_with_progress", _sync_runner)
+    big = tmp_path / "big.tif"
+    big.write_bytes(b"x")
+    dock._tiled_source = {"image": str(big), "source": str(big), "bands": None}
+    dock.sam = TiledSam(fail=True)
+    dock.tiled_check.setChecked(True)
+    dock.text_prompt_edit.setText("tree")
+    before = list(dock._temp_files)
+
+    dock.segment_by_text()
+
+    output = dock.sam.calls[0]["output"]
+    assert not os.path.exists(output)
+    assert dock._temp_files == before
+    assert "CUDA out of memory" in errors[0]
+
+
+# ---------------------------------------------------------------------------
+# Worker threads on cleanup
+# ---------------------------------------------------------------------------
+
+
+def test_cleanup_keeps_running_thread_alive_until_it_finishes(dock, qapp):
+    import threading
+    import time
+
+    release = threading.Event()
+    worker = samgeo.SamGeoOperationWorker(lambda: release.wait(10))
+    worker.start()
+    real_wait = worker.wait
+    calls = []
+
+    def _wait(*args):
+        calls.append(args)
+        return False if len(calls) == 1 else real_wait(*args)
+
+    worker.wait = _wait
+    dock._hf_worker = worker
+
+    dock._stop_worker_threads()
+
+    assert dock._hf_worker is None
+    assert worker in samgeo._LIVE_THREADS
+
+    release.set()
+    deadline = time.monotonic() + 5
+    while worker in samgeo._LIVE_THREADS and time.monotonic() < deadline:
+        qapp.processEvents()
+        time.sleep(0.01)
+    assert worker not in samgeo._LIVE_THREADS
+    assert not worker.isRunning()

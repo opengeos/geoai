@@ -67,6 +67,24 @@ def test_default_output_path_from_geopackage_source(tmp_path):
         assert path == str(tmp_path / "ortho_sam_masks.shp")
 
 
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (
+            "GPKG:/data/archive.gpkg.backup/scene.gpkg:tiles",
+            "/data/archive.gpkg.backup/scene.gpkg",
+        ),
+        ("GPKG:/data/scene.gpkg:tiles", "/data/scene.gpkg"),
+        ("GPKG:/data/scene.gpkg", "/data/scene.gpkg"),
+        ("GPKG:C:/data/Scene.GPKG:tiles", "C:/data/Scene.GPKG"),
+        ("/data/scene.gpkg|layername=tiles", "/data/scene.gpkg"),
+        ("/data/image.tif", "/data/image.tif"),
+    ],
+)
+def test_source_file_path_variants(source, expected):
+    assert so.source_file_path(source) == expected
+
+
 def test_unique_path_with_fake_exists():
     taken = {"/d/a.tif", "/d/a_1.tif"}
 
@@ -128,6 +146,33 @@ def test_find_mask_id_field(fields, expected):
     assert so.find_mask_id_field(fields) == expected
 
 
+def test_normalize_mask_scores_drops_non_finite():
+    scores = so.normalize_mask_scores(
+        {"1": float("nan"), "2": float("inf"), "3": float("-inf"), "4": 0.25}
+    )
+
+    assert scores == {4: 0.25}
+
+
+def test_clip_shapefile_text_by_utf8_bytes():
+    text = "é" * 200  # 400 UTF-8 bytes
+    clipped = so._clip(text, True)
+
+    assert len(clipped.encode("utf-8")) <= so.SHAPEFILE_STRING_MAX
+    assert clipped == "é" * 127  # 254 bytes, no partial character
+    assert so._clip("a" + "é" * 200, True) == "a" + "é" * 126  # drops half a char
+    assert so._clip(text, False) == text
+    assert so._clip("short", True) == "short"
+
+
+def test_count_raster_labels_binary_is_none():
+    assert so.count_raster_labels("missing.tif", unique=False) is None
+
+
+def test_count_raster_labels_unreadable_is_none(tmp_path):
+    assert so.count_raster_labels(str(tmp_path / "missing.tif"), True) is None
+
+
 def test_normalize_mask_scores_handles_json_keys():
     scores = so.normalize_mask_scores({"1": 0.9, "2": "0.5", "x": 1, "3": None})
 
@@ -170,8 +215,18 @@ def test_hf_access_help_for_gated_errors(message):
     assert "Hugging Face field" in help_text
 
 
-def test_hf_access_help_ignores_other_errors():
-    assert so.hf_access_help("Torch not compiled with CUDA enabled") is None
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Torch not compiled with CUDA enabled",
+        "403 Client Error: Forbidden for url: http://proxy.corp.local/check",
+        "401 Client Error: Unauthorized for url: https://download.pytorch.org/x",
+        "Repository not found: https://github.com/example/repo",
+        "Unauthorized",
+    ],
+)
+def test_hf_access_help_ignores_other_errors(message):
+    assert so.hf_access_help(message) is None
 
 
 def test_redact():
@@ -271,9 +326,16 @@ def test_save_masks_without_mask_scores_attribute(monkeypatch):
     assert result["mask_scores"] is None
 
 
-def test_generate_masks_tiled_handler(fake_sam):
-    # The worker counts tiled objects with numpy, which its venv always has.
-    pytest.importorskip("numpy")
+def test_generate_masks_tiled_handler(fake_sam, monkeypatch):
+    # Objects are counted from the written raster, one block at a time.
+    blocks = [[[0, 1, 1], [2, 0, 5]], [[5, 7], [0, 0]]]
+    seen = []
+
+    def _blocks(path):
+        seen.append(path)
+        return iter(blocks)
+
+    monkeypatch.setattr(samgeo_worker, "_iter_raster_blocks", _blocks)
     result = samgeo_worker._dispatch(
         {
             "action": "generate_masks_tiled",
@@ -292,7 +354,41 @@ def test_generate_masks_tiled_handler(fake_sam):
     assert fake_sam.tiled["tile_size"] == 512
     assert fake_sam.tiled["overlap"] == 64
     assert fake_sam.tiled["bands"] == [3, 2, 1]
-    assert result == {"output": "tiles.tif", "object_count": 3, "mask_count": 0}
+    assert result == {"output": "tiles.tif", "object_count": 4, "mask_count": 0}
+    assert seen == ["tiles.tif"]
+
+
+def test_count_raster_labels_worker(monkeypatch):
+    monkeypatch.setattr(
+        samgeo_worker, "_iter_raster_blocks", lambda path: iter([[[0, 3], [3, 9]]])
+    )
+
+    assert samgeo_worker._count_raster_labels("x.tif", unique=True) == 2
+    assert samgeo_worker._count_raster_labels("x.tif", unique=False) is None
+
+
+def test_count_raster_labels_worker_unreadable(monkeypatch):
+    def _fail(path):
+        raise OSError("cannot open")
+
+    monkeypatch.setattr(samgeo_worker, "_iter_raster_blocks", _fail)
+
+    assert samgeo_worker._count_raster_labels("x.tif", unique=True) is None
+
+
+def test_save_masks_drops_non_finite_scores(monkeypatch):
+    sam = FakeSam()
+    monkeypatch.setitem(samgeo_worker._STATE, "sam", sam)
+
+    def save_masks(output, unique=True):
+        sam.mask_scores = {1: float("nan"), 2: 0.5, 3: float("inf")}
+
+    sam.save_masks = save_masks
+
+    result = samgeo_worker._handle_save_masks({"output": "o.tif", "unique": True})
+
+    assert result["mask_scores"] == {"2": 0.5}
+    json.loads(json.dumps(samgeo_worker._json_safe(result), allow_nan=False))
 
 
 def test_supported_methods_include_tiled():
@@ -338,7 +434,9 @@ def test_client_generate_masks_tiled_payload(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _fake_hub(monkeypatch, *, valid=True, stored_token=None, login_error=None):
+def _fake_hub(
+    monkeypatch, *, valid=True, stored_token=None, login_error=None, token_path=None
+):
     hub = types.ModuleType("huggingface_hub")
     calls = {}
 
@@ -347,6 +445,9 @@ def _fake_hub(monkeypatch, *, valid=True, stored_token=None, login_error=None):
         print("Login successful")  # must not reach the protocol stdout
         if login_error:
             raise ValueError(login_error)
+        if token_path is not None:
+            with open(token_path, "w") as handle:
+                handle.write(token)
 
     def whoami(token=None):
         calls["whoami"] = token
@@ -357,6 +458,8 @@ def _fake_hub(monkeypatch, *, valid=True, stored_token=None, login_error=None):
     hub.login = login
     hub.whoami = whoami
     hub.get_token = lambda: stored_token
+    if token_path is not None:
+        hub.constants = types.SimpleNamespace(HF_TOKEN_PATH=str(token_path))
     monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
     return calls
 
@@ -388,6 +491,39 @@ def test_hf_login_error_is_redacted(monkeypatch):
     assert "***" in str(excinfo.value)
     assert excinfo.value.__cause__ is None
     assert excinfo.value.__suppress_context__
+
+
+def test_hf_login_whoami_failure_still_logged_in(monkeypatch):
+    """Once login() saved the token, a failed name lookup is not a login error."""
+    _fake_hub(monkeypatch, valid=False)
+
+    result = geoai_task_worker._task_hf_login({"token": TOKEN})
+
+    assert result == {"logged_in": True, "user": None}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
+def test_hf_login_token_file_is_private(monkeypatch, tmp_path):
+    token_file = tmp_path / "token"
+    token_file.write_text("old")
+    os.chmod(token_file, 0o644)
+    _fake_hub(monkeypatch, token_path=token_file)
+
+    geoai_task_worker._task_hf_login({"token": TOKEN})
+
+    assert (token_file.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
+def test_hf_login_new_token_file_created_private(monkeypatch, tmp_path):
+    token_file = tmp_path / "new_token"
+    _fake_hub(monkeypatch, token_path=token_file)
+    monkeypatch.setattr(geoai_task_worker, "_restrict_token_files", lambda hub: None)
+
+    geoai_task_worker._task_hf_login({"token": TOKEN})
+
+    # Created under umask 077 even without the chmod step.
+    assert (token_file.stat().st_mode & 0o077) == 0
 
 
 def test_hf_login_requires_token(monkeypatch):

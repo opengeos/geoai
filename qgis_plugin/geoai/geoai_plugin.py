@@ -406,6 +406,11 @@ class GeoAIPlugin:
             self._segmentation_dock = None
 
         if self._samgeo_dock:
+            try:
+                # Stops or detaches its worker threads before deletion.
+                self._samgeo_dock.cleanup()
+            except Exception:
+                pass
             self.iface.removeDockWidget(self._samgeo_dock)
             self._samgeo_dock.deleteLater()
             self._samgeo_dock = None

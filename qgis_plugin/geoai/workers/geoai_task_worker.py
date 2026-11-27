@@ -338,37 +338,90 @@ def _huggingface_hub():
     return huggingface_hub
 
 
+def _hf_token_files(hub) -> list:
+    """List the files where ``huggingface_hub`` stores access tokens.
+
+    Args:
+        hub: The ``huggingface_hub`` module.
+
+    Returns:
+        Paths of the active token file and the stored-tokens file (those the
+        installed version defines, honoring ``HF_HOME``/``HF_TOKEN_PATH``).
+    """
+    paths = []
+    constants = getattr(hub, "constants", None)
+    for name in ("HF_TOKEN_PATH", "HF_STORED_TOKENS_PATH"):
+        value = getattr(constants, name, None) if constants is not None else None
+        if value:
+            paths.append(str(value))
+    return paths
+
+
+def _restrict_token_files(hub) -> None:
+    """Make the saved token files readable only by their owner (best effort).
+
+    Does nothing on Windows, where POSIX modes do not apply.
+
+    Args:
+        hub: The ``huggingface_hub`` module.
+    """
+    if os.name == "nt":
+        return
+    for path in _hf_token_files(hub):
+        try:
+            if os.path.isfile(path):
+                os.chmod(path, 0o600)
+        except OSError:
+            pass
+
+
 def _task_hf_login(params: Dict[str, Any]) -> Dict[str, Any]:
     """Save a Hugging Face access token for the plugin environment.
 
     Equivalent to ``hf auth login`` (the token is written to the Hugging Face
-    token cache, not to git credentials). The token is never included in
-    progress messages, results or errors.
+    token cache, not to git credentials). On POSIX systems the token files are
+    created with mode 0600 and tightened to 0600 if they already existed. The
+    token is never included in progress messages, results or errors.
 
     Args:
         params: ``{"token": <access token>}``.
 
     Returns:
-        ``{"logged_in": True, "user": <user name>}``.
+        ``{"logged_in": True, "user": <user name or None>}``. ``user`` is None
+        when the token was saved but the account name could not be looked up.
 
     Raises:
         ValueError: If no token was given.
-        RuntimeError: If the login fails (message redacted).
+        RuntimeError: If the token could not be validated or saved (message
+            redacted).
     """
     token = str(params.get("token") or "").strip()
     if not token:
         raise ValueError("No Hugging Face token was provided.")
     hub = _huggingface_hub()
+    old_umask = os.umask(0o077) if os.name != "nt" else None
     try:
         # Libraries may print; stdout is the JSON protocol channel.
         with redirect_stdout(sys.stderr):
             hub.login(token=token, add_to_git_credential=False)
-            info = hub.whoami(token=token)
     except Exception as exc:
         raise RuntimeError(
             f"Hugging Face login failed: {_redact(exc, token)}"
         ) from None
-    user = info.get("name") if isinstance(info, dict) else None
+    finally:
+        if old_umask is not None:
+            os.umask(old_umask)
+    _restrict_token_files(hub)
+
+    # The token is saved now; a failed name lookup is not a login failure.
+    user = None
+    try:
+        with redirect_stdout(sys.stderr):
+            info = hub.whoami(token=token)
+        if isinstance(info, dict):
+            user = info.get("name")
+    except Exception:
+        user = None
     return {"logged_in": True, "user": user}
 
 
