@@ -67,12 +67,13 @@ class MoondreamGeo:
             model_name: HuggingFace model name. Options:
                 - "vikhyatk/moondream2" (default)
                 - "moondream/moondream3-preview"
-            revision: Model revision/checkpoint. For moondream2 this defaults to
-                ``DEFAULT_MOONDREAM2_REVISION``, a pinned checkpoint that is
-                known to work with the installed transformers version. Pass
-                "main" to track the latest upstream checkpoint instead. Note
-                that moondream2 revisions published before the pinned one (such
-                as the "2025-06-21" tag) do not work with transformers >= 5.
+            revision: Model revision/checkpoint. For ``vikhyatk/moondream2``
+                this defaults to ``DEFAULT_MOONDREAM2_REVISION``, a pinned
+                checkpoint that is known to work with the installed
+                transformers version. Pass "main" to track the latest upstream
+                checkpoint instead. Note that moondream2 revisions published
+                before the pinned one (such as the "2025-06-21" tag) do not
+                work with transformers >= 5.
             device: Device for inference ("cuda", "mps", or "cpu").
                 If None, automatically selects the best available device.
             compile_model: Whether to compile the model (recommended for
@@ -94,9 +95,10 @@ class MoondreamGeo:
         else:
             self.model_version = "moondream2"
 
-        # Pin moondream2 so an upstream change to `main` cannot silently alter
-        # (or break) results. Callers can still opt in with revision="main".
-        if revision is None and self.model_version == "moondream2":
+        # Pin vikhyatk/moondream2 so an upstream change to `main` cannot
+        # silently alter (or break) results. Custom/forked repos and local
+        # paths are not pinned, and callers can opt in with revision="main".
+        if revision is None and self.model_name == "vikhyatk/moondream2":
             revision = DEFAULT_MOONDREAM2_REVISION
 
         # Load the model
@@ -195,7 +197,7 @@ class MoondreamGeo:
                     f"on the meta device by transformers 5, which leaves their "
                     f"non-persistent buffers unset and makes inference return "
                     f"meaningless results. Use the default revision "
-                    f"(DEFAULT_MOONDREAM2_REVISION) or a newer one, or pin "
+                    f"({DEFAULT_MOONDREAM2_REVISION}) or a newer one, or pin "
                     f"transformers < 5. Original error: {e}"
                 )
             raise RuntimeError(f"Failed to load Moondream model: {error_msg}") from e

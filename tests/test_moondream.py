@@ -520,6 +520,10 @@ class TestModelRevision(unittest.TestCase):
         )
         self.assertNotIn("revision", kwargs)
 
+    def test_custom_moondream2_repo_not_pinned(self):
+        kwargs = self._load_kwargs(model_name="other-org/moondream2-fork", device="cpu")
+        self.assertNotIn("revision", kwargs)
+
 
 class TestIncompatibleTransformers(unittest.TestCase):
     """An unloadable checkpoint must raise instead of returning a broken model.
@@ -530,7 +534,7 @@ class TestIncompatibleTransformers(unittest.TestCase):
     """
 
     def test_all_tied_weights_keys_raises_with_guidance(self):
-        from geoai.moondream import MoondreamGeo
+        from geoai.moondream import DEFAULT_MOONDREAM2_REVISION, MoondreamGeo
 
         fake_auto_model = MagicMock()
         fake_auto_model.from_pretrained.side_effect = AttributeError(
@@ -546,6 +550,8 @@ class TestIncompatibleTransformers(unittest.TestCase):
         message = str(ctx.exception)
         self.assertIn("2025-06-21", message)
         self.assertIn("transformers", message)
+        self.assertIn(DEFAULT_MOONDREAM2_REVISION, message)
+        self.assertNotIn("DEFAULT_MOONDREAM2_REVISION", message)
         self.assertEqual(fake_auto_model.from_pretrained.call_count, 1)
 
 
