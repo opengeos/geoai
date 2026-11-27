@@ -22,6 +22,7 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -497,6 +498,249 @@ class RasterToVectorStep(PipelineStep):
         return item
 
 
+class ONNXInferenceStep(PipelineStep):
+    """Run ONNX geospatial inference on each item, loading the model once in setup().
+
+    Wraps :class:`geoai.onnx.ONNXGeoModel`.
+
+    Args:
+        name: Step name.
+        model_path: Path to the ``.onnx`` model file.
+        task: Task name (e.g. ``"semantic-segmentation"``,
+            ``"depth-estimation"``, ``"object-detection"``).
+        tile_size: Tile size for tiled inference.
+        overlap: Tile overlap in pixels.
+        threshold: Probability threshold for binary segmentation masks.
+        box_threshold: Confidence threshold for object detection.
+        providers: Optional ONNX Runtime execution providers list.
+        suffix: Filename suffix for output GeoTIFFs.
+        input_key: Item key for input raster path.
+        output_key: Item key for output raster path.
+    """
+
+    def __init__(
+        self,
+        name: str = "onnx_inference",
+        model_path: str = "",
+        task: Optional[str] = "semantic-segmentation",
+        tile_size: int = 512,
+        overlap: int = 64,
+        threshold: float = 0.5,
+        box_threshold: float = 0.3,
+        providers: Optional[List[str]] = None,
+        suffix: str = "_onnx",
+        input_key: str = "input_path",
+        output_key: str = "output_path",
+    ) -> None:
+        super().__init__(name)
+        self.model_path = model_path
+        self.task = task
+        self.tile_size = tile_size
+        self.overlap = overlap
+        self.threshold = threshold
+        self.box_threshold = box_threshold
+        self.providers = providers
+        self.suffix = suffix
+        self.input_key = input_key
+        self.output_key = output_key
+        self._model: Any = None
+
+    def setup(self) -> None:
+        """Load the ONNX model once before processing items."""
+        from geoai.onnx import ONNXGeoModel
+
+        self._model = ONNXGeoModel(
+            model_path=self.model_path,
+            task=self.task,
+            providers=self.providers,
+            tile_size=self.tile_size,
+            overlap=self.overlap,
+        )
+        logger.info("ONNXInferenceStep loaded model from %s", self.model_path)
+
+    def process(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """Run ONNX inference on a single work item."""
+        if self._model is None:
+            self.setup()
+        input_path = item[self.input_key]
+        output_dir = item.get("output_dir", os.path.dirname(input_path) or ".")
+        os.makedirs(output_dir, exist_ok=True)
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_path = os.path.join(output_dir, f"{base_name}{self.suffix}.tif")
+
+        self._model.predict(
+            input_path,
+            output_path=output_path,
+            threshold=self.threshold,
+            box_threshold=self.box_threshold,
+        )
+        item[self.output_key] = output_path
+        return item
+
+    def teardown(self) -> None:
+        """Release the loaded ONNX model reference."""
+        self._model = None
+
+
+class CanopyHeightStep(PipelineStep):
+    """Run canopy height estimation on each item, loading the model once in setup().
+
+    Wraps :class:`geoai.canopy.CanopyHeightEstimation`.
+
+    Args:
+        name: Step name.
+        model_name: Canopy model variant name.
+        checkpoint_path: Optional local checkpoint path.
+        device: Torch device string, or ``None`` for auto-detection.
+        tile_size: Tile size in pixels.
+        overlap: Tile overlap in pixels.
+        batch_size: Inference batch size.
+        scale_factor: Height scale factor in meters.
+        suffix: Filename suffix for output GeoTIFFs.
+        input_key: Item key for input raster path.
+        output_key: Item key for output raster path.
+    """
+
+    def __init__(
+        self,
+        name: str = "canopy_height",
+        model_name: str = "compressed_SSLhuge",
+        checkpoint_path: Optional[str] = None,
+        device: Optional[str] = None,
+        tile_size: int = 256,
+        overlap: int = 64,
+        batch_size: int = 4,
+        scale_factor: float = 10.0,
+        suffix: str = "_canopy",
+        input_key: str = "input_path",
+        output_key: str = "output_path",
+    ) -> None:
+        super().__init__(name)
+        self.model_name = model_name
+        self.checkpoint_path = checkpoint_path
+        self.device = device
+        self.tile_size = tile_size
+        self.overlap = overlap
+        self.batch_size = batch_size
+        self.scale_factor = scale_factor
+        self.suffix = suffix
+        self.input_key = input_key
+        self.output_key = output_key
+        self._model: Any = None
+
+    def setup(self) -> None:
+        """Load the canopy height model once before processing items."""
+        from geoai.canopy import CanopyHeightEstimation
+
+        self._model = CanopyHeightEstimation(
+            model_name=self.model_name,
+            checkpoint_path=self.checkpoint_path,
+            device=self.device,
+        )
+        logger.info("CanopyHeightStep loaded model '%s'", self.model_name)
+
+    def process(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """Run canopy height prediction on a single work item."""
+        if self._model is None:
+            self.setup()
+        input_path = item[self.input_key]
+        output_dir = item.get("output_dir", os.path.dirname(input_path) or ".")
+        os.makedirs(output_dir, exist_ok=True)
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_path = os.path.join(output_dir, f"{base_name}{self.suffix}.tif")
+
+        self._model.predict(
+            input_path=input_path,
+            output_path=output_path,
+            tile_size=self.tile_size,
+            overlap=self.overlap,
+            batch_size=self.batch_size,
+            scale_factor=self.scale_factor,
+        )
+        item[self.output_key] = output_path
+        return item
+
+    def teardown(self) -> None:
+        """Release the loaded canopy model and GPU cache."""
+        self._model = None
+        try:
+            from geoai.utils.device import empty_cache
+
+            empty_cache()
+        except ImportError:
+            pass
+
+
+class CleanMaskStep(PipelineStep):
+    """Post-process segmentation masks with morphological cleaning.
+
+    Wraps :func:`geoai.tools.multiclean.clean_raster`.
+
+    Args:
+        name: Step name.
+        class_values: Optional list of class IDs to clean.
+        smooth_edge_size: Edge smoothing kernel width in pixels.
+        min_island_size: Minimum island area in pixels.
+        connectivity: Pixel connectivity (4 or 8).
+        fill_nan: Whether to fill NaN/nodata pixels.
+        band: 1-based band index to clean.
+        suffix: Filename suffix for cleaned GeoTIFFs.
+        input_key: Item key for input mask raster path.
+        output_key: Item key for cleaned mask raster path.
+    """
+
+    def __init__(
+        self,
+        name: str = "clean_mask",
+        class_values: Optional[List[int]] = None,
+        smooth_edge_size: int = 2,
+        min_island_size: int = 100,
+        connectivity: int = 8,
+        fill_nan: bool = False,
+        band: int = 1,
+        suffix: str = "_cleaned",
+        input_key: str = "output_path",
+        output_key: str = "cleaned_path",
+    ) -> None:
+        super().__init__(name)
+        self.class_values = class_values
+        self.smooth_edge_size = smooth_edge_size
+        self.min_island_size = min_island_size
+        self.connectivity = connectivity
+        self.fill_nan = fill_nan
+        self.band = band
+        self.suffix = suffix
+        self.input_key = input_key
+        self.output_key = output_key
+
+    def setup(self) -> None:
+        """Verify the multiclean helper is importable."""
+        from geoai.tools.multiclean import clean_raster  # noqa: F401
+
+    def process(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """Clean a single raster mask file."""
+        from geoai.tools.multiclean import clean_raster
+
+        raster_path = item[self.input_key]
+        base_name = os.path.splitext(os.path.basename(raster_path))[0]
+        output_dir = item.get("output_dir", os.path.dirname(raster_path) or ".")
+        os.makedirs(output_dir, exist_ok=True)
+        cleaned_path = os.path.join(output_dir, f"{base_name}{self.suffix}.tif")
+
+        clean_raster(
+            input_path=raster_path,
+            output_path=cleaned_path,
+            class_values=self.class_values,
+            smooth_edge_size=self.smooth_edge_size,
+            min_island_size=self.min_island_size,
+            connectivity=self.connectivity,
+            fill_nan=self.fill_nan,
+            band=self.band,
+        )
+        item[self.output_key] = cleaned_path
+        return item
+
+
 # ---------------------------------------------------------------------------
 # Checkpoint manager
 # ---------------------------------------------------------------------------
@@ -576,7 +820,7 @@ class CheckpointManager:
         )
 
     def save(self) -> None:
-        """Persist checkpoint state to disk."""
+        """Persist checkpoint state to disk atomically."""
         data: Dict[str, Any] = {
             "config_hash": self.config_hash,
             "last_updated": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -589,11 +833,21 @@ class CheckpointManager:
                 "completed_steps": entry.completed_steps,
                 "timestamp": entry.timestamp,
             }
-        parent = os.path.dirname(self.checkpoint_path)
+        parent = os.path.dirname(os.path.abspath(self.checkpoint_path))
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(self.checkpoint_path, "w") as f:
-            json.dump(data, f, indent=2)
+        fd, tmp_path = tempfile.mkstemp(dir=parent, prefix=".ckpt_", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp_path, self.checkpoint_path)
+        except BaseException:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            raise
 
     def is_completed(self, item_key: str) -> bool:
         """Check if an item was already completed.
@@ -719,6 +973,9 @@ def _step_from_dict(d: Dict[str, Any]) -> PipelineStep:
 register_step(GlobStep)
 register_step(SemanticSegmentationStep)
 register_step(RasterToVectorStep)
+register_step(ONNXInferenceStep)
+register_step(CanopyHeightStep)
+register_step(CleanMaskStep)
 
 
 # ---------------------------------------------------------------------------
@@ -951,12 +1208,15 @@ class Pipeline:
         # Initialize checkpoint
         self._checkpoint = self._init_checkpoint()
 
-        # Setup all processing steps
+        # Setup all processing steps inside try/finally so partial setup tears down
         proc_steps = self._processing_steps()
-        for step in proc_steps:
-            step.setup()
+        setup_steps: List[PipelineStep] = []
 
         try:
+            for step in proc_steps:
+                step.setup()
+                setup_steps.append(step)
+
             # Filter already-completed items
             pending_items = []
             for item in items:
@@ -979,7 +1239,7 @@ class Pipeline:
                 self._run_parallel(pending_items, result)
 
         finally:
-            for step in proc_steps:
+            for step in reversed(setup_steps):
                 try:
                     step.teardown()
                 except Exception as e:
@@ -1083,6 +1343,11 @@ class Pipeline:
                         result.failed.append((step_result.item, step_result.error))
 
                     pbar.update(1)
+
+                    # Periodic checkpoint save
+                    processed = len(result.completed) + len(result.failed)
+                    if self._checkpoint and processed % 10 == 0:
+                        self._checkpoint.save()
 
         if self._checkpoint:
             self._checkpoint.save()
@@ -1208,6 +1473,9 @@ __all__ = [
     "GlobStep",
     "SemanticSegmentationStep",
     "RasterToVectorStep",
+    "ONNXInferenceStep",
+    "CanopyHeightStep",
+    "CleanMaskStep",
     "PipelineResult",
     "StepResult",
     "ErrorPolicy",

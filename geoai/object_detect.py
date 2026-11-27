@@ -616,7 +616,7 @@ def multiclass_detection(
             model_name = class_info.get("model_name", None)
 
     # Load checkpoint
-    state_dict = torch.load(model_path, map_location=device)
+    state_dict = torch.load(model_path, map_location=device, weights_only=True)
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()
@@ -1023,7 +1023,7 @@ def evaluate_multiclass_detector(
 
         model_path = hf_hub_download(repo_id=hf_repo, filename=model_path)
 
-    state_dict = torch.load(model_path, map_location=device)
+    state_dict = torch.load(model_path, map_location=device, weights_only=True)
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()
@@ -1454,7 +1454,7 @@ def push_detector_to_hub(
         return None
 
     # Load state dict
-    state_dict = torch.load(model_path, map_location="cpu")
+    state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()

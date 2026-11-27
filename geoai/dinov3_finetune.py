@@ -365,7 +365,7 @@ class DINOv3Segmenter(_LightningBase):
         )
 
         if weights_path and os.path.exists(weights_path):
-            state_dict = torch.load(weights_path, map_location="cpu")
+            state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
         else:
             if weights_path:
                 logger.warning(
@@ -375,7 +375,7 @@ class DINOv3Segmenter(_LightningBase):
             weights_file = hf_hub_download(
                 repo_id="giswqs/geoai", filename="dinov3_vitl16_sat493m.pth"
             )
-            state_dict = torch.load(weights_file, map_location="cpu")
+            state_dict = torch.load(weights_file, map_location="cpu", weights_only=True)
 
         model.load_state_dict(state_dict, strict=False)
         return model
@@ -907,7 +907,7 @@ def dinov3_segment_geotiff(
             num_classes=num_classes,
             decoder_features=decoder_features,
         )
-        state = torch.load(checkpoint_path, map_location=dev)
+        state = torch.load(checkpoint_path, map_location=dev, weights_only=True)
         model_module.load_state_dict(state, strict=False)
 
     model_module.eval()
@@ -917,7 +917,14 @@ def dinov3_segment_geotiff(
     with rasterio.open(input_path) as src:
         meta = src.meta.copy()
         height, width = src.shape
-        num_channels = min(src.count, 3)
+        raw_dtypes = getattr(src, "dtypes", None)
+        if raw_dtypes:
+            src_dtype = np.dtype(raw_dtypes[0])
+        elif meta.get("dtype") is not None:
+            src_dtype = np.dtype(meta["dtype"])
+        else:
+            src_dtype = np.dtype("float32")
+        num_channels = 3
 
         stride = window_size - overlap
         n_rows = max(1, int(np.ceil((height - overlap) / stride)))
@@ -960,7 +967,9 @@ def dinov3_segment_geotiff(
 
         def _prepare_window(img: np.ndarray) -> Tuple[np.ndarray, int, int]:
             """Normalise, channel-select, and pad a raw window."""
-            if img.shape[0] > num_channels:
+            if img.shape[0] == 1:
+                img = np.repeat(img, num_channels, axis=0)
+            elif img.shape[0] > num_channels:
                 img = img[:num_channels]
             elif img.shape[0] < num_channels:
                 pad_arr = np.zeros(
@@ -969,8 +978,19 @@ def dinov3_segment_geotiff(
                 pad_arr[: img.shape[0]] = img
                 img = pad_arr
 
-            if img.max() > 1.0:
+            if src_dtype == np.uint8:
                 img = img / 255.0
+            elif src_dtype == np.uint16:
+                img = img / 65535.0
+            elif np.issubdtype(src_dtype, np.integer):
+                dtype_max = float(np.iinfo(src_dtype).max)
+                img = np.clip(img, 0.0, dtype_max) / dtype_max
+            else:
+                img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
+                img_max = float(img.max()) if img.size > 0 else 0.0
+                if img_max > 1.0:
+                    img = img / 255.0 if img_max <= 255.0 else img / img_max
+                img = np.clip(img, 0.0, 1.0)
 
             h, w = img.shape[1], img.shape[2]
             if h < padded_h or w < padded_w:
@@ -1001,7 +1021,11 @@ def dinov3_segment_geotiff(
                 out_window = Window(wcs, wrs, wce - wcs, wre - wrs)
                 dst.write(pred, 1, window=out_window)
 
+        meta.pop("photometric", None)
         meta.update({"count": 1, "dtype": "uint8", "compress": "lzw"})
+        out_dir = os.path.dirname(os.path.abspath(output_path))
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         with torch.no_grad():
             batch_imgs: List[np.ndarray] = []
             batch_meta: List[

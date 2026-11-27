@@ -13,7 +13,56 @@ from strands import tool
 
 
 class DataTools:
-    """Collection of tools for inspecting and processing geospatial data."""
+    """Collection of tools for inspecting and processing geospatial data.
+
+    Args:
+        workspace_dir: Optional root workspace directory. When set, relative
+            paths are resolved under it and all reads, listings, and writes
+            are restricted to this directory (and any ``allowed_roots``).
+        allowed_roots: Optional list of allowed root directories. When set,
+            all file and directory paths must resolve inside one of these
+            roots (after symlink resolution via ``os.path.realpath``).
+    """
+
+    def __init__(
+        self,
+        workspace_dir: Optional[str] = None,
+        allowed_roots: Optional[List[str]] = None,
+    ) -> None:
+        self.workspace_dir: Optional[str] = (
+            os.path.realpath(workspace_dir) if workspace_dir is not None else None
+        )
+        if workspace_dir is None and allowed_roots is None:
+            self.allowed_roots: Optional[List[str]] = None
+        else:
+            roots: List[str] = []
+            if self.workspace_dir is not None:
+                roots.append(self.workspace_dir)
+            if allowed_roots is not None:
+                roots.extend(os.path.realpath(r) for r in allowed_roots)
+            self.allowed_roots = roots
+
+    def _resolve_and_validate_path(self, path: str) -> str:
+        """Resolve *path* via ``os.path.realpath`` and enforce root containment."""
+        if self.workspace_dir is not None and not os.path.isabs(path):
+            candidate = os.path.join(self.workspace_dir, path)
+        else:
+            candidate = path
+        resolved = os.path.realpath(candidate)
+        if self.allowed_roots is not None:
+            allowed = False
+            for root in self.allowed_roots:
+                try:
+                    if os.path.commonpath([root, resolved]) == root:
+                        allowed = True
+                        break
+                except ValueError:
+                    continue
+            if not allowed:
+                raise ValueError(
+                    f"Access denied: path '{path}' resolves outside allowed directories."
+                )
+        return resolved
 
     @tool(
         description="Get metadata and band statistics for a raster file (GeoTIFF, etc.)"
@@ -30,9 +79,10 @@ class DataTools:
         """
         from ..utils.raster import get_raster_info
 
-        if not os.path.isfile(raster_path):
+        resolved = self._resolve_and_validate_path(raster_path)
+        if not os.path.isfile(resolved):
             return json.dumps({"error": f"File not found: {raster_path}"})
-        info = get_raster_info(raster_path)
+        info = get_raster_info(resolved)
         # Make bounds serializable
         info["bounds"] = {
             "left": info["bounds"].left,
@@ -56,9 +106,10 @@ class DataTools:
         """
         from ..utils.raster import read_vector
 
-        if not os.path.isfile(vector_path):
+        resolved = self._resolve_and_validate_path(vector_path)
+        if not os.path.isfile(resolved):
             return json.dumps({"error": f"File not found: {vector_path}"})
-        gdf = read_vector(vector_path)
+        gdf = read_vector(resolved)
         info = {
             "feature_count": len(gdf),
             "crs": str(gdf.crs) if gdf.crs else None,
@@ -97,16 +148,17 @@ class DataTools:
         Returns:
             JSON string confirming the output path and its dimensions.
         """
-        from ..utils.raster import clip_raster_by_bbox
+        from ..utils.raster import clip_raster_by_bbox, get_raster_info
 
+        resolved_in = self._resolve_and_validate_path(input_raster)
+        resolved_out = self._resolve_and_validate_path(output_raster)
         bbox = [min_lon, min_lat, max_lon, max_lat]
-        clip_raster_by_bbox(input_raster, output_raster, bbox)
-        from ..utils.raster import get_raster_info
+        clip_raster_by_bbox(resolved_in, resolved_out, bbox)
 
-        info = get_raster_info(output_raster)
+        info = get_raster_info(resolved_out)
         return json.dumps(
             {
-                "output_path": output_raster,
+                "output_path": resolved_out,
                 "width": info["width"],
                 "height": info["height"],
                 "bands": info["count"],
@@ -130,9 +182,11 @@ class DataTools:
         """
         from ..utils.raster import raster_to_vector as _r2v, read_vector
 
-        _r2v(raster_path, output_path)
-        gdf = read_vector(output_path)
-        return json.dumps({"output_path": output_path, "feature_count": len(gdf)})
+        resolved_in = self._resolve_and_validate_path(raster_path)
+        resolved_out = self._resolve_and_validate_path(output_path)
+        _r2v(resolved_in, resolved_out)
+        gdf = read_vector(resolved_out)
+        return json.dumps({"output_path": resolved_out, "feature_count": len(gdf)})
 
     @tool(description="List files in a directory, optionally filtered by extension")
     def list_files(
@@ -149,12 +203,18 @@ class DataTools:
         Returns:
             JSON list of file paths.
         """
-        if not os.path.isdir(directory):
+        resolved_dir = self._resolve_and_validate_path(directory)
+        if not os.path.isdir(resolved_dir):
             return json.dumps({"error": f"Directory not found: {directory}"})
         files = []
-        for f in sorted(os.listdir(directory)):
-            full = os.path.join(directory, f)
+        for f in sorted(os.listdir(resolved_dir)):
+            full = os.path.join(resolved_dir, f)
             if os.path.isfile(full):
+                if self.allowed_roots is not None:
+                    try:
+                        self._resolve_and_validate_path(full)
+                    except ValueError:
+                        continue
                 if extension is None or f.lower().endswith(extension.lower()):
                     files.append(full)
         return json.dumps(files[:100])  # cap at 100 entries

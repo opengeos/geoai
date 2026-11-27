@@ -1,56 +1,19 @@
 """Main module."""
 
 import logging
-from typing import Any, Dict, List, Optional
-
-import torch
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 logging.getLogger("maplibre").setLevel(logging.ERROR)
 
 import leafmap
 import leafmap.maplibregl as maplibregl
 
-from .classify import classify_image, classify_images, train_classifier
-from .download import (
-    download_naip,
-    download_overture_buildings,
-    download_pc_stac_item,
-    extract_building_stats,
-    get_overture_data,
-    pc_collection_list,
-    pc_item_asset_list,
-    pc_stac_download,
-    pc_stac_search,
-    read_pc_item_asset,
-    view_pc_item,
-    view_pc_items,
-)
-from .extract import *
-from .hf import *
 from .map_widgets import DINOv3GUI
-from .segment import *
-from .train import (
-    COCODetectionDataset,
-    evaluate_coco_metrics,
-    get_instance_segmentation_model,
-    instance_segmentation,
-    instance_segmentation_batch,
-    instance_segmentation_inference_on_geotiff,
-    lightly_embed_images,
-    lightly_train_model,
-    load_lightly_pretrained_model,
-    multiclass_detection_inference_on_geotiff,
-    object_detection,
-    object_detection_batch,
-    semantic_segmentation,
-    semantic_segmentation_batch,
-    train_instance_segmentation_model,
-    train_MaskRCNN_model,
-    train_segmentation_model,
-)
-from .utils import *
-from .landcover_utils import *
-from .landcover_train import *
+
+if TYPE_CHECKING:
+    import torch
+
+    from .dinov3 import DINOv3GeoProcessor
 
 
 class LeafMap(leafmap.Map):
@@ -64,7 +27,7 @@ class LeafMap(leafmap.Map):
         self,
         raster: str,
         processor: "DINOv3GeoProcessor",
-        features: torch.Tensor,
+        features: "torch.Tensor",
         **kwargs: Any,
     ) -> None:
         """Add a DINOv3 GUI to the map."""

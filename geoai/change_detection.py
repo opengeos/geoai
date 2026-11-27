@@ -1898,6 +1898,13 @@ class ChangeStarDetection:
             ValueError: If the images do not overlap.
         """
         with rasterio.open(image1_path) as src1, rasterio.open(image2_path) as src2:
+            if src1.crs is not None and src2.crs is not None and src1.crs != src2.crs:
+                raise ValueError(
+                    f"CRS mismatch between images: image1 has {src1.crs} and "
+                    f"image2 has {src2.crs}. Reproject both images to a common "
+                    "CRS before running change detection."
+                )
+
             bounds1 = src1.bounds
             bounds2 = src2.bounds
 
@@ -2183,8 +2190,29 @@ class ChangeStarDetection:
         Returns:
             Dict[str, np.ndarray]: Merged prediction results.
         """
+        if tile_size <= 0 or overlap < 0 or overlap >= tile_size:
+            raise ValueError(
+                f"Invalid tiling parameters: requires tile_size > 0 and "
+                f"0 <= overlap < tile_size, got tile_size={tile_size}, "
+                f"overlap={overlap}."
+            )
+
         h, w = img1.shape[:2]
         stride = tile_size - overlap
+
+        # Precompute deduplicated tile ranges so boundary tiles are not run redundantly
+        y_ranges = list(
+            dict.fromkeys(
+                (max(0, min(y + tile_size, h) - tile_size), min(y + tile_size, h))
+                for y in range(0, h, stride)
+            )
+        )
+        x_ranges = list(
+            dict.fromkeys(
+                (max(0, min(x + tile_size, w) - tile_size), min(x + tile_size, w))
+                for x in range(0, w, stride)
+            )
+        )
 
         # Initialize output arrays (semantic arrays may be multi-class)
         change_prob = np.zeros((h, w), dtype=np.float32)
@@ -2194,13 +2222,8 @@ class ChangeStarDetection:
         num_classes = 1
 
         # Process tiles
-        for y in range(0, h, stride):
-            for x in range(0, w, stride):
-                # Calculate tile bounds
-                y_end = min(y + tile_size, h)
-                x_end = min(x + tile_size, w)
-                y_start = max(0, y_end - tile_size)
-                x_start = max(0, x_end - tile_size)
+        for y_start, y_end in y_ranges:
+            for x_start, x_end in x_ranges:
 
                 tile1 = img1[y_start:y_end, x_start:x_end]
                 tile2 = img2[y_start:y_end, x_start:x_end]

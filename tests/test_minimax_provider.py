@@ -137,9 +137,11 @@ class TestMinimaxStringRouting(unittest.TestCase):
         """Test that minimax string routing calls create_minimax_model."""
         pattern = r'model\.lower\(\)\.startswith\("minimax"\).*?create_minimax_model'
         matches = re.findall(pattern, self.source, re.DOTALL)
-        # Should appear 3 times: GeoAgent, STACAgent, CatalogAgent
-        self.assertEqual(
-            len(matches), 3, "Expected 3 minimax routing blocks (one per agent class)"
+        # Routing is handled centrally in _resolve_model (or once per agent class)
+        self.assertGreaterEqual(
+            len(matches),
+            1,
+            "Expected minimax routing to call create_minimax_model",
         )
 
     def test_minimax_string_detection_logic(self):
@@ -277,20 +279,27 @@ class TestMinimaxInAllAgents(unittest.TestCase):
         geo_start = self.source.find("class GeoAgent")
         stac_start = self.source.find("class STACAgent")
         geo_source = self.source[geo_start:stac_start]
-        self.assertIn("create_minimax_model", geo_source)
+        self.assertTrue(
+            "create_minimax_model" in geo_source or "_resolve_model(" in geo_source
+        )
 
     def test_stac_agent_minimax_routing(self):
         """Test that STACAgent has MiniMax string routing."""
         stac_start = self.source.find("class STACAgent")
         catalog_start = self.source.find("class CatalogAgent")
         stac_source = self.source[stac_start:catalog_start]
-        self.assertIn("create_minimax_model", stac_source)
+        self.assertTrue(
+            "create_minimax_model" in stac_source or "_resolve_model(" in stac_source
+        )
 
     def test_catalog_agent_minimax_routing(self):
         """Test that CatalogAgent has MiniMax string routing."""
         catalog_start = self.source.find("class CatalogAgent")
         catalog_source = self.source[catalog_start:]
-        self.assertIn("create_minimax_model", catalog_source)
+        self.assertTrue(
+            "create_minimax_model" in catalog_source
+            or "_resolve_model(" in catalog_source
+        )
 
 
 class TestMinimaxModelIntegration(unittest.TestCase):

@@ -615,7 +615,7 @@ def download_pc_stac_item(
     search = catalog.search(collections=[collection], ids=[item_id])
 
     # Get the first item from the search results
-    items = list(search.get_items())
+    items = list(search.items())
     if not items:
         raise ValueError(f"Item with ID {item_id} not found")
 
@@ -656,158 +656,175 @@ def download_pc_stac_item(
     )
 
     # Download each requested band
-    for band in progress_iter:
-        if band not in item.assets:
-            if show_progress and not isinstance(progress_iter, list):
-                progress_iter.write(
-                    f"Warning: Band {band} not found in assets, skipping."
-                )
-            continue
-
-        band_url = item.assets[band].href
-
-        if output_dir:
-            file_path = os.path.join(output_dir, f"{item.id}_{band}.tif")
-
-            # Check if file exists and skip if overwrite is False
-            if os.path.exists(file_path) and not overwrite:
+    try:
+        for band in progress_iter:
+            if band not in item.assets:
                 if show_progress and not isinstance(progress_iter, list):
                     progress_iter.write(
-                        f"File {file_path} already exists, skipping (use overwrite=True to force download)."
+                        f"Warning: Band {band} not found in assets, skipping."
                     )
-                # Still need to open the file to get the data for merging
-                if merge_bands:
-                    band_data = rxr.open_rasterio(file_path)
-                    band_data_arrays.append((band, band_data))
-                    band_names.append(band)
-                result[band] = file_path
                 continue
 
-        if show_progress and not isinstance(progress_iter, list):
-            progress_iter.set_description(f"Downloading {band}")
+            band_url = item.assets[band].href
 
-        band_data = rxr.open_rasterio(band_url)
+            if output_dir:
+                file_path = os.path.join(output_dir, f"{item.id}_{band}.tif")
 
-        # Store the data array for potential merging later
-        if merge_bands:
-            band_data_arrays.append((band, band_data))
-            band_names.append(band)
+                # Check if file exists and skip if overwrite is False
+                if os.path.exists(file_path) and not overwrite:
+                    if show_progress and not isinstance(progress_iter, list):
+                        progress_iter.write(
+                            f"File {file_path} already exists, skipping (use overwrite=True to force download)."
+                        )
+                    # Still need to open the file to get the data for merging
+                    if merge_bands:
+                        band_data = rxr.open_rasterio(file_path)
+                        band_data_arrays.append((band, band_data))
+                        band_names.append(band)
+                    result[band] = file_path
+                    continue
 
-        if output_dir:
-            file_path = os.path.join(output_dir, f"{item.id}_{band}.tif")
-            band_data.rio.to_raster(file_path)
-            result[band] = file_path
-        else:
-            result[band] = band_data
+            if show_progress and not isinstance(progress_iter, list):
+                progress_iter.set_description(f"Downloading {band}")
 
-    # Merge bands if requested
-    if merge_bands and output_dir:
-        if merged_filename is None:
-            merged_filename = f"{item.id}_merged.tif"
+            if output_dir and not merge_bands:
+                file_path = os.path.join(output_dir, f"{item.id}_{band}.tif")
+                with rxr.open_rasterio(band_url) as band_data:
+                    band_data.rio.to_raster(file_path)
+                result[band] = file_path
+            else:
+                band_data = rxr.open_rasterio(band_url)
 
-        merged_path = os.path.join(output_dir, merged_filename)
+                # Store the data array for potential merging later
+                if merge_bands:
+                    band_data_arrays.append((band, band_data))
+                    band_names.append(band)
 
-        # Check if merged file exists and skip if overwrite is False
-        if os.path.exists(merged_path) and not overwrite:
-            if show_progress:
-                logger.info(
-                    "Merged file %s already exists, skipping (use overwrite=True to force creation).",
-                    merged_path,
-                )
-            result["merged"] = merged_path
-        else:
-            if show_progress:
-                logger.info("Resampling and merging bands...")
+                if output_dir:
+                    file_path = os.path.join(output_dir, f"{item.id}_{band}.tif")
+                    band_data.rio.to_raster(file_path)
+                    result[band] = file_path
+                else:
+                    result[band] = band_data
 
-            # Determine target cell size if not provided
-            if cell_size is None and band_data_arrays:
-                # Use the resolution of the first band (usually 10m for B02, B03, B04, B08)
-                # Get the affine transform (containing resolution info)
-                first_band_data = band_data_arrays[0][1]
-                # Extract resolution from transform
-                cell_size = abs(first_band_data.rio.transform()[0])
+        # Merge bands if requested
+        if merge_bands and output_dir:
+            if merged_filename is None:
+                merged_filename = f"{item.id}_merged.tif"
+
+            merged_path = os.path.join(output_dir, merged_filename)
+
+            # Check if merged file exists and skip if overwrite is False
+            if os.path.exists(merged_path) and not overwrite:
                 if show_progress:
-                    logger.info("Using detected resolution: %sm", cell_size)
-            elif cell_size is None:
-                # Default to 10m if no bands are available
-                cell_size = 10
+                    logger.info(
+                        "Merged file %s already exists, skipping (use overwrite=True to force creation).",
+                        merged_path,
+                    )
+                result["merged"] = merged_path
+            else:
                 if show_progress:
-                    logger.info("Using default resolution: %sm", cell_size)
+                    logger.info("Resampling and merging bands...")
 
-            # Process bands in memory-efficient way
-            for i, (band_name, data_array) in enumerate(band_data_arrays):
-                if show_progress:
-                    logger.info("Processing band: %s", band_name)
-
-                # Get current resolution
-                current_res = abs(data_array.rio.transform()[0])
-
-                # Resample if needed
-                if (
-                    abs(current_res - cell_size) > 0.01
-                ):  # Small tolerance for floating point comparison
+                # Determine target cell size if not provided
+                if cell_size is None and band_data_arrays:
+                    # Use the resolution of the first band (usually 10m for B02, B03, B04, B08)
+                    # Get the affine transform (containing resolution info)
+                    first_band_data = band_data_arrays[0][1]
+                    # Extract resolution from transform
+                    cell_size = abs(first_band_data.rio.transform()[0])
                     if show_progress:
-                        logger.info(
-                            "Resampling %s from %sm to %sm",
-                            band_name,
-                            current_res,
-                            cell_size,
+                        logger.info("Using detected resolution: %sm", cell_size)
+                elif cell_size is None:
+                    # Default to 10m if no bands are available
+                    cell_size = 10
+                    if show_progress:
+                        logger.info("Using default resolution: %sm", cell_size)
+
+                # Process bands in memory-efficient way
+                for i, (band_name, data_array) in enumerate(band_data_arrays):
+                    if show_progress:
+                        logger.info("Processing band: %s", band_name)
+
+                    # Get current resolution
+                    current_res = abs(data_array.rio.transform()[0])
+
+                    # Resample if needed
+                    if (
+                        abs(current_res - cell_size) > 0.01
+                    ):  # Small tolerance for floating point comparison
+                        if show_progress:
+                            logger.info(
+                                "Resampling %s from %sm to %sm",
+                                band_name,
+                                current_res,
+                                cell_size,
+                            )
+
+                        # Use bilinear for downsampling (higher to lower resolution)
+                        # Use nearest for upsampling (lower to higher resolution)
+                        resampling_method = (
+                            Resampling.bilinear
+                            if current_res < cell_size
+                            else Resampling.nearest
                         )
 
-                    # Use bilinear for downsampling (higher to lower resolution)
-                    # Use nearest for upsampling (lower to higher resolution)
-                    resampling_method = (
-                        Resampling.bilinear
-                        if current_res < cell_size
-                        else Resampling.nearest
+                        resampled = data_array.rio.reproject(
+                            data_array.rio.crs,
+                            resolution=(cell_size, cell_size),
+                            resampling=resampling_method,
+                        )
+                        resampled_arrays.append(resampled)
+                    else:
+                        resampled_arrays.append(data_array)
+
+                if show_progress:
+                    logger.info("Stacking bands...")
+
+                # Concatenate all resampled arrays along the band dimension
+                try:
+                    merged_data = xr.concat(resampled_arrays, dim="band")
+
+                    if show_progress:
+                        logger.info("Writing merged data to %s...", merged_path)
+
+                    # Add description metadata
+                    merged_data.attrs["description"] = (
+                        f"Multi-band image containing {', '.join(band_names)}"
                     )
 
-                    resampled = data_array.rio.reproject(
-                        data_array.rio.crs,
-                        resolution=(cell_size, cell_size),
-                        resampling=resampling_method,
+                    # Create a dictionary mapping band indices to band names
+                    band_descriptions = {}
+                    for i, name in enumerate(band_names):
+                        band_descriptions[i + 1] = name
+
+                    # Write the merged data to file with band descriptions
+                    merged_data.rio.to_raster(
+                        merged_path,
+                        tags={"BAND_NAMES": ",".join(band_names)},
+                        descriptions=band_names,
                     )
-                    resampled_arrays.append(resampled)
-                else:
-                    resampled_arrays.append(data_array)
 
-            if show_progress:
-                logger.info("Stacking bands...")
+                    result["merged"] = merged_path
 
-            # Concatenate all resampled arrays along the band dimension
-            try:
-                merged_data = xr.concat(resampled_arrays, dim="band")
-
-                if show_progress:
-                    logger.info("Writing merged data to %s...", merged_path)
-
-                # Add description metadata
-                merged_data.attrs["description"] = (
-                    f"Multi-band image containing {', '.join(band_names)}"
-                )
-
-                # Create a dictionary mapping band indices to band names
-                band_descriptions = {}
-                for i, name in enumerate(band_names):
-                    band_descriptions[i + 1] = name
-
-                # Write the merged data to file with band descriptions
-                merged_data.rio.to_raster(
-                    merged_path,
-                    tags={"BAND_NAMES": ",".join(band_names)},
-                    descriptions=band_names,
-                )
-
-                result["merged"] = merged_path
-
-                if show_progress:
-                    logger.info("Merged bands saved to: %s", merged_path)
-                    logger.info("Band order in merged file: %s", ", ".join(band_names))
-            except Exception as e:
-                if show_progress:
-                    logger.error("Error during merging: %s", str(e))
-                    logger.error("Error details: %s: %s", type(e).__name__, str(e))
-                raise
+                    if show_progress:
+                        logger.info("Merged bands saved to: %s", merged_path)
+                        logger.info(
+                            "Band order in merged file: %s", ", ".join(band_names)
+                        )
+                except Exception as e:
+                    if show_progress:
+                        logger.error("Error during merging: %s", str(e))
+                        logger.error("Error details: %s: %s", type(e).__name__, str(e))
+                    raise
+    finally:
+        if output_dir:
+            for _, data_array in band_data_arrays:
+                with contextlib.suppress(Exception):
+                    data_array.close()
+            for data_array in resampled_arrays:
+                with contextlib.suppress(Exception):
+                    data_array.close()
 
     return result
 
@@ -948,6 +965,7 @@ def pc_stac_search(
     max_items: Optional[int] = None,
     quiet: bool = False,
     endpoint: str = "https://planetarycomputer.microsoft.com/api/stac/v1",
+    ids: Optional[List[str]] = None,
 ) -> List["pystac.Item"]:
     """
     Search for STAC items in the Planetary Computer catalog.
@@ -967,9 +985,11 @@ def pc_stac_search(
         limit (int, optional): Number of items to return per page. Defaults to 10.
         max_items (int, optional): Maximum total number of items to return.
             Defaults to None (returns all matching items).
-        quiet: bool, optional): Whether to suppress print statements. Defaults to False.
+        quiet (bool, optional): Whether to suppress print statements. Defaults to False.
         endpoint (str, optional): STAC API endpoint URL.
             Defaults to "https://planetarycomputer.microsoft.com/api/stac/v1".
+        ids (list, optional): List of specific STAC item IDs to retrieve.
+            Defaults to None.
 
     Returns:
         list: List of STAC Item objects matching the search criteria.
@@ -1006,22 +1026,29 @@ def pc_stac_search(
         time_str = None
 
     # Create the search object
-    search = catalog.search(
-        collections=[collection], bbox=bbox, datetime=time_str, query=query, limit=limit
-    )
+    search_kwargs: Dict[str, Any] = {
+        "collections": [collection],
+        "bbox": bbox,
+        "datetime": time_str,
+        "query": query,
+        "limit": limit,
+    }
+    if ids is not None:
+        search_kwargs["ids"] = ids
+    search = catalog.search(**search_kwargs)
 
     # Collect the items
     items = []
     try:
         # Use max_items if specified, otherwise get all items
         if max_items:
-            items_gen = search.get_items()
+            items_gen = search.items()
             for item in items_gen:
                 items.append(item)
                 if len(items) >= max_items:
                     break
         else:
-            items = list(search.get_items())
+            items = list(search.items())
     except Exception as e:
         raise Exception(f"Error retrieving search results: {str(e)}")
 
@@ -1076,14 +1103,13 @@ def pc_stac_download(
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    # Function to download a single asset
+    # Function to download a single asset (expects an already-signed item)
     def download_asset(
         item: "pystac.Item", asset_key: str, asset: "pystac.Asset"
     ) -> str:
-        item = pc.sign(item)
         item_id = item.id
 
-        # Get the asset URL and sign it if needed
+        # Get the signed asset URL
         asset_url = item.assets[asset_key].href
         # Determine output filename
         if asset.media_type:
@@ -1155,6 +1181,7 @@ def pc_stac_download(
         item_assets = {}
         if isinstance(item, str):
             item = pystac.Item.from_file(item)
+        item = pc.sign(item)
         item_id = item.id
         logger.info("Processing STAC item: %s", item_id)
 
@@ -1447,18 +1474,21 @@ def view_pc_items(
         for item in items:
 
             if isinstance(item, pystac.Item):
-                collection = item.collection_id
+                item_collection = item.collection_id
                 if assets is None:
-                    assets = [list(item.assets.keys())[0]]
-                item = item.id
+                    asset_keys = list(item.assets.keys())
+                    item_assets = [asset_keys[0]] if asset_keys else None
+                else:
+                    item_assets = assets
+                item_id = item.id
 
                 m.add_stac_layer(
-                    collection=collection,
-                    item=item,
-                    assets=assets,
+                    collection=item_collection,
+                    item=item_id,
+                    assets=item_assets,
                     bands=bands,
                     titiler_endpoint=titiler_endpoint,
-                    name=item,
+                    name=item_id,
                     attribution=attribution,
                     opacity=opacity,
                     shown=shown,

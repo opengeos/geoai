@@ -1070,7 +1070,7 @@ def predict_images_from_hub(
         num_classes=num_classes,
         in_chans=in_channels,
     )
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
+    model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
 
     result = predict_images(
         model=model,

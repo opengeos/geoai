@@ -133,7 +133,9 @@ class DINOv3GeoProcessor:
                     source=self.dinov3_source,
                 )
                 # Load state dict manually
-                state_dict = torch.load(weights_path, map_location=self.device)
+                state_dict = torch.load(
+                    weights_path, map_location=self.device, weights_only=True
+                )
                 model.load_state_dict(state_dict, strict=False)
             else:
                 # Download weights and load manually
@@ -148,7 +150,9 @@ class DINOv3GeoProcessor:
                     skip_validation=True,  # optional: speeds things up
                 )
                 # Load state dict manually
-                state_dict = torch.load(weights_path, map_location=self.device)
+                state_dict = torch.load(
+                    weights_path, map_location=self.device, weights_only=True
+                )
                 model.load_state_dict(state_dict, strict=False)
 
             model = model.to(self.device)

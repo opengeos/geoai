@@ -107,8 +107,7 @@ def create_ollama_model(
     Returns:
         OllamaModel: An Ollama model.
     """
-    if client_args is None:
-        client_args = {}
+    client_args = dict(client_args or {})
     return OllamaModel(host=host, model_id=model_id, client_args=client_args, **kwargs)
 
 
@@ -129,8 +128,12 @@ def create_openai_model(
     Returns:
         OpenAIModel: An OpenAI model.
     """
-
-    if api_key is None and not (client_args or {}).get("api_key"):
+    client_args = dict(
+        client_args
+        if client_args is not None
+        else (kwargs.pop("client_args", None) or {})
+    )
+    if api_key is None and not client_args.get("api_key"):
         try:
             api_key = os.getenv("OPENAI_API_KEY", None)
             if api_key is None:
@@ -138,8 +141,6 @@ def create_openai_model(
         except Exception:
             raise ValueError("OPENAI_API_KEY is not set")
 
-    if client_args is None:
-        client_args = kwargs.get("client_args", {})
     if not client_args.get("api_key") and api_key is not None:
         client_args["api_key"] = api_key
 
@@ -162,9 +163,13 @@ def create_anthropic_model(
         client_args: Client arguments for the Anthropic model.
         **kwargs: Additional keyword arguments for the Anthropic model.
     """
-
-    token_auth = (client_args or {}).get("auth_token")
-    if api_key is None and not (client_args or {}).get("api_key") and not token_auth:
+    client_args = dict(
+        client_args
+        if client_args is not None
+        else (kwargs.pop("client_args", None) or {})
+    )
+    token_auth = client_args.get("auth_token")
+    if api_key is None and not client_args.get("api_key") and not token_auth:
         try:
             api_key = os.getenv("ANTHROPIC_API_KEY", None)
             if api_key is None:
@@ -172,8 +177,6 @@ def create_anthropic_model(
         except Exception:
             raise ValueError("ANTHROPIC_API_KEY is not set")
 
-    if client_args is None:
-        client_args = kwargs.get("client_args", {})
     if not client_args.get("api_key") and api_key is not None and not token_auth:
         client_args["api_key"] = api_key
 
@@ -224,8 +227,12 @@ def create_gemini_model(
     Returns:
         GeminiModel: A Gemini model.
     """
-
-    if api_key is None and (client_args is None or "api_key" not in client_args):
+    client_args = dict(
+        client_args
+        if client_args is not None
+        else (kwargs.pop("client_args", None) or {})
+    )
+    if api_key is None and not client_args.get("api_key"):
         try:
             api_key = os.getenv("GOOGLE_API_KEY", None)
             if api_key is None:
@@ -233,9 +240,7 @@ def create_gemini_model(
         except Exception:
             raise ValueError("GOOGLE_API_KEY is not set")
 
-    if client_args is None:
-        client_args = kwargs.get("client_args", {})
-    if "api_key" not in client_args and api_key is not None:
+    if not client_args.get("api_key") and api_key is not None:
         client_args["api_key"] = api_key
 
     return GeminiModel(client_args=client_args, model_id=model_id, **kwargs)
@@ -266,9 +271,12 @@ def create_minimax_model(
         OpenAIModel: An OpenAI-compatible model configured for MiniMax.
     """
 
-    # Normalize client_args first so we can honor an API key passed there.
-    if client_args is None:
-        client_args = kwargs.get("client_args", {}) or {}
+    # Normalize and copy client_args so caller dicts are not mutated.
+    client_args = dict(
+        client_args
+        if client_args is not None
+        else (kwargs.pop("client_args", None) or {})
+    )
 
     # Determine the effective API key from the function argument, client_args, or env var.
     effective_api_key = api_key or client_args.get("api_key")
@@ -317,8 +325,11 @@ def create_vllm_model(
     Returns:
         OpenAIModel: An OpenAI-compatible model configured for vLLM.
     """
-    if client_args is None:
-        client_args = kwargs.get("client_args", {}) or {}
+    client_args = dict(
+        client_args
+        if client_args is not None
+        else (kwargs.pop("client_args", None) or {})
+    )
 
     if "api_key" not in client_args:
         client_args["api_key"] = api_key
@@ -326,6 +337,66 @@ def create_vllm_model(
         client_args["base_url"] = base_url
 
     return OpenAIModel(client_args=client_args, model_id=model_id, **kwargs)
+
+
+def _resolve_model(
+    model: Any,
+    model_args: Optional[dict] = None,
+) -> Callable[[], Any]:
+    """Resolve a model identifier or model instance into a per-turn model factory.
+
+    Supports string model IDs (Ollama, MiniMax, Bedrock) and pre-constructed
+    instances of ``OllamaModel``, ``OpenAIModel``, ``AnthropicModel``,
+    ``GeminiModel``, and ``BedrockModel``.
+    """
+    args = dict(model_args or {})
+
+    if isinstance(model, str) and (":" in model or model.startswith("llama")):
+        return lambda m=model: create_ollama_model(
+            host="http://localhost:11434", model_id=m, **args
+        )
+    if isinstance(model, str) and model.lower().startswith("minimax"):
+        return lambda m=model: create_minimax_model(model_id=m, **args)
+    if isinstance(model, OllamaModel):
+        model_id = model.config["model_id"]
+        host = model.host
+        client_args = dict(model.client_args or {})
+        return lambda mid=model_id, h=host, ca=client_args: create_ollama_model(
+            host=h, model_id=mid, client_args=dict(ca), **args
+        )
+    if isinstance(model, OpenAIModel):
+        model_id = model.config["model_id"]
+        client_args = dict(model.client_args or {})
+        return lambda mid=model_id, ca=client_args: create_openai_model(
+            model_id=mid, client_args=dict(ca), **args
+        )
+    if isinstance(model, AnthropicModel):
+        model_id = model.config["model_id"]
+        client_args = dict(model.client_args or {})
+        return lambda mid=model_id, ca=client_args: create_anthropic_model(
+            model_id=mid, client_args=dict(ca), **args
+        )
+    if isinstance(model, GeminiModel):
+        model_id = model.config["model_id"]
+        client_args = dict(model.client_args or {})
+        return lambda mid=model_id, ca=client_args: create_gemini_model(
+            model_id=mid, client_args=dict(ca), **args
+        )
+    if isinstance(model, BedrockModel):
+        model_id = model.config["model_id"]
+        bedrock_kwargs = dict(args)
+        if "region_name" not in bedrock_kwargs:
+            region = getattr(model, "region_name", None)
+            if region is None and isinstance(getattr(model, "config", None), dict):
+                region = model.config.get("region_name")
+            if region is not None:
+                bedrock_kwargs["region_name"] = region
+        return lambda mid=model_id, bk=bedrock_kwargs: create_bedrock_model(
+            model_id=mid, **bk
+        )
+    if isinstance(model, str):
+        return lambda m=model: create_bedrock_model(model_id=m, **args)
+    raise ValueError(f"Invalid model: {model}")
 
 
 class GeoAgent(Agent):
@@ -351,64 +422,7 @@ class GeoAgent(Agent):
         self.session: MapSession = MapSession(map_instance)
         self.tools: MapTools = MapTools(self.session)
 
-        if model_args is None:
-            model_args = {}
-
-        # --- save a model factory we can call each turn ---
-        if isinstance(model, str) and (":" in model or model.startswith("llama")):
-            # treat ANY "llama..." model id as Ollama
-            self._model_factory = lambda m=model: create_ollama_model(
-                host="http://localhost:11434", model_id=m, **model_args
-            )
-        elif isinstance(model, str) and model.lower().startswith("minimax"):
-            # MiniMax models (e.g., "MiniMax-M3", "MiniMax-M2.7")
-            self._model_factory = lambda m=model: create_minimax_model(
-                model_id=m, **model_args
-            )
-        elif isinstance(model, OllamaModel):
-            # Extract configuration from existing OllamaModel and create new instances
-            model_id = model.config["model_id"]
-            host = model.host
-            client_args = model.client_args
-            self._model_factory: Callable[[], OllamaModel] = (
-                lambda: create_ollama_model(
-                    host=host, model_id=model_id, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, OpenAIModel):
-            # Extract configuration from existing OpenAIModel and create new instances
-            model_id = model.config["model_id"]
-            client_args = model.client_args.copy()
-            self._model_factory: Callable[[], OpenAIModel] = (
-                lambda mid=model_id, client_args=client_args: create_openai_model(
-                    model_id=mid, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, AnthropicModel):
-            # Extract configuration from existing AnthropicModel and create new instances
-            model_id = model.config["model_id"]
-            client_args = model.client_args.copy()
-            self._model_factory: Callable[[], AnthropicModel] = (
-                lambda mid=model_id, client_args=client_args: create_anthropic_model(
-                    model_id=mid, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, GeminiModel):
-            # Extract configuration from existing GeminiModel and create new instances
-            model_id = model.config["model_id"]
-            client_args = model.client_args.copy()
-            self._model_factory: Callable[[], GeminiModel] = (
-                lambda mid=model_id, client_args=client_args: create_gemini_model(
-                    model_id=mid, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, str):
-            # Only Bedrock IDs here, not LLaMA
-            self._model_factory = lambda m=model: create_bedrock_model(
-                model_id=m, **model_args
-            )
-        else:
-            raise ValueError(f"Invalid model: {model}")
+        self._model_factory = _resolve_model(model, model_args)
 
         # build initial model (first turn)
         model = self._model_factory()
@@ -642,12 +656,12 @@ class GeoAgent(Agent):
             _append("user", text)
             _lock(True)
             self._ui.status.value = "<span style='color:#0a7'>Running…</span>"
+            old_callback = self.callback_handler
             try:
                 # Create a callback handler that updates the status widget
                 callback_handler = UICallbackHandler(status_widget=self._ui.status)
 
                 # Temporarily set callback_handler for this call
-                old_callback = self.callback_handler
                 self.callback_handler = callback_handler
 
                 out = self.ask(text)  # fresh Agent/model per call, with callback
@@ -779,55 +793,7 @@ class STACAgent(Agent):
         self.stac_tools: STACTools = STACTools(endpoint=endpoint)
         self.map_instance = map_instance if map_instance is not None else leafmap.Map()
 
-        if model_args is None:
-            model_args = {}
-
-        # --- save a model factory we can call each turn ---
-        if isinstance(model, str) and (":" in model or model.startswith("llama")):
-            # treat ANY "llama..." model id as Ollama
-            self._model_factory = lambda m=model: create_ollama_model(
-                host="http://localhost:11434", model_id=m, **model_args
-            )
-        elif isinstance(model, str) and model.lower().startswith("minimax"):
-            # MiniMax models (e.g., "MiniMax-M3", "MiniMax-M2.7")
-            self._model_factory = lambda m=model: create_minimax_model(
-                model_id=m, **model_args
-            )
-        elif isinstance(model, OllamaModel):
-            # Extract configuration from existing OllamaModel and create new instances
-            model_id = model.config["model_id"]
-            host = model.host
-            client_args = model.client_args
-            self._model_factory: Callable[[], OllamaModel] = (
-                lambda: create_ollama_model(
-                    host=host, model_id=model_id, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, OpenAIModel):
-            # Extract configuration from existing OpenAIModel and create new instances
-            model_id = model.config["model_id"]
-            client_args = model.client_args.copy()
-            self._model_factory: Callable[[], OpenAIModel] = (
-                lambda mid=model_id, client_args=client_args: create_openai_model(
-                    model_id=mid, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, AnthropicModel):
-            # Extract configuration from existing AnthropicModel and create new instances
-            model_id = model.config["model_id"]
-            client_args = model.client_args.copy()
-            self._model_factory: Callable[[], AnthropicModel] = (
-                lambda mid=model_id, client_args=client_args: create_anthropic_model(
-                    model_id=mid, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, str):
-            # Only Bedrock IDs here, not LLaMA
-            self._model_factory = lambda m=model: create_bedrock_model(
-                model_id=m, **model_args
-            )
-        else:
-            raise ValueError(f"Invalid model: {model}")
+        self._model_factory = _resolve_model(model, model_args)
 
         # build initial model (first turn)
         model = self._model_factory()
@@ -1262,12 +1228,12 @@ CRITICAL: Return ONLY JSON. NO explanatory text, NO made-up data."""
             _append("user", text)
             _lock(True)
             self._ui.status.value = "<span style='color:#0a7'>Searching…</span>"
+            old_callback = self.callback_handler
             try:
                 # Create a callback handler that updates the status widget
                 callback_handler = UICallbackHandler(status_widget=self._ui.status)
 
                 # Temporarily set callback_handler for this call
-                old_callback = self.callback_handler
                 self.callback_handler = callback_handler
 
                 # Get the structured search result directly (will show progress via callback)
@@ -1425,55 +1391,7 @@ class CatalogAgent(Agent):
             catalog_url=catalog_url, catalog_df=catalog_df
         )
 
-        if model_args is None:
-            model_args = {}
-
-        # --- save a model factory we can call each turn ---
-        if isinstance(model, str) and (":" in model or model.startswith("llama")):
-            # treat ANY "llama..." model id as Ollama
-            self._model_factory = lambda m=model: create_ollama_model(
-                host="http://localhost:11434", model_id=m, **model_args
-            )
-        elif isinstance(model, str) and model.lower().startswith("minimax"):
-            # MiniMax models (e.g., "MiniMax-M3", "MiniMax-M2.7")
-            self._model_factory = lambda m=model: create_minimax_model(
-                model_id=m, **model_args
-            )
-        elif isinstance(model, OllamaModel):
-            # Extract configuration from existing OllamaModel and create new instances
-            model_id = model.config["model_id"]
-            host = model.host
-            client_args = model.client_args
-            self._model_factory: Callable[[], OllamaModel] = (
-                lambda: create_ollama_model(
-                    host=host, model_id=model_id, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, OpenAIModel):
-            # Extract configuration from existing OpenAIModel and create new instances
-            model_id = model.config["model_id"]
-            client_args = model.client_args.copy()
-            self._model_factory: Callable[[], OpenAIModel] = (
-                lambda mid=model_id, client_args=client_args: create_openai_model(
-                    model_id=mid, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, AnthropicModel):
-            # Extract configuration from existing AnthropicModel and create new instances
-            model_id = model.config["model_id"]
-            client_args = model.client_args.copy()
-            self._model_factory: Callable[[], AnthropicModel] = (
-                lambda mid=model_id, client_args=client_args: create_anthropic_model(
-                    model_id=mid, client_args=client_args, **model_args
-                )
-            )
-        elif isinstance(model, str):
-            # Only Bedrock IDs here, not LLaMA
-            self._model_factory = lambda m=model: create_bedrock_model(
-                model_id=m, **model_args
-            )
-        else:
-            raise ValueError(f"Invalid model: {model}")
+        self._model_factory = _resolve_model(model, model_args)
 
         # build initial model (first turn)
         model = self._model_factory()

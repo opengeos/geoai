@@ -32,48 +32,51 @@ def download_file(
         str: The path to the downloaded file or the extracted directory.
     """
 
+    import contextlib
     import uuid
     import zipfile
+    from urllib.parse import urlparse
 
     from ..progress import tqdm
 
     if output_path is None:
-        output_path = os.path.basename(url)
+        url_path = urlparse(url).path
+        output_path = os.path.basename(url_path) or "downloaded_file"
 
     if os.path.exists(output_path) and not overwrite:
         logger.info("File already exists: %s", output_path)
     else:
         # Download the file with a progress bar
-        response = requests.get(url, stream=True, timeout=50)
-        response.raise_for_status()
-        total_size = int(response.headers.get("content-length", 0))
-        parent = os.path.dirname(output_path)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
+        with contextlib.closing(requests.get(url, stream=True, timeout=50)) as response:
+            response.raise_for_status()
+            total_size = int(response.headers.get("content-length", 0))
+            parent = os.path.dirname(output_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
 
-        # Write to a temporary file first, so a broken download never leaves
-        # a partial file at output_path that the next call would reuse. Each
-        # call gets its own file, so parallel downloads don't clash.
-        temp_path = f"{output_path}.{uuid.uuid4().hex}.part"
-        try:
-            with (
-                open(temp_path, "wb") as file,
-                tqdm(
-                    desc=f"Downloading {os.path.basename(output_path)}",
-                    total=total_size,
-                    unit="B",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                ) as progress_bar,
-            ):
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:
-                        file.write(chunk)
-                        progress_bar.update(len(chunk))
-            os.replace(temp_path, output_path)
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            # Write to a temporary file first, so a broken download never leaves
+            # a partial file at output_path that the next call would reuse. Each
+            # call gets its own file, so parallel downloads don't clash.
+            temp_path = f"{output_path}.{uuid.uuid4().hex}.part"
+            try:
+                with (
+                    open(temp_path, "wb") as file,
+                    tqdm(
+                        desc=f"Downloading {os.path.basename(output_path)}",
+                        total=total_size,
+                        unit="B",
+                        unit_scale=True,
+                        unit_divisor=1024,
+                    ) as progress_bar,
+                ):
+                    for chunk in response.iter_content(chunk_size=1024):
+                        if chunk:
+                            file.write(chunk)
+                            progress_bar.update(len(chunk))
+                os.replace(temp_path, output_path)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
 
     # If the file is a ZIP archive and unzip is True
     if unzip and zipfile.is_zipfile(output_path):

@@ -268,6 +268,51 @@ def _create_rfdetr_model(
     return model_cls(**init_kwargs)
 
 
+def _normalize_tile_to_uint8(tile_hwc: np.ndarray) -> np.ndarray:
+    """Normalize a non-uint8 HWC GeoTIFF tile into [0, 255] uint8.
+
+    Uses dtype-aware scaling for [0, 1] floating-point arrays and per-band
+    2nd-98th percentile stretching for integer or high-range imagery so
+    values are not truncated or wrapped by a raw ``.astype(np.uint8)``.
+    """
+    if tile_hwc.dtype == np.uint8:
+        return tile_hwc
+
+    is_float = np.issubdtype(tile_hwc.dtype, np.floating)
+    is_int = np.issubdtype(tile_hwc.dtype, np.integer)
+
+    arr = np.nan_to_num(tile_hwc.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    if (
+        is_float
+        and arr.size > 0
+        and float(arr.min()) >= 0.0
+        and float(arr.max()) <= 1.0
+    ):
+        return np.clip(arr * 255.0, 0.0, 255.0).astype(np.uint8)
+
+    out = np.zeros(arr.shape, dtype=np.float32)
+    channels = arr.shape[-1] if arr.ndim == 3 else 1
+    for i in range(channels):
+        band = arr[..., i] if arr.ndim == 3 else arr
+        p2, p98 = np.percentile(band, [2, 98])
+        if p98 > p2:
+            scaled = np.clip((band - p2) / (p98 - p2) * 255.0, 0.0, 255.0)
+        elif band.size > 0 and float(band.max()) > float(band.min()):
+            bmin = float(band.min())
+            bmax = float(band.max())
+            scaled = np.clip((band - bmin) / (bmax - bmin) * 255.0, 0.0, 255.0)
+        elif is_int:
+            dtype_max = float(np.iinfo(tile_hwc.dtype).max)
+            scaled = np.clip(band / dtype_max * 255.0, 0.0, 255.0)
+        else:
+            scaled = np.clip(band, 0.0, 255.0)
+        if arr.ndim == 3:
+            out[..., i] = scaled
+        else:
+            out = scaled
+    return out.astype(np.uint8)
+
+
 def rfdetr_detect(
     input_path: str,
     output_path: Optional[str] = None,
@@ -423,15 +468,17 @@ def rfdetr_detect(
                     rgb[: window.shape[0]] = window
                 tile_hwc = np.transpose(rgb, (1, 2, 0))
 
+                # Normalize non-uint8 GeoTIFF tiles to [0, 255] uint8 before padding
+                if tile_hwc.dtype != np.uint8:
+                    tile_hwc = _normalize_tile_to_uint8(tile_hwc)
+
                 # Pad to full window_size if tile is smaller (edge tiles)
                 if actual_h < window_size or actual_w < window_size:
-                    padded = np.zeros(
-                        (window_size, window_size, 3), dtype=tile_hwc.dtype
-                    )
+                    padded = np.zeros((window_size, window_size, 3), dtype=np.uint8)
                     padded[:actual_h, :actual_w] = tile_hwc
                     tile_hwc = padded
 
-                pil_image = Image.fromarray(tile_hwc.astype(np.uint8))
+                pil_image = Image.fromarray(tile_hwc)
                 batch_images.append(pil_image)
                 batch_positions.append((x, y, actual_w, actual_h))
 

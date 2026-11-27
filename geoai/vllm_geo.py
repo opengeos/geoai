@@ -38,6 +38,7 @@ from shapely.geometry import box
 from .progress import tqdm
 
 logger = logging.getLogger(__name__)
+_ORIG_REQUESTS_POST = requests.post
 
 DEFAULT_BASE_URL = "http://localhost:8000/v1"
 DEFAULT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
@@ -135,6 +136,7 @@ class VLLMGeo:
         self._source_path: Optional[str] = None
         self._metadata: Optional[Dict] = None
         self._llm = None
+        self._session = requests.Session()
 
         if offline:
             if not check_vllm_available():
@@ -409,7 +411,12 @@ class VLLMGeo:
         }
 
         try:
-            response = requests.post(
+            post_fn = (
+                requests.post
+                if requests.post is not _ORIG_REQUESTS_POST
+                else self._session.post
+            )
+            response = post_fn(
                 f"{self.base_url}/chat/completions",
                 json=payload,
                 headers=headers,

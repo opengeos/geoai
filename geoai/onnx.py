@@ -646,8 +646,10 @@ class ONNXGeoModel:
         if isinstance(source, str) and source.startswith(("http://", "https://")):
             import requests
 
-            pil_image = Image.open(requests.get(source, stream=True).raw)
-            data = np.array(pil_image.convert("RGB")).transpose(2, 0, 1)
+            with requests.get(source, stream=True, timeout=60) as resp:
+                resp.raise_for_status()
+                pil_image = Image.open(resp.raw).convert("RGB")
+            data = np.array(pil_image).transpose(2, 0, 1)
             metadata = None
         else:
             data, metadata = self.load_image(source, window, bands)
@@ -669,6 +671,7 @@ class ONNXGeoModel:
                 metadata,
                 threshold=threshold,
                 return_probabilities=return_probabilities,
+                box_threshold=box_threshold,
             )
         else:
             result = self._predict_single(
@@ -676,6 +679,7 @@ class ONNXGeoModel:
                 metadata,
                 threshold=threshold,
                 return_probabilities=return_probabilities,
+                box_threshold=box_threshold,
             )
 
         # Save GeoTIFF
@@ -711,11 +715,9 @@ class ONNXGeoModel:
         metadata: Optional[Dict],
         threshold: float = 0.5,
         return_probabilities: bool = False,
+        box_threshold: float = 0.3,
     ) -> Dict[str, Any]:
         """Run inference on a single (non-tiled) image."""
-        # Lazy import to avoid QGIS opencv conflicts
-        import cv2
-
         original_h = data.shape[1] if data.ndim == 3 else data.shape[0]
         original_w = data.shape[2] if data.ndim == 3 else data.shape[1]
 
@@ -723,7 +725,11 @@ class ONNXGeoModel:
         outputs = self.session.run(self.output_names, {self.input_name: input_tensor})
 
         result = self._process_outputs(
-            outputs, (original_h, original_w), threshold, return_probabilities
+            outputs,
+            (original_h, original_w),
+            threshold,
+            return_probabilities,
+            box_threshold=box_threshold,
         )
         result["metadata"] = metadata
         return result
@@ -734,10 +740,17 @@ class ONNXGeoModel:
         metadata: Optional[Dict],
         threshold: float = 0.5,
         return_probabilities: bool = False,
+        box_threshold: float = 0.3,
     ) -> Dict[str, Any]:
         """Run tiled inference for large images."""
         # Lazy import to avoid QGIS opencv conflicts
         import cv2
+
+        if not (0 <= 2 * self.overlap < self.tile_size):
+            raise ValueError(
+                f"Invalid tiling configuration: requires 0 <= 2 * overlap < tile_size, "
+                f"got tile_size={self.tile_size}, overlap={self.overlap}"
+            )
 
         if data.ndim == 3:
             _, height, width = data.shape
@@ -749,7 +762,10 @@ class ONNXGeoModel:
         n_y = max(1, int(np.ceil(height / effective)))
         total = n_x * n_y
 
+        is_depth = self.task == "depth-estimation"
         mask_output = np.zeros((height, width), dtype=np.float32)
+        prob_output: Optional[np.ndarray] = None
+        discrete_votes: Optional[np.ndarray] = None
         count_output = np.zeros((height, width), dtype=np.float32)
 
         logger.info("Processing %d tiles (%dx%d)", total, n_x, n_y)
@@ -767,34 +783,181 @@ class ONNXGeoModel:
                     else:
                         tile = data[y_start:y_end, x_start:x_end]
 
+                    tile_h = y_end - y_start
+                    tile_w = x_end - x_start
+
                     try:
                         tile_result = self._predict_single(
-                            tile, None, threshold, return_probabilities
+                            tile,
+                            None,
+                            threshold=threshold,
+                            return_probabilities=True,
+                            box_threshold=box_threshold,
                         )
-                        tile_mask = tile_result.get("mask", tile_result.get("output"))
-                        if tile_mask is not None:
-                            if tile_mask.ndim > 2:
-                                tile_mask = tile_mask.squeeze()
-                            if tile_mask.ndim > 2:
-                                tile_mask = tile_mask[0]
+                        if "depth" in tile_result:
+                            is_depth = True
 
-                            tile_h = y_end - y_start
-                            tile_w = x_end - x_start
-                            if tile_mask.shape != (tile_h, tile_w):
-                                tile_mask = cv2.resize(
-                                    tile_mask.astype(np.float32),
-                                    (tile_w, tile_h),
-                                    interpolation=cv2.INTER_LINEAR,
+                        if is_depth:
+                            tile_depth = tile_result.get(
+                                "depth", tile_result.get("output")
+                            )
+                            if tile_depth is not None:
+                                if tile_depth.ndim > 2:
+                                    tile_depth = tile_depth.squeeze()
+                                if tile_depth.ndim > 2:
+                                    tile_depth = tile_depth[0]
+                                if tile_depth.shape != (tile_h, tile_w):
+                                    tile_depth = cv2.resize(
+                                        tile_depth.astype(np.float32),
+                                        (tile_w, tile_h),
+                                        interpolation=cv2.INTER_LINEAR,
+                                    )
+                                mask_output[
+                                    y_start:y_end, x_start:x_end
+                                ] += tile_depth.astype(np.float32)
+                                count_output[y_start:y_end, x_start:x_end] += 1
+                            pbar.update(1)
+                            continue
+
+                        tile_probs = tile_result.get("probabilities")
+                        if (
+                            tile_probs is not None
+                            and isinstance(tile_probs, np.ndarray)
+                            and tile_probs.ndim == 3
+                            and tile_probs.shape[0] > 1
+                        ):
+                            num_classes = tile_probs.shape[0]
+                            if prob_output is None:
+                                prob_output = np.zeros(
+                                    (num_classes, height, width), dtype=np.float32
                                 )
-
-                            mask_output[y_start:y_end, x_start:x_end] += tile_mask
+                            if tile_probs.shape[1:] != (tile_h, tile_w):
+                                resized = np.empty(
+                                    (num_classes, tile_h, tile_w), dtype=np.float32
+                                )
+                                for c in range(num_classes):
+                                    resized[c] = cv2.resize(
+                                        tile_probs[c].astype(np.float32),
+                                        (tile_w, tile_h),
+                                        interpolation=cv2.INTER_LINEAR,
+                                    )
+                                tile_probs = resized
+                            prob_output[
+                                :, y_start:y_end, x_start:x_end
+                            ] += tile_probs.astype(np.float32)
                             count_output[y_start:y_end, x_start:x_end] += 1
+                        else:
+                            tile_mask = tile_result.get(
+                                "mask", tile_result.get("output")
+                            )
+                            if (
+                                tile_probs is not None
+                                and isinstance(tile_probs, np.ndarray)
+                                and (
+                                    tile_probs.ndim == 2
+                                    or (
+                                        tile_probs.ndim == 3
+                                        and tile_probs.shape[0] == 1
+                                    )
+                                )
+                            ):
+                                tile_arr = tile_probs.squeeze().astype(np.float32)
+                                if tile_arr.shape != (tile_h, tile_w):
+                                    tile_arr = cv2.resize(
+                                        tile_arr,
+                                        (tile_w, tile_h),
+                                        interpolation=cv2.INTER_LINEAR,
+                                    )
+                                mask_output[y_start:y_end, x_start:x_end] += tile_arr
+                                count_output[y_start:y_end, x_start:x_end] += 1
+                            elif tile_mask is not None:
+                                if tile_mask.ndim > 2:
+                                    tile_mask = tile_mask.squeeze()
+                                if tile_mask.ndim > 2:
+                                    tile_mask = tile_mask[0]
+                                is_discrete_multi = discrete_votes is not None or (
+                                    tile_mask.dtype.kind in ("i", "u")
+                                    and tile_mask.size > 0
+                                    and int(tile_mask.max()) > 1
+                                )
+                                if is_discrete_multi:
+                                    if tile_mask.shape != (tile_h, tile_w):
+                                        tile_mask = cv2.resize(
+                                            tile_mask.astype(np.float32),
+                                            (tile_w, tile_h),
+                                            interpolation=cv2.INTER_NEAREST,
+                                        ).astype(np.int64)
+                                    max_cls = (
+                                        int(tile_mask.max()) if tile_mask.size else 0
+                                    )
+                                    if discrete_votes is None:
+                                        num_cls = max(max_cls + 1, 2)
+                                        discrete_votes = np.zeros(
+                                            (num_cls, height, width), dtype=np.float32
+                                        )
+                                        discrete_votes[0] = count_output - mask_output
+                                        discrete_votes[1] = mask_output
+                                    elif max_cls >= discrete_votes.shape[0]:
+                                        grown = np.zeros(
+                                            (max_cls + 1, height, width),
+                                            dtype=np.float32,
+                                        )
+                                        grown[: discrete_votes.shape[0]] = (
+                                            discrete_votes
+                                        )
+                                        discrete_votes = grown
+                                    for cls_id in np.unique(tile_mask):
+                                        cls_idx = int(cls_id)
+                                        if cls_idx >= 0:
+                                            discrete_votes[
+                                                cls_idx, y_start:y_end, x_start:x_end
+                                            ] += (tile_mask == cls_id)
+                                    count_output[y_start:y_end, x_start:x_end] += 1
+                                else:
+                                    if tile_mask.shape != (tile_h, tile_w):
+                                        tile_mask = cv2.resize(
+                                            tile_mask.astype(np.float32),
+                                            (tile_w, tile_h),
+                                            interpolation=cv2.INTER_LINEAR,
+                                        )
+                                    mask_output[
+                                        y_start:y_end, x_start:x_end
+                                    ] += tile_mask
+                                    count_output[y_start:y_end, x_start:x_end] += 1
                     except (RuntimeError, ValueError, IndexError) as e:
                         logger.error("Error processing tile (%d, %d): %s", ix, iy, e)
 
                     pbar.update(1)
 
         count_output = np.maximum(count_output, 1)
+
+        if is_depth:
+            depth_output = mask_output / count_output
+            return {
+                "output": depth_output,
+                "depth": depth_output,
+                "metadata": metadata,
+            }
+
+        if prob_output is not None:
+            prob_output = prob_output / count_output[np.newaxis, :, :]
+            return {
+                "mask": np.argmax(prob_output, axis=0).astype(np.uint8),
+                "probabilities": prob_output if return_probabilities else None,
+                "metadata": metadata,
+            }
+
+        if discrete_votes is not None:
+            return {
+                "mask": np.argmax(discrete_votes, axis=0).astype(np.uint8),
+                "probabilities": (
+                    (discrete_votes / count_output[np.newaxis, :, :])
+                    if return_probabilities
+                    else None
+                ),
+                "metadata": metadata,
+            }
+
         mask_output = mask_output / count_output
 
         return {
@@ -813,6 +976,7 @@ class ONNXGeoModel:
         original_size: Tuple[int, int],
         threshold: float = 0.5,
         return_probabilities: bool = False,
+        box_threshold: float = 0.3,
     ) -> Dict[str, Any]:
         """Map raw ONNX outputs to a result dict.
 
@@ -823,6 +987,7 @@ class ONNXGeoModel:
                 resizing.
             threshold: Binary threshold for segmentation masks.
             return_probabilities: Whether to include probability maps.
+            box_threshold: Confidence threshold for object detection boxes.
 
         Returns:
             Result dictionary.
@@ -836,21 +1001,34 @@ class ONNXGeoModel:
         if self.task in ("segmentation", "semantic-segmentation"):
             logits = outputs[0]  # (1, C, H, W)
             if logits.ndim == 4:
-                # Softmax → argmax
-                exp = np.exp(logits - logits.max(axis=1, keepdims=True))
-                probs = exp / exp.sum(axis=1, keepdims=True)
-                mask = probs.argmax(axis=1).squeeze()  # (H, W)
+                if logits.shape[1] == 1:
+                    probs = 1.0 / (1.0 + np.exp(-logits))
+                    prob_2d = probs.squeeze()
+                    if prob_2d.shape != (oh, ow):
+                        prob_2d = cv2.resize(
+                            prob_2d.astype(np.float32),
+                            (ow, oh),
+                            interpolation=cv2.INTER_LINEAR,
+                        )
+                    result["mask"] = (prob_2d > threshold).astype(np.uint8)
+                    if return_probabilities:
+                        result["probabilities"] = prob_2d
+                else:
+                    # Softmax -> argmax
+                    exp = np.exp(logits - logits.max(axis=1, keepdims=True))
+                    probs = exp / exp.sum(axis=1, keepdims=True)
+                    mask = probs.argmax(axis=1).squeeze()  # (H, W)
 
-                if mask.shape != (oh, ow):
-                    mask = cv2.resize(
-                        mask.astype(np.float32),
-                        (ow, oh),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
+                    if mask.shape != (oh, ow):
+                        mask = cv2.resize(
+                            mask.astype(np.float32),
+                            (ow, oh),
+                            interpolation=cv2.INTER_NEAREST,
+                        )
 
-                result["mask"] = mask.astype(np.uint8)
-                if return_probabilities:
-                    result["probabilities"] = probs.squeeze()
+                    result["mask"] = mask.astype(np.uint8)
+                    if return_probabilities:
+                        result["probabilities"] = probs.squeeze(0)
 
         elif self.task in ("classification", "image-classification"):
             logits = outputs[0]  # (1, C)
@@ -872,7 +1050,7 @@ class ONNXGeoModel:
                 labels = scores_all.argmax(axis=-1).squeeze()  # (N,)
                 boxes = pred_boxes.squeeze()  # (N, 4)
 
-                keep = scores > threshold
+                keep = scores > box_threshold
                 result["boxes"] = boxes[keep]
                 result["scores"] = scores[keep]
                 result["labels"] = labels[keep]
