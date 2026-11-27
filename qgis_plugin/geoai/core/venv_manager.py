@@ -1447,6 +1447,12 @@ def ensure_venv_packages_available() -> bool:
     # bundles its own proj.db and needs PROJ_DATA to point there.
     _fix_proj_data(site_packages)
 
+    # On macOS, the venv's torch bundles its own libomp. When QGIS has
+    # already loaded another OpenMP runtime (conda-forge QGIS does), the
+    # in-process torch import used by several panels aborts QGIS.
+    if sys.platform == "darwin":
+        _allow_duplicate_openmp_runtime()
+
     # On Windows, register DLL directories for native packages (torch, etc.)
     # so that the OS loader can find their DLLs when importing from the venv
     # inside QGIS's process.  Also patch geoai/__init__.py to guard
@@ -1789,6 +1795,26 @@ def _wrap_bare_imports(filepath: str) -> bool:
         Qgis.Info,
     )
     return True
+
+
+def _allow_duplicate_openmp_runtime() -> None:
+    """Let a second OpenMP runtime initialize inside the QGIS process.
+
+    PyTorch wheels for macOS ship their own ``libomp.dylib``. Importing
+    torch from the venv into a QGIS process that has already loaded a
+    different ``libomp`` (for example a conda-forge QGIS) makes libomp
+    abort the whole process with "OMP: Error #15". Setting
+    ``KMP_DUPLICATE_LIB_OK`` before torch is imported lets the second
+    runtime start instead. A value the user has already set is kept.
+    """
+    if "KMP_DUPLICATE_LIB_OK" in os.environ:
+        return
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    _log(
+        "Set KMP_DUPLICATE_LIB_OK=TRUE so the venv's PyTorch OpenMP runtime "
+        "can load alongside the one already in the QGIS process",
+        Qgis.Info,
+    )
 
 
 def _fix_proj_data(site_packages: str) -> None:

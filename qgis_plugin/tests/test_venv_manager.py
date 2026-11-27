@@ -873,3 +873,51 @@ def test_torchange_verification_imports_anychange():
 
     assert "add_dll_directory" in code
     assert "from torchange.models.segment_any_change import AnyChange" in code
+
+
+def _prepare_fake_venv(tmp_path, monkeypatch, platform):
+    """Point venv_manager at an empty fake venv and stub side effects.
+
+    Args:
+        tmp_path: Pytest temporary directory.
+        monkeypatch: Pytest monkeypatch fixture.
+        platform: Value to use for ``sys.platform``.
+    """
+    site_packages = tmp_path / "site packages"
+    site_packages.mkdir()
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda *_args: True)
+    monkeypatch.setattr(
+        venv_manager,
+        "get_venv_site_packages",
+        lambda _venv_dir=None: str(site_packages),
+    )
+    monkeypatch.setattr(venv_manager, "_fix_proj_data", lambda _sp: None)
+    monkeypatch.setattr(venv_manager.sys, "platform", platform)
+    monkeypatch.setattr(venv_manager.sys, "path", list(sys.path))
+
+
+def test_ensure_venv_allows_duplicate_openmp_on_macos(tmp_path, monkeypatch):
+    _prepare_fake_venv(tmp_path, monkeypatch, "darwin")
+    monkeypatch.delenv("KMP_DUPLICATE_LIB_OK", raising=False)
+
+    assert venv_manager.ensure_venv_packages_available() is True
+
+    assert venv_manager.os.environ["KMP_DUPLICATE_LIB_OK"] == "TRUE"
+
+
+def test_ensure_venv_keeps_user_openmp_setting(tmp_path, monkeypatch):
+    _prepare_fake_venv(tmp_path, monkeypatch, "darwin")
+    monkeypatch.setenv("KMP_DUPLICATE_LIB_OK", "FALSE")
+
+    assert venv_manager.ensure_venv_packages_available() is True
+
+    assert venv_manager.os.environ["KMP_DUPLICATE_LIB_OK"] == "FALSE"
+
+
+def test_ensure_venv_leaves_openmp_alone_on_linux(tmp_path, monkeypatch):
+    _prepare_fake_venv(tmp_path, monkeypatch, "linux")
+    monkeypatch.delenv("KMP_DUPLICATE_LIB_OK", raising=False)
+
+    assert venv_manager.ensure_venv_packages_available() is True
+
+    assert "KMP_DUPLICATE_LIB_OK" not in venv_manager.os.environ
