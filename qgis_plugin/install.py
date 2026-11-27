@@ -12,35 +12,62 @@ import sys
 import shutil
 import argparse
 from pathlib import Path
+from typing import List
+
+
+def get_qgis_settings_root() -> Path:
+    """Get the per-user QGIS settings root for the current platform.
+
+    Returns:
+        Path to the directory that holds the ``QGIS3``/``QGIS4`` folders.
+
+    Raises:
+        RuntimeError: If the platform is not supported.
+    """
+    home = Path.home()
+
+    if sys.platform.startswith("linux"):
+        return home / ".local/share/QGIS"
+    if sys.platform == "darwin":
+        return home / "Library/Application Support/QGIS"
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            return Path(appdata) / "QGIS"
+        return home / "AppData/Roaming/QGIS"
+    raise RuntimeError(f"Unsupported platform: {sys.platform}")
+
+
+def get_qgis_plugin_dirs(profile: str = "default") -> List[Path]:
+    """Get the plugin directories of every installed QGIS major version.
+
+    QGIS 3 keeps its settings under ``QGIS/QGIS3`` and QGIS 4 under
+    ``QGIS/QGIS4``. The plugin is installed for each version found; when
+    neither exists yet, the QGIS 3 location is used.
+
+    Args:
+        profile: QGIS user profile name.
+
+    Returns:
+        List of plugin directories.
+    """
+    root = get_qgis_settings_root()
+    suffix = Path("profiles") / profile / "python" / "plugins"
+    found = [
+        root / version / suffix
+        for version in ("QGIS4", "QGIS3")
+        if (root / version).is_dir()
+    ]
+    return found or [root / "QGIS3" / suffix]
 
 
 def get_qgis_plugin_dir() -> Path:
     """Get the QGIS plugin directory based on the current platform.
 
     Returns:
-        Path to the QGIS plugins directory.
+        Path to the QGIS plugins directory of the newest installed QGIS.
     """
-    home = Path.home()
-
-    if sys.platform == "linux" or sys.platform == "linux2":
-        plugin_dir = home / ".local/share/QGIS/QGIS3/profiles/default/python/plugins"
-    elif sys.platform == "darwin":
-        plugin_dir = (
-            home
-            / "Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins"
-        )
-    elif sys.platform == "win32":
-        appdata = os.environ.get("APPDATA", "")
-        if appdata:
-            plugin_dir = Path(appdata) / "QGIS/QGIS3/profiles/default/python/plugins"
-        else:
-            plugin_dir = (
-                home / "AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins"
-            )
-    else:
-        raise RuntimeError(f"Unsupported platform: {sys.platform}")
-
-    return plugin_dir
+    return get_qgis_plugin_dirs()[0]
 
 
 def install_plugin(source_dir: Path, plugin_dir: Path) -> bool:
@@ -99,6 +126,12 @@ def main():
         help="Remove the plugin instead of installing",
     )
     parser.add_argument(
+        "--profile",
+        type=str,
+        default="default",
+        help="QGIS user profile name (default: default)",
+    )
+    parser.add_argument(
         "--plugin-dir",
         type=str,
         default=None,
@@ -114,25 +147,29 @@ def main():
         print(f"Error: Plugin source directory not found: {source_dir}")
         sys.exit(1)
 
-    # Get plugin directory
+    # Get plugin directories
     if args.plugin_dir:
-        plugin_dir = Path(args.plugin_dir)
+        plugin_dirs = [Path(args.plugin_dir)]
     else:
         try:
-            plugin_dir = get_qgis_plugin_dir()
+            plugin_dirs = get_qgis_plugin_dirs(args.profile)
         except RuntimeError as e:
             print(f"Error: {e}")
             print("Please specify the plugin directory with --plugin-dir")
             sys.exit(1)
 
     print(f"Platform: {sys.platform}")
-    print(f"Plugin directory: {plugin_dir}")
+    for plugin_dir in plugin_dirs:
+        print(f"Plugin directory: {plugin_dir}")
     print()
 
     if args.remove:
-        success = remove_plugin(plugin_dir)
+        results = [remove_plugin(plugin_dir) for plugin_dir in plugin_dirs]
+        success = any(results)
     else:
-        success = install_plugin(source_dir, plugin_dir)
+        success = all(
+            install_plugin(source_dir, plugin_dir) for plugin_dir in plugin_dirs
+        )
 
         if success:
             print()
