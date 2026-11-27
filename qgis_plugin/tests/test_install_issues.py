@@ -90,6 +90,16 @@ def test_tls_error_in_the_middle_of_long_output_is_classified_first():
     assert len(message) < 2000
 
 
+def test_windows_crash_message_keeps_installer_output(monkeypatch):
+    monkeypatch.setattr(venv_manager.sys, "platform", "win32")
+    message = venv_manager._describe_install_failure(
+        "torch", "fatal: c10.dll failed", ["torch>=2.0.0"], returncode=-1073741819
+    )
+
+    assert "process crashed (code -1073741819)" in message
+    assert "c10.dll failed" in message
+
+
 def test_package_names_containing_ssl_are_not_tls_errors():
     output = (
         "No solution found when resolving dependencies:\n"

@@ -655,6 +655,11 @@ _TORCH_DISTRIBUTIONS = ("torch", "torchvision")
 # written to the QGIS log in full.
 _ERROR_DETAIL_LIMIT = 1200
 
+# Characters of installer output kept for failure classification. Generous
+# enough that a TLS error in the middle of a long resolve survives, while a
+# runaway multi-megabyte log cannot flood the QGIS log or the dialog.
+_CLASSIFY_OUTPUT_LIMIT = 50000
+
 # When a uv install also points at the PyTorch wheel index via
 # ``--extra-index-url``, uv defaults to the "first-index" strategy and only
 # considers a package on the first index that lists it. The PyTorch index
@@ -978,9 +983,10 @@ def _describe_install_failure(
             "\n\nInstaller output:\n{}"
         ).format(package_name, detail)
     if returncode is not None and _is_windows_process_crash(returncode):
-        return "Failed to install {}: process crashed (code {})".format(
-            package_name, returncode
-        )
+        return (
+            "Failed to install {}: process crashed (code {})"
+            "\n\nInstaller output:\n{}"
+        ).format(package_name, returncode, detail)
     return "Failed to install {}: {}".format(package_name, detail)
 
 
@@ -3483,7 +3489,9 @@ def install_dependencies(
                     install_failed = True
                     # Keep the full output: _describe_install_failure()
                     # classifies it before truncating what it displays.
-                    install_error_msg = error_msg
+                    install_error_msg = _truncate_error(
+                        error_msg, _CLASSIFY_OUTPUT_LIMIT
+                    )
                     last_returncode = result.returncode
 
             except subprocess.TimeoutExpired:
@@ -3577,6 +3585,7 @@ def install_dependencies(
                         _cuda_fell_back = True
                     else:
                         cpu_err = cpu_result.stderr or cpu_result.stdout or ""
+                        last_returncode = cpu_result.returncode
                         _log(
                             "Failed to install {} (CPU fallback): {}".format(
                                 package_spec, cpu_err
@@ -3585,10 +3594,12 @@ def install_dependencies(
                         )
                         install_error_msg = (
                             "CUDA and CPU install both failed for {}: {}".format(
-                                package_name, cpu_err
+                                package_name,
+                                _truncate_error(cpu_err, _CLASSIFY_OUTPUT_LIMIT),
                             )
                         )
                 except subprocess.TimeoutExpired:
+                    last_returncode = None
                     _log(
                         "Installation of {} (CPU fallback) timed out".format(
                             package_spec
@@ -3601,6 +3612,7 @@ def install_dependencies(
                         )
                     )
                 except Exception as e:
+                    last_returncode = None
                     _log(
                         "Exception installing {} (CPU fallback): {}".format(
                             package_spec, e
@@ -4731,7 +4743,11 @@ def create_venv_and_install(
             progress_callback(15, "Checking virtual environment...")
         reusable_venv = venv_python_works()
         home = _read_pyvenv_cfg(VENV_DIR).get("home", "")
-        if reusable_venv and _is_qgis_fallback_python(os.path.join(home, "python.exe")):
+        if (
+            reusable_venv
+            and home
+            and _is_qgis_fallback_python(os.path.join(home, "python.exe"))
+        ):
             # A venv left by an earlier QGIS-Python fallback may lack ssl
             # (issue #911); repair it before installing anything.
             ssl_ok, ssl_msg = _ensure_venv_ssl(
