@@ -2146,8 +2146,11 @@ def inference_on_geotiff(
                                 ]
                             )
 
-                            # Convert to weight in [0, 1]
-                            edge_distance = np.minimum(edge_distance, half_overlap)
+                            # Convert to weight in (0, 1] with a positive floor
+                            # so tapered border pixels never receive zero weight.
+                            edge_distance = np.minimum(
+                                np.maximum(edge_distance, 0.5), half_overlap
+                            )
                             weight = (edge_distance / half_overlap).astype(np.float32)
 
                         # Always count every processed window in count_accumulator

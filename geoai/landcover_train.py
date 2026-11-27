@@ -544,8 +544,8 @@ def landcover_iou(
             target_filtered = target[valid_mask]
             pred_filtered = pred[valid_mask]
         else:
-            target_filtered = target.view(-1)
-            pred_filtered = pred.view(-1)
+            target_filtered = target.reshape(-1)
+            pred_filtered = pred.reshape(-1)
 
         total_valid_pixels = target_filtered.numel()
 
@@ -1672,6 +1672,7 @@ def _train_with_custom_iou(
         # full validation set on CPU each epoch (root cause of OOM after epoch 1
         # when training set grew). Other modes still need full tensors.
         stream_iou = iou_mode == "mean"
+        resolved_ignore = _resolve_ignore_index(ignore_index)
         conf = (
             torch.zeros(num_classes, num_classes, dtype=torch.long, device=device)
             if stream_iou

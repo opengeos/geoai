@@ -1520,6 +1520,11 @@ def export_geotiff_tiles(
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
 
+    if apply_augmentation and augmentation_count < 0:
+        raise ValueError(
+            f"augmentation_count must be >= 0 when apply_augmentation is True, got {augmentation_count}"
+        )
+
     # Handle FlipnSlide tiling strategy
     if tiling_strategy == "flipnslide":
         if apply_augmentation:
