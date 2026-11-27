@@ -1287,11 +1287,12 @@ def evaluate(
             # stochastic layers are not affected by validation data.
             if len(targets) > 0:
                 try:
-                    # Freeze BN/Dropout before switching to train mode
+                    model.train()
+                    # Freeze BN/Dropout after switching to train mode so running
+                    # stats and stochastic layers are not affected by validation data.
                     for mod in model.modules():
                         if isinstance(mod, (torch.nn.BatchNorm2d, torch.nn.Dropout)):
                             mod.eval()
-                    model.train()
                     loss_dict = model(images, targets)
                     model.eval()
                     if isinstance(loss_dict, dict):
@@ -2109,29 +2110,50 @@ def inference_on_geotiff(
                         y_pos, x_pos, h, w = batch_positions[idx]
 
                         # Create weight matrix that gives higher weight to center pixels
-                        # This helps with smooth blending at boundaries
-                        y_grid, x_grid = np.mgrid[0:h, 0:w]
+                        # while preserving full weight on outer raster boundaries.
+                        if overlap <= 1:
+                            weight = np.ones((h, w), dtype=np.float32)
+                        else:
+                            half_overlap = overlap / 2.0
+                            y_grid, x_grid = np.mgrid[0:h, 0:w]
+                            full = np.full((h, w), half_overlap, dtype=np.float32)
 
-                        # Calculate distance from each edge
-                        dist_from_left = x_grid
-                        dist_from_right = w - x_grid - 1
-                        dist_from_top = y_grid
-                        dist_from_bottom = h - y_grid - 1
+                            # Only taper sides that border another window
+                            dist_from_left = (
+                                x_grid.astype(np.float32) if x_pos > 0 else full
+                            )
+                            dist_from_right = (
+                                (w - x_grid - 1).astype(np.float32)
+                                if (x_pos + w) < width
+                                else full
+                            )
+                            dist_from_top = (
+                                y_grid.astype(np.float32) if y_pos > 0 else full
+                            )
+                            dist_from_bottom = (
+                                (h - y_grid - 1).astype(np.float32)
+                                if (y_pos + h) < height
+                                else full
+                            )
 
-                        # Combine distances (minimum distance to any edge)
-                        edge_distance = np.minimum.reduce(
-                            [
-                                dist_from_left,
-                                dist_from_right,
-                                dist_from_top,
-                                dist_from_bottom,
-                            ]
-                        )
+                            # Combine distances (minimum distance to any tapered edge)
+                            edge_distance = np.minimum.reduce(
+                                [
+                                    dist_from_left,
+                                    dist_from_right,
+                                    dist_from_top,
+                                    dist_from_bottom,
+                                ]
+                            )
 
-                        # Convert to weight (higher weight for center pixels)
-                        # Normalize to [0, 1]
-                        edge_distance = np.minimum(edge_distance, overlap / 2)
-                        weight = edge_distance / (overlap / 2)
+                            # Convert to weight in [0, 1]
+                            edge_distance = np.minimum(edge_distance, half_overlap)
+                            weight = (edge_distance / half_overlap).astype(np.float32)
+
+                        # Always count every processed window in count_accumulator
+                        count_accumulator[
+                            y_pos : y_pos + h, x_pos : x_pos + w
+                        ] += weight
 
                         # Get masks for predictions above threshold
                         if len(output["scores"]) > 0:
@@ -2151,13 +2173,10 @@ def inference_on_geotiff(
                                 # Apply weight to prediction
                                 weighted_pred = combined_mask * weight
 
-                                # Add to accumulators
+                                # Add to prediction accumulator
                                 pred_accumulator[
                                     y_pos : y_pos + h, x_pos : x_pos + w
                                 ] += weighted_pred
-                                count_accumulator[
-                                    y_pos : y_pos + h, x_pos : x_pos + w
-                                ] += weight
 
                     # Reset batch
                     batch_inputs = []
@@ -2892,7 +2911,9 @@ def evaluate_coco_metrics(
             if abs(iou_thresh - 0.5) < 1e-6 and class_names is not None:
                 idx = class_id - 1  # class_id is 1-indexed
                 name = (
-                    class_names[idx] if idx < len(class_names) else f"class_{class_id}"
+                    class_names[idx]
+                    if 0 <= idx < len(class_names)
+                    else f"class_{class_id}"
                 )
                 results[f"AP@0.5/{name}"] = ap
 

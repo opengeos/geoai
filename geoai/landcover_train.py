@@ -28,6 +28,18 @@ import torch.nn.functional as F
 logger = logging.getLogger(__name__)
 
 
+def _resolve_ignore_index(ignore_index: Union[int, bool, None]) -> Optional[int]:
+    """Normalize an ignore_index argument.
+
+    In Python, ``bool`` is a subclass of ``int`` (so ``isinstance(False, int)``
+    is ``True`` and ``False == 0``). Return ``None`` when ``ignore_index`` is
+    ``None`` or a boolean, and ``int(ignore_index)`` otherwise.
+    """
+    if ignore_index is None or isinstance(ignore_index, bool):
+        return None
+    return int(ignore_index)
+
+
 def _one_hot_with_ignore(
     targets: torch.Tensor, num_classes: int, ignore_index: int = -100
 ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -87,23 +99,35 @@ class FocalLoss(nn.Module):
         Returns:
             Loss value
         """
-        # Get class probabilities
-        ce_loss = F.cross_entropy(
+        # Compute unweighted CE to obtain true class probability p_t
+        ce_unweighted = F.cross_entropy(
             inputs,
             targets,
-            weight=self.weight,
             ignore_index=self.ignore_index,
             reduction="none",
         )
+        p_t = torch.exp(-ce_unweighted)
 
-        # Get probability of true class
-        p_t = torch.exp(-ce_loss)
+        # Apply class weights separately so weights do not distort p_t
+        if self.weight is not None:
+            ce_loss = F.cross_entropy(
+                inputs,
+                targets,
+                weight=self.weight.to(inputs.device),
+                ignore_index=self.ignore_index,
+                reduction="none",
+            )
+        else:
+            ce_loss = ce_unweighted
 
         # Calculate focal loss
-        focal_loss = self.alpha * (1 - p_t) ** self.gamma * ce_loss
+        focal_loss = self.alpha * (1.0 - p_t) ** self.gamma * ce_loss
 
         # Apply reduction
         if self.reduction == "mean":
+            valid = targets != self.ignore_index
+            if valid.any():
+                return focal_loss[valid].mean()
             return focal_loss.mean()
         elif self.reduction == "sum":
             return focal_loss.sum()
@@ -134,8 +158,9 @@ class LandcoverCrossEntropyLoss(nn.Module):
     ):
         super().__init__()
         self.weight = weight
-        # Convert ignore_index: int stays as-is, False becomes -100 (PyTorch default)
-        self.ignore_index = ignore_index if isinstance(ignore_index, int) else -100
+        # Convert ignore_index: int stays as-is, bool/None becomes -100 (PyTorch default)
+        resolved = _resolve_ignore_index(ignore_index)
+        self.ignore_index = resolved if resolved is not None else -100
         self.reduction = reduction
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -374,15 +399,24 @@ class UnifiedFocalLoss(nn.Module):
         Returns:
             Scalar loss value.
         """
-        # --- Distribution component: focal cross-entropy ---
-        ce = F.cross_entropy(
+        # Distribution component: focal cross-entropy
+        ce_unweighted = F.cross_entropy(
             inputs,
             targets,
-            weight=self.weight.to(inputs.device) if self.weight is not None else None,
             ignore_index=self.ignore_index,
             reduction="none",
         )
-        p_t = torch.exp(-ce)
+        p_t = torch.exp(-ce_unweighted)
+        if self.weight is not None:
+            ce = F.cross_entropy(
+                inputs,
+                targets,
+                weight=self.weight.to(inputs.device),
+                ignore_index=self.ignore_index,
+                reduction="none",
+            )
+        else:
+            ce = ce_unweighted
         focal_ce = ((1.0 - p_t) ** self.gamma) * ce
 
         # Mean over valid pixels
@@ -392,7 +426,7 @@ class UnifiedFocalLoss(nn.Module):
         else:
             dist_loss = focal_ce.mean()
 
-        # --- Region component: focal Tversky ---
+        # Region component: focal Tversky
         num_classes = inputs.shape[1]
         one_hot, valid_mask = _one_hot_with_ignore(
             targets, num_classes, self.ignore_index
@@ -407,7 +441,7 @@ class UnifiedFocalLoss(nn.Module):
         tversky = (tp + self.smooth) / (
             tp + (1.0 - self.delta) * fp + self.delta * fn + self.smooth
         )
-        focal_tversky = (1.0 - tversky) ** self.gamma  # (C,)
+        focal_tversky = (1.0 - tversky).clamp(min=1e-7) ** self.gamma  # (C,)
 
         rw = self.region_weight if self.region_weight is not None else self.weight
         if rw is not None:
@@ -473,18 +507,19 @@ def landcover_iou(
         raise ValueError(f"Shape mismatch: pred {pred.shape}, target {target.shape}")
 
     # Create mask for valid pixels
-    # Handle ignore_index: int means specific class, False means don't ignore
-    if isinstance(ignore_index, int):
-        valid_mask = target != ignore_index
+    # Handle ignore_index: int means specific class, bool/None means don't ignore
+    resolved_ignore = _resolve_ignore_index(ignore_index)
+    if resolved_ignore is not None:
+        valid_mask = target != resolved_ignore
     else:
-        # ignore_index is False or any other non-int value - don't ignore anything
+        # ignore_index is False or None; do not ignore anything
         valid_mask = torch.ones_like(target, dtype=torch.bool)
 
     # Simple mean IoU
     if mode == "mean":
         ious = []
         for cls in range(num_classes):
-            if isinstance(ignore_index, int) and cls == ignore_index:
+            if resolved_ignore is not None and cls == resolved_ignore:
                 continue
 
             pred_cls = (pred == cls) & valid_mask
@@ -505,7 +540,7 @@ def landcover_iou(
         class_counts = []
 
         # Filter out ignore_index from target
-        if isinstance(ignore_index, int):
+        if resolved_ignore is not None:
             target_filtered = target[valid_mask]
             pred_filtered = pred[valid_mask]
         else:
@@ -515,7 +550,7 @@ def landcover_iou(
         total_valid_pixels = target_filtered.numel()
 
         for cls in range(num_classes):
-            if isinstance(ignore_index, int) and cls == ignore_index:
+            if resolved_ignore is not None and cls == resolved_ignore:
                 continue
 
             pred_cls = pred_filtered == cls
@@ -552,7 +587,7 @@ def landcover_iou(
         weights = []
 
         for cls in range(num_classes):
-            if isinstance(ignore_index, int) and cls == ignore_index:
+            if resolved_ignore is not None and cls == resolved_ignore:
                 continue
 
             pred_cls = (pred == cls) & valid_mask
@@ -594,8 +629,8 @@ def landcover_iou(
 
         # Mask for labeled pixels (ground truth is NOT background)
         labeled_mask = target != bg_class
-        if isinstance(ignore_index, int):
-            labeled_mask = labeled_mask & (target != ignore_index)
+        if resolved_ignore is not None:
+            labeled_mask = labeled_mask & (target != resolved_ignore)
 
         for cls in range(num_classes):
             # Skip background class and ignore_index
@@ -604,7 +639,7 @@ def landcover_iou(
                 recalls.append(0.0)
                 precisions.append(0.0)
                 continue
-            if isinstance(ignore_index, int) and cls == ignore_index:
+            if resolved_ignore is not None and cls == resolved_ignore:
                 per_class_ious.append(0.0)
                 recalls.append(0.0)
                 precisions.append(0.0)
@@ -722,7 +757,8 @@ def get_landcover_loss_function(
     weights = class_weights if use_class_weights else None
     if weights is not None:
         weights = weights.to(device)
-    idx = ignore_index if isinstance(ignore_index, int) else -100
+    resolved_ignore = _resolve_ignore_index(ignore_index)
+    idx = resolved_ignore if resolved_ignore is not None else -100
 
     if loss_name == "crossentropy":
         return LandcoverCrossEntropyLoss(
@@ -828,12 +864,14 @@ def compute_class_weights(
 
     logger.info("Computing class weights from %d label files...", len(label_files))
 
+    resolved_ignore = _resolve_ignore_index(ignore_index)
+
     for label_file in label_files:
         try:
             with rasterio.open(label_file) as src:
                 label_data = src.read(1)
                 for class_id in range(num_classes):
-                    if isinstance(ignore_index, int) and class_id == ignore_index:
+                    if resolved_ignore is not None and class_id == resolved_ignore:
                         continue
                     count = (label_data == class_id).sum()
                     class_counts[class_id] += int(count)
@@ -851,7 +889,7 @@ def compute_class_weights(
     if use_inverse_frequency:
         # Compute inverse frequency weights
         for class_id in range(num_classes):
-            if isinstance(ignore_index, int) and class_id == ignore_index:
+            if resolved_ignore is not None and class_id == resolved_ignore:
                 weights[class_id] = 0.0
             elif class_counts[class_id] > 0:
                 # Inverse frequency: total_pixels / class_pixels
@@ -866,7 +904,7 @@ def compute_class_weights(
     else:
         # Use uniform weights (all 1.0)
         for class_id in range(num_classes):
-            if isinstance(ignore_index, int) and class_id == ignore_index:
+            if resolved_ignore is not None and class_id == resolved_ignore:
                 weights[class_id] = 0.0
 
     # Apply custom multipliers if provided
@@ -919,8 +957,8 @@ def compute_class_weights(
             percent,
         )
 
-    if isinstance(ignore_index, int) and 0 <= ignore_index < num_classes:
-        logger.info("Note: Class %d (ignore_index) has weight 0.0", ignore_index)
+    if resolved_ignore is not None and 0 <= resolved_ignore < num_classes:
+        logger.info("Note: Class %d (ignore_index) has weight 0.0", resolved_ignore)
 
     return weights
 
@@ -1067,12 +1105,8 @@ def train_segmentation_landcover(
     """
 
     # Convert ignore_index to format expected by PyTorch loss functions
-    if isinstance(ignore_index, bool) and ignore_index is False:
-        ignore_idx_for_loss = -100  # PyTorch default (effectively no ignoring)
-    elif isinstance(ignore_index, int):
-        ignore_idx_for_loss = ignore_index
-    else:
-        ignore_idx_for_loss = -100
+    resolved_ignore = _resolve_ignore_index(ignore_index)
+    ignore_idx_for_loss = resolved_ignore if resolved_ignore is not None else -100
 
     # Compute class weights if requested
     class_weights_tensor = None
@@ -1560,18 +1594,18 @@ def _train_with_custom_iou(
     if checkpoint_path is not None and os.path.exists(checkpoint_path):
         logger.info("Loading checkpoint from %s", checkpoint_path)
         checkpoint = torch.load(checkpoint_path, map_location=device)
-        if isinstance(checkpoint, dict):
-            if "model_state_dict" in checkpoint:
-                model.load_state_dict(checkpoint["model_state_dict"])
-                if resume_training:
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            model.load_state_dict(checkpoint["model_state_dict"])
+            if resume_training:
+                if "optimizer_state_dict" in checkpoint:
                     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-                    start_epoch = checkpoint.get("epoch", 0) + 1
-                    best_iou = checkpoint.get("best_iou", 0.0)
-                    logger.info(
-                        "Resuming from epoch %d, best IoU: %.4f",
-                        start_epoch,
-                        best_iou,
-                    )
+                start_epoch = checkpoint.get("epoch", 0) + 1
+                best_iou = checkpoint.get("best_iou", 0.0)
+                logger.info(
+                    "Resuming from epoch %d, best IoU: %.4f",
+                    start_epoch,
+                    best_iou,
+                )
         else:
             model.load_state_dict(checkpoint)
 
@@ -1662,11 +1696,8 @@ def _train_with_custom_iou(
 
                 if stream_iou:
                     # Stream confusion matrix on GPU, accumulate on CPU.
-                    # bool is a subclass of int; treat bool False as "no ignore".
-                    if isinstance(ignore_index, int) and not isinstance(
-                        ignore_index, bool
-                    ):
-                        valid = targets != ignore_index
+                    if resolved_ignore is not None:
+                        valid = targets != resolved_ignore
                         t_flat = targets[valid].to(torch.int64)
                         p_flat = preds[valid].to(torch.int64)
                     else:
@@ -1696,9 +1727,8 @@ def _train_with_custom_iou(
             )
             present = denom > 0
             # Exclude ignore_index from mean, matching landcover_iou(mode='mean') behaviour.
-            if isinstance(ignore_index, int) and not isinstance(ignore_index, bool):
-                if 0 <= ignore_index < num_classes:
-                    present[ignore_index] = False
+            if resolved_ignore is not None and 0 <= resolved_ignore < num_classes:
+                present[resolved_ignore] = False
             val_iou = iou_per_class[present].mean().item() if present.any() else 0.0
             iou_display = f"Val IoU: {val_iou:.4f}"
         else:
@@ -2019,29 +2049,26 @@ def evaluate_sparse_iou(
     per_class_recall_dict = {}
     per_class_precision_dict = {}
 
-    class_idx = 0
+    resolved_ignore = _resolve_ignore_index(ignore_index)
     for cls in range(num_classes):
         if cls == background_class:
             continue
-        if isinstance(ignore_index, int) and cls == ignore_index:
+        if resolved_ignore is not None and cls == resolved_ignore:
             continue
 
         per_class_iou_dict[cls] = per_class_ious[cls]
-        per_class_recall_dict[cls] = (
-            recalls[class_idx] if class_idx < len(recalls) else 0.0
-        )
-        per_class_precision_dict[cls] = (
-            precisions[class_idx] if class_idx < len(precisions) else 0.0
-        )
-        class_idx += 1
+        per_class_recall_dict[cls] = recalls[cls]
+        per_class_precision_dict[cls] = precisions[cls]
 
-    # Calculate means (excluding background)
-    valid_recalls = [r for r in recalls if r > 0]
-    valid_precisions = [p for p in precisions if p > 0]
-    mean_recall = sum(valid_recalls) / len(valid_recalls) if valid_recalls else 0.0
-    mean_precision = (
-        sum(valid_precisions) / len(valid_precisions) if valid_precisions else 0.0
-    )
+    # Calculate means over evaluated foreground classes
+    if per_class_recall_dict:
+        mean_recall = sum(per_class_recall_dict.values()) / len(per_class_recall_dict)
+        mean_precision = sum(per_class_precision_dict.values()) / len(
+            per_class_precision_dict
+        )
+    else:
+        mean_recall = 0.0
+        mean_precision = 0.0
 
     results = {
         "mean_sparse_iou": mean_iou,

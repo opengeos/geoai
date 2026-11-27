@@ -1073,7 +1073,7 @@ class CanopyHeightEstimation:
         Returns:
             2D float32 array of shape (tile_size, tile_size).
         """
-        if overlap <= 0:
+        if overlap <= 1:
             return np.ones((tile_size, tile_size), dtype=np.float32)
 
         ramp = np.linspace(0.0, 1.0, overlap, dtype=np.float32)
@@ -1084,7 +1084,7 @@ class CanopyHeightEstimation:
             if start:
                 w[:overlap] = ramp
             if end:
-                w[-overlap:] = ramp[::-1]
+                w[-overlap:] = np.minimum(w[-overlap:], ramp[::-1])
             return w
 
         return np.outer(taper(top, bottom), taper(left, right))

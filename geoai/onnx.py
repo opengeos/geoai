@@ -568,16 +568,17 @@ class ONNXGeoModel:
         elif img.shape[-1] > 3:
             img = img[..., :3]
 
-        # Percentile normalization → uint8
+        # Percentile normalization to uint8
         if img.dtype != np.uint8:
+            out = np.zeros(img.shape, dtype=np.float32)
             for i in range(img.shape[-1]):
                 band = img[..., i].astype(np.float32)
                 p2, p98 = np.percentile(band, [2, 98])
                 if p98 > p2:
-                    img[..., i] = np.clip((band - p2) / (p98 - p2), 0, 1)
+                    out[..., i] = np.clip((band - p2) / (p98 - p2), 0, 1)
                 else:
-                    img[..., i] = 0
-            img = (img * 255).astype(np.uint8)
+                    out[..., i] = 0
+            img = (out * 255).astype(np.uint8)
 
         # Resize to model expected size if needed
         th = target_height or self._model_height
