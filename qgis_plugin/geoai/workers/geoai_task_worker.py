@@ -9,6 +9,7 @@ import os
 import sys
 import tempfile
 import traceback
+from contextlib import redirect_stdout
 from typing import Any, Callable, Dict
 
 _PROTO_STDOUT = sys.stdout
@@ -304,6 +305,119 @@ def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_raster": output_raster, "output_vector": output_vector}
 
 
+def _redact(text: Any, secret: str) -> str:
+    """Replace every occurrence of ``secret`` in ``text`` with ``***``.
+
+    Args:
+        text: Message that might contain the secret.
+        secret: The secret (an access token).
+
+    Returns:
+        The redacted message.
+    """
+    text = "" if text is None else str(text)
+    return text.replace(secret, "***") if secret else text
+
+
+def _huggingface_hub():
+    """Import ``huggingface_hub`` from the plugin environment.
+
+    Returns:
+        The ``huggingface_hub`` module.
+
+    Raises:
+        RuntimeError: If the package is not installed.
+    """
+    try:
+        import huggingface_hub
+    except ImportError:
+        raise RuntimeError(
+            "huggingface_hub is not installed in the plugin environment. "
+            "Reinstall the plugin dependencies."
+        ) from None
+    return huggingface_hub
+
+
+def _task_hf_login(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Save a Hugging Face access token for the plugin environment.
+
+    Equivalent to ``hf auth login`` (the token is written to the Hugging Face
+    token cache, not to git credentials). The token is never included in
+    progress messages, results or errors.
+
+    Args:
+        params: ``{"token": <access token>}``.
+
+    Returns:
+        ``{"logged_in": True, "user": <user name>}``.
+
+    Raises:
+        ValueError: If no token was given.
+        RuntimeError: If the login fails (message redacted).
+    """
+    token = str(params.get("token") or "").strip()
+    if not token:
+        raise ValueError("No Hugging Face token was provided.")
+    hub = _huggingface_hub()
+    try:
+        # Libraries may print; stdout is the JSON protocol channel.
+        with redirect_stdout(sys.stderr):
+            hub.login(token=token, add_to_git_credential=False)
+            info = hub.whoami(token=token)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Hugging Face login failed: {_redact(exc, token)}"
+        ) from None
+    user = info.get("name") if isinstance(info, dict) else None
+    return {"logged_in": True, "user": user}
+
+
+def _task_hf_whoami(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Report which Hugging Face account the plugin environment uses.
+
+    Args:
+        params: Unused.
+
+    Returns:
+        ``{"logged_in": bool, "user": name or None, "token_found": bool,
+        "message": str}``. ``token_found`` is True when a token is stored or
+        set through ``HF_TOKEN`` even if it could not be verified.
+    """
+    hub = _huggingface_hub()
+    get_token = getattr(hub, "get_token", None)
+    token = None
+    if callable(get_token):
+        try:
+            token = get_token()
+        except Exception:
+            token = None
+    if not token:
+        return {
+            "logged_in": False,
+            "user": None,
+            "token_found": False,
+            "message": "Not logged in to Hugging Face.",
+        }
+    try:
+        with redirect_stdout(sys.stderr):
+            info = hub.whoami(token=token)
+    except Exception as exc:
+        return {
+            "logged_in": False,
+            "user": None,
+            "token_found": True,
+            "message": "A Hugging Face token is set but could not be verified: "
+            + _redact(exc, token),
+        }
+    user = info.get("name") if isinstance(info, dict) else None
+    return {
+        "logged_in": True,
+        "user": user,
+        "token_found": True,
+        "message": f"Logged in to Hugging Face as {user}.",
+    }
+
+
 _TASKS = {
     "train_segmentation_model": _task_train_segmentation_model,
     "train_instance_segmentation_model": _task_train_instance_segmentation_model,
@@ -316,6 +430,8 @@ _TASKS = {
     "smooth_vector": _task_smooth_vector,
     "segment_water": _task_segment_water,
     "detect_changes": _task_detect_changes,
+    "hf_login": _task_hf_login,
+    "hf_whoami": _task_hf_whoami,
 }
 
 

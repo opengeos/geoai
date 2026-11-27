@@ -310,7 +310,7 @@ pixi run pip install -U numpy transformers
 
 #### Request access to SAM 3
 
-SAM 3 is hosted in a gated Hugging Face repository. Request access at <https://huggingface.co/facebook/sam3>, then authenticate from the Pixi project folder:
+SAM 3 is hosted in a gated Hugging Face repository. Request access at <https://huggingface.co/facebook/sam3>, then either log in from the Segment Anything panel (Model tab → **Hugging Face** → **Log in**) or authenticate from the Pixi project folder:
 
 ```bash
 pixi run hf auth login
@@ -388,9 +388,17 @@ Go to <https://huggingface.co/settings/tokens> and create a token:
 
 ### Authenticate
 
+#### Easiest: log in from the Segment Anything panel
+
+Open the **Segment Anything** panel, go to the **Model** tab and find the **Hugging Face** group. Paste your token in the token field (it is masked) and click **Log in**. The plugin saves the token for its own Python environment, exactly like `hf auth login` would, and shows the account name once it works. The token is not stored in the QGIS project or written to the QGIS log. Then click **Load Model** again; no restart is needed. This works on every platform and with either installation method, and is the simplest option on Windows.
+
+If loading SAM 3 fails because access is denied, the panel tells you so and points you back to this field. If login succeeds but loading still fails, check that your access request on <https://huggingface.co/facebook/sam3> has been approved and, for fine-grained tokens, that the gated-repo permission above is enabled.
+
+#### From the command line
+
 The `hf` command is installed inside the plugin's Python environment, not on your system `PATH`. Running a bare `hf auth login` in a terminal fails with `'hf' is not recognized...` (Windows) or `command not found` (Linux/macOS) no matter which directory you are in. Use the method that matches how you installed the dependencies.
 
-#### If you used the built-in dependency installer (Option A)
+##### If you used the built-in dependency installer (Option A)
 
 Call `hf` by its full path inside the managed environment at `~/.qgis_geoai/`. The environment folder is named after your QGIS Python version (for example, `venv_py3.12`); to see the exact path, use `GeoAI` menu → `Generate Diagnostics Report...` and look for **Virtual environment path**.
 
@@ -413,7 +421,7 @@ ls ~/.qgis_geoai            # e.g. venv_py3.12
 
 Paste your token when prompted, then restart QGIS.
 
-#### If you used the Pixi environment (Option B)
+##### If you used the Pixi environment (Option B)
 
 Run this from the Pixi project folder (the `geo` directory you created):
 
@@ -444,7 +452,7 @@ export HF_TOKEN=hf_your_token_here
 - On Windows, launch QGIS *after* running `setx`; an already-running QGIS will not pick it up.
 - On Linux/macOS, exporting in `~/.bashrc` or `~/.zshrc` only covers QGIS started from a terminal in that shell. Desktop shortcuts and application launchers do not read shell startup files, so either start QGIS from that terminal or set the variable somewhere your desktop session reads it (for example `~/.profile` or `~/.config/environment.d/` on Linux, or `launchctl setenv HF_TOKEN <token>` on macOS).
 
-If that is awkward, prefer `hf auth login` above: it writes the token to `~/.cache/huggingface/token`, which is read no matter how QGIS was started.
+If that is awkward, prefer the panel's **Log in** button or `hf auth login` above: it writes the token to `~/.cache/huggingface/token`, which is read no matter how QGIS was started.
 
 **Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`. Use SAM 1 or SAM 2 on CPU-only systems.
 
@@ -590,13 +598,14 @@ Steps:
 2. In the **Model** tab:
     - Select the SAM model version (SamGeo3/SAM3, SamGeo2/SAM2, or SamGeo/SAM1)
     - Configure backend (meta or transformers) and device (auto, cuda, cpu)
+    - For SAM 3, paste a Hugging Face token in the **Hugging Face** group and click **Log in** if you have not authenticated yet (see [Hugging Face Authentication (SAM 3)](#hugging-face-authentication-sam-3))
     - Click "Load Model" to initialize the model
     - Select a raster layer or browse for an image file and click "Set Image"
 
     ![](https://github.com/user-attachments/assets/600b0879-f851-4423-b668-cb9e8df28425)
 
 3. Choose a segmentation method:
-    - **Text Tab**: Enter text prompts describing objects to segment (e.g., "tree, building")
+    - **Text Tab**: Enter text prompts describing objects to segment (e.g., "tree, building"). For large GeoTIFFs, check **Process in tiles (large images)** and set the tile size and overlap (defaults 1024 / 128 pixels) to segment the image tile by tile and limit GPU memory use. Confidence scores are not available for tiled runs.
 
         ![](https://github.com/user-attachments/assets/da2c17fc-4633-488d-ba44-00f1cd97555c)
 
@@ -616,7 +625,9 @@ Steps:
     - For vector output, optionally enable regularization:
         - Check "Regularize polygons (orthogonalize)"
         - Set Epsilon (simplification tolerance) and Min Area (filter small polygons)
+    - Leave the output path empty to save next to the source image as `<image>_sam_masks.<ext>` (`_1`, `_2`, ... are added instead of overwriting; a temporary file is used if that folder is not writable)
     - Click "Save Masks" to export results
+    - Vector outputs include a `score` field (SAM's predicted confidence for the mask each polygon came from, available when "Unique values for each object" is checked), a `source` field (the image file name) and a `prompt` field (for example `text: tree`, `point`, `box` or `batch points`)
 
     ![](https://github.com/user-attachments/assets/5c80cc57-3870-4a20-bb74-73e394ef22a6)
 
@@ -715,7 +726,7 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 - Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
 - CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
 - Model download failures: check network/firewall, then retry loading models from the panel.
-- SAM 3 fails to load with a gated-repo access error, or `hf` is not recognized as a command: see [Hugging Face Authentication (SAM 3)](#hugging-face-authentication-sam-3). The `hf` command is not on your system `PATH`; it lives inside the plugin's Python environment.
+- SAM 3 fails to load with a gated-repo access error, or `hf` is not recognized as a command: paste a token in the **Hugging Face** field on the Segment Anything panel's Model tab and click **Log in**, or see [Hugging Face Authentication (SAM 3)](#hugging-face-authentication-sam-3). The `hf` command is not on your system `PATH`; it lives inside the plugin's Python environment.
 
 ## License
 

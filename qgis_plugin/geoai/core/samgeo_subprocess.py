@@ -72,6 +72,8 @@ class SamGeoSubprocessClient:
         self._stderr_file = None
         self._lock = threading.RLock()
         self.masks = None
+        self.mask_scores = None
+        self.objects = None
 
         plugin_root = Path(__file__).resolve().parents[1]
         self.worker_script = plugin_root / "workers" / "samgeo_worker.py"
@@ -222,7 +224,70 @@ class SamGeoSubprocessClient:
         self._set_mask_count(result.get("mask_count", 0))
         return result
 
+    def generate_masks_tiled(
+        self,
+        source: str,
+        prompt: str,
+        output: str,
+        tile_size: int = 1024,
+        overlap: int = 128,
+        min_size: int = 0,
+        max_size=None,
+        unique: bool = True,
+        bands=None,
+    ):
+        """Segment a large GeoTIFF tile by tile with a text prompt.
+
+        The worker's ``SamGeo3.generate_masks_tiled`` writes the merged mask
+        raster to ``output`` and keeps no masks in memory afterwards.
+
+        Args:
+            source: Path to the input GeoTIFF.
+            prompt: Text prompt describing the objects.
+            output: Path of the mask GeoTIFF to write.
+            tile_size: Tile size in pixels.
+            overlap: Overlap between tiles in pixels.
+            min_size: Minimum mask size in pixels.
+            max_size: Maximum mask size in pixels, or None for no limit.
+            unique: Give each object its own raster value.
+            bands: Optional 1-based RGB band indices.
+
+        Returns:
+            The worker result dict with ``output`` and ``object_count``.
+        """
+        result = self._request(
+            {
+                "action": "generate_masks_tiled",
+                "source": source,
+                "prompt": prompt,
+                "output": output,
+                "tile_size": int(tile_size),
+                "overlap": int(overlap),
+                "min_size": min_size,
+                "max_size": max_size,
+                "unique": bool(unique),
+                "bands": self._json_payload(bands),
+            },
+            timeout=max(self._TIMEOUT_REQUEST, 6 * 3600),
+        )
+        self._set_mask_count(result.get("mask_count", 0))
+        self.mask_scores = None
+        return result
+
     def save_masks(self, output: str, unique: bool = False):
+        """Save the current masks to a raster in the worker process.
+
+        Also stores the per-mask confidence scores the worker reports in
+        ``self.mask_scores`` (mask id -> SAM confidence), mirroring
+        ``SamGeo3.mask_scores``; None when unavailable or ``unique`` is False.
+
+        Args:
+            output: Path of the mask raster to write.
+            unique: Give each mask its own raster value.
+
+        Returns:
+            The worker result dict with ``mask_count`` and ``mask_scores``.
+        """
         result = self._request(
             {
                 "action": "save_masks",
@@ -232,6 +297,7 @@ class SamGeoSubprocessClient:
             timeout=max(self._TIMEOUT_REQUEST, 1800),
         )
         self._set_mask_count(result.get("mask_count", 0))
+        self.mask_scores = result.get("mask_scores") or None
         return result
 
     def close(self) -> None:
