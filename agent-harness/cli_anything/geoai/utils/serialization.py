@@ -72,6 +72,12 @@ def atomic_write_json(data: Any, path: str) -> str:
     os.makedirs(parent, exist_ok=True)
 
     payload = sanitize_json_value(data)
+    existing_mode: int | None = None
+    try:
+        existing_mode = os.stat(abs_path).st_mode & 0o777
+    except OSError:
+        existing_mode = None
+
     tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -86,6 +92,11 @@ def atomic_write_json(data: Any, path: str) -> str:
             json.dump(payload, tmp_file, indent=2, default=str, allow_nan=False)
             tmp_file.flush()
             os.fsync(tmp_file.fileno())
+        if existing_mode is not None:
+            try:
+                os.chmod(tmp_path, existing_mode)
+            except OSError:
+                pass
         os.replace(tmp_path, abs_path)
         tmp_path = None
         return abs_path

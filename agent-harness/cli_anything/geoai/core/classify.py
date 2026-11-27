@@ -23,8 +23,10 @@ def train_classifier(
 
     Args:
         train_dir: Training data directory (subdirectories are class names).
-        val_dir: Optional validation data directory (validated if given;
-            geoai.recognize.train_image_classifier splits data_dir internally).
+        val_dir: Unsupported legacy parameter; passing a non-empty value
+            raises ``ValueError`` because
+            ``geoai.recognize.train_image_classifier`` splits ``train_dir``
+            internally.
         output_dir: Output directory for model and metrics.
         model_name: TIMM model architecture name.
         num_epochs: Number of training epochs.
@@ -38,6 +40,7 @@ def train_classifier(
 
     Raises:
         FileNotFoundError: If training directory does not exist.
+        ValueError: If ``val_dir`` is provided.
     """
     train_dir = os.path.abspath(train_dir)
     output_dir = os.path.abspath(output_dir)

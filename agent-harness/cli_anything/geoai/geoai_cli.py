@@ -828,14 +828,7 @@ def classify():
     "-t",
     required=True,
     type=click.Path(exists=True),
-    help="Training data directory.",
-)
-@click.option(
-    "--val-dir",
-    "-v",
-    default=None,
-    type=click.Path(exists=True),
-    help="Validation data directory.",
+    help="Training data directory (split internally for validation).",
 )
 @click.option("--output-dir", "-o", required=True, help="Output directory.")
 @click.option("--model", "-m", default="resnet50", help="TIMM model name.")
@@ -847,7 +840,6 @@ def classify():
 @handle_error
 def classify_train(
     train_dir,
-    val_dir,
     output_dir,
     model,
     epochs,
@@ -859,7 +851,6 @@ def classify_train(
     """Train an image classification model."""
     result = classify_mod.train_classifier(
         train_dir=train_dir,
-        val_dir=val_dir,
         output_dir=output_dir,
         model_name=model,
         num_epochs=epochs,
