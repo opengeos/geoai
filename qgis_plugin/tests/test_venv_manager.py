@@ -896,18 +896,60 @@ def _prepare_fake_venv(tmp_path, monkeypatch, platform):
     monkeypatch.setattr(venv_manager.sys, "path", list(sys.path))
 
 
+def _unset_openmp_env(monkeypatch):
+    """Remove KMP_DUPLICATE_LIB_OK so teardown also removes later values.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    """
+    monkeypatch.setenv("KMP_DUPLICATE_LIB_OK", "placeholder")
+    monkeypatch.delenv("KMP_DUPLICATE_LIB_OK")
+
+
+def _stub_loaded_openmp(monkeypatch, loaded):
+    """Make ``_loaded_openmp_runtimes`` report a fixed list.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+        loaded: Paths to report as loaded OpenMP runtimes.
+    """
+    monkeypatch.setattr(venv_manager, "_loaded_openmp_runtimes", lambda: loaded)
+
+
 def test_ensure_venv_allows_duplicate_openmp_on_macos(tmp_path, monkeypatch):
     _prepare_fake_venv(tmp_path, monkeypatch, "darwin")
-    monkeypatch.delenv("KMP_DUPLICATE_LIB_OK", raising=False)
+    _unset_openmp_env(monkeypatch)
+    _stub_loaded_openmp(monkeypatch, ["/opt/conda/lib/libomp.dylib"])
 
     assert venv_manager.ensure_venv_packages_available() is True
 
     assert venv_manager.os.environ["KMP_DUPLICATE_LIB_OK"] == "TRUE"
 
 
+def test_ensure_venv_treats_empty_openmp_value_as_unset(tmp_path, monkeypatch):
+    _prepare_fake_venv(tmp_path, monkeypatch, "darwin")
+    monkeypatch.setenv("KMP_DUPLICATE_LIB_OK", "")
+    _stub_loaded_openmp(monkeypatch, ["/opt/conda/lib/libomp.dylib"])
+
+    assert venv_manager.ensure_venv_packages_available() is True
+
+    assert venv_manager.os.environ["KMP_DUPLICATE_LIB_OK"] == "TRUE"
+
+
+def test_ensure_venv_skips_openmp_when_none_loaded(tmp_path, monkeypatch):
+    _prepare_fake_venv(tmp_path, monkeypatch, "darwin")
+    _unset_openmp_env(monkeypatch)
+    _stub_loaded_openmp(monkeypatch, [])
+
+    assert venv_manager.ensure_venv_packages_available() is True
+
+    assert "KMP_DUPLICATE_LIB_OK" not in venv_manager.os.environ
+
+
 def test_ensure_venv_keeps_user_openmp_setting(tmp_path, monkeypatch):
     _prepare_fake_venv(tmp_path, monkeypatch, "darwin")
     monkeypatch.setenv("KMP_DUPLICATE_LIB_OK", "FALSE")
+    _stub_loaded_openmp(monkeypatch, ["/opt/conda/lib/libomp.dylib"])
 
     assert venv_manager.ensure_venv_packages_available() is True
 
@@ -916,7 +958,8 @@ def test_ensure_venv_keeps_user_openmp_setting(tmp_path, monkeypatch):
 
 def test_ensure_venv_leaves_openmp_alone_on_linux(tmp_path, monkeypatch):
     _prepare_fake_venv(tmp_path, monkeypatch, "linux")
-    monkeypatch.delenv("KMP_DUPLICATE_LIB_OK", raising=False)
+    _unset_openmp_env(monkeypatch)
+    _stub_loaded_openmp(monkeypatch, ["/usr/lib/libgomp.1.dylib"])
 
     assert venv_manager.ensure_venv_packages_available() is True
 

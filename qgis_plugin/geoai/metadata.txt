@@ -71,7 +71,7 @@ changelog=
         - Strip PYTHONEXECUTABLE from the managed environment and require deepforest>=2.1.0 (#960)
         - Fix DeepForest dependency verification (#919, #979) and SAM 3 model download failures (#973)
         - Preserve classFactory on plugin reload (#919)
-        - Fix QGIS aborting with "OMP: Error #15" on macOS when a panel imports PyTorch into a QGIS that already loaded another OpenMP runtime
+        - Fix QGIS aborting with "OMP: Error #15" on macOS when a panel imports PyTorch into a QGIS that already loaded another OpenMP runtime, by allowing duplicate OpenMP runtimes in that case only (a documented workaround)
     1.5.2
         - Fix dependency installation failing on GPU installs when the PyTorch wheel index shadowed newer shared packages such as requests, blocking geoai-py/datasets resolution (#827, #829, #831, #833)
     1.5.1
