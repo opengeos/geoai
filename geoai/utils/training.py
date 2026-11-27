@@ -713,6 +713,20 @@ def _load_class_data_raster(
     return class_to_id, coco_categories
 
 
+def _sort_class_values(values):
+    """Sort class values deterministically, handling NaNs and mixed types."""
+    try:
+        return sorted(
+            values,
+            key=lambda v: (
+                isinstance(v, (float, np.floating)) and np.isnan(v),
+                v,
+            ),
+        )
+    except TypeError:
+        return sorted(values, key=lambda v: (str(v), type(v).__name__))
+
+
 def _load_class_data_vector(
     vector_path,
     src_crs,
@@ -756,7 +770,7 @@ def _load_class_data_vector(
                 logger.info(f"Applied buffer of {buffer_radius} units")
 
         if class_value_field in gdf.columns:
-            unique_classes = gdf[class_value_field].unique()
+            unique_classes = _sort_class_values(gdf[class_value_field].unique())
             if not quiet:
                 logger.info(
                     f"Found {len(unique_classes)} unique classes: {unique_classes}"
@@ -864,11 +878,7 @@ def _collect_batch_class_mapping(
             )
         return {1: 1}, 1
 
-    try:
-        sorted_values = sorted(class_values)
-    except TypeError:
-        # Mixed value types (e.g. strings and numbers) are not directly sortable.
-        sorted_values = sorted(class_values, key=str)
+    sorted_values = _sort_class_values(class_values)
 
     class_to_id = {cls: i + 1 for i, cls in enumerate(sorted_values)}
     unclassified_id = 1
@@ -2644,7 +2654,9 @@ def _process_image_mask_pair(
                 # Check if class_value_field exists
                 if not use_batch_class_to_id:
                     if class_value_field in gdf.columns:
-                        unique_classes = gdf[class_value_field].unique()
+                        unique_classes = _sort_class_values(
+                            gdf[class_value_field].unique()
+                        )
                         # Create class mapping
                         class_to_id = {
                             cls: i + 1 for i, cls in enumerate(unique_classes)
@@ -3087,8 +3099,13 @@ def export_training_data(
             gdf[class_value_field] = 1
             unique_classes = [1]
         else:
+            if gdf[class_value_field].isna().any():
+                raise ValueError(
+                    f"Column '{class_value_field}' contains null/NaN class values. "
+                    "Remove or fill null class labels before calling export_training_data."
+                )
             # Print unique classes for debugging
-            unique_classes = gdf[class_value_field].unique()
+            unique_classes = _sort_class_values(gdf[class_value_field].unique())
             if not quiet:
                 logger.info(
                     f"Found {len(unique_classes)} unique classes: {unique_classes}"
@@ -3360,12 +3377,8 @@ def export_training_data(
                             if class_value_field in feature
                             else 1
                         )
-                        if isinstance(class_val, str):
-                            # If class is a string, use its position in the unique classes list
-                            class_id = class_to_id.get(class_val, 1)
-                        else:
-                            # If class is already a number, use it directly
-                            class_id = int(class_val) if class_val > 0 else 1
+                        # Map class value through class_to_id for consistent IDs
+                        class_id = class_to_id[class_val]
 
                         # Get the geometry in pixel coordinates
                         geom = feature.geometry.intersection(window_bounds)
