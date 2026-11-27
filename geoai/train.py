@@ -4294,11 +4294,10 @@ def evaluate_semantic(
     model.eval()
 
     total_loss = 0
-    f1_scores = []
-    iou_scores = []
-    precision_scores = []
-    recall_scores = []
     num_batches = len(data_loader)
+    # Pool counts over the whole loader (dataset-level mIoU) instead of
+    # averaging per-image scores, so empty tiles do not inflate the result.
+    confusion = torch.zeros(num_classes, num_classes, dtype=torch.long, device=device)
 
     with torch.no_grad():
         for images, targets in data_loader:
@@ -4311,45 +4310,48 @@ def evaluate_semantic(
             loss = criterion(outputs, targets)
             total_loss += loss.item()
 
-            # Calculate metrics for each sample in the batch
-            for pred, target in zip(outputs, targets):
-                f1 = f1_score(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
+            if outputs.shape[1] != num_classes:
+                raise ValueError(
+                    f"Model output channels ({outputs.shape[1]}) do not match "
+                    f"num_classes ({num_classes})."
                 )
-                iou = iou_coefficient(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
-                )
-                precision = precision_score(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
-                )
-                recall = recall_score(
-                    pred,
-                    target,
-                    num_classes=num_classes,
-                    ignore_index=ignore_index,
-                )
-                f1_scores.append(f1)
-                iou_scores.append(iou)
-                precision_scores.append(precision)
-                recall_scores.append(recall)
+            pred_classes = torch.argmax(outputs, dim=1)
+            valid = (targets >= 0) & (targets < num_classes)
+            if ignore_index is not None:
+                valid &= targets != ignore_index
+            idx = targets[valid].long() * num_classes + pred_classes[valid].long()
+            confusion += torch.bincount(idx, minlength=num_classes**2).reshape(
+                num_classes, num_classes
+            )
 
-    # Calculate metrics
+    # Calculate metrics from pooled per-class counts (rows: target, cols: pred)
+    # Move to CPU first: MPS does not support float64
+    confusion = confusion.cpu().double()
+    tp = confusion.diag()
+    fp = confusion.sum(dim=0) - tp
+    fn = confusion.sum(dim=1) - tp
+
+    # Use a single present-class mask (any ground-truth or predicted pixels)
+    # across all four metrics so unpredicted ground-truth classes score 0 for
+    # precision rather than being dropped from the mean.
+    present = (tp + fp + fn) > 0
+    if ignore_index is not None and 0 <= ignore_index < num_classes:
+        # An in-range ignore_index is not a scored class (as in iou_coefficient)
+        present[ignore_index] = False
+
+    def _mean_over_present(numerator: torch.Tensor, denominator: torch.Tensor) -> float:
+        if not torch.any(present):
+            return 0.0
+        denom = denominator[present]
+        safe_denom = torch.where(denom > 0, denom, torch.ones_like(denom))
+        scores = torch.where(denom > 0, numerator[present] / safe_denom, 0.0)
+        return scores.mean().item()
+
     avg_loss = total_loss / num_batches
-    avg_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0
-    avg_iou = sum(iou_scores) / len(iou_scores) if iou_scores else 0
-    avg_precision = (
-        sum(precision_scores) / len(precision_scores) if precision_scores else 0
-    )
-    avg_recall = sum(recall_scores) / len(recall_scores) if recall_scores else 0
+    avg_iou = _mean_over_present(tp, tp + fp + fn)
+    avg_f1 = _mean_over_present(2 * tp, 2 * tp + fp + fn)
+    avg_precision = _mean_over_present(tp, tp + fp)
+    avg_recall = _mean_over_present(tp, tp + fn)
 
     return {
         "loss": avg_loss,
@@ -4358,6 +4360,10 @@ def evaluate_semantic(
         "Precision": avg_precision,
         "Recall": avg_recall,
     }
+
+
+# Bumped when the validation IoU used for model selection changes meaning
+_VAL_IOU_VERSION = 2
 
 
 def train_segmentation_model(
@@ -4950,6 +4956,17 @@ def train_segmentation_model(
                 "best_score", best_val_loss if monitor == "val_loss" else best_iou
             )
             best_epoch = checkpoint.get("best_epoch")
+            if checkpoint.get("val_iou_version") != _VAL_IOU_VERSION:
+                # Older checkpoints stored a per-image mean IoU, which is not
+                # comparable with the pooled IoU used now.
+                logger.warning(
+                    "Checkpoint predates pooled validation IoU; "
+                    "resetting the best-IoU baseline."
+                )
+                best_iou = float("-inf")
+                if monitor == "val_iou":
+                    best_score = float("-inf")
+                    best_epoch = None
 
             # Load optimizer state if available
             if "optimizer_state_dict" in checkpoint:
@@ -5090,6 +5107,7 @@ def train_segmentation_model(
                     "best_iou": best_iou,
                     "best_val_loss": best_val_loss,
                     "monitor": monitor,
+                    "val_iou_version": _VAL_IOU_VERSION,
                     "best_score": best_score,
                     "best_epoch": best_epoch,
                     "architecture": architecture,
