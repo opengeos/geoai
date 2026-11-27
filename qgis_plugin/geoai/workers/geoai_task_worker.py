@@ -432,8 +432,8 @@ def _task_hf_whoami(params: Dict[str, Any]) -> Dict[str, Any]:
         params: Unused.
 
     Returns:
-        ``{"logged_in": bool, "user": name or None, "token_found": bool,
-        "message": str}``. ``token_found`` is True when a token is stored or
+        ``{"logged_in": bool, "user": name or None, "credentials_found": bool,
+        "message": str}``. ``credentials_found`` is True when a token is stored or
         set through ``HF_TOKEN`` even if it could not be verified.
     """
     hub = _huggingface_hub()
@@ -448,7 +448,7 @@ def _task_hf_whoami(params: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "logged_in": False,
             "user": None,
-            "token_found": False,
+            "credentials_found": False,
             "message": "Not logged in to Hugging Face.",
         }
     try:
@@ -458,7 +458,7 @@ def _task_hf_whoami(params: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "logged_in": False,
             "user": None,
-            "token_found": True,
+            "credentials_found": True,
             "message": "A Hugging Face token is set but could not be verified: "
             + _redact(exc, token),
         }
@@ -466,7 +466,7 @@ def _task_hf_whoami(params: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "logged_in": True,
         "user": user,
-        "token_found": True,
+        "credentials_found": True,
         "message": f"Logged in to Hugging Face as {user}.",
     }
 

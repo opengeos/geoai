@@ -666,7 +666,7 @@ class SamGeoDockWidget(QDockWidget):
             if result.get("logged_in"):
                 user = result.get("user") or "unknown user"
                 self._set_hf_status(f"Hugging Face: logged in as {user}", "green")
-            elif result.get("token_found"):
+            elif result.get("credentials_found"):
                 self._set_hf_status(
                     result.get("message") or "Hugging Face: token not verified",
                     "orange",

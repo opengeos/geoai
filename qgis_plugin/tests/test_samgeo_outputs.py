@@ -563,7 +563,7 @@ def test_hf_whoami_not_logged_in(monkeypatch):
     result = geoai_task_worker._task_hf_whoami({})
 
     assert result["logged_in"] is False
-    assert result["token_found"] is False
+    assert result["credentials_found"] is False
 
 
 def test_hf_whoami_logged_in(monkeypatch):
@@ -582,7 +582,7 @@ def test_hf_whoami_invalid_token_redacted(monkeypatch):
     result = geoai_task_worker._task_hf_whoami({})
 
     assert result["logged_in"] is False
-    assert result["token_found"] is True
+    assert result["credentials_found"] is True
     assert TOKEN not in json.dumps(result)
 
 
