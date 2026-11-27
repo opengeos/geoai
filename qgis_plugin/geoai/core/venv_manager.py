@@ -1925,8 +1925,8 @@ def _get_qgis_python() -> Optional[str]:
 def _get_linux_system_python() -> Optional[str]:
     """Get a suitable system Python on Linux for creating venvs.
 
-    Searches for python3 on PATH, verifies version >= 3.9 and
-    that the venv module is available.
+    Searches for python3 on PATH, verifies that its major/minor version
+    matches the QGIS Python and that the venv module is available.
 
     Returns:
         Path to a suitable Python executable, or None if not found.
@@ -1991,7 +1991,8 @@ def _get_linux_system_python() -> Optional[str]:
             parts = result.stdout.strip().split()
             if len(parts) == 3:
                 major, minor, micro = int(parts[0]), int(parts[1]), int(parts[2])
-                if (major, minor) >= (3, 9):
+                expected = (sys.version_info.major, sys.version_info.minor)
+                if (major, minor) == expected:
                     _log(
                         "System Python verified: {} ({}.{}.{})".format(
                             candidate, major, minor, micro
@@ -2000,10 +2001,13 @@ def _get_linux_system_python() -> Optional[str]:
                     )
                     return candidate
                 else:
+                    # A venv on another minor version is rejected by
+                    # venv_python_version_matches() and would be rebuilt on
+                    # every install, so only a matching Python qualifies.
                     _log(
-                        "System Python {} version {}.{}.{} "
-                        "is too old (need >= 3.9)".format(
-                            candidate, major, minor, micro
+                        "System Python {} version {}.{}.{} does not match "
+                        "QGIS Python {}.{}".format(
+                            candidate, major, minor, micro, expected[0], expected[1]
                         ),
                         Qgis.Warning,
                     )
@@ -2068,9 +2072,12 @@ def _get_system_python() -> str:
 
     if sys.platform.startswith("linux"):
         raise RuntimeError(
-            "Python standalone not installed and no suitable system Python found. "
+            "Python standalone not installed and no system Python {}.{} found. "
             "Please ensure python3 and python3-venv are installed "
-            "(e.g., sudo apt install python3-venv) and click 'Install Dependencies'."
+            "(e.g., sudo apt install python3-venv) and click "
+            "'Install Dependencies'.".format(
+                sys.version_info.major, sys.version_info.minor
+            )
         )
     raise RuntimeError(
         "Python standalone not installed. "
@@ -2289,14 +2296,19 @@ def create_venv(
                 venv_dir,
             ]
             _log("Trying a uv-managed Python before QGIS's Python", Qgis.Info)
-            result = subprocess.run(
-                managed_cmd,
-                capture_output=True,
-                text=True,
-                timeout=600,
-                env=env,
-                **subprocess_kwargs,
-            )
+            try:
+                result = subprocess.run(
+                    managed_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=600,
+                    env=env,
+                    **subprocess_kwargs,
+                )
+            except subprocess.TimeoutExpired:
+                result = subprocess.CompletedProcess(
+                    managed_cmd, 1, stdout="", stderr="timed out after 600s"
+                )
             if result.returncode == 0:
                 system_python = None
             else:
@@ -4659,12 +4671,14 @@ def create_venv_and_install(
                     if progress_callback:
                         progress_callback(10, "Using system Python (fallback)...")
                 else:
-                    return False, (
-                        "Failed to download Python: {}\n"
-                        "No suitable system Python found. Please ensure python3 "
-                        "and python3-venv are installed "
-                        "(e.g., sudo apt install python3-venv)."
-                    ).format(msg)
+                    # No system Python matches QGIS; create_venv() can still
+                    # use a uv-managed Python of the right version.
+                    _log(
+                        "Standalone Python download failed and no system "
+                        "Python matches QGIS; will try a uv-managed Python: "
+                        "{}".format(msg),
+                        Qgis.Warning,
+                    )
             else:
                 return False, f"Failed to download Python: {msg}"
 

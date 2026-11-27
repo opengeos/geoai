@@ -302,13 +302,75 @@ def test_installer_replaces_stale_standalone_and_its_venv(tmp_path, monkeypatch)
         "download_python_standalone",
         lambda **_kwargs: (False, "offline"),
     )
+    from geoai.core import uv_manager
+
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: True)
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: False)
+    monkeypatch.setattr(
+        venv_manager, "create_venv", lambda **_kwargs: (False, "no python")
+    )
 
     ok, message = venv_manager.create_venv_and_install()
 
     assert removed == [True]
     assert cleaned == [str(tmp_path / "venv")]
     assert ok is False
-    assert "offline" in message
+    assert message == "no python"
+
+
+def test_linux_system_python_must_match_qgis_version(monkeypatch):
+    """A mismatched fallback would build a venv the version check rejects."""
+    monkeypatch.setattr(venv_manager.sys, "platform", "linux")
+    monkeypatch.setattr(venv_manager.shutil, "which", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", dict)
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", dict)
+    major, minor = sys.version_info[:2]
+
+    def run_reporting(version):
+        return lambda cmd, **_kwargs: subprocess.CompletedProcess(
+            cmd, 0, stdout=version, stderr=""
+        )
+
+    monkeypatch.setattr(
+        venv_manager.subprocess, "run", run_reporting(f"{major} {minor + 1} 0")
+    )
+    assert venv_manager._get_linux_system_python() is None
+
+    monkeypatch.setattr(
+        venv_manager.subprocess, "run", run_reporting(f"{major} {minor} 4")
+    )
+    assert venv_manager._get_linux_system_python() == "/usr/bin/python3"
+
+
+def test_managed_python_timeout_falls_back_to_qgis_python(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if "--managed-python" in cmd:
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout"))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    from geoai.core import uv_manager
+
+    qgis_python = str(Path(sys.prefix) / "python.exe")
+    monkeypatch.setattr(venv_manager.sys, "platform", "win32")
+    monkeypatch.setattr(venv_manager, "_get_system_python", lambda: qgis_python)
+    monkeypatch.setattr(uv_manager, "uv_exists", lambda: True)
+    monkeypatch.setattr(uv_manager, "get_uv_path", lambda: "uv")
+    monkeypatch.setattr(venv_manager, "_get_clean_env_for_venv", dict)
+    monkeypatch.setattr(venv_manager, "_get_subprocess_kwargs", dict)
+    monkeypatch.setattr(venv_manager, "_cleanup_partial_venv", lambda _d: None)
+    monkeypatch.setattr(
+        venv_manager, "_ensure_venv_ssl", lambda *_args: (True, "ssl available")
+    )
+    monkeypatch.setattr(venv_manager.subprocess, "run", fake_run)
+
+    ok, _message = venv_manager.create_venv(str(tmp_path / "venv"))
+
+    assert ok is True
+    assert "--managed-python" in calls[0]
+    assert qgis_python in calls[1]
 
 
 # ---------------------------------------------------------------------------
