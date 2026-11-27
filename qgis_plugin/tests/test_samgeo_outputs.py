@@ -5,7 +5,6 @@ import os
 import sys
 import types
 
-import numpy as np
 import pytest
 
 from geoai.core import samgeo_outputs as so
@@ -186,6 +185,31 @@ def test_redact():
 # ---------------------------------------------------------------------------
 
 
+class _NumpyLikeScalar:
+    """Stand-in for a numpy scalar that exposes ``tolist()``.
+
+    Keeps these tests free of a numpy dependency (the plugin CI job installs
+    only PyQt6 and pytest) while exercising the same ``tolist()`` path the
+    worker's JSON conversion takes for real numpy scores.
+    """
+
+    def __init__(self, value):
+        """Store the wrapped value.
+
+        Args:
+            value: The Python float to return from ``tolist()``.
+        """
+        self._value = value
+
+    def tolist(self):
+        """Return the plain Python value, like numpy's ``tolist()``."""
+        return self._value
+
+    def __float__(self):
+        """Convert to a Python float, like ``float(np.float32(...))``."""
+        return float(self._value)
+
+
 class FakeSam:
     """Minimal stand-in for SamGeo3."""
 
@@ -201,13 +225,15 @@ class FakeSam:
         self.saved = (output, unique)
         if hasattr(self, "mask_scores"):
             self.mask_scores = (
-                {1: np.float32(0.875), 2: 0.5, 3: np.float64(0.25)} if unique else None
+                {1: _NumpyLikeScalar(0.875), 2: 0.5, 3: _NumpyLikeScalar(0.25)}
+                if unique
+                else None
             )
 
     def generate_masks_tiled(self, **kwargs):
         self.tiled = kwargs
         self.masks = None
-        self.objects = np.array([[0, 1, 1], [2, 0, 5]], dtype=np.uint32)
+        self.objects = [[0, 1, 1], [2, 0, 5]]
         return kwargs["output"]
 
 
@@ -246,6 +272,8 @@ def test_save_masks_without_mask_scores_attribute(monkeypatch):
 
 
 def test_generate_masks_tiled_handler(fake_sam):
+    # The worker counts tiled objects with numpy, which its venv always has.
+    pytest.importorskip("numpy")
     result = samgeo_worker._dispatch(
         {
             "action": "generate_masks_tiled",
