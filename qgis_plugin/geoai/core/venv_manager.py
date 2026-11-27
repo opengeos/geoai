@@ -1026,6 +1026,10 @@ def _get_clean_env_for_venv() -> dict:
         "GDAL_DRIVER_PATH",
     ):
         env.pop(var, None)
+    # Workers load a single OpenMP runtime, so keep libomp's duplicate check
+    # on there when the plugin (not the user) relaxed it for QGIS itself.
+    if _OPENMP_OVERRIDE_SET_BY_PLUGIN:
+        env.pop("KMP_DUPLICATE_LIB_OK", None)
     env["PYTHONIOENCODING"] = "utf-8"
     # Never let packages from the user site (e.g. %APPDATA%\Python\Python312)
     # shadow the managed venv. Issue #977 had a stale geoai-py imported from
@@ -1447,6 +1451,13 @@ def ensure_venv_packages_available() -> bool:
     # bundles its own proj.db and needs PROJ_DATA to point there.
     _fix_proj_data(site_packages)
 
+    # On macOS, the venv's torch bundles its own libomp. When QGIS has
+    # already loaded another OpenMP runtime (conda-forge QGIS does), the
+    # in-process torch import used by several panels aborts QGIS unless
+    # duplicate runtimes are allowed.
+    if sys.platform == "darwin":
+        _allow_duplicate_openmp_runtime()
+
     # On Windows, register DLL directories for native packages (torch, etc.)
     # so that the OS loader can find their DLLs when importing from the venv
     # inside QGIS's process.  Also patch geoai/__init__.py to guard
@@ -1789,6 +1800,77 @@ def _wrap_bare_imports(filepath: str) -> bool:
         Qgis.Info,
     )
     return True
+
+
+_OPENMP_RUNTIME_NAMES = ("libomp.dylib", "libiomp5.dylib", "libgomp.1.dylib")
+
+# True once _allow_duplicate_openmp_runtime() set KMP_DUPLICATE_LIB_OK, so
+# worker subprocesses can be started without it.
+_OPENMP_OVERRIDE_SET_BY_PLUGIN = False
+
+
+def _loaded_openmp_runtimes() -> List[str]:
+    """List the OpenMP runtimes already loaded into this macOS process.
+
+    Uses dyld's image list, so nothing new is loaded.
+
+    Returns:
+        Paths of loaded images whose file name is a known OpenMP runtime.
+        Empty when the list cannot be read.
+    """
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+        libc._dyld_image_count.restype = ctypes.c_uint32
+        libc._dyld_get_image_name.restype = ctypes.c_char_p
+        libc._dyld_get_image_name.argtypes = [ctypes.c_uint32]
+        loaded = []
+        for index in range(libc._dyld_image_count()):
+            name = libc._dyld_get_image_name(index)
+            if not name:
+                continue
+            path = name.decode("utf-8", "replace")
+            if os.path.basename(path) in _OPENMP_RUNTIME_NAMES:
+                loaded.append(path)
+        return loaded
+    except Exception:
+        return []
+
+
+def _allow_duplicate_openmp_runtime() -> None:
+    """Let the venv's OpenMP runtime start next to one QGIS already loaded.
+
+    PyTorch wheels for macOS ship their own ``libomp.dylib``. Importing
+    torch from the venv into a QGIS process that has already loaded a
+    different OpenMP runtime (for example a conda-forge QGIS) makes libomp
+    abort the whole process with "OMP: Error #15".
+
+    This sets ``KMP_DUPLICATE_LIB_OK=TRUE``, only when such a runtime is
+    already loaded and the variable is unset or empty. It is a workaround:
+    LLVM and Intel document two OpenMP runtimes in one process as
+    unsupported, with possible thread oversubscription or wrong results,
+    and the variable applies to the whole QGIS process. The alternative in
+    this situation is QGIS aborting, so the risk is accepted there and
+    nowhere else. ``_get_clean_env_for_venv`` drops the variable again for
+    worker subprocesses, which run the heavy work with a single runtime.
+    Only runtimes loaded when this runs are seen; one loaded later by
+    another plugin is not.
+    """
+    global _OPENMP_OVERRIDE_SET_BY_PLUGIN
+    if os.environ.get("KMP_DUPLICATE_LIB_OK"):
+        return
+    loaded = _loaded_openmp_runtimes()
+    if not loaded:
+        return
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    _OPENMP_OVERRIDE_SET_BY_PLUGIN = True
+    _log(
+        "QGIS already loaded an OpenMP runtime ({}); set "
+        "KMP_DUPLICATE_LIB_OK=TRUE so the venv's PyTorch can load its "
+        "own instead of aborting QGIS".format(", ".join(loaded)),
+        Qgis.Warning,
+    )
 
 
 def _fix_proj_data(site_packages: str) -> None:
