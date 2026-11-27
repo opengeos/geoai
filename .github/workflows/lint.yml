@@ -61,13 +61,13 @@ jobs:
                   # 1. No relative examples/*.ipynb links in top-level docs/*.md
                   for md in sorted(Path("docs").glob("*.md")):
                       text = md.read_text(encoding="utf-8")
-                      for hit in re.findall(r"examples/[^\s\)\"']+\.ipynb", text):
+                      for hit in re.findall(r"\]\((examples/[^\s\)\"']+\.ipynb)\)", text):
                           errors.append(f"{md}: relative notebook link '{hit}'")
 
-                  # 2. No broken youtu.be/...&list= links in README.md or docs/index.md
+                  # 2. No broken youtu.be/...&list= links (missing '?') in README.md or docs/index.md
                   for doc in (Path("README.md"), Path("docs/index.md")):
                       text = doc.read_text(encoding="utf-8")
-                      for hit in re.findall(r"youtu\.be/[^\s\)\"']*&list=[^\s\)\"']*", text):
+                      for hit in re.findall(r"youtu\.be/[^?\s\)\"']*&list=[^\s\)\"']*", text):
                           errors.append(f"{doc}: broken YouTube link '{hit}'")
 
                   # 3. Every top-level docs/*.md (excluding index.md, changelog.md) listed in zensical.toml

@@ -377,10 +377,9 @@ def test_train_ptv3_dales_fixes():
     # Verify --hf_pretrained does not overwrite args.resume
     assert "args.resume = hf_hub_download" not in source
 
-    # Verify eval_only uses DistributedSampler when world_size > 1
+    # Verify eval_only partitions evaluation across ranks without duplicate padding
     eval_block = source.split("# -- eval-only mode")[1].split("# -- training loop")[0]
-    assert "DistributedSampler(ds, shuffle=False)" in eval_block
-    assert "sampler=eval_sampler" in eval_block
+    assert "Subset(ds, list(range(rank, len(ds), world_size)))" in eval_block
 
     # Verify _load_checkpoint tries weights_only=True first and falls back on error
     func_names = {node.name for node in tree.body if isinstance(node, ast.FunctionDef)}

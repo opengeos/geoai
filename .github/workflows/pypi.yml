@@ -4,7 +4,7 @@
 # To migrate from PYPI_USERNAME/PYPI_PASSWORD secrets to PyPI OIDC Trusted Publishing:
 # 1. Configure a Trusted Publisher for this repository and workflow on PyPI.
 # 2. Add `id-token: write` under `permissions:` below.
-# 3. Replace the `twine upload` step with `uses: pypa/gh-action-pypi-publish@release/v1`.
+# 3. Keep `python -m build` in its own preceding step and replace `twine upload` with `uses: pypa/gh-action-pypi-publish@release/v1`.
 
 name: pypi
 

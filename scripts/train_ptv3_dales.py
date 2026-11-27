@@ -1347,14 +1347,15 @@ def main() -> None:
             if not (data_root / split).exists():
                 continue
             ds = DALESDataset(data_root, split, eval_tf, args.grid_size)
-            eval_sampler = (
-                DistributedSampler(ds, shuffle=False) if world_size > 1 else None
+            eval_ds = (
+                torch.utils.data.Subset(ds, list(range(rank, len(ds), world_size)))
+                if world_size > 1
+                else ds
             )
             ldr = DataLoader(
-                ds,
+                eval_ds,
                 batch_size=args.batch_size,
                 shuffle=False,
-                sampler=eval_sampler,
                 collate_fn=point_collate_fn,
                 num_workers=args.num_workers,
                 pin_memory=True,
