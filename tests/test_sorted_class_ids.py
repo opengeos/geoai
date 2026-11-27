@@ -417,3 +417,65 @@ class TestSortedClassIds(unittest.TestCase):
         self.assertEqual(after, before)
         if not _TRAINING_AVAILABLE:
             self.assertNotIn("geoai.utils.training", sys.modules)
+
+    def test_mixed_type_string_tie_is_order_independent(self):
+        """Mixed values with equal str() (e.g. 1 and '1') get identical IDs regardless of row order."""
+        if _TRAINING_AVAILABLE:
+            from geoai.utils.training import _sort_class_values
+
+            self.assertEqual(
+                _sort_class_values([1, "1"]),
+                _sort_class_values(["1", 1]),
+            )
+            geoms = [box(0, 0, 1, 1), box(1, 1, 2, 2)]
+            gdf_a = gpd.GeoDataFrame(
+                {"class": pd.Series([1, "1"], dtype=object), "geometry": geoms},
+                crs="EPSG:4326",
+            )
+            gdf_b = gpd.GeoDataFrame(
+                {"class": pd.Series(["1", 1], dtype=object), "geometry": geoms},
+                crs="EPSG:4326",
+            )
+            with patch("geopandas.read_file", return_value=gdf_a):
+                _, map_a, _ = _load_class_data_vector(
+                    vector_path="a.geojson",
+                    src_crs="EPSG:4326",
+                    class_value_field="class",
+                    quiet=True,
+                )
+            with patch("geopandas.read_file", return_value=gdf_b):
+                _, map_b, _ = _load_class_data_vector(
+                    vector_path="b.geojson",
+                    src_crs="EPSG:4326",
+                    class_value_field="class",
+                    quiet=True,
+                )
+            self.assertEqual(map_a, map_b)
+
+    def test_export_training_data_rejects_null_class_labels(self):
+        """export_training_data raises ValueError when class column contains nulls."""
+        img_path = os.path.join(self.temp_dir.name, "img_null.tif")
+        _write_test_raster(img_path, width=64, height=64)
+        vec_path = _write_vector(
+            os.path.join(self.temp_dir.name, "vec_null.geojson"),
+            ["building", None],
+            [box(0, 0, 32, 32), box(32, 32, 64, 64)],
+        )
+        out_dir = os.path.join(self.temp_dir.name, "out_null")
+        if _TRAINING_AVAILABLE:
+            with self.assertRaises(ValueError):
+                export_training_data(
+                    img_path,
+                    out_dir,
+                    vec_path,
+                    tile_size_x=64,
+                    tile_size_y=64,
+                    stride_x=64,
+                    stride_y=64,
+                    metadata_format="COCO",
+                    class_value_field="class",
+                    quiet=True,
+                )
+            self.assertFalse(
+                os.path.exists(os.path.join(out_dir, "labels", "tile_000000.tif"))
+            )
