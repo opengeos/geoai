@@ -1948,7 +1948,7 @@ def _is_python_executable_name(path: str) -> bool:
         return True
     if not name.startswith("python"):
         return False
-    suffix = name[6:]
+    suffix = name[6:].rstrip("dmtu")
     if "-" in suffix:
         return False
     return suffix.isdigit() or (

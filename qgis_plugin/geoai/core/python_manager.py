@@ -85,8 +85,22 @@ def _safe_extract_tar(tar: tarfile.TarFile, dest_dir: str) -> None:
                 raise ValueError(
                     f"Refusing absolute or empty link in tar archive: {member.name}"
                 )
-            base = os.path.dirname(member_path) if member.issym() else dest_dir
-            link_target = os.path.realpath(os.path.join(base, linkname))
+            if member.issym():
+                parent_dir = os.path.realpath(
+                    os.path.dirname(os.path.join(dest_dir, member.name))
+                )
+                link_target = os.path.realpath(os.path.join(parent_dir, linkname))
+            else:
+                raw_target = os.path.normpath(os.path.join(dest_dir, linkname))
+                if not _is_within_directory(raw_target, dest_dir):
+                    raise ValueError(
+                        f"Attempted link traversal in tar archive: {member.name} -> {linkname}"
+                    )
+                if os.path.islink(raw_target):
+                    raise ValueError(
+                        f"Refusing hardlink to symlink in tar archive: {member.name} -> {linkname}"
+                    )
+                link_target = os.path.realpath(raw_target)
             if not _is_within_directory(link_target, dest_dir):
                 raise ValueError(
                     f"Attempted link traversal in tar archive: {member.name} -> {linkname}"
