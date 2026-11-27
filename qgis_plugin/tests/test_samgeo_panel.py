@@ -4,6 +4,7 @@
 vectorization and QGIS attribute writing are replaced with recorders.
 """
 
+import types
 import os
 from unittest.mock import MagicMock
 
@@ -501,3 +502,20 @@ def test_dropping_a_queued_login_unlocks_the_controls(hf_dock):
     assert hf_dock._hf_queued is None
     assert hf_dock.hf_login_btn.isEnabled()
     assert not hf_dock.hf_token_edit.isReadOnly()
+
+
+def test_queued_task_waits_for_worker_exit_without_blocking(hf_dock, monkeypatch):
+    started = []
+    running = {"value": True}
+    hf_dock._hf_worker = types.SimpleNamespace(isRunning=lambda: running["value"])
+    hf_dock._hf_queued = ("hf_whoami", {}, None, None)
+    monkeypatch.setattr(hf_dock, "_run_hf_task", lambda *a: started.append(a))
+
+    hf_dock._start_queued_hf_task()  # worker still exiting: stays queued
+    assert started == []
+    assert hf_dock._hf_queued is not None
+
+    running["value"] = False
+    hf_dock._start_queued_hf_task()
+    assert started == [("hf_whoami", {}, None, None)]
+    assert hf_dock._hf_queued is None

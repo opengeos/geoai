@@ -18,7 +18,7 @@ except (ImportError, OSError) as e:
     torch = None
     _TORCH_IMPORT_ERROR = e
 
-from qgis.PyQt.QtCore import Qt, QCoreApplication
+from qgis.PyQt.QtCore import Qt, QCoreApplication, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
@@ -627,14 +627,18 @@ class SamGeoDockWidget(QDockWidget):
         Args:
             *_args: The finished task's result or error message (ignored).
         """
+        worker = self._hf_worker
+        if worker is not None and worker.isRunning():
+            # Signals are delivered just before run() returns. Retry shortly
+            # instead of blocking the GUI thread with wait(); the task stays
+            # queued until the worker has actually exited.
+            if self._hf_queued is not None:
+                QTimer.singleShot(50, self._start_queued_hf_task)
+            return
         queued = self._hf_queued
         self._hf_queued = None
         if queued is None:
             return
-        worker = self._hf_worker
-        if worker is not None and worker.isRunning():
-            # Signals are delivered just before run() returns; let it exit.
-            worker.wait(5000)
         self._run_hf_task(*queued)
 
     def _set_hf_status(self, text, color):
@@ -2877,13 +2881,19 @@ class SamGeoDockWidget(QDockWidget):
                         "This SamGeo version does not report mask scores; "
                         "skipping the score field."
                     )
-                add_mask_attributes(
-                    out_path,
-                    mask_scores=mask_scores or None,
-                    source=source_name,
-                    prompt=prompt_label,
-                    log=self.log_message,
-                )
+                try:
+                    add_mask_attributes(
+                        out_path,
+                        mask_scores=mask_scores or None,
+                        source=source_name,
+                        prompt=prompt_label,
+                        log=self.log_message,
+                    )
+                except Exception as exc:  # never block loading the saved file
+                    self.log_message(
+                        f"Could not add attributes to {out_path}: {exc}",
+                        level=Qgis.Warning,
+                    )
             if add_to_map:
                 if kind == "raster":
                     layer = QgsRasterLayer(out_path, lname)
