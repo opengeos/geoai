@@ -1513,19 +1513,21 @@ def _train_with_custom_iou(
     if num_workers is None:
         num_workers = 0 if platform.system() in ["Darwin", "Windows"] else 4
 
+    is_cuda = torch.device(device).type == "cuda"
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=is_cuda,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=is_cuda,
     )
 
     # Test data loader
@@ -2060,11 +2062,27 @@ def evaluate_sparse_iou(
             return torch.from_numpy(image), torch.from_numpy(label.astype(np.int64))
 
     eval_dataset = _SparseEvalDataset(image_files, label_files, num_channels)
+
+    def _collate_maybe_variable(batch):
+        first_shape = batch[0][0].shape
+        if len(batch) > 1 and all(
+            img.shape == first_shape and lbl.shape == batch[0][1].shape
+            for img, lbl in batch
+        ):
+            return [
+                (
+                    torch.stack([b[0] for b in batch]),
+                    torch.stack([b[1] for b in batch]),
+                )
+            ]
+        return [(img.unsqueeze(0), lbl.unsqueeze(0)) for img, lbl in batch]
+
     eval_loader = DataLoader(
         eval_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=0,
+        collate_fn=_collate_maybe_variable,
     )
 
     smooth = 1e-6
@@ -2078,31 +2096,38 @@ def evaluate_sparse_iou(
     fp_sparse = torch.zeros(num_classes, dtype=torch.float64)
 
     processed = 0
+    next_log = 50
     with torch.no_grad():
-        for images, targets in eval_loader:
-            images = images.to(device)
-            outputs = model(images)
-            preds = torch.argmax(outputs, dim=1).cpu()
-            targets = targets.cpu()
+        for chunks in eval_loader:
+            for images, targets in chunks:
+                images = images.to(device)
+                outputs = model(images)
+                preds = torch.argmax(outputs, dim=1).cpu()
+                targets = targets.cpu()
 
-            labeled_mask = targets != bg_class
-            if resolved_ignore is not None:
-                labeled_mask = labeled_mask & (targets != resolved_ignore)
+                labeled_mask = targets != bg_class
+                if resolved_ignore is not None:
+                    labeled_mask = labeled_mask & (targets != resolved_ignore)
 
-            for cls in range(num_classes):
-                if cls == bg_class or (
-                    resolved_ignore is not None and cls == resolved_ignore
-                ):
-                    continue
-                pred_cls = preds == cls
-                target_cls = targets == cls
-                tp[cls] += (pred_cls & target_cls).sum().item()
-                fn[cls] += (target_cls & ~pred_cls).sum().item()
-                fp_sparse[cls] += (pred_cls & ~target_cls & labeled_mask).sum().item()
+                for cls in range(num_classes):
+                    if cls == bg_class or (
+                        resolved_ignore is not None and cls == resolved_ignore
+                    ):
+                        continue
+                    pred_cls = preds == cls
+                    target_cls = targets == cls
+                    tp[cls] += (pred_cls & target_cls).sum().item()
+                    fn[cls] += (target_cls & ~pred_cls).sum().item()
+                    fp_sparse[cls] += (
+                        (pred_cls & ~target_cls & labeled_mask).sum().item()
+                    )
 
-            processed += images.shape[0]
-            if verbose and (processed % 50 < images.shape[0]):
-                logger.info("   Processed %d/%d tiles...", processed, len(image_files))
+                processed += images.shape[0]
+                if verbose and processed >= next_log:
+                    logger.info(
+                        "   Processed %d/%d tiles...", processed, len(image_files)
+                    )
+                    next_log += 50
 
     # Build results dictionary
     ious = []
