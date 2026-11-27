@@ -6,7 +6,7 @@ This guide covers various methods for installing GeoAI on different platforms wi
 
 GeoAI requires:
 
--   Python 3.10 or above
+-   Python 3.12 or above
 -   The required dependencies will be installed automatically
 
 ## 🚀 Recommended Installation Methods
@@ -19,11 +19,13 @@ The simplest way to install the latest stable release of GeoAI is via pip:
 pip install geoai-py
 ```
 
-To install GeoAI with all optional dependencies for additional features:
+To install GeoAI with optional dependencies for additional features:
 
 ```bash
-pip install "geoai-py[all]"
+pip install "geoai-py[extra]"
 ```
+
+Other task-specific optional extras are also available in `pyproject.toml`: `agents`, `onnx`, `rfdetr`, `terratorch`, `sr`, `vllm`, `networks`, `osd`, and `building` (for example, `pip install "geoai-py[onnx]"`).
 
 ### 🐍 Using uv
 

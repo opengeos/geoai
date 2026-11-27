@@ -56,10 +56,6 @@ constraint-dependencies = [
 ]
 
 
-[tool.distutils.bdist_wheel]
-universal = true
-
-
 [tool.bumpversion]
 current_version = "0.44.1"
 commit = true
