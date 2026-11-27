@@ -452,6 +452,25 @@ def test_ensure_venv_ssl_reports_unrecoverable_venv(tmp_path, monkeypatch):
     assert "SSL module" in message
 
 
+def test_qgis_dll_directories_only_trust_osgeo4w_bin(tmp_path, monkeypatch):
+    root = tmp_path / "OSGeo4W"
+    prefix = root / "apps" / "Python312"
+    (root / "bin").mkdir(parents=True)
+    prefix.mkdir(parents=True)
+    monkeypatch.setattr(venv_manager.sys, "prefix", str(prefix))
+    monkeypatch.setattr(venv_manager.sys, "executable", str(root / "bin" / "x.exe"))
+    assert str(root / "bin") in venv_manager._qgis_dll_directories()
+
+    other_prefix = tmp_path / "custom" / "Python312"
+    other_prefix.mkdir(parents=True)
+    (tmp_path / "bin").mkdir()
+    monkeypatch.setattr(venv_manager.sys, "prefix", str(other_prefix))
+    monkeypatch.setattr(
+        venv_manager.sys, "executable", str(other_prefix / "python.exe")
+    )
+    assert str(tmp_path / "bin") not in venv_manager._qgis_dll_directories()
+
+
 def test_qgis_fallback_python_detection(monkeypatch):
     monkeypatch.setattr(venv_manager.sys, "platform", "win32")
     qgis_python = str(Path(sys.prefix) / "python.exe")

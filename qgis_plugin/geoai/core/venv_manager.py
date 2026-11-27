@@ -2142,9 +2142,14 @@ def _qgis_dll_directories() -> List[str]:
     """
     candidates = [
         os.path.dirname(sys.executable or ""),
-        os.path.join(os.path.dirname(os.path.dirname(sys.prefix)), "bin"),
         os.path.join(sys.prefix, "DLLs"),
     ]
+    # Only trust <root>/bin for the known <root>/apps/PythonXY layout, so an
+    # unrelated (possibly user-writable) directory is never added to the
+    # DLL search path.
+    apps_dir = os.path.dirname(os.path.abspath(sys.prefix))
+    if os.path.basename(apps_dir).lower() == "apps":
+        candidates.insert(1, os.path.join(os.path.dirname(apps_dir), "bin"))
     seen = []
     for path in candidates:
         if path and os.path.isdir(path) and path not in seen:
@@ -4745,8 +4750,10 @@ def create_venv_and_install(
         home = _read_pyvenv_cfg(VENV_DIR).get("home", "")
         if (
             reusable_venv
+            and sys.platform == "win32"
             and home
-            and _is_qgis_fallback_python(os.path.join(home, "python.exe"))
+            and os.path.normcase(os.path.abspath(home))
+            == os.path.normcase(os.path.abspath(sys.prefix))
         ):
             # A venv left by an earlier QGIS-Python fallback may lack ssl
             # (issue #911); repair it before installing anything.
