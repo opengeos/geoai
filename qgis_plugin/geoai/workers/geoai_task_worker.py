@@ -6,10 +6,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 import traceback
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from typing import Any, Callable, Dict
 
 _PROTO_STDOUT = sys.stdout
@@ -244,6 +245,16 @@ def _task_segment_water(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_raster": final_raster, "output_vector": output_vector}
 
 
+@contextmanager
+def _temp_dir_ignore_cleanup_errors():
+    """Create a temporary directory and ignore cleanup errors (Python 3.9 compatible)."""
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        yield tmp_dir
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
     from geoai.change_detection import ChangeDetection
     from geoai.utils.raster import raster_to_vector
@@ -276,7 +287,7 @@ def _task_detect_changes(params: Dict[str, Any]) -> Dict[str, Any]:
 
     # The instance raster (and the score raster detect_changes writes next to
     # it) only feed the polygons, so keep them out of the user's folders.
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+    with _temp_dir_ignore_cleanup_errors() as tmp_dir:
         # Each change instance has its own ID here, so it becomes its own polygon.
         instance_raster = (
             os.path.join(tmp_dir, "instances.tif") if output_vector else None

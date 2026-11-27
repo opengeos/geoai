@@ -2039,7 +2039,7 @@ def _get_linux_system_python() -> Optional[str]:
 
     if sys.executable and os.path.isfile(sys.executable):
         real_path = os.path.realpath(sys.executable)
-        if real_path not in candidates:
+        if _is_python_executable_name(real_path) and real_path not in candidates:
             candidates.append(real_path)
 
     for candidate in candidates:

@@ -1349,10 +1349,20 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.images_dir_edit.setText(dir_path)
 
     def browse_labels_dir(self):
-        """Choose the training labels directory."""
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Labels Directory")
-        if dir_path:
-            self.labels_dir_edit.setText(dir_path)
+        """Choose the training labels directory or COCO JSON annotations file."""
+        if self.input_format_combo.currentText() == "coco":
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Select COCO Annotations File",
+                "",
+                "JSON Files (*.json);;All Files (*)",
+            )
+            if file_path:
+                self.labels_dir_edit.setText(file_path)
+        else:
+            dir_path = QFileDialog.getExistingDirectory(self, "Select Labels Directory")
+            if dir_path:
+                self.labels_dir_edit.setText(dir_path)
 
     def browse_model_output(self):
         """Choose the model output directory."""

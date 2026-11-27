@@ -1296,7 +1296,8 @@ class SamGeoDockWidget(QDockWidget):
 
     def _on_custom_bands_changed(self, state):
         """Handle custom bands checkbox state change."""
-        enabled = state == Qt.CheckState.Checked
+        checked_value = getattr(Qt.CheckState.Checked, "value", 2)
+        enabled = state in (Qt.CheckState.Checked, checked_value)
         self.red_band_spin.setEnabled(enabled)
         self.green_band_spin.setEnabled(enabled)
         self.blue_band_spin.setEnabled(enabled)
