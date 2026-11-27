@@ -733,19 +733,22 @@ class MoondreamDockWidget(QDockWidget):
             export_format = self.export_format_combo.currentText()
             tile_size = self.export_tile_size_spin.value()
 
-            # Import and call export function
-            from .._geoai_lib import get_geoai
+            # Runs in the venv subprocess when it exists, keeping the geoai
+            # library (and PyTorch) out of the QGIS process. It blocks until
+            # done without pumping events, so a second export cannot start
+            # while this one is still writing the same tiles.
+            from ..core.geoai_task_subprocess import export_geotiff_tiles
 
-            geoai = get_geoai()
-
-            geoai.export_geotiff_tiles(
-                in_raster=self.current_image_path,
-                out_folder=output_dir,
-                in_class_data=vector_path,
-                tile_size=tile_size,
-                stride=tile_size,  # No overlap for detection training
-                metadata_format=export_format,
-                skip_empty_tiles=True,
+            export_geotiff_tiles(
+                {
+                    "in_raster": self.current_image_path,
+                    "out_folder": output_dir,
+                    "in_class_data": vector_path,
+                    "tile_size": tile_size,
+                    "stride": tile_size,  # No overlap for detection training
+                    "metadata_format": export_format,
+                    "skip_empty_tiles": True,
+                },
             )
 
             self.progress_bar.setRange(0, 100)

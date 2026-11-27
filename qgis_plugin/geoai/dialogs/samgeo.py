@@ -10,14 +10,6 @@ import shutil
 import sys
 import tempfile
 
-_TORCH_IMPORT_ERROR = None
-
-try:
-    import torch
-except (ImportError, OSError) as e:
-    torch = None
-    _TORCH_IMPORT_ERROR = e
-
 from qgis.PyQt.QtCore import Qt, QCoreApplication, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import (
@@ -58,6 +50,7 @@ from qgis.PyQt.QtCore import QThread, pyqtSignal
 
 from .map_tools import PointPromptTool, BoxPromptTool
 from .._pkg_resources_compat import ensure_pkg_resources
+from ..core.lazy_torch import import_torch
 from ..core.samgeo_outputs import (
     add_mask_attributes,
     count_raster_labels,
@@ -1515,15 +1508,17 @@ class SamGeoDockWidget(QDockWidget):
     def check_cuda_devices(self):
         """Check CUDA device availability and fix CUDA_VISIBLE_DEVICES if needed.
 
+        Only used when SamGeo runs inside the QGIS process, so PyTorch is
+        imported here rather than when the panel opens.
+
         Returns:
             tuple: (is_cuda_available: bool, warning_message: str or None)
         """
+        torch, torch_error = import_torch()
         if torch is None:
             detail = ""
-            if _TORCH_IMPORT_ERROR is not None:
-                detail = (
-                    f"\n\nPyTorch import error in QGIS process:\n{_TORCH_IMPORT_ERROR}"
-                )
+            if torch_error is not None:
+                detail = f"\n\nPyTorch import error in QGIS process:\n{torch_error}"
             return (
                 False,
                 "PyTorch is not available in this QGIS session. "
@@ -1635,20 +1630,19 @@ class SamGeoDockWidget(QDockWidget):
         device = self.device_combo.currentText()
         use_subprocess = _use_samgeo_subprocess()
 
-        if torch is None:
-            if use_subprocess:
-                self.log_message(
-                    "PyTorch is unavailable in QGIS process; using SamGeo subprocess worker.",
-                    level=Qgis.Warning,
-                )
-            else:
+        # The subprocess worker picks the device itself; PyTorch is imported
+        # into QGIS only when the model runs in-process.
+        torch = None
+        if not use_subprocess:
+            torch, torch_error = import_torch()
+            if torch is None:
                 self.progress_bar.setVisible(False)
                 self.load_model_btn.setEnabled(True)
                 err = "PyTorch is not available in the QGIS process."
-                if _TORCH_IMPORT_ERROR is not None:
+                if torch_error is not None:
                     err += (
                         "\n\nImport error:\n"
-                        f"{_TORCH_IMPORT_ERROR}\n\n"
+                        f"{torch_error}\n\n"
                         "This is typically a Windows QGIS/PyTorch DLL incompatibility."
                     )
                 self.show_error(err)
@@ -2985,22 +2979,25 @@ class SamGeoDockWidget(QDockWidget):
             tile_size = self.export_tile_size_spin.value()
             stride = self.export_stride_spin.value()
 
-            # Import and call export function
-            from .._geoai_lib import get_geoai
-
-            geoai = get_geoai()
+            # Runs in the venv subprocess when it exists, keeping the geoai
+            # library (and PyTorch) out of the QGIS process. It blocks until
+            # done without pumping events, so a second export cannot start
+            # while this one is still writing the same tiles.
+            from ..core.geoai_task_subprocess import export_geotiff_tiles
 
             self.results_text.append(f"\nExporting tiles in {export_format} format...")
             QCoreApplication.processEvents()
 
-            geoai.export_geotiff_tiles(
-                in_raster=image_path,
-                out_folder=output_dir,
-                in_class_data=temp_mask,
-                tile_size=tile_size,
-                stride=stride,
-                metadata_format=export_format,
-                skip_empty_tiles=True,
+            export_geotiff_tiles(
+                {
+                    "in_raster": image_path,
+                    "out_folder": output_dir,
+                    "in_class_data": temp_mask,
+                    "tile_size": tile_size,
+                    "stride": stride,
+                    "metadata_format": export_format,
+                    "skip_empty_tiles": True,
+                },
             )
 
             self.results_text.append(f"Training data exported to: {output_dir}")

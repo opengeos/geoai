@@ -11,11 +11,6 @@ import sys
 import tempfile
 import traceback
 
-try:
-    import torch
-except (ImportError, OSError):
-    torch = None
-
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
 from qgis.PyQt.QtWidgets import (
     QCheckBox,

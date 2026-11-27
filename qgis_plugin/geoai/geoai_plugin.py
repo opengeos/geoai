@@ -940,17 +940,13 @@ class GeoAIPlugin:
 
         cleared_items = []
 
-        # Import torch early to use for cleanup
-        torch = None
-        torch_import_error = None
-        try:
-            import torch as _torch
+        # Only clear PyTorch caches if a model actually loaded PyTorch into
+        # QGIS. Importing it here just to clean up can crash QGIS (DLL
+        # conflicts on Windows, a duplicate libomp with conda QGIS on macOS);
+        # subprocess-backed models are released below either way.
+        from .core.lazy_torch import loaded_torch
 
-            torch = _torch
-        except (ImportError, OSError) as e:
-            # PyTorch may be unavailable in QGIS (e.g. Windows DLL conflict) even if
-            # it is installed in the plugin venv. Continue with best-effort model cleanup.
-            torch_import_error = e
+        torch = loaded_torch()
 
         # Clear Moondream model if loaded
         if self._moondream_dock is not None:
@@ -1196,19 +1192,10 @@ class GeoAIPlugin:
             except Exception as e:
                 memory_info = f"\n\nError clearing MPS cache: {str(e)}"
         elif torch is None:
-            if isinstance(torch_import_error, OSError):
-                memory_info = (
-                    "\n\nPyTorch is installed but not available in the QGIS process "
-                    f"(likely DLL conflict): {torch_import_error}"
-                    "\nSubprocess-backed models are still released by this action."
-                )
-            elif torch_import_error is not None:
-                memory_info = (
-                    "\n\nPyTorch is not available in this QGIS session: "
-                    f"{torch_import_error}"
-                )
-            else:
-                memory_info = "\n\nPyTorch not installed."
+            memory_info = (
+                "\n\nPyTorch is not loaded in the QGIS process; models run in "
+                "separate processes, which this action releases."
+            )
         else:
             memory_info = "\n\nNo CUDA or MPS accelerator available."
 
