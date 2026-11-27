@@ -25,6 +25,8 @@ jobs:
               run: pip install bandit
             - name: Run Bandit (matches plugins.qgis.org security scan)
               run: bandit -r qgis_plugin/geoai --severity-level medium
+            - name: Run Bandit hardcoded credential checks (blocking on plugins.qgis.org at any severity)
+              run: bandit -r qgis_plugin/geoai -t B105,B106,B107
 
     pyqt6-smoke:
         name: PyQt6 import smoke
