@@ -5,7 +5,7 @@ import os
 import platform
 import random
 import time
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -2070,17 +2070,7 @@ def inference_on_geotiff(
                 window, current_height, current_width = _pad_window(window, window_size)
 
                 # Normalize and prepare input
-                image = window.astype(np.float32) / 255.0
-
-                # Handle different number of bands
-                if image.shape[0] > num_channels:
-                    image = image[:num_channels]
-                elif image.shape[0] < num_channels:
-                    padded = np.zeros(
-                        (num_channels, window_size, window_size), dtype=np.float32
-                    )
-                    padded[: image.shape[0]] = image
-                    image = padded
+                image = _normalize_image_array(window, num_channels, None)
 
                 # Convert to tensor
                 image_tensor = torch.tensor(image, device=device)
@@ -3118,6 +3108,305 @@ def object_detection_batch(
         )
 
 
+NORMALIZATION_FILENAME = "normalization.json"
+
+
+def _validate_channel_normalization(
+    num_channels: int,
+    channel_means: Optional[Sequence[float]] = None,
+    channel_stds: Optional[Sequence[float]] = None,
+    channel_mins: Optional[Sequence[float]] = None,
+    channel_maxs: Optional[Sequence[float]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Validate optional per-channel normalization parameters.
+
+    Returns ``None`` when all parameters are ``None`` (preserving legacy ``/ 255.0``
+    normalization), or a normalized configuration dict with ``mode`` set to
+    ``"zscore"`` or ``"minmax"``.
+    """
+    has_zscore = channel_means is not None or channel_stds is not None
+    has_minmax = channel_mins is not None or channel_maxs is not None
+    if not has_zscore and not has_minmax:
+        return None
+    if has_zscore and has_minmax:
+        raise ValueError(
+            "Specify either channel_means/channel_stds or channel_mins/channel_maxs, not both."
+        )
+
+    if has_zscore:
+        means = (
+            [0.0] * num_channels
+            if channel_means is None
+            else [float(v) for v in channel_means]
+        )
+        stds = (
+            [1.0] * num_channels
+            if channel_stds is None
+            else [float(v) for v in channel_stds]
+        )
+        if len(means) != num_channels or len(stds) != num_channels:
+            raise ValueError(
+                f"channel_means (length {len(means)}) and channel_stds (length {len(stds)}) "
+                f"must match num_channels ({num_channels})."
+            )
+        if not all(math.isfinite(v) for v in means):
+            raise ValueError("All channel_means values must be finite.")
+        if not all(math.isfinite(v) and v > 0.0 for v in stds):
+            raise ValueError("All channel_stds values must be finite and > 0.")
+        return {"mode": "zscore", "means": means, "stds": stds}
+
+    mins = (
+        [0.0] * num_channels
+        if channel_mins is None
+        else [float(v) for v in channel_mins]
+    )
+    maxs = (
+        [255.0] * num_channels
+        if channel_maxs is None
+        else [float(v) for v in channel_maxs]
+    )
+    if len(mins) != num_channels or len(maxs) != num_channels:
+        raise ValueError(
+            f"channel_mins (length {len(mins)}) and channel_maxs (length {len(maxs)}) "
+            f"must match num_channels ({num_channels})."
+        )
+    if not all(math.isfinite(v) for v in mins) or not all(
+        math.isfinite(v) for v in maxs
+    ):
+        raise ValueError("All channel_mins and channel_maxs values must be finite.")
+    if any(hi <= lo for lo, hi in zip(mins, maxs)):
+        raise ValueError(
+            "Each channel_maxs value must be strictly greater than its corresponding channel_mins value."
+        )
+    return {"mode": "minmax", "mins": mins, "maxs": maxs}
+
+
+def _normalize_image_array(
+    image: np.ndarray,
+    num_channels: int,
+    norm_config: Optional[Dict[str, Any]] = None,
+) -> np.ndarray:
+    """Adjust channel count, sanitize non-finite values, and normalize a CHW image array."""
+    image = np.asarray(image, dtype=np.float32)
+
+    if image.shape[0] > num_channels:
+        image = image[:num_channels]
+    elif image.shape[0] < num_channels:
+        padded = np.zeros(
+            (num_channels, image.shape[1], image.shape[2]), dtype=np.float32
+        )
+        padded[: image.shape[0]] = image
+        image = padded
+
+    if not np.all(np.isfinite(image)):
+        image = np.nan_to_num(image, nan=0.0, posinf=0.0, neginf=0.0)
+
+    if norm_config is None:
+        return image / 255.0
+
+    mode = norm_config["mode"]
+    if mode == "zscore":
+        means = np.asarray(norm_config["means"], dtype=np.float32)[:, None, None]
+        stds = np.asarray(norm_config["stds"], dtype=np.float32)[:, None, None]
+        return (image - means) / stds
+    if mode == "minmax":
+        mins = np.asarray(norm_config["mins"], dtype=np.float32)[:, None, None]
+        maxs = np.asarray(norm_config["maxs"], dtype=np.float32)[:, None, None]
+        return np.clip((image - mins) / (maxs - mins), 0.0, 1.0)
+    raise ValueError(f"Unsupported normalization mode: {mode!r}")
+
+
+def _save_normalization_sidecar(
+    output_dir: str, norm_config: Optional[Dict[str, Any]]
+) -> None:
+    """Persist or clear per-channel normalization metadata next to trained checkpoints."""
+    sidecar_path = os.path.join(output_dir, NORMALIZATION_FILENAME)
+    if norm_config is None:
+        if os.path.isfile(sidecar_path):
+            os.remove(sidecar_path)
+        return
+    import json
+
+    tmp_path = f"{sidecar_path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(norm_config, f, indent=2)
+    os.replace(tmp_path, sidecar_path)
+
+
+def _resolve_inference_normalization(
+    model_path: Union[str, List[str]],
+    num_channels: int,
+    channel_means: Optional[Sequence[float]] = None,
+    channel_stds: Optional[Sequence[float]] = None,
+    channel_mins: Optional[Sequence[float]] = None,
+    channel_maxs: Optional[Sequence[float]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Resolve explicit normalization parameters or auto-load normalization.json next to checkpoints."""
+    explicit = _validate_channel_normalization(
+        num_channels=num_channels,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
+    )
+    if explicit is not None:
+        return explicit
+
+    import json
+
+    paths = (
+        [model_path] if isinstance(model_path, (str, os.PathLike)) else list(model_path)
+    )
+    configs: List[Optional[Dict[str, Any]]] = []
+    for p in paths:
+        sidecar = os.path.join(
+            os.path.dirname(os.path.abspath(str(p))), NORMALIZATION_FILENAME
+        )
+        if not os.path.isfile(sidecar):
+            configs.append(None)
+            continue
+        with open(sidecar, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        mode = raw.get("mode")
+        if mode == "zscore":
+            cfg = _validate_channel_normalization(
+                num_channels=num_channels,
+                channel_means=raw.get("means"),
+                channel_stds=raw.get("stds"),
+            )
+        elif mode == "minmax":
+            cfg = _validate_channel_normalization(
+                num_channels=num_channels,
+                channel_mins=raw.get("mins"),
+                channel_maxs=raw.get("maxs"),
+            )
+        else:
+            raise ValueError(f"Unsupported normalization mode in {sidecar}: {mode!r}")
+        configs.append(cfg)
+    if not configs:
+        return None
+    first = configs[0]
+    if any(cfg != first for cfg in configs[1:]):
+        raise ValueError(
+            "Ensemble checkpoints have conflicting normalization.json sidecar configs "
+            "(including mixing legacy /255.0 checkpoints without a sidecar and normalized "
+            "checkpoints); pass explicit channel_means/channel_stds or channel_mins/channel_maxs."
+        )
+    return first
+
+
+def compute_channel_stats(
+    images_source: Union[str, os.PathLike, Sequence[Union[str, os.PathLike]]],
+    num_channels: Optional[int] = None,
+    nodata: Optional[float] = None,
+) -> Dict[str, List[float]]:
+    """Compute per-channel means, stds, mins, and maxs across GeoTIFF or image tiles.
+
+    Non-finite values (NaN/Inf) and raster NoData pixels are excluded per channel.
+    Useful for deriving ``channel_means`` / ``channel_stds`` or ``channel_mins`` /
+    ``channel_maxs`` for multi-sensor stacks (e.g., 8-bit NAIP + float32 LiDAR DEM/TWI/HAND).
+
+    Args:
+        images_source: Directory containing image tiles or a sequence of image file paths.
+        num_channels: Number of channels to aggregate. If ``None``, inferred from the first image.
+        nodata: Optional NoData value to ignore in addition to each GeoTIFF's declared NoData.
+
+    Returns:
+        Dictionary with keys ``"means"``, ``"stds"``, ``"mins"``, and ``"maxs"``.
+    """
+    exts = (".tif", ".tiff", ".png", ".jpg", ".jpeg")
+    if isinstance(images_source, (str, os.PathLike)):
+        src_path = os.fspath(images_source)
+        if os.path.isdir(src_path):
+            image_paths = sorted(
+                os.path.join(src_path, f)
+                for f in os.listdir(src_path)
+                if f.lower().endswith(exts)
+            )
+        else:
+            image_paths = [src_path]
+    else:
+        image_paths = [os.fspath(p) for p in images_source]
+
+    if not image_paths:
+        raise FileNotFoundError("No image files found to compute channel statistics.")
+
+    sum_x: Optional[np.ndarray] = None
+    sum_x2: Optional[np.ndarray] = None
+    counts: Optional[np.ndarray] = None
+    mins: Optional[np.ndarray] = None
+    maxs: Optional[np.ndarray] = None
+    target_channels: Optional[int] = num_channels
+
+    for path in image_paths:
+        if path.lower().endswith((".tif", ".tiff")):
+            with rasterio.open(path) as src:
+                arr = src.read().astype(np.float64)
+                file_nodata = src.nodata
+        else:
+            with Image.open(path) as img:
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                arr = np.transpose(np.asarray(img, dtype=np.float64), (2, 0, 1))
+                file_nodata = None
+
+        if target_channels is None:
+            target_channels = int(arr.shape[0])
+        c_count = target_channels
+        if sum_x is None:
+            sum_x = np.zeros(c_count, dtype=np.float64)
+            sum_x2 = np.zeros(c_count, dtype=np.float64)
+            counts = np.zeros(c_count, dtype=np.int64)
+            mins = np.full(c_count, np.inf, dtype=np.float64)
+            maxs = np.full(c_count, -np.inf, dtype=np.float64)
+
+        limit = min(arr.shape[0], c_count)
+        for ch in range(limit):
+            band = arr[ch]
+            valid = np.isfinite(band)
+            if file_nodata is not None and math.isfinite(float(file_nodata)):
+                valid &= band != float(file_nodata)
+            if nodata is not None and math.isfinite(float(nodata)):
+                valid &= band != float(nodata)
+            vals = band[valid]
+            if vals.size == 0:
+                continue
+            sum_x[ch] += float(vals.sum())
+            sum_x2[ch] += float(np.square(vals).sum())
+            counts[ch] += int(vals.size)
+            mins[ch] = min(mins[ch], float(vals.min()))
+            maxs[ch] = max(maxs[ch], float(vals.max()))
+
+    assert sum_x is not None and sum_x2 is not None and counts is not None
+    assert mins is not None and maxs is not None
+
+    out_means: List[float] = []
+    out_stds: List[float] = []
+    out_mins: List[float] = []
+    out_maxs: List[float] = []
+    for ch in range(len(counts)):
+        if counts[ch] == 0:
+            out_means.append(0.0)
+            out_stds.append(1.0)
+            out_mins.append(0.0)
+            out_maxs.append(1.0)
+        else:
+            mean = sum_x[ch] / counts[ch]
+            var = max(sum_x2[ch] / counts[ch] - mean * mean, 0.0)
+            std = math.sqrt(var)
+            out_means.append(float(mean))
+            out_stds.append(float(std if std > 1e-6 else 1.0))
+            out_mins.append(float(mins[ch]))
+            out_maxs.append(float(maxs[ch]))
+
+    return {
+        "means": out_means,
+        "stds": out_stds,
+        "mins": out_mins,
+        "maxs": out_maxs,
+    }
+
+
 class SemanticSegmentationDataset(Dataset):
     """Dataset for semantic segmentation from GeoTIFF, PNG, JPG, and other image formats."""
 
@@ -3131,6 +3420,10 @@ class SemanticSegmentationDataset(Dataset):
         resize_mode: str = "resize",
         num_classes: int = 2,
         ignore_index: Optional[int] = -100,
+        channel_means: Optional[Sequence[float]] = None,
+        channel_stds: Optional[Sequence[float]] = None,
+        channel_mins: Optional[Sequence[float]] = None,
+        channel_maxs: Optional[Sequence[float]] = None,
     ) -> None:
         """
         Initialize dataset for semantic segmentation.
@@ -3149,6 +3442,14 @@ class SemanticSegmentationDataset(Dataset):
             num_classes (int): Number of classes for segmentation. Used for mask normalization.
             ignore_index (int, optional): Label value to preserve as ignored pixels
                 during mask normalization and resizing. Defaults to -100.
+            channel_means (Sequence[float], optional): Per-channel mean for z-score
+                normalization ``(x - mean) / std``. Defaults to None (legacy ``/ 255.0``).
+            channel_stds (Sequence[float], optional): Per-channel std for z-score
+                normalization. Defaults to None.
+            channel_mins (Sequence[float], optional): Per-channel lower bound for min-max
+                scaling into ``[0, 1]``. Mutually exclusive with ``channel_means``/``channel_stds``.
+            channel_maxs (Sequence[float], optional): Per-channel upper bound for min-max
+                scaling into ``[0, 1]``. Mutually exclusive with ``channel_means``/``channel_stds``.
         """
         self.image_paths = image_paths
         self.label_paths = label_paths
@@ -3163,6 +3464,14 @@ class SemanticSegmentationDataset(Dataset):
             self.num_channels = self._get_num_channels(self.image_paths[0])
         else:
             self.num_channels = num_channels
+
+        self.norm_config = _validate_channel_normalization(
+            num_channels=self.num_channels,
+            channel_means=channel_means,
+            channel_stds=channel_stds,
+            channel_mins=channel_mins,
+            channel_maxs=channel_maxs,
+        )
 
     def _is_geotiff(self, file_path: str) -> bool:
         """Check if file is a GeoTIFF based on extension."""
@@ -3322,32 +3631,17 @@ class SemanticSegmentationDataset(Dataset):
             with rasterio.open(image_path) as src:
                 # Read as [C, H, W] format
                 image = src.read().astype(np.float32)
-                # Normalize image to [0, 1] range
-                image = image / 255.0
         else:
             # Load standard image formats using PIL
             with Image.open(image_path) as img:
                 # Convert to RGB if needed
                 if img.mode != "RGB":
                     img = img.convert("RGB")
-                # Convert to numpy array [H, W, C]
-                image = np.array(img, dtype=np.float32)
-                # Normalize to [0, 1] range
-                image = image / 255.0
-                # Convert to [C, H, W] format
-                image = np.transpose(image, (2, 0, 1))
+                # Convert to numpy array [H, W, C] then [C, H, W]
+                image = np.transpose(np.array(img, dtype=np.float32), (2, 0, 1))
 
-        # Handle different number of channels
-        if image.shape[0] > self.num_channels:
-            image = image[: self.num_channels]  # Keep only specified bands
-        elif image.shape[0] < self.num_channels:
-            # Pad with zeros if less than specified bands
-            padded = np.zeros(
-                (self.num_channels, image.shape[1], image.shape[2]),
-                dtype=np.float32,
-            )
-            padded[: image.shape[0]] = image
-            image = padded
+        # Adjust channel count, sanitize non-finite values, and normalize
+        image = _normalize_image_array(image, self.num_channels, self.norm_config)
 
         # Convert to CHW tensor
         image = torch.as_tensor(image, dtype=torch.float32)
@@ -3511,7 +3805,7 @@ class SemanticContrastAdjustment:
         return image, mask
 
 
-def get_semantic_transform(train: bool) -> Any:
+def get_semantic_transform(train: bool, include_photometric: bool = True) -> Any:
     """
     Get transforms for semantic segmentation data augmentation.
 
@@ -3522,8 +3816,11 @@ def get_semantic_transform(train: bool) -> Any:
 
     Args:
         train (bool): Whether to include training-specific transforms.
-            If True, applies augmentations (flips, rotations, brightness/contrast adjustments).
+            If True, applies augmentations (flips, rotations, and optionally brightness/contrast adjustments).
             If False, only converts to tensor (for validation).
+        include_photometric (bool): Whether to include ``[0, 1]``-clamping brightness and
+            contrast augmentations during training. Set to ``False`` when using unbounded
+            z-score normalization so negative or ``> 1`` values are preserved.
 
     Returns:
         SemanticTransforms: Composed transforms.
@@ -3541,13 +3838,14 @@ def get_semantic_transform(train: bool) -> Any:
         transforms.append(SemanticRandomVerticalFlip(0.5))
         transforms.append(SemanticRandomRotation90(0.5))
 
-        # Photometric transforms - improve model robustness
-        transforms.append(
-            SemanticBrightnessAdjustment(brightness_range=(0.8, 1.2), prob=0.5)
-        )
-        transforms.append(
-            SemanticContrastAdjustment(contrast_range=(0.8, 1.2), prob=0.5)
-        )
+        if include_photometric:
+            # Photometric transforms - improve model robustness for [0, 1] inputs
+            transforms.append(
+                SemanticBrightnessAdjustment(brightness_range=(0.8, 1.2), prob=0.5)
+            )
+            transforms.append(
+                SemanticContrastAdjustment(contrast_range=(0.8, 1.2), prob=0.5)
+            )
 
     return SemanticTransforms(transforms)
 
@@ -4099,6 +4397,10 @@ def train_segmentation_model(
     only_fold: Optional[int] = None,
     overwrite: bool = False,
     monitor: str = "val_iou",
+    channel_means: Optional[Sequence[float]] = None,
+    channel_stds: Optional[Sequence[float]] = None,
+    channel_mins: Optional[Sequence[float]] = None,
+    channel_maxs: Optional[Sequence[float]] = None,
     **kwargs: Any,
 ) -> Optional[Dict[str, Any]]:
     """
@@ -4421,12 +4723,22 @@ def train_segmentation_model(
                 logger.info(f"All sampled images have the same size: {image_sizes[0]}")
                 logger.info("No resizing needed.")
 
+    norm_config = _validate_channel_normalization(
+        num_channels=num_channels,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
+    )
+
     # Create datasets
     # Use custom transforms if provided, otherwise use default transforms
+    # Omit [0, 1]-clamping photometric augmentations for unbounded z-score normalization
+    include_photometric = norm_config is None or norm_config["mode"] != "zscore"
     train_transform = (
         train_transforms
         if train_transforms is not None
-        else get_semantic_transform(train=True)
+        else get_semantic_transform(train=True, include_photometric=include_photometric)
     )
     val_transform = (
         val_transforms
@@ -4443,6 +4755,10 @@ def train_segmentation_model(
         resize_mode=resize_mode,
         num_classes=num_classes,
         ignore_index=ignore_index,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
     )
     val_dataset = SemanticSegmentationDataset(
         val_imgs,
@@ -4453,6 +4769,10 @@ def train_segmentation_model(
         resize_mode=resize_mode,
         num_classes=num_classes,
         ignore_index=ignore_index,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
     )
 
     # Create data loaders
@@ -4518,8 +4838,8 @@ def train_segmentation_model(
     )
     model.to(device)
 
-    # Enable multi-GPU training if multiple GPUs are available
-    if torch.cuda.device_count() > 1:
+    # Enable multi-GPU training if multiple GPUs are available and training on CUDA
+    if torch.device(device).type == "cuda" and torch.cuda.device_count() > 1:
         logger.info(f"Using {torch.cuda.device_count()} GPUs for training")
         model = torch.nn.DataParallel(model)
 
@@ -4732,6 +5052,7 @@ def train_segmentation_model(
             epochs_without_improvement = 0
             logger.info("Saving best model with %s: %.4f", monitor, best_score)
             torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
+            _save_normalization_sidecar(output_dir, norm_config)
             _write_json(
                 Path(output_dir) / "model_selection.json",
                 {
@@ -4784,6 +5105,7 @@ def train_segmentation_model(
 
     # Save final model
     torch.save(model.state_dict(), os.path.join(output_dir, "final_model.pth"))
+    _save_normalization_sidecar(output_dir, norm_config)
 
     # Save training history
     history = {
@@ -5109,6 +5431,10 @@ def _train_segmentation_kfold(
             quiet=True,
             model_kwargs=options["kwargs"],
             raise_on_error=True,
+            channel_means=options.get("channel_means"),
+            channel_stds=options.get("channel_stds"),
+            channel_mins=options.get("channel_mins"),
+            channel_maxs=options.get("channel_maxs"),
         )
         targets = [1] if options["num_classes"] == 2 else range(options["num_classes"])
         counts = {f"class_{c}": {} for c in targets}
@@ -5218,6 +5544,10 @@ def semantic_inference_on_geotiff(
     probability_threshold: Optional[float] = None,
     save_class_probabilities: bool = False,
     quiet: bool = False,
+    channel_means: Optional[Sequence[float]] = None,
+    channel_stds: Optional[Sequence[float]] = None,
+    channel_mins: Optional[Sequence[float]] = None,
+    channel_maxs: Optional[Sequence[float]] = None,
     **kwargs: Any,
 ) -> Tuple[str, float]:
     """
@@ -5248,6 +5578,14 @@ def semantic_inference_on_geotiff(
     """
     if device is None:
         device = get_device()
+
+    norm_config = _validate_channel_normalization(
+        num_channels=num_channels,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
+    )
 
     # Put model in evaluation mode
     model.to(device)
@@ -5310,20 +5648,9 @@ def semantic_inference_on_geotiff(
                 if window.shape[1] == 0 or window.shape[2] == 0:
                     continue
 
-                window, current_height, current_width = _pad_window(window, window_size)
-
-                # Normalize and prepare input
-                image = window.astype(np.float32) / 255.0
-
-                # Handle different number of bands
-                if image.shape[0] > num_channels:
-                    image = image[:num_channels]
-                elif image.shape[0] < num_channels:
-                    padded = np.zeros(
-                        (num_channels, window_size, window_size), dtype=np.float32
-                    )
-                    padded[: image.shape[0]] = image
-                    image = padded
+                # Normalize real pixels first so zero-padded edge pixels remain 0.0
+                image = _normalize_image_array(window, num_channels, norm_config)
+                image, current_height, current_width = _pad_window(image, window_size)
 
                 # Convert to tensor
                 image_tensor = torch.tensor(image, device=device)
@@ -5517,6 +5844,10 @@ def semantic_inference_on_image(
     probability_threshold: Optional[float] = None,
     save_class_probabilities: bool = False,
     quiet: bool = False,
+    channel_means: Optional[Sequence[float]] = None,
+    channel_stds: Optional[Sequence[float]] = None,
+    channel_mins: Optional[Sequence[float]] = None,
+    channel_maxs: Optional[Sequence[float]] = None,
     **kwargs: Any,
 ) -> Tuple[str, float]:
     """
@@ -5550,6 +5881,14 @@ def semantic_inference_on_image(
 
     if device is None:
         device = get_device()
+
+    norm_config = _validate_channel_normalization(
+        num_channels=num_channels,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
+    )
 
     # Put model in evaluation mode
     model.to(device)
@@ -5618,20 +5957,9 @@ def semantic_inference_on_image(
                 if window.shape[1] == 0 or window.shape[2] == 0:
                     continue
 
-                window, current_height, current_width = _pad_window(window, window_size)
-
-                # Normalize and prepare input
-                image = window.astype(np.float32) / 255.0
-
-                # Handle different number of channels
-                if image.shape[0] > num_channels:
-                    image = image[:num_channels]
-                elif image.shape[0] < num_channels:
-                    padded = np.zeros(
-                        (num_channels, image.shape[1], image.shape[2]), dtype=np.float32
-                    )
-                    padded[: image.shape[0]] = image
-                    image = padded
+                # Normalize real pixels first so zero-padded edge pixels remain 0.0
+                image = _normalize_image_array(window, num_channels, norm_config)
+                image, current_height, current_width = _pad_window(image, window_size)
 
                 # Convert to tensor
                 image_tensor = torch.tensor(image, device=device)
@@ -5948,6 +6276,10 @@ def semantic_segmentation(
     probability_threshold: Optional[float] = None,
     save_class_probabilities: bool = False,
     quiet: bool = False,
+    channel_means: Optional[Sequence[float]] = None,
+    channel_stds: Optional[Sequence[float]] = None,
+    channel_mins: Optional[Sequence[float]] = None,
+    channel_maxs: Optional[Sequence[float]] = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -5983,6 +6315,13 @@ def semantic_segmentation(
             "probability_class_0.tif", "probability_class_1.tif", etc. in the same directory
             as probability_path. Defaults to False.
         quiet (bool): If True, suppress progress bar. Defaults to False.
+        channel_means (Sequence[float], optional): Per-channel mean for z-score
+            normalization. If all four normalization arguments are None, automatically
+            loads ``normalization.json`` next to ``model_path`` when present, otherwise
+            falls back to legacy ``/ 255.0``.
+        channel_stds (Sequence[float], optional): Per-channel std for z-score normalization.
+        channel_mins (Sequence[float], optional): Per-channel lower bound for min-max scaling.
+        channel_maxs (Sequence[float], optional): Per-channel upper bound for min-max scaling.
         **kwargs: Additional arguments.
 
     Returns:
@@ -5990,6 +6329,23 @@ def semantic_segmentation(
     """
     if device is None:
         device = get_device()
+
+    norm_config = _resolve_inference_normalization(
+        model_path=model_path,
+        num_channels=num_channels,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
+    )
+    resolved_norm_kwargs: Dict[str, Any] = {}
+    if norm_config is not None:
+        if norm_config["mode"] == "zscore":
+            resolved_norm_kwargs["channel_means"] = norm_config["means"]
+            resolved_norm_kwargs["channel_stds"] = norm_config["stds"]
+        elif norm_config["mode"] == "minmax":
+            resolved_norm_kwargs["channel_mins"] = norm_config["mins"]
+            resolved_norm_kwargs["channel_maxs"] = norm_config["maxs"]
 
     # Detect file format based on extension
     input_ext = os.path.splitext(input_path)[1].lower()
@@ -6035,6 +6391,7 @@ def semantic_segmentation(
             probability_threshold=probability_threshold,
             save_class_probabilities=save_class_probabilities,
             quiet=quiet,
+            **resolved_norm_kwargs,
             **kwargs,
         )
     else:
@@ -6056,6 +6413,7 @@ def semantic_segmentation(
             probability_threshold=probability_threshold,
             save_class_probabilities=save_class_probabilities,
             quiet=quiet,
+            **resolved_norm_kwargs,
             **kwargs,
         )
 
@@ -6078,6 +6436,10 @@ def semantic_segmentation_batch(
     skip_existing: bool = False,
     model_kwargs: Optional[Dict[str, Any]] = None,
     raise_on_error: bool = False,
+    channel_means: Optional[Sequence[float]] = None,
+    channel_stds: Optional[Sequence[float]] = None,
+    channel_mins: Optional[Sequence[float]] = None,
+    channel_maxs: Optional[Sequence[float]] = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -6178,6 +6540,23 @@ def semantic_segmentation_batch(
         model_kwargs=model_kwargs,
     )
 
+    norm_config = _resolve_inference_normalization(
+        model_path=model_path,
+        num_channels=num_channels,
+        channel_means=channel_means,
+        channel_stds=channel_stds,
+        channel_mins=channel_mins,
+        channel_maxs=channel_maxs,
+    )
+    resolved_norm_kwargs: Dict[str, Any] = {}
+    if norm_config is not None:
+        if norm_config["mode"] == "zscore":
+            resolved_norm_kwargs["channel_means"] = norm_config["means"]
+            resolved_norm_kwargs["channel_stds"] = norm_config["stds"]
+        elif norm_config["mode"] == "minmax":
+            resolved_norm_kwargs["channel_mins"] = norm_config["mins"]
+            resolved_norm_kwargs["channel_maxs"] = norm_config["maxs"]
+
     # Generate output filenames if not provided
     if filenames is None:
         filenames = []
@@ -6228,6 +6607,7 @@ def semantic_segmentation_batch(
                     num_classes=num_classes,
                     device=device,
                     quiet=quiet,
+                    **resolved_norm_kwargs,
                     **kwargs,
                 )
             else:
@@ -6243,6 +6623,7 @@ def semantic_segmentation_batch(
                     device=device,
                     binary_output=num_classes == 2,
                     quiet=quiet,
+                    **resolved_norm_kwargs,
                     **kwargs,
                 )
         except Exception as e:
