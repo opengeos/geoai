@@ -399,7 +399,7 @@ jobs:
           claude_args: |
             --model claude-haiku-5-5
             --max-turns 120
-            --disallowedTools "Read(//proc/**),Read(//sys/**),Read(/${{ runner.temp }}/**),Read(~/.claude/**),Read(.git/config),Edit(/${{ runner.temp }}/**),Edit(.git/**),Edit(~/.claude/**),Edit(~/.gitconfig),Edit(~/.config/git/**)"
+            --disallowedTools "Read(//proc/**),Read(//sys/**),Read(/${{ runner.temp }}/**),Read(~/.claude/**),Read(.git/**),Read(~/.gitconfig),Read(~/.config/git/**),Grep(//proc/**),Grep(//sys/**),Grep(/${{ runner.temp }}/**),Grep(~/.claude/**),Grep(.git/**),Grep(~/.gitconfig),Grep(~/.config/git/**),Glob(//proc/**),Glob(//sys/**),Glob(/${{ runner.temp }}/**),Glob(~/.claude/**),Glob(.git/**),Glob(~/.gitconfig),Glob(~/.config/git/**),Edit(//proc/**),Edit(//sys/**),Edit(/${{ runner.temp }}/**),Edit(~/.claude/**),Edit(.git/**),Edit(~/.gitconfig),Edit(~/.config/git/**),Write(//proc/**),Write(//sys/**),Write(/${{ runner.temp }}/**),Write(~/.claude/**),Write(.git/**),Write(~/.gitconfig),Write(~/.config/git/**)"
             --allowedTools "Read,Grep,Glob,Edit,Write"
 
       - name: Commit the merge
@@ -503,7 +503,7 @@ jobs:
           claude_args: |
             --model claude-haiku-5-5
             --max-turns 120
-            --disallowedTools "Read(//proc/**),Read(//sys/**),Read(/${{ runner.temp }}/**),Read(~/.claude/**),Read(.git/config),Edit(/${{ runner.temp }}/**),Edit(.git/**),Edit(~/.claude/**),Edit(~/.gitconfig),Edit(~/.config/git/**)"
+            --disallowedTools "Read(//proc/**),Read(//sys/**),Read(/${{ runner.temp }}/**),Read(~/.claude/**),Read(.git/**),Read(~/.gitconfig),Read(~/.config/git/**),Grep(//proc/**),Grep(//sys/**),Grep(/${{ runner.temp }}/**),Grep(~/.claude/**),Grep(.git/**),Grep(~/.gitconfig),Grep(~/.config/git/**),Glob(//proc/**),Glob(//sys/**),Glob(/${{ runner.temp }}/**),Glob(~/.claude/**),Glob(.git/**),Glob(~/.gitconfig),Glob(~/.config/git/**),Edit(//proc/**),Edit(//sys/**),Edit(/${{ runner.temp }}/**),Edit(~/.claude/**),Edit(.git/**),Edit(~/.gitconfig),Edit(~/.config/git/**),Write(//proc/**),Write(//sys/**),Write(/${{ runner.temp }}/**),Write(~/.claude/**),Write(.git/**),Write(~/.gitconfig),Write(~/.config/git/**)"
             --allowedTools "Read,Grep,Glob,Edit,Write${{ github.event.pull_request.head.repo.full_name == github.repository && ',Bash(.venv/bin/black:*),Bash(.venv/bin/python -m pytest:*)' || '' }}"
 
       - name: Commit the fix

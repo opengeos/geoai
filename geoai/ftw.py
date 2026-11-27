@@ -130,22 +130,36 @@ def download_ftw(
             # Extract into a temp dir first to handle flat zip structure
             tmp_dir = os.path.join(output_dir, f"_tmp_{country}")
             os.makedirs(tmp_dir, exist_ok=True)
+            try:
+                logger.info("Extracting %s...", zip_path)
+                tmp_real = os.path.realpath(tmp_dir)
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    for member in zf.namelist():
+                        member_path = os.path.realpath(os.path.join(tmp_dir, member))
+                        if member_path == tmp_real and member.endswith("/"):
+                            continue
+                        if not member_path.startswith(tmp_real + os.sep):
+                            raise ValueError(
+                                f"Zip member {member!r} would extract outside "
+                                f"the target directory"
+                            )
+                    zf.extractall(tmp_dir)
 
-            logger.info("Extracting %s...", zip_path)
-            with zipfile.ZipFile(zip_path, "r") as zf:
-                zf.extractall(tmp_dir)
-
-            # Check if the zip contained a single top-level directory
-            top_items = os.listdir(tmp_dir)
-            if len(top_items) == 1 and os.path.isdir(
-                os.path.join(tmp_dir, top_items[0])
-            ):
-                # Single directory — move it
-                shutil.move(os.path.join(tmp_dir, top_items[0]), country_dir)
-                os.rmdir(tmp_dir)
-            else:
-                # Flat structure — rename the temp dir
-                shutil.move(tmp_dir, country_dir)
+                # Check if the zip contained a single top-level directory
+                top_items = os.listdir(tmp_dir)
+                if len(top_items) == 1 and os.path.isdir(
+                    os.path.join(tmp_dir, top_items[0])
+                ):
+                    # Single directory: move it
+                    shutil.move(os.path.join(tmp_dir, top_items[0]), country_dir)
+                    os.rmdir(tmp_dir)
+                else:
+                    # Flat structure: rename the temp dir
+                    shutil.move(tmp_dir, country_dir)
+            except BaseException:
+                if os.path.exists(tmp_dir):
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise
 
             logger.info("Extracted to %s", country_dir)
 

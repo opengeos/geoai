@@ -1,7 +1,12 @@
 """Tests for utility modules."""
 
+import asyncio
+import importlib
+import sys
+import types
 import pytest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from geoai_mcp_server.utils.error_handling import (
     GeoAIError,
@@ -18,6 +23,8 @@ from geoai_mcp_server.utils.validation import (
 )
 from geoai_mcp_server.utils.file_management import (
     generate_output_filename,
+    get_safe_output_path,
+    validate_output_path,
 )
 from geoai_mcp_server.config import GeoAIConfig
 
@@ -160,6 +167,205 @@ class TestFileManagement:
         # Both should be valid, may or may not be identical depending on timing
         assert result1.endswith(".tif")
         assert result2.endswith(".tif")
+
+    def test_validate_output_path_rejects_output_dir_itself(self, tmp_path):
+        """Output paths resolving to output_dir itself must be rejected."""
+        cfg = GeoAIConfig(input_dir=tmp_path / "in", output_dir=tmp_path / "out")
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+
+        with pytest.raises(FileAccessError):
+            validate_output_path(".", cfg)
+        with pytest.raises(FileAccessError):
+            validate_output_path("", cfg)
+        with pytest.raises(FileAccessError):
+            validate_output_path(cfg.output_dir, cfg)
+
+        valid = validate_output_path("result.tif", cfg)
+        assert valid == (cfg.output_dir / "result.tif").resolve()
+
+    def test_get_safe_output_path_rejects_dot(self, tmp_path):
+        """get_safe_output_path must reject '.' resolving to output_dir itself."""
+        cfg = GeoAIConfig(input_dir=tmp_path / "in", output_dir=tmp_path / "out")
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+
+        with patch(
+            "geoai_mcp_server.utils.file_management.get_config", return_value=cfg
+        ):
+            with pytest.raises(FileAccessError):
+                get_safe_output_path(".")
+
+            valid = get_safe_output_path("nested/result.tif")
+            assert valid == (cfg.output_dir / "nested" / "result.tif").resolve()
+
+    def test_validate_output_subdir_validation(self, tmp_path):
+        """validate_output_subdir rejects absolute paths, traversal, and root dir."""
+        from geoai_mcp_server.utils.file_management import validate_output_subdir
+
+        cfg = GeoAIConfig(input_dir=tmp_path / "in", output_dir=tmp_path / "out")
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+
+        with pytest.raises(InputValidationError):
+            validate_output_subdir("/tmp/outside", cfg)
+        with pytest.raises(InputValidationError):
+            validate_output_subdir("../outside", cfg)
+        with pytest.raises(InputValidationError):
+            validate_output_subdir("sub/../../outside", cfg)
+        with pytest.raises(InputValidationError):
+            validate_output_subdir("", cfg)
+        with pytest.raises(FileAccessError):
+            validate_output_subdir(".", cfg)
+
+        valid = validate_output_subdir("downloads/naip", cfg)
+        assert valid == (cfg.output_dir / "downloads" / "naip").resolve()
+
+
+def _load_server_module():
+    """Import geoai_mcp_server.server, stubbing FastMCP when mcp is not installed."""
+    try:
+        return importlib.import_module("geoai_mcp_server.server")
+    except ModuleNotFoundError as exc:
+        if exc.name not in ("mcp", "mcp.server", "mcp.server.fastmcp"):
+            raise
+
+    class _DummyFastMCP:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def tool(self, *args, **kwargs):
+            return lambda fn: fn
+
+        def resource(self, *args, **kwargs):
+            return lambda fn: fn
+
+        def prompt(self, *args, **kwargs):
+            return lambda fn: fn
+
+    mcp_mod = types.ModuleType("mcp")
+    mcp_server_mod = types.ModuleType("mcp.server")
+    mcp_fastmcp_mod = types.ModuleType("mcp.server.fastmcp")
+    mcp_fastmcp_mod.FastMCP = _DummyFastMCP
+    mcp_server_mod.fastmcp = mcp_fastmcp_mod
+    mcp_mod.server = mcp_server_mod
+
+    with patch.dict(
+        sys.modules,
+        {
+            "mcp": mcp_mod,
+            "mcp.server": mcp_server_mod,
+            "mcp.server.fastmcp": mcp_fastmcp_mod,
+        },
+    ):
+        sys.modules.pop("geoai_mcp_server.server", None)
+        return importlib.import_module("geoai_mcp_server.server")
+
+
+class TestServerPathValidation:
+    """Tests for output_subdir and model_path validation in server tools."""
+
+    def test_download_satellite_imagery_rejects_traversal_subdir(self, tmp_path):
+        """download_satellite_imagery blocks output_subdir outside output_dir."""
+        server = _load_server_module()
+
+        cfg = GeoAIConfig(input_dir=tmp_path / "in", output_dir=tmp_path / "out")
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+
+        with (
+            patch.object(server, "config", cfg),
+            patch.object(server, "_get_geoai_module") as mock_get,
+        ):
+            result = asyncio.run(
+                server.download_satellite_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.4,
+                    max_lat=37.8,
+                    data_source="naip",
+                    output_subdir="../escaped",
+                )
+            )
+
+        assert result["success"] is False
+        mock_get.assert_not_called()
+        assert not (tmp_path / "escaped").exists()
+
+    def test_prepare_training_data_rejects_absolute_subdir(self, tmp_path):
+        """prepare_training_data blocks absolute output_subdir paths."""
+        server = _load_server_module()
+
+        cfg = GeoAIConfig(input_dir=tmp_path / "in", output_dir=tmp_path / "out")
+        (cfg.input_dir / "images").mkdir(parents=True, exist_ok=True)
+        (cfg.input_dir / "labels").mkdir(parents=True, exist_ok=True)
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+        outside = tmp_path / "outside_dir"
+
+        with (
+            patch.object(server, "config", cfg),
+            patch.object(server, "_get_geoai_module") as mock_get,
+        ):
+            result = asyncio.run(
+                server.prepare_training_data(
+                    images_dir="images",
+                    labels_dir="labels",
+                    output_subdir=str(outside),
+                )
+            )
+
+        assert result["success"] is False
+        mock_get.assert_not_called()
+        assert not outside.exists()
+
+    def test_classify_land_cover_validates_model_path(self, tmp_path):
+        """classify_land_cover rejects URLs and outside paths for model_path."""
+        server = _load_server_module()
+
+        cfg = GeoAIConfig(input_dir=tmp_path / "in", output_dir=tmp_path / "out")
+        cfg.input_dir.mkdir(parents=True, exist_ok=True)
+        cfg.output_dir.mkdir(parents=True, exist_ok=True)
+        image_file = cfg.input_dir / "scene.tif"
+        image_file.write_bytes(b"img")
+        outside_model = tmp_path / "external.ckpt"
+        outside_model.write_bytes(b"model")
+        valid_model = cfg.input_dir / "local.ckpt"
+        valid_model.write_bytes(b"model")
+
+        with (
+            patch.object(server, "config", cfg),
+            patch.object(server, "_get_geoai_module") as mock_get,
+        ):
+            res_url = asyncio.run(
+                server.classify_land_cover(
+                    image_path="scene.tif",
+                    model_path="https://example.com/model.ckpt",
+                )
+            )
+            res_outside = asyncio.run(
+                server.classify_land_cover(
+                    image_path="scene.tif",
+                    model_path=str(outside_model),
+                )
+            )
+            assert res_url["success"] is False
+            assert res_outside["success"] is False
+            mock_get.assert_not_called()
+
+            mock_classify = MagicMock()
+            mock_classify.classify_image.return_value = MagicMock(
+                class_distribution={"forest": 0.7, "water": 0.3}
+            )
+            mock_get.return_value = mock_classify
+
+            res_ok = asyncio.run(
+                server.classify_land_cover(
+                    image_path="scene.tif",
+                    model_path="local.ckpt",
+                )
+            )
+
+        assert res_ok["success"] is True
+        mock_classify.classify_image.assert_called_once()
+        assert mock_classify.classify_image.call_args.kwargs["model_path"] == str(
+            valid_model.resolve()
+        )
 
 
 class TestConfig:

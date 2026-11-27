@@ -403,6 +403,31 @@ class TestVector:
                 os.path.join(tmp_dir, "out.tif"),
             )
 
+    def test_cli_vector_rasterize_command(self, sample_vector, sample_raster, tmp_dir):
+        """Click CLI vector rasterize maps --output/-o to output_path cleanly."""
+        from click.testing import CliRunner
+
+        from cli_anything.geoai.geoai_cli import cli
+
+        out_path = os.path.join(tmp_dir, "cli_rasterized.tif")
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "vector",
+                "rasterize",
+                sample_vector,
+                "--template",
+                sample_raster,
+                "--output",
+                out_path,
+                "--attribute",
+                "value",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert os.path.isfile(out_path)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # core/data.py tests

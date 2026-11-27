@@ -400,7 +400,9 @@ def vector_info(path):
     type=click.Path(exists=True),
     help="Template raster for extent/resolution.",
 )
-@click.option("--output", "-o", required=True, help="Output raster file path.")
+@click.option(
+    "--output", "-o", "output_path", required=True, help="Output raster file path."
+)
 @click.option("--attribute", "-a", default=None, help="Attribute column to burn.")
 @handle_error
 def vector_rasterize(path, template, output_path, attribute):
