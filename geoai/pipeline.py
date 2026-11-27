@@ -811,11 +811,17 @@ class Pipeline:
             }
             for key, value in vars(step).items():
                 if not key.startswith("_") and key != "name":
+                    hash_key = (
+                        "device_str"
+                        if isinstance(step, SemanticSegmentationStep)
+                        and key == "device"
+                        else key
+                    )
                     try:
                         json.dumps(value)
-                        sc[key] = value
+                        sc[hash_key] = value
                     except (TypeError, ValueError):
-                        sc[key] = repr(value)
+                        sc[hash_key] = repr(value)
             step_configs.append(sc)
         config_str = json.dumps(
             {"name": self.name, "steps": step_configs},
@@ -831,7 +837,7 @@ class Pipeline:
             not self.name
             or "/" in self.name
             or "\\" in self.name
-            or ".." in self.name
+            or self.name in (".", "..")
             or "\x00" in self.name
             or os.path.basename(self.name) != self.name
         ):

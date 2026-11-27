@@ -147,7 +147,17 @@ class SamGeo:
         elif isinstance(source, np.ndarray):
             image = source
             source = None
-            generator_input = Image.fromarray(image)
+            arr = image
+            if arr.ndim == 3 and arr.shape[2] == 1:
+                arr = arr[:, :, 0]
+            elif arr.ndim == 3 and arr.shape[2] > 3:
+                arr = arr[:, :, :3]
+            if arr.dtype != np.uint8:
+                arr_f = arr.astype(np.float32)
+                if arr_f.max() <= 1.0 and arr_f.min() >= 0.0:
+                    arr_f = arr_f * 255.0
+                arr = np.clip(arr_f, 0, 255).astype(np.uint8)
+            generator_input = Image.fromarray(arr)
         else:
             raise ValueError("Input source must be either a path or a numpy array.")
 
@@ -348,7 +358,8 @@ class SamGeo:
                     (
                         sorted_masks[0]["segmentation"].shape[0],
                         sorted_masks[0]["segmentation"].shape[1],
-                    )
+                    ),
+                    dtype=dtype,
                 )
                 # Assign a unique value to each object
                 count = len(sorted_masks)

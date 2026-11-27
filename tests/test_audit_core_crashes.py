@@ -245,16 +245,30 @@ class TestGeoAgentsTyping(unittest.TestCase):
                     setattr(stub, attr, _StubClass)
                 stub_modules[mod_name] = stub
 
-        sys.modules.pop("geoai.agents.geo_agents", None)
+        orig_mod = sys.modules.get("geoai.agents.geo_agents")
+        agents_pkg = sys.modules.get("geoai.agents")
+        had_pkg_attr = agents_pkg is not None and hasattr(agents_pkg, "geo_agents")
+        orig_pkg_attr = (
+            getattr(agents_pkg, "geo_agents", None) if had_pkg_attr else None
+        )
         try:
             with patch.dict(sys.modules, stub_modules):
+                sys.modules.pop("geoai.agents.geo_agents", None)
                 mod = importlib.import_module("geoai.agents.geo_agents")
                 hints = typing.get_type_hints(mod.CatalogAgent.search_datasets)
                 self.assertEqual(
                     hints["return"], typing.List[typing.Dict[str, typing.Any]]
                 )
         finally:
-            sys.modules.pop("geoai.agents.geo_agents", None)
+            if orig_mod is not None:
+                sys.modules["geoai.agents.geo_agents"] = orig_mod
+            else:
+                sys.modules.pop("geoai.agents.geo_agents", None)
+            if agents_pkg is not None:
+                if had_pkg_attr:
+                    setattr(agents_pkg, "geo_agents", orig_pkg_attr)
+                elif hasattr(agents_pkg, "geo_agents"):
+                    delattr(agents_pkg, "geo_agents")
 
 
 class TestVectorFixes(unittest.TestCase):

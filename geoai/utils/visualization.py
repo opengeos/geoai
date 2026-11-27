@@ -1157,7 +1157,7 @@ def create_overview_image(
         unique_vals = unique_vals[unique_vals > 0]
 
         # Use a colormap for class values
-        cmap = plt.cm.get_cmap("tab10", max(len(unique_vals), 1))
+        cmap = plt.get_cmap("tab10", max(len(unique_vals), 1))
         rgb = np.zeros((overview_height, overview_width, 3), dtype=np.float64)
 
         for i, val in enumerate(unique_vals):
