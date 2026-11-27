@@ -1,3 +1,5 @@
+import contextlib
+
 #!/usr/bin/env python
 """Regression tests for Issue #1013 Batch A (core ML modules)."""
 
@@ -1050,11 +1052,20 @@ class TestLandcoverTrainFixes(unittest.TestCase):
                     load_calls.append(kwargs)
                     return orig_load(*args, **kwargs)
 
-                # Simulate multi-GPU host while explicitly requesting CPU device
+                # Simulate multi-GPU host while explicitly requesting CPU device.
+                # Keep torch.accelerator.is_available() False so PyTorch's internal
+                # Adam.step() graph-capture health check does not call _cuda_init()
+                # on CPU-only CI runners.
+                extra_ctx = (
+                    patch("torch.accelerator.is_available", return_value=False)
+                    if hasattr(torch, "accelerator")
+                    else contextlib.nullcontext()
+                )
                 with (
                     patch("segmentation_models_pytorch.Unet", side_effect=TinySegNet),
                     patch("torch.cuda.is_available", return_value=True),
                     patch("torch.cuda.device_count", return_value=2),
+                    extra_ctx,
                     patch("geoai.landcover_train.torch.load", side_effect=spy_load),
                 ):
                     model = train_segmentation_landcover(
