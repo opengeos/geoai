@@ -251,8 +251,17 @@ class TimmClassifier(_LightningBase):
                 classifier = self.model.get_classifier()
                 if isinstance(classifier, str) and hasattr(self.model, classifier):
                     classifier = getattr(self.model, classifier)
+                modules = []
                 if isinstance(classifier, nn.Module):
-                    params = list(classifier.parameters())
+                    modules = [classifier]
+                elif isinstance(classifier, (tuple, list)):
+                    for item in classifier:
+                        if isinstance(item, str) and hasattr(self.model, item):
+                            item = getattr(self.model, item)
+                        if isinstance(item, nn.Module):
+                            modules.append(item)
+                for module in modules:
+                    params = list(module.parameters())
                     if params:
                         for param in params:
                             param.requires_grad = True

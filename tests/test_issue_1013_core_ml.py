@@ -109,6 +109,125 @@ class TestTimmRegressFixes(unittest.TestCase):
         m_perfect.update(torch.full((4,), 5.0), torch.full((4,), 5.0))
         self.assertAlmostEqual(m_perfect.compute().item(), 1.0, places=6)
 
+        # Tiny-scale targets (~1e-7) must not be misclassified as constant
+        m_tiny = _PooledRegressionMetric("r2")
+        t_tiny = torch.tensor([1e-7, 2e-7, 3e-7], dtype=torch.float32)
+        p_tiny = torch.tensor([1.1e-7, 2.0e-7, 2.9e-7], dtype=torch.float32)
+        m_tiny.update(p_tiny, t_tiny)
+        self.assertAlmostEqual(m_tiny.compute().item(), 0.99, places=4)
+
+        # Large-mean elevation targets (1000m +/- 1m) across multiple batches
+        # must avoid catastrophic cancellation in both float64 and float32 (MPS).
+        def _sim_mps_apply(t):
+            if t.dtype == torch.float64:
+                raise TypeError(
+                    "Cannot convert a MPS Tensor to float64 dtype as the MPS "
+                    "framework doesn't support float64."
+                )
+            return t
+
+        for use_mps_sim in (False, True):
+            m_elev = _PooledRegressionMetric("r2")
+            if use_mps_sim:
+                m_elev._apply(_sim_mps_apply)
+                self.assertEqual(m_elev.sum_sq_err.dtype, torch.float32)
+                self.assertEqual(m_elev.mean_y.dtype, torch.float32)
+                self.assertEqual(m_elev.m2_y.dtype, torch.float32)
+                # reset() must keep float32 defaults on MPS
+                m_elev.reset()
+                self.assertEqual(m_elev.sum_sq_err.dtype, torch.float32)
+            b1_t = torch.tensor([999.0, 1000.0, 1001.0], dtype=torch.float32)
+            b2_t = torch.tensor([999.0, 1000.0, 1001.0], dtype=torch.float32)
+            b1_p = b1_t + 0.5
+            b2_p = b2_t - 0.5
+            m_elev.update(b1_p, b1_t)
+            m_elev.update(b2_p, b2_t)
+            # ss_tot = 4.0, ss_res = 6 * 0.25 = 1.5 -> R2 = 1 - 1.5/4.0 = 0.625
+            self.assertAlmostEqual(m_elev.compute().item(), 0.625, places=4)
+
+        # Constant large-mean target in float32 (MPS) returns 1.0 / 0.0
+        m_const_mps = _PooledRegressionMetric("r2")
+        m_const_mps._apply(_sim_mps_apply)
+        m_const_mps.update(
+            torch.full((16,), 1000.3, dtype=torch.float32),
+            torch.full((16,), 1000.3, dtype=torch.float32),
+        )
+        self.assertAlmostEqual(m_const_mps.compute().item(), 1.0, places=5)
+        m_const_mps.reset()
+        m_const_mps.update(
+            torch.full((16,), 1001.3, dtype=torch.float32),
+            torch.full((16,), 1000.3, dtype=torch.float32),
+        )
+        self.assertAlmostEqual(m_const_mps.compute().item(), 0.0, places=5)
+
+    def test_create_regression_tiles_preserves_target_nodata_on_clip(self):
+        from geoai.timm_regress import create_regression_tiles
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            in_arr = np.full((3, 16, 16), 0.5, dtype=np.float32)
+            tgt_arr = np.ones((16, 16), dtype=np.float32)
+            # 12.5% NoData (-9999), 87.5% valid (1.0) -> passes min_valid_ratio=0.8
+            tgt_arr[:2, :] = -9999.0
+            in_tif = _write_geotiff(os.path.join(tmpdir, "in.tif"), in_arr)
+            tgt_tif = _write_geotiff(
+                os.path.join(tmpdir, "tgt.tif"), tgt_arr, nodata=-9999.0
+            )
+            imgs, tgts = create_regression_tiles(
+                in_tif,
+                tgt_tif,
+                os.path.join(tmpdir, "out"),
+                tile_size=16,
+                min_valid_ratio=0.8,
+                target_min=0.0,
+                target_max=2.0,
+            )
+            self.assertEqual(len(imgs), 1)
+            self.assertEqual(len(tgts), 1)
+            with rasterio.open(tgts[0]) as ds:
+                self.assertEqual(ds.nodata, -9999.0)
+                saved = ds.read(1)
+            np.testing.assert_array_equal(saved[:2, :], -9999.0)
+            np.testing.assert_array_equal(saved[2:, :], 1.0)
+
+    def test_dataset_and_predict_raster_share_finite_input_nodata_cleanup(self):
+        from geoai.timm_regress import PixelRegressionDataset, predict_raster
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            in_arr = np.full((3, 16, 16), 0.5, dtype=np.float32)
+            # Finite NoData sentinel 65535 must NOT force /10000 scaling on valid 0.5 pixels
+            in_arr[:, 0, 0] = 65535.0
+            tgt_arr = np.ones((16, 16), dtype=np.float32)
+            in_tif = _write_geotiff(
+                os.path.join(tmpdir, "in.tif"), in_arr, nodata=65535.0
+            )
+            tgt_tif = _write_geotiff(os.path.join(tmpdir, "tgt.tif"), tgt_arr)
+
+            ds = PixelRegressionDataset([in_tif], [tgt_tif], normalize_input=True)
+            train_img, _ = ds[0]
+
+            captured = []
+
+            class CaptureModel(nn.Module):
+                def forward(self, x):
+                    captured.append(x[0].detach().cpu().clone())
+                    return torch.zeros((x.shape[0], x.shape[2], x.shape[3]))
+
+            predict_raster(
+                CaptureModel(),
+                in_tif,
+                os.path.join(tmpdir, "pred.tif"),
+                tile_size=16,
+                overlap=0,
+                device="cpu",
+                use_model_preprocessing=False,
+            )
+            pred_img = captured[0]
+
+            # Both training and prediction see 0.5 on valid pixels and 0.0 on NoData pixels
+            self.assertAlmostEqual(float(train_img[0, 5, 5]), 0.5, places=5)
+            self.assertAlmostEqual(float(train_img[0, 0, 0]), 0.0, places=5)
+            torch.testing.assert_close(train_img, pred_img)
+
     def test_predict_raster_overlap_validation_dedup_streaming_nodata(self):
         from geoai.timm_regress import _create_weight_mask, predict_raster
 
@@ -470,6 +589,43 @@ class TestTimmTrainFixes(unittest.TestCase):
 
         for name, param in clf_fb.model.named_parameters():
             if name.startswith("head."):
+                self.assertTrue(param.requires_grad, f"{name} should be trainable")
+            else:
+                self.assertFalse(param.requires_grad, f"{name} should be frozen")
+
+    def test_freeze_backbone_unfreezes_tuple_classifier_heads(self):
+        from geoai.timm_train import TimmClassifier
+
+        class FakeDistilledDeiT(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.blocks = nn.ModuleList(
+                    [
+                        nn.ModuleDict(
+                            {
+                                "mlp": nn.ModuleDict(
+                                    {
+                                        "fc1": nn.Linear(8, 16),
+                                        "fc2": nn.Linear(16, 8),
+                                    }
+                                )
+                            }
+                        )
+                    ]
+                )
+                self.head = nn.Linear(8, 3)
+                self.head_dist = nn.Linear(8, 3)
+
+            def get_classifier(self):
+                return (self.head, self.head_dist)
+
+        clf = TimmClassifier.__new__(TimmClassifier)
+        nn.Module.__init__(clf)
+        clf.model = FakeDistilledDeiT()
+        clf._freeze_backbone()
+
+        for name, param in clf.model.named_parameters():
+            if name.startswith(("head.", "head_dist.")):
                 self.assertTrue(param.requires_grad, f"{name} should be trainable")
             else:
                 self.assertFalse(param.requires_grad, f"{name} should be frozen")
@@ -843,8 +999,23 @@ class TestTrainFixes(unittest.TestCase):
             norm, np.array([[0, 0, 0], [1, -100, 0]], dtype=np.int64)
         )
 
-    def test_safe_torch_load_prefers_weights_only(self):
+    def test_safe_torch_load_prefers_weights_only_and_requires_opt_in(self):
+        import pickle
+        import geoai._torch_io as torch_io
+        import geoai.landcover_train as lc_mod
+        import geoai.timm_segment as seg_mod
         import geoai.train as train_mod
+
+        # All modules share the single consolidated helper
+        self.assertIs(train_mod._safe_torch_load, torch_io._safe_torch_load)
+        self.assertIs(lc_mod._safe_torch_load, torch_io._safe_torch_load)
+        self.assertIs(seg_mod._safe_torch_load, torch_io._safe_torch_load)
+        self.assertIs(
+            train_mod._clear_incompatible_nodata, torch_io._clear_incompatible_nodata
+        )
+        self.assertIs(
+            seg_mod._clear_incompatible_nodata, torch_io._clear_incompatible_nodata
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "w.pth")
@@ -856,11 +1027,61 @@ class TestTrainFixes(unittest.TestCase):
                 calls.append(kwargs)
                 return orig_load(*args, **kwargs)
 
-            with patch("geoai.train.torch.load", side_effect=spy_load):
+            with patch("geoai._torch_io.torch.load", side_effect=spy_load):
                 loaded = train_mod._safe_torch_load(path, map_location="cpu")
 
             self.assertTrue(calls[0].get("weights_only"))
             self.assertEqual(loaded["a"].item(), 1.0)
+
+            # Restricted load failure must NOT silently retry weights_only=False
+            unsafe_calls = []
+
+            def failing_weights_only(*args, **kwargs):
+                unsafe_calls.append(kwargs)
+                if kwargs.get("weights_only"):
+                    raise pickle.UnpicklingError("Weights only load failed")
+                return {"legacy": True}
+
+            with (
+                patch.dict(os.environ, {}, clear=False),
+                patch("geoai._torch_io.torch.load", side_effect=failing_weights_only),
+            ):
+                os.environ.pop("GEOAI_ALLOW_UNSAFE_TORCH_LOAD", None)
+                with self.assertRaises(pickle.UnpicklingError) as ctx:
+                    torch_io._safe_torch_load(path, map_location="cpu")
+                self.assertIn("allow_unsafe=True", str(ctx.exception))
+                self.assertIn("GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1", str(ctx.exception))
+                # Only the safe attempt ran
+                self.assertEqual(len(unsafe_calls), 1)
+                self.assertTrue(unsafe_calls[0].get("weights_only"))
+
+                # Explicit allow_unsafe=True permits fallback
+                res = torch_io._safe_torch_load(
+                    path, map_location="cpu", allow_unsafe=True
+                )
+                self.assertEqual(res, {"legacy": True})
+
+            # Environment variable opt-in permits fallback
+            with (
+                patch.dict(os.environ, {"GEOAI_ALLOW_UNSAFE_TORCH_LOAD": "1"}),
+                patch("geoai._torch_io.torch.load", side_effect=failing_weights_only),
+            ):
+                res = torch_io._safe_torch_load(path, map_location="cpu")
+                self.assertEqual(res, {"legacy": True})
+
+            # Unrelated RuntimeError (e.g. corrupt file) must never trigger unsafe retry
+            corrupt_calls = []
+
+            def corrupt_load(*args, **kwargs):
+                corrupt_calls.append(kwargs)
+                raise RuntimeError("PytorchStreamReader failed reading zip archive")
+
+            with patch("geoai._torch_io.torch.load", side_effect=corrupt_load):
+                with self.assertRaises(RuntimeError):
+                    torch_io._safe_torch_load(
+                        path, map_location="cpu", allow_unsafe=True
+                    )
+                self.assertEqual(len(corrupt_calls), 1)
 
 
 class TestSegmentationFixes(unittest.TestCase):
@@ -1009,6 +1230,95 @@ class TestLandcoverTrainFixes(unittest.TestCase):
             self.assertAlmostEqual(res["per_class_iou"][2], ref_ious[2], places=5)
             self.assertAlmostEqual(res["per_class_recall"][1], ref_rec[1], places=5)
             self.assertAlmostEqual(res["per_class_precision"][2], ref_prec[2], places=5)
+
+    def test_evaluate_sparse_iou_rgb_png_labels_ignore_index_and_shape_mismatch(self):
+        from geoai.landcover_train import evaluate_sparse_iou, landcover_iou
+
+        class FixedThreeClassModel(nn.Module):
+            def __init__(self, out_h=None):
+                super().__init__()
+                self.out_h = out_h
+
+            def forward(self, x):
+                n, _, h, w = x.shape
+                oh = self.out_h if self.out_h is not None else h
+                out = torch.zeros((n, 4, oh, w), dtype=torch.float32, device=x.device)
+                out[:, 1, : min(2, oh), :] = 10.0
+                if oh > 2:
+                    out[:, 2, 2:, :] = 10.0
+                return out
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            img_dir = os.path.join(tmpdir, "images")
+            lbl_dir = os.path.join(tmpdir, "labels")
+            os.makedirs(img_dir)
+            os.makedirs(lbl_dir)
+
+            # 3-band RGB PNG labels (class IDs in band 0); class 3 has zero union
+            lbl_2d = np.array(
+                [
+                    [0, 1, 1, 2],
+                    [1, 1, 2, 0],
+                    [2, 2, 1, 0],
+                    [0, 2, 2, 1],
+                ],
+                dtype=np.uint8,
+            )
+            rgb_lbl = np.stack([lbl_2d, lbl_2d, lbl_2d], axis=-1)
+            rgb_img = np.full((4, 4, 3), 128, dtype=np.uint8)
+            Image.fromarray(rgb_img).save(os.path.join(img_dir, "tile_0.png"))
+            Image.fromarray(rgb_lbl).save(os.path.join(lbl_dir, "tile_0.png"))
+
+            # Parity check with both ignore_index=False and ignore_index=2
+            for ign in (False, 2):
+                res = evaluate_sparse_iou(
+                    model=FixedThreeClassModel(),
+                    images_dir=img_dir,
+                    labels_dir=lbl_dir,
+                    num_classes=4,
+                    num_channels=3,
+                    batch_size=2,
+                    background_class=0,
+                    ignore_index=ign,
+                    device=torch.device("cpu"),
+                    verbose=False,
+                )
+                ref_targets = torch.from_numpy(lbl_2d.astype(np.int64)).unsqueeze(0)
+                ref_preds = torch.zeros_like(ref_targets)
+                ref_preds[:, :2, :] = 1
+                ref_preds[:, 2:, :] = 2
+                ref_mean, ref_ious, ref_rec, ref_prec = landcover_iou(
+                    ref_preds,
+                    ref_targets,
+                    num_classes=4,
+                    ignore_index=ign,
+                    mode="sparse_labels",
+                    background_class=0,
+                )
+                self.assertAlmostEqual(res["mean_sparse_iou"], ref_mean, places=6)
+                for cls, val in res["per_class_iou"].items():
+                    self.assertAlmostEqual(val, ref_ious[cls], places=6)
+                    self.assertAlmostEqual(
+                        res["per_class_recall"][cls], ref_rec[cls], places=6
+                    )
+                    self.assertAlmostEqual(
+                        res["per_class_precision"][cls], ref_prec[cls], places=6
+                    )
+
+            # Shape mismatch (1, 1, 4) vs (1, 4, 4) must raise ValueError, not broadcast
+            with self.assertRaises(ValueError):
+                evaluate_sparse_iou(
+                    model=FixedThreeClassModel(out_h=1),
+                    images_dir=img_dir,
+                    labels_dir=lbl_dir,
+                    num_classes=4,
+                    num_channels=3,
+                    batch_size=1,
+                    background_class=0,
+                    ignore_index=False,
+                    device=torch.device("cpu"),
+                    verbose=False,
+                )
 
     def test_train_segmentation_landcover_multispectral_resize_cpu_gating_and_safe_load(
         self,

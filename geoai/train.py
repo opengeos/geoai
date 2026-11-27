@@ -264,45 +264,7 @@ def parse_yolo_annotations(
     return sorted(image_files), sorted(label_files)
 
 
-def _safe_torch_load(path: str, map_location: Any = None) -> Any:
-    """Load a PyTorch checkpoint preferring weights_only=True."""
-    try:
-        return torch.load(path, map_location=map_location, weights_only=True)
-    except TypeError:
-        return torch.load(path, map_location=map_location)
-    except Exception as exc:
-        import pickle
-
-        if isinstance(exc, (pickle.UnpicklingError, RuntimeError)):
-            logger.warning(
-                "Falling back to weights_only=False for legacy checkpoint %s: %s",
-                path,
-                exc,
-            )
-            return torch.load(path, map_location=map_location, weights_only=False)
-        raise
-
-
-def _clear_incompatible_nodata(meta: Dict[str, Any], dtype: str) -> None:
-    """Clear inherited nodata if it cannot be represented in the target dtype."""
-    nodata = meta.get("nodata")
-    if nodata is None:
-        return
-    np_dtype = np.dtype(dtype)
-    if np.issubdtype(np_dtype, np.integer):
-        info = np.iinfo(np_dtype)
-        try:
-            if (
-                (
-                    isinstance(nodata, float)
-                    and (not np.isfinite(nodata) or not nodata.is_integer())
-                )
-                or nodata < info.min
-                or nodata > info.max
-            ):
-                meta["nodata"] = None
-        except TypeError:
-            meta["nodata"] = None
+from geoai._torch_io import _clear_incompatible_nodata, _safe_torch_load
 
 
 def _compute_window_weight(
@@ -2642,7 +2604,10 @@ def multiclass_detection_inference_on_geotiff(
 
     Returns:
         Tuple of (output_path, inference_time, detections_list) where each
-        detection is a dict with keys: mask, score, box, label.
+        detection is a dict with keys: ``mask`` (np.ndarray, window-sized
+        compact boolean mask), ``mask_offset`` (tuple of ``(y, x, h, w)``
+        window origin and size), ``score`` (float), ``box`` (list in global
+        pixel coords), ``label`` (int), and ``instance_id`` (int).
     """
     if device is None:
         device = get_device()
@@ -7106,10 +7071,12 @@ def lightly_train_model(
             - "dino": Works with both CNNs and ViTs
             - "dinov2": Requires ViT models only
             - "dinov2_distillation": Requires ViT models only (recommended for ViTs)
-            Default is "simclr".
+            Default is "simclr" (compatible with the default ResNet-50 model).
         epochs (int): Number of training epochs. Default is 100.
         batch_size (int): Batch size for training. Default is 64.
-        learning_rate (float): Learning rate for training. Default is 1e-4.
+        learning_rate (float): Learning rate for training, forwarded via
+            ``optim_args["lr"]`` unless already set in ``optim_args``.
+            Default is 1e-4.
         **kwargs: Additional arguments passed to lightly_train.train().
 
     Returns:

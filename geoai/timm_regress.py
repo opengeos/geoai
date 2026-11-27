@@ -127,12 +127,40 @@ def _infer_preprocessing_params(
         return None
 
 
+def _clean_input_nodata(
+    raw_tile: np.ndarray, nodata: Any = None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Replace NaN and finite raster NoData sentinel values with 0.0.
+
+    Shared by ``PixelRegressionDataset`` and ``predict_raster`` so training and
+    inference select the same normalization scale when input tiles contain
+    finite NoData sentinels.
+
+    Args:
+        raw_tile: Input raster array of shape ``(C, H, W)``.
+        nodata: Raster NoData value (or None / NaN).
+
+    Returns:
+        Tuple of ``(cleaned_float32_tile, nodata_mask_hw)``.
+    """
+    nodata_mask = np.any(np.isnan(raw_tile), axis=0)
+    if nodata is not None and not (isinstance(nodata, float) and np.isnan(nodata)):
+        nodata_mask |= np.any(raw_tile == nodata, axis=0)
+    tile = raw_tile.astype(np.float32, copy=True)
+    if np.any(nodata_mask):
+        tile[:, nodata_mask] = 0.0
+    tile = np.nan_to_num(tile, nan=0.0)
+    return tile, nodata_mask
+
+
 class _PooledRegressionMetric(_MetricBase):
     """Pooled pixel-level regression metric (RMSE, MAE, or R2) over an epoch.
 
-    Accumulates exact sufficient statistics across batches (and across
-    processes when training is distributed) so epoch metrics do not depend
-    on batch splitting and remain finite for constant-target batches.
+    Accumulates centered second moments via Chan's parallel Welford algorithm
+    across batches (and across processes when training is distributed) so epoch
+    metrics do not depend on batch splitting, avoid catastrophic cancellation
+    on large-mean targets, remain finite for constant-target batches, and
+    support devices without float64 support (such as MPS).
     """
 
     full_state_update = False
@@ -154,54 +182,120 @@ class _PooledRegressionMetric(_MetricBase):
                 dist_reduce_fx="sum",
             )
             self.add_state(
-                "sum_y",
+                "mean_y",
                 default=torch.tensor(0.0, dtype=torch.float64),
-                dist_reduce_fx="sum",
+                dist_reduce_fx="cat",
             )
             self.add_state(
-                "sum_y2",
+                "m2_y",
                 default=torch.tensor(0.0, dtype=torch.float64),
-                dist_reduce_fx="sum",
+                dist_reduce_fx="cat",
             )
             self.add_state(
                 "count",
                 default=torch.tensor(0, dtype=torch.long),
-                dist_reduce_fx="sum",
+                dist_reduce_fx="cat",
             )
         else:
             self.register_buffer("sum_sq_err", torch.tensor(0.0, dtype=torch.float64))
             self.register_buffer("sum_abs_err", torch.tensor(0.0, dtype=torch.float64))
-            self.register_buffer("sum_y", torch.tensor(0.0, dtype=torch.float64))
-            self.register_buffer("sum_y2", torch.tensor(0.0, dtype=torch.float64))
+            self.register_buffer("mean_y", torch.tensor(0.0, dtype=torch.float64))
+            self.register_buffer("m2_y", torch.tensor(0.0, dtype=torch.float64))
             self.register_buffer("count", torch.tensor(0, dtype=torch.long))
 
+    def _downcast_float64_states(self) -> None:
+        """Downcast float64 metric states and defaults to float32 (for MPS)."""
+        defaults = getattr(self, "_defaults", None)
+        if isinstance(defaults, dict):
+            for key, val in list(defaults.items()):
+                if isinstance(val, torch.Tensor) and val.dtype == torch.float64:
+                    defaults[key] = val.to(torch.float32)
+                cur = getattr(self, key, None)
+                if isinstance(cur, torch.Tensor) and cur.dtype == torch.float64:
+                    setattr(self, key, cur.to(torch.float32))
+        for key, buf in list(self._buffers.items()):
+            if isinstance(buf, torch.Tensor) and buf.dtype == torch.float64:
+                self._buffers[key] = buf.to(torch.float32)
+
+    def _apply(self, fn: Callable, *args: Any, **kwargs: Any):
+        has_float64 = any(
+            isinstance(getattr(self, name, None), torch.Tensor)
+            and getattr(self, name).dtype == torch.float64
+            for name in ("sum_sq_err", "sum_abs_err", "mean_y", "m2_y")
+        )
+        if has_float64:
+            try:
+                fn(torch.empty(0, dtype=torch.float64, device=self.sum_sq_err.device))
+            except TypeError:
+                self._downcast_float64_states()
+        return super()._apply(fn, *args, **kwargs)
+
     def update(self, preds: torch.Tensor, targets: torch.Tensor) -> None:
-        """Accumulate error and target moments for one batch."""
+        """Accumulate error and centered target moments for one batch."""
         dtype = self.sum_sq_err.dtype
         preds_flat = preds.detach().reshape(-1).to(dtype)
         targets_flat = targets.detach().reshape(-1).to(dtype)
+        batch_n = targets_flat.numel()
+        if batch_n == 0:
+            return
         diff = preds_flat - targets_flat
         self.sum_sq_err += torch.sum(diff * diff)
         self.sum_abs_err += torch.sum(torch.abs(diff))
-        self.sum_y += torch.sum(targets_flat)
-        self.sum_y2 += torch.sum(targets_flat * targets_flat)
-        self.count += targets_flat.numel()
+
+        batch_mean = torch.mean(targets_flat)
+        centered = targets_flat - batch_mean
+        batch_m2 = torch.sum(centered * centered)
+
+        if self.count == 0:
+            self.mean_y.copy_(batch_mean)
+            self.m2_y.copy_(batch_m2)
+        else:
+            prev_n = self.count.to(dtype)
+            new_n = prev_n + batch_n
+            delta = batch_mean - self.mean_y
+            self.mean_y += delta * (batch_n / new_n)
+            self.m2_y += batch_m2 + (delta * delta) * (prev_n * batch_n / new_n)
+        self.count += batch_n
 
     def compute(self) -> torch.Tensor:
         """Compute pooled RMSE, MAE, or R2 over all seen pixels."""
-        if self.count == 0:
+        dtype = self.sum_sq_err.dtype
+        if self.count.ndim == 0:
+            total_n = self.count.to(dtype)
+            mean_y = self.mean_y
+            ss_tot = self.m2_y
+        else:
+            total_n = torch.tensor(0.0, dtype=dtype, device=self.count.device)
+            mean_y = torch.tensor(0.0, dtype=dtype, device=self.count.device)
+            ss_tot = torch.tensor(0.0, dtype=dtype, device=self.count.device)
+            for n_i, m_i, m2_i in zip(self.count, self.mean_y, self.m2_y):
+                n_f = n_i.to(dtype)
+                if n_f == 0:
+                    continue
+                if total_n == 0:
+                    total_n = n_f
+                    mean_y = m_i
+                    ss_tot = m2_i
+                else:
+                    new_n = total_n + n_f
+                    delta = m_i - mean_y
+                    mean_y = mean_y + delta * (n_f / new_n)
+                    ss_tot = ss_tot + m2_i + (delta * delta) * (total_n * n_f / new_n)
+                    total_n = new_n
+
+        if total_n == 0:
             return torch.tensor(0.0, dtype=torch.float32, device=self.count.device)
 
-        n = self.count.to(self.sum_sq_err.dtype)
         if self.metric == "rmse":
-            return torch.sqrt(self.sum_sq_err / n).to(torch.float32)
+            return torch.sqrt(self.sum_sq_err / total_n).to(torch.float32)
         if self.metric == "mae":
-            return (self.sum_abs_err / n).to(torch.float32)
+            return (self.sum_abs_err / total_n).to(torch.float32)
 
         ss_res = self.sum_sq_err
-        ss_tot = self.sum_y2 - (self.sum_y * self.sum_y) / n
-        if ss_tot <= 1e-12:
-            val = 1.0 if ss_res <= 1e-12 else 0.0
+        eps = torch.finfo(dtype).eps
+        tol = (100.0 * eps * eps) * (total_n * mean_y * mean_y)
+        if ss_tot <= tol:
+            val = 1.0 if ss_res <= tol else 0.0
             return torch.tensor(val, dtype=torch.float32, device=self.count.device)
         return (1.0 - ss_res / ss_tot).to(torch.float32)
 
@@ -337,10 +431,18 @@ class PixelRegressionModel(_LightningBase):
         mae = torch.mean(torch.abs(preds_flat - targets_flat))
 
         # R2 (coefficient of determination)
-        ss_res = torch.sum((targets_flat - preds_flat) ** 2)
-        ss_tot = torch.sum((targets_flat - targets_flat.mean()) ** 2)
-        if ss_tot <= 1e-12:
-            r2_val = 1.0 if ss_res <= 1e-12 else 0.0
+        f_dtype = (
+            targets_flat.dtype if targets_flat.is_floating_point() else torch.float32
+        )
+        targets_f = targets_flat.to(f_dtype)
+        preds_f = preds_flat.to(f_dtype)
+        mean_y = targets_f.mean()
+        ss_res = torch.sum((targets_f - preds_f) ** 2)
+        ss_tot = torch.sum((targets_f - mean_y) ** 2)
+        eps = torch.finfo(f_dtype).eps
+        tol = (100.0 * eps * eps) * (targets_f.numel() * mean_y * mean_y)
+        if ss_tot <= tol:
+            r2_val = 1.0 if ss_res <= tol else 0.0
             r2 = torch.tensor(r2_val, dtype=preds_flat.dtype, device=preds_flat.device)
         else:
             r2 = 1.0 - ss_res / ss_tot
@@ -478,6 +580,7 @@ class PixelRegressionDataset(Dataset):
                 image = src.read(self.input_bands)
             else:
                 image = src.read()
+            src_nodata = src.nodata
 
         # Load target
         with rasterio.open(self.target_paths[idx]) as src:
@@ -496,12 +599,11 @@ class PixelRegressionDataset(Dataset):
         if tgt_nodata is not None:
             target = np.where(target == tgt_nodata, np.nan, target)
 
-        # Handle NaN
-        image = np.nan_to_num(image, nan=0.0)
+        # Clean input NaN/NoData consistently with predict_raster before normalization
+        image, _ = _clean_input_nodata(image, src_nodata)
         target = np.nan_to_num(target, nan=0.0)
 
         # Normalize input
-        image = image.astype(np.float32)
         if self.normalize_input:
             data_max = np.abs(image).max()
             if data_max <= 1.5:
@@ -616,13 +718,12 @@ def create_regression_tiles(
                     target_tile = src_target.read(target_band, window=window)
 
                     # Check for valid pixels (NaN and raster nodata values)
-                    valid_mask = ~np.isnan(input_tile).any(axis=0) & ~np.isnan(
-                        target_tile
-                    )
+                    target_nodata_mask = np.isnan(target_tile)
+                    if check_target_nodata:
+                        target_nodata_mask |= target_tile == target_nodata
+                    valid_mask = ~np.isnan(input_tile).any(axis=0) & ~target_nodata_mask
                     if check_input_nodata:
                         valid_mask &= ~(input_tile == input_nodata).any(axis=0)
-                    if check_target_nodata:
-                        valid_mask &= target_tile != target_nodata
                     valid_ratio = valid_mask.sum() / (tile_size * tile_size)
 
                     if valid_ratio < min_valid_ratio:
@@ -651,17 +752,27 @@ def create_regression_tiles(
                             skipped_range += 1
                             continue
 
-                    # Replace NaN with 0
+                    # Replace NaN with 0 in input; preserve finite target NoData
                     input_tile = np.nan_to_num(input_tile, nan=0.0)
-                    target_tile = np.nan_to_num(target_tile, nan=0.0)
-
-                    # Clip target values to valid range (important!)
-                    if target_min is not None or target_max is not None:
-                        target_tile = np.clip(
-                            target_tile,
-                            target_min if target_min is not None else -np.inf,
-                            target_max if target_max is not None else np.inf,
-                        )
+                    if check_target_nodata:
+                        target_clipped = np.nan_to_num(target_tile, nan=0.0)
+                        if target_min is not None or target_max is not None:
+                            target_clipped = np.clip(
+                                target_clipped,
+                                target_min if target_min is not None else -np.inf,
+                                target_max if target_max is not None else np.inf,
+                            )
+                        target_tile = np.where(
+                            target_nodata_mask, target_nodata, target_clipped
+                        ).astype(target_tile.dtype, copy=False)
+                    else:
+                        target_tile = np.nan_to_num(target_tile, nan=0.0)
+                        if target_min is not None or target_max is not None:
+                            target_tile = np.clip(
+                                target_tile,
+                                target_min if target_min is not None else -np.inf,
+                                target_max if target_max is not None else np.inf,
+                            )
 
                     # Save tiles
                     image_path = os.path.join(image_dir, f"tile_{tile_idx:06d}.tif")
@@ -1000,9 +1111,6 @@ def predict_raster(
         # the entire input raster into memory at once.
         nodata_mask = np.zeros((height, width), dtype=bool)
         src_nodata = src.nodata
-        check_src_nodata = src_nodata is not None and not (
-            isinstance(src_nodata, float) and np.isnan(src_nodata)
-        )
 
         if use_model_preprocessing and image_mean is None and image_std is None:
             encoder_name = getattr(
@@ -1068,14 +1176,8 @@ def predict_raster(
                     col_start, row_start, col_end - col_start, row_end - row_start
                 )
                 raw_tile = src.read(input_bands, window=window)
-                tile_nodata = np.any(np.isnan(raw_tile), axis=0)
-                if check_src_nodata:
-                    tile_nodata |= np.any(raw_tile == src_nodata, axis=0)
+                tile, tile_nodata = _clean_input_nodata(raw_tile, src_nodata)
                 nodata_mask[row_start:row_end, col_start:col_end] |= tile_nodata
-
-                tile = raw_tile.astype(np.float32)
-                if np.any(tile_nodata):
-                    tile[:, tile_nodata] = 0.0
 
                 # Handle non-square tiles at edges
                 if tile.shape[1] != tile_size or tile.shape[2] != tile_size:
