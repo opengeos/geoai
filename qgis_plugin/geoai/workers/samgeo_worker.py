@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import redirect_stdout
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -140,6 +141,7 @@ def _supported_methods_for(sam) -> set[str]:
         "predict",
         "generate_masks_by_boxes",
         "generate_masks_by_points_patch",
+        "generate_masks_tiled",
         "save_masks",
         "set_image",
     ):
@@ -339,14 +341,160 @@ def _handle_generate_masks_by_points_patch(req: dict) -> Any:
     return {"mask_count": _mask_count()}
 
 
+def _mask_scores_of(sam) -> Any:
+    """Read the per-mask confidence scores left by ``save_masks``.
+
+    samgeo 1.4.2+ sets ``SamGeo3.mask_scores`` to a mapping of each unique
+    raster value to SAM's predicted confidence for that mask (None when the
+    masks were saved with ``unique=False``). Older samgeo has no such
+    attribute.
+
+    Args:
+        sam: The SamGeo model object.
+
+    Returns:
+        A JSON-safe ``{str(mask id): float score}`` dict, or None when no
+        scores are available.
+    """
+    scores = getattr(sam, "mask_scores", None)
+    if not scores:
+        return None
+    try:
+        items = list(scores.items())
+    except AttributeError:
+        return None
+    result = {}
+    for key, value in items:
+        try:
+            score = float(value)
+            mask_id = str(int(float(key)))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not math.isfinite(score):
+            continue  # NaN/inf would make the JSON response invalid
+        result[mask_id] = score
+    return result or None
+
+
 def _handle_save_masks(req: dict) -> Any:
+    """Save the current masks to a raster and report their confidence scores.
+
+    Args:
+        req: Request with ``output`` (raster path) and ``unique``.
+
+    Returns:
+        A dict with ``mask_count`` and ``mask_scores`` (mask id -> SAM
+        confidence, or None when unavailable or ``unique`` is False).
+    """
     sam = _get_sam()
+    unique = bool(req.get("unique", False))
     _run_quiet_stdout(
         sam.save_masks,
         output=req["output"],
-        unique=bool(req.get("unique", False)),
+        unique=unique,
     )
-    return {"mask_count": _mask_count()}
+    return {
+        "mask_count": _mask_count(),
+        "mask_scores": _mask_scores_of(sam) if unique else None,
+    }
+
+
+def _iter_raster_blocks(path: str):
+    """Yield band 1 of a raster one internal block at a time.
+
+    Args:
+        path: Raster path.
+
+    Yields:
+        Arrays holding one block window each.
+    """
+    import rasterio
+
+    with rasterio.open(path) as src:
+        for _, window in src.block_windows(1):
+            yield src.read(1, window=window)
+
+
+def _unique_values(block: Any) -> set:
+    """Return the distinct values of one raster block.
+
+    Args:
+        block: A numpy array, or nested lists in tests.
+
+    Returns:
+        The set of values in the block.
+    """
+    if hasattr(block, "ravel"):
+        import numpy as np
+
+        return set(np.unique(block).tolist())
+    return {value for row in block for value in row}
+
+
+def _count_raster_labels(path: str, unique: bool) -> Any:
+    """Count the objects in a labelled mask raster without loading it whole.
+
+    Reads the raster block by block and collects the labels in a set, so
+    memory grows with the number of objects rather than the raster size.
+
+    Args:
+        path: Path to the mask raster written by ``generate_masks_tiled``.
+        unique: Whether each object has its own label.
+
+    Returns:
+        The number of distinct non-zero labels when ``unique`` is True, None
+        for binary masks (objects cannot be told apart) or if the raster
+        cannot be read.
+    """
+    if not unique:
+        return None
+    try:
+        labels = set()
+        for block in _iter_raster_blocks(path):
+            labels.update(_unique_values(block))
+        labels.discard(0)
+        return len(labels)
+    except Exception:
+        return None
+
+
+def _handle_generate_masks_tiled(req: dict) -> Any:
+    """Run text-prompted segmentation tile by tile on a large GeoTIFF.
+
+    ``SamGeo3.generate_masks_tiled`` writes the merged mask raster to
+    ``output`` itself and clears ``masks``/``scores`` after each tile, so the
+    result is only available as that raster (no per-mask scores).
+
+    Args:
+        req: Request with ``source``, ``prompt``, ``output``, ``tile_size``,
+            ``overlap``, ``min_size``, ``max_size``, ``unique`` and ``bands``.
+
+    Returns:
+        A dict with ``output`` (the written raster), ``object_count`` and
+        ``mask_count`` (always 0: no in-memory masks remain).
+    """
+    sam = _get_sam()
+    if not hasattr(sam, "generate_masks_tiled"):
+        raise AttributeError("generate_masks_tiled is not supported")
+    unique = bool(req.get("unique", True))
+    kwargs = {
+        "source": req["source"],
+        "prompt": req["prompt"],
+        "output": req["output"],
+        "tile_size": int(req.get("tile_size") or 1024),
+        "overlap": int(req.get("overlap") or 0),
+        "min_size": int(req.get("min_size") or 0),
+        "max_size": req.get("max_size"),
+        "unique": unique,
+    }
+    if req.get("bands"):
+        kwargs["bands"] = req.get("bands")
+    output = _run_quiet_stdout(sam.generate_masks_tiled, **kwargs) or req["output"]
+    return {
+        "output": output,
+        "object_count": _count_raster_labels(output, unique),
+        "mask_count": _mask_count(),
+    }
 
 
 def _handle_supports(req: dict) -> Any:
@@ -386,6 +534,8 @@ def _dispatch(req: dict) -> Any:
         return _handle_generate_masks_by_boxes(req)
     if action == "generate_masks_by_points_patch":
         return _handle_generate_masks_by_points_patch(req)
+    if action == "generate_masks_tiled":
+        return _handle_generate_masks_tiled(req)
     if action == "save_masks":
         return _handle_save_masks(req)
     if action == "supports":
