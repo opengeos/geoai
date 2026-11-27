@@ -3,7 +3,7 @@ name=GeoAI
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
 description=GeoAI plugin for QGIS providing AI-powered geospatial analysis including tree segmentation (DeepForest), water segmentation (OmniWaterMask), Moondream vision-language model, Segment Anything (SAM1/SAM2/SAM3), semantic segmentation, instance segmentation (Mask R-CNN), and change detection (AnyChange).
-version=1.8.1
+version=1.9.0
 author=Qiusheng Wu
 email=giswqs@gmail.com
 
@@ -63,6 +63,14 @@ experimental=False
 deprecated=False
 
 changelog=
+    1.9.0
+        - Add a Change Detection panel that runs AnyChange on a before/after raster pair (#958)
+        - Add a processing monitor for running GeoAI tasks (#946)
+        - Add SAM confidence, source and prompt attributes to vector outputs, tiled text prompts, and in-plugin Hugging Face login (#1000)
+        - Repair managed environment installs on Windows and after QGIS upgrades (#999)
+        - Strip PYTHONEXECUTABLE from the managed environment and require deepforest>=2.1.0 (#960)
+        - Fix DeepForest dependency verification (#919, #979) and SAM 3 model download failures (#973)
+        - Preserve classFactory on plugin reload (#919)
     1.5.2
         - Fix dependency installation failing on GPU installs when the PyTorch wheel index shadowed newer shared packages such as requests, blocking geoai-py/datasets resolution (#827, #829, #831, #833)
     1.5.1
