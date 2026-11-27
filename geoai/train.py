@@ -264,6 +264,81 @@ def parse_yolo_annotations(
     return sorted(image_files), sorted(label_files)
 
 
+def _safe_torch_load(path: str, map_location: Any = None) -> Any:
+    """Load a PyTorch checkpoint preferring weights_only=True."""
+    try:
+        return torch.load(path, map_location=map_location, weights_only=True)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+    except Exception as exc:
+        import pickle
+
+        if isinstance(exc, (pickle.UnpicklingError, RuntimeError)):
+            logger.warning(
+                "Falling back to weights_only=False for legacy checkpoint %s: %s",
+                path,
+                exc,
+            )
+            return torch.load(path, map_location=map_location, weights_only=False)
+        raise
+
+
+def _clear_incompatible_nodata(meta: Dict[str, Any], dtype: str) -> None:
+    """Clear inherited nodata if it cannot be represented in the target dtype."""
+    nodata = meta.get("nodata")
+    if nodata is None:
+        return
+    np_dtype = np.dtype(dtype)
+    if np.issubdtype(np_dtype, np.integer):
+        info = np.iinfo(np_dtype)
+        try:
+            if (
+                (
+                    isinstance(nodata, float)
+                    and (not np.isfinite(nodata) or not nodata.is_integer())
+                )
+                or nodata < info.min
+                or nodata > info.max
+            ):
+                meta["nodata"] = None
+        except TypeError:
+            meta["nodata"] = None
+
+
+def _compute_window_weight(
+    h: int,
+    w: int,
+    y_pos: int,
+    x_pos: int,
+    height: int,
+    width: int,
+    overlap: int,
+    min_weight: float = 0.1,
+) -> np.ndarray:
+    """Compute blending weights that taper only sides facing another window."""
+    if overlap <= 1:
+        return np.ones((h, w), dtype=np.float32)
+
+    half_overlap = overlap / 2.0
+    y_grid, x_grid = np.mgrid[0:h, 0:w]
+    full = np.full((h, w), half_overlap, dtype=np.float32)
+
+    dist_from_left = x_grid.astype(np.float32) if x_pos > 0 else full
+    dist_from_right = (
+        (w - x_grid - 1).astype(np.float32) if (x_pos + w) < width else full
+    )
+    dist_from_top = y_grid.astype(np.float32) if y_pos > 0 else full
+    dist_from_bottom = (
+        (h - y_grid - 1).astype(np.float32) if (y_pos + h) < height else full
+    )
+
+    edge_distance = np.minimum.reduce(
+        [dist_from_left, dist_from_right, dist_from_top, dist_from_bottom]
+    )
+    edge_distance = np.minimum(edge_distance, half_overlap)
+    return np.maximum(edge_distance / half_overlap, min_weight).astype(np.float32)
+
+
 DETECTION_MODELS = {
     "fasterrcnn_resnet50_fpn_v2",
     "fasterrcnn_mobilenet_v3_large_fpn",
@@ -1316,12 +1391,12 @@ def evaluate(
             for i, output in enumerate(outputs):
                 if use_mask_iou:
                     # Mask-based IoU (Mask R-CNN)
-                    if (
-                        "masks" not in output
-                        or len(output["masks"]) == 0
-                        or "masks" not in targets[i]
-                        or len(targets[i]["masks"]) == 0
-                    ):
+                    has_pred = "masks" in output and len(output["masks"]) > 0
+                    has_target = "masks" in targets[i] and len(targets[i]["masks"]) > 0
+                    if not has_pred and not has_target:
+                        continue
+                    if not has_pred or not has_target:
+                        iou_scores.append(0.0)
                         continue
 
                     pred_masks = (output["masks"].squeeze(1) > 0.5).float()
@@ -1344,7 +1419,10 @@ def evaluate(
                     # Box-based IoU (Faster R-CNN, RetinaNet, FCOS)
                     pred_boxes = output["boxes"]
                     target_boxes = targets[i]["boxes"]
+                    if len(pred_boxes) == 0 and len(target_boxes) == 0:
+                        continue
                     if len(pred_boxes) == 0 or len(target_boxes) == 0:
+                        iou_scores.append(0.0)
                         continue
 
                     iou_matrix = torchvision.ops.box_iou(pred_boxes, target_boxes)
@@ -1739,6 +1817,7 @@ def train_MaskRCNN_model(
             train_imgs,
             train_labels,
             transforms=get_transform(train=True),
+            num_channels=num_channels,
             instance_labels=instance_labels,
             multiclass=multiclass,
         )
@@ -1746,6 +1825,7 @@ def train_MaskRCNN_model(
             val_imgs,
             val_labels,
             transforms=get_transform(train=False),
+            num_channels=num_channels,
             instance_labels=instance_labels,
             multiclass=multiclass,
         )
@@ -1813,7 +1893,7 @@ def train_MaskRCNN_model(
         logger.info(f"Loading pretrained model from: {pretrained_model_path}")
         try:
             # Check if it's a full checkpoint or just model weights
-            checkpoint = torch.load(pretrained_model_path, map_location=device)
+            checkpoint = _safe_torch_load(pretrained_model_path, map_location=device)
 
             if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
                 # It's a checkpoint with extra information
@@ -1893,11 +1973,20 @@ def train_MaskRCNN_model(
     # Save training history
     torch.save(training_history, os.path.join(output_dir, "training_history.pth"))
 
-    # Load best model for evaluation and visualization
-    model.load_state_dict(torch.load(os.path.join(output_dir, "best_model.pth")))
+    # Load best model for evaluation and visualization if saved
+    best_model_path = os.path.join(output_dir, "best_model.pth")
+    if os.path.exists(best_model_path):
+        model.load_state_dict(_safe_torch_load(best_model_path, map_location=device))
+    else:
+        logger.warning(
+            "best_model.pth not found in %s; evaluating with final epoch weights.",
+            output_dir,
+        )
 
     # Final evaluation
-    final_metrics = evaluate(model, val_loader, device)
+    final_metrics = evaluate(
+        model, val_loader, device, use_mask_iou=model_has_masks(model_name)
+    )
     logger.info(
         f"Final Evaluation - Loss: {final_metrics['loss']:.4f}, IoU: {final_metrics['IoU']:.4f}"
     )
@@ -2040,6 +2129,7 @@ def inference_on_geotiff(
         out_meta.update(
             {"count": 1, "dtype": "uint8"}  # Single band for mask  # Binary mask
         )
+        _clear_incompatible_nodata(out_meta, "uint8")
 
         # We'll use two arrays:
         # 1. For accumulating predictions
@@ -2486,12 +2576,14 @@ def instance_segmentation_inference_on_geotiff(
         # Save instance raster (uint32)
         inst_meta = meta.copy()
         inst_meta.update({"count": 1, "dtype": "uint32"})
+        _clear_incompatible_nodata(inst_meta, "uint32")
         with rasterio.open(output_path, "w", **inst_meta) as dst:
             dst.write(instance_mask, 1)
 
         # Save class raster (uint16)
         cls_meta = meta.copy()
         cls_meta.update({"count": 1, "dtype": "uint16"})
+        _clear_incompatible_nodata(cls_meta, "uint16")
         with rasterio.open(class_path, "w", **cls_meta) as dst:
             dst.write(class_mask, 1)
 
@@ -2567,11 +2659,11 @@ def multiclass_detection_inference_on_geotiff(
 
         all_detections = []
 
-        stride = window_size - overlap
-        # Compute exact number of steps so loop bounds match total_windows
-        steps_y = max(1, math.ceil((height - window_size) / stride) + 1)
-        steps_x = max(1, math.ceil((width - window_size) / stride) + 1)
-        total_windows = steps_y * steps_x
+        # Window origins that cover every pixel without repeating a window; also
+        # validates 0 <= overlap < window_size.
+        y_starts = _sliding_window_starts(height, window_size, overlap)
+        x_starts = _sliding_window_starts(width, window_size, overlap)
+        total_windows = len(y_starts) * len(x_starts)
 
         logger.info(
             f"Processing {total_windows} windows with size "
@@ -2584,26 +2676,21 @@ def multiclass_detection_inference_on_geotiff(
         batch_count = 0
         start_time = time.time()
 
-        for i in range(steps_y):
-            y = min(i * stride, height - window_size)
-            y = max(0, y)
-
-            for j in range(steps_x):
-                x = min(j * stride, width - window_size)
-                x = max(0, x)
-
+        last_i, last_j = len(y_starts) - 1, len(x_starts) - 1
+        for i, y in enumerate(y_starts):
+            for j, x in enumerate(x_starts):
                 window = src.read(window=Window(x, y, window_size, window_size))
                 if window.shape[1] == 0 or window.shape[2] == 0:
                     continue
 
-                actual_height, actual_width = window.shape[1], window.shape[2]
+                window, actual_height, actual_width = _pad_window(window, window_size)
                 image = window.astype(np.float32) / 255.0
 
                 if image.shape[0] > num_channels:
                     image = image[:num_channels]
                 elif image.shape[0] < num_channels:
                     padded = np.zeros(
-                        (num_channels, image.shape[1], image.shape[2]),
+                        (num_channels, window_size, window_size),
                         dtype=np.float32,
                     )
                     padded[: image.shape[0]] = image
@@ -2614,7 +2701,7 @@ def multiclass_detection_inference_on_geotiff(
                 batch_positions.append((y, x, actual_height, actual_width))
                 batch_count += 1
 
-                if batch_count == batch_size or (i == steps_y - 1 and j == steps_x - 1):
+                if batch_count == batch_size or (i == last_i and j == last_j):
                     with torch.no_grad():
                         outputs = model(batch_inputs)
 
@@ -2632,14 +2719,21 @@ def multiclass_detection_inference_on_geotiff(
 
                             for k in range(len(scores)):
                                 score = scores[k].cpu().item()
-                                box = boxes[k].cpu().numpy()
+                                box = boxes[k].cpu().numpy().copy()
                                 label = det_labels[k].cpu().item()
 
+                                # Clip box to actual tile dims and skip if empty
+                                box[0] = np.clip(box[0], 0, w)
+                                box[1] = np.clip(box[1], 0, h)
+                                box[2] = np.clip(box[2], 0, w)
+                                box[3] = np.clip(box[3], 0, h)
+                                if box[2] <= box[0] or box[3] <= box[1]:
+                                    continue
+
                                 if has_masks:
-                                    mask = masks[k].cpu().numpy() > 0.5
+                                    mask = masks[k].cpu().numpy()[:h, :w] > 0.5
                                 else:
-                                    # Create box-shaped mask for
-                                    # bbox-only models
+                                    # Create box-shaped mask for bbox-only models
                                     mask = np.zeros((h, w), dtype=bool)
                                     bx = box.astype(int)
                                     mask[
@@ -2687,6 +2781,7 @@ def multiclass_detection_inference_on_geotiff(
             keep_indices = torchvision.ops.batched_nms(
                 boxes, scores, det_labels, nms_threshold
             )
+            keep_indices = keep_indices.cpu().tolist()
 
             final_detections = [all_detections[i] for i in keep_indices]
             logger.info(f"After NMS: {len(final_detections)} detections")
@@ -2697,19 +2792,22 @@ def multiclass_detection_inference_on_geotiff(
 
             final_detections.sort(key=lambda x: x["score"], reverse=True)
 
-            # Materialize full-size masks only for final kept detections
+            # Write raster bands from compact masks using window slices
+            # (avoids allocating full-image arrays per detection)
             for instance_id, detection in enumerate(final_detections, 1):
-                compact_mask = detection["mask"]
                 y_pos, x_pos, h, w = detection["mask_offset"]
-                full_mask = np.zeros((height, width), dtype=bool)
-                full_mask[y_pos : y_pos + h, x_pos : x_pos + w] = compact_mask
-                # Replace compact mask with full mask for downstream use
-                detection["mask"] = full_mask
-                del detection["mask_offset"]
+                detection["instance_id"] = instance_id
 
-                available_pixels = (instance_mask == 0) & full_mask
-                class_mask[available_pixels] = detection["label"]
-                instance_mask[available_pixels] = instance_id
+                compact_mask = detection["mask"][:h, :w]
+
+                region_inst = instance_mask[y_pos : y_pos + h, x_pos : x_pos + w]
+                available = (region_inst == 0) & compact_mask
+                class_mask[y_pos : y_pos + h, x_pos : x_pos + w][available] = detection[
+                    "label"
+                ]
+                instance_mask[y_pos : y_pos + h, x_pos : x_pos + w][
+                    available
+                ] = instance_id
         else:
             class_mask = np.zeros((height, width), dtype=np.uint8)
             instance_mask = np.zeros((height, width), dtype=np.uint32)
@@ -2733,6 +2831,7 @@ def multiclass_detection_inference_on_geotiff(
 
         # Write class band as uint8, instance band as uint32
         out_meta.update({"count": 2, "dtype": "uint32"})
+        _clear_incompatible_nodata(out_meta, "uint32")
         with rasterio.open(output_path, "w", **out_meta) as dst:
             dst.write(class_mask.astype(np.uint32), 1)
             dst.write(instance_mask, 2)
@@ -2995,7 +3094,7 @@ def object_detection(
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
     # Load state dict and handle DataParallel module prefix
-    state_dict = torch.load(model_path, map_location=device)
+    state_dict = _safe_torch_load(model_path, map_location=device)
 
     # Remove 'module.' prefix if present (from DataParallel training)
     if any(key.startswith("module.") for key in state_dict.keys()):
@@ -3083,7 +3182,7 @@ def object_detection_batch(
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
     # Load state dict and handle DataParallel module prefix
-    state_dict = torch.load(model_path, map_location=device)
+    state_dict = _safe_torch_load(model_path, map_location=device)
 
     # Remove 'module.' prefix if present (from DataParallel training)
     if any(key.startswith("module.") for key in state_dict.keys()):
@@ -3529,11 +3628,9 @@ class SemanticSegmentationDataset(Dataset):
         if self.ignore_index is not None:
             ignore_mask = label_mask == self.ignore_index
 
-        unique_vals = np.unique(label_mask)
         if self.num_classes == 2:
-            # Binary segmentation: normalize any non-zero value to foreground (1)
-            if unique_vals.max() > 1:
-                label_mask = (label_mask > 0).astype(np.int64)
+            # Binary segmentation: clamp negative values to 0 and map positive values to 1
+            label_mask = (label_mask > 0).astype(np.int64)
         else:
             # Multi-class segmentation: preserve class IDs and clamp to valid range.
             label_mask = np.clip(label_mask, 0, self.num_classes - 1)
@@ -3768,8 +3865,11 @@ class SemanticRandomRotation90:
         self, image: torch.Tensor, mask: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         if random.random() < self.prob:
-            # Randomly rotate by 90, 180, or 270 degrees
-            k = random.randint(1, 3)
+            # For non-square images, restrict to 180 degrees so H and W do not swap
+            if image.shape[1] != image.shape[2]:
+                k = 2
+            else:
+                k = random.randint(1, 3)
             image = torch.rot90(image, k, dims=[1, 2])
             mask = torch.rot90(mask, k, dims=[0, 1])
         return image, mask
@@ -4920,7 +5020,7 @@ def train_segmentation_model(
 
         logger.info(f"Loading checkpoint from: {checkpoint_path}")
         try:
-            checkpoint = torch.load(checkpoint_path, map_location=device)
+            checkpoint = _safe_torch_load(checkpoint_path, map_location=device)
 
             if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
                 # Load model state
@@ -5646,6 +5746,7 @@ def semantic_inference_on_geotiff(
         # Update metadata for output raster
         out_meta = meta.copy()
         out_meta.update({"count": 1, "dtype": "uint8"})
+        _clear_incompatible_nodata(out_meta, "uint8")
 
         # Initialize accumulator arrays for multi-class probability blending
         # We'll accumulate probabilities for each class and then take argmax
@@ -5707,29 +5808,11 @@ def semantic_inference_on_geotiff(
                     for idx, prob in enumerate(probs):
                         y_pos, x_pos, h, w = batch_positions[idx]
 
-                        # Create weight matrix for blending
-                        y_grid, x_grid = np.mgrid[0:h, 0:w]
-                        dist_from_left = x_grid
-                        dist_from_right = w - x_grid - 1
-                        dist_from_top = y_grid
-                        dist_from_bottom = h - y_grid - 1
-
-                        edge_distance = np.minimum.reduce(
-                            [
-                                dist_from_left,
-                                dist_from_right,
-                                dist_from_top,
-                                dist_from_bottom,
-                            ]
+                        # Create weight matrix for blending, preserving full weight
+                        # on outer raster boundaries
+                        weight = _compute_window_weight(
+                            h, w, y_pos, x_pos, height, width, overlap
                         )
-                        edge_distance = np.minimum(edge_distance, overlap / 2)
-
-                        # Avoid zero weights - use minimum weight of 0.1
-                        weight = np.maximum(edge_distance / (overlap / 2), 0.1)
-
-                        # For non-overlapping windows, use uniform weight
-                        if overlap == 0:
-                            weight = np.ones_like(weight)
 
                         # Convert probabilities to numpy [C, H, W] - crop to actual size
                         prob_np = prob.cpu().numpy()[:, :h, :w]
@@ -6005,29 +6088,11 @@ def semantic_inference_on_image(
                     for idx, prob in enumerate(probs):
                         y_pos, x_pos, h, w = batch_positions[idx]
 
-                        # Create weight matrix for blending
-                        y_grid, x_grid = np.mgrid[0:h, 0:w]
-                        dist_from_left = x_grid
-                        dist_from_right = w - x_grid - 1
-                        dist_from_top = y_grid
-                        dist_from_bottom = h - y_grid - 1
-
-                        edge_distance = np.minimum.reduce(
-                            [
-                                dist_from_left,
-                                dist_from_right,
-                                dist_from_top,
-                                dist_from_bottom,
-                            ]
+                        # Create weight matrix for blending, preserving full weight
+                        # on outer raster boundaries
+                        weight = _compute_window_weight(
+                            h, w, y_pos, x_pos, height, width, overlap
                         )
-                        edge_distance = np.minimum(edge_distance, overlap / 2)
-
-                        # Avoid zero weights - use minimum weight of 0.1
-                        weight = np.maximum(edge_distance / (overlap / 2), 0.1)
-
-                        # For non-overlapping windows, use uniform weight
-                        if overlap == 0:
-                            weight = np.ones_like(weight)
 
                         # Convert probabilities to numpy [C, H, W] - crop to actual size
                         prob_np = prob.cpu().numpy()[:, :h, :w]
@@ -6116,13 +6181,14 @@ def semantic_inference_on_image(
             logger.info(f"Inference completed in {inference_time:.2f} seconds")
 
         # Save output as image
+        out_dir = os.path.dirname(os.path.abspath(output_path))
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         # For binary masks, use PNG to avoid JPEG compression artifacts
         if binary_output and num_classes == 2:
             # Change extension to PNG if binary output to preserve exact values
             output_path_png = os.path.splitext(output_path)[0] + ".png"
             output_img = Image.fromarray(mask, mode="L")
-            out_dir = os.path.abspath(os.path.dirname(output_path))
-            os.makedirs(out_dir, exist_ok=True)
             output_img.save(output_path_png)
             if not quiet:
                 logger.info(
@@ -6743,6 +6809,7 @@ def train_instance_segmentation_model(
         output_dir=output_dir,
         input_format=input_format,
         num_channels=num_channels,
+        num_classes=num_classes,
         model=model,
         batch_size=batch_size,
         num_epochs=num_epochs,
@@ -6849,7 +6916,7 @@ def instance_segmentation(
         device = get_device()
 
     # Load state dict and handle DataParallel module prefix
-    state_dict = torch.load(model_path, map_location=device)
+    state_dict = _safe_torch_load(model_path, map_location=device)
 
     # Remove 'module.' prefix if present (from DataParallel training)
     if any(key.startswith("module.") for key in state_dict.keys()):
@@ -6957,7 +7024,7 @@ def instance_segmentation_batch(
         device = get_device()
 
     # Load state dict and handle DataParallel module prefix
-    state_dict = torch.load(model_path, map_location=device)
+    state_dict = _safe_torch_load(model_path, map_location=device)
 
     # Remove 'module.' prefix if present (from DataParallel training)
     if any(key.startswith("module.") for key in state_dict.keys()):
@@ -7020,7 +7087,7 @@ def lightly_train_model(
     data_dir: str,
     output_dir: str,
     model: str = "torchvision/resnet50",
-    method: str = "dinov2_distillation",
+    method: str = "simclr",
     epochs: int = 100,
     batch_size: int = 64,
     learning_rate: float = 1e-4,
@@ -7039,7 +7106,7 @@ def lightly_train_model(
             - "dino": Works with both CNNs and ViTs
             - "dinov2": Requires ViT models only
             - "dinov2_distillation": Requires ViT models only (recommended for ViTs)
-            Default is "dinov2_distillation".
+            Default is "simclr".
         epochs (int): Number of training epochs. Default is 100.
         batch_size (int): Batch size for training. Default is 64.
         learning_rate (float): Learning rate for training. Default is 1e-4.
@@ -7133,6 +7200,11 @@ def lightly_train_model(
             kwargs["accelerator"] = "cpu"
         if "devices" not in kwargs:
             kwargs["devices"] = 1  # Force single device
+
+    if learning_rate is not None:
+        optim_args = dict(kwargs.get("optim_args") or {})
+        optim_args.setdefault("lr", learning_rate)
+        kwargs["optim_args"] = optim_args
 
     # Train the model using Lightly Train
     lightly_train.train(

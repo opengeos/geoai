@@ -28,6 +28,25 @@ import torch.nn.functional as F
 logger = logging.getLogger(__name__)
 
 
+def _safe_torch_load(path: str, map_location: Any = None) -> Any:
+    """Load a PyTorch checkpoint preferring weights_only=True."""
+    try:
+        return torch.load(path, map_location=map_location, weights_only=True)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+    except Exception as exc:
+        import pickle
+
+        if isinstance(exc, (pickle.UnpicklingError, RuntimeError)):
+            logger.warning(
+                "Falling back to weights_only=False for legacy checkpoint %s: %s",
+                path,
+                exc,
+            )
+            return torch.load(path, map_location=map_location, weights_only=False)
+        raise
+
+
 def _resolve_ignore_index(ignore_index: Union[int, bool, None]) -> Optional[int]:
     """Normalize an ignore_index argument.
 
@@ -1459,32 +1478,30 @@ def _train_with_custom_iou(
             if image.max() > 1.0:
                 image = image / 255.0
 
-            # Resize if needed
+            # Resize tensors with F.interpolate so 1-band and >4-band rasters work
+            image_tensor = torch.from_numpy(image)
+            label_tensor = torch.from_numpy(label.astype(np.int64))
+
             if self.target_size is not None:
-                from PIL import Image as PILImage
-
-                # Resize image
-                c, h, w = image.shape
-                img_pil = PILImage.fromarray(
-                    (image.transpose(1, 2, 0) * 255).astype(np.uint8)
+                target_h, target_w = self.target_size
+                image_tensor = F.interpolate(
+                    image_tensor.unsqueeze(0),
+                    size=(target_h, target_w),
+                    mode="bilinear",
+                    align_corners=False,
+                ).squeeze(0)
+                label_tensor = (
+                    F.interpolate(
+                        label_tensor.unsqueeze(0).unsqueeze(0).float(),
+                        size=(target_h, target_w),
+                        mode="nearest",
+                    )
+                    .squeeze(0)
+                    .squeeze(0)
+                    .long()
                 )
-                img_pil = img_pil.resize(
-                    (self.target_size[1], self.target_size[0]), PILImage.BILINEAR
-                )
-                image = np.array(img_pil).astype(np.float32) / 255.0
-                if image.ndim == 2:
-                    image = np.expand_dims(image, 0)
-                else:
-                    image = image.transpose(2, 0, 1)
 
-                # Resize label
-                lbl_pil = PILImage.fromarray(label.astype(np.uint8))
-                lbl_pil = lbl_pil.resize(
-                    (self.target_size[1], self.target_size[0]), PILImage.NEAREST
-                )
-                label = np.array(lbl_pil)
-
-            return torch.from_numpy(image), torch.from_numpy(label.astype(np.int64))
+            return image_tensor, label_tensor
 
     # Create datasets
     train_dataset = SparseLabelsDataset(
@@ -1553,19 +1570,21 @@ def _train_with_custom_iou(
     )
     model.to(device)
 
-    # Enable multi-GPU training if available
-    if torch.cuda.device_count() > 1:
+    is_cuda = torch.device(device).type == "cuda"
+
+    # Enable multi-GPU training only when running on CUDA with multiple GPUs
+    if is_cuda and torch.cuda.device_count() > 1:
         logger.info("Using %d GPUs for training", torch.cuda.device_count())
         model = torch.nn.DataParallel(model)
 
     # ===== PERFORMANCE OPTIMIZATIONS =====
     # Enable cuDNN auto-tuner for optimal conv algorithms (fixed input size)
-    if torch.cuda.is_available():
+    if is_cuda:
         torch.backends.cudnn.benchmark = True
         logger.info("cuDNN benchmark mode enabled")
 
     # Setup mixed precision training (AMP) for ~2x speedup
-    use_amp = torch.cuda.is_available()
+    use_amp = is_cuda
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
     if use_amp:
         logger.info("Mixed precision training (AMP) enabled")
@@ -1593,7 +1612,7 @@ def _train_with_custom_iou(
     # Load checkpoint if provided
     if checkpoint_path is not None and os.path.exists(checkpoint_path):
         logger.info("Loading checkpoint from %s", checkpoint_path)
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = _safe_torch_load(checkpoint_path, map_location=device)
         if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
             model.load_state_dict(checkpoint["model_state_dict"])
             if resume_training:
@@ -1895,7 +1914,7 @@ def _train_with_custom_iou(
     # Load best model weights
     best_model_path = os.path.join(output_dir, "best_model.pth")
     if os.path.exists(best_model_path):
-        model.load_state_dict(torch.load(best_model_path, map_location=device))
+        model.load_state_dict(_safe_torch_load(best_model_path, map_location=device))
         logger.info("Loaded best model (%s: %.4f)", iou_label, best_iou)
 
     return model
@@ -1957,11 +1976,16 @@ def evaluate_sparse_iou(
         >>> print(f"Sparse IoU: {results['mean_sparse_iou']:.4f}")
     """
     import os
+    import numpy as np
     import rasterio
+    from PIL import Image
     from torch.utils.data import DataLoader, Dataset
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if batch_size < 1:
+        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
 
     model.to(device)
     model.eval()
@@ -1998,68 +2022,120 @@ def evaluate_sparse_iou(
         )
         logger.info("Number of classes: %d", num_classes)
 
-    # Accumulate predictions and targets
-    all_preds = []
-    all_targets = []
+    class _SparseEvalDataset(Dataset):
+        def __init__(self, img_paths, lbl_paths, channels):
+            self.img_paths = img_paths
+            self.lbl_paths = lbl_paths
+            self.channels = channels
 
-    with torch.no_grad():
-        for i, (img_path, label_path) in enumerate(zip(image_files, label_files)):
-            # Load image
-            with rasterio.open(img_path) as src:
-                image = src.read()[:num_channels]  # (C, H, W)
+        def __len__(self):
+            return len(self.img_paths)
 
-            # Load label
-            with rasterio.open(label_path) as src:
-                label = src.read(1)  # (H, W)
+        def __getitem__(self, idx):
+            img_path = self.img_paths[idx]
+            if img_path.lower().endswith((".tif", ".tiff")):
+                with rasterio.open(img_path) as src:
+                    image = src.read()[: self.channels]
+            else:
+                with Image.open(img_path) as img:
+                    image = np.array(img)
+                    if image.ndim == 2:
+                        image = np.expand_dims(image, 0)
+                    elif image.ndim == 3:
+                        image = np.transpose(image, (2, 0, 1))
+                    image = image[: self.channels]
 
-            # Normalize image to 0-1 range
-            image = image.astype("float32")
-            if image.max() > 1.0:
+            label_path = self.lbl_paths[idx]
+            if label_path.lower().endswith((".tif", ".tiff")):
+                with rasterio.open(label_path) as src:
+                    label = src.read(1)
+            else:
+                with Image.open(label_path) as lbl:
+                    label = np.array(lbl)
+
+            image = image.astype(np.float32)
+            if image.size > 0 and image.max() > 1.0:
                 image = image / 255.0
 
-            # Convert to tensor and add batch dimension
-            image_tensor = torch.from_numpy(image).unsqueeze(0).to(device)
-            label_tensor = torch.from_numpy(label).unsqueeze(0)
+            return torch.from_numpy(image), torch.from_numpy(label.astype(np.int64))
 
-            # Get prediction
-            output = model(image_tensor)
-            pred = torch.argmax(output, dim=1).cpu()
-
-            all_preds.append(pred)
-            all_targets.append(label_tensor)
-
-            if verbose and (i + 1) % 50 == 0:
-                logger.info("   Processed %d/%d tiles...", i + 1, len(image_files))
-
-    # Concatenate all predictions and targets
-    all_preds = torch.cat(all_preds, dim=0)
-    all_targets = torch.cat(all_targets, dim=0)
-
-    # Calculate sparse IoU
-    mean_iou, per_class_ious, recalls, precisions = landcover_iou(
-        pred=all_preds,
-        target=all_targets,
-        num_classes=num_classes,
-        ignore_index=ignore_index,
-        mode="sparse_labels",
-        background_class=background_class,
+    eval_dataset = _SparseEvalDataset(image_files, label_files, num_channels)
+    eval_loader = DataLoader(
+        eval_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=0,
     )
 
+    smooth = 1e-6
+    bg_class = background_class if background_class is not None else 0
+    resolved_ignore = _resolve_ignore_index(ignore_index)
+
+    # Stream per-class TP, FN, and sparse FP counts instead of materializing
+    # all predictions and targets in memory.
+    tp = torch.zeros(num_classes, dtype=torch.float64)
+    fn = torch.zeros(num_classes, dtype=torch.float64)
+    fp_sparse = torch.zeros(num_classes, dtype=torch.float64)
+
+    processed = 0
+    with torch.no_grad():
+        for images, targets in eval_loader:
+            images = images.to(device)
+            outputs = model(images)
+            preds = torch.argmax(outputs, dim=1).cpu()
+            targets = targets.cpu()
+
+            labeled_mask = targets != bg_class
+            if resolved_ignore is not None:
+                labeled_mask = labeled_mask & (targets != resolved_ignore)
+
+            for cls in range(num_classes):
+                if cls == bg_class or (
+                    resolved_ignore is not None and cls == resolved_ignore
+                ):
+                    continue
+                pred_cls = preds == cls
+                target_cls = targets == cls
+                tp[cls] += (pred_cls & target_cls).sum().item()
+                fn[cls] += (target_cls & ~pred_cls).sum().item()
+                fp_sparse[cls] += (pred_cls & ~target_cls & labeled_mask).sum().item()
+
+            processed += images.shape[0]
+            if verbose and (processed % 50 < images.shape[0]):
+                logger.info("   Processed %d/%d tiles...", processed, len(image_files))
+
     # Build results dictionary
+    ious = []
     per_class_iou_dict = {}
     per_class_recall_dict = {}
     per_class_precision_dict = {}
 
-    resolved_ignore = _resolve_ignore_index(ignore_index)
     for cls in range(num_classes):
-        if cls == background_class:
+        if cls == bg_class:
             continue
         if resolved_ignore is not None and cls == resolved_ignore:
             continue
 
-        per_class_iou_dict[cls] = per_class_ious[cls]
-        per_class_recall_dict[cls] = recalls[cls]
-        per_class_precision_dict[cls] = precisions[cls]
+        cls_tp = tp[cls].item()
+        cls_fn = fn[cls].item()
+        cls_fp = fp_sparse[cls].item()
+        union_sparse = cls_tp + cls_fn + cls_fp
+
+        if union_sparse > 0:
+            iou = (cls_tp + smooth) / (union_sparse + smooth)
+            ious.append(iou)
+            per_class_iou_dict[cls] = iou
+        else:
+            per_class_iou_dict[cls] = 0.0
+
+        per_class_recall_dict[cls] = (
+            cls_tp / (cls_tp + cls_fn) if (cls_tp + cls_fn) > 0 else 0.0
+        )
+        per_class_precision_dict[cls] = (
+            cls_tp / (cls_tp + cls_fp) if (cls_tp + cls_fp) > 0 else 0.0
+        )
+
+    mean_iou = sum(ious) / len(ious) if ious else 0.0
 
     # Calculate means over evaluated foreground classes
     if per_class_recall_dict:

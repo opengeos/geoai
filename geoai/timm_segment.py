@@ -36,8 +36,52 @@ try:
 except ImportError:
     LIGHTNING_AVAILABLE = False
 
+_MetricBase = Metric if LIGHTNING_AVAILABLE else nn.Module
+_LightningBase = pl.LightningModule if LIGHTNING_AVAILABLE else nn.Module
 
-class _PooledIoU(Metric):
+
+def _safe_torch_load(path: str, map_location: Any = None) -> Any:
+    """Load a PyTorch checkpoint preferring weights_only=True."""
+    try:
+        return torch.load(path, map_location=map_location, weights_only=True)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+    except Exception as exc:
+        import pickle
+
+        if isinstance(exc, (pickle.UnpicklingError, RuntimeError)):
+            logger.warning(
+                "Falling back to weights_only=False for legacy checkpoint %s: %s",
+                path,
+                exc,
+            )
+            return torch.load(path, map_location=map_location, weights_only=False)
+        raise
+
+
+def _clear_incompatible_nodata(meta: Dict[str, Any], dtype: str) -> None:
+    """Clear inherited nodata if it cannot be represented in the target dtype."""
+    nodata = meta.get("nodata")
+    if nodata is None:
+        return
+    np_dtype = np.dtype(dtype)
+    if np.issubdtype(np_dtype, np.integer):
+        info = np.iinfo(np_dtype)
+        try:
+            if (
+                (
+                    isinstance(nodata, float)
+                    and (not np.isfinite(nodata) or not nodata.is_integer())
+                )
+                or nodata < info.min
+                or nodata > info.max
+            ):
+                meta["nodata"] = None
+        except TypeError:
+            meta["nodata"] = None
+
+
+class _PooledIoU(_MetricBase):
     """Mean IoU over all pixels seen since the last reset.
 
     Per-class intersections and unions are summed over batches (and over
@@ -52,16 +96,22 @@ class _PooledIoU(Metric):
     def __init__(self, num_classes: int):
         super().__init__()
         self.num_classes = num_classes
-        self.add_state(
-            "intersection",
-            default=torch.zeros(num_classes, dtype=torch.long),
-            dist_reduce_fx="sum",
-        )
-        self.add_state(
-            "union",
-            default=torch.zeros(num_classes, dtype=torch.long),
-            dist_reduce_fx="sum",
-        )
+        if hasattr(self, "add_state"):
+            self.add_state(
+                "intersection",
+                default=torch.zeros(num_classes, dtype=torch.long),
+                dist_reduce_fx="sum",
+            )
+            self.add_state(
+                "union",
+                default=torch.zeros(num_classes, dtype=torch.long),
+                dist_reduce_fx="sum",
+            )
+        else:
+            self.register_buffer(
+                "intersection", torch.zeros(num_classes, dtype=torch.long)
+            )
+            self.register_buffer("union", torch.zeros(num_classes, dtype=torch.long))
 
     def update(self, pred: torch.Tensor, target: torch.Tensor) -> None:
         """Add one batch's per-class intersections and unions.
@@ -90,7 +140,7 @@ class _PooledIoU(Metric):
         return (self.intersection[present].float() / self.union[present].float()).mean()
 
 
-class TimmSegmentationModel(pl.LightningModule):
+class TimmSegmentationModel(_LightningBase):
     """
     PyTorch Lightning module for semantic segmentation using timm encoders with SMP decoders,
     or pure timm models from Hugging Face Hub.
@@ -1013,7 +1063,7 @@ def timm_semantic_segmentation(
                     f"Error: {str(e)}"
                 )
 
-        checkpoint = torch.load(model_path, map_location=device)
+        checkpoint = _safe_torch_load(model_path, map_location=device)
         # Extract state_dict from common checkpoint wrapper formats
         if isinstance(checkpoint, dict):
             for key in ("state_dict", "model_state_dict", "model"):
@@ -1045,11 +1095,78 @@ def timm_semantic_segmentation(
         if not quiet:
             logger.info(f"Processing {n_rows} x {n_cols} = {n_rows * n_cols} windows")
 
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+
         # Initialize probability accumulators for proper overlap blending
         prob_accumulator = np.zeros((num_classes, height, width), dtype=np.float32)
         count_accumulator = np.zeros((height, width), dtype=np.float32)
 
-        # Process windows
+        def _flush_batch(
+            batch_imgs: List[np.ndarray],
+            batch_bounds: List[Tuple[int, int, int, int, int, int]],
+        ) -> None:
+            batch_tensor = torch.from_numpy(np.stack(batch_imgs, axis=0)).to(device)
+            logits = model(batch_tensor)
+            batch_probs = torch.softmax(logits, dim=1).cpu().numpy()
+
+            for probs, (row_start, col_start, row_end, col_end, h, w) in zip(
+                batch_probs, batch_bounds
+            ):
+                # Crop to actual size [C, h, w]
+                probs = probs[:, :h, :w]
+
+                # Create edge-distance weight matrix for blending, tapering only
+                # edges that face an adjacent window so outer raster borders keep
+                # full weight.
+                if overlap <= 1:
+                    weight = np.ones((h, w), dtype=np.float32)
+                else:
+                    half_overlap = overlap / 2.0
+                    y_grid, x_grid = np.mgrid[0:h, 0:w]
+                    full = np.full((h, w), half_overlap, dtype=np.float32)
+
+                    dist_from_left = (
+                        x_grid.astype(np.float32) if col_start > 0 else full
+                    )
+                    dist_from_right = (
+                        (w - x_grid - 1).astype(np.float32) if col_end < width else full
+                    )
+                    dist_from_top = y_grid.astype(np.float32) if row_start > 0 else full
+                    dist_from_bottom = (
+                        (h - y_grid - 1).astype(np.float32)
+                        if row_end < height
+                        else full
+                    )
+
+                    edge_distance = np.minimum.reduce(
+                        [
+                            dist_from_left,
+                            dist_from_right,
+                            dist_from_top,
+                            dist_from_bottom,
+                        ]
+                    )
+                    edge_distance = np.minimum(edge_distance, half_overlap)
+                    weight = np.maximum(edge_distance / half_overlap, 0.1).astype(
+                        np.float32
+                    )
+
+                # Accumulate weighted probabilities for each class
+                y_slice = slice(row_start, row_end)
+                x_slice = slice(col_start, col_end)
+
+                for class_idx in range(num_classes):
+                    prob_accumulator[class_idx, y_slice, x_slice] += (
+                        probs[class_idx] * weight
+                    )
+
+                # Update weight accumulator
+                count_accumulator[y_slice, x_slice] += weight
+
+        # Process windows in batches up to batch_size
+        batch_imgs: List[np.ndarray] = []
+        batch_bounds: List[Tuple[int, int, int, int, int, int]] = []
         with torch.no_grad():
             for i in tqdm(range(n_rows), disable=quiet, desc="Processing rows"):
                 for j in range(n_cols):
@@ -1087,51 +1204,18 @@ def timm_semantic_segmentation(
                         padded[:, :h, :w] = img
                         img = padded
 
-                    # Predict
-                    img_tensor = torch.from_numpy(img).unsqueeze(0).to(device)
-                    logits = model(img_tensor)
+                    batch_imgs.append(img)
+                    batch_bounds.append((row_start, col_start, row_end, col_end, h, w))
 
-                    # Apply softmax to get class probabilities
-                    probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
+                    if len(batch_imgs) == batch_size:
+                        _flush_batch(batch_imgs, batch_bounds)
+                        batch_imgs.clear()
+                        batch_bounds.clear()
 
-                    # Crop to actual size [C, h, w]
-                    probs = probs[:, :h, :w]
-
-                    # Create edge-distance weight matrix for blending
-                    y_grid, x_grid = np.mgrid[0:h, 0:w]
-                    dist_from_left = x_grid
-                    dist_from_right = w - x_grid - 1
-                    dist_from_top = y_grid
-                    dist_from_bottom = h - y_grid - 1
-
-                    edge_distance = np.minimum.reduce(
-                        [
-                            dist_from_left,
-                            dist_from_right,
-                            dist_from_top,
-                            dist_from_bottom,
-                        ]
-                    )
-                    edge_distance = np.minimum(edge_distance, overlap / 2)
-
-                    # For non-overlapping windows, use uniform weight
-                    if overlap == 0:
-                        weight = np.ones((h, w), dtype=np.float32)
-                    else:
-                        # Avoid zero weights - use minimum weight of 0.1
-                        weight = np.maximum(edge_distance / (overlap / 2), 0.1)
-
-                    # Accumulate weighted probabilities for each class
-                    y_slice = slice(row_start, row_end)
-                    x_slice = slice(col_start, col_end)
-
-                    for class_idx in range(num_classes):
-                        prob_accumulator[class_idx, y_slice, x_slice] += (
-                            probs[class_idx] * weight
-                        )
-
-                    # Update weight accumulator
-                    count_accumulator[y_slice, x_slice] += weight
+            if batch_imgs:
+                _flush_batch(batch_imgs, batch_bounds)
+                batch_imgs.clear()
+                batch_bounds.clear()
 
         # Calculate final mask from accumulated probabilities
         output = np.zeros((height, width), dtype=np.uint8)
@@ -1160,6 +1244,7 @@ def timm_semantic_segmentation(
 
     # Save output
     meta.update({"count": 1, "dtype": "uint8", "compress": "lzw"})
+    _clear_incompatible_nodata(meta, "uint8")
 
     out_dir = os.path.abspath(os.path.dirname(output_path))
     os.makedirs(out_dir, exist_ok=True)
@@ -1286,7 +1371,7 @@ def push_timm_model_to_hub(
                 classes=num_classes,
             )
 
-        checkpoint = torch.load(model_path, map_location="cpu")
+        checkpoint = _safe_torch_load(model_path, map_location="cpu")
         # Extract state_dict from common checkpoint wrapper formats
         if isinstance(checkpoint, dict):
             for key in ("state_dict", "model_state_dict", "model"):
