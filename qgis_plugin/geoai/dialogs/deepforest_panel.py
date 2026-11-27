@@ -9,14 +9,6 @@ import os
 import json
 import tempfile
 
-_TORCH_IMPORT_ERROR = None
-
-try:
-    import torch
-except (ImportError, OSError) as e:
-    torch = None
-    _TORCH_IMPORT_ERROR = e
-
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
@@ -50,6 +42,8 @@ from qgis.core import (
 )
 
 from qgis.PyQt.QtCore import QThread, pyqtSignal
+
+from ..core.lazy_torch import import_torch, loaded_torch
 
 # ---------------------------------------------------------------------------
 # Lightweight DataFrame-like wrappers for when pandas is unavailable
@@ -157,7 +151,12 @@ class _RecordsFrame:
 
 
 def _get_gpu_memory_mb() -> int:
-    """Return total GPU VRAM in MB, or 0 if no GPU is available."""
+    """Return total GPU VRAM in MB, or 0 if no GPU is available.
+
+    Uses PyTorch only if it is already loaded; otherwise asks nvidia-smi, so
+    opening the panel never imports PyTorch into QGIS.
+    """
+    torch = loaded_torch()
     if torch is not None:
         try:
             if torch.cuda.is_available() and torch.cuda.device_count() > 0:
@@ -318,6 +317,8 @@ class DeepForestModelLoadWorker(QThread):
             os.environ["LOCAL_RANK"] = "0"
             os.environ["MASTER_ADDR"] = "127.0.0.1"
             os.environ["MASTER_PORT"] = "12355"
+            # In-process path: DeepForest imports PyTorch next anyway.
+            torch, _torch_error = import_torch()
             if torch is not None:
                 torch.set_float32_matmul_precision("medium")
                 if (
@@ -444,6 +445,7 @@ class DeepForestPredictWorker(QThread):
             os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"
             os.environ["PL_TRAINER_STRATEGY"] = "auto"
             os.environ["PL_ACCELERATOR"] = "gpu"
+            torch = loaded_torch()  # Loaded with the in-process model
             if torch is not None:
                 torch.set_float32_matmul_precision("medium")
                 if (
@@ -596,6 +598,7 @@ class DeepForestPredictWorker(QThread):
     @staticmethod
     def _is_cuda_oom(exc: Exception) -> bool:
         """Check whether *exc* is a CUDA out-of-memory error."""
+        torch = loaded_torch()
         if torch is not None:
             oom_cls = getattr(torch.cuda, "OutOfMemoryError", None)
             if oom_cls is not None and isinstance(exc, oom_cls):
@@ -637,6 +640,7 @@ class DeepForestPredictWorker(QThread):
                 raise
 
         # --- Retry 1: reduce batch, switch to window strategy ---------------
+        torch = loaded_torch()
         if torch is not None:
             try:
                 torch.cuda.empty_cache()
@@ -664,6 +668,7 @@ class DeepForestPredictWorker(QThread):
             self.model.config["batch_size"] = orig_batch
 
         # --- Retry 2: fall back to CPU --------------------------------------
+        torch = loaded_torch()
         if torch is not None:
             try:
                 torch.cuda.empty_cache()
@@ -1227,12 +1232,12 @@ class DeepForestDockWidget(QDockWidget):
         Returns:
             tuple: (is_cuda_available: bool, warning_message: str or None)
         """
+        # Only used when DeepForest runs inside QGIS.
+        torch, torch_error = import_torch()
         if torch is None:
             detail = ""
-            if _TORCH_IMPORT_ERROR is not None:
-                detail = (
-                    f"\n\nPyTorch import error in QGIS process:\n{_TORCH_IMPORT_ERROR}"
-                )
+            if torch_error is not None:
+                detail = f"\n\nPyTorch import error in QGIS process:\n{torch_error}"
             return (
                 False,
                 "PyTorch is not available in this QGIS session. "
@@ -1329,20 +1334,17 @@ class DeepForestDockWidget(QDockWidget):
         device = self.device_combo.currentText()
         use_subprocess = _use_deepforest_subprocess()
 
-        if torch is None:
-            if use_subprocess:
-                self.log_message(
-                    "PyTorch is unavailable in QGIS process; using DeepForest subprocess worker.",
-                    level=Qgis.Warning,
-                )
-            else:
+        # PyTorch is imported into QGIS only when the model runs in-process.
+        if not use_subprocess:
+            torch, torch_error = import_torch()
+            if torch is None:
                 self.progress_bar.setVisible(False)
                 self.load_model_btn.setEnabled(True)
                 err = "PyTorch is not available in the QGIS process."
-                if _TORCH_IMPORT_ERROR is not None:
+                if torch_error is not None:
                     err += (
                         "\n\nImport error:\n"
-                        f"{_TORCH_IMPORT_ERROR}\n\n"
+                        f"{torch_error}\n\n"
                         "This is typically a Windows QGIS/PyTorch DLL incompatibility. "
                         "The DeepForest panel can open, but model loading requires a "
                         "subprocess-backed DeepForest path."
