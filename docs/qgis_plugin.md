@@ -344,7 +344,7 @@ cd geoai/qgis_plugin
 python install.py
 ```
 
-This links/copies the plugin into your active QGIS profile. Re-run after pulling updates. Remove with:
+This copies the plugin into the `default` profile of every installed QGIS major version (QGIS 3 and QGIS 4; use `--profile NAME` for another profile). Re-run after pulling updates. Remove with:
 
 ```bash
 python install.py --remove
@@ -356,6 +356,7 @@ Option C — manual copy:
     - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
     - Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
     - macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
+    - QGIS 4 uses `QGIS4` instead of `QGIS3` in these paths.
 
 ### 3. Enable in QGIS
 

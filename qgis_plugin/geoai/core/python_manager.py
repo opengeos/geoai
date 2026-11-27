@@ -149,6 +149,91 @@ def standalone_python_exists() -> bool:
     return os.path.exists(python_path)
 
 
+def get_standalone_python_version() -> Optional[Tuple[int, int]]:
+    """Return the major/minor version of the installed standalone Python.
+
+    Returns:
+        ``(major, minor)``, or None when the interpreter is missing or does
+        not run.
+    """
+    python_path = get_standalone_python_path()
+    if not os.path.exists(python_path):
+        return None
+    try:
+        result = subprocess.run(
+            [
+                python_path,
+                "-c",
+                "import sys; print(sys.version_info[0], sys.version_info[1])",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=_get_clean_env(),
+            **_get_subprocess_kwargs(),
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        _log(f"Could not run standalone Python: {e}", Qgis.Warning)
+        return None
+    parts = result.stdout.strip().split()
+    if result.returncode != 0 or len(parts) != 2:
+        return None
+    try:
+        return int(parts[0]), int(parts[1])
+    except ValueError:
+        return None
+
+
+def standalone_python_matches_qgis() -> bool:
+    """Check whether the standalone Python matches the QGIS Python version.
+
+    The standalone directory is not versioned, so after a QGIS upgrade
+    (e.g. Python 3.9 to 3.12) it can still hold the old interpreter, and a
+    venv created from it gets the wrong Python. See issue #964.
+
+    Returns:
+        False only when the standalone runs and reports a different
+        major/minor version. A missing or unrunnable interpreter returns
+        True so that a slow antivirus scan does not trigger a re-download.
+    """
+    version = get_standalone_python_version()
+    if version is None:
+        return True
+    return version == get_qgis_python_version()
+
+
+def _get_standalone_site_packages() -> str:
+    """Return the site-packages directory of the standalone Python.
+
+    Returns:
+        Path to the standalone interpreter's site-packages directory.
+    """
+    python_dir = os.path.join(STANDALONE_DIR, "python")
+    if sys.platform == "win32":
+        return os.path.join(python_dir, "Lib", "site-packages")
+    major, minor = get_qgis_python_version()
+    return os.path.join(python_dir, "lib", f"python{major}.{minor}", "site-packages")
+
+
+def standalone_has_installed_packages() -> bool:
+    """Detect AI packages installed into the standalone interpreter itself.
+
+    Plugin 1.8.1 and earlier did not strip ``PYTHONEXECUTABLE`` from the
+    subprocess environment on Windows, so the venv interpreter ran as the
+    base interpreter and packages landed in the standalone Python instead of
+    the venv (issue #925). Such an interpreter carries gigabytes of stray
+    packages and should be replaced.
+
+    Returns:
+        True if heavy packages are found in the standalone site-packages.
+    """
+    site_packages = _get_standalone_site_packages()
+    return any(
+        os.path.isdir(os.path.join(site_packages, name))
+        for name in ("torch", "torchvision", "geoai")
+    )
+
+
 def _get_platform_info() -> Tuple[str, str]:
     """Get platform and architecture info for download URL.
 
@@ -225,6 +310,7 @@ def _get_clean_env() -> dict:
     ):
         env.pop(var, None)
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONNOUSERSITE"] = "1"
     return env
 
 

@@ -16,6 +16,7 @@ from .venv_manager import (
     _get_clean_env_for_venv,
     _get_subprocess_kwargs,
     _get_windows_dll_setup_code,
+    _read_pyvenv_cfg,
     detect_nvidia_gpu,
     get_venv_python_path,
     get_venv_site_packages,
@@ -89,6 +90,7 @@ def generate_diagnostics_report() -> str:
         f"- Virtual environment exists: `{_yes_no(venv_info['exists'])}`",
         f"- Virtual environment Python: `{_value(venv_info['python_path'])}`",
         f"- Virtual environment site-packages: `{_value(venv_info['site_packages'])}`",
+        f"- pyvenv.cfg Python version: `{_value(venv_info.get('pyvenv_version'))}`",
         f"- GEOAI_CACHE_DIR: `{_value(os.environ.get('GEOAI_CACHE_DIR'), '<unset>')}`",
         f"- GEOAI_VENV_DIR: `{_value(os.environ.get('GEOAI_VENV_DIR'), '<unset>')}`",
         "",
@@ -185,12 +187,14 @@ def _get_nvidia_gpu_detection() -> Dict[str, Any]:
 
 
 def _get_venv_info() -> Dict[str, Any]:
+    pyvenv_cfg = _read_pyvenv_cfg()
     return {
         "cache_dir": CACHE_DIR,
         "venv_dir": VENV_DIR,
         "exists": venv_exists(),
         "python_path": get_venv_python_path(),
         "site_packages": get_venv_site_packages(),
+        "pyvenv_version": pyvenv_cfg.get("version_info") or pyvenv_cfg.get("version"),
     }
 
 
@@ -292,6 +296,7 @@ def _venv_probe_script() -> str:
             "python_version": sys.version.replace("\\n", " "),
             "python_executable": sys.executable,
             "python_prefix": sys.prefix,
+            "venv_active": sys.prefix != sys.base_prefix,
             "platform": platform.platform(),
             "packages": [
                 package_metadata(dist_name, module_name, label)
@@ -494,6 +499,7 @@ def _format_venv_runtime(runtime: Dict[str, Any]) -> List[str]:
         f"- Python version: `{_value(runtime.get('python_version'))}`",
         f"- Python executable: `{_value(runtime.get('python_executable'))}`",
         f"- Python prefix: `{_value(runtime.get('python_prefix'))}`",
+        f"- Venv active (prefix != base_prefix): `{_yes_no(runtime.get('venv_active'))}`",
         f"- Platform: `{_value(runtime.get('platform'))}`",
         "",
         "## CUDA / Accelerator",
