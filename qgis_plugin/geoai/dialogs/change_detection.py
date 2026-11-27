@@ -450,6 +450,21 @@ class ChangeDetectionDockWidget(QDockWidget):
             )
             return
 
+        existing_outputs = [
+            path
+            for path in (output_raster, output_vector)
+            if path and os.path.exists(path)
+        ]
+        if existing_outputs:
+            paths_text = "\n".join(existing_outputs)
+            reply = QMessageBox.question(
+                self,
+                "Overwrite Existing File",
+                f"The following output file(s) already exist:\n{paths_text}\n\nOverwrite?",
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
         params = {
             "before_path": os.path.abspath(before.source()),
             "after_path": os.path.abspath(after.source()),

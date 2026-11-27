@@ -287,17 +287,17 @@ class ChangeDetection:
             # Store original size for later use
             original_shape = img1_data.shape[:2]
 
-            # Resize to target size for torchange processing
-            if img1_data.shape[0] != target_size or img1_data.shape[1] != target_size:
+            # Resize each image independently to target size for torchange processing
+            img1_resized = img1_data
+            img2_resized = img2_data
+            if img1_data.shape[:2] != (target_size, target_size):
                 img1_resized = resize(
                     img1_data, (target_size, target_size), preserve_range=True
                 ).astype(np.uint8)
+            if img2_data.shape[:2] != (target_size, target_size):
                 img2_resized = resize(
                     img2_data, (target_size, target_size), preserve_range=True
                 ).astype(np.uint8)
-            else:
-                img1_resized = img1_data
-                img2_resized = img2_data
 
             return (img1_resized, img2_resized, transform, crs, original_shape)
 
