@@ -70,13 +70,13 @@ def read_tile(
 
     Returns
     -------
-    coord : (N, 3) float32
+    coord : (N, 3) float64
     strength : (N, 1) float32  normalised return_number [0, 1] (falls back to intensity)
     segment : (N,) int32  class labels clipped to [0, 8]
     """
     las = laspy.read(str(las_path))
 
-    coord = np.column_stack([las.x, las.y, las.z]).astype(np.float32)
+    coord = np.column_stack([las.x, las.y, las.z]).astype(np.float64)
 
     # DALES tiles have zero intensity but useful multi-return info.
     # Use return_number (normalised to [0, 1]) as the feature channel;
@@ -128,11 +128,11 @@ def split_into_blocks(
             )
             n = int(mask.sum())
             if n >= min_points:
-                block_coord = coord[mask].copy()
+                block_coord = coord[mask].astype(np.float64, copy=False)
                 # Centre in float64 to avoid catastrophic cancellation
                 # with large UTM offsets (Y ~ 5 × 10⁶ causes f32 precision loss).
-                centre = block_coord.astype(np.float64).mean(axis=0)
-                centred = (block_coord.astype(np.float64) - centre).astype(np.float32)
+                centre = block_coord.mean(axis=0)
+                centred = (block_coord - centre).astype(np.float32)
                 blocks.append(
                     {
                         "coord": centred,

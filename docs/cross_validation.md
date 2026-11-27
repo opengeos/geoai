@@ -6,7 +6,7 @@ on NumPy, so it works with custom tree-crown pipelines and different training
 frameworks. `geoai.run_kfold` and `geoai.compute_fold_indices` are also available.
 
 For an executable dataset walkthrough, open the
-[K-fold cross-validation notebook](examples/kfold_cross_validation.ipynb). It
+[K-fold cross-validation notebook](examples/kfold_cross_validation.md). It
 uses built-in U-Net training, performance plots, batch inference, and prediction
 comparisons. Configure your image/mask paths and select a Python environment
 with the local GeoAI checkout, PyTorch, and segmentation-models-pytorch installed.

@@ -13,9 +13,9 @@ early stopping. Pass the returned `ensemble_model_paths` to batch inference to
 average selected fold models' probabilities on new imagery.
 
 !!! example "Related Examples"
-    - [Train Object Detection Model](examples/train_object_detection_model.ipynb)
-    - [Train Segmentation Model](examples/train_segmentation_model.ipynb)
-    - [K-fold Cross-validation](examples/kfold_cross_validation.ipynb)
-    - [Train Instance Segmentation Model](examples/train_instance_segmentation_model.ipynb)
+    - [Train Object Detection Model](examples/train_object_detection_model.md)
+    - [Train Segmentation Model](examples/train_segmentation_model.md)
+    - [K-fold Cross-validation](examples/kfold_cross_validation.md)
+    - [Train Instance Segmentation Model](examples/train_instance_segmentation_model.md)
 
 ::: geoai.train

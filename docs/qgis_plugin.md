@@ -46,7 +46,7 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 
 ### Water Segmentation Panel (OmniWaterMask)
 
-- **Water Body Detection**: Automated water body segmentation from satellite and aerial imagery using the [OmniWaterMask](https://github.com/NikolasEnt/OmniWaterMask) model
+- **Water Body Detection**: Automated water body segmentation from satellite and aerial imagery using the [OmniWaterMask](https://github.com/DPIRD-DMA/OmniWaterMask) model
 - **Band Configuration**: Configurable band ordering for multispectral images (RGBN, BGRN, etc.)
 - **Patch-based Inference**: Sliding window inference with configurable patch size, overlap, and batch size
 - **OSM Integration**: Optional OpenStreetMap data for refinement (water features, buildings, roads)
@@ -358,7 +358,7 @@ python install.py --remove
 
 Option C — manual copy:
 
-- Copy the `qgis_plugin` folder to your QGIS plugins directory:
+- Copy the `qgis_plugin/geoai` folder to your QGIS plugins directory:
     - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
     - Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
     - macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
@@ -735,7 +735,7 @@ The QGIS plugin supports any models supported by [Pytorch Segmentation Models](h
 
 ## License
 
-MIT License - see [LICENSE](../LICENSE) for details.
+MIT License - see [LICENSE](https://github.com/opengeos/geoai/blob/main/LICENSE) for details.
 
 ## Links
 

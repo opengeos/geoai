@@ -136,11 +136,11 @@ Comprehensive documentation is available at [https://opengeoai.org](https://open
 
 ### GeoAI Made Easy: Learn the Python Package Step-by-Step (Beginner Friendly)
 
-[![intro](https://github.com/user-attachments/assets/7e60ce05-573d-4d0d-9876-5289b87e5136)](https://youtu.be/VIl29Rca6zE&list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
+[![intro](https://github.com/user-attachments/assets/7e60ce05-573d-4d0d-9876-5289b87e5136)](https://youtu.be/VIl29Rca6zE?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 
 ### GeoAI Workshop: Unlocking the Power of GeoAI with Python
 
-[![cover](https://github.com/user-attachments/assets/1c14e651-65b9-41ae-b42d-3ad028b3eeb8)](https://youtu.be/jdK-cleFUkc&list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
+[![cover](https://github.com/user-attachments/assets/1c14e651-65b9-41ae-b42d-3ad028b3eeb8)](https://youtu.be/jdK-cleFUkc?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 
 ### GeoAI Tutorials Playlist
 
