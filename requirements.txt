@@ -18,7 +18,7 @@ planetary-computer
 pyarrow
 pystac-client
 rasterio
-requests>=2.33.0
+requests>=2.34.2
 rioxarray
 safetensors
 scikit-image
