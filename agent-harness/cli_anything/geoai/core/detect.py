@@ -71,11 +71,17 @@ def run_detection(
 
     from geoai.object_detect import multiclass_detection
 
+    if overlap < 0:
+        raise ValueError(f"overlap must be non-negative, got {overlap}")
     overlap_px = (
         int(chip_size * overlap)
-        if isinstance(overlap, float) and 0.0 <= overlap < 1.0
+        if isinstance(overlap, float) and 0.0 < overlap < 1.0
         else int(overlap)
     )
+    if overlap_px >= chip_size:
+        raise ValueError(
+            f"Resolved overlap ({overlap_px}px) must be smaller than chip_size ({chip_size}px)"
+        )
 
     temp_raster: Optional[str] = None
     if output_raster:

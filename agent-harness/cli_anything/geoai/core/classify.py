@@ -45,9 +45,10 @@ def train_classifier(
     if not os.path.isdir(train_dir):
         raise FileNotFoundError(f"Training directory not found: {train_dir}")
     if val_dir:
-        val_dir = os.path.abspath(val_dir)
-        if not os.path.isdir(val_dir):
-            raise FileNotFoundError(f"Validation directory not found: {val_dir}")
+        raise ValueError(
+            "Separate val_dir is not supported by geoai.recognize.train_image_classifier; "
+            "place all class subdirectories under train_dir instead."
+        )
 
     os.makedirs(output_dir, exist_ok=True)
 
