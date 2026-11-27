@@ -1,11 +1,11 @@
 """Change detection operations.
 
-Wraps geoai change detection functions: ChangeStar, AnyChange
+Wraps geoai change detection functions: ChangeStar and AnyChange (ChangeDetection)
 for CLI consumption.
 """
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 CHANGE_METHODS = ["changestar", "anychange"]
 
@@ -25,7 +25,7 @@ def detect_changes(
         image2: Path to the later image.
         output: Output change map file path.
         method: Detection method (changestar, anychange).
-        confidence_threshold: Confidence threshold for change pixels (0-255).
+        confidence_threshold: Confidence threshold for change pixels (0-255, or 0-1 float).
         min_area: Minimum area threshold for change regions in pixels.
 
     Returns:
@@ -53,8 +53,7 @@ def detect_changes(
 
     if method == "changestar":
         return _run_changestar(image1, image2, output, confidence_threshold, min_area)
-    else:
-        return _run_anychange(image1, image2, output, min_area)
+    return _run_anychange(image1, image2, output, min_area)
 
 
 def _run_changestar(
@@ -70,27 +69,33 @@ def _run_changestar(
         image1: Path to the earlier image.
         image2: Path to the later image.
         output: Output change map path.
-        confidence_threshold: Confidence threshold.
+        confidence_threshold: Confidence threshold (0-255 integer or 0-1 float).
         min_area: Minimum area threshold.
 
     Returns:
         Result dict.
     """
-    from geoai import changestar_detect
+    from geoai.change_detection import changestar_detect
 
-    changestar_detect(
-        image1=image1,
-        image2=image2,
-        output=output,
-        change_confidence_threshold=confidence_threshold,
-        min_area=min_area,
+    threshold = (
+        float(confidence_threshold) / 255.0
+        if confidence_threshold > 1
+        else float(confidence_threshold)
     )
 
-    result = {
+    changestar_detect(
+        image1_path=image1,
+        image2_path=image2,
+        output_change=output,
+        threshold=threshold,
+    )
+
+    result: Dict[str, Any] = {
         "image1": image1,
         "image2": image2,
         "output": output,
         "method": "changestar",
+        "threshold": round(threshold, 4),
         "confidence_threshold": confidence_threshold,
         "min_area": min_area,
     }
@@ -108,7 +113,7 @@ def _run_anychange(
     output: str,
     min_area: int,
 ) -> Dict[str, Any]:
-    """Run AnyChange change detection.
+    """Run AnyChange (ChangeDetection) change detection.
 
     Args:
         image1: Path to the earlier image.
@@ -119,12 +124,16 @@ def _run_anychange(
     Returns:
         Result dict.
     """
-    from geoai.change_detection import AnyChangeDetection
+    from geoai.change_detection import ChangeDetection
 
-    detector = AnyChangeDetection()
-    detector.detect(image1=image1, image2=image2, output=output, min_area=min_area)
+    detector = ChangeDetection()
+    detector.detect_changes(
+        image1_path=image1,
+        image2_path=image2,
+        output_path=output,
+    )
 
-    result = {
+    result: Dict[str, Any] = {
         "image1": image1,
         "image2": image2,
         "output": output,

@@ -27,28 +27,17 @@ __author__ = "GeoAI Team"
 from .config import GeoAIConfig, load_config
 
 
-def mcp(*args, **kwargs):
-    """
-    Entry point for the GeoAI MCP server.
+def __getattr__(name: str):
+    """Lazily expose ``mcp`` and ``main`` from ``geoai_mcp_server.server``."""
+    if name == "mcp":
+        from .server import mcp as _mcp
 
-    This function lazily imports and delegates to ``geoai_mcp_server.server.mcp``
-    to avoid importing the side-effectful ``server`` module at package import time.
-    """
-    from .server import mcp as _mcp
+        return _mcp
+    if name == "main":
+        from .server import main as _main
 
-    return _mcp(*args, **kwargs)
-
-
-def main(*args, **kwargs):
-    """
-    Main CLI entry point for running the GeoAI MCP server.
-
-    This function lazily imports and delegates to ``geoai_mcp_server.server.main``
-    to avoid importing the side-effectful ``server`` module at package import time.
-    """
-    from .server import main as _main
-
-    return _main(*args, **kwargs)
+        return _main
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [

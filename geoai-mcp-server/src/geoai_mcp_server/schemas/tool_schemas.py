@@ -6,7 +6,7 @@ enabling automatic validation and documentation generation.
 
 from enum import Enum
 from typing import Any, Optional, List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # =============================================================================
 # Common Enums and Types
@@ -20,6 +20,17 @@ class OutputFormat(str, Enum):
     GEOJSON = "geojson"
     SHAPEFILE = "shapefile"
     GEOPACKAGE = "geopackage"
+
+    @property
+    def extension(self) -> str:
+        """Return the canonical file extension (without leading dot)."""
+        extensions = {
+            OutputFormat.GEOTIFF: "tif",
+            OutputFormat.GEOJSON: "geojson",
+            OutputFormat.SHAPEFILE: "shp",
+            OutputFormat.GEOPACKAGE: "gpkg",
+        }
+        return extensions[self]
 
 
 class DataSource(str, Enum):
@@ -82,6 +93,19 @@ class BoundingBox(BaseModel):
     min_lat: float = Field(..., description="Minimum latitude (south)", ge=-90, le=90)
     max_lon: float = Field(..., description="Maximum longitude (east)", ge=-180, le=180)
     max_lat: float = Field(..., description="Maximum latitude (north)", ge=-90, le=90)
+
+    @model_validator(mode="after")
+    def _validate_bounds_order(self) -> "BoundingBox":
+        """Ensure minimum coordinates are strictly less than maximum coordinates."""
+        if self.min_lon >= self.max_lon:
+            raise ValueError(
+                f"min_lon ({self.min_lon}) must be less than max_lon ({self.max_lon})"
+            )
+        if self.min_lat >= self.max_lat:
+            raise ValueError(
+                f"min_lat ({self.min_lat}) must be less than max_lat ({self.max_lat})"
+            )
+        return self
 
     def to_tuple(self) -> tuple[float, float, float, float]:
         """Convert to tuple format."""
@@ -506,3 +530,33 @@ class ListFilesResult(BaseResult):
     )
     total_count: int = Field(0, description="Total number of files")
     total_size_mb: float = Field(0, description="Total size in megabytes")
+
+
+class InspectRasterResult(BaseResult):
+    """Result schema for read-only raster inspection."""
+
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Raster metadata (CRS, shape, bands, bounds)"
+    )
+    band_stats: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Optional per-band statistics"
+    )
+
+
+class InspectVectorResult(BaseResult):
+    """Result schema for read-only vector inspection."""
+
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Vector metadata (feature count, CRS, geometry types, bounds, columns)",
+    )
+
+
+class StacSearchResult(BaseResult):
+    """Result schema for read-only STAC catalog search."""
+
+    collection: str = Field("", description="STAC collection searched")
+    total_items: int = Field(0, description="Number of matching STAC items")
+    items: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Matching STAC item summaries"
+    )

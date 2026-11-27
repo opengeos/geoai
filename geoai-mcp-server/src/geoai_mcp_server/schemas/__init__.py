@@ -5,6 +5,7 @@ from .tool_schemas import (
     BoundingBox,
     OutputFormat,
     DataSource,
+    FoundationModel,
     ModelType,
     SegmentationModel,
     DetectionTarget,
@@ -36,12 +37,16 @@ from .tool_schemas import (
     CleanResultsInput,
     CleanResultsResult,
     ListFilesResult,
+    InspectRasterResult,
+    InspectVectorResult,
+    StacSearchResult,
 )
 
 __all__ = [
     "BoundingBox",
     "OutputFormat",
     "DataSource",
+    "FoundationModel",
     "ModelType",
     "SegmentationModel",
     "DetectionTarget",
@@ -67,4 +72,7 @@ __all__ = [
     "CleanResultsInput",
     "CleanResultsResult",
     "ListFilesResult",
+    "InspectRasterResult",
+    "InspectVectorResult",
+    "StacSearchResult",
 ]

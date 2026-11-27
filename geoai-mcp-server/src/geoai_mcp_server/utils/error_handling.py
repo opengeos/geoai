@@ -158,7 +158,7 @@ class ProcessingError(GeoAIError):
         )
 
 
-class TimeoutError(GeoAIError):
+class OperationTimeoutError(GeoAIError):
     """Error raised when operation exceeds time limit."""
 
     def __init__(
@@ -180,6 +180,10 @@ class TimeoutError(GeoAIError):
             suggestion="Try with a smaller image, reduce tile size, or increase timeout.",
             retry_allowed=True,
         )
+
+
+# Backward-compatible alias for callers importing TimeoutError from this module.
+TimeoutError = OperationTimeoutError
 
 
 class ExternalServiceError(GeoAIError):

@@ -1,0 +1,65 @@
+name: Subpackages CI
+
+permissions:
+    contents: read
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - "geoai-mcp-server/**"
+            - "agent-harness/**"
+            - "geoai/**"
+            - ".github/workflows/subpackages.yml"
+    pull_request:
+        branches:
+            - main
+        paths:
+            - "geoai-mcp-server/**"
+            - "agent-harness/**"
+            - "geoai/**"
+            - ".github/workflows/subpackages.yml"
+
+jobs:
+    test-subpackages:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+              with:
+                  version: ""
+                  enable-cache: false
+
+            - name: Set up Python 3.12
+              run: uv python install 3.12
+
+            - name: Install subpackage test dependencies
+              run: |
+                  uv venv --python 3.12
+                  uv pip install \
+                      pytest \
+                      pytest-asyncio \
+                      mcp \
+                      pydantic \
+                      python-dotenv \
+                      click \
+                      prompt-toolkit \
+                      rasterio \
+                      geopandas \
+                      shapely \
+                      numpy \
+                      tqdm \
+                      pyyaml
+
+            - name: Run geoai-mcp-server tests
+              run: |
+                  PYTHONPATH="${{ github.workspace }}:${{ github.workspace }}/geoai-mcp-server/src" \
+                      .venv/bin/python -m pytest geoai-mcp-server/tests -v
+
+            - name: Run agent-harness tests
+              run: |
+                  PYTHONPATH="${{ github.workspace }}:${{ github.workspace }}/agent-harness" \
+                      .venv/bin/python -m pytest agent-harness/cli_anything/geoai/tests -v

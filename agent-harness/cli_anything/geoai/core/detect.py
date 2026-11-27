@@ -5,6 +5,7 @@ Wraps geoai object detection functions (Mask R-CNN and friends via
 """
 
 import os
+import tempfile
 from typing import Any, Dict, List, Optional
 
 DETECTION_MODELS = [
@@ -42,13 +43,14 @@ def run_detection(
         band_indexes: Band indices to use (0-indexed).
         confidence_threshold: Minimum confidence for detections.
         chip_size: Processing chip size in pixels.
-        overlap: Overlap fraction between chips.
+        overlap: Overlap fraction (0-1) or overlap in pixels between chips.
 
     Returns:
         Result dict with output paths and detection count.
 
     Raises:
         FileNotFoundError: If input files do not exist.
+        ValueError: If neither output_vector nor output_raster is provided.
     """
     raster = os.path.abspath(raster)
     model_path = os.path.abspath(model_path)
@@ -57,6 +59,8 @@ def run_detection(
         raise FileNotFoundError(f"Raster file not found: {raster}")
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
+    if not output_vector and not output_raster:
+        raise ValueError("Specify at least one of output_vector or output_raster")
 
     if output_vector:
         output_vector = os.path.abspath(output_vector)
@@ -65,26 +69,53 @@ def run_detection(
         output_raster = os.path.abspath(output_raster)
         os.makedirs(os.path.dirname(output_raster) or ".", exist_ok=True)
 
-    from geoai import multiclass_detection
+    from geoai.object_detect import multiclass_detection
 
-    kwargs = {
-        "raster": raster,
-        "model_path": model_path,
-        "num_classes": num_classes,
-        "confidence_threshold": confidence_threshold,
-        "chip_size": chip_size,
-        "overlap": overlap,
-    }
-    if output_vector:
-        kwargs["output_vector"] = output_vector
+    overlap_px = (
+        int(chip_size * overlap)
+        if isinstance(overlap, float) and 0.0 <= overlap < 1.0
+        else int(overlap)
+    )
+
+    temp_raster: Optional[str] = None
     if output_raster:
-        kwargs["output_raster"] = output_raster
-    if band_indexes is not None:
-        kwargs["band_indexes"] = band_indexes
+        target_raster = output_raster
+    else:
+        fd, temp_raster = tempfile.mkstemp(
+            suffix=".tif",
+            prefix="geoai_det_",
+            dir=os.path.dirname(output_vector) or ".",
+        )
+        os.close(fd)
+        target_raster = temp_raster
 
-    multiclass_detection(**kwargs)
+    try:
+        kwargs: Dict[str, Any] = {
+            "input_path": raster,
+            "output_path": target_raster,
+            "model_path": model_path,
+            "num_classes": num_classes,
+            "confidence_threshold": confidence_threshold,
+            "window_size": chip_size,
+            "overlap": overlap_px,
+        }
+        if band_indexes is not None:
+            kwargs["num_channels"] = len(band_indexes)
 
-    result = {
+        multiclass_detection(**kwargs)
+
+        if output_vector and os.path.isfile(target_raster):
+            from geoai.utils import raster_to_vector
+
+            raster_to_vector(target_raster, output_vector)
+    finally:
+        if temp_raster and os.path.exists(temp_raster):
+            try:
+                os.unlink(temp_raster)
+            except OSError:
+                pass
+
+    result: Dict[str, Any] = {
         "input": raster,
         "model": model_path,
         "num_classes": num_classes,
@@ -158,7 +189,7 @@ def train_detector(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    from geoai import train_MaskRCNN_model
+    from geoai.train import train_MaskRCNN_model
 
     result = train_MaskRCNN_model(
         images_dir=images_dir,
@@ -167,7 +198,7 @@ def train_detector(
         model_name=model_name,
         num_classes=num_classes,
         input_format=input_format,
-        epochs=epochs,
+        num_epochs=epochs,
         batch_size=batch_size,
         learning_rate=learning_rate,
     )

@@ -5,10 +5,10 @@ tracks modifications, and supports undo/redo via deep-copy snapshots.
 """
 
 import copy
-import json
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+from cli_anything.geoai.utils.serialization import atomic_write_json
 
 
 class Session:
@@ -97,18 +97,21 @@ class Session:
         if not self._undo_stack:
             raise RuntimeError("Nothing to undo")
 
+        state = self._undo_stack.pop()
+        desc = state.get("description", "")
         self._redo_stack.append(
             {
                 "project": copy.deepcopy(self.project),
-                "description": "redo point",
+                "description": desc,
                 "timestamp": datetime.now().isoformat(),
             }
         )
+        if len(self._redo_stack) > self.MAX_UNDO:
+            self._redo_stack.pop(0)
 
-        state = self._undo_stack.pop()
         self.project = state["project"]
         self._modified = True
-        return state.get("description", "")
+        return desc
 
     def redo(self) -> str:
         """Redo a previously undone operation.
@@ -122,18 +125,21 @@ class Session:
         if not self._redo_stack:
             raise RuntimeError("Nothing to redo")
 
+        state = self._redo_stack.pop()
+        desc = state.get("description", "")
         self._undo_stack.append(
             {
                 "project": copy.deepcopy(self.project),
-                "description": "undo point",
+                "description": desc,
                 "timestamp": datetime.now().isoformat(),
             }
         )
+        if len(self._undo_stack) > self.MAX_UNDO:
+            self._undo_stack.pop(0)
 
-        state = self._redo_stack.pop()
         self.project = state["project"]
         self._modified = True
-        return state.get("description", "")
+        return desc
 
     def history(self) -> List[Dict[str, str]]:
         """Get the undo history.
@@ -186,16 +192,13 @@ class Session:
         if save_path is None:
             raise RuntimeError("No save path specified. Use 'project save -o <path>'.")
 
-        save_path = os.path.abspath(save_path)
-        self.project["modified"] = datetime.now().isoformat()
+        new_modified = datetime.now().isoformat()
+        payload = dict(self.project)
+        payload["modified"] = new_modified
 
-        os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+        abs_path = atomic_write_json(payload, save_path)
 
-        tmp_path = save_path + ".tmp"
-        with open(tmp_path, "w") as f:
-            json.dump(self.project, f, indent=2, default=str)
-        os.replace(tmp_path, save_path)
-
-        self.project_path = save_path
+        self.project["modified"] = new_modified
+        self.project_path = abs_path
         self._modified = False
-        return save_path
+        return abs_path

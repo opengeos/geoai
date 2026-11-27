@@ -5,7 +5,7 @@ and model training for CLI consumption.
 """
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 SAM_MODELS = [
     "facebook/sam-vit-huge",
@@ -37,6 +37,37 @@ SEGMENTATION_BACKBONES = [
     "mobilenet_v2",
     "resnext50_32x4d",
 ]
+
+SUPPORTED_LOSSES = ("ce", "dice", "focal", "jaccard")
+
+
+def _resolve_loss_fn(loss: str):
+    """Map a CLI loss name to an optional torch.nn.Module for train_segmentation_model."""
+    if loss not in SUPPORTED_LOSSES:
+        raise ValueError(
+            f"Unknown loss function: {loss}. "
+            f"Choose from: {', '.join(SUPPORTED_LOSSES)}"
+        )
+    if loss == "ce":
+        return None
+    if loss == "dice":
+        from geoai.landcover_train import DiceLoss
+
+        return DiceLoss()
+    if loss == "focal":
+        from geoai.landcover_train import FocalLoss
+
+        return FocalLoss()
+    if loss == "jaccard":
+        try:
+            import segmentation_models_pytorch as smp
+
+            return smp.losses.JaccardLoss(mode="multiclass")
+        except ImportError:
+            from geoai.landcover_train import TverskyLoss
+
+            return TverskyLoss(alpha=0.5, beta=0.5)
+    return None
 
 
 def run_sam(
@@ -70,10 +101,10 @@ def run_sam(
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
-    from geoai import SamGeo
+    from geoai.sam import SamGeo
 
-    sam = SamGeo(model_id=model, automatic=automatic)
-    sam.generate(raster, output, foreground=foreground, unique=unique)
+    sam = SamGeo(model=model, automatic=automatic)
+    sam.generate(source=raster, output=output, foreground=foreground, unique=unique)
 
     result = {
         "input": raster,
@@ -121,14 +152,14 @@ def run_grounded_sam(
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
-    from geoai import GroundedSAM
+    from geoai.segment import GroundedSAM
 
     gsam = GroundedSAM(
         detector_id=detector_model,
         segmenter_id=segmenter_model,
         tile_size=tile_size,
     )
-    gsam.segment_image(raster, output, text_prompts=prompt)
+    gsam.segment_image(input_path=raster, output_path=output, text_prompts=prompt)
 
     result = {
         "input": raster,
@@ -163,7 +194,7 @@ def run_semantic_segmentation(
         num_classes: Number of classes in the model.
         band_indexes: Band indices to use (0-indexed). None for all bands.
         chip_size: Size of processing chips.
-        overlap: Overlap fraction between chips.
+        overlap: Overlap fraction (0-1) or overlap in pixels between chips.
 
     Returns:
         Result dict with output path.
@@ -182,20 +213,26 @@ def run_semantic_segmentation(
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
-    from geoai import semantic_segmentation
+    from geoai.train import semantic_segmentation
 
-    kwargs = {
+    overlap_px = (
+        int(chip_size * overlap)
+        if isinstance(overlap, float) and 0.0 <= overlap < 1.0
+        else int(overlap)
+    )
+
+    kwargs: Dict[str, Any] = {
         "num_classes": num_classes,
-        "chip_size": chip_size,
-        "overlap": overlap,
+        "window_size": chip_size,
+        "overlap": overlap_px,
     }
     if band_indexes is not None:
-        kwargs["band_indexes"] = band_indexes
+        kwargs["num_channels"] = len(band_indexes)
 
     semantic_segmentation(
-        raster=raster,
+        input_path=raster,
+        output_path=output,
         model_path=model_path,
-        output=output,
         **kwargs,
     )
 
@@ -205,7 +242,7 @@ def run_semantic_segmentation(
         "output": output,
         "num_classes": num_classes,
         "chip_size": chip_size,
-        "overlap": overlap,
+        "overlap": overlap_px,
     }
 
     if os.path.isfile(output):
@@ -247,7 +284,7 @@ def train_segmentation(
 
     Raises:
         FileNotFoundError: If input directories do not exist.
-        ValueError: If architecture or backbone is invalid.
+        ValueError: If architecture or loss is invalid.
     """
     image_root = os.path.abspath(image_root)
     label_root = os.path.abspath(label_root)
@@ -264,22 +301,23 @@ def train_segmentation(
             f"Choose from: {', '.join(SEGMENTATION_ARCHITECTURES)}"
         )
 
+    loss_fn = _resolve_loss_fn(loss)
     os.makedirs(output_dir, exist_ok=True)
 
-    from geoai import train_segmentation_model
+    from geoai.train import train_segmentation_model
 
     result = train_segmentation_model(
-        image_root=image_root,
-        label_root=label_root,
+        images_dir=image_root,
+        labels_dir=label_root,
         output_dir=output_dir,
-        model=architecture,
-        backbone=backbone,
+        architecture=architecture,
+        encoder_name=backbone,
+        num_channels=in_channels,
         num_classes=num_classes,
-        in_channels=in_channels,
-        epochs=epochs,
+        num_epochs=epochs,
         batch_size=batch_size,
         learning_rate=learning_rate,
-        loss=loss,
+        loss_fn=loss_fn,
     )
 
     return {

@@ -4,8 +4,11 @@ Wraps geoai raster utility functions for CLI consumption.
 All functions return JSON-serializable dicts.
 """
 
+import math
 import os
 from typing import Any, Dict, List, Optional
+
+from cli_anything.geoai.utils.serialization import sanitize_json_value, serialize_info
 
 
 def get_raster_info(path: str) -> Dict[str, Any]:
@@ -29,7 +32,7 @@ def get_raster_info(path: str) -> Dict[str, Any]:
         from geoai.utils import get_raster_info as _get_info
 
         info = _get_info(path)
-        return _serialize_info(info)
+        return serialize_info(info)
     except ImportError:
         return _get_raster_info_rasterio(path)
 
@@ -60,24 +63,27 @@ def get_raster_stats(path: str, band: int = 1) -> Dict[str, Any]:
         data = src.read(band)
         nodata = src.nodata
 
-        mask = np.ones(data.shape, dtype=bool)
-        if nodata is not None:
+        mask = np.isfinite(data)
+        if nodata is not None and not (
+            isinstance(nodata, float) and math.isnan(nodata)
+        ):
             mask &= data != nodata
-        mask &= ~np.isnan(data)
 
         valid = data[mask]
 
-        return {
-            "band": band,
-            "min": float(np.min(valid)) if valid.size > 0 else None,
-            "max": float(np.max(valid)) if valid.size > 0 else None,
-            "mean": float(np.mean(valid)) if valid.size > 0 else None,
-            "std": float(np.std(valid)) if valid.size > 0 else None,
-            "valid_pixels": int(valid.size),
-            "nodata_pixels": int(data.size - valid.size),
-            "total_pixels": int(data.size),
-            "nodata_value": float(nodata) if nodata is not None else None,
-        }
+        return sanitize_json_value(
+            {
+                "band": band,
+                "min": float(np.min(valid)) if valid.size > 0 else None,
+                "max": float(np.max(valid)) if valid.size > 0 else None,
+                "mean": float(np.mean(valid)) if valid.size > 0 else None,
+                "std": float(np.std(valid)) if valid.size > 0 else None,
+                "valid_pixels": int(valid.size),
+                "nodata_pixels": int(data.size - valid.size),
+                "total_pixels": int(data.size),
+                "nodata_value": float(nodata) if nodata is not None else None,
+            }
+        )
 
 
 def tile_raster(
@@ -192,49 +198,23 @@ def _get_raster_info_rasterio(path: str) -> Dict[str, Any]:
     import rasterio
 
     with rasterio.open(path) as src:
-        return {
-            "path": path,
-            "driver": src.driver,
-            "dtype": str(src.dtypes[0]),
-            "width": src.width,
-            "height": src.height,
-            "bands": src.count,
-            "crs": str(src.crs) if src.crs else None,
-            "bounds": {
-                "left": src.bounds.left,
-                "bottom": src.bounds.bottom,
-                "right": src.bounds.right,
-                "top": src.bounds.top,
-            },
-            "resolution": {"x": src.res[0], "y": src.res[1]},
-            "nodata": src.nodata,
-            "file_size_bytes": os.path.getsize(path),
-        }
-
-
-def _serialize_info(info: Any) -> Dict[str, Any]:
-    """Convert geoai info output to a clean JSON-serializable dict.
-
-    Args:
-        info: Info dict or object from geoai.
-
-    Returns:
-        Cleaned dict.
-    """
-    if isinstance(info, dict):
-        result = {}
-        for k, v in info.items():
-            if hasattr(v, "__geo_interface__"):
-                result[k] = str(v)
-            elif hasattr(v, "tolist"):
-                result[k] = v.tolist()
-            else:
-                try:
-                    import json
-
-                    json.dumps(v)
-                    result[k] = v
-                except (TypeError, ValueError):
-                    result[k] = str(v)
-        return result
-    return {"info": str(info)}
+        return sanitize_json_value(
+            {
+                "path": path,
+                "driver": src.driver,
+                "dtype": str(src.dtypes[0]),
+                "width": src.width,
+                "height": src.height,
+                "bands": src.count,
+                "crs": str(src.crs) if src.crs else None,
+                "bounds": {
+                    "left": src.bounds.left,
+                    "bottom": src.bounds.bottom,
+                    "right": src.bounds.right,
+                    "top": src.bounds.top,
+                },
+                "resolution": {"x": src.res[0], "y": src.res[1]},
+                "nodata": src.nodata,
+                "file_size_bytes": os.path.getsize(path),
+            }
+        )

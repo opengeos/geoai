@@ -182,6 +182,63 @@ def validate_output_subdir(subdir: str | Path, config: Optional[Any] = None) -> 
     return full_path
 
 
+def get_safe_file_path(
+    filename: str, source: str = "input", config: Optional[Any] = None
+) -> Path:
+    """Get a safe path for reading a file from either the input or output directory.
+
+    Args:
+        filename: Filename or relative path within the selected workspace directory.
+        source: Workspace directory to resolve against ("input" or "output").
+        config: Optional configuration object (uses global config if not provided).
+
+    Returns:
+        Safe absolute path to the existing file.
+
+    Raises:
+        InputValidationError: If source is invalid or filename contains traversal.
+        FileAccessError: If the resolved path escapes the directory or does not exist.
+    """
+    if source not in ("input", "output"):
+        raise InputValidationError(
+            message=f"Invalid source directory '{source}'. Use 'input' or 'output'.",
+            parameter_name="source",
+            received_value=source,
+            expected="'input' or 'output'",
+        )
+
+    if not filename or "\x00" in filename or ".." in Path(filename).parts:
+        raise InputValidationError(
+            message="Filename cannot be empty or contain '..'",
+            parameter_name="filename",
+            received_value=filename,
+            expected="A relative filename without directory traversal",
+        )
+
+    if config is None:
+        config = get_config()
+
+    base_dir = (config.input_dir if source == "input" else config.output_dir).resolve()
+    full_path = (base_dir / filename).resolve()
+
+    if not _is_path_within_directory(full_path, base_dir):
+        logger.warning(f"Path traversal attempt blocked ({source}): {filename}")
+        raise FileAccessError(
+            message=f"Path is outside allowed {source} directory",
+            file_path=filename,
+            operation="read",
+        )
+
+    if not full_path.exists():
+        raise FileAccessError(
+            message=f"File not found in {source} directory: {filename}",
+            file_path=filename,
+            operation="read",
+        )
+
+    return full_path
+
+
 def get_safe_input_path(filename: str, config: Optional[Any] = None) -> Path:
     """Get a safe path for reading an input file.
 
@@ -196,37 +253,7 @@ def get_safe_input_path(filename: str, config: Optional[Any] = None) -> Path:
         InputValidationError: If filename contains path traversal
         FileAccessError: If file doesn't exist
     """
-    # Check for traversal attempts
-    if ".." in filename:
-        raise InputValidationError(
-            message="Filename cannot contain '..'",
-            parameter_name="filename",
-            received_value=filename,
-            expected="A filename without directory traversal",
-        )
-
-    if config is None:
-        config = get_config()
-
-    full_path = (config.input_dir / filename).resolve()
-
-    # Security check: ensure path is within input directory
-    if not _is_path_within_directory(full_path, config.input_dir):
-        logger.warning(f"Path traversal attempt blocked: {filename}")
-        raise FileAccessError(
-            message="Input path is outside allowed directory",
-            file_path=filename,
-            operation="read",
-        )
-
-    if not full_path.exists():
-        raise FileAccessError(
-            message=f"File not found in input directory: {filename}",
-            file_path=filename,
-            operation="read",
-        )
-
-    return full_path
+    return get_safe_file_path(filename, source="input", config=config)
 
 
 def get_safe_output_path(
@@ -282,6 +309,7 @@ def list_input_files(
     pattern: str = "*",
     extensions: Optional[List[str]] = None,
     recursive: bool = False,
+    max_files: int = 500,
 ) -> List[Path]:
     """List files in a directory.
 
@@ -290,14 +318,15 @@ def list_input_files(
         pattern: Glob pattern to match (default: all files)
         extensions: Filter by extensions (e.g., ['.tif', '.tiff'])
         recursive: Whether to search subdirectories
+        max_files: Maximum number of matching files to return (default: 500)
 
     Returns:
         List of Path objects for matching files
 
     Raises:
-        InputValidationError: If pattern contains path traversal attempts
+        InputValidationError: If pattern contains path traversal or '**' wildcards
     """
-    # Security: reject patterns that could escape the base directory
+    # Security: reject patterns that could escape the base directory or cause glob DoS
     if ".." in pattern or pattern.startswith("/") or pattern.startswith("\\"):
         raise InputValidationError(
             message="Pattern cannot contain '..' or absolute path prefixes",
@@ -305,31 +334,47 @@ def list_input_files(
             received_value=pattern,
             expected="A safe glob pattern without directory traversal",
         )
+    if "**" in pattern:
+        raise InputValidationError(
+            message="Pattern cannot contain '**' recursive wildcards",
+            parameter_name="pattern",
+            received_value=pattern,
+            expected="A non-recursive glob pattern without '**'",
+        )
 
     if base_dir is None:
         config = get_config()
         base_dir = config.input_dir
 
     base_dir = base_dir.resolve()
+    if not base_dir.exists():
+        return []
 
-    if recursive:
-        files = list(base_dir.rglob(pattern))
-    else:
-        files = list(base_dir.glob(pattern))
-
-    # Security: filter out any files that somehow escaped base_dir
-    files = [f for f in files if _is_path_within_directory(f, base_dir)]
-
-    # Filter by extensions if specified
+    normalized_exts = None
     if extensions:
-        extensions = [
+        normalized_exts = {
             ext.lower() if ext.startswith(".") else f".{ext.lower()}"
             for ext in extensions
-        ]
-        files = [f for f in files if f.suffix.lower() in extensions]
+        }
 
-    # Return only files (not directories)
-    return sorted([f for f in files if f.is_file()])
+    iterator = base_dir.rglob(pattern) if recursive else base_dir.glob(pattern)
+
+    matched: List[Path] = []
+    for candidate in iterator:
+        if not _is_path_within_directory(candidate, base_dir):
+            continue
+        if not candidate.is_file():
+            continue
+        if (
+            normalized_exts is not None
+            and candidate.suffix.lower() not in normalized_exts
+        ):
+            continue
+        matched.append(candidate)
+        if max_files > 0 and len(matched) >= max_files:
+            break
+
+    return sorted(matched)
 
 
 def generate_output_filename(
@@ -367,19 +412,3 @@ def generate_output_filename(
         extension = f".{extension}"
 
     return "_".join(parts) + extension
-
-
-def _format_size(size_bytes: int) -> str:
-    """Format file size in human-readable format.
-
-    Args:
-        size_bytes: Size in bytes
-
-    Returns:
-        Human-readable size string
-    """
-    for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.1f} PB"

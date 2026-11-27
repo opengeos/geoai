@@ -65,6 +65,33 @@ class TestBoundingBox:
                 max_lat=37.8,
             )
 
+    def test_inverted_bounds_rejected(self):
+        """Test min >= max longitude or latitude raises ValidationError."""
+        with pytest.raises(ValidationError):
+            BoundingBox(
+                min_lon=-122.4,
+                min_lat=37.7,
+                max_lon=-122.5,
+                max_lat=37.8,
+            )
+        with pytest.raises(ValidationError):
+            BoundingBox(
+                min_lon=-122.5,
+                min_lat=37.8,
+                max_lon=-122.4,
+                max_lat=37.7,
+            )
+
+
+class TestOutputFormat:
+    """Tests for OutputFormat enum and file extensions."""
+
+    def test_extension_mapping(self):
+        assert OutputFormat.GEOTIFF.extension == "tif"
+        assert OutputFormat.GEOJSON.extension == "geojson"
+        assert OutputFormat.SHAPEFILE.extension == "shp"
+        assert OutputFormat.GEOPACKAGE.extension == "gpkg"
+
 
 class TestSegmentObjectsInput:
     """Tests for SegmentObjectsInput schema."""
