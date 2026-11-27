@@ -586,6 +586,7 @@ class SamGeoDockWidget(QDockWidget):
             on_error: Called with the error message on the main thread.
         """
         if self._hf_worker is not None and self._hf_worker.isRunning():
+            self._drop_queued_hf_task()
             self._hf_queued = (action, params, on_done, on_error)
             return
 
@@ -600,6 +601,22 @@ class SamGeoDockWidget(QDockWidget):
         self._hf_worker.finished.connect(self._start_queued_hf_task)
         self._hf_worker.error.connect(self._start_queued_hf_task)
         self._hf_worker.start()
+
+    def _drop_queued_hf_task(self):
+        """Discard the queued Hugging Face task without running it.
+
+        A queued login has already locked the Log in button and the token
+        field; its callbacks would normally unlock them, so unlock them here
+        when it is dropped instead.
+        """
+        queued = self._hf_queued
+        self._hf_queued = None
+        if queued is not None and queued[0] == "hf_login":
+            try:
+                self.hf_login_btn.setEnabled(True)
+                self.hf_token_edit.setReadOnly(False)
+            except RuntimeError:
+                pass  # Widgets already deleted during teardown
 
     def _start_queued_hf_task(self, *_args):
         """Start the queued Hugging Face task, if any, after one finishes.
@@ -707,22 +724,19 @@ class SamGeoDockWidget(QDockWidget):
         """Make later model loads use the token saved by the panel login.
 
         Hugging Face gives ``HF_TOKEN`` (and the legacy
-        ``HUGGING_FACE_HUB_TOKEN``) priority over the saved token, and every
-        venv subprocess inherits the QGIS environment. After a successful
-        login those variables are removed from this QGIS session's
-        environment so new workers read the saved token. A model that is
-        already loaded keeps working; the next Load Model starts a fresh
-        worker with the new environment.
+        ``HUGGING_FACE_HUB_TOKEN``) priority over the saved token. Those
+        variables are dropped only from the environment of SamGeo workers
+        started after the login; the QGIS process environment (shared with
+        other plugins) is left unchanged. A model that is already loaded
+        keeps working; the next Load Model starts a fresh worker.
         """
-        removed = [
-            name
-            for name in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
-            if os.environ.pop(name, None) is not None
-        ]
-        if removed:
+        from ..core.samgeo_subprocess import prefer_saved_hf_token
+
+        overridden = prefer_saved_hf_token()
+        if overridden:
             self.log_message(
-                f"Ignoring {', '.join(removed)} from the QGIS environment for this "
-                "session so the token saved by the panel login is used."
+                f"New SamGeo workers will ignore {', '.join(overridden)} so the "
+                "token saved by the panel login is used."
             )
 
     def _create_text_tab(self):
@@ -2932,20 +2946,18 @@ class SamGeoDockWidget(QDockWidget):
             self.show_error("Please specify an export output directory.")
             return
 
+        temp_mask = None
         try:
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)
-            QCoreApplication.processEvents()
 
-            # First save the masks to a temporary raster file (a tiled run
-            # already wrote one)
+            # Stage the mask and capture its image before any processEvents():
+            # a set-image completion handled there can change
+            # current_image_path or delete a superseded tiled raster. A tiled
+            # mask is paired with the image it was segmented from.
             temp_mask = tempfile.NamedTemporaryFile(
                 suffix=".tif", delete=False, prefix="samgeo_export_"
             ).name
-
-            # Capture the image together with the staged mask: the
-            # processEvents() calls below can change current_image_path.
-            # A tiled mask must be paired with the image it came from.
             image_path = self.current_image_path
             if tiled is not None:
                 image_path = tiled_image or image_path
@@ -2953,6 +2965,7 @@ class SamGeoDockWidget(QDockWidget):
             else:
                 unique = self.unique_check.isChecked()
                 self.sam.save_masks(output=temp_mask, unique=unique)
+            QCoreApplication.processEvents()
 
             # Get export parameters
             export_format = self.export_format_combo.currentText()
@@ -2977,10 +2990,6 @@ class SamGeoDockWidget(QDockWidget):
                 skip_empty_tiles=True,
             )
 
-            # Clean up temp file
-            if os.path.exists(temp_mask):
-                os.remove(temp_mask)
-
             self.results_text.append(f"Training data exported to: {output_dir}")
             self.results_text.append(
                 f"Format: {export_format}, Tile size: {tile_size}x{tile_size}"
@@ -2998,8 +3007,14 @@ class SamGeoDockWidget(QDockWidget):
 
         except Exception as e:
             self.show_error(f"Failed to export training data: {str(e)}")
-
         finally:
+            # Remove the staged mask on success and failure alike, so a
+            # partial copy (e.g. a full disk) does not linger.
+            if temp_mask and os.path.exists(temp_mask):
+                try:
+                    os.remove(temp_mask)
+                except OSError:
+                    pass
             self.progress_bar.setVisible(False)
 
     def show_error(self, message):
@@ -3078,7 +3093,7 @@ class SamGeoDockWidget(QDockWidget):
             except RuntimeError:
                 pass  # Underlying C++ object already gone
             setattr(self, attr, None)
-        self._hf_queued = None
+        self._drop_queued_hf_task()
 
     def closeEvent(self, event):
         """Handle close event."""

@@ -29,6 +29,25 @@ def _log(message: str, level=Qgis.Info) -> None:
     QgsMessageLog.logMessage(message, "GeoAI", level=level)
 
 
+# Hugging Face gives these variables priority over the token saved by
+# ``huggingface_hub.login``. After a panel login they are dropped from the
+# SamGeo worker's environment only, leaving the QGIS process untouched.
+_HF_TOKEN_ENV_VARS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
+_PREFER_SAVED_HF_TOKEN = False
+
+
+def prefer_saved_hf_token() -> list:
+    """Make SamGeo workers started from now on use the saved HF token.
+
+    Returns:
+        Names of the token variables set in the QGIS environment that new
+        SamGeo workers will no longer inherit.
+    """
+    global _PREFER_SAVED_HF_TOKEN
+    _PREFER_SAVED_HF_TOKEN = True
+    return [name for name in _HF_TOKEN_ENV_VARS if os.environ.get(name)]
+
+
 class _MaskCountProxy:
     """Lightweight list-like placeholder so existing UI len()/truthiness checks work."""
 
@@ -98,6 +117,9 @@ class SamGeoSubprocessClient:
 
             cmd = [python_path, "-u", str(self.worker_script)]
             env = _get_clean_env_for_venv()
+            if _PREFER_SAVED_HF_TOKEN:
+                for name in _HF_TOKEN_ENV_VARS:
+                    env.pop(name, None)
             popen_kwargs = dict(_get_subprocess_kwargs())
 
             try:

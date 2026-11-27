@@ -281,7 +281,7 @@ def normalize_mask_scores(scores: Optional[Mapping]) -> Dict[int, float]:
         try:
             mask_id = int(float(key))
             score = float(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             continue
         if not math.isfinite(score):
             continue
@@ -302,7 +302,7 @@ def mask_id_from_value(value) -> Optional[int]:
         return None
     try:
         return int(round(float(value)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 

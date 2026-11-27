@@ -256,7 +256,12 @@ def test_login_success_clears_only_the_submitted_token(hf_dock, monkeypatch):
     assert hf_dock.hf_token_edit.text() == "hf_SomethingElse"
 
 
-def test_login_success_drops_inherited_hf_token(hf_dock, monkeypatch):
+def test_login_success_drops_inherited_hf_token_for_samgeo_workers_only(
+    hf_dock, monkeypatch
+):
+    from geoai.core import samgeo_subprocess
+
+    monkeypatch.setattr(samgeo_subprocess, "_PREFER_SAVED_HF_TOKEN", False)
     monkeypatch.setenv("HF_TOKEN", "hf_OldEnvironmentToken")
     monkeypatch.setenv("HUGGING_FACE_HUB_TOKEN", "hf_OldLegacyToken")
     tasks = _capture_hf_tasks(hf_dock, monkeypatch)
@@ -265,8 +270,11 @@ def test_login_success_drops_inherited_hf_token(hf_dock, monkeypatch):
 
     tasks[0][2]({"logged_in": True, "user": None})
 
-    assert "HF_TOKEN" not in os.environ
-    assert "HUGGING_FACE_HUB_TOKEN" not in os.environ
+    # The QGIS process environment (shared with other plugins) is untouched;
+    # only SamGeo workers started from now on drop the variables.
+    assert os.environ["HF_TOKEN"] == "hf_OldEnvironmentToken"
+    assert os.environ["HUGGING_FACE_HUB_TOKEN"] == "hf_OldLegacyToken"
+    assert samgeo_subprocess._PREFER_SAVED_HF_TOKEN is True
     assert "unknown user" in hf_dock.hf_status_label.text()
 
 
@@ -276,9 +284,13 @@ def test_login_failure_keeps_env_and_redacts(hf_dock, monkeypatch):
     hf_dock.hf_token_edit.setText(TOKEN)
     hf_dock.hf_login()
 
+    from geoai.core import samgeo_subprocess
+
+    monkeypatch.setattr(samgeo_subprocess, "_PREFER_SAVED_HF_TOKEN", False)
     tasks[0][3](f"Hugging Face login failed: bad token {TOKEN}")
 
     assert os.environ["HF_TOKEN"] == "hf_OldEnvironmentToken"
+    assert samgeo_subprocess._PREFER_SAVED_HF_TOKEN is False
     assert hf_dock.hf_login_btn.isEnabled()
     assert not hf_dock.hf_token_edit.isReadOnly()
     assert TOKEN not in hf_dock._test_errors[0]
@@ -477,3 +489,15 @@ def test_cleanup_keeps_running_thread_alive_until_it_finishes(dock, qapp):
         time.sleep(0.01)
     assert worker not in samgeo._LIVE_THREADS
     assert not worker.isRunning()
+
+
+def test_dropping_a_queued_login_unlocks_the_controls(hf_dock):
+    hf_dock.hf_login_btn.setEnabled(False)
+    hf_dock.hf_token_edit.setReadOnly(True)
+    hf_dock._hf_queued = ("hf_login", {"token": TOKEN}, None, None)
+
+    hf_dock._drop_queued_hf_task()
+
+    assert hf_dock._hf_queued is None
+    assert hf_dock.hf_login_btn.isEnabled()
+    assert not hf_dock.hf_token_edit.isReadOnly()

@@ -610,3 +610,41 @@ def test_worker_skips_infinite_and_float_string_score_keys():
     )
 
     assert samgeo_worker._mask_scores_of(sam) == {"2": 0.5, "3": 0.25}
+
+
+def test_samgeo_worker_env_drops_hf_token_only_after_panel_login(monkeypatch):
+    from geoai.core import samgeo_subprocess
+
+    captured = []
+
+    class _Stop(Exception):
+        pass
+
+    def fake_popen(cmd, **kwargs):
+        captured.append(kwargs["env"])
+        raise _Stop()
+
+    monkeypatch.setenv("HF_TOKEN", "hf_FromEnvironment")
+    monkeypatch.setattr(samgeo_subprocess, "venv_exists", lambda: True)
+    monkeypatch.setattr(
+        samgeo_subprocess, "get_venv_python_path", lambda: sys.executable
+    )
+    monkeypatch.setattr(
+        samgeo_subprocess, "_get_clean_env_for_venv", lambda: dict(os.environ)
+    )
+    monkeypatch.setattr(samgeo_subprocess, "_get_subprocess_kwargs", dict)
+    monkeypatch.setattr(samgeo_subprocess.subprocess, "Popen", fake_popen)
+
+    def start():
+        client = SamGeoSubprocessClient("SamGeo3 (SAM3)", "meta", "cpu", 0.5, False)
+        with pytest.raises(_Stop):
+            client.initialize()
+
+    monkeypatch.setattr(samgeo_subprocess, "_PREFER_SAVED_HF_TOKEN", False)
+    start()
+    assert captured[-1]["HF_TOKEN"] == "hf_FromEnvironment"
+
+    assert samgeo_subprocess.prefer_saved_hf_token() == ["HF_TOKEN"]
+    start()
+    assert "HF_TOKEN" not in captured[-1]
+    assert os.environ["HF_TOKEN"] == "hf_FromEnvironment"
