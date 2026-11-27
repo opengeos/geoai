@@ -64,11 +64,24 @@ class _PooledIoU(Metric):
         )
 
     def update(self, pred: torch.Tensor, target: torch.Tensor) -> None:
-        for cls in range(self.num_classes):
-            pred_cls = pred == cls
-            target_cls = target == cls
-            self.intersection[cls] += (pred_cls & target_cls).sum()
-            self.union[cls] += (pred_cls | target_cls).sum()
+        """Add one batch's per-class intersections and unions.
+
+        Args:
+            pred: Predicted class indices, any shape.
+            target: Target class indices, same shape as ``pred``. Values
+                outside ``[0, num_classes)`` (such as an ignore index) count
+                towards no class.
+        """
+        n = self.num_classes
+        pred = pred.flatten().long()
+        target = target.flatten().long()
+        pred_ok = (pred >= 0) & (pred < n)
+        target_ok = (target >= 0) & (target < n)
+        inter = torch.bincount(target[(pred == target) & target_ok], minlength=n)
+        pred_count = torch.bincount(pred[pred_ok], minlength=n)
+        target_count = torch.bincount(target[target_ok], minlength=n)
+        self.intersection += inter
+        self.union += pred_count + target_count - inter
 
     def compute(self) -> torch.Tensor:
         present = self.union > 0

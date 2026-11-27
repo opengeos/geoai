@@ -83,9 +83,14 @@ def test_validation_epochs_do_not_carry_over():
     model = _model()
     loader = DataLoader(TensorDataset(*_data()), batch_size=1)
     first = _trainer().validate(model, loader, verbose=False)[0]["val_iou"]
-    second = _trainer().validate(model, loader, verbose=False)[0]["val_iou"]
-    assert first == pytest.approx(second, abs=TOL)
     assert first == pytest.approx(POOLED_MIOU, abs=TOL)
+
+    # Only correctly predicted background: IoU is 1.0 unless the first
+    # run's counts were kept (which would give 0.4921875).
+    x, target = _data()
+    clean = DataLoader(TensorDataset(x[:1], target[:1]), batch_size=1)
+    second = _trainer().validate(model, clean, verbose=False)[0]["val_iou"]
+    assert second == pytest.approx(1.0, abs=TOL)
 
 
 def test_pooled_iou_matches_single_pass_and_skips_absent_classes():
@@ -118,3 +123,16 @@ def test_pooled_iou_is_zero_before_any_update():
 
 def test_metric_state_is_not_saved_in_checkpoints():
     assert not any("iou" in key for key in _model().state_dict())
+
+
+def test_pooled_iou_ignores_out_of_range_targets():
+    from geoai.timm_segment import _PooledIoU
+
+    pred = torch.tensor([0, 1, 1, 0])
+    target = torch.tensor([0, 1, 255, -1])
+    metric = _PooledIoU(num_classes=2)
+    metric.update(pred, target)
+    # Class 0: inter 1, union 2 (pixel 3 predicted 0). Class 1: inter 1, union 2.
+    assert metric.intersection.tolist() == [1, 1]
+    assert metric.union.tolist() == [2, 2]
+    assert metric.compute().item() == pytest.approx(0.5)
