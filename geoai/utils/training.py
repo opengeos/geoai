@@ -80,6 +80,8 @@ def get_default_augmentation_transforms(
             "Install it with: pip install albumentations"
         )
 
+    from .._albu_compat import make_gauss_noise
+
     transforms_list = [
         # Geometric transforms
         A.HorizontalFlip(p=0.5),
@@ -104,7 +106,7 @@ def get_default_augmentation_transforms(
             val_shift_limit=10,
             p=0.3,
         ),
-        A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),
+        make_gauss_noise(var_limit=(10.0, 50.0), p=0.2),
         A.GaussianBlur(blur_limit=(3, 5), p=0.2),
     ]
 
