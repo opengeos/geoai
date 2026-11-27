@@ -124,6 +124,11 @@ def run_geoai_task(
                     progress_callback(line)
                 continue
 
+            if not isinstance(msg, dict):
+                if progress_callback is not None:
+                    progress_callback(line)
+                continue
+
             msg_type = msg.get("type")
             if msg_type == "progress":
                 text = msg.get("message", "")
@@ -160,7 +165,7 @@ def run_geoai_task(
                         "process (often due to out-of-memory)."
                     )
                 if stderr_text:
-                    msg += f"\n{stderr_text[:2000]}"
+                    msg += f"\n{stderr_text[-2000:]}"
                 raise RuntimeError(msg)
 
         if final_result is None:
@@ -173,7 +178,7 @@ def run_geoai_task(
                     pass
             msg = "geoai task worker produced no result"
             if stderr_text:
-                msg += f"\n{stderr_text[:2000]}"
+                msg += f"\n{stderr_text[-2000:]}"
             raise RuntimeError(msg)
 
         return final_result
@@ -181,6 +186,14 @@ def run_geoai_task(
         try:
             if proc.poll() is None:
                 proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=2)
+                    except Exception:
+                        pass
         except Exception:
             pass
         if stderr_file is not None:

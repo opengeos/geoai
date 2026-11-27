@@ -103,14 +103,21 @@ def _run_quiet_stdout(fn, *args, **kwargs):
 
 def _ensure_pkg_resources_shim() -> bool:
     try:
-        plugin_parent = Path(__file__).resolve().parents[2]
-        plugin_parent_str = str(plugin_parent)
-        if plugin_parent_str not in sys.path:
-            sys.path.insert(0, plugin_parent_str)
+        import importlib.util
 
-        from geoai._pkg_resources_compat import ensure_pkg_resources
+        compat_path = Path(__file__).resolve().parents[1] / "_pkg_resources_compat.py"
+        if not compat_path.is_file():
+            return False
 
-        return bool(ensure_pkg_resources())
+        spec = importlib.util.spec_from_file_location(
+            "_geoai_pkg_resources_compat", compat_path
+        )
+        if spec is None or spec.loader is None:
+            return False
+
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return bool(module.ensure_pkg_resources())
     except Exception:
         return False
 

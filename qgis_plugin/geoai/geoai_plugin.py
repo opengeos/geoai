@@ -388,57 +388,29 @@ class GeoAIPlugin:
                     pass
             self._deps_install_worker = None
 
-        # Remove deps dock
-        if self._deps_dock:
-            self.iface.removeDockWidget(self._deps_dock)
-            self._deps_dock.deleteLater()
-            self._deps_dock = None
-
-        # Remove dock widgets
-        if self._moondream_dock:
-            self.iface.removeDockWidget(self._moondream_dock)
-            self._moondream_dock.deleteLater()
-            self._moondream_dock = None
-
-        if self._segmentation_dock:
-            self.iface.removeDockWidget(self._segmentation_dock)
-            self._segmentation_dock.deleteLater()
-            self._segmentation_dock = None
-
-        if self._samgeo_dock:
-            try:
-                # Stops or detaches its worker threads before deletion.
-                self._samgeo_dock.cleanup()
-            except Exception:
-                pass
-            self.iface.removeDockWidget(self._samgeo_dock)
-            self._samgeo_dock.deleteLater()
-            self._samgeo_dock = None
-
-        if self._deepforest_dock:
-            self.iface.removeDockWidget(self._deepforest_dock)
-            self._deepforest_dock.deleteLater()
-            self._deepforest_dock = None
-
-        if self._water_segmentation_dock:
-            self.iface.removeDockWidget(self._water_segmentation_dock)
-            self._water_segmentation_dock.deleteLater()
-            self._water_segmentation_dock = None
-
-        if self._change_detection_dock:
-            self.iface.removeDockWidget(self._change_detection_dock)
-            self._change_detection_dock.deleteLater()
-            self._change_detection_dock = None
-
-        if self._instance_segmentation_dock:
-            self.iface.removeDockWidget(self._instance_segmentation_dock)
-            self._instance_segmentation_dock.deleteLater()
-            self._instance_segmentation_dock = None
-
-        if self._processing_monitor_dock:
-            self.iface.removeDockWidget(self._processing_monitor_dock)
-            self._processing_monitor_dock.deleteLater()
-            self._processing_monitor_dock = None
+        # Remove dock widgets (clean up any worker threads before deletion)
+        for dock_attr in (
+            "_deps_dock",
+            "_moondream_dock",
+            "_segmentation_dock",
+            "_samgeo_dock",
+            "_deepforest_dock",
+            "_water_segmentation_dock",
+            "_change_detection_dock",
+            "_instance_segmentation_dock",
+            "_processing_monitor_dock",
+        ):
+            dock = getattr(self, dock_attr, None)
+            if dock is not None:
+                if hasattr(dock, "cleanup"):
+                    try:
+                        # Stops or detaches worker threads before deletion.
+                        dock.cleanup()
+                    except Exception:
+                        pass
+                self.iface.removeDockWidget(dock)
+                dock.deleteLater()
+                setattr(self, dock_attr, None)
 
         # Remove actions from menu
         for action in self.actions:
@@ -700,7 +672,7 @@ class GeoAIPlugin:
                 self.processing_monitor_action.setChecked(False)
                 return
 
-        if self.processing_monitor_action.isChecked():
+        if self._processing_monitor_dock.isVisible():
             self._processing_monitor_dock.hide()
         else:
             self._processing_monitor_dock.show()

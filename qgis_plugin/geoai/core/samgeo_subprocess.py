@@ -358,6 +358,7 @@ class SamGeoSubprocessClient:
                 except Exception:
                     try:
                         proc.kill()
+                        proc.wait(timeout=2)
                     except Exception:
                         pass
 
@@ -379,7 +380,11 @@ class SamGeoSubprocessClient:
         with self._lock:
             if not self._is_running():
                 self.initialize()
-            return self._request_locked(payload, timeout=timeout)
+            try:
+                return self._request_locked(payload, timeout=timeout)
+            except TimeoutError:
+                self.close()
+                raise
 
     def _request_locked(self, payload: Dict[str, Any], timeout: Optional[int] = None):
         if not self._is_running():
@@ -398,19 +403,27 @@ class SamGeoSubprocessClient:
                 f"Failed to send request to SamGeo worker: {exc}"
             ) from exc
 
-        line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
-        while True:
-            try:
-                response = json.loads(line)
+        try:
+            line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
+            while True:
+                try:
+                    response = json.loads(line)
+                except json.JSONDecodeError:
+                    line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
+                    continue
+                if not isinstance(response, dict):
+                    line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
+                    continue
                 break
-            except json.JSONDecodeError:
-                line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
+        except TimeoutError:
+            self.close()
+            raise
 
         if response.get("type") == "error":
             message = response.get("message", "Unknown SamGeo worker error")
             stderr_output = self._read_stderr()
             if stderr_output:
-                message = f"{message}\nWorker stderr:\n{stderr_output[:2000]}"
+                message = f"{message}\nWorker stderr:\n{stderr_output[-2000:]}"
             raise RuntimeError(message)
 
         if response.get("type") != "ok":
@@ -450,16 +463,16 @@ class SamGeoSubprocessClient:
             stderr_output = self._read_stderr()
             msg = "SamGeo worker closed stdout unexpectedly"
             if stderr_output:
-                msg = f"{msg}\nWorker stderr:\n{stderr_output[:2000]}"
+                msg = f"{msg}\nWorker stderr:\n{stderr_output[-2000:]}"
             raise RuntimeError(msg)
         return line.strip()
 
-    def _read_stderr(self) -> str:
+    def _read_stderr(self, max_chars: int = 2000) -> str:
         if self._stderr_file is None:
             return ""
         try:
             self._stderr_file.seek(0)
-            return self._stderr_file.read()
+            return self._stderr_file.read()[-max_chars:]
         except Exception:
             return ""
 

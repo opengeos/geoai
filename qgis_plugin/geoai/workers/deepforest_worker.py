@@ -348,10 +348,13 @@ def _handle_predict(req: dict) -> Any:
     image_path = req["image_path"]
     mode = req.get("mode") or "Single Image"
     patch_size = int(req.get("patch_size") or 400)
-    patch_overlap = float(req.get("patch_overlap") or 0.25)
-    iou_threshold = float(req.get("iou_threshold") or 0.15)
+    raw_patch_overlap = req.get("patch_overlap")
+    patch_overlap = 0.25 if raw_patch_overlap is None else float(raw_patch_overlap)
+    raw_iou_threshold = req.get("iou_threshold")
+    iou_threshold = 0.15 if raw_iou_threshold is None else float(raw_iou_threshold)
     dataloader_strategy = req.get("dataloader_strategy") or "batch"
-    score_threshold = float(req.get("score_threshold") or 0.3)
+    raw_score_threshold = req.get("score_threshold")
+    score_threshold = 0.3 if raw_score_threshold is None else float(raw_score_threshold)
     batch_size = int(req.get("batch_size") or 4)
 
     # Configure model for safe in-process behavior (in the worker process).

@@ -51,6 +51,11 @@ def _log(message: str, level=Qgis.Info):
     QgsMessageLog.logMessage(message, "GeoAI", level=level)
 
 
+def _is_within_directory(path: str, base_dir: str) -> bool:
+    """Return True if resolved ``path`` is inside or equal to ``base_dir``."""
+    return path == base_dir or path.startswith(base_dir + os.sep)
+
+
 def _safe_extract_tar(tar: tarfile.TarFile, dest_dir: str) -> None:
     """Safely extract tar archive with path traversal protection.
 
@@ -65,13 +70,41 @@ def _safe_extract_tar(tar: tarfile.TarFile, dest_dir: str) -> None:
     use_filter = sys.version_info >= (3, 12)
     for member in tar.getmembers():
         member_path = os.path.realpath(os.path.join(dest_dir, member.name))
-        if not member_path.startswith(dest_dir + os.sep) and member_path != dest_dir:
+        if not _is_within_directory(member_path, dest_dir):
             raise ValueError(f"Attempted path traversal in tar archive: {member.name}")
         # On Python <3.12 the ``filter="data"`` safety mechanism is not
-        # available, so explicitly reject symlinks and hardlinks that
-        # could escape the destination directory.
+        # available, so validate symlink and hardlink targets stay inside
+        # ``dest_dir`` and reject empty or absolute link targets.
         if not use_filter and (member.issym() or member.islnk()):
-            raise ValueError(f"Refusing symlink/hardlink in tar archive: {member.name}")
+            linkname = member.linkname
+            if (
+                not linkname
+                or os.path.isabs(linkname)
+                or linkname.startswith(("/", "\\"))
+            ):
+                raise ValueError(
+                    f"Refusing absolute or empty link in tar archive: {member.name}"
+                )
+            if member.issym():
+                parent_dir = os.path.realpath(
+                    os.path.dirname(os.path.join(dest_dir, member.name))
+                )
+                link_target = os.path.realpath(os.path.join(parent_dir, linkname))
+            else:
+                raw_target = os.path.normpath(os.path.join(dest_dir, linkname))
+                if not _is_within_directory(raw_target, dest_dir):
+                    raise ValueError(
+                        f"Attempted link traversal in tar archive: {member.name} -> {linkname}"
+                    )
+                if os.path.islink(raw_target):
+                    raise ValueError(
+                        f"Refusing hardlink to symlink in tar archive: {member.name} -> {linkname}"
+                    )
+                link_target = os.path.realpath(raw_target)
+            if not _is_within_directory(link_target, dest_dir):
+                raise ValueError(
+                    f"Attempted link traversal in tar archive: {member.name} -> {linkname}"
+                )
         if use_filter:
             tar.extract(member, dest_dir, filter="data")
         else:
@@ -344,6 +377,9 @@ def download_python_standalone(
     fd, temp_path = tempfile.mkstemp(suffix=".tar.gz")
     os.close(fd)
 
+    install_started = False
+    install_succeeded = False
+
     try:
         if cancel_check and cancel_check():
             return False, "Download cancelled"
@@ -390,6 +426,7 @@ def download_python_standalone(
             shutil.rmtree(STANDALONE_DIR)
 
         os.makedirs(STANDALONE_DIR, exist_ok=True)
+        install_started = True
 
         if temp_path.endswith(".tar.gz") or temp_path.endswith(".tgz"):
             with tarfile.open(temp_path, "r:gz") as tar:
@@ -404,6 +441,7 @@ def download_python_standalone(
         success, verify_msg = verify_standalone_python()
 
         if success:
+            install_succeeded = True
             if progress_callback:
                 progress_callback(10, f"Python {python_version} installed")
             _log("Python standalone installed successfully", Qgis.Success)
@@ -432,6 +470,8 @@ def download_python_standalone(
 
         return False, error_msg
     finally:
+        if install_started and not install_succeeded and os.path.exists(STANDALONE_DIR):
+            shutil.rmtree(STANDALONE_DIR, ignore_errors=True)
         if os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
