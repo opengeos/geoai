@@ -699,10 +699,12 @@ def test_deepforest_save_as_raster_uses_uint32_at_65535_and_image_dims_helper(
     fake_shapely = types.ModuleType("shapely")
     fake_shapely_geom = types.ModuleType("shapely.geometry")
     fake_shapely_geom.box = lambda *args: "BOX"
+    fake_gpd = types.ModuleType("geopandas")
     monkeypatch.setitem(sys.modules, "rasterio", fake_rasterio)
     monkeypatch.setitem(sys.modules, "rasterio.features", fake_features)
     monkeypatch.setitem(sys.modules, "shapely", fake_shapely)
     monkeypatch.setitem(sys.modules, "shapely.geometry", fake_shapely_geom)
+    monkeypatch.setitem(sys.modules, "geopandas", fake_gpd)
 
     class FakePreds:
         def __init__(self, count):
