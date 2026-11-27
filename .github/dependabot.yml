@@ -13,6 +13,14 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/geoai-mcp-server"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/agent-harness"
+    schedule:
+      interval: "weekly"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

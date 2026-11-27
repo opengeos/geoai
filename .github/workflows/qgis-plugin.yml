@@ -12,6 +12,9 @@ on:
             - "qgis_plugin/**"
             - ".github/workflows/qgis-plugin.yml"
 
+permissions:
+    contents: read
+
 jobs:
     bandit:
         name: Bandit security scan

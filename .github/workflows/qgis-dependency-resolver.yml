@@ -14,6 +14,9 @@ on:
             - "qgis_plugin/**"
             - ".github/workflows/qgis-dependency-resolver.yml"
 
+permissions:
+    contents: read
+
 jobs:
     windows-python-312-resolve:
         name: Windows Python 3.12 dependency resolve

@@ -45,8 +45,10 @@ def download_dataset(data_dir="s2_water_dataset"):
             val_scene/, val_truth/.
     """
     url = "https://huggingface.co/datasets/giswqs/s2-water-dataset/resolve/main/dset-s2.zip"
+    os.makedirs(data_dir, exist_ok=True)
+    zip_path = os.path.join(data_dir, "dset-s2.zip")
     print("Downloading Earth Surface Water Dataset...")
-    raw_path = geoai.download_file(url)
+    raw_path = geoai.download_file(url, output_path=zip_path)
     print(f"Dataset downloaded to: {raw_path}")
 
     # Find the extracted directory containing tra_scene/val_scene
@@ -381,18 +383,19 @@ Binary classification:
 ```
 """
 
-    # Write README to a temp file and upload
-    readme_path = os.path.join(tempfile.gettempdir(), "README.md")
-    with open(readme_path, "w") as f:
-        f.write(readme_content)
+    # Write README to a secure temporary directory and upload
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme_path = os.path.join(tmpdir, "README.md")
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(readme_content)
 
-    api.upload_file(
-        path_or_fileobj=readme_path,
-        path_in_repo="README.md",
-        repo_id=repo_id,
-        repo_type="dataset",
-        commit_message="Add dataset card",
-    )
+        api.upload_file(
+            path_or_fileobj=readme_path,
+            path_in_repo="README.md",
+            repo_id=repo_id,
+            repo_type="dataset",
+            commit_message="Add dataset card",
+        )
 
     # Upload dataset directories
     print("Uploading dataset files (this may take a while)...")

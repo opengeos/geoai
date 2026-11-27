@@ -1,5 +1,15 @@
 name: Draft PDF
-on: [push]
+on:
+    push:
+        paths:
+            - "paper/**"
+    pull_request:
+        paths:
+            - "paper/**"
+    workflow_dispatch:
+
+permissions:
+    contents: read
 
 jobs:
     paper:

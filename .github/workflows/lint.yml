@@ -1,0 +1,115 @@
+name: Lint and docs integrity
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+permissions:
+    contents: read
+
+jobs:
+    lint:
+        name: Config, docs, and syntax checks
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Set up Python
+              uses: actions/setup-python@v7
+              with:
+                  python-version: "3.12"
+
+            - name: Install lint tools
+              run: pip install pyyaml ruff
+
+            - name: Validate YAML and TOML files
+              run: |
+                  python - <<'PY'
+                  import glob
+                  import tomllib
+                  import yaml
+
+                  yaml_files = sorted(glob.glob(".github/workflows/*.yml")) + [
+                      ".github/dependabot.yml",
+                      ".pre-commit-config.yaml",
+                  ]
+                  for path in yaml_files:
+                      with open(path, encoding="utf-8") as fh:
+                          yaml.safe_load(fh)
+                      print(f"YAML OK: {path}")
+
+                  for path in ("pyproject.toml", "zensical.toml"):
+                      with open(path, "rb") as fh:
+                          tomllib.load(fh)
+                      print(f"TOML OK: {path}")
+                  PY
+
+            - name: Check documentation integrity
+              run: |
+                  python - <<'PY'
+                  import re
+                  import sys
+                  import tomllib
+                  from pathlib import Path
+
+                  errors = []
+
+                  # 1. No relative examples/*.ipynb links in top-level docs/*.md
+                  for md in sorted(Path("docs").glob("*.md")):
+                      text = md.read_text(encoding="utf-8")
+                      for hit in re.findall(r"examples/[^\s\)\"']+\.ipynb", text):
+                          errors.append(f"{md}: relative notebook link '{hit}'")
+
+                  # 2. No broken youtu.be/...&list= links in README.md or docs/index.md
+                  for doc in (Path("README.md"), Path("docs/index.md")):
+                      text = doc.read_text(encoding="utf-8")
+                      for hit in re.findall(r"youtu\.be/[^\s\)\"']*&list=[^\s\)\"']*", text):
+                          errors.append(f"{doc}: broken YouTube link '{hit}'")
+
+                  # 3. Every top-level docs/*.md (excluding index.md, changelog.md) listed in zensical.toml
+                  with open("zensical.toml", "rb") as fh:
+                      zen = tomllib.load(fh)
+
+                  nav_files = set()
+
+                  def collect(node):
+                      if isinstance(node, str):
+                          if not node.startswith("http"):
+                              nav_files.add(node)
+                      elif isinstance(node, list):
+                          for item in node:
+                              collect(item)
+                      elif isinstance(node, dict):
+                          for value in node.values():
+                              collect(value)
+
+                  collect(zen["project"]["nav"])
+
+                  ignored = {"index.md", "changelog.md"}
+                  for md in sorted(Path("docs").glob("*.md")):
+                      if md.name not in ignored and md.name not in nav_files:
+                          errors.append(f"docs/{md.name}: not listed in zensical.toml nav")
+
+                  # 4. Every examples/*.md listed in zensical.toml nav has a matching .ipynb
+                  for nav_path in sorted(nav_files):
+                      if nav_path.startswith("examples/") and nav_path.endswith(".md"):
+                          ipynb = (Path("docs") / nav_path).with_suffix(".ipynb")
+                          if not ipynb.exists():
+                              errors.append(
+                                  f"zensical.toml nav '{nav_path}': missing notebook {ipynb}"
+                              )
+
+                  if errors:
+                      for err in errors:
+                          print(f"ERROR: {err}", file=sys.stderr)
+                      sys.exit(1)
+
+                  print("Documentation integrity checks passed.")
+                  PY
+
+            - name: Run Ruff critical syntax and name checks
+              run: ruff check --select E9,F63,F7 geoai/ scripts/
