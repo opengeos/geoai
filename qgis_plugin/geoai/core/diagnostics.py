@@ -32,6 +32,7 @@ PACKAGE_SPECS = [
     ("segmentation-models-pytorch", "segmentation_models_pytorch", "SMP"),
     ("deepforest", "deepforest", "DeepForest"),
     ("omniwatermask", "omniwatermask", "OmniWaterMask"),
+    ("torchange", "torchange", "torchange"),
     ("rasterio", "rasterio", "Rasterio"),
     ("geopandas", "geopandas", "GeoPandas"),
     ("numpy", "numpy", "NumPy"),
