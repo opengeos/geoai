@@ -894,6 +894,7 @@ def _prepare_fake_venv(tmp_path, monkeypatch, platform):
     monkeypatch.setattr(venv_manager, "_fix_proj_data", lambda _sp: None)
     monkeypatch.setattr(venv_manager.sys, "platform", platform)
     monkeypatch.setattr(venv_manager.sys, "path", list(sys.path))
+    monkeypatch.setattr(venv_manager, "_OPENMP_OVERRIDE_SET_BY_PLUGIN", False)
 
 
 def _unset_openmp_env(monkeypatch):
@@ -964,3 +965,25 @@ def test_ensure_venv_leaves_openmp_alone_on_linux(tmp_path, monkeypatch):
     assert venv_manager.ensure_venv_packages_available() is True
 
     assert "KMP_DUPLICATE_LIB_OK" not in venv_manager.os.environ
+
+
+def test_worker_env_drops_plugin_openmp_override(tmp_path, monkeypatch):
+    _prepare_fake_venv(tmp_path, monkeypatch, "darwin")
+    _unset_openmp_env(monkeypatch)
+    _stub_loaded_openmp(monkeypatch, ["/opt/conda/lib/libomp.dylib"])
+    monkeypatch.setattr(venv_manager, "_get_qgis_proxy_settings", lambda: None)
+
+    venv_manager.ensure_venv_packages_available()
+
+    assert venv_manager.os.environ["KMP_DUPLICATE_LIB_OK"] == "TRUE"
+    assert "KMP_DUPLICATE_LIB_OK" not in venv_manager._get_clean_env_for_venv()
+
+
+def test_worker_env_keeps_user_openmp_setting(monkeypatch):
+    monkeypatch.setenv("KMP_DUPLICATE_LIB_OK", "TRUE")
+    monkeypatch.setattr(venv_manager, "_OPENMP_OVERRIDE_SET_BY_PLUGIN", False)
+    monkeypatch.setattr(venv_manager, "_get_qgis_proxy_settings", lambda: None)
+
+    env = venv_manager._get_clean_env_for_venv()
+
+    assert env["KMP_DUPLICATE_LIB_OK"] == "TRUE"

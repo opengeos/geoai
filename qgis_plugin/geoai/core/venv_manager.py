@@ -1026,6 +1026,10 @@ def _get_clean_env_for_venv() -> dict:
         "GDAL_DRIVER_PATH",
     ):
         env.pop(var, None)
+    # Workers load a single OpenMP runtime, so keep libomp's duplicate check
+    # on there when the plugin (not the user) relaxed it for QGIS itself.
+    if _OPENMP_OVERRIDE_SET_BY_PLUGIN:
+        env.pop("KMP_DUPLICATE_LIB_OK", None)
     env["PYTHONIOENCODING"] = "utf-8"
     # Never let packages from the user site (e.g. %APPDATA%\Python\Python312)
     # shadow the managed venv. Issue #977 had a stale geoai-py imported from
@@ -1800,6 +1804,10 @@ def _wrap_bare_imports(filepath: str) -> bool:
 
 _OPENMP_RUNTIME_NAMES = ("libomp.dylib", "libiomp5.dylib", "libgomp.1.dylib")
 
+# True once _allow_duplicate_openmp_runtime() set KMP_DUPLICATE_LIB_OK, so
+# worker subprocesses can be started without it.
+_OPENMP_OVERRIDE_SET_BY_PLUGIN = False
+
 
 def _loaded_openmp_runtimes() -> List[str]:
     """List the OpenMP runtimes already loaded into this macOS process.
@@ -1844,15 +1852,19 @@ def _allow_duplicate_openmp_runtime() -> None:
     unsupported, with possible thread oversubscription or wrong results,
     and the variable applies to the whole QGIS process. The alternative in
     this situation is QGIS aborting, so the risk is accepted there and
-    nowhere else. Heavy work runs in worker subprocesses, which do not
-    share QGIS's runtime.
+    nowhere else. ``_get_clean_env_for_venv`` drops the variable again for
+    worker subprocesses, which run the heavy work with a single runtime.
+    Only runtimes loaded when this runs are seen; one loaded later by
+    another plugin is not.
     """
+    global _OPENMP_OVERRIDE_SET_BY_PLUGIN
     if os.environ.get("KMP_DUPLICATE_LIB_OK"):
         return
     loaded = _loaded_openmp_runtimes()
     if not loaded:
         return
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    _OPENMP_OVERRIDE_SET_BY_PLUGIN = True
     _log(
         "QGIS already loaded an OpenMP runtime ({}); set "
         "KMP_DUPLICATE_LIB_OK=TRUE so the venv's PyTorch can load its "
