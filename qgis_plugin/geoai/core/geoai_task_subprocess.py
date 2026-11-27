@@ -19,6 +19,36 @@ from .venv_manager import (
 ProgressCallback = Optional[Callable[[str], None]]
 
 
+def export_geotiff_tiles(
+    params: Dict[str, Any], progress_callback: ProgressCallback = None
+) -> None:
+    """Export training tiles with ``geoai.export_geotiff_tiles``.
+
+    Runs in the managed venv's subprocess when it exists, so the geoai library
+    (which imports PyTorch) is never loaded into QGIS. Without a managed venv,
+    geoai can only come from the interpreter running QGIS, so it is called
+    in-process.
+
+    Args:
+        params: Keyword arguments for ``export_geotiff_tiles`` (JSON
+            serializable).
+        progress_callback: Optional callable receiving progress lines.
+
+    Raises:
+        RuntimeError: If the export fails or geoai is not available.
+    """
+    if venv_exists():
+        run_geoai_task("export_geotiff_tiles", params, progress_callback)
+        return
+
+    from .._geoai_lib import get_geoai
+
+    geoai = get_geoai()
+    if geoai is None:
+        raise RuntimeError("The geoai package is not available. Install dependencies.")
+    geoai.export_geotiff_tiles(**params)
+
+
 def run_geoai_task(
     action: str,
     params: Dict[str, Any],

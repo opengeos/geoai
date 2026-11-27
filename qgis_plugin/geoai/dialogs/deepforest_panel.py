@@ -194,8 +194,28 @@ def _adaptive_tile_defaults(vram_mb: int) -> tuple:
 
 
 def _use_deepforest_subprocess() -> bool:
-    """Use subprocess DeepForest on Windows to avoid QGIS/PyTorch DLL conflicts."""
-    return os.name == "nt"
+    """Decide whether to run DeepForest in the managed venv subprocess.
+
+    Running DeepForest inside QGIS imports PyTorch into the QGIS process. On
+    Windows that hits DLL conflicts; with conda-forge QGIS on macOS it loads a
+    second libomp next to conda's and aborts QGIS ("OMP: Error #15"); and on
+    every platform the venv's NumPy-2-era stack can clash with the NumPy QGIS
+    already imported (as for SamGeo, issues #688 and #854).
+
+    Windows always uses the subprocess. Elsewhere it is used whenever the
+    managed venv exists. Without one, DeepForest can only come from the
+    interpreter running QGIS, so the in-process path stays available for
+    users who launch QGIS from an environment that already provides it.
+
+    Returns:
+        True if model loading and prediction should run in a subprocess.
+    """
+    if os.name == "nt":
+        return True
+
+    from ..core.venv_manager import venv_exists
+
+    return venv_exists()
 
 
 def _empty_detection_guidance(mode: str) -> str:

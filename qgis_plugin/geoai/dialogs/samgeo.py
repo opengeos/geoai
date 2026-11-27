@@ -2979,22 +2979,24 @@ class SamGeoDockWidget(QDockWidget):
             tile_size = self.export_tile_size_spin.value()
             stride = self.export_stride_spin.value()
 
-            # Import and call export function
-            from .._geoai_lib import get_geoai
-
-            geoai = get_geoai()
+            # Runs in the venv subprocess when it exists, keeping the geoai
+            # library (and PyTorch) out of the QGIS process.
+            from ..core.geoai_task_subprocess import export_geotiff_tiles
 
             self.results_text.append(f"\nExporting tiles in {export_format} format...")
             QCoreApplication.processEvents()
 
-            geoai.export_geotiff_tiles(
-                in_raster=image_path,
-                out_folder=output_dir,
-                in_class_data=temp_mask,
-                tile_size=tile_size,
-                stride=stride,
-                metadata_format=export_format,
-                skip_empty_tiles=True,
+            export_geotiff_tiles(
+                {
+                    "in_raster": image_path,
+                    "out_folder": output_dir,
+                    "in_class_data": temp_mask,
+                    "tile_size": tile_size,
+                    "stride": stride,
+                    "metadata_format": export_format,
+                    "skip_empty_tiles": True,
+                },
+                progress_callback=lambda _line: QCoreApplication.processEvents(),
             )
 
             self.results_text.append(f"Training data exported to: {output_dir}")

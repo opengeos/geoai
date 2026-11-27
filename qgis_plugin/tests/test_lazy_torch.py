@@ -100,3 +100,85 @@ def test_panels_have_no_module_level_torch(module):
     mod = importlib.import_module(f"geoai.dialogs.{module}")
     assert not hasattr(mod, "torch")
     assert not hasattr(mod, "_TORCH_IMPORT_ERROR")
+
+
+# --- DeepForest runs in the venv subprocess like SamGeo -------------------
+
+
+def test_deepforest_uses_subprocess_on_windows(monkeypatch):
+    from geoai.dialogs import deepforest_panel
+
+    monkeypatch.setattr(deepforest_panel.os, "name", "nt")
+
+    assert deepforest_panel._use_deepforest_subprocess() is True
+
+
+def test_deepforest_uses_subprocess_on_posix_when_venv_exists(monkeypatch):
+    """Regression test: in-process DeepForest crashed conda QGIS on macOS."""
+    from geoai.core import venv_manager
+    from geoai.dialogs import deepforest_panel
+
+    monkeypatch.setattr(deepforest_panel.os, "name", "posix")
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: True)
+
+    assert deepforest_panel._use_deepforest_subprocess() is True
+
+
+def test_deepforest_in_process_on_posix_without_venv(monkeypatch):
+    from geoai.core import venv_manager
+    from geoai.dialogs import deepforest_panel
+
+    monkeypatch.setattr(deepforest_panel.os, "name", "posix")
+    monkeypatch.setattr(venv_manager, "venv_exists", lambda _venv_dir=None: False)
+
+    assert deepforest_panel._use_deepforest_subprocess() is False
+
+
+# --- Training-tile export keeps the geoai library out of QGIS -------------
+
+
+def test_export_tiles_uses_venv_subprocess(monkeypatch):
+    from geoai.core import geoai_task_subprocess as gts
+
+    calls = []
+    monkeypatch.setattr(gts, "venv_exists", lambda: True)
+    monkeypatch.setattr(
+        gts,
+        "run_geoai_task",
+        lambda action, params, progress_callback=None: calls.append((action, params)),
+    )
+
+    def no_in_process(*_a, **_k):
+        raise AssertionError("geoai must not be loaded into QGIS")
+
+    monkeypatch.setattr("geoai._geoai_lib.get_geoai", no_in_process)
+
+    params = {"in_raster": "a.tif", "out_folder": "out", "tile_size": 256}
+    gts.export_geotiff_tiles(params)
+
+    assert calls == [("export_geotiff_tiles", params)]
+
+
+def test_export_tiles_falls_back_in_process_without_venv(monkeypatch):
+    import types
+
+    from geoai.core import geoai_task_subprocess as gts
+
+    seen = {}
+    fake = types.SimpleNamespace(export_geotiff_tiles=lambda **kw: seen.update(kw))
+    monkeypatch.setattr(gts, "venv_exists", lambda: False)
+    monkeypatch.setattr("geoai._geoai_lib.get_geoai", lambda: fake)
+
+    gts.export_geotiff_tiles({"in_raster": "a.tif", "out_folder": "out"})
+
+    assert seen == {"in_raster": "a.tif", "out_folder": "out"}
+
+
+def test_export_tiles_without_geoai_raises(monkeypatch):
+    from geoai.core import geoai_task_subprocess as gts
+
+    monkeypatch.setattr(gts, "venv_exists", lambda: False)
+    monkeypatch.setattr("geoai._geoai_lib.get_geoai", lambda: None)
+
+    with pytest.raises(RuntimeError, match="geoai package is not available"):
+        gts.export_geotiff_tiles({"in_raster": "a.tif", "out_folder": "out"})
