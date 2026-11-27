@@ -118,6 +118,38 @@ class TestDownloadWithProgressAtomic(unittest.TestCase):
             with open(existing_part, "rb") as f:
                 self.assertEqual(f.read(), b"keep-me")
 
+    def test_overwrite_preserves_existing_permissions(self):
+        import stat
+
+        from geoai.download import download_with_progress
+
+        if os.name == "nt":
+            self.skipTest("POSIX permissions test")
+        response = MagicMock()
+        response.headers = {"content-length": "3"}
+        response.iter_content.return_value = [b"new"]
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "img.tif")
+            with open(out, "wb") as f:
+                f.write(b"old")
+            os.chmod(out, 0o644)
+            with patch("geoai.download.requests.get", return_value=response):
+                download_with_progress("https://example.com/img.tif", out)
+            self.assertEqual(stat.S_IMODE(os.stat(out).st_mode), 0o644)
+
+    def test_long_destination_filename_succeeds(self):
+        from geoai.download import download_with_progress
+
+        response = MagicMock()
+        response.headers = {"content-length": "3"}
+        response.iter_content.return_value = [b"abc"]
+        with tempfile.TemporaryDirectory() as tmp:
+            long_name = "a" * 240 + ".tif"
+            out = os.path.join(tmp, long_name)
+            with patch("geoai.download.requests.get", return_value=response):
+                download_with_progress("https://example.com/img.tif", out)
+            self.assertTrue(os.path.exists(out))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,7 @@ import datetime
 import json
 import logging
 import os
+import stat
 import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -157,6 +158,29 @@ def _validate_url(url: str) -> None:
         raise ValueError(f"URL is missing a host: {url!r}")
 
 
+def _apply_output_permissions(temp_path: str, output_path: str) -> None:
+    """Apply existing destination permissions or umask-default mode to *temp_path*."""
+    if os.name == "nt":
+        return
+    try:
+        mode = stat.S_IMODE(os.stat(output_path).st_mode)
+    except FileNotFoundError:
+        umask = None
+        try:
+            with open("/proc/self/status", encoding="utf-8") as status_file:
+                for line in status_file:
+                    if line.startswith("Umask:"):
+                        umask = int(line.split(":", 1)[1].strip(), 8)
+                        break
+        except OSError:
+            pass
+        if umask is None:
+            umask = os.umask(0o022)
+            os.umask(umask)
+        mode = 0o666 & ~umask
+    os.chmod(temp_path, mode)
+
+
 def download_with_progress(
     url: str, output_path: str, max_size: Optional[int] = None
 ) -> None:
@@ -194,7 +218,7 @@ def download_with_progress(
         output_dir = os.path.dirname(os.path.abspath(output_path))
         fd, temp_path = tempfile.mkstemp(
             dir=output_dir,
-            prefix=f".{os.path.basename(output_path)}.",
+            prefix=".geoai_dl_",
             suffix=".part",
         )
         bytes_written = 0
@@ -223,6 +247,7 @@ def download_with_progress(
                 f"{total_size} bytes from {url}."
             )
 
+        _apply_output_permissions(temp_path, output_path)
         os.replace(temp_path, output_path)
     except BaseException:
         if temp_path is not None:
