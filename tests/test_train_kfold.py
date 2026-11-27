@@ -965,3 +965,51 @@ def test_resume_resets_legacy_val_iou_baseline(paired_images, tmp_path, version,
             resume_training=True,
         )
     assert (output / "best_model.pth").exists() is saved
+
+
+def test_resume_val_loss_resets_legacy_best_iou_only(paired_images, tmp_path):
+    """On val_loss resume, reset legacy best_iou without resetting best_score/best_epoch."""
+    images, masks = paired_images
+    model = training.torch.nn.Conv2d(3, 2, kernel_size=1)
+    checkpoint = {
+        "epoch": 0,
+        "model_state_dict": model.state_dict(),
+        "monitor": "val_loss",
+        "best_iou": 0.9,
+        "best_val_loss": 0.2,
+        "best_score": 0.2,
+        "best_epoch": 1,
+    }
+    ckpt = tmp_path / "ckpt.pth"
+    training.torch.save(checkpoint, ckpt)
+    metrics = [{"loss": 0.5, "IoU": 0.5, "F1": 0.5, "Precision": 0.5, "Recall": 0.5}]
+    output = tmp_path / "out"
+    with (
+        patch.object(training, "get_smp_model", return_value=model),
+        patch.object(training, "train_semantic_one_epoch", return_value=1.0),
+        patch.object(training, "evaluate_semantic", side_effect=metrics),
+    ):
+        training.train_segmentation_model(
+            str(images),
+            str(masks),
+            str(output),
+            num_epochs=2,
+            target_size=(32, 32),
+            num_workers=0,
+            device="cpu",
+            encoder_weights=None,
+            monitor="val_loss",
+            save_best_only=False,
+            checkpoint_path=str(ckpt),
+            resume_training=True,
+        )
+    # Loss did not improve (0.5 vs 0.2), so best_model.pth is not overwritten,
+    # while saved checkpoint records the new pooled best_iou (0.5) and keeps best_epoch=1.
+    assert not (output / "best_model.pth").exists()
+    saved_ckpt = training.torch.load(
+        output / "checkpoint_epoch_2.pth", weights_only=False
+    )
+    assert saved_ckpt["best_iou"] == pytest.approx(0.5)
+    assert saved_ckpt["best_score"] == pytest.approx(0.2)
+    assert saved_ckpt["best_epoch"] == 1
+    assert saved_ckpt["val_iou_version"] == training._VAL_IOU_VERSION

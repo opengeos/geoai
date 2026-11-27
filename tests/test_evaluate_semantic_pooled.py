@@ -48,8 +48,9 @@ class TestEvaluateSemanticPooled(unittest.TestCase):
         targets[0, :, :4] = 1  # 32 building pixels, tiles 1-2 empty
         preds = torch.zeros_like(targets)  # building never predicted
         out = _evaluate(preds, targets)
-        # class 0: TP=160 FP=32 FN=0 -> 160/192; class 1: TP=0 -> 0
+        # class 0: TP=160 FP=32 FN=0 -> IoU/Prec=160/192, Rec=1.0; class 1: TP=0 -> 0
         self.assertAlmostEqual(out["IoU"], (160 / 192 + 0) / 2, places=5)
+        self.assertAlmostEqual(out["Precision"], (160 / 192 + 0) / 2, places=5)
         self.assertAlmostEqual(out["Recall"], (1.0 + 0) / 2, places=5)
 
     def test_never_finds_object_scores_lower_than_finding_it(self):

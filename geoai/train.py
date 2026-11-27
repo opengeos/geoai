@@ -4009,11 +4009,15 @@ def evaluate_semantic(
             loss = criterion(outputs, targets)
             total_loss += loss.item()
 
+            if outputs.shape[1] != num_classes:
+                raise ValueError(
+                    f"Model output channels ({outputs.shape[1]}) do not match "
+                    f"num_classes ({num_classes})."
+                )
             pred_classes = torch.argmax(outputs, dim=1)
             valid = (targets >= 0) & (targets < num_classes)
             if ignore_index is not None:
                 valid &= targets != ignore_index
-            valid &= (pred_classes >= 0) & (pred_classes < num_classes)
             idx = targets[valid].long() * num_classes + pred_classes[valid].long()
             confusion += torch.bincount(idx, minlength=num_classes**2).reshape(
                 num_classes, num_classes
@@ -4026,14 +4030,21 @@ def evaluate_semantic(
     fp = confusion.sum(dim=0) - tp
     fn = confusion.sum(dim=1) - tp
 
+    # Use a single present-class mask (any ground-truth or predicted pixels)
+    # across all four metrics so unpredicted ground-truth classes score 0 for
+    # precision rather than being dropped from the mean.
+    present = (tp + fp + fn) > 0
+    if ignore_index is not None and 0 <= ignore_index < num_classes:
+        # An in-range ignore_index is not a scored class (as in iou_coefficient)
+        present[ignore_index] = False
+
     def _mean_over_present(numerator: torch.Tensor, denominator: torch.Tensor) -> float:
-        present = denominator > 0
-        if ignore_index is not None and 0 <= ignore_index < num_classes:
-            # An in-range ignore_index is not a scored class (as in iou_coefficient)
-            present[ignore_index] = False
         if not torch.any(present):
             return 0.0
-        return (numerator[present] / denominator[present]).mean().item()
+        denom = denominator[present]
+        safe_denom = torch.where(denom > 0, denom, torch.ones_like(denom))
+        scores = torch.where(denom > 0, numerator[present] / safe_denom, 0.0)
+        return scores.mean().item()
 
     avg_loss = total_loss / num_batches
     avg_iou = _mean_over_present(tp, tp + fp + fn)
@@ -4622,19 +4633,17 @@ def train_segmentation_model(
                 "best_score", best_val_loss if monitor == "val_loss" else best_iou
             )
             best_epoch = checkpoint.get("best_epoch")
-            if (
-                monitor == "val_iou"
-                and checkpoint.get("val_iou_version") != _VAL_IOU_VERSION
-            ):
+            if checkpoint.get("val_iou_version") != _VAL_IOU_VERSION:
                 # Older checkpoints stored a per-image mean IoU, which is not
-                # comparable with the pooled IoU used for selection now.
+                # comparable with the pooled IoU used now.
                 logger.warning(
                     "Checkpoint predates pooled validation IoU; "
                     "resetting the best-IoU baseline."
                 )
                 best_iou = float("-inf")
-                best_score = float("-inf")
-                best_epoch = None
+                if monitor == "val_iou":
+                    best_score = float("-inf")
+                    best_epoch = None
 
             # Load optimizer state if available
             if "optimizer_state_dict" in checkpoint:
