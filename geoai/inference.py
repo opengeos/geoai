@@ -118,7 +118,7 @@ def _blend_weight_1d(
     Returns:
         numpy.ndarray: 1D float32 array of shape ``(size,)``.
     """
-    if overlap == 0 or mode == BlendMode.NONE:
+    if overlap <= 1 or mode == BlendMode.NONE:
         return np.ones(size, dtype=np.float32)
 
     if mode in (BlendMode.LINEAR, BlendMode.COSINE):

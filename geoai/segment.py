@@ -197,8 +197,8 @@ class GroundedSAM:
                 [
                     detection.box.xmin,
                     detection.box.ymin,
-                    detection.box.xmax,
-                    detection.box.ymax,
+                    detection.box.xmax - detection.box.xmin,
+                    detection.box.ymax - detection.box.ymin,
                 ]
             )
             scores.append(detection.score)
@@ -479,6 +479,15 @@ class GroundedSAM:
             all_boxes = []
             all_polygons = []
 
+            # Validate tiling configuration
+            if self.tile_size <= 0:
+                raise ValueError(f"tile_size must be positive, got {self.tile_size}")
+            if self.overlap < 0 or 2 * self.overlap >= self.tile_size:
+                raise ValueError(
+                    f"overlap must satisfy 0 <= 2 * overlap < tile_size, "
+                    f"got overlap={self.overlap}, tile_size={self.tile_size}"
+                )
+
             # Calculate effective tile size (accounting for overlap)
             effective_tile_size = self.tile_size - 2 * self.overlap
 
@@ -651,24 +660,20 @@ class GroundedSAM:
                                                 )
                                                 all_polygons.append(poly_data)
 
-                                        # Store mask in the global array
-                                        valid_x_start = self.overlap if x > 0 else 0
-                                        valid_y_start = self.overlap if y > 0 else 0
-                                        valid_x_end = (
-                                            tile_width - self.overlap
-                                            if x < n_tiles_x - 1
-                                            else tile_width
+                                        # Store non-overlapping destination region owned by this tile
+                                        dest_x_start = x * effective_tile_size
+                                        dest_y_start = y * effective_tile_size
+                                        dest_x_end = min(
+                                            width, (x + 1) * effective_tile_size
                                         )
-                                        valid_y_end = (
-                                            tile_height - self.overlap
-                                            if y < n_tiles_y - 1
-                                            else tile_height
+                                        dest_y_end = min(
+                                            height, (y + 1) * effective_tile_size
                                         )
 
-                                        dest_x_start = x_start + valid_x_start
-                                        dest_y_start = y_start + valid_y_start
-                                        dest_x_end = x_start + valid_x_end
-                                        dest_y_end = y_start + valid_y_end
+                                        valid_x_start = dest_x_start - x_start
+                                        valid_y_start = dest_y_start - y_start
+                                        valid_x_end = dest_x_end - x_start
+                                        valid_y_end = dest_y_end - y_start
 
                                         mask_slice = prompt_mask[
                                             valid_y_start:valid_y_end,
@@ -842,6 +847,15 @@ class CLIPSegmentation:
             segmentation = np.zeros((height, width), dtype=np.float32)
             probabilities = np.zeros((height, width), dtype=np.float32)
 
+            # Validate tiling configuration
+            if self.tile_size <= 0:
+                raise ValueError(f"tile_size must be positive, got {self.tile_size}")
+            if self.overlap < 0 or 2 * self.overlap >= self.tile_size:
+                raise ValueError(
+                    f"overlap must satisfy 0 <= 2 * overlap < tile_size, "
+                    f"got overlap={self.overlap}, tile_size={self.tile_size}"
+                )
+
             # Calculate effective tile size (accounting for overlap)
             effective_tile_size = self.tile_size - 2 * self.overlap
 
@@ -968,25 +982,16 @@ class CLIPSegmentation:
                             except ImportError:
                                 pass  # Continue without smoothing if scipy is not available
 
-                            # Store results in the full arrays
-                            # Only store the non-overlapping part (except at edges)
-                            valid_x_start = self.overlap if x > 0 else 0
-                            valid_y_start = self.overlap if y > 0 else 0
-                            valid_x_end = (
-                                tile_width - self.overlap
-                                if x < n_tiles_x - 1
-                                else tile_width
-                            )
-                            valid_y_end = (
-                                tile_height - self.overlap
-                                if y < n_tiles_y - 1
-                                else tile_height
-                            )
+                            # Store non-overlapping destination region owned by this tile
+                            dest_x_start = x * effective_tile_size
+                            dest_y_start = y * effective_tile_size
+                            dest_x_end = min(width, (x + 1) * effective_tile_size)
+                            dest_y_end = min(height, (y + 1) * effective_tile_size)
 
-                            dest_x_start = x_start + valid_x_start
-                            dest_y_start = y_start + valid_y_start
-                            dest_x_end = x_start + valid_x_end
-                            dest_y_end = y_start + valid_y_end
+                            valid_x_start = dest_x_start - x_start
+                            valid_y_start = dest_y_start - y_start
+                            valid_x_end = dest_x_end - x_start
+                            valid_y_end = dest_y_end - y_start
 
                             # Store probabilities
                             probabilities[

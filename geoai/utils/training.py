@@ -1520,6 +1520,11 @@ def export_geotiff_tiles(
 
     logging.getLogger("rasterio").setLevel(logging.ERROR)
 
+    if apply_augmentation and augmentation_count < 0:
+        raise ValueError(
+            f"augmentation_count must be >= 0 when apply_augmentation is True, got {augmentation_count}"
+        )
+
     # Handle FlipnSlide tiling strategy
     if tiling_strategy == "flipnslide":
         if apply_augmentation:
@@ -1792,11 +1797,18 @@ def export_geotiff_tiles(
                             pbar.write(f"ERROR saving label GeoTIFF: {e}")
                             stats["errors"] += 1
 
+                # Compute collision-free tile ID when augmentation is enabled
+                orig_tile_id = (
+                    tile_index * (augmentation_count + 1)
+                    if apply_augmentation
+                    else tile_index
+                )
+
                 # Save original tile
                 save_tile(
                     image_data,
                     label_mask,
-                    tile_index,
+                    orig_tile_id,
                     src.profile,
                     window_transform,
                     is_augmented=False,
@@ -1841,10 +1853,7 @@ def export_geotiff_tiles(
                             aug_image = aug_image.astype(image_data.dtype)
 
                             # Generate unique tile ID for augmented version
-                            # Use a collision-free numbering scheme: (tile_index * (augmentation_count + 1)) + aug_idx + 1
-                            aug_tile_id = (
-                                (tile_index * (augmentation_count + 1)) + aug_idx + 1
-                            )
+                            aug_tile_id = orig_tile_id + aug_idx + 1
 
                             # Save augmented tile
                             save_tile(
@@ -1873,7 +1882,7 @@ def export_geotiff_tiles(
                     if metadata_format == "PASCAL_VOC":
                         _create_pascal_voc_annotation(
                             window_features,
-                            tile_index,
+                            orig_tile_id,
                             tile_size,
                             image_data,
                             src.crs,
@@ -1890,7 +1899,7 @@ def export_geotiff_tiles(
                     elif metadata_format == "COCO":
                         ann_id = _create_coco_annotation(
                             window_features,
-                            tile_index,
+                            orig_tile_id,
                             tile_size,
                             src.crs,
                             window_transform,
@@ -1904,7 +1913,7 @@ def export_geotiff_tiles(
                     elif metadata_format == "YOLO":
                         _create_yolo_annotation(
                             window_features,
-                            tile_index,
+                            orig_tile_id,
                             tile_size,
                             window_transform,
                             window_bounds,

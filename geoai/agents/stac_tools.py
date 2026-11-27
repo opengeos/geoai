@@ -205,10 +205,11 @@ class STACTools:
                     )
                 # Fix extra closing braces
                 elif query_str.count("}") > query_str.count("{"):
-                    # Remove extra closing braces from the end
                     extra_braces = query_str.count("}") - query_str.count("{")
-                    for _ in range(extra_braces):
-                        query_str = query_str.rstrip("}")
+                    trailing_braces = len(query_str) - len(query_str.rstrip("}"))
+                    trim = min(extra_braces, trailing_braces)
+                    if trim:
+                        query_str = query_str[:-trim]
                 query = ast.literal_eval(query_str)
             if isinstance(limit, str):
                 limit = ast.literal_eval(limit)

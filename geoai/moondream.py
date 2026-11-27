@@ -862,23 +862,40 @@ class MoondreamGeo:
         Returns:
             List of tuples (x_start, y_start, x_end, y_end) for each window.
         """
-        windows = []
+        if window_size <= 0:
+            raise ValueError(f"window_size must be positive, got {window_size}")
+        if overlap < 0 or overlap >= window_size:
+            raise ValueError(
+                f"overlap must satisfy 0 <= overlap < window_size, "
+                f"got overlap={overlap}, window_size={window_size}"
+            )
+        if image_width <= 0 or image_height <= 0:
+            return []
+
         stride = window_size - overlap
 
-        for y in range(0, image_height, stride):
-            for x in range(0, image_width, stride):
-                x_start = x
-                y_start = y
-                x_end = min(x + window_size, image_width)
-                y_end = min(y + window_size, image_height)
+        def _axis_windows(length: int) -> List[Tuple[int, int]]:
+            if length <= window_size:
+                return [(0, length)]
+            coords = []
+            pos = 0
+            while pos + window_size < length:
+                coords.append((pos, pos + window_size))
+                pos += stride
+            final_start = max(0, length - window_size)
+            final = (final_start, length)
+            if not coords or coords[-1] != final:
+                coords.append(final)
+            return coords
 
-                # Only add windows that have sufficient size
-                if (x_end - x_start) >= window_size // 2 and (
-                    y_end - y_start
-                ) >= window_size // 2:
-                    windows.append((x_start, y_start, x_end, y_end))
+        x_ranges = _axis_windows(image_width)
+        y_ranges = _axis_windows(image_height)
 
-        return windows
+        return [
+            (x_start, y_start, x_end, y_end)
+            for y_start, y_end in y_ranges
+            for x_start, x_end in x_ranges
+        ]
 
     def _apply_nms(
         self,
