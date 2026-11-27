@@ -6,7 +6,9 @@ co-registered images using the AnyChange model (torchange + SAM) via
 geoai.change_detection.ChangeDetection.
 """
 
+import inspect
 import os
+import threading
 import traceback
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -42,6 +44,35 @@ from qgis.core import (
 ANYCHANGE_TARGET_SIZE = 1024
 
 
+_LIVE_THREADS = set()
+
+
+def _keep_thread_alive(thread: QThread) -> None:
+    """Keep a still-running worker thread referenced until it exits."""
+    for sig_name in ("finished", "error", "progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
+    def _drop(*_args):
+        try:
+            thread.wait()
+        except RuntimeError:
+            pass
+        _LIVE_THREADS.discard(thread)
+
+    _LIVE_THREADS.add(thread)
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
+
+
 class ChangeDetectionWorker(QThread):
     """Worker thread for running AnyChange change detection."""
 
@@ -57,21 +88,29 @@ class ChangeDetectionWorker(QThread):
         """
         super().__init__()
         self.params = params
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of the background task."""
+        self._cancel_event.set()
 
     def run(self):
         """Run change detection in background thread."""
         try:
             from ..core.geoai_task_subprocess import run_geoai_task
 
-            result = run_geoai_task(
-                "detect_changes",
-                self.params,
-                progress_callback=self.progress.emit,
-            )
-            self.finished.emit(result["output_raster"], result.get("output_vector", ""))
+            kwargs = {"progress_callback": self.progress.emit}
+            if "cancel_event" in inspect.signature(run_geoai_task).parameters:
+                kwargs["cancel_event"] = self._cancel_event
+            result = run_geoai_task("detect_changes", self.params, **kwargs)
+            if not self._cancel_event.is_set():
+                self.finished.emit(
+                    result["output_raster"], result.get("output_vector", "")
+                )
 
         except Exception as e:
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class ChangeDetectionDockWidget(QDockWidget):
@@ -609,9 +648,12 @@ class ChangeDetectionDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
-        if self.worker is not None and self.worker.isRunning():
-            self.worker.terminate()
-            self.worker.wait()
+        worker = self.worker
+        self.worker = None
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            if not worker.wait(5000):
+                _keep_thread_alive(worker)
 
     def closeEvent(self, event):
         """Handle dock widget close event.

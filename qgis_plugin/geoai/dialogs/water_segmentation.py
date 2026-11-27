@@ -6,9 +6,10 @@ satellite and aerial imagery using the OmniWaterMask model via the
 geoai.segment_water() function.
 """
 
+import inspect
 import os
-import sys
 import tempfile
+import threading
 import traceback
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -42,43 +43,33 @@ from qgis.core import (
     Qgis,
 )
 
+_LIVE_THREADS = set()
 
-class OutputCapture:
-    """Capture stdout and emit lines to a callback in real-time."""
 
-    def __init__(self, callback, original_stdout):
-        """Initialize the output capture.
+def _keep_thread_alive(thread: QThread) -> None:
+    """Keep a still-running worker thread referenced until it exits."""
+    for sig_name in ("finished", "error", "progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
 
-        Args:
-            callback: Function to call for each line of output.
-            original_stdout: The original stdout stream to also write to.
-        """
-        self.callback = callback
-        self.original_stdout = original_stdout
-        self.buffer = ""
+    def _drop(*_args):
+        try:
+            thread.wait()
+        except RuntimeError:
+            pass
+        _LIVE_THREADS.discard(thread)
 
-    def write(self, text):
-        """Write text to buffer, emitting complete lines via callback.
-
-        Args:
-            text: Text to write.
-        """
-        if self.original_stdout:
-            self.original_stdout.write(text)
-
-        self.buffer += text
-        while "\n" in self.buffer:
-            line, self.buffer = self.buffer.split("\n", 1)
-            if line.strip():
-                self.callback(line)
-
-    def flush(self):
-        """Flush the buffer, emitting any remaining content."""
-        if self.original_stdout:
-            self.original_stdout.flush()
-        if self.buffer.strip():
-            self.callback(self.buffer)
-            self.buffer = ""
+    _LIVE_THREADS.add(thread)
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
 
 
 class WaterSegmentationWorker(QThread):
@@ -144,6 +135,11 @@ class WaterSegmentationWorker(QThread):
         self.min_size = min_size
         self.smooth = smooth
         self.smooth_iterations = smooth_iterations
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of the water segmentation task."""
+        self._cancel_event.set()
 
     def run(self):
         """Run water segmentation in background thread."""
@@ -177,15 +173,19 @@ class WaterSegmentationWorker(QThread):
             if self.device:
                 kwargs["device"] = self.device
 
-            result = run_geoai_task(
-                "segment_water",
-                kwargs,
-                progress_callback=self.progress.emit,
-            )
-            self.finished.emit(result["output_raster"], result.get("output_vector", ""))
+            call_kwargs = {"progress_callback": self.progress.emit}
+            if "cancel_event" in inspect.signature(run_geoai_task).parameters:
+                call_kwargs["cancel_event"] = self._cancel_event
+
+            result = run_geoai_task("segment_water", kwargs, **call_kwargs)
+            if not self._cancel_event.is_set():
+                self.finished.emit(
+                    result["output_raster"], result.get("output_vector", "")
+                )
 
         except Exception as e:
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class WaterSegmentationDockWidget(QDockWidget):
@@ -966,9 +966,12 @@ class WaterSegmentationDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
-        if self.worker is not None and self.worker.isRunning():
-            self.worker.terminate()
-            self.worker.wait()
+        worker = self.worker
+        self.worker = None
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            if not worker.wait(5000):
+                _keep_thread_alive(worker)
 
         for temp_file in self._temp_files:
             try:

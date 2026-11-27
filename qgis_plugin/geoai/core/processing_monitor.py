@@ -36,6 +36,7 @@ class GPUMetrics:
     reserved_bytes: Optional[int] = None
     peak_allocated_bytes: Optional[int] = None
     unavailable_reason: Optional[str] = None
+    total_bytes: Optional[int] = None
 
 
 @dataclass
@@ -96,10 +97,31 @@ def classify_error(error: BaseException | str) -> str:
 
 
 def get_gpu_metrics() -> GPUMetrics:
-    """Read optional CUDA metrics without making PyTorch a plugin dependency."""
+    """Read optional CUDA metrics without importing PyTorch into QGIS."""
     torch = sys.modules.get("torch")
     if torch is None:
-        return GPUMetrics(False, unavailable_reason="PyTorch unavailable")
+        try:
+            from .venv_manager import detect_nvidia_gpu
+
+            has_gpu, gpu_info = detect_nvidia_gpu()
+            if has_gpu:
+                name = gpu_info.get("name") or "NVIDIA GPU"
+                memory_mb = gpu_info.get("memory_mb")
+                total_bytes = (
+                    int(memory_mb) * 1024 * 1024 if memory_mb is not None else None
+                )
+                display_name = (
+                    f"{name} ({memory_mb} MB)" if memory_mb is not None else name
+                )
+                return GPUMetrics(
+                    available=True,
+                    device_name=display_name,
+                    total_bytes=total_bytes,
+                )
+            return GPUMetrics(False, unavailable_reason="No NVIDIA GPU detected")
+        except Exception as exc:
+            logger.info("Fallback GPU detection unavailable: %s", exc)
+            return GPUMetrics(False, unavailable_reason="PyTorch unavailable")
 
     try:
         cuda = getattr(torch, "cuda", None)

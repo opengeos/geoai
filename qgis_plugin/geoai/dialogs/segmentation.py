@@ -5,9 +5,11 @@ This dock widget provides an interface for training semantic segmentation models
 and running inference, combined in a single dockable panel.
 """
 
+import inspect
 import os
 import shutil
 import tempfile
+import threading
 import uuid
 from typing import Optional
 
@@ -41,35 +43,47 @@ from qgis.core import QgsMapLayerProxyModel
 from .inference_range import InferenceRangeMixin
 from ..core.processing_monitor import get_processing_monitor
 
+_LIVE_THREADS = set()
 
-class OutputCapture:
-    """Capture stdout and emit lines to a callback in real-time."""
 
-    def __init__(self, callback, original_stdout):
-        """Initialize output forwarding with a callback and original stream."""
-        self.callback = callback
-        self.original_stdout = original_stdout
-        self.buffer = ""
+def _keep_thread_alive(thread: QThread) -> None:
+    """Keep a still-running worker thread referenced until it exits."""
+    for sig_name in ("finished", "error", "exception", "progress", "epoch_progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
 
-    def write(self, text):
-        """Forward complete output lines to the callback."""
-        # Also write to original stdout
-        if self.original_stdout:
-            self.original_stdout.write(text)
+    def _drop(*_args):
+        try:
+            thread.wait()
+        except RuntimeError:
+            pass
+        _LIVE_THREADS.discard(thread)
 
-        self.buffer += text
-        while "\n" in self.buffer:
-            line, self.buffer = self.buffer.split("\n", 1)
-            if line.strip():
-                self.callback(line)
+    _LIVE_THREADS.add(thread)
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
 
-    def flush(self):
-        """Flush buffered output and the original stream."""
-        if self.original_stdout:
-            self.original_stdout.flush()
-        if self.buffer.strip():
-            self.callback(self.buffer)
-            self.buffer = ""
+
+def _call_run_geoai_task(
+    run_fn, action, params, progress_callback=None, cancel_event=None
+):
+    """Invoke ``run_geoai_task``, forwarding ``cancel_event`` when supported."""
+    kwargs = {"progress_callback": progress_callback}
+    if cancel_event is not None:
+        try:
+            if "cancel_event" in inspect.signature(run_fn).parameters:
+                kwargs["cancel_event"] = cancel_event
+        except (TypeError, ValueError):
+            pass
+    return run_fn(action, params, **kwargs)
 
 
 class TrainingWorker(QThread):
@@ -121,6 +135,11 @@ class TrainingWorker(QThread):
         self.resume_training = resume_training
         self.freeze_encoder = freeze_encoder
         self._epoch_pattern = None
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of training."""
+        self._cancel_event.set()
 
     def _parse_output_line(self, line: str):
         """Parse a line of output for epoch progress."""
@@ -147,7 +166,8 @@ class TrainingWorker(QThread):
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Starting training...")
-            result = run_geoai_task(
+            result = _call_run_geoai_task(
+                run_geoai_task,
                 "train_segmentation_model",
                 {
                     "images_dir": self.images_dir,
@@ -172,14 +192,17 @@ class TrainingWorker(QThread):
                     "freeze_encoder": self.freeze_encoder,
                 },
                 progress_callback=self._parse_output_line,
+                cancel_event=self._cancel_event,
             )
-            self.finished.emit(result["model_path"])
+            if not self._cancel_event.is_set():
+                self.finished.emit(result["model_path"])
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
-            self.exception.emit(e)
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.exception.emit(e)
 
 
 class TileExportWorker(QThread):
@@ -209,6 +232,11 @@ class TileExportWorker(QThread):
         self.stride = stride
         self.buffer_radius = buffer_radius
         self.metadata_format = metadata_format
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of tile export."""
+        self._cancel_event.set()
 
     def run(self):
         """Execute tile export."""
@@ -216,7 +244,8 @@ class TileExportWorker(QThread):
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit(f"Exporting tiles in {self.metadata_format} format...")
-            run_geoai_task(
+            _call_run_geoai_task(
+                run_geoai_task,
                 "export_geotiff_tiles",
                 {
                     "in_raster": self.raster_path,
@@ -228,15 +257,18 @@ class TileExportWorker(QThread):
                     "metadata_format": self.metadata_format,
                 },
                 progress_callback=self.progress.emit,
+                cancel_event=self._cancel_event,
             )
 
-            self.finished.emit(self.output_dir)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_dir)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
-            self.exception.emit(e)
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.exception.emit(e)
 
 
 class InferenceWorker(QThread):
@@ -280,6 +312,11 @@ class InferenceWorker(QThread):
         self.probability_threshold = probability_threshold
         self.inference_bbox = inference_bbox
         self.inference_bbox_crs = inference_bbox_crs
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of inference."""
+        self._cancel_event.set()
 
     def run(self):
         """Execute the inference."""
@@ -294,7 +331,8 @@ class InferenceWorker(QThread):
                 temp_dir = tempfile.mkdtemp(prefix="geoai_inference_range_")
                 clipped_input_path = os.path.join(temp_dir, "clip.tif")
                 self.progress.emit("Clipping raster to selected range...")
-                run_geoai_task(
+                _call_run_geoai_task(
+                    run_geoai_task,
                     "clip_raster_by_bbox",
                     {
                         "input_raster": self.input_path,
@@ -304,6 +342,7 @@ class InferenceWorker(QThread):
                         "bbox_crs": self.inference_bbox_crs,
                     },
                     progress_callback=self.progress.emit,
+                    cancel_event=self._cancel_event,
                 )
                 input_path = clipped_input_path
 
@@ -326,19 +365,23 @@ class InferenceWorker(QThread):
                 "batch_size": self.batch_size,
                 **kwargs,
             }
-            run_geoai_task(
+            _call_run_geoai_task(
+                run_geoai_task,
                 "semantic_segmentation",
                 params,
                 progress_callback=self.progress.emit,
+                cancel_event=self._cancel_event,
             )
 
-            self.finished.emit(self.output_path)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_path)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
-            self.exception.emit(e)
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.exception.emit(e)
         finally:
             if temp_dir:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -365,6 +408,11 @@ class VectorizeWorker(QThread):
         self.output_path = output_path
         self.epsilon = epsilon
         self.min_area = min_area
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of vectorization."""
+        self._cancel_event.set()
 
     def run(self):
         """Execute vectorization."""
@@ -372,7 +420,8 @@ class VectorizeWorker(QThread):
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Vectorizing mask...")
-            run_geoai_task(
+            _call_run_geoai_task(
+                run_geoai_task,
                 "vectorize_mask",
                 {
                     "mask_path": self.mask_path,
@@ -381,15 +430,18 @@ class VectorizeWorker(QThread):
                     "min_area": self.min_area,
                 },
                 progress_callback=self.progress.emit,
+                cancel_event=self._cancel_event,
             )
 
-            self.finished.emit(self.output_path)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_path)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
-            self.exception.emit(e)
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.exception.emit(e)
 
 
 class SmoothVectorWorker(QThread):
@@ -415,13 +467,19 @@ class SmoothVectorWorker(QThread):
         self.smooth_iterations = smooth_iterations
         self.min_area = min_area
         self.simplify_tolerance = simplify_tolerance
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of smoothing."""
+        self._cancel_event.set()
 
     def run(self):
         """Execute smoothing."""
         try:
             from ..core.geoai_task_subprocess import run_geoai_task
 
-            run_geoai_task(
+            _call_run_geoai_task(
+                run_geoai_task,
                 "smooth_vector",
                 {
                     "mask_path": self.mask_path,
@@ -431,15 +489,18 @@ class SmoothVectorWorker(QThread):
                     "simplify_tolerance": self.simplify_tolerance,
                 },
                 progress_callback=self.progress.emit,
+                cancel_event=self._cancel_event,
             )
 
-            self.finished.emit(self.output_path)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_path)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
-            self.exception.emit(e)
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.exception.emit(e)
 
 
 class _MonitorSignalBridge(QObject):
@@ -1919,20 +1980,28 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.log(f"Vectorize error: {error}")
         QMessageBox.critical(self, "Error", f"Vectorization failed:\n{error}")
 
-    def closeEvent(self, event):
-        """Handle widget close event."""
-        for worker in [
-            self.train_worker,
-            self.tile_worker,
-            self.inference_worker,
-            self.vectorize_worker,
-            self.smooth_worker,
-        ]:
+    def cleanup(self):
+        """Cooperatively stop running workers and update monitor tasks."""
+        for attr in (
+            "train_worker",
+            "tile_worker",
+            "inference_worker",
+            "vectorize_worker",
+            "smooth_worker",
+        ):
+            worker = getattr(self, attr, None)
             was_running = worker is not None and worker.isRunning()
             if was_running:
-                worker.terminate()
-                worker.wait()
+                if hasattr(worker, "cancel"):
+                    worker.cancel()
+                if not worker.wait(5000):
+                    _keep_thread_alive(worker)
             self._cancel_monitored_worker(worker, was_running)
+            setattr(self, attr, None)
+
+    def closeEvent(self, event):
+        """Handle widget close event."""
+        self.cleanup()
         event.accept()
 
     def _cancel_monitored_worker(self, worker, was_running=None):

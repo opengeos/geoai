@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -54,6 +55,8 @@ def run_geoai_task(
     params: Dict[str, Any],
     progress_callback: ProgressCallback = None,
     drop_env: Tuple[str, ...] = (),
+    cancel_event: Optional[threading.Event] = None,
+    on_process_start: Optional[Callable[[subprocess.Popen], None]] = None,
 ) -> Any:
     """Run a geoai task in a subprocess and return its JSON-serializable result.
 
@@ -63,10 +66,17 @@ def run_geoai_task(
         progress_callback: Optional callable receiving progress lines.
         drop_env: Environment variable names to remove from the worker's
             environment only (the QGIS process environment is unchanged).
+        cancel_event: Optional threading.Event that, when set, terminates the
+            active worker subprocess cooperatively.
+        on_process_start: Optional callback invoked with the spawned Popen
+            instance immediately after process creation.
 
     Returns:
         The task's result.
     """
+    if cancel_event is not None and cancel_event.is_set():
+        raise RuntimeError("Task cancelled")
+
     if not venv_exists():
         raise RuntimeError("GeoAI virtual environment not found. Install dependencies.")
 
@@ -103,6 +113,33 @@ def run_geoai_task(
         **popen_kwargs,
     )
 
+    if on_process_start is not None:
+        try:
+            on_process_start(proc)
+        except Exception:
+            pass
+
+    done_event = threading.Event()
+    if cancel_event is not None:
+
+        def _watch_cancel() -> None:
+            while not done_event.is_set():
+                if cancel_event.wait(timeout=0.1):
+                    if not done_event.is_set():
+                        try:
+                            if proc.poll() is None:
+                                proc.terminate()
+                                try:
+                                    proc.wait(timeout=1.0)
+                                except Exception:
+                                    proc.kill()
+                                    proc.wait(timeout=1.0)
+                        except Exception:
+                            pass
+                    return
+
+        threading.Thread(target=_watch_cancel, daemon=True).start()
+
     try:
         if proc.stdin is None or proc.stdout is None:
             raise RuntimeError("Failed to create pipes for geoai task worker")
@@ -113,6 +150,9 @@ def run_geoai_task(
 
         final_result = None
         for raw_line in proc.stdout:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Task cancelled")
+
             line = raw_line.strip()
             if not line:
                 continue
@@ -147,6 +187,9 @@ def run_geoai_task(
                 ):
                     raise FileNotFoundError(error_msg)
                 raise RuntimeError(error_msg)
+
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("Task cancelled")
 
         returncode = proc.wait()
         if returncode != 0:
@@ -183,6 +226,7 @@ def run_geoai_task(
 
         return final_result
     finally:
+        done_event.set()
         try:
             if proc.poll() is None:
                 proc.terminate()

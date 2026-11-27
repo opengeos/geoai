@@ -6,6 +6,7 @@ dependency installation in the plugin's virtual environment.
 Source: https://github.com/astral-sh/uv
 """
 
+import hashlib
 import os
 import platform
 import shutil
@@ -15,7 +16,7 @@ import sys
 import tarfile
 import tempfile
 import zipfile
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 from qgis.core import Qgis, QgsBlockingNetworkRequest, QgsMessageLog
 from qgis.PyQt.QtCore import QUrl
@@ -30,6 +31,43 @@ UV_DIR = os.path.join(CACHE_DIR, "uv")
 
 # Pin a known-good uv version.
 UV_VERSION = "0.10.6"
+
+# Optional SHA-256 checksums keyed by release archive filename. When an entry
+# is configured for the downloaded archive, download_uv() verifies the digest
+# before extracting and removes mismatched files.
+KNOWN_SHA256: Dict[str, str] = {}
+
+
+def verify_sha256(file_path: str, expected_sha256: str) -> bool:
+    """Verify the SHA-256 digest of a downloaded archive.
+
+    Args:
+        file_path: Path to the downloaded file.
+        expected_sha256: Expected hexadecimal SHA-256 digest (case-insensitive).
+
+    Returns:
+        True when the file digest matches ``expected_sha256``.
+
+    Raises:
+        ValueError: When the computed digest does not match. The mismatched
+            file is removed before raising.
+    """
+    expected = (expected_sha256 or "").strip().lower()
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            hasher.update(chunk)
+    actual = hasher.hexdigest().lower()
+    if actual != expected:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+        raise ValueError(
+            f"SHA-256 checksum mismatch for {os.path.basename(file_path)}: "
+            f"expected {expected}, got {actual}"
+        )
+    return True
 
 
 def _log(message, level=Qgis.Info):
@@ -155,6 +193,11 @@ def download_uv(progress_callback=None, cancel_check=None):
 
         with open(temp_path, "wb") as f:
             f.write(content.data())
+
+        asset_name = os.path.basename(str(url))
+        expected_sha256 = KNOWN_SHA256.get(asset_name)
+        if expected_sha256:
+            verify_sha256(temp_path, expected_sha256)
 
         _log(f"Download complete ({len(content)} bytes), extracting...")
 

@@ -39,6 +39,34 @@ from qgis.core import (
 from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayerProxyModel
 
+_LIVE_THREADS = set()
+
+
+def _keep_thread_alive(thread: QThread) -> None:
+    """Detach a running QThread and hold a reference until it exits."""
+    for sig_name in ("finished", "error", "progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
+    def _drop(*_args):
+        try:
+            thread.wait()
+        except RuntimeError:
+            pass
+        _LIVE_THREADS.discard(thread)
+
+    _LIVE_THREADS.add(thread)
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
+
 
 class ModelLoadWorker(QThread):
     """Worker thread for loading Moondream model."""
@@ -51,6 +79,16 @@ class ModelLoadWorker(QThread):
         super().__init__()
         self.model_name = model_name
         self.device = device
+        self._client = None
+
+    def abort(self):
+        """Abort the subprocess initialization without locking."""
+        client = self._client
+        if client is not None and hasattr(client, "abort"):
+            try:
+                client.abort()
+            except Exception:
+                pass
 
     def run(self):
         """Load the Moondream model in background."""
@@ -62,6 +100,7 @@ class ModelLoadWorker(QThread):
             moondream = MoondreamSubprocessClient(
                 model_name=self.model_name, device=self.device
             )
+            self._client = moondream
             self.progress.emit(f"Loading {self.model_name.split('/')[-1]} in worker...")
             moondream.initialize()
 
@@ -459,6 +498,16 @@ class MoondreamDockWidget(QDockWidget):
 
     def on_model_loaded(self, moondream):
         """Handle successful model loading."""
+        old_client = self.moondream
+        if (
+            old_client is not None
+            and old_client is not moondream
+            and hasattr(old_client, "close")
+        ):
+            try:
+                old_client.close()
+            except Exception:
+                pass
         self.moondream = moondream
         model_name = self.model_combo.currentText()
 
@@ -846,29 +895,66 @@ class MoondreamDockWidget(QDockWidget):
         else:
             driver = "GPKG"
 
-        write_result = QgsVectorFileWriter.writeAsVectorFormat(
-            layer,
-            output_path,
-            "UTF-8",
-            layer.crs(),
-            driver,
-        )
+        if hasattr(QgsVectorFileWriter, "writeAsVectorFormatV3"):
+            options = QgsVectorFileWriter.SaveVectorOptions()
+            options.driverName = driver
+            options.fileEncoding = "UTF-8"
+            write_result = QgsVectorFileWriter.writeAsVectorFormatV3(
+                layer,
+                output_path,
+                QgsProject.instance().transformContext(),
+                options,
+            )
+        else:
+            write_result = QgsVectorFileWriter.writeAsVectorFormat(
+                layer,
+                output_path,
+                "UTF-8",
+                layer.crs(),
+                driver,
+            )
         error_code = (
             write_result[0] if isinstance(write_result, tuple) else write_result
         )
         if error_code != QgsVectorFileWriter.NoError:
             raise RuntimeError(f"Failed to save vector layer (driver={driver})")
 
-    def closeEvent(self, event):
-        """Handle widget close event."""
-        for worker in [self.worker, self.model_load_worker]:
-            if worker and worker.isRunning():
-                worker.terminate()
-                worker.wait()
+    def cleanup(self):
+        """Clean up subprocess clients and worker threads safely."""
+        # Abort subprocesses first (lock-free) so blocked workers unblock and
+        # release _lock before wait() / close().
+        if self.moondream is not None and hasattr(self.moondream, "abort"):
+            try:
+                self.moondream.abort()
+            except Exception:
+                pass
+        if self.model_load_worker is not None and hasattr(
+            self.model_load_worker, "abort"
+        ):
+            try:
+                self.model_load_worker.abort()
+            except Exception:
+                pass
+
+        for attr in ("worker", "model_load_worker"):
+            worker = getattr(self, attr, None)
+            if worker is None:
+                continue
+            try:
+                if worker.isRunning() and not worker.wait(5000):
+                    _keep_thread_alive(worker)
+            except RuntimeError:
+                pass
+            setattr(self, attr, None)
+
         if self.moondream is not None and hasattr(self.moondream, "close"):
             try:
                 self.moondream.close()
             except Exception:
                 pass
             self.moondream = None
+
+    def closeEvent(self, event):
+        """Handle widget close event."""
+        self.cleanup()
         event.accept()

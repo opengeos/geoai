@@ -145,7 +145,18 @@ def _task_instance_segmentation(params: Dict[str, Any]) -> Dict[str, Any]:
     geoai = _geoai()
     _progress("Running instance segmentation inference...")
     _run_with_progress(lambda: geoai.instance_segmentation(**params))
-    return {"output_path": params["output_path"]}
+    output_path = params["output_path"]
+    num_instances = None
+    try:
+        import rasterio
+
+        if os.path.exists(output_path):
+            with rasterio.open(output_path) as src:
+                data = src.read(1)
+                num_instances = int(data.max()) if getattr(data, "size", 0) > 0 else 0
+    except Exception:
+        num_instances = None
+    return {"output_path": output_path, "num_instances": num_instances}
 
 
 def _task_clip_raster_by_bbox(params: Dict[str, Any]) -> Dict[str, Any]:

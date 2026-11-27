@@ -5,9 +5,11 @@ This dock widget provides an interface for training Mask R-CNN instance
 segmentation models and running inference, combined in a single dockable panel.
 """
 
+import inspect
 import os
 import shutil
 import tempfile
+import threading
 from typing import Optional
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -40,32 +42,47 @@ from qgis.core import QgsMapLayerProxyModel
 
 from .inference_range import InferenceRangeMixin
 
+_LIVE_THREADS = set()
 
-class OutputCapture:
-    """Capture stdout and emit lines to a callback in real-time."""
 
-    def __init__(self, callback, original_stdout):
-        self.callback = callback
-        self.original_stdout = original_stdout
-        self.buffer = ""
+def _keep_thread_alive(thread: QThread) -> None:
+    """Keep a still-running worker thread referenced until it exits."""
+    for sig_name in ("finished", "error", "progress", "epoch_progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
 
-    def write(self, text):
-        # Also write to original stdout
-        if self.original_stdout:
-            self.original_stdout.write(text)
+    def _drop(*_args):
+        try:
+            thread.wait()
+        except RuntimeError:
+            pass
+        _LIVE_THREADS.discard(thread)
 
-        self.buffer += text
-        while "\n" in self.buffer:
-            line, self.buffer = self.buffer.split("\n", 1)
-            if line.strip():
-                self.callback(line)
+    _LIVE_THREADS.add(thread)
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
 
-    def flush(self):
-        if self.original_stdout:
-            self.original_stdout.flush()
-        if self.buffer.strip():
-            self.callback(self.buffer)
-            self.buffer = ""
+
+def _call_run_geoai_task(
+    run_fn, action, params, progress_callback=None, cancel_event=None
+):
+    """Invoke ``run_geoai_task``, forwarding ``cancel_event`` when supported."""
+    kwargs = {"progress_callback": progress_callback}
+    if cancel_event is not None:
+        try:
+            if "cancel_event" in inspect.signature(run_fn).parameters:
+                kwargs["cancel_event"] = cancel_event
+        except (TypeError, ValueError):
+            pass
+    return run_fn(action, params, **kwargs)
 
 
 class InstanceTrainingWorker(QThread):
@@ -103,6 +120,11 @@ class InstanceTrainingWorker(QThread):
         self.input_format = input_format
         self.visualize = visualize
         self._epoch_pattern = None
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of training."""
+        self._cancel_event.set()
 
     def _parse_output_line(self, line: str):
         """Parse a line of output for epoch progress."""
@@ -127,7 +149,8 @@ class InstanceTrainingWorker(QThread):
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Starting Mask R-CNN training...")
-            result = run_geoai_task(
+            result = _call_run_geoai_task(
+                run_geoai_task,
                 "train_instance_segmentation_model",
                 {
                     "images_dir": self.images_dir,
@@ -144,13 +167,16 @@ class InstanceTrainingWorker(QThread):
                     "verbose": True,
                 },
                 progress_callback=self._parse_output_line,
+                cancel_event=self._cancel_event,
             )
-            self.finished.emit(result["model_path"])
+            if not self._cancel_event.is_set():
+                self.finished.emit(result["model_path"])
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class InstanceTileExportWorker(QThread):
@@ -178,6 +204,11 @@ class InstanceTileExportWorker(QThread):
         self.stride = stride
         self.buffer_radius = buffer_radius
         self.metadata_format = metadata_format
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of tile export."""
+        self._cancel_event.set()
 
     def run(self):
         """Execute tile export."""
@@ -185,7 +216,8 @@ class InstanceTileExportWorker(QThread):
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit(f"Exporting tiles in {self.metadata_format} format...")
-            run_geoai_task(
+            _call_run_geoai_task(
+                run_geoai_task,
                 "export_geotiff_tiles",
                 {
                     "in_raster": self.raster_path,
@@ -197,14 +229,17 @@ class InstanceTileExportWorker(QThread):
                     "metadata_format": self.metadata_format,
                 },
                 progress_callback=self.progress.emit,
+                cancel_event=self._cancel_event,
             )
 
-            self.finished.emit(self.output_dir)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_dir)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class InstanceInferenceWorker(QThread):
@@ -240,6 +275,12 @@ class InstanceInferenceWorker(QThread):
         self.batch_size = batch_size
         self.inference_bbox = inference_bbox
         self.inference_bbox_crs = inference_bbox_crs
+        self.num_instances: Optional[int] = None
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of inference."""
+        self._cancel_event.set()
 
     def _forward_line(self, line: str):
         """Forward stdout lines as progress messages."""
@@ -258,7 +299,8 @@ class InstanceInferenceWorker(QThread):
                 temp_dir = tempfile.mkdtemp(prefix="geoai_inference_range_")
                 clipped_input_path = os.path.join(temp_dir, "clip.tif")
                 self.progress.emit("Clipping raster to selected range...")
-                run_geoai_task(
+                _call_run_geoai_task(
+                    run_geoai_task,
                     "clip_raster_by_bbox",
                     {
                         "input_raster": self.input_path,
@@ -268,10 +310,12 @@ class InstanceInferenceWorker(QThread):
                         "bbox_crs": self.inference_bbox_crs,
                     },
                     progress_callback=self._forward_line,
+                    cancel_event=self._cancel_event,
                 )
                 input_path = clipped_input_path
 
-            run_geoai_task(
+            result = _call_run_geoai_task(
+                run_geoai_task,
                 "instance_segmentation",
                 {
                     "input_path": input_path,
@@ -285,14 +329,19 @@ class InstanceInferenceWorker(QThread):
                     "batch_size": self.batch_size,
                 },
                 progress_callback=self._forward_line,
+                cancel_event=self._cancel_event,
             )
+            if isinstance(result, dict):
+                self.num_instances = result.get("num_instances")
 
-            self.finished.emit(self.output_path)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_path)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
         finally:
             if temp_dir:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -317,6 +366,11 @@ class VectorizeWorker(QThread):
         self.output_path = output_path
         self.epsilon = epsilon
         self.min_area = min_area
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of vectorization."""
+        self._cancel_event.set()
 
     def run(self):
         """Execute vectorization."""
@@ -324,7 +378,8 @@ class VectorizeWorker(QThread):
             from ..core.geoai_task_subprocess import run_geoai_task
 
             self.progress.emit("Vectorizing mask...")
-            run_geoai_task(
+            _call_run_geoai_task(
+                run_geoai_task,
                 "vectorize_mask",
                 {
                     "mask_path": self.mask_path,
@@ -333,14 +388,17 @@ class VectorizeWorker(QThread):
                     "min_area": self.min_area,
                 },
                 progress_callback=self.progress.emit,
+                cancel_event=self._cancel_event,
             )
 
-            self.finished.emit(self.output_path)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_path)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class SmoothVectorWorker(QThread):
@@ -364,13 +422,19 @@ class SmoothVectorWorker(QThread):
         self.smooth_iterations = smooth_iterations
         self.min_area = min_area
         self.simplify_tolerance = simplify_tolerance
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of smoothing."""
+        self._cancel_event.set()
 
     def run(self):
         """Execute smoothing."""
         try:
             from ..core.geoai_task_subprocess import run_geoai_task
 
-            run_geoai_task(
+            _call_run_geoai_task(
+                run_geoai_task,
                 "smooth_vector",
                 {
                     "mask_path": self.mask_path,
@@ -380,14 +444,17 @@ class SmoothVectorWorker(QThread):
                     "simplify_tolerance": self.simplify_tolerance,
                 },
                 progress_callback=self.progress.emit,
+                cancel_event=self._cancel_event,
             )
 
-            self.finished.emit(self.output_path)
+            if not self._cancel_event.is_set():
+                self.finished.emit(self.output_path)
 
         except Exception as e:
-            import traceback
+            if not self._cancel_event.is_set():
+                import traceback
 
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
@@ -1454,7 +1521,7 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.inference_worker.progress.connect(self.log)
         self.inference_worker.start()
 
-    def on_inference_finished(self, output_path: str):
+    def on_inference_finished(self, output_path: str, num_instances=None):
         """Handle inference completion."""
         self.inference_progress.setRange(0, 100)
         self.inference_progress.setValue(100)
@@ -1464,22 +1531,24 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
         self.log(f"Instance segmentation complete: {output_path}")
 
-        # Check if result contains any instances
-        num_instances = 0
-        try:
-            import numpy as np
-
+        # Prefer instance count reported by the venv worker (rasterio may not
+        # be installed in QGIS's embedded Python).
+        if num_instances is None and self.inference_worker is not None:
+            num_instances = getattr(self.inference_worker, "num_instances", None)
+        if num_instances is None:
             try:
                 import rasterio
 
                 with rasterio.open(output_path) as src:
                     data = src.read(1)
-                    num_instances = int(data.max())
-                    self.log(f"Detected instances: {num_instances}")
-            except ImportError:
-                pass
-        except Exception:
-            pass
+                    num_instances = (
+                        int(data.max()) if getattr(data, "size", 0) > 0 else 0
+                    )
+            except Exception:
+                num_instances = None
+
+        if num_instances is not None:
+            self.log(f"Detected instances: {num_instances}")
 
         if self.add_to_map_check.isChecked():
             layer = QgsRasterLayer(output_path, "Instance Segmentation Result")
@@ -1497,12 +1566,18 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
                 "- Using a model trained on similar data\n"
                 "- Checking that num_classes and num_channels match the trained model",
             )
-        else:
+        elif num_instances is not None:
             QMessageBox.information(
                 self,
                 "Success",
                 f"Output saved to:\n{output_path}\n\n"
                 f"Detected {num_instances} instances.",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Output saved to:\n{output_path}",
             )
 
     def on_inference_error(self, error: str):
@@ -1587,16 +1662,24 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.log(f"Vectorize error: {error}")
         QMessageBox.critical(self, "Error", f"Vectorization failed:\n{error}")
 
+    def cleanup(self):
+        """Cooperatively stop running workers when the dock closes."""
+        for attr in (
+            "train_worker",
+            "tile_worker",
+            "inference_worker",
+            "vectorize_worker",
+            "smooth_worker",
+        ):
+            worker = getattr(self, attr, None)
+            if worker is not None and worker.isRunning():
+                if hasattr(worker, "cancel"):
+                    worker.cancel()
+                if not worker.wait(5000):
+                    _keep_thread_alive(worker)
+            setattr(self, attr, None)
+
     def closeEvent(self, event):
         """Handle widget close event."""
-        for worker in [
-            self.train_worker,
-            self.tile_worker,
-            self.inference_worker,
-            self.vectorize_worker,
-            self.smooth_worker,
-        ]:
-            if worker and worker.isRunning():
-                worker.terminate()
-                worker.wait()
+        self.cleanup()
         event.accept()

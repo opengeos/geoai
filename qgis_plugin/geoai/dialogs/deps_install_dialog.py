@@ -9,7 +9,7 @@ import os
 import platform
 import sys
 
-from qgis.PyQt.QtCore import Qt, pyqtSignal
+from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
     QFrame,
@@ -21,6 +21,22 @@ from qgis.PyQt.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class _VenvRemoveWorker(QThread):
+    """Background worker that removes an existing virtual environment."""
+
+    done = pyqtSignal(bool, str)
+
+    def run(self):
+        """Remove the plugin virtual environment off the Qt main thread."""
+        try:
+            from ..core.venv_manager import remove_venv
+
+            ok, message = remove_venv()
+            self.done.emit(bool(ok), str(message))
+        except Exception as exc:
+            self.done.emit(False, str(exc))
 
 
 class DepsInstallDockWidget(QDockWidget):
@@ -158,6 +174,7 @@ class DepsInstallDockWidget(QDockWidget):
         self.setWidget(container)
 
         # Detect GPU on creation
+        self._remove_worker = None
         self._detect_gpu()
 
     def _detect_gpu(self):
@@ -213,15 +230,32 @@ class DepsInstallDockWidget(QDockWidget):
                 self.gpu_label.setText("Could not detect GPU.\nCPU mode will be used.")
 
     def _on_reinstall_clicked(self):
-        """Handle reinstall button click by removing existing venv first."""
-        try:
-            from ..core.venv_manager import remove_venv
+        """Handle reinstall button click by removing existing venv off the UI thread."""
+        if self._remove_worker is not None and self._remove_worker.isRunning():
+            return
 
-            remove_venv()
-        except Exception:
-            pass
         self.reinstall_button.hide()
+        self.install_button.hide()
+        self.status_label.hide()
+        self.progress_frame.show()
+        self.progress_bar.setRange(0, 0)
+        self.progress_label.setText("Removing existing virtual environment...")
+
+        self._remove_worker = _VenvRemoveWorker(self)
+        self._remove_worker.done.connect(self._on_venv_removed)
+        self._remove_worker.start()
+
+    def _on_venv_removed(self, _ok: bool, _message: str):
+        """Proceed with dependency installation after venv removal completes."""
+        self.progress_bar.setRange(0, 100)
+        self._remove_worker = None
         self.install_requested.emit()
+
+    def closeEvent(self, event):
+        """Wait for any background venv removal before closing."""
+        if self._remove_worker is not None and self._remove_worker.isRunning():
+            self._remove_worker.wait(5000)
+        super().closeEvent(event)
 
     def show_install_ui(self):
         """Show the install button, hide progress and status."""

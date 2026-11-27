@@ -44,6 +44,14 @@ PANEL_MODULES = [
     "geoai.dialogs.samgeo",
     "geoai.dialogs.deepforest_panel",
     "geoai.dialogs.water_segmentation",
+    "geoai.dialogs.moondream",
+    "geoai.dialogs.segmentation",
+    "geoai.dialogs.instance_segmentation",
+    "geoai.dialogs.change_detection",
+    "geoai.dialogs.processing_monitor",
+    "geoai.dialogs.diagnostics",
+    "geoai.dialogs.update_checker",
+    "geoai.dialogs.deps_install_dialog",
     "geoai.geoai_plugin",
 ]
 

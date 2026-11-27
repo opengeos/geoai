@@ -7,6 +7,7 @@ This script is adapted from the QGIS AI-Segmentation plugin's python_manager.py.
 Source: https://github.com/TerraLabAI/QGIS_AI-Segmentation/blob/main/src/core/python_manager.py
 """
 
+import hashlib
 import os
 import platform
 import shutil
@@ -15,7 +16,7 @@ import sys
 import tarfile
 import tempfile
 import zipfile
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 from qgis.core import Qgis, QgsBlockingNetworkRequest, QgsMessageLog
 from qgis.PyQt.QtCore import QUrl
@@ -39,6 +40,43 @@ PYTHON_VERSIONS = {
     (3, 12): "3.12.8",
     (3, 13): "3.13.1",
 }
+
+# Optional SHA-256 checksums keyed by release archive filename. When an entry
+# is configured for the downloaded archive, download_python_standalone() verifies
+# the digest before extracting and deletes mismatched files.
+KNOWN_SHA256: Dict[str, str] = {}
+
+
+def verify_sha256(file_path: str, expected_sha256: str) -> bool:
+    """Verify the SHA-256 digest of a downloaded archive.
+
+    Args:
+        file_path: Path to the downloaded file.
+        expected_sha256: Expected hexadecimal SHA-256 digest (case-insensitive).
+
+    Returns:
+        True when the file digest matches ``expected_sha256``.
+
+    Raises:
+        ValueError: When the computed digest does not match. The mismatched
+            file is removed before raising.
+    """
+    expected = (expected_sha256 or "").strip().lower()
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            hasher.update(chunk)
+    actual = hasher.hexdigest().lower()
+    if actual != expected:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+        raise ValueError(
+            f"SHA-256 checksum mismatch for {os.path.basename(file_path)}: "
+            f"expected {expected}, got {actual}"
+        )
+    return True
 
 
 def _log(message: str, level=Qgis.Info):
@@ -416,6 +454,12 @@ def download_python_standalone(
 
         with open(temp_path, "wb") as f:
             f.write(content.data())
+
+        url_str = url[0] if isinstance(url, tuple) else str(url)
+        asset_name = os.path.basename(url_str)
+        expected_sha256 = KNOWN_SHA256.get(asset_name)
+        if expected_sha256:
+            verify_sha256(temp_path, expected_sha256)
 
         _log(f"Download complete ({len(content)} bytes), extracting...", Qgis.Info)
 

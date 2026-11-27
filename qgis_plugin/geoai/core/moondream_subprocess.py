@@ -6,17 +6,11 @@ to avoid DLL conflicts with QGIS's embedded Python on Windows.
 
 from __future__ import annotations
 
-import json
-import os
 import subprocess
-import tempfile
-import threading
-import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from qgis.core import Qgis, QgsMessageLog
-
+from .subprocess_client import PersistentSubprocessClient
 from .venv_manager import (
     _get_clean_env_for_venv,
     _get_subprocess_kwargs,
@@ -24,27 +18,31 @@ from .venv_manager import (
     venv_exists,
 )
 
+__all__ = [
+    "MoondreamSubprocessClient",
+    "subprocess",
+    "_get_clean_env_for_venv",
+    "_get_subprocess_kwargs",
+    "get_venv_python_path",
+    "venv_exists",
+]
 
-def _log(message: str, level=Qgis.Info) -> None:
-    QgsMessageLog.logMessage(message, "GeoAI", level=level)
 
-
-class MoondreamSubprocessClient:
+class MoondreamSubprocessClient(PersistentSubprocessClient):
     """Thin client that proxies Moondream calls to a persistent subprocess."""
 
+    _WORKER_LABEL = "Moondream"
     _TIMEOUT_INIT = 900
     _TIMEOUT_LOAD_IMAGE = 300
     _TIMEOUT_REQUEST = 600
+    _STDERR_TAIL_CHARS = 2000
+    _EMPTY_RESULT_IS_DICT = False
 
     def __init__(self, model_name: str, device: Optional[str] = None):
         self.model_name = model_name
         self.device = device
-        self.process: Optional[subprocess.Popen] = None
-        self._stderr_file = None
-        self._lock = threading.RLock()
-
         plugin_root = Path(__file__).resolve().parents[1]
-        self.worker_script = plugin_root / "workers" / "moondream_worker.py"
+        super().__init__(plugin_root / "workers" / "moondream_worker.py")
 
     def initialize(self) -> None:
         """Start the worker process and load the requested model."""
@@ -52,47 +50,7 @@ class MoondreamSubprocessClient:
             if self._is_running():
                 return
 
-            if not venv_exists():
-                raise RuntimeError(
-                    "GeoAI virtual environment not found. Install dependencies first."
-                )
-
-            python_path = get_venv_python_path()
-            if not os.path.exists(python_path):
-                raise FileNotFoundError(f"Venv Python not found: {python_path}")
-            if not self.worker_script.exists():
-                raise FileNotFoundError(
-                    f"Moondream worker script not found: {self.worker_script}"
-                )
-
-            cmd = [python_path, "-u", str(self.worker_script)]
-            env = _get_clean_env_for_venv()
-            popen_kwargs = dict(_get_subprocess_kwargs())
-
-            try:
-                self._stderr_file = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
-            except Exception:
-                self._stderr_file = None
-
-            _log(
-                f"Starting Moondream worker subprocess: {python_path}",
-                Qgis.Info,
-            )
-            self.process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=(
-                    self._stderr_file
-                    if self._stderr_file is not None
-                    else subprocess.DEVNULL
-                ),
-                text=True,
-                bufsize=1,
-                env=env,
-                **popen_kwargs,
-            )
-
+            self._start_process_locked()
             try:
                 self._request_locked(
                     {
@@ -197,174 +155,3 @@ class MoondreamSubprocessClient:
             "kwargs": kwargs,
         }
         return self._request(payload, timeout=max(self._TIMEOUT_REQUEST, 1800))
-
-    def close(self) -> None:
-        """Shut down the worker process."""
-        with self._lock:
-            proc = self.process
-            self.process = None
-            if proc is None:
-                self._close_stderr_file()
-                return
-
-            try:
-                if proc.poll() is None and proc.stdin is not None:
-                    proc.stdin.write(json.dumps({"action": "shutdown"}) + "\n")
-                    proc.stdin.flush()
-            except Exception:
-                pass
-
-            try:
-                proc.wait(timeout=2)
-            except Exception:
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=2)
-                except Exception:
-                    try:
-                        proc.kill()
-                        proc.wait(timeout=2)
-                    except Exception:
-                        pass
-
-            self._close_stderr_file()
-
-    def _close_stderr_file(self) -> None:
-        if self._stderr_file is not None:
-            try:
-                self._stderr_file.close()
-            except Exception:
-                pass
-            self._stderr_file = None
-
-    def _request(self, payload: Dict[str, Any], timeout: Optional[int] = None):
-        with self._lock:
-            if not self._is_running():
-                self.initialize()
-            try:
-                return self._request_locked(payload, timeout=timeout)
-            except TimeoutError:
-                self.close()
-                raise
-
-    def _request_locked(self, payload: Dict[str, Any], timeout: Optional[int] = None):
-        if not self._is_running():
-            raise RuntimeError("Moondream worker process is not running")
-
-        proc = self.process
-        assert proc is not None
-        if proc.stdin is None or proc.stdout is None:
-            raise RuntimeError("Moondream worker pipes are not available")
-
-        try:
-            proc.stdin.write(json.dumps(payload) + "\n")
-            proc.stdin.flush()
-        except Exception as exc:
-            raise RuntimeError(
-                f"Failed to send request to Moondream worker: {exc}"
-            ) from exc
-
-        effective_timeout = timeout or self._TIMEOUT_REQUEST
-        # Total deadline caps overall runtime even when heartbeats keep arriving.
-        # Each heartbeat resets the per-read inactivity timer but cannot extend
-        # past the absolute deadline (3x the per-read timeout).
-        deadline = time.monotonic() + effective_timeout * 3
-        try:
-            line = self._read_response_line(effective_timeout)
-            while True:
-                try:
-                    response = json.loads(line)
-                except json.JSONDecodeError:
-                    # Be tolerant of accidental stdout noise from third-party libs.
-                    line = self._read_response_line(effective_timeout)
-                    continue
-
-                if not isinstance(response, dict):
-                    line = self._read_response_line(effective_timeout)
-                    continue
-
-                if response.get("type") == "heartbeat":
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        raise TimeoutError(
-                            "Moondream worker exceeded total deadline "
-                            "({}s)".format(effective_timeout * 3)
-                        )
-                    # Worker is alive; read the next line with a fresh inactivity
-                    # timeout, capped by the remaining total deadline.
-                    next_timeout = min(effective_timeout, remaining)
-                    line = self._read_response_line(int(max(next_timeout, 1)))
-                    continue
-
-                break
-        except TimeoutError:
-            self.close()
-            raise
-
-        if response.get("type") == "error":
-            message = response.get("message", "Unknown Moondream worker error")
-            stderr_output = self._read_stderr()
-            if stderr_output:
-                message = f"{message}\nWorker stderr:\n{stderr_output[-2000:]}"
-            raise RuntimeError(message)
-
-        if response.get("type") != "ok":
-            raise RuntimeError(f"Unexpected Moondream worker response: {response}")
-
-        return response.get("result")
-
-    def _read_response_line(self, timeout_seconds: int) -> str:
-        proc = self.process
-        if proc is None or proc.poll() is not None:
-            raise RuntimeError("Moondream worker process is not running")
-        if proc.stdout is None:
-            raise RuntimeError("Moondream worker stdout is not available")
-
-        result = [None]
-        error = [None]
-
-        def _reader():
-            try:
-                result[0] = proc.stdout.readline()
-            except Exception as exc:  # pragma: no cover - defensive
-                error[0] = exc
-
-        thread = threading.Thread(target=_reader, daemon=True)
-        thread.start()
-        thread.join(timeout_seconds)
-
-        if thread.is_alive():
-            stderr_output = self._read_stderr()
-            msg = f"Moondream worker did not respond within {timeout_seconds}s"
-            if stderr_output:
-                msg = f"{msg}\nWorker stderr:\n{stderr_output[-2000:]}"
-            raise TimeoutError(msg)
-        if error[0] is not None:
-            raise error[0]
-
-        line = result[0]
-        if not line:
-            stderr_output = self._read_stderr()
-            msg = "Moondream worker closed stdout unexpectedly"
-            if stderr_output:
-                msg = f"{msg}\nWorker stderr:\n{stderr_output[-2000:]}"
-            raise RuntimeError(msg)
-        return line.strip()
-
-    def _read_stderr(self, max_chars: int = 2000) -> str:
-        if self._stderr_file is None:
-            return ""
-        try:
-            self._stderr_file.seek(0)
-            return self._stderr_file.read()[-max_chars:]
-        except Exception:
-            return ""
-
-    def _is_running(self) -> bool:
-        return self.process is not None and self.process.poll() is None
-
-    def __del__(self):
-        try:
-            self.close()
-        except Exception:
-            pass

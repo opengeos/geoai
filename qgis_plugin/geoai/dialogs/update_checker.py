@@ -9,9 +9,12 @@ import os
 import re
 import shutil
 import tempfile
+import threading
 import zipfile
-from urllib.request import urlopen, urlretrieve
-from urllib.error import URLError, HTTPError
+from typing import List, Optional
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
 from qgis.PyQt.QtWidgets import (
@@ -34,6 +37,106 @@ GITHUB_BRANCH = "main"
 PLUGIN_PATH = "qgis_plugin/geoai"
 METADATA_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{PLUGIN_PATH}/metadata.txt"
 ZIP_URL = f"https://github.com/{GITHUB_REPO}/archive/refs/heads/{GITHUB_BRANCH}.zip"
+DOWNLOAD_TIMEOUT_SECONDS = 60
+
+_LIVE_THREADS = set()
+
+
+def _keep_thread_alive(thread: QThread) -> None:
+    """Keep a still-running QThread referenced until it finishes cleanly."""
+    for sig_name in ("finished", "error", "progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
+    def _drop(*_args):
+        try:
+            thread.wait()
+        except RuntimeError:
+            pass
+        _LIVE_THREADS.discard(thread)
+
+    _LIVE_THREADS.add(thread)
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
+
+
+def _validate_https_url(url: str) -> str:
+    """Ensure update download URLs use HTTPS with a non-empty host."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError(f"Refusing non-HTTPS update URL: {url}")
+    return url
+
+
+def _get_archive_urls(version: Optional[str] = None) -> List[str]:
+    """Build candidate GitHub archive URLs, preferring a versioned release tag."""
+    urls: List[str] = []
+    if version:
+        cleaned = str(version).strip().lstrip("v")
+        if cleaned and re.fullmatch(r"[0-9A-Za-z._-]+", cleaned):
+            urls.append(
+                f"https://github.com/{GITHUB_REPO}/archive/refs/tags/v{cleaned}.zip"
+            )
+    urls.append(ZIP_URL)
+    return urls
+
+
+def _download_archive_streaming(
+    urls: List[str],
+    dest_path: str,
+    cancel_event: threading.Event,
+    progress_callback=None,
+    timeout: int = DOWNLOAD_TIMEOUT_SECONDS,
+) -> str:
+    """Stream an HTTPS archive to ``dest_path`` with timeout and cancellation."""
+    last_http_error: Optional[HTTPError] = None
+    for idx, candidate in enumerate(urls):
+        if cancel_event.is_set():
+            raise InterruptedError("Download cancelled")
+        validated_url = _validate_https_url(candidate)
+        try:
+            # Scheme validated as https:// above.
+            with urlopen(validated_url, timeout=timeout) as response:  # nosec B310
+                total_header = None
+                if hasattr(response, "headers") and response.headers is not None:
+                    total_header = response.headers.get("Content-Length")
+                try:
+                    total_size = int(total_header) if total_header else 0
+                except (TypeError, ValueError):
+                    total_size = 0
+
+                downloaded = 0
+                with open(dest_path, "wb") as out_file:
+                    while True:
+                        if cancel_event.is_set():
+                            raise InterruptedError("Download cancelled")
+                        chunk = response.read(65536)
+                        if not chunk:
+                            break
+                        out_file.write(chunk)
+                        downloaded += len(chunk)
+                        if progress_callback is not None and total_size > 0:
+                            percent = min(int((downloaded / total_size) * 50), 50)
+                            progress_callback(10 + percent, "Downloading...")
+                return validated_url
+        except HTTPError as exc:
+            # Fall back to the next candidate URL when a versioned tag archive
+            # is not present on GitHub (404).
+            if exc.code == 404 and idx + 1 < len(urls):
+                last_http_error = exc
+                continue
+            raise
+    if last_http_error is not None:
+        raise last_http_error
+    raise RuntimeError("No update archive URL available")
 
 
 class VersionCheckWorker(QThread):
@@ -42,11 +145,26 @@ class VersionCheckWorker(QThread):
     finished = pyqtSignal(dict)
     error = pyqtSignal(str)
 
+    def __init__(self):
+        super().__init__()
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of the version check."""
+        self._cancel_event.set()
+
     def run(self):
         """Fetch the latest metadata from GitHub."""
         try:
-            with urlopen(METADATA_URL, timeout=15) as response:  # nosec B310
+            if self._cancel_event.is_set():
+                return
+            url = _validate_https_url(METADATA_URL)
+            # Scheme validated as https:// above.
+            with urlopen(url, timeout=15) as response:  # nosec B310
                 content = response.read().decode("utf-8")
+
+            if self._cancel_event.is_set():
+                return
 
             # Parse version from metadata
             version_match = re.search(r"^version=(.+)$", content, re.MULTILINE)
@@ -66,16 +184,24 @@ class VersionCheckWorker(QThread):
             if changelog_match:
                 changelog = changelog_match.group(1).strip()
 
-            self.finished.emit(
-                {"version": latest_version, "changelog": changelog, "metadata": content}
-            )
+            if not self._cancel_event.is_set():
+                self.finished.emit(
+                    {
+                        "version": latest_version,
+                        "changelog": changelog,
+                        "metadata": content,
+                    }
+                )
 
         except HTTPError as e:
-            self.error.emit(f"HTTP Error: {e.code} - {e.reason}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"HTTP Error: {e.code} - {e.reason}")
         except URLError as e:
-            self.error.emit(f"URL Error: {e.reason}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"URL Error: {e.reason}")
         except Exception as e:
-            self.error.emit(f"Error checking for updates: {str(e)}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"Error checking for updates: {str(e)}")
 
 
 class DownloadWorker(QThread):
@@ -85,9 +211,15 @@ class DownloadWorker(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(int, str)
 
-    def __init__(self, plugin_dir):
+    def __init__(self, plugin_dir, version: Optional[str] = None):
         super().__init__()
         self.plugin_dir = plugin_dir
+        self.version = version
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation before filesystem replacement."""
+        self._cancel_event.set()
 
     def run(self):
         """Download and install the latest plugin version."""
@@ -97,16 +229,19 @@ class DownloadWorker(QThread):
             temp_dir = tempfile.mkdtemp(prefix="geoai_update_")
             zip_path = os.path.join(temp_dir, "geoai.zip")
 
-            # Download the zip file
+            # Download the zip file with timeout and cooperative cancellation
             self.progress.emit(10, "Downloading plugin from GitHub...")
+            urls = _get_archive_urls(self.version)
+            _download_archive_streaming(
+                urls=urls,
+                dest_path=zip_path,
+                cancel_event=self._cancel_event,
+                progress_callback=self.progress.emit,
+                timeout=DOWNLOAD_TIMEOUT_SECONDS,
+            )
 
-            def reporthook(block_num, block_size, total_size):
-                if total_size > 0:
-                    downloaded = block_num * block_size
-                    percent = min(int((downloaded / total_size) * 50), 50)
-                    self.progress.emit(10 + percent, "Downloading...")
-
-            urlretrieve(ZIP_URL, zip_path, reporthook)  # nosec B310
+            if self._cancel_event.is_set():
+                return
 
             self.progress.emit(60, "Extracting files...")
 
@@ -115,6 +250,8 @@ class DownloadWorker(QThread):
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 # Secure extraction to prevent zip slip
                 for member in zip_ref.namelist():
+                    if self._cancel_event.is_set():
+                        return
                     member_path = os.path.realpath(os.path.join(extract_dir, member))
                     extract_dir_real = os.path.realpath(extract_dir)
                     if not member_path.startswith(extract_dir_real + os.sep):
@@ -123,10 +260,13 @@ class DownloadWorker(QThread):
                         )
                 zip_ref.extractall(extract_dir)
 
+            if self._cancel_event.is_set():
+                return
+
             self.progress.emit(70, "Locating plugin files...")
 
             # Find the plugin directory in the extracted files
-            # The structure will be: geoai-main/qgis_plugin/geoai/
+            # The structure will be: geoai-<ref>/qgis_plugin/geoai/
             extracted_plugin_dir = None
             for root, dirs, files in os.walk(extract_dir):
                 if "metadata.txt" in files and "geoai_plugin.py" in files:
@@ -135,6 +275,10 @@ class DownloadWorker(QThread):
 
             if not extracted_plugin_dir:
                 self.error.emit("Could not find plugin files in downloaded archive")
+                return
+
+            # Cooperative cancellation gate immediately before replacing files on disk.
+            if self._cancel_event.is_set():
                 return
 
             self.progress.emit(80, "Installing update...")
@@ -175,12 +319,17 @@ class DownloadWorker(QThread):
                     )
                 raise e
 
+        except InterruptedError:
+            return
         except HTTPError as e:
-            self.error.emit(f"HTTP Error downloading: {e.code} - {e.reason}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"HTTP Error downloading: {e.code} - {e.reason}")
         except URLError as e:
-            self.error.emit(f"URL Error downloading: {e.reason}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"URL Error downloading: {e.reason}")
         except Exception as e:
-            self.error.emit(f"Error installing update: {str(e)}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"Error installing update: {str(e)}")
         finally:
             # Cleanup temp directory
             if temp_dir and os.path.exists(temp_dir):
@@ -418,7 +567,9 @@ class UpdateCheckerDialog(QDialog):
         self.status_label.setText("Downloading and installing update...")
         self.status_label.setStyleSheet("color: blue;")
 
-        self.download_worker = DownloadWorker(self.plugin_dir)
+        self.download_worker = DownloadWorker(
+            self.plugin_dir, version=self.latest_version
+        )
         self.download_worker.finished.connect(self._on_download_finished)
         self.download_worker.error.connect(self._on_download_error)
         self.download_worker.progress.connect(self._on_download_progress)
@@ -471,12 +622,7 @@ class UpdateCheckerDialog(QDialog):
         )
 
     def closeEvent(self, event):
-        """Handle dialog close event."""
-        # Stop any running workers
-        if self.check_worker and self.check_worker.isRunning():
-            self.check_worker.terminate()
-            self.check_worker.wait()
-
+        """Handle dialog close event with cooperative worker cancellation."""
         if self.download_worker and self.download_worker.isRunning():
             reply = QMessageBox.question(
                 self,
@@ -488,7 +634,15 @@ class UpdateCheckerDialog(QDialog):
             if reply != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
-            self.download_worker.terminate()
-            self.download_worker.wait()
+            self.download_worker.cancel()
+            if not self.download_worker.wait(5000):
+                _keep_thread_alive(self.download_worker)
+            self.download_worker = None
+
+        if self.check_worker and self.check_worker.isRunning():
+            self.check_worker.cancel()
+            if not self.check_worker.wait(5000):
+                _keep_thread_alive(self.check_worker)
+            self.check_worker = None
 
         event.accept()
