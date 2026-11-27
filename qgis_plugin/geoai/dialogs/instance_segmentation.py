@@ -45,6 +45,20 @@ from .inference_range import InferenceRangeMixin
 _LIVE_THREADS = set()
 
 
+def _connect_native_finished(thread: QThread, slot) -> bool:
+    """Connect ``slot`` to the native ``QThread.finished`` signal even if shadowed."""
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(slot)
+        return True
+    connected = False
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(slot)
+            connected = True
+    return connected
+
+
 def _keep_thread_alive(thread: QThread) -> None:
     """Keep a still-running worker thread referenced until it exits."""
     for sig_name in ("finished", "error", "progress", "epoch_progress"):
@@ -59,12 +73,22 @@ def _keep_thread_alive(thread: QThread) -> None:
         _LIVE_THREADS.discard(thread)
 
     _LIVE_THREADS.add(thread)
-    for sig_name in ("finished", "error"):
-        sig = getattr(thread, sig_name, None)
-        if sig is not None:
-            sig.connect(_drop)
+    _connect_native_finished(thread, _drop)
     if not thread.isRunning():
         _LIVE_THREADS.discard(thread)
+
+
+def _count_positive_labels(data) -> int:
+    """Count distinct positive instance IDs in a label raster band."""
+    if getattr(data, "size", 0) == 0:
+        return 0
+    try:
+        import numpy as np
+
+        return int(np.count_nonzero(np.unique(data) > 0))
+    except ImportError:
+        values = data.ravel() if hasattr(data, "ravel") else data
+        return len({v for v in values if v > 0})
 
 
 def _call_run_geoai_task(
@@ -1216,6 +1240,22 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.smooth_iterations_spin.setVisible(is_smooth)
         self._smooth_iterations_label.setVisible(is_smooth)
 
+    def _has_conflicting_retained_worker(self, output_path: str) -> bool:
+        """Return True if a retained cancelled worker is still writing output_path."""
+        retained = getattr(self, "_retained_workers", None)
+        if not retained or not output_path:
+            return False
+        target = os.path.normcase(os.path.abspath(output_path))
+        for old_worker in list(retained):
+            if not old_worker.isRunning():
+                retained.discard(old_worker)
+                continue
+            for attr in ("output_path", "output_dir"):
+                old_out = getattr(old_worker, attr, None)
+                if old_out and os.path.normcase(os.path.abspath(old_out)) == target:
+                    return True
+        return False
+
     # Export tiles
     def export_tiles(self):
         """Export training tiles from raster and vector data."""
@@ -1239,12 +1279,21 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             QMessageBox.warning(self, "Warning", "Please fill in all fields.")
             return
 
+        if self._has_conflicting_retained_worker(output_dir):
+            QMessageBox.warning(
+                self,
+                "Busy",
+                "A cancelled tile export is still finishing writes to this "
+                "output directory. Please wait or choose another folder.",
+            )
+            return
+
         self.export_tiles_btn.setEnabled(False)
         self.tile_progress.setRange(0, 0)
         export_format = self.tile_export_format_combo.currentText()
         self.log(f"Starting tile export in {export_format} format...")
 
-        self.tile_worker = InstanceTileExportWorker(
+        worker = InstanceTileExportWorker(
             raster_path,
             vector_path,
             output_dir,
@@ -1253,10 +1302,21 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.buffer_spin.value(),
             export_format,
         )
-        self.tile_worker.finished.connect(self.on_tile_export_finished)
-        self.tile_worker.error.connect(self.on_tile_export_error)
-        self.tile_worker.progress.connect(self.log)
-        self.tile_worker.start()
+        self.tile_worker = worker
+        worker.finished.connect(
+            lambda out, w=worker: (
+                self.on_tile_export_finished(out) if self.tile_worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda err, w=worker: (
+                self.on_tile_export_error(err) if self.tile_worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: self.log(msg) if self.tile_worker is w else None
+        )
+        worker.start()
 
     def on_tile_export_finished(self, output_dir: str):
         """Handle tile export completion."""
@@ -1383,6 +1443,15 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
                 )
                 return
 
+        if self._has_conflicting_retained_worker(output_dir):
+            QMessageBox.warning(
+                self,
+                "Busy",
+                "A cancelled training run is still finishing writes to this "
+                "output directory. Please wait or choose another folder.",
+            )
+            return
+
         self.train_btn.setEnabled(False)
         num_epochs = self.epochs_spin.value()
         self.train_progress.setRange(0, num_epochs)
@@ -1393,7 +1462,7 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         self.log(f"  Classes: {self.num_classes_spin.value()}")
         self.log(f"  Epochs: {num_epochs}, Batch size: {self.batch_size_spin.value()}")
 
-        self.train_worker = InstanceTrainingWorker(
+        worker = InstanceTrainingWorker(
             images_dir,
             labels_dir,
             output_dir,
@@ -1406,11 +1475,28 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.input_format_combo.currentText(),
             self.visualize_check.isChecked(),
         )
-        self.train_worker.finished.connect(self.on_training_finished)
-        self.train_worker.error.connect(self.on_training_error)
-        self.train_worker.progress.connect(self.log)
-        self.train_worker.epoch_progress.connect(self.on_epoch_progress)
-        self.train_worker.start()
+        self.train_worker = worker
+        worker.finished.connect(
+            lambda path, w=worker: (
+                self.on_training_finished(path) if self.train_worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda err, w=worker: (
+                self.on_training_error(err) if self.train_worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: self.log(msg) if self.train_worker is w else None
+        )
+        worker.epoch_progress.connect(
+            lambda cur, tot, met, w=worker: (
+                self.on_epoch_progress(cur, tot, met)
+                if self.train_worker is w
+                else None
+            )
+        )
+        worker.start()
 
     def on_epoch_progress(self, current_epoch: int, total_epochs: int, metrics: str):
         """Handle epoch progress updates."""
@@ -1492,6 +1578,15 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             QMessageBox.warning(self, "Warning", range_error)
             return
 
+        if self._has_conflicting_retained_worker(output_path):
+            QMessageBox.warning(
+                self,
+                "Busy",
+                "A cancelled inference task is still finishing writes to this "
+                "output file. Please wait or choose another output path.",
+            )
+            return
+
         self.run_inference_btn.setEnabled(False)
         self.inference_progress.setRange(0, 0)
         if inference_bbox is not None:
@@ -1499,7 +1594,7 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         else:
             self.log("Starting instance segmentation inference...")
 
-        self.inference_worker = InstanceInferenceWorker(
+        worker = InstanceInferenceWorker(
             input_path,
             output_path,
             model_path,
@@ -1512,10 +1607,21 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             inference_bbox=inference_bbox,
             inference_bbox_crs=inference_bbox_crs,
         )
-        self.inference_worker.finished.connect(self.on_inference_finished)
-        self.inference_worker.error.connect(self.on_inference_error)
-        self.inference_worker.progress.connect(self.log)
-        self.inference_worker.start()
+        self.inference_worker = worker
+        worker.finished.connect(
+            lambda path, w=worker: (
+                self.on_inference_finished(path) if self.inference_worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda err, w=worker: (
+                self.on_inference_error(err) if self.inference_worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: self.log(msg) if self.inference_worker is w else None
+        )
+        worker.start()
 
     def on_inference_finished(self, output_path: str, num_instances=None):
         """Handle inference completion."""
@@ -1537,9 +1643,7 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
                 with rasterio.open(output_path) as src:
                     data = src.read(1)
-                    num_instances = (
-                        int(data.max()) if getattr(data, "size", 0) > 0 else 0
-                    )
+                    num_instances = _count_positive_labels(data)
             except Exception:
                 num_instances = None
 
@@ -1599,6 +1703,15 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             vector_output = f"{base}_vector.geojson"
             self.vector_output_edit.setText(vector_output)
 
+        if self._has_conflicting_retained_worker(vector_output):
+            QMessageBox.warning(
+                self,
+                "Busy",
+                "A cancelled vectorization task is still finishing writes to "
+                "this output file. Please wait or choose another output path.",
+            )
+            return
+
         self.vectorize_btn.setEnabled(False)
         self.inference_progress.setRange(0, 0)
 
@@ -1611,28 +1724,56 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
         if is_smooth_mode:
             self.log("Smoothing vector (for natural features)...")
-            self.smooth_worker = SmoothVectorWorker(
+            worker = SmoothVectorWorker(
                 mask_path,
                 vector_output,
                 smooth_iterations=self.smooth_iterations_spin.value(),
                 min_area=min_area,
             )
-            self.smooth_worker.finished.connect(self.on_vectorize_finished)
-            self.smooth_worker.error.connect(self.on_vectorize_error)
-            self.smooth_worker.progress.connect(self.log)
-            self.smooth_worker.start()
+            self.smooth_worker = worker
+            worker.finished.connect(
+                lambda path, w=worker: (
+                    self.on_vectorize_finished(path)
+                    if self.smooth_worker is w
+                    else None
+                )
+            )
+            worker.error.connect(
+                lambda err, w=worker: (
+                    self.on_vectorize_error(err) if self.smooth_worker is w else None
+                )
+            )
+            worker.progress.connect(
+                lambda msg, w=worker: self.log(msg) if self.smooth_worker is w else None
+            )
+            worker.start()
         else:
             self.log("Regularizing vector (for buildings)...")
-            self.vectorize_worker = VectorizeWorker(
+            worker = VectorizeWorker(
                 mask_path,
                 vector_output,
                 self.epsilon_spin.value(),
                 min_area,
             )
-            self.vectorize_worker.finished.connect(self.on_vectorize_finished)
-            self.vectorize_worker.error.connect(self.on_vectorize_error)
-            self.vectorize_worker.progress.connect(self.log)
-            self.vectorize_worker.start()
+            self.vectorize_worker = worker
+            worker.finished.connect(
+                lambda path, w=worker: (
+                    self.on_vectorize_finished(path)
+                    if self.vectorize_worker is w
+                    else None
+                )
+            )
+            worker.error.connect(
+                lambda err, w=worker: (
+                    self.on_vectorize_error(err) if self.vectorize_worker is w else None
+                )
+            )
+            worker.progress.connect(
+                lambda msg, w=worker: (
+                    self.log(msg) if self.vectorize_worker is w else None
+                )
+            )
+            worker.start()
 
     def on_vectorize_finished(self, output_path: str):
         """Handle vectorization completion."""
@@ -1668,12 +1809,51 @@ class InstanceSegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             "smooth_worker",
         ):
             worker = getattr(self, attr, None)
-            if worker is not None and worker.isRunning():
-                if hasattr(worker, "cancel"):
-                    worker.cancel()
-                if not worker.wait(5000):
-                    _keep_thread_alive(worker)
             setattr(self, attr, None)
+            if worker is not None:
+                for sig_name in ("finished", "error", "progress", "epoch_progress"):
+                    sig = getattr(worker, sig_name, None)
+                    if sig is not None:
+                        try:
+                            sig.disconnect()
+                        except (TypeError, RuntimeError):
+                            pass
+                if worker.isRunning():
+                    if hasattr(worker, "cancel"):
+                        worker.cancel()
+                    if not worker.wait(5000):
+                        _keep_thread_alive(worker)
+                        retained = getattr(self, "_retained_workers", None)
+                        if retained is None:
+                            retained = set()
+                            self._retained_workers = retained
+                        retained.add(worker)
+
+                        def _drop_retained(*_args, w=worker, s=retained):
+                            s.discard(w)
+
+                        _connect_native_finished(worker, _drop_retained)
+                        if not worker.isRunning():
+                            retained.discard(worker)
+
+        if hasattr(self, "train_btn"):
+            self.train_btn.setEnabled(True)
+        if hasattr(self, "train_progress"):
+            self.train_progress.setRange(0, 100)
+            self.train_progress.setValue(0)
+            self.train_progress.setFormat("")
+        if hasattr(self, "export_tiles_btn"):
+            self.export_tiles_btn.setEnabled(True)
+        if hasattr(self, "tile_progress"):
+            self.tile_progress.setRange(0, 100)
+            self.tile_progress.setValue(0)
+        if hasattr(self, "run_inference_btn"):
+            self.run_inference_btn.setEnabled(True)
+        if hasattr(self, "vectorize_btn"):
+            self.vectorize_btn.setEnabled(bool(getattr(self, "last_output_path", None)))
+        if hasattr(self, "inference_progress"):
+            self.inference_progress.setRange(0, 100)
+            self.inference_progress.setValue(0)
 
     def closeEvent(self, event):
         """Handle widget close event."""

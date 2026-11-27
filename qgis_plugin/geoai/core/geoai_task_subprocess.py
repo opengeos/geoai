@@ -120,27 +120,27 @@ def run_geoai_task(
             pass
 
     done_event = threading.Event()
-    if cancel_event is not None:
-
-        def _watch_cancel() -> None:
-            while not done_event.is_set():
-                if cancel_event.wait(timeout=0.1):
-                    if not done_event.is_set():
-                        try:
-                            if proc.poll() is None:
-                                proc.terminate()
-                                try:
-                                    proc.wait(timeout=1.0)
-                                except Exception:
-                                    proc.kill()
-                                    proc.wait(timeout=1.0)
-                        except Exception:
-                            pass
-                    return
-
-        threading.Thread(target=_watch_cancel, daemon=True).start()
-
     try:
+        if cancel_event is not None:
+
+            def _watch_cancel() -> None:
+                while not done_event.is_set():
+                    if cancel_event.wait(timeout=0.1):
+                        if not done_event.is_set():
+                            try:
+                                if proc.poll() is None:
+                                    proc.terminate()
+                                    try:
+                                        proc.wait(timeout=1.0)
+                                    except Exception:
+                                        proc.kill()
+                                        proc.wait(timeout=1.0)
+                            except Exception:
+                                pass
+                        return
+
+            threading.Thread(target=_watch_cancel, daemon=True).start()
+
         if proc.stdin is None or proc.stdout is None:
             raise RuntimeError("Failed to create pipes for geoai task worker")
 

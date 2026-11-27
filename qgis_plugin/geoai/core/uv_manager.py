@@ -6,7 +6,6 @@ dependency installation in the plugin's virtual environment.
 Source: https://github.com/astral-sh/uv
 """
 
-import hashlib
 import os
 import platform
 import shutil
@@ -16,11 +15,13 @@ import sys
 import tarfile
 import tempfile
 import zipfile
-from typing import Callable, Dict, Optional, Tuple
+from typing import Dict
 
 from qgis.core import Qgis, QgsBlockingNetworkRequest, QgsMessageLog
 from qgis.PyQt.QtCore import QUrl
 from qgis.PyQt.QtNetwork import QNetworkRequest
+
+from .python_manager import verify_sha256
 
 CACHE_DIR = (
     os.environ.get("GEOAI_CACHE_DIR")
@@ -32,42 +33,15 @@ UV_DIR = os.path.join(CACHE_DIR, "uv")
 # Pin a known-good uv version.
 UV_VERSION = "0.10.6"
 
-# Optional SHA-256 checksums keyed by release archive filename. When an entry
-# is configured for the downloaded archive, download_uv() verifies the digest
-# before extracting and removes mismatched files.
-KNOWN_SHA256: Dict[str, str] = {}
-
-
-def verify_sha256(file_path: str, expected_sha256: str) -> bool:
-    """Verify the SHA-256 digest of a downloaded archive.
-
-    Args:
-        file_path: Path to the downloaded file.
-        expected_sha256: Expected hexadecimal SHA-256 digest (case-insensitive).
-
-    Returns:
-        True when the file digest matches ``expected_sha256``.
-
-    Raises:
-        ValueError: When the computed digest does not match. The mismatched
-            file is removed before raising.
-    """
-    expected = (expected_sha256 or "").strip().lower()
-    hasher = hashlib.sha256()
-    with open(file_path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(65536), b""):
-            hasher.update(chunk)
-    actual = hasher.hexdigest().lower()
-    if actual != expected:
-        try:
-            os.remove(file_path)
-        except OSError:
-            pass
-        raise ValueError(
-            f"SHA-256 checksum mismatch for {os.path.basename(file_path)}: "
-            f"expected {expected}, got {actual}"
-        )
-    return True
+# Official SHA-256 checksums for UV_VERSION release archives
+# (from astral-sh/uv release 0.10.6 .sha256 files).
+KNOWN_SHA256: Dict[str, str] = {
+    "uv-aarch64-apple-darwin.tar.gz": "3993249d8f51deaf34cfce037e57e294e82267ff1f9dc45b7983a17afaf065b4",
+    "uv-x86_64-apple-darwin.tar.gz": "d7647571fb17a5107d4d23cc190418039c157fd7361ddb59bc6f8127a49e3eac",
+    "uv-x86_64-pc-windows-msvc.zip": "b27eb789f281e398a82197477de727fc8faf08605152115686da2c3cba0d25f7",
+    "uv-aarch64-unknown-linux-gnu.tar.gz": "9380705294a85e3e634570abddd5b2577900c1873c29b790c7abc56a81dce4bc",
+    "uv-x86_64-unknown-linux-gnu.tar.gz": "aaa402e19d14a6b9a4267fcf4ec35380f804c68923525cea67cd6ee05bb4e930",
+}
 
 
 def _log(message, level=Qgis.Info):
@@ -149,7 +123,8 @@ def download_uv(progress_callback=None, cancel_check=None):
         return True, "uv already installed"
 
     url = get_uv_download_url()
-    _log(f"Downloading uv {UV_VERSION} from: {url}")
+    url_str = url[0] if isinstance(url, tuple) else str(url)
+    _log(f"Downloading uv {UV_VERSION} from: {url_str}")
 
     if progress_callback:
         progress_callback(0, f"Downloading uv {UV_VERSION}...")
@@ -163,7 +138,7 @@ def download_uv(progress_callback=None, cancel_check=None):
             return False, "Download cancelled"
 
         request = QgsBlockingNetworkRequest()
-        qurl = QUrl(url)
+        qurl = QUrl(url_str)
 
         if progress_callback:
             progress_callback(5, "Connecting to download server...")
@@ -194,7 +169,7 @@ def download_uv(progress_callback=None, cancel_check=None):
         with open(temp_path, "wb") as f:
             f.write(content.data())
 
-        asset_name = os.path.basename(str(url))
+        asset_name = os.path.basename(url_str)
         expected_sha256 = KNOWN_SHA256.get(asset_name)
         if expected_sha256:
             verify_sha256(temp_path, expected_sha256)

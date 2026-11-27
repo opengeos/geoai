@@ -3664,6 +3664,39 @@ def install_dependencies(
                                 return False, "Installation cancelled"
                             if result.returncode == 0:
                                 break
+                            if use_uv:
+                                result = _retry_uv_install_with_insecure_hosts(
+                                    result=result,
+                                    cmd=base_cmd,
+                                    timeout=pkg_timeout,
+                                    env=env,
+                                    subprocess_kwargs=subprocess_kwargs,
+                                    label=label,
+                                    progress_start=pkg_start,
+                                    progress_end=pkg_end,
+                                    progress_callback=progress_callback,
+                                    cancel_check=cancel_check,
+                                )
+                            else:
+                                result = _retry_pip_install_with_insecure_hosts(
+                                    result=result,
+                                    cmd=base_cmd,
+                                    timeout=pkg_timeout,
+                                    env=env,
+                                    subprocess_kwargs=subprocess_kwargs,
+                                    label=label,
+                                    progress_start=pkg_start,
+                                    progress_end=pkg_end,
+                                    progress_callback=progress_callback,
+                                    cancel_check=cancel_check,
+                                )
+                            if (
+                                result.returncode == -1
+                                and "cancelled" in (result.stderr or "").lower()
+                            ) or (cancel_check and cancel_check()):
+                                return False, "Installation cancelled"
+                            if result.returncode == 0:
+                                break
 
                 if result.returncode == 0:
                     _log(
@@ -4043,6 +4076,44 @@ def install_dependencies(
                             progress_callback=progress_callback,
                             cancel_check=cancel_check,
                         )
+                        if (
+                            result.returncode == -1
+                            and "cancelled" in (result.stderr or "").lower()
+                        ) or (cancel_check and cancel_check()):
+                            return False, "Installation cancelled"
+                        if result.returncode == 0:
+                            break
+                        if use_uv:
+                            result = _retry_uv_install_with_insecure_hosts(
+                                result=result,
+                                cmd=base_cmd,
+                                timeout=batch_timeout,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label="dependencies (retry {})".format(attempt),
+                                progress_start=batch_start,
+                                progress_end=batch_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
+                        else:
+                            result = _retry_pip_install_with_insecure_hosts(
+                                result=result,
+                                cmd=base_cmd,
+                                timeout=batch_timeout,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label="dependencies (retry {})".format(attempt),
+                                progress_start=batch_start,
+                                progress_end=batch_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
+                        if (
+                            result.returncode == -1
+                            and "cancelled" in (result.stderr or "").lower()
+                        ) or (cancel_check and cancel_check()):
+                            return False, "Installation cancelled"
                         if result.returncode == 0:
                             break
 

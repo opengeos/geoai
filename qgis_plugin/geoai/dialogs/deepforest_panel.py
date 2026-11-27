@@ -8,6 +8,7 @@ using the DeepForest library with pretrained models for various detection tasks.
 import os
 import json
 import tempfile
+import threading
 
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtWidgets import (
@@ -319,12 +320,32 @@ def _keep_thread_alive(thread: QThread) -> None:
         _LIVE_THREADS.discard(thread)
 
     _LIVE_THREADS.add(thread)
-    for sig_name in ("finished", "error"):
-        sig = getattr(thread, sig_name, None)
-        if sig is not None:
-            sig.connect(_drop)
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(_drop)
+    else:
+        for sig_name in ("finished", "error"):
+            sig = getattr(thread, sig_name, None)
+            if sig is not None:
+                sig.connect(_drop)
     if not thread.isRunning():
         _LIVE_THREADS.discard(thread)
+
+
+def _retire_client_in_background(client, wait_worker=None) -> None:
+    """Close a superseded or busy client off the Qt GUI thread."""
+
+    def _close():
+        if wait_worker is not None:
+            try:
+                wait_worker.wait()
+            except Exception:
+                pass
+        try:
+            client.close()
+        except Exception:
+            pass
+
+    threading.Thread(target=_close, daemon=True).start()
 
 
 def _active_project_layer_paths() -> set:
@@ -359,7 +380,6 @@ def _get_image_dimensions(image_path: str):
 
     from PIL import Image
 
-    Image.MAX_IMAGE_PIXELS = None
     with Image.open(image_path) as img:
         width, height = img.size
         depth = len(img.getbands())
@@ -398,19 +418,29 @@ class DeepForestModelLoadWorker(QThread):
             use_subprocess = _use_deepforest_subprocess()
         self.use_subprocess = use_subprocess
         self._client = None
+        self._abort_lock = threading.Lock()
+        self._aborted = False
 
     def abort(self):
-        """Abort an in-progress subprocess model load without locking."""
-        client = self._client
+        """Record cancellation and abort any active subprocess load without locking."""
+        with self._abort_lock:
+            self._aborted = True
+            client = self._client
         if client is not None and hasattr(client, "abort"):
             try:
                 client.abort()
             except Exception:
                 pass
 
+    def _is_aborted(self) -> bool:
+        with self._abort_lock:
+            return self._aborted
+
     def run(self):
         """Load the DeepForest model in background."""
         try:
+            if self._is_aborted():
+                return
             if self.use_subprocess:
                 self.progress.emit("Starting DeepForest subprocess worker...")
                 from ..core.deepforest_subprocess import DeepForestSubprocessClient
@@ -420,8 +450,17 @@ class DeepForestModelLoadWorker(QThread):
                     revision=self.revision,
                     device=self.device,
                 )
-                self._client = model
+                with self._abort_lock:
+                    if self._aborted:
+                        return
+                    self._client = model
                 model.initialize()
+                if self._is_aborted():
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
+                    return
                 self.finished.emit(model, getattr(model, "model_name", self.model_name))
                 return
 
@@ -469,9 +508,24 @@ class DeepForestModelLoadWorker(QThread):
                     except Exception:
                         pass  # CPU is default
 
+            if self._is_aborted():
+                if hasattr(model, "close") and callable(getattr(model, "close")):
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
+                return
             self.finished.emit(model, self.model_name)
 
         except Exception as e:
+            if self._is_aborted():
+                client = self._client
+                if client is not None and hasattr(client, "close"):
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+                return
             self.error.emit(str(e))
 
 
@@ -1510,14 +1564,50 @@ class DeepForestDockWidget(QDockWidget):
                 # CUDA is now available but there was a warning
                 QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
 
+        # Abort any previous in-flight model load before starting a new one
+        prev_loader = getattr(self, "model_load_worker", None)
+        if prev_loader is not None:
+            self.model_load_worker = None
+            if hasattr(prev_loader, "abort"):
+                try:
+                    prev_loader.abort()
+                except Exception:
+                    pass
+            try:
+                if prev_loader.isRunning():
+                    _keep_thread_alive(prev_loader)
+            except RuntimeError:
+                pass
+
         # Create and start the model loading worker thread
-        self.model_load_worker = DeepForestModelLoadWorker(
+        worker = DeepForestModelLoadWorker(
             model_name, revision, device, use_subprocess=use_subprocess
         )
-        self.model_load_worker.finished.connect(self.on_model_loaded)
-        self.model_load_worker.error.connect(self.on_model_load_error)
-        self.model_load_worker.progress.connect(self.on_model_load_progress)
-        self.model_load_worker.start()
+        self.model_load_worker = worker
+
+        def _on_loaded(model, loaded_name, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                if hasattr(model, "close") and callable(getattr(model, "close")):
+                    _retire_client_in_background(model)
+                return
+            self.model_load_worker = None
+            self.on_model_loaded(model, loaded_name)
+
+        def _on_error(err, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.model_load_worker = None
+            self.on_model_load_error(err)
+
+        def _on_progress(msg, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.on_model_load_progress(msg)
+
+        worker.finished.connect(_on_loaded)
+        worker.error.connect(_on_error)
+        worker.progress.connect(_on_progress)
+        worker.start()
 
     def on_model_load_progress(self, message: str):
         """Handle model loading progress updates."""
@@ -1532,10 +1622,14 @@ class DeepForestDockWidget(QDockWidget):
             and hasattr(old_model, "close")
             and callable(getattr(old_model, "close"))
         ):
-            try:
-                old_model.close()
-            except Exception:
-                pass
+            predict_worker = getattr(self, "predict_worker", None)
+            if predict_worker is not None and predict_worker.isRunning():
+                _retire_client_in_background(old_model, wait_worker=predict_worker)
+            else:
+                try:
+                    old_model.close()
+                except Exception:
+                    pass
         self.deepforest = model
         self.model_status.setText(f"Model: {model_name} loaded")
         self.model_status.setStyleSheet("color: green;")
@@ -2397,6 +2491,13 @@ class DeepForestDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
+        # Detach active worker references before aborting so queued callbacks
+        # from an intentional cancel are ignored and never surface as errors.
+        load_worker = getattr(self, "model_load_worker", None)
+        predict_worker = getattr(self, "predict_worker", None)
+        self.model_load_worker = None
+        self.predict_worker = None
+
         # Abort subprocesses first (lock-free) so blocked worker threads unblock
         # and release _lock before wait() / close().
         if self.deepforest is not None and hasattr(self.deepforest, "abort"):
@@ -2404,24 +2505,38 @@ class DeepForestDockWidget(QDockWidget):
                 self.deepforest.abort()
             except Exception:
                 pass
-        if self.model_load_worker is not None and hasattr(
-            self.model_load_worker, "abort"
-        ):
+        if load_worker is not None and hasattr(load_worker, "abort"):
             try:
-                self.model_load_worker.abort()
+                load_worker.abort()
             except Exception:
                 pass
 
-        for attr in ("model_load_worker", "predict_worker"):
-            worker = getattr(self, attr, None)
+        retained_predict_worker = None
+        for attr_name, worker in (
+            ("model_load_worker", load_worker),
+            ("predict_worker", predict_worker),
+        ):
             if worker is None:
                 continue
+            for sig_name in ("finished", "error", "progress"):
+                sig = getattr(worker, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
             try:
                 if worker.isRunning() and not worker.wait(5000):
                     _keep_thread_alive(worker)
+                    if attr_name == "predict_worker":
+                        retained_predict_worker = worker
             except RuntimeError:
                 pass
-            setattr(self, attr, None)
+
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.setVisible(False)
+        if hasattr(self, "load_model_btn"):
+            self.load_model_btn.setEnabled(True)
 
         # Clean up temporary files not actively referenced by open project layers
         active_paths = _active_project_layer_paths()
@@ -2441,17 +2556,20 @@ class DeepForestDockWidget(QDockWidget):
                 )
         self._temp_files = remaining_temp_files
 
-        # Clean up model
-        if self.deepforest is not None:
-            try:
-                if hasattr(self.deepforest, "close") and callable(
-                    getattr(self.deepforest, "close")
-                ):
-                    self.deepforest.close()
-            except Exception:
-                pass
-            del self.deepforest
-            self.deepforest = None
+        # Clean up model (defer off GUI thread if a retained worker still holds it)
+        model = self.deepforest
+        self.deepforest = None
+        if model is not None:
+            if hasattr(model, "close") and callable(getattr(model, "close")):
+                if retained_predict_worker is not None:
+                    _retire_client_in_background(
+                        model, wait_worker=retained_predict_worker
+                    )
+                else:
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
 
     def closeEvent(self, event):
         """Handle close event."""

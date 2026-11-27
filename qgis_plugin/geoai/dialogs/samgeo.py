@@ -9,6 +9,7 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 
 from qgis.PyQt.QtCore import Qt, QCoreApplication, QTimer
 from qgis.PyQt.QtGui import QColor
@@ -113,7 +114,7 @@ def _keep_thread_alive(thread):
         thread: A ``SamGeoOperationWorker`` or other QThread with ``finished``
             and ``error`` signals.
     """
-    for signal_name in ("finished", "error"):
+    for signal_name in ("finished", "error", "progress"):
         signal = getattr(thread, signal_name, None)
         if signal is None:
             continue
@@ -123,17 +124,35 @@ def _keep_thread_alive(thread):
             pass
 
     def _drop(*_args):
-        # The signal fires just before run() returns; let the thread exit.
-        thread.wait()
         _LIVE_THREADS.discard(thread)
 
     _LIVE_THREADS.add(thread)
-    for signal_name in ("finished", "error"):
-        signal = getattr(thread, signal_name, None)
-        if signal is not None:
-            signal.connect(_drop)
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(_drop)
+    else:
+        for signal_name in ("finished", "error"):
+            signal = getattr(thread, signal_name, None)
+            if signal is not None:
+                signal.connect(_drop)
     if not thread.isRunning():
         _LIVE_THREADS.discard(thread)
+
+
+def _retire_client_in_background(client, wait_worker=None) -> None:
+    """Close a superseded or busy SamGeo client off the Qt GUI thread."""
+
+    def _close():
+        if wait_worker is not None:
+            try:
+                wait_worker.wait()
+            except Exception:
+                pass
+        try:
+            client.close()
+        except Exception:
+            pass
+
+    threading.Thread(target=_close, daemon=True).start()
 
 
 def _point_geometry_type():
@@ -166,19 +185,29 @@ class SamGeoModelLoadWorker(QThread):
         self.confidence = confidence
         self.enable_interactive = enable_interactive
         self._client = None
+        self._abort_lock = threading.Lock()
+        self._aborted = False
 
     def abort(self):
-        """Abort an in-progress subprocess model load without locking."""
-        client = self._client
+        """Record cancellation and abort any active subprocess load without locking."""
+        with self._abort_lock:
+            self._aborted = True
+            client = self._client
         if client is not None and hasattr(client, "abort"):
             try:
                 client.abort()
             except Exception:
                 pass
 
+    def _is_aborted(self) -> bool:
+        with self._abort_lock:
+            return self._aborted
+
     def run(self):
         """Load the SamGeo model in background."""
         try:
+            if self._is_aborted():
+                return
             self.progress.emit("Initializing SamGeo...")
             if _use_samgeo_subprocess():
                 self.progress.emit("Starting SamGeo subprocess worker...")
@@ -191,8 +220,17 @@ class SamGeoModelLoadWorker(QThread):
                     confidence=self.confidence,
                     enable_interactive=self.enable_interactive,
                 )
-                self._client = model
+                with self._abort_lock:
+                    if self._aborted:
+                        return
+                    self._client = model
                 model.initialize()
+                if self._is_aborted():
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
+                    return
                 self.finished.emit(model, getattr(model, "model_name", "SamGeo"))
                 return
 
@@ -226,9 +264,24 @@ class SamGeoModelLoadWorker(QThread):
                 model = SamGeo(device=self.device)
                 model_name = "SamGeo"
 
+            if self._is_aborted():
+                if hasattr(model, "close") and callable(getattr(model, "close")):
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
+                return
             self.finished.emit(model, model_name)
 
         except Exception as e:
+            if self._is_aborted():
+                client = self._client
+                if client is not None and hasattr(client, "close"):
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+                return
             self.error.emit(str(e))
 
 
@@ -1721,14 +1774,50 @@ class SamGeoDockWidget(QDockWidget):
         confidence = self.conf_spin.value()
         enable_interactive = self.interactive_check.isChecked()
 
+        # Abort any previous in-flight model load before starting a new one
+        prev_loader = getattr(self, "model_load_worker", None)
+        if prev_loader is not None:
+            self.model_load_worker = None
+            if hasattr(prev_loader, "abort"):
+                try:
+                    prev_loader.abort()
+                except Exception:
+                    pass
+            try:
+                if prev_loader.isRunning():
+                    _keep_thread_alive(prev_loader)
+            except RuntimeError:
+                pass
+
         # Create and start the model loading worker thread
-        self.model_load_worker = SamGeoModelLoadWorker(
+        worker = SamGeoModelLoadWorker(
             model_version, backend, device, confidence, enable_interactive
         )
-        self.model_load_worker.finished.connect(self.on_model_loaded)
-        self.model_load_worker.error.connect(self.on_model_load_error)
-        self.model_load_worker.progress.connect(self.on_model_load_progress)
-        self.model_load_worker.start()
+        self.model_load_worker = worker
+
+        def _on_loaded(model, loaded_name, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                if hasattr(model, "close") and callable(getattr(model, "close")):
+                    _retire_client_in_background(model)
+                return
+            self.model_load_worker = None
+            self.on_model_loaded(model, loaded_name)
+
+        def _on_error(err, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.model_load_worker = None
+            self.on_model_load_error(err)
+
+        def _on_progress(msg, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.on_model_load_progress(msg)
+
+        worker.finished.connect(_on_loaded)
+        worker.error.connect(_on_error)
+        worker.progress.connect(_on_progress)
+        worker.start()
 
     def on_model_load_progress(self, message: str):
         """Handle model loading progress updates."""
@@ -1743,10 +1832,14 @@ class SamGeoDockWidget(QDockWidget):
             and hasattr(old_sam, "close")
             and callable(getattr(old_sam, "close"))
         ):
-            try:
-                old_sam.close()
-            except Exception:
-                pass
+            op_worker = getattr(self, "_operation_worker", None)
+            if op_worker is not None and op_worker.isRunning():
+                _retire_client_in_background(old_sam, wait_worker=op_worker)
+            else:
+                try:
+                    old_sam.close()
+                except Exception:
+                    pass
         self.sam = model
         self._set_tiled_result(None)
         self._image_state_stale = False
@@ -1782,6 +1875,11 @@ class SamGeoDockWidget(QDockWidget):
     # Generic threaded-operation helper
     # ------------------------------------------------------------------
 
+    def _has_active_operation(self) -> bool:
+        """Return True when a background SamGeo operation is still active."""
+        existing = getattr(self, "_operation_worker", None)
+        return existing is not None and existing.isRunning()
+
     def _run_with_progress(self, func, on_done, on_error=None):
         """Run *func* in a background thread while the progress bar spins.
 
@@ -1802,8 +1900,9 @@ class SamGeoDockWidget(QDockWidget):
         worker = SamGeoOperationWorker(func)
 
         def _on_finished(result):
-            if getattr(self, "_operation_worker", None) is worker:
-                self._operation_worker = None
+            if getattr(self, "_operation_worker", None) is not worker:
+                return
+            self._operation_worker = None
             self.progress_bar.setVisible(False)
             try:
                 on_done(result)
@@ -1814,8 +1913,9 @@ class SamGeoDockWidget(QDockWidget):
                     self.show_error(str(exc))
 
         def _on_error(msg):
-            if getattr(self, "_operation_worker", None) is worker:
-                self._operation_worker = None
+            if getattr(self, "_operation_worker", None) is not worker:
+                return
+            self._operation_worker = None
             self.progress_bar.setVisible(False)
             if on_error:
                 on_error(msg)
@@ -1823,18 +1923,17 @@ class SamGeoDockWidget(QDockWidget):
                 self.show_error(msg)
 
         def _drop_thread(*_args):
-            try:
-                worker.wait()
-            except RuntimeError:
-                pass
             _LIVE_THREADS.discard(worker)
 
         _LIVE_THREADS.add(worker)
         self._operation_worker = worker
         worker.finished.connect(_on_finished)
         worker.error.connect(_on_error)
-        worker.finished.connect(_drop_thread)
-        worker.error.connect(_drop_thread)
+        if isinstance(worker, QThread):
+            QThread.finished.__get__(worker, QThread).connect(_drop_thread)
+        else:
+            worker.finished.connect(_drop_thread)
+            worker.error.connect(_drop_thread)
         worker.start()
         return True
 
@@ -1842,6 +1941,14 @@ class SamGeoDockWidget(QDockWidget):
         """Set the image from the selected QGIS layer."""
         if self.sam is None:
             self.show_error("Please load the model first.")
+            return
+
+        if self._has_active_operation():
+            self.log_message(
+                "An operation is already running; ignoring overlapping set_image request.",
+                level=Qgis.Warning,
+            )
+            self.show_error("An operation is already in progress. Please wait.")
             return
 
         layer_id = self.layer_combo.currentData()
@@ -1862,7 +1969,7 @@ class SamGeoDockWidget(QDockWidget):
         temp_export_path = None
 
         if is_gpkg:
-            # GeoPackage export uses QGIS internals — keep on main thread.
+            # GeoPackage export uses QGIS internals; keep on main thread.
             # It is brief; processEvents() keeps the UI alive during it.
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)
@@ -1890,11 +1997,13 @@ class SamGeoDockWidget(QDockWidget):
         # Run the (potentially slow) model embedding step in a background thread
         # so the spinning progress bar remains animated.
         bands = self._get_bands()
-        self._tiled_source = {
+        prev_tiled_source = getattr(self, "_tiled_source", None)
+        new_tiled_source = {
             "image": image_path,
             "source": source_file_path(source) if is_gpkg else image_path,
             "bands": bands,
         }
+        self._tiled_source = new_tiled_source
 
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)
@@ -1933,12 +2042,21 @@ class SamGeoDockWidget(QDockWidget):
                 f"Failed to set image: {msg}{self._tiled_fallback_hint(image_path)}"
             )
 
-        self._run_with_progress(_work, _done, _error)
+        if not self._run_with_progress(_work, _done, _error):
+            self._tiled_source = prev_tiled_source
 
     def set_image_from_file(self):
         """Set the image from the file path."""
         if self.sam is None:
             self.show_error("Please load the model first.")
+            return
+
+        if self._has_active_operation():
+            self.log_message(
+                "An operation is already running; ignoring overlapping set_image request.",
+                level=Qgis.Warning,
+            )
+            self.show_error("An operation is already in progress. Please wait.")
             return
 
         file_path = self.image_path_edit.text()
@@ -1947,6 +2065,7 @@ class SamGeoDockWidget(QDockWidget):
             return
 
         bands = self._get_bands()
+        prev_tiled_source = getattr(self, "_tiled_source", None)
         self._tiled_source = {"image": file_path, "source": file_path, "bands": bands}
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)
@@ -1991,7 +2110,8 @@ class SamGeoDockWidget(QDockWidget):
                 f"Failed to set image: {msg}{self._tiled_fallback_hint(file_path)}"
             )
 
-        self._run_with_progress(_work, _done, _error)
+        if not self._run_with_progress(_work, _done, _error):
+            self._tiled_source = prev_tiled_source
 
     def segment_by_text(self):
         """Segment the image using text prompt."""
@@ -3104,24 +3224,29 @@ class SamGeoDockWidget(QDockWidget):
         if self.box_tool is not None:
             self.box_tool.clear_rubber_band()
 
-        # Stop model loading worker if running (lock-free abort + wait)
-        if self.model_load_worker is not None:
-            if hasattr(self.model_load_worker, "abort"):
+        # Stop model loading worker if running (detach + lock-free abort + wait)
+        load_worker = getattr(self, "model_load_worker", None)
+        self.model_load_worker = None
+        if load_worker is not None:
+            if hasattr(load_worker, "abort"):
                 try:
-                    self.model_load_worker.abort()
+                    load_worker.abort()
                 except Exception:
                     pass
+            for sig_name in ("finished", "error", "progress"):
+                sig = getattr(load_worker, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
             try:
-                if (
-                    self.model_load_worker.isRunning()
-                    and not self.model_load_worker.wait(5000)
-                ):
-                    _keep_thread_alive(self.model_load_worker)
+                if load_worker.isRunning() and not load_worker.wait(5000):
+                    _keep_thread_alive(load_worker)
             except RuntimeError:
                 pass
-            self.model_load_worker = None
 
-        self._stop_worker_threads()
+        retained_op_worker = self._stop_worker_threads()
 
         # Clean up temporary files (e.g., exported GeoPackage rasters)
         for temp_file in self._temp_files:
@@ -3135,15 +3260,22 @@ class SamGeoDockWidget(QDockWidget):
                 )
         self._temp_files.clear()
 
-        # Clean up model
-        if self.sam is not None:
-            try:
-                if hasattr(self.sam, "close") and callable(getattr(self.sam, "close")):
-                    self.sam.close()
-            except Exception:
-                pass
-            del self.sam
-            self.sam = None
+        # Clean up model (defer off GUI thread if a retained operation worker
+        # may still hold the client's request lock).
+        sam = self.sam
+        self.sam = None
+        if (
+            sam is not None
+            and hasattr(sam, "close")
+            and callable(getattr(sam, "close"))
+        ):
+            if retained_op_worker is not None:
+                _retire_client_in_background(sam, wait_worker=retained_op_worker)
+            else:
+                try:
+                    sam.close()
+                except Exception:
+                    pass
 
     def _stop_worker_threads(self):
         """Make sure no running dock-owned QThread is destroyed with the dock.
@@ -3151,6 +3283,9 @@ class SamGeoDockWidget(QDockWidget):
         A running operation backed by the SamGeo subprocess is unblocked by
         killing that process. Each worker then gets a short wait; one that is
         still running is detached and kept referenced until it finishes.
+
+        Returns:
+            The retained operation worker if its wait timed out, else None.
         """
         op_worker = getattr(self, "_operation_worker", None)
         if op_worker is not None and op_worker.isRunning():
@@ -3167,17 +3302,21 @@ class SamGeoDockWidget(QDockWidget):
                     except Exception:
                         pass
 
+        retained_op_worker = None
         for attr in ("_operation_worker", "_hf_worker"):
             worker = getattr(self, attr, None)
+            setattr(self, attr, None)
             if worker is None:
                 continue
             try:
                 if worker.isRunning() and not worker.wait(3000):
                     _keep_thread_alive(worker)
+                    if attr == "_operation_worker":
+                        retained_op_worker = worker
             except RuntimeError:
                 pass  # Underlying C++ object already gone
-            setattr(self, attr, None)
         self._drop_queued_hf_task()
+        return retained_op_worker
 
     def closeEvent(self, event):
         """Handle close event."""

@@ -141,6 +141,19 @@ def _task_semantic_segmentation(params: Dict[str, Any]) -> Dict[str, Any]:
     return {"output_path": params["output_path"]}
 
 
+def _count_positive_labels(data) -> int:
+    """Count distinct positive instance IDs in a label raster band."""
+    if getattr(data, "size", 0) == 0:
+        return 0
+    try:
+        import numpy as np
+
+        return int(np.count_nonzero(np.unique(data) > 0))
+    except ImportError:
+        values = data.ravel() if hasattr(data, "ravel") else data
+        return len({v for v in values if v > 0})
+
+
 def _task_instance_segmentation(params: Dict[str, Any]) -> Dict[str, Any]:
     geoai = _geoai()
     _progress("Running instance segmentation inference...")
@@ -153,7 +166,7 @@ def _task_instance_segmentation(params: Dict[str, Any]) -> Dict[str, Any]:
         if os.path.exists(output_path):
             with rasterio.open(output_path) as src:
                 data = src.read(1)
-                num_instances = int(data.max()) if getattr(data, "size", 0) > 0 else 0
+                num_instances = _count_positive_labels(data)
     except Exception:
         num_instances = None
     return {"output_path": output_path, "num_instances": num_instances}

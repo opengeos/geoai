@@ -8,6 +8,7 @@ vision-language model for geospatial image analysis in QGIS.
 import os
 import shutil
 import tempfile
+import threading
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
 from qgis.PyQt.QtWidgets import (
@@ -56,12 +57,32 @@ def _keep_thread_alive(thread: QThread) -> None:
         _LIVE_THREADS.discard(thread)
 
     _LIVE_THREADS.add(thread)
-    for sig_name in ("finished", "error"):
-        sig = getattr(thread, sig_name, None)
-        if sig is not None:
-            sig.connect(_drop)
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(_drop)
+    else:
+        for sig_name in ("finished", "error"):
+            sig = getattr(thread, sig_name, None)
+            if sig is not None:
+                sig.connect(_drop)
     if not thread.isRunning():
         _LIVE_THREADS.discard(thread)
+
+
+def _retire_client_in_background(client, wait_worker=None) -> None:
+    """Close a superseded or busy Moondream client off the Qt GUI thread."""
+
+    def _close():
+        if wait_worker is not None:
+            try:
+                wait_worker.wait()
+            except Exception:
+                pass
+        try:
+            client.close()
+        except Exception:
+            pass
+
+    threading.Thread(target=_close, daemon=True).start()
 
 
 class ModelLoadWorker(QThread):
@@ -76,19 +97,29 @@ class ModelLoadWorker(QThread):
         self.model_name = model_name
         self.device = device
         self._client = None
+        self._abort_lock = threading.Lock()
+        self._aborted = False
 
     def abort(self):
-        """Abort the subprocess initialization without locking."""
-        client = self._client
+        """Record cancellation and abort subprocess initialization without locking."""
+        with self._abort_lock:
+            self._aborted = True
+            client = self._client
         if client is not None and hasattr(client, "abort"):
             try:
                 client.abort()
             except Exception:
                 pass
 
+    def _is_aborted(self) -> bool:
+        with self._abort_lock:
+            return self._aborted
+
     def run(self):
         """Load the Moondream model in background."""
         try:
+            if self._is_aborted():
+                return
             self.progress.emit("Starting worker subprocess...")
 
             from ..core.moondream_subprocess import MoondreamSubprocessClient
@@ -96,13 +127,30 @@ class ModelLoadWorker(QThread):
             moondream = MoondreamSubprocessClient(
                 model_name=self.model_name, device=self.device
             )
-            self._client = moondream
+            with self._abort_lock:
+                if self._aborted:
+                    return
+                self._client = moondream
             self.progress.emit(f"Loading {self.model_name.split('/')[-1]} in worker...")
             moondream.initialize()
 
+            if self._is_aborted():
+                try:
+                    moondream.close()
+                except Exception:
+                    pass
+                return
             self.finished.emit(moondream)
 
         except Exception as e:
+            if self._is_aborted():
+                client = self._client
+                if client is not None and hasattr(client, "close"):
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+                return
             self.error.emit(str(e))
 
 
@@ -481,12 +529,50 @@ class MoondreamDockWidget(QDockWidget):
         if device == "Auto":
             device = None
 
+        # Abort any previous in-flight model load before starting a new one
+        prev_loader = getattr(self, "model_load_worker", None)
+        if prev_loader is not None:
+            self.model_load_worker = None
+            if hasattr(prev_loader, "abort"):
+                try:
+                    prev_loader.abort()
+                except Exception:
+                    pass
+            try:
+                if prev_loader.isRunning():
+                    _keep_thread_alive(prev_loader)
+            except RuntimeError:
+                pass
+
         # Create and start the model loading worker thread
-        self.model_load_worker = ModelLoadWorker(model_name, device)
-        self.model_load_worker.finished.connect(self.on_model_loaded)
-        self.model_load_worker.error.connect(self.on_model_load_error)
-        self.model_load_worker.progress.connect(self.on_model_load_progress)
-        self.model_load_worker.start()
+        worker = ModelLoadWorker(model_name, device)
+        self.model_load_worker = worker
+
+        def _on_loaded(loaded_client, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                if hasattr(loaded_client, "close") and callable(
+                    getattr(loaded_client, "close")
+                ):
+                    _retire_client_in_background(loaded_client)
+                return
+            self.model_load_worker = None
+            self.on_model_loaded(loaded_client)
+
+        def _on_error(err, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.model_load_worker = None
+            self.on_model_load_error(err)
+
+        def _on_progress(msg, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.on_model_load_progress(msg)
+
+        worker.finished.connect(_on_loaded)
+        worker.error.connect(_on_error)
+        worker.progress.connect(_on_progress)
+        worker.start()
 
     def on_model_load_progress(self, message: str):
         """Handle model loading progress updates."""
@@ -500,10 +586,14 @@ class MoondreamDockWidget(QDockWidget):
             and old_client is not moondream
             and hasattr(old_client, "close")
         ):
-            try:
-                old_client.close()
-            except Exception:
-                pass
+            active_worker = getattr(self, "worker", None)
+            if active_worker is not None and active_worker.isRunning():
+                _retire_client_in_background(old_client, wait_worker=active_worker)
+            else:
+                try:
+                    old_client.close()
+                except Exception:
+                    pass
         self.moondream = moondream
         model_name = self.model_combo.currentText()
 
@@ -917,6 +1007,13 @@ class MoondreamDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up subprocess clients and worker threads safely."""
+        # Detach worker references before aborting so queued callbacks from an
+        # intentional cancel are rejected (and any unclaimed client is closed).
+        inference_worker = getattr(self, "worker", None)
+        load_worker = getattr(self, "model_load_worker", None)
+        self.worker = None
+        self.model_load_worker = None
+
         # Abort subprocesses first (lock-free) so blocked workers unblock and
         # release _lock before wait() / close().
         if self.moondream is not None and hasattr(self.moondream, "abort"):
@@ -924,31 +1021,48 @@ class MoondreamDockWidget(QDockWidget):
                 self.moondream.abort()
             except Exception:
                 pass
-        if self.model_load_worker is not None and hasattr(
-            self.model_load_worker, "abort"
-        ):
+        if load_worker is not None and hasattr(load_worker, "abort"):
             try:
-                self.model_load_worker.abort()
+                load_worker.abort()
             except Exception:
                 pass
 
-        for attr in ("worker", "model_load_worker"):
-            worker = getattr(self, attr, None)
+        retained_inference_worker = None
+        for attr_name, worker in (
+            ("worker", inference_worker),
+            ("model_load_worker", load_worker),
+        ):
             if worker is None:
                 continue
+            for sig_name in ("finished", "error", "progress"):
+                sig = getattr(worker, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
             try:
                 if worker.isRunning() and not worker.wait(5000):
                     _keep_thread_alive(worker)
+                    if attr_name == "worker":
+                        retained_inference_worker = worker
             except RuntimeError:
                 pass
-            setattr(self, attr, None)
 
-        if self.moondream is not None and hasattr(self.moondream, "close"):
-            try:
-                self.moondream.close()
-            except Exception:
-                pass
-            self.moondream = None
+        client = self.moondream
+        self.moondream = None
+        if client is not None and hasattr(client, "close"):
+            if retained_inference_worker is not None:
+                # Defer lock-taking close() off the GUI thread until the
+                # retained inference worker finishes.
+                _retire_client_in_background(
+                    client, wait_worker=retained_inference_worker
+                )
+            else:
+                try:
+                    client.close()
+                except Exception:
+                    pass
 
     def closeEvent(self, event):
         """Handle widget close event."""

@@ -22,6 +22,29 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+_LIVE_THREADS = set()
+
+
+def _keep_thread_alive(thread: QThread) -> None:
+    """Detach a running removal worker and keep it referenced until it exits."""
+    done_sig = getattr(thread, "done", None)
+    if done_sig is not None:
+        try:
+            done_sig.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+
+    def _drop(*_args):
+        _LIVE_THREADS.discard(thread)
+
+    _LIVE_THREADS.add(thread)
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(_drop)
+    elif done_sig is not None:
+        done_sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
+
 
 class _VenvRemoveWorker(QThread):
     """Background worker that removes an existing virtual environment."""
@@ -241,9 +264,14 @@ class DepsInstallDockWidget(QDockWidget):
         self.progress_bar.setRange(0, 0)
         self.progress_label.setText("Removing existing virtual environment...")
 
-        self._remove_worker = _VenvRemoveWorker(self)
-        self._remove_worker.done.connect(self._on_venv_removed)
-        self._remove_worker.start()
+        worker = _VenvRemoveWorker(self)
+        self._remove_worker = worker
+        worker.done.connect(
+            lambda ok, message, w=worker: (
+                self._on_venv_removed(ok, message) if self._remove_worker is w else None
+            )
+        )
+        worker.start()
 
     def _on_venv_removed(self, ok: bool, message: str):
         """Proceed with dependency installation after venv removal completes."""
@@ -260,10 +288,31 @@ class DepsInstallDockWidget(QDockWidget):
             return
         self.install_requested.emit()
 
+    def cleanup(self):
+        """Detach and retain any running venv removal worker before unload/close."""
+        worker = self._remove_worker
+        self._remove_worker = None
+        if worker is None:
+            return
+        done_sig = getattr(worker, "done", None)
+        if done_sig is not None:
+            try:
+                done_sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+        try:
+            worker.setParent(None)
+        except RuntimeError:
+            pass
+        try:
+            if worker.isRunning() and not worker.wait(5000):
+                _keep_thread_alive(worker)
+        except RuntimeError:
+            pass
+
     def closeEvent(self, event):
-        """Wait for any background venv removal before closing."""
-        if self._remove_worker is not None and self._remove_worker.isRunning():
-            self._remove_worker.wait(5000)
+        """Wait for or detach any background venv removal before closing."""
+        self.cleanup()
         super().closeEvent(event)
 
     def show_install_ui(self):

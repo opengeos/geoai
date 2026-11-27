@@ -46,6 +46,20 @@ from ..core.processing_monitor import get_processing_monitor
 _LIVE_THREADS = set()
 
 
+def _connect_native_finished(thread: QThread, slot) -> bool:
+    """Connect ``slot`` to the native ``QThread.finished`` signal even if shadowed."""
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(slot)
+        return True
+    connected = False
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(slot)
+            connected = True
+    return connected
+
+
 def _keep_thread_alive(thread: QThread) -> None:
     """Keep a still-running worker thread referenced until it exits."""
     for sig_name in ("finished", "error", "exception", "progress", "epoch_progress"):
@@ -60,10 +74,7 @@ def _keep_thread_alive(thread: QThread) -> None:
         _LIVE_THREADS.discard(thread)
 
     _LIVE_THREADS.add(thread)
-    for sig_name in ("finished", "error"):
-        sig = getattr(thread, sig_name, None)
-        if sig is not None:
-            sig.connect(_drop)
+    _connect_native_finished(thread, _drop)
     if not thread.isRunning():
         _LIVE_THREADS.discard(thread)
 
@@ -1533,7 +1544,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
         export_format = self.tile_export_format_combo.currentText()
         self.log(f"Starting tile export in {export_format} format...")
 
-        self.tile_worker = TileExportWorker(
+        worker = TileExportWorker(
             raster_path,
             vector_path,
             output_dir,
@@ -1542,11 +1553,22 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.buffer_spin.value(),
             export_format,
         )
-        self.tile_worker.finished.connect(self.on_tile_export_finished)
-        self.tile_worker.error.connect(self.on_tile_export_error)
-        self.tile_worker.progress.connect(self.log)
-        self._monitor_worker(self.tile_worker, "Semantic segmentation tile export")
-        self.tile_worker.start()
+        self.tile_worker = worker
+        worker.finished.connect(
+            lambda out, w=worker: (
+                self.on_tile_export_finished(out) if self.tile_worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda err, w=worker: (
+                self.on_tile_export_error(err) if self.tile_worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: self.log(msg) if self.tile_worker is w else None
+        )
+        self._monitor_worker(worker, "Semantic segmentation tile export")
+        worker.start()
 
     def on_tile_export_finished(self, output_dir: str):
         """Update the UI after training tiles are exported."""
@@ -1699,7 +1721,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             if self.resume_training_check.isChecked():
                 self.log("  Resuming training state")
 
-        self.train_worker = TrainingWorker(
+        worker = TrainingWorker(
             images_dir,
             labels_dir,
             output_dir,
@@ -1718,17 +1740,34 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             self.resume_training_check.isChecked(),
             self.freeze_encoder_check.isChecked(),
         )
-        self.train_worker.finished.connect(self.on_training_finished)
-        self.train_worker.error.connect(self.on_training_error)
-        self.train_worker.progress.connect(self.log)
-        self.train_worker.epoch_progress.connect(self.on_epoch_progress)
-        self._monitor_worker(
-            self.train_worker,
-            "Semantic segmentation model training",
-            progress_signal=self.train_worker.progress,
-            epoch_progress_signal=self.train_worker.epoch_progress,
+        self.train_worker = worker
+        worker.finished.connect(
+            lambda path, w=worker: (
+                self.on_training_finished(path) if self.train_worker is w else None
+            )
         )
-        self.train_worker.start()
+        worker.error.connect(
+            lambda err, w=worker: (
+                self.on_training_error(err) if self.train_worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: self.log(msg) if self.train_worker is w else None
+        )
+        worker.epoch_progress.connect(
+            lambda cur, tot, met, w=worker: (
+                self.on_epoch_progress(cur, tot, met)
+                if self.train_worker is w
+                else None
+            )
+        )
+        self._monitor_worker(
+            worker,
+            "Semantic segmentation model training",
+            progress_signal=worker.progress,
+            epoch_progress_signal=worker.epoch_progress,
+        )
+        worker.start()
 
     def on_epoch_progress(self, current_epoch: int, total_epochs: int, metrics: str):
         """Handle epoch progress updates."""
@@ -1841,7 +1880,7 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
                 probability_path = f"{base}_probability{ext}"
                 self.probability_path_edit.setText(probability_path)
 
-        self.inference_worker = InferenceWorker(
+        worker = InferenceWorker(
             input_path,
             output_path,
             model_path,
@@ -1857,11 +1896,22 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             inference_bbox=inference_bbox,
             inference_bbox_crs=inference_bbox_crs,
         )
-        self.inference_worker.finished.connect(self.on_inference_finished)
-        self.inference_worker.error.connect(self.on_inference_error)
-        self.inference_worker.progress.connect(self.log)
-        self._monitor_worker(self.inference_worker, "Semantic segmentation inference")
-        self.inference_worker.start()
+        self.inference_worker = worker
+        worker.finished.connect(
+            lambda path, w=worker: (
+                self.on_inference_finished(path) if self.inference_worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda err, w=worker: (
+                self.on_inference_error(err) if self.inference_worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: self.log(msg) if self.inference_worker is w else None
+        )
+        self._monitor_worker(worker, "Semantic segmentation inference")
+        worker.start()
 
     def on_inference_finished(self, output_path: str):
         """Update the UI after inference completes."""
@@ -1927,30 +1977,58 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
 
         if is_smooth_mode:
             self.log("Smoothing vector (for natural features)...")
-            self.smooth_worker = SmoothVectorWorker(
+            worker = SmoothVectorWorker(
                 mask_path,
                 vector_output,
                 smooth_iterations=self.smooth_iterations_spin.value(),
                 min_area=min_area,
             )
-            self.smooth_worker.finished.connect(self.on_vectorize_finished)
-            self.smooth_worker.error.connect(self.on_vectorize_error)
-            self.smooth_worker.progress.connect(self.log)
-            self._monitor_worker(self.smooth_worker, "Smooth segmentation vectors")
-            self.smooth_worker.start()
+            self.smooth_worker = worker
+            worker.finished.connect(
+                lambda path, w=worker: (
+                    self.on_vectorize_finished(path)
+                    if self.smooth_worker is w
+                    else None
+                )
+            )
+            worker.error.connect(
+                lambda err, w=worker: (
+                    self.on_vectorize_error(err) if self.smooth_worker is w else None
+                )
+            )
+            worker.progress.connect(
+                lambda msg, w=worker: self.log(msg) if self.smooth_worker is w else None
+            )
+            self._monitor_worker(worker, "Smooth segmentation vectors")
+            worker.start()
         else:
             self.log("Regularizing vector (for buildings)...")
-            self.vectorize_worker = VectorizeWorker(
+            worker = VectorizeWorker(
                 mask_path,
                 vector_output,
                 self.epsilon_spin.value(),
                 min_area,
             )
-            self.vectorize_worker.finished.connect(self.on_vectorize_finished)
-            self.vectorize_worker.error.connect(self.on_vectorize_error)
-            self.vectorize_worker.progress.connect(self.log)
-            self._monitor_worker(self.vectorize_worker, "Vectorize segmentation mask")
-            self.vectorize_worker.start()
+            self.vectorize_worker = worker
+            worker.finished.connect(
+                lambda path, w=worker: (
+                    self.on_vectorize_finished(path)
+                    if self.vectorize_worker is w
+                    else None
+                )
+            )
+            worker.error.connect(
+                lambda err, w=worker: (
+                    self.on_vectorize_error(err) if self.vectorize_worker is w else None
+                )
+            )
+            worker.progress.connect(
+                lambda msg, w=worker: (
+                    self.log(msg) if self.vectorize_worker is w else None
+                )
+            )
+            self._monitor_worker(worker, "Vectorize segmentation mask")
+            worker.start()
 
     def on_vectorize_finished(self, output_path: str):
         """Update the UI after vectorization completes."""
@@ -1986,6 +2064,21 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
             "smooth_worker",
         ):
             worker = getattr(self, attr, None)
+            setattr(self, attr, None)
+            if worker is not None:
+                for sig_name in (
+                    "finished",
+                    "error",
+                    "exception",
+                    "progress",
+                    "epoch_progress",
+                ):
+                    sig = getattr(worker, sig_name, None)
+                    if sig is not None:
+                        try:
+                            sig.disconnect()
+                        except (TypeError, RuntimeError):
+                            pass
             was_running = worker is not None and worker.isRunning()
             if was_running:
                 if hasattr(worker, "cancel"):
@@ -1993,7 +2086,25 @@ class SegmentationDockWidget(InferenceRangeMixin, QDockWidget):
                 if not worker.wait(5000):
                     _keep_thread_alive(worker)
             self._cancel_monitored_worker(worker, was_running)
-            setattr(self, attr, None)
+
+        if hasattr(self, "train_btn"):
+            self.train_btn.setEnabled(True)
+        if hasattr(self, "train_progress"):
+            self.train_progress.setRange(0, 100)
+            self.train_progress.setValue(0)
+            self.train_progress.setFormat("")
+        if hasattr(self, "export_tiles_btn"):
+            self.export_tiles_btn.setEnabled(True)
+        if hasattr(self, "tile_progress"):
+            self.tile_progress.setRange(0, 100)
+            self.tile_progress.setValue(0)
+        if hasattr(self, "run_inference_btn"):
+            self.run_inference_btn.setEnabled(True)
+        if hasattr(self, "vectorize_btn"):
+            self.vectorize_btn.setEnabled(bool(getattr(self, "last_output_path", None)))
+        if hasattr(self, "inference_progress"):
+            self.inference_progress.setRange(0, 100)
+            self.inference_progress.setValue(0)
 
     def closeEvent(self, event):
         """Handle widget close event."""

@@ -46,6 +46,20 @@ from qgis.core import (
 _LIVE_THREADS = set()
 
 
+def _connect_native_finished(thread: QThread, slot) -> bool:
+    """Connect ``slot`` to the native ``QThread.finished`` signal even if shadowed."""
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(slot)
+        return True
+    connected = False
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(slot)
+            connected = True
+    return connected
+
+
 def _keep_thread_alive(thread: QThread) -> None:
     """Keep a still-running worker thread referenced until it exits."""
     for sig_name in ("finished", "error", "progress"):
@@ -60,10 +74,7 @@ def _keep_thread_alive(thread: QThread) -> None:
         _LIVE_THREADS.discard(thread)
 
     _LIVE_THREADS.add(thread)
-    for sig_name in ("finished", "error"):
-        sig = getattr(thread, sig_name, None)
-        if sig is not None:
-            sig.connect(_drop)
+    _connect_native_finished(thread, _drop)
     if not thread.isRunning():
         _LIVE_THREADS.discard(thread)
 
@@ -795,6 +806,38 @@ class WaterSegmentationDockWidget(QDockWidget):
         if device == "auto":
             device = None
 
+        retained = getattr(self, "_retained_workers", None)
+        if retained:
+            requested_outputs = {
+                os.path.normcase(os.path.abspath(p))
+                for p in (output_raster, output_vector)
+                if p
+            }
+            for old_worker in list(retained):
+                if not old_worker.isRunning():
+                    retained.discard(old_worker)
+                    continue
+                old_outputs = {
+                    os.path.normcase(os.path.abspath(p))
+                    for p in (
+                        getattr(old_worker, "output_raster", None),
+                        getattr(old_worker, "output_vector", None),
+                    )
+                    if p
+                }
+                if (requested_outputs & old_outputs) or (
+                    not requested_outputs
+                    and getattr(old_worker, "input_path", None) == input_path
+                ):
+                    QMessageBox.warning(
+                        self,
+                        "Water Segmentation Busy",
+                        "A cancelled water segmentation task is still finishing "
+                        "writes to the same output. Please wait a moment or "
+                        "choose a different output path.",
+                    )
+                    return
+
         # Disable UI and show progress
         self.run_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
@@ -803,7 +846,7 @@ class WaterSegmentationDockWidget(QDockWidget):
         self.status_label.setStyleSheet("color: orange;")
         self.results_text.clear()
 
-        self.worker = WaterSegmentationWorker(
+        worker = WaterSegmentationWorker(
             input_path=input_path,
             band_order=band_order,
             output_raster=output_raster,
@@ -821,10 +864,23 @@ class WaterSegmentationDockWidget(QDockWidget):
             smooth=self.smooth_check.isChecked(),
             smooth_iterations=self.smooth_iterations_spin.value(),
         )
-        self.worker.finished.connect(self._on_segmentation_finished)
-        self.worker.error.connect(self._on_segmentation_error)
-        self.worker.progress.connect(self._on_segmentation_progress)
-        self.worker.start()
+        self.worker = worker
+        worker.finished.connect(
+            lambda r, v, w=worker: (
+                self._on_segmentation_finished(r, v) if self.worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda msg, w=worker: (
+                self._on_segmentation_error(msg) if self.worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: (
+                self._on_segmentation_progress(msg) if self.worker is w else None
+            )
+        )
+        worker.start()
 
     def _on_segmentation_finished(self, raster_path, vector_path):
         """Handle successful segmentation completion.
@@ -964,10 +1020,39 @@ class WaterSegmentationDockWidget(QDockWidget):
         """Clean up resources when the dock is closed."""
         worker = self.worker
         self.worker = None
-        if worker is not None and worker.isRunning():
-            worker.cancel()
-            if not worker.wait(5000):
-                _keep_thread_alive(worker)
+        if worker is not None:
+            for sig_name in ("finished", "error", "progress"):
+                sig = getattr(worker, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
+            if worker.isRunning():
+                worker.cancel()
+                if not worker.wait(5000):
+                    _keep_thread_alive(worker)
+                    retained = getattr(self, "_retained_workers", None)
+                    if retained is None:
+                        retained = set()
+                        self._retained_workers = retained
+                    retained.add(worker)
+
+                    def _drop_retained(*_args, w=worker, s=retained):
+                        s.discard(w)
+
+                    _connect_native_finished(worker, _drop_retained)
+                    if not worker.isRunning():
+                        retained.discard(worker)
+
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.setVisible(False)
+            self.progress_bar.setRange(0, 100)
+        if hasattr(self, "run_btn"):
+            self.run_btn.setEnabled(True)
+        if hasattr(self, "status_label"):
+            self.status_label.setText("Ready")
+            self.status_label.setStyleSheet("color: gray;")
 
         for temp_file in self._temp_files:
             try:

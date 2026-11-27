@@ -7,26 +7,12 @@ Windows.
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .subprocess_client import PersistentSubprocessClient
-from .venv_manager import (
-    _get_clean_env_for_venv,
-    _get_subprocess_kwargs,
-    get_venv_python_path,
-    venv_exists,
-)
+from .subprocess_client import PersistentSubprocessClient, SubprocessAbortedError
 
-__all__ = [
-    "DeepForestSubprocessClient",
-    "subprocess",
-    "_get_clean_env_for_venv",
-    "_get_subprocess_kwargs",
-    "get_venv_python_path",
-    "venv_exists",
-]
+__all__ = ["DeepForestSubprocessClient"]
 
 
 class DeepForestSubprocessClient(PersistentSubprocessClient):
@@ -47,6 +33,10 @@ class DeepForestSubprocessClient(PersistentSubprocessClient):
 
     def initialize(self) -> None:
         with self._lock:
+            if self._is_aborted():
+                raise SubprocessAbortedError(
+                    f"{self._WORKER_LABEL} worker start cancelled"
+                )
             if self._is_running():
                 return
 
