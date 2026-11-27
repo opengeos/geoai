@@ -962,7 +962,13 @@ def _describe_install_failure(
             "proxy user and password in QGIS Settings > Options > Network."
             "\n\nInstaller output:\n{}"
         ).format(package_name, detail)
-    if _is_network_error(output):
+    # pip prints retry warnings for transient connection drops and may still
+    # end in a genuine conflict; only blame the network when the resolver saw
+    # no versions at all or reported no conflict.
+    if _is_network_error(output) and (
+        not _looks_like_resolution_conflict(output)
+        or "from versions: none" in output.lower()
+    ):
         return (
             "Failed to install {}: network error. Check your internet "
             "connection and retry; the installer resumes from its cache."

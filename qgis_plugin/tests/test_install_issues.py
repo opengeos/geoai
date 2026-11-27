@@ -100,6 +100,19 @@ def test_windows_crash_message_keeps_installer_output(monkeypatch):
     assert "c10.dll failed" in message
 
 
+def test_retry_warnings_do_not_hide_a_real_resolver_conflict():
+    output = (
+        "WARNING: Retrying (Retry(total=4)) after connection broken by "
+        "'ProtocolError('Connection aborted.')': /simple/torch/\n"
+        "ERROR: Cannot install geoai-py and torch==1.0 because these package "
+        "versions have conflicting dependencies.\n"
+        "ERROR: ResolutionImpossible"
+    )
+    message = venv_manager._describe_install_failure("torch", output, ["torch==1.0"])
+
+    assert "Dependency resolution failed" in message
+
+
 def test_package_names_containing_ssl_are_not_tls_errors():
     output = (
         "No solution found when resolving dependencies:\n"
@@ -134,6 +147,8 @@ def test_network_error_message_is_not_a_resolver_conflict():
     output = (
         "ConnectionResetError(10054, 'An existing connection was forcibly "
         "closed by the remote host')\n"
+        "ERROR: Could not find a version that satisfies the requirement "
+        "geoai-py>=0.39.0 (from versions: none)\n"
         "ERROR: No matching distribution found for geoai-py>=0.39.0"
     )
     message = venv_manager._describe_install_failure(
