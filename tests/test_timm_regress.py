@@ -343,5 +343,64 @@ class TestPixelRegressionDatasetInit(unittest.TestCase):
             )
 
 
+class TestPredictRasterBorder(unittest.TestCase):
+    """Tests that predict_raster keeps the model output at the raster's edges."""
+
+    def test_weight_mask_tapers_only_towards_neighbours(self):
+        """Test that sides without a neighbouring tile keep full weight."""
+        from geoai.timm_regress import _create_weight_mask
+
+        # Top-left tile: neighbours below and to the right only.
+        w = _create_weight_mask(32, 8, top=False, bottom=True, left=False, right=True)
+        np.testing.assert_array_equal(w[:24, :24], 1.0)
+        self.assertEqual(w[-1, -1], 0.0)
+
+    def test_constant_model_fills_every_pixel(self):
+        """Test that a constant model gives its value on every pixel, edges included."""
+        import os
+        import tempfile
+
+        import rasterio
+        import torch
+        from rasterio.transform import from_origin
+
+        from geoai.timm_regress import predict_raster
+
+        class Constant(torch.nn.Module):
+            def forward(self, x):
+                return torch.full((x.shape[0], x.shape[2], x.shape[3]), 7.0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            src = os.path.join(tmp, "in.tif")
+            dst = os.path.join(tmp, "out.tif")
+            with rasterio.open(
+                src,
+                "w",
+                driver="GTiff",
+                height=40,
+                width=50,
+                count=3,
+                dtype="float32",
+                crs="EPSG:32617",
+                transform=from_origin(500000, 4000000, 1, 1),
+            ) as ds:
+                ds.write(np.full((3, 40, 50), 0.5, dtype="float32"))
+
+            predict_raster(
+                Constant(),
+                src,
+                dst,
+                tile_size=16,
+                overlap=4,
+                batch_size=4,
+                device="cpu",
+                use_model_preprocessing=False,
+            )
+            with rasterio.open(dst) as ds:
+                out = ds.read(1)
+
+        np.testing.assert_allclose(out, 7.0)
+
+
 if __name__ == "__main__":
     unittest.main()
