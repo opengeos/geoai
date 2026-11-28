@@ -469,8 +469,6 @@ def test_train_s2_water_uses_data_dir_and_tempdir(tmp_path):
 
 def test_zensical_examples_nav_sorted_alphabetically():
     """Examples navigation entries in zensical.toml use filename stems sorted alphabetically."""
-    import tomllib
-
     config = tomllib.loads((REPO_ROOT / "zensical.toml").read_text(encoding="utf-8"))
     examples_nav = next(
         item["Examples"]
