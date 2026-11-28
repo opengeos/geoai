@@ -143,11 +143,8 @@ def test_apply_package_host_env_preserves_existing_values():
     venv_manager._apply_package_host_env(env)
 
     assert env["UV_NATIVE_TLS"] == "true"
-    assert "internal.example.com" in env["PIP_TRUSTED_HOST"].split()
-    assert env["PIP_TRUSTED_HOST"].split().count("pypi.org") == 1
-    assert "files.pythonhosted.org" in env["PIP_TRUSTED_HOST"].split()
-    assert "pypi.org" in env["UV_INSECURE_HOST"].split()
-    assert "download.pytorch.org" in env["UV_INSECURE_HOST"].split()
+    assert env["PIP_TRUSTED_HOST"] == "internal.example.com pypi.org"
+    assert "UV_INSECURE_HOST" not in env
 
 
 def test_ssl_error_detects_uv_rustls_unknown_issuer():

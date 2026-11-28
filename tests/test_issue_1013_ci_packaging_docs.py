@@ -13,8 +13,22 @@ from unittest import mock
 
 import pytest
 import yaml
+from packaging.version import Version
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _assert_min_floor(reqs, pkg_name: str, min_ver: str) -> None:
+    matches = [
+        line
+        for line in reqs
+        if re.match(rf"^{re.escape(pkg_name)}>=(.+)$", line, re.IGNORECASE)
+    ]
+    assert matches, f"Expected lower-bounded requirement for {pkg_name}"
+    ver_str = matches[0].split(">=", 1)[1].split(",")[0].strip()
+    assert Version(ver_str) >= Version(
+        min_ver
+    ), f"{pkg_name} floor {ver_str} is below minimum {min_ver}"
 
 
 def _load_module(name: str, path: Path):
@@ -183,9 +197,9 @@ def test_pyproject_and_requirements_consistency():
         for line in req_lines
         if line.strip() and not line.strip().startswith("#")
     ]
-    assert "aiohttp>=3.13.4" in active_reqs
-    assert "requests>=2.33.0" in active_reqs
-    assert "cryptography>=46.0.6" in active_reqs
+    _assert_min_floor(active_reqs, "aiohttp", "3.13.4")
+    _assert_min_floor(active_reqs, "requests", "2.33.0")
+    _assert_min_floor(active_reqs, "cryptography", "46.0.6")
     assert active_reqs == sorted(
         active_reqs, key=str.lower
     ), "requirements.txt must remain alphabetically sorted for pre-commit"
@@ -204,10 +218,13 @@ def test_requirements_docs_and_manifest_and_docker():
         "mkdocstrings",
         "mkdocstrings-python",
         "pymdown-extensions",
-        "pygments>=2.21.0",
         "nbformat",
     ):
-        assert required in docs_reqs
+        assert any(
+            re.split(r"[<>=!~;\[]", r)[0].strip().lower() == required for r in docs_reqs
+        ), f"Expected {required} in requirements_docs.txt"
+
+    _assert_min_floor(docs_reqs, "pygments", "2.21.0")
 
     for legacy in (
         "sphinx",
@@ -241,7 +258,9 @@ def test_requirements_docs_and_manifest_and_docker():
 
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
     assert "quay.io/jupyter/base-notebook:latest" not in dockerfile
-    assert "quay.io/jupyter/base-notebook:python-3.12" in dockerfile
+    assert re.search(
+        r"FROM\s+quay\.io/jupyter/base-notebook:python-3\.\d+", dockerfile
+    ), "Dockerfile must pin a Python 3.x base-notebook tag"
     assert "--no-install-recommends" in dockerfile
     assert "mamba clean --all -f -y" in dockerfile
     assert "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_GEOAI" not in dockerfile

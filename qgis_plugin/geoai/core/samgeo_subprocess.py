@@ -7,27 +7,11 @@ Windows.
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
-import tempfile
-import threading
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-from qgis.core import Qgis, QgsMessageLog
-
-from .venv_manager import (
-    _get_clean_env_for_venv,
-    _get_subprocess_kwargs,
-    get_venv_python_path,
-    venv_exists,
-)
-
-
-def _log(message: str, level=Qgis.Info) -> None:
-    QgsMessageLog.logMessage(message, "GeoAI", level=level)
-
+from .subprocess_client import PersistentSubprocessClient, SubprocessAbortedError
 
 # Hugging Face gives these variables priority over the token saved by
 # ``huggingface_hub.login``. After a panel login they are dropped from the
@@ -75,12 +59,15 @@ class _MaskCountProxy:
         return f"<MaskCountProxy count={self.count}>"
 
 
-class SamGeoSubprocessClient:
+class SamGeoSubprocessClient(PersistentSubprocessClient):
     """Thin stateful proxy for SamGeo running in a persistent subprocess."""
 
+    _WORKER_LABEL = "SamGeo"
     _TIMEOUT_INIT = 900
     _TIMEOUT_SET_IMAGE = 180
     _TIMEOUT_REQUEST = 600
+    _STDERR_TAIL_CHARS = 2000
+    _EMPTY_RESULT_IS_DICT = True
 
     def __init__(
         self,
@@ -98,62 +85,30 @@ class SamGeoSubprocessClient:
 
         self.model_name = "SamGeo"
         self.supported_methods = set()
-        self.process: Optional[subprocess.Popen] = None
-        self._stderr_file = None
-        self._lock = threading.RLock()
         self.masks = None
         self.mask_scores = None
         self.objects = None
 
         plugin_root = Path(__file__).resolve().parents[1]
-        self.worker_script = plugin_root / "workers" / "samgeo_worker.py"
+        super().__init__(plugin_root / "workers" / "samgeo_worker.py")
+
+    def _prepare_env(self) -> dict:
+        env = super()._prepare_env()
+        if _PREFER_SAVED_HF_TOKEN:
+            for name in _HF_TOKEN_ENV_VARS:
+                env.pop(name, None)
+        return env
 
     def initialize(self) -> None:
         with self._lock:
+            if self._is_aborted():
+                raise SubprocessAbortedError(
+                    f"{self._WORKER_LABEL} worker start cancelled"
+                )
             if self._is_running():
                 return
 
-            if not venv_exists():
-                raise RuntimeError(
-                    "GeoAI virtual environment not found. Install dependencies first."
-                )
-
-            python_path = get_venv_python_path()
-            if not os.path.exists(python_path):
-                raise FileNotFoundError(f"Venv Python not found: {python_path}")
-            if not self.worker_script.exists():
-                raise FileNotFoundError(
-                    f"SamGeo worker script not found: {self.worker_script}"
-                )
-
-            cmd = [python_path, "-u", str(self.worker_script)]
-            env = _get_clean_env_for_venv()
-            if _PREFER_SAVED_HF_TOKEN:
-                for name in _HF_TOKEN_ENV_VARS:
-                    env.pop(name, None)
-            popen_kwargs = dict(_get_subprocess_kwargs())
-
-            try:
-                self._stderr_file = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
-            except Exception:
-                self._stderr_file = None
-
-            _log(f"Starting SamGeo worker subprocess: {python_path}", Qgis.Info)
-            self.process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=(
-                    self._stderr_file
-                    if self._stderr_file is not None
-                    else subprocess.DEVNULL
-                ),
-                text=True,
-                bufsize=1,
-                env=env,
-                **popen_kwargs,
-            )
-
+            self._start_process_locked()
             try:
                 result = self._request_locked(
                     {
@@ -335,149 +290,12 @@ class SamGeoSubprocessClient:
 
     def close(self) -> None:
         with self._lock:
-            proc = self.process
-            self.process = None
             self.masks = None
-            if proc is None:
-                self._close_stderr_file()
-                return
-
-            try:
-                if proc.poll() is None and proc.stdin is not None:
-                    proc.stdin.write(json.dumps({"action": "shutdown"}) + "\n")
-                    proc.stdin.flush()
-            except Exception:
-                pass
-
-            try:
-                proc.wait(timeout=2)
-            except Exception:
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=2)
-                except Exception:
-                    try:
-                        proc.kill()
-                        proc.wait(timeout=2)
-                    except Exception:
-                        pass
-
-            self._close_stderr_file()
+            super().close()
 
     def _set_mask_count(self, count: Any) -> None:
         count = int(count or 0)
         self.masks = _MaskCountProxy(count) if count > 0 else None
-
-    def _close_stderr_file(self) -> None:
-        if self._stderr_file is not None:
-            try:
-                self._stderr_file.close()
-            except Exception:
-                pass
-            self._stderr_file = None
-
-    def _request(self, payload: Dict[str, Any], timeout: Optional[int] = None):
-        with self._lock:
-            if not self._is_running():
-                self.initialize()
-            try:
-                return self._request_locked(payload, timeout=timeout)
-            except TimeoutError:
-                self.close()
-                raise
-
-    def _request_locked(self, payload: Dict[str, Any], timeout: Optional[int] = None):
-        if not self._is_running():
-            raise RuntimeError("SamGeo worker process is not running")
-
-        proc = self.process
-        assert proc is not None
-        if proc.stdin is None or proc.stdout is None:
-            raise RuntimeError("SamGeo worker pipes are not available")
-
-        try:
-            proc.stdin.write(json.dumps(payload) + "\n")
-            proc.stdin.flush()
-        except Exception as exc:
-            raise RuntimeError(
-                f"Failed to send request to SamGeo worker: {exc}"
-            ) from exc
-
-        try:
-            line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
-            while True:
-                try:
-                    response = json.loads(line)
-                except json.JSONDecodeError:
-                    line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
-                    continue
-                if not isinstance(response, dict):
-                    line = self._read_response_line(timeout or self._TIMEOUT_REQUEST)
-                    continue
-                break
-        except TimeoutError:
-            self.close()
-            raise
-
-        if response.get("type") == "error":
-            message = response.get("message", "Unknown SamGeo worker error")
-            stderr_output = self._read_stderr()
-            if stderr_output:
-                message = f"{message}\nWorker stderr:\n{stderr_output[-2000:]}"
-            raise RuntimeError(message)
-
-        if response.get("type") != "ok":
-            raise RuntimeError(f"Unexpected SamGeo worker response: {response}")
-
-        return response.get("result") or {}
-
-    def _read_response_line(self, timeout_seconds: int) -> str:
-        proc = self.process
-        if proc is None or proc.poll() is not None:
-            raise RuntimeError("SamGeo worker process is not running")
-        if proc.stdout is None:
-            raise RuntimeError("SamGeo worker stdout is not available")
-
-        result = [None]
-        error = [None]
-
-        def _reader():
-            try:
-                result[0] = proc.stdout.readline()
-            except Exception as exc:  # pragma: no cover - defensive
-                error[0] = exc
-
-        thread = threading.Thread(target=_reader, daemon=True)
-        thread.start()
-        thread.join(timeout_seconds)
-
-        if thread.is_alive():
-            raise TimeoutError(
-                f"SamGeo worker did not respond within {timeout_seconds}s"
-            )
-        if error[0] is not None:
-            raise error[0]
-
-        line = result[0]
-        if not line:
-            stderr_output = self._read_stderr()
-            msg = "SamGeo worker closed stdout unexpectedly"
-            if stderr_output:
-                msg = f"{msg}\nWorker stderr:\n{stderr_output[-2000:]}"
-            raise RuntimeError(msg)
-        return line.strip()
-
-    def _read_stderr(self, max_chars: int = 2000) -> str:
-        if self._stderr_file is None:
-            return ""
-        try:
-            self._stderr_file.seek(0)
-            return self._stderr_file.read()[-max_chars:]
-        except Exception:
-            return ""
-
-    def _is_running(self) -> bool:
-        return self.process is not None and self.process.poll() is None
 
     def _json_payload(self, value: Any) -> Any:
         if value is None or isinstance(value, (bool, int, float, str)):
@@ -497,9 +315,3 @@ class SamGeoSubprocessClient:
             except Exception:
                 pass
         return str(value)
-
-    def __del__(self):
-        try:
-            self.close()
-        except Exception:
-            pass

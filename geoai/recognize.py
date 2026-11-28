@@ -1070,7 +1070,26 @@ def predict_images_from_hub(
         num_classes=num_classes,
         in_chans=in_channels,
     )
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
+    import pickle
+
+    try:
+        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+    except (pickle.UnpicklingError, RuntimeError) as exc:
+        raise RuntimeError(
+            f"Failed to load checkpoint '{model_path}' with weights_only=True. "
+            "GeoAI enforces weights_only=True by default for security. If this is a "
+            "trusted legacy checkpoint containing pickled Python objects, re-save it "
+            "as a plain state_dict (torch.save(model.state_dict(), path)) or register "
+            "trusted globals with torch.serialization.add_safe_globals()."
+        ) from exc
+    if isinstance(state_dict, dict):
+        if "state_dict" in state_dict and isinstance(state_dict["state_dict"], dict):
+            state_dict = state_dict["state_dict"]
+        elif "model_state_dict" in state_dict and isinstance(
+            state_dict["model_state_dict"], dict
+        ):
+            state_dict = state_dict["model_state_dict"]
+    model.load_state_dict(state_dict)
 
     result = predict_images(
         model=model,

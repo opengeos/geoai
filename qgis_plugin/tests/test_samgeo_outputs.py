@@ -613,7 +613,7 @@ def test_worker_skips_infinite_and_float_string_score_keys():
 
 
 def test_samgeo_worker_env_drops_hf_token_only_after_panel_login(monkeypatch):
-    from geoai.core import samgeo_subprocess
+    from geoai.core import samgeo_subprocess, subprocess_client
 
     captured = []
 
@@ -625,15 +625,15 @@ def test_samgeo_worker_env_drops_hf_token_only_after_panel_login(monkeypatch):
         raise _Stop()
 
     monkeypatch.setenv("HF_TOKEN", "hf_FromEnvironment")
-    monkeypatch.setattr(samgeo_subprocess, "venv_exists", lambda: True)
+    monkeypatch.setattr(subprocess_client, "venv_exists", lambda: True)
     monkeypatch.setattr(
-        samgeo_subprocess, "get_venv_python_path", lambda: sys.executable
+        subprocess_client, "get_venv_python_path", lambda: sys.executable
     )
     monkeypatch.setattr(
-        samgeo_subprocess, "_get_clean_env_for_venv", lambda: dict(os.environ)
+        subprocess_client, "_get_clean_env_for_venv", lambda: dict(os.environ)
     )
-    monkeypatch.setattr(samgeo_subprocess, "_get_subprocess_kwargs", dict)
-    monkeypatch.setattr(samgeo_subprocess.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(subprocess_client, "_get_subprocess_kwargs", dict)
+    monkeypatch.setattr(subprocess_client.subprocess, "Popen", fake_popen)
 
     def start():
         client = SamGeoSubprocessClient("SamGeo3 (SAM3)", "meta", "cpu", 0.5, False)
