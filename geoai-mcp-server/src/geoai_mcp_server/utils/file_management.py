@@ -20,8 +20,18 @@ _INTERNAL_STAGING_PREFIXES = (
     ".geoai_pub_",
     ".geoai_bak_",
     ".geoai_tmp_",
-    ".geoai_training_dataset",
+    ".geoai_stage_",
+    ".geoai_training_stage_",
+    ".geoai_training_backup_",
+    ".gsam_stage_",
+    ".clipseg_tmp_",
+    ".sam_tmp_",
+    ".auto_seg_tmp_",
+    ".detect_stage_",
+    ".change_stage_",
+    ".vlm_stage_",
 )
+_INTERNAL_EXACT_NAMES = frozenset({".geoai_training_dataset"})
 
 
 def _is_internal_staging_path(path: Path, base_dir: Path) -> bool:
@@ -30,7 +40,10 @@ def _is_internal_staging_path(path: Path, base_dir: Path) -> bool:
         rel_parts = path.resolve().relative_to(base_dir.resolve()).parts
     except ValueError:
         return False
-    return any(part.startswith(_INTERNAL_STAGING_PREFIXES) for part in rel_parts)
+    return any(
+        part in _INTERNAL_EXACT_NAMES or part.startswith(_INTERNAL_STAGING_PREFIXES)
+        for part in rel_parts
+    )
 
 
 def _is_path_within_directory(path: Path, directory: Path) -> bool:
@@ -133,6 +146,14 @@ def validate_output_path(path: str | Path, config: Optional[Any] = None) -> Path
             operation="access",
         )
 
+    if _is_internal_staging_path(full_path, output_dir_resolved):
+        raise InputValidationError(
+            message=f"Output path uses a reserved internal staging name: {path}",
+            parameter_name="output_filename",
+            received_value=str(path),
+            expected="A filename outside reserved internal staging names",
+        )
+
     # Ensure parent directory exists
     full_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -194,6 +215,14 @@ def validate_output_subdir(subdir: str | Path, config: Optional[Any] = None) -> 
             message="Access denied: output subdirectory must be strictly inside the allowed output directory",
             file_path=subdir_str,
             operation="access",
+        )
+
+    if _is_internal_staging_path(full_path, output_dir_resolved):
+        raise InputValidationError(
+            message=f"Output subdirectory uses a reserved internal staging name: {subdir_str}",
+            parameter_name="output_subdir",
+            received_value=subdir_str,
+            expected="A relative subdirectory outside reserved internal staging names",
         )
 
     return full_path

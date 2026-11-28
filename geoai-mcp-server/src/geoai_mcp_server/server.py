@@ -1256,6 +1256,11 @@ async def detect_temporal_changes(
         out_name = output_filename or generate_output_filename(
             image1_path, "change_map", out_format.extension
         )
+        if (
+            out_format == OutputFormat.SHAPEFILE
+            and Path(out_name).suffix.lower() != ".shp"
+        ):
+            out_name = f"{out_name}.shp"
         output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Detecting changes between {full_path1} and {full_path2}")
@@ -1443,7 +1448,18 @@ async def download_satellite_imagery(
             if date_range is not None:
                 cleaned_range = date_range.strip()
                 if len(cleaned_range) == 4 and cleaned_range.isdigit():
-                    naip_year = int(cleaned_range)
+                    parsed_year = int(cleaned_range)
+                    if not (1900 <= parsed_year <= 2100):
+                        raise InputValidationError(
+                            message=(
+                                f"Invalid NAIP year '{date_range}'. "
+                                "Expected a four-digit year between 1900 and 2100."
+                            ),
+                            parameter_name="date_range",
+                            received_value=date_range,
+                            expected="Four-digit year between 1900 and 2100",
+                        )
+                    naip_year = parsed_year
                 elif "/" in cleaned_range:
                     parts = cleaned_range.split("/", 1)
                     try:
@@ -1461,6 +1477,7 @@ async def download_satellite_imagery(
                         ) from exc
                     if (
                         start_dt.year == end_dt.year
+                        and 1900 <= start_dt.year <= 2100
                         and start_dt == date(start_dt.year, 1, 1)
                         and end_dt == date(end_dt.year, 12, 31)
                     ):
@@ -1576,17 +1593,22 @@ async def download_satellite_imagery(
                         shutil.rmtree(orphan, ignore_errors=True)
                     raise
 
+                publish_error: Optional[str] = None
                 if stage_dir is not None:
                     stage_root = stage_dir.resolve()
                     pub_lock = threading.Lock()
                     pub_started = False
+                    publish_abandoned = False
 
                     def _publish_stac_downloads():
                         nonlocal pub_started
                         with pub_lock:
+                            if publish_abandoned:
+                                return [], None
                             pub_started = True
+                        published: list[str] = []
+                        err_msg: Optional[str] = None
                         try:
-                            published: list[str] = []
                             for p_str in raw_paths:
                                 src_p = Path(p_str)
                                 try:
@@ -1603,23 +1625,32 @@ async def download_satellite_imagery(
                                         published.append(str(dest_p))
                                 else:
                                     published.append(p_str)
-                            return published
+                        except Exception as exc:
+                            err_msg = str(exc)
                         finally:
                             shutil.rmtree(stage_dir, ignore_errors=True)
+                        return published, err_msg
 
                     try:
                         # Do not apply a second timeout to the irreversible commit.
-                        downloaded_files = await asyncio.to_thread(
+                        downloaded_files, publish_error = await asyncio.to_thread(
                             _publish_stac_downloads
                         )
                     except BaseException:
                         with pub_lock:
+                            publish_abandoned = True
                             started = pub_started
                         if not started:
                             shutil.rmtree(stage_dir, ignore_errors=True)
                         raise
 
-                if requested_assets > 0:
+                if publish_error is not None:
+                    download_success = False
+                    download_message = (
+                        f"Failed while publishing {source_enum.value} assets after "
+                        f"publishing {len(downloaded_files)} file(s): {publish_error}"
+                    )
+                elif requested_assets > 0:
                     if len(downloaded_files) == 0:
                         download_success = False
                         download_message = (
@@ -2138,14 +2169,19 @@ async def extract_features_with_foundation_model(
 
             if output_type == "similarity_map":
                 sim_dir = validate_output_path(output_path.with_suffix(""), cfg)
+                sim_lock = threading.Lock()
+                sim_abandoned = False
+                sim_stage_holder: list[Optional[Path]] = [None]
 
                 def _run_similarity():
-                    # Run similarity map in a fresh staging directory so reused
-                    # output names only publish and report artifacts from this run.
-                    with tempfile.TemporaryDirectory(
-                        prefix="geoai_sim_stage_"
-                    ) as stage_dir:
-                        stage_root = Path(stage_dir)
+                    # Stage similarity map inside the worker and publish only
+                    # after the request accepts the result so timed-out workers
+                    # cannot overwrite outputs of a later run.
+                    with sim_lock:
+                        if sim_abandoned:
+                            return (), None, []
+                    stage_root = Path(tempfile.mkdtemp(prefix="geoai_sim_stage_"))
+                    try:
                         res = dino_module.create_similarity_map(
                             input_image=str(full_input_path),
                             query_coords=(float(reference_x), float(reference_y)),
@@ -2161,20 +2197,50 @@ async def extract_features_with_foundation_model(
                             if sim_data is not None and hasattr(sim_data, "shape"):
                                 dims = tuple(int(d) for d in sim_data.shape)
 
-                        staged_files = sorted(
-                            p for p in stage_root.rglob("*") if p.is_file()
+                        rel_files = sorted(
+                            p.relative_to(stage_root)
+                            for p in stage_root.rglob("*")
+                            if p.is_file()
                         )
-                        published: list[str] = []
-                        if staged_files:
+                        with sim_lock:
+                            if sim_abandoned:
+                                should_cleanup = True
+                            else:
+                                sim_stage_holder[0] = stage_root
+                                should_cleanup = False
+                        if should_cleanup:
+                            shutil.rmtree(stage_root, ignore_errors=True)
+                            return (), None, []
+                        return dims, stage_root, rel_files
+                    except BaseException:
+                        shutil.rmtree(stage_root, ignore_errors=True)
+                        raise
+
+                try:
+                    feature_dims, sim_stage_dir, staged_rel_files = await _run_blocking(
+                        _run_similarity
+                    )
+                except BaseException:
+                    with sim_lock:
+                        sim_abandoned = True
+                        orphan_sim = sim_stage_holder[0]
+                        sim_stage_holder[0] = None
+                    if orphan_sim is not None:
+                        shutil.rmtree(orphan_sim, ignore_errors=True)
+                    raise
+
+                output_files = []
+                if sim_stage_dir is not None:
+                    try:
+                        if staged_rel_files:
                             sim_dir.mkdir(parents=True, exist_ok=True)
-                            for src_f in staged_files:
-                                rel = src_f.relative_to(stage_root)
+                            for rel in staged_rel_files:
+                                src_f = sim_stage_dir / rel
                                 dest_f = validate_output_path(sim_dir / rel, cfg)
                                 _atomic_publish_file(src_f, dest_f)
-                                published.append(str(dest_f))
-                        return dims, published
-
-                feature_dims, output_files = await _run_blocking(_run_similarity)
+                                output_files.append(str(dest_f))
+                    finally:
+                        shutil.rmtree(sim_stage_dir, ignore_errors=True)
             else:
                 import numpy as np
 

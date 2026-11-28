@@ -161,6 +161,7 @@ class TestSegmentationTools:
             seen_clean_paths.append(p)
 
         def _fake_r2v(raster_path, output_path, min_area=0):
+            assert Path(raster_path) == seen_clean_paths[0]
             existed_during_vectorize.append(
                 Path(raster_path).is_file()
                 and seen_raw_paths[0].is_file()
@@ -1397,7 +1398,7 @@ class TestCodeRabbitRegressions:
                 part.write_bytes(b"partial")
                 staged_paths.append(stage_path)
                 staged_written.set()
-                release_worker.wait(timeout=5.0)
+                release_worker.wait()
                 return {"scene": {"B04": str(part)}}
             finally:
                 worker_exited.set()
@@ -1426,17 +1427,18 @@ class TestCodeRabbitRegressions:
             return await real_wait_for(aw, timeout=timeout)
 
         async def _drive_timeout():
-            res = await download_satellite_imagery(
-                min_lon=-122.5,
-                min_lat=37.7,
-                max_lon=-122.4,
-                max_lat=37.8,
-                data_source="sentinel2",
-                max_cloud_cover=0,
-            )
-            release_worker.set()
-            assert await asyncio.to_thread(worker_exited.wait, 5.0)
-            return res
+            try:
+                return await download_satellite_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.4,
+                    max_lat=37.8,
+                    data_source="sentinel2",
+                    max_cloud_cover=0,
+                )
+            finally:
+                release_worker.set()
+                assert await asyncio.to_thread(worker_exited.wait, 5.0)
 
         with (
             patch("geoai_mcp_server.server.config") as mock_config,
@@ -1836,3 +1838,131 @@ class TestCodeRabbitRegressions:
         assert tuple(seen_encoder_coords["temporal"].shape) == (1, 1, 2)
         assert seen_encoder_coords["location"] is not None
         assert tuple(seen_encoder_coords["location"].shape) == (1, 2)
+
+    def test_round4_fixes_shapefile_naip_year_partial_publish_and_internal_names(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """Regression coverage for round-4 shapefile suffix, NAIP year 0000, partial STAC publish, and exact marker match."""
+        from types import SimpleNamespace
+
+        import numpy as np
+
+        from geoai_mcp_server.server import (
+            detect_temporal_changes,
+            download_satellite_imagery,
+        )
+        from geoai_mcp_server.utils.error_handling import InputValidationError
+        from geoai_mcp_server.utils.file_management import (
+            get_safe_file_path,
+            list_input_files,
+            validate_output_path,
+        )
+
+        # 1. ChangeStar shapefile destination without .shp normalizes to .shp and moves companions
+        def _fake_changestar(**kwargs):
+            vec_p = Path(kwargs["output_vector"])
+            vec_p.write_bytes(b"shp")
+            vec_p.with_suffix(".shx").write_bytes(b"shx")
+            vec_p.with_suffix(".dbf").write_bytes(b"dbf")
+            return {"change_map": np.ones((4, 4), dtype=np.uint8)}
+
+        # 2. STAC commit failure after publishing first asset reports published files
+        fake_item = SimpleNamespace(id="scene", assets={"B04": "h1", "B08": "h2"})
+        conflict_dir = temp_output_dir / "scene_B08.tif"
+        conflict_dir.mkdir()
+
+        def _fake_stac_download(items, output_dir):
+            out = Path(output_dir)
+            f1 = out / "scene_B04.tif"
+            f2 = out / "scene_B08.tif"
+            f1.write_bytes(b"b04")
+            f2.write_bytes(b"b08")
+            return {"scene": {"B04": str(f1), "B08": str(f2)}}
+
+        mock_dl = MagicMock()
+        mock_dl.pc_stac_search.return_value = [fake_item]
+        mock_dl.pc_stac_download.side_effect = _fake_stac_download
+
+        modules = {
+            "change_detection": SimpleNamespace(changestar_detect=_fake_changestar),
+            "download": mock_dl,
+        }
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch(
+                "geoai_mcp_server.server._get_geoai_module",
+                side_effect=lambda name: modules[name],
+            ),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            r_chg = asyncio.run(
+                detect_temporal_changes(
+                    image1_path=sample_geotiff.name,
+                    image2_path=sample_geotiff.name,
+                    output_format="shapefile",
+                    output_filename="changes",
+                )
+            )
+            r_naip_zero = asyncio.run(
+                download_satellite_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.4,
+                    max_lat=37.8,
+                    data_source="naip",
+                    date_range="0000",
+                )
+            )
+            r_partial_pub = asyncio.run(
+                download_satellite_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.4,
+                    max_lat=37.8,
+                    data_source="sentinel2",
+                )
+            )
+
+        assert r_chg["success"] is True
+        assert r_chg["output_files"] == [str(temp_output_dir / "changes.shp")]
+        assert (temp_output_dir / "changes.shp").is_file()
+        assert (temp_output_dir / "changes.shx").is_file()
+        assert (temp_output_dir / "changes.dbf").is_file()
+
+        assert r_naip_zero["success"] is False
+        assert "1900" in r_naip_zero["message"]
+        mock_dl.download_naip.assert_not_called()
+
+        assert r_partial_pub["success"] is False
+        assert r_partial_pub["output_files"] == [str(temp_output_dir / "scene_B04.tif")]
+        assert (temp_output_dir / "scene_B04.tif").is_file()
+
+        # 3. Exact marker matching & internal staging dir hiding
+        cfg = SimpleNamespace(
+            input_dir=sample_geotiff.parent, output_dir=temp_output_dir
+        )
+        allowed_name = validate_output_path(".geoai_training_dataset_features.npy", cfg)
+        allowed_name.write_bytes(b"ok")
+        assert (
+            get_safe_file_path(
+                ".geoai_training_dataset_features.npy", source="output", config=cfg
+            )
+            == allowed_name
+        )
+
+        with pytest.raises(InputValidationError):
+            validate_output_path(".geoai_training_dataset", cfg)
+        with pytest.raises(InputValidationError):
+            validate_output_path(".change_stage_abc/out.geojson", cfg)
+
+        stage_dir = temp_output_dir / ".change_stage_tmp"
+        stage_dir.mkdir()
+        (stage_dir / "hidden.geojson").write_text("{}")
+        listed = list_input_files(temp_output_dir, pattern="*")
+        nested_listed = list_input_files(temp_output_dir, pattern="*/*")
+        listed_names = {p.name for p in listed + nested_listed}
+        assert ".geoai_training_dataset_features.npy" in listed_names
+        assert "hidden.geojson" not in listed_names
