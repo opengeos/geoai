@@ -36,9 +36,21 @@ pipe = Pipeline(
 
 result = pipe.run(input_dir="./data/images", output_dir="./data/results")
 print(result.summary)
+
+# Pipelines made of registered steps can be exported to YAML/JSON and reloaded later
+pipe.to_yaml("building_segmentation.yaml")
 ```
 
-For quick ad-hoc transformations, wrap any callable taking and returning an item `dict` with `FunctionStep`:
+Reload an exported configuration with `load_pipeline()`:
+
+```python
+from geoai.pipeline import load_pipeline
+
+pipe = load_pipeline("building_segmentation.yaml", max_workers=4)
+result = pipe.run(input_dir="./data/images", output_dir="./data/results")
+```
+
+For quick ad-hoc Python transformations, wrap any callable taking and returning an item `dict` with `FunctionStep` (note that `FunctionStep` callables cannot round-trip through YAML or JSON configs because `FunctionStep` is not registered for config deserialization):
 
 ```python
 from geoai.pipeline import FunctionStep, Pipeline
@@ -49,17 +61,8 @@ def tag_item(item):
     return item
 
 
-pipe = Pipeline(steps=[FunctionStep("tag", tag_item)])
-result = pipe.run(items=[{"input_path": "scene_01.tif"}])
-```
-
-You can also export a pipeline to YAML or JSON (`pipe.to_yaml("pipeline.yaml")`, `pipe.to_json("pipeline.json")`) and reload it later with `load_pipeline()`:
-
-```python
-from geoai.pipeline import load_pipeline
-
-pipe = load_pipeline("semantic_segmentation.yaml", max_workers=4)
-result = pipe.run(input_dir="./data/images", output_dir="./data/results")
+custom_pipe = Pipeline(steps=[FunctionStep("tag", tag_item)])
+result = custom_pipe.run(items=[{"input_path": "scene_01.tif"}])
 ```
 
 ### YAML and JSON Configuration Files
@@ -154,14 +157,14 @@ Pass `checkpoint_dir` to `Pipeline` (or `-c` / `--checkpoint-dir` on the CLI) to
 - Progress is persisted atomically to `<checkpoint_dir>/<name>_checkpoint.json` every 10 processed items and when the run finishes or aborts.
 - Each item is keyed by `item["input_path"]` by default (customizable via `item_key_fn`).
 - On subsequent runs, items marked `completed` are skipped automatically and recorded in `result.skipped`.
-- A hash of the pipeline name, step types, and step parameters is stored in the checkpoint. If the pipeline configuration changes, existing checkpoint progress is reset automatically so stale outputs are not reused.
+- A hash of the pipeline name, step types, and public step attributes is stored in the checkpoint. If a registered step's public configuration changes, existing checkpoint progress is reset automatically so stale outputs are not reused. Note that private attributes (such as a `FunctionStep`'s underlying `_fn` callable) are not included in `_config_hash()`, so clear the checkpoint file or choose a new checkpoint directory/pipeline name whenever you modify callable behavior.
 
 ## Error Handling and Execution
 
 `Pipeline` executes items using a thread pool (`executor_type="thread"`, controlled by `max_workers`) so GPU models loaded in `setup()` can be shared safely without cross-process pickling. Two error policies are supported via `on_error` (or `--on-error`):
 
 - **`"skip"` (`ErrorPolicy.SKIP`, default)**: Logs the error, records `(item, error_message)` in `result.failed`, marks the item as failed in the checkpoint, and continues processing the remaining items.
-- **`"fail"` (`ErrorPolicy.FAIL`)**: Saves the checkpoint immediately and raises a `RuntimeError` on the first failed item.
+- **`"fail"` (`ErrorPolicy.FAIL`)**: Saves the checkpoint and raises a `RuntimeError` on the first failed item. When running with multiple workers (`max_workers > 1`), pending tasks are cancelled while already-running worker threads finish (and may still write outputs) before the exception propagates.
 
 ## Example Pipeline Configurations
 

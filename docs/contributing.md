@@ -163,6 +163,8 @@ The documentation site is built with [Zensical](https://zensical.org) (`zensical
     zensical build
     ```
 
+    If you edit any `.ipynb` notebook while `zensical serve` is running, re-run `python scripts/convert_notebooks.py` so the updated Markdown is regenerated (Zensical does not automatically invoke the notebook converter on rebuild).
+
 ## Pull Request Guidelines
 
 Before you submit a pull request, check that it meets these guidelines:

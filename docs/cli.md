@@ -88,7 +88,7 @@ geoai pipeline run CONFIG_PATH [OPTIONS]
 | `-o`, `--output-dir TEXT` | Output directory (overrides config). |
 | `-w`, `--max-workers INTEGER` | Number of parallel worker threads. |
 | `-c`, `--checkpoint-dir TEXT` | Checkpoint directory for resume support. |
-| `--on-error [skip\|fail]` | Error handling policy (`skip` continues on failed items; `fail` stops immediately). |
+| `--on-error [skip\|fail]` | Error handling policy (`skip` continues on failed items; `fail` aborts on the first failure, cancelling pending tasks while already-running worker threads finish and may still write outputs). |
 | `-q`, `--quiet` | Suppress progress bars. |
 | `--json` | Output run summary (including `checkpoint_path` and `failed_items`) as JSON. |
 

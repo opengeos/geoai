@@ -9,9 +9,9 @@ If you find GeoAI useful in your research, please consider citing the following 
 ```bibtex
 @article{Wu2026geoai,
   author    = {Wu, Qiusheng},
-  title     = {GeoAI: A Python package for integrating artificial intelligence with geospatial data analysis and visualization},
+  title     = {{GeoAI}: A {Python} package for integrating artificial intelligence with geospatial data analysis and visualization},
   journal   = {Journal of Open Source Software},
-  publisher = {Open Journals},
+  publisher = {The Open Journal},
   year      = {2026},
   month     = feb,
   volume    = {11},
@@ -30,7 +30,7 @@ If you find GeoAI useful in your research, please consider citing the following 
 ```bibtex
 @book{Wu2026geoai_book,
   author    = {Wu, Qiusheng},
-  title     = {GeoAI with Python: A Practical Guide to Open-Source Geospatial AI},
+  title     = {{GeoAI} with {Python}: A Practical Guide to Open-Source Geospatial {AI}},
   year      = {2026},
   publisher = {Independently published},
   isbn      = {979-8993859729},

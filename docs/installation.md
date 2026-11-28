@@ -25,7 +25,7 @@ To install GeoAI with optional dependencies for additional features:
 pip install "geoai-py[extra]"
 ```
 
-You can also install one or more task-specific extras (for example, `pip install "geoai-py[agents,onnx]"`). See [Optional Dependencies](#optional-dependencies-extras) below for the full list.
+You can also install one or more task-specific extras (for example, `pip install "geoai-py[agents,onnx]"`). See [Optional Dependencies](#optional-dependencies) below for the full list.
 
 ### 🐍 Using uv
 
@@ -60,6 +60,7 @@ conda install -c conda-forge mamba
 mamba install -c conda-forge geoai
 ```
 
+<a id="optional-dependencies"></a>
 ## 📦 Optional Dependencies (Extras)
 
 GeoAI defines 10 optional dependency groups in `pyproject.toml` so you only install heavy or specialized packages when you need them:

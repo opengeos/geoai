@@ -38,7 +38,7 @@ Add the server to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "geoai": {
-      "command": "python",
+      "command": "/path/to/geoai/geoai-mcp-server/.venv/bin/python",
       "args": ["-m", "geoai_mcp_server.server"],
       "cwd": "/path/to/geoai/geoai-mcp-server",
       "env": {
@@ -51,7 +51,7 @@ Add the server to your Claude Desktop configuration file:
 }
 ```
 
-Restart Claude Desktop after saving the configuration to load the GeoAI tools.
+Use the absolute path to the virtual environment's Python interpreter (on Windows, `C:\\path\\to\\geoai\\geoai-mcp-server\\.venv\\Scripts\\python.exe`), because Claude Desktop launches MCP servers outside your activated shell environment. Restart Claude Desktop after saving the configuration to load the GeoAI tools.
 
 ### Available MCP Tools
 
@@ -129,19 +129,31 @@ cli-anything-geoai data download naip --bbox "-84.0,35.9,-83.9,36.0" -o naip.tif
 
 ### Structured JSON Output and Project State
 
-Pass `--json` before any subcommand for machine-readable output suited to AI agents, and use `--project` to track files, results, and undo/redo history across commands:
+Pass `--json` before any subcommand for machine-readable output suited to AI agents:
 
 ```bash
-# Create a workspace project and register files
-cli-anything-geoai project new -n "my_analysis" -o project.json
-cli-anything-geoai --project project.json project add-file image.tif
-cli-anything-geoai --project project.json project save
-
 # Chain structured JSON commands
 cli-anything-geoai --json raster info satellite.tif
 cli-anything-geoai --json segment grounded-sam satellite.tif -o buildings_mask.tif -p "buildings"
 cli-anything-geoai --json raster vectorize buildings_mask.tif -o buildings.geojson
 cli-anything-geoai --json vector info buildings.geojson
+```
+
+To track files, results, and undo/redo history in a workspace project, run project mutations and `project save` within the same interactive REPL session (project modifications and undo/redo history are session-local until saved):
+
+```bash
+# Create a project file, then open an interactive REPL session bound to it
+cli-anything-geoai project new -n "my_analysis" -o project.json
+cli-anything-geoai --project project.json
+```
+
+Inside the REPL session:
+
+```text
+project add-file image.tif
+project list-files
+project save
+session history
 ```
 
 ### Command Groups

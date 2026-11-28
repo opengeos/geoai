@@ -10,7 +10,7 @@ A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](
 
 - Install the QGIS plugin from the QGIS Plugin Manager. Alternatively, you can download the plugin from [here](https://qgis.gishub.org/plugins/geoai.zip) and install it manually.
 - Enable the GeoAI plugin in QGIS.
-- Open any GeoAI toolbar panel; the built-in installer will guide you through one-click dependency setup.
+- Open an AI tool panel (such as **Semantic Segmentation**, **Segment Anything**, or **Moondream**); the built-in installer will guide you through one-click dependency setup.
 - Try the sample datasets below.
 
 ## Video Tutorials
@@ -361,7 +361,7 @@ cd geoai/qgis_plugin
 python install.py
 ```
 
-This copies the plugin into the `default` profile of every installed QGIS major version (QGIS 3 and QGIS 4; use `--profile NAME` for another profile). Re-run after pulling updates. Remove with:
+This copies the plugin into the `default` profile of every QGIS major version whose settings directory exists (`QGIS4` and `QGIS3`; use `--profile NAME` for another profile). If QGIS 4 has not been launched yet so its settings directory does not exist, launch QGIS 4 once first or pass `--plugin-dir /path/to/plugins` explicitly (if neither settings directory exists, the script falls back to the QGIS 3 path). Re-run after pulling updates. Remove with:
 
 ```bash
 python install.py --remove
