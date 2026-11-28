@@ -122,6 +122,32 @@ class DINOv3GeoProcessor:
             )
             raise
 
+    def _load_state_dict_safe(self, weights_path: str) -> dict:
+        """Load a state dict with ``weights_only=True`` and a clear error on failure."""
+        import pickle
+
+        try:
+            state = torch.load(
+                weights_path, map_location=self.device, weights_only=True
+            )
+        except (pickle.UnpicklingError, RuntimeError) as exc:
+            raise RuntimeError(
+                f"Failed to load checkpoint '{weights_path}' with weights_only=True. "
+                "GeoAI enforces weights_only=True by default for security. If this "
+                "is a trusted legacy checkpoint containing pickled Python objects, "
+                "re-save it as a plain state_dict (torch.save(model.state_dict(), "
+                "path)) or register trusted globals with "
+                "torch.serialization.add_safe_globals()."
+            ) from exc
+        if isinstance(state, dict):
+            if "state_dict" in state and isinstance(state["state_dict"], dict):
+                return state["state_dict"]
+            if "model_state_dict" in state and isinstance(
+                state["model_state_dict"], dict
+            ):
+                return state["model_state_dict"]
+        return state
+
     def _load_model(self, weights_path: Optional[str] = None) -> torch.nn.Module:
         """Load DINOv3 model."""
         try:
@@ -133,7 +159,7 @@ class DINOv3GeoProcessor:
                     source=self.dinov3_source,
                 )
                 # Load state dict manually
-                state_dict = torch.load(weights_path, map_location=self.device)
+                state_dict = self._load_state_dict_safe(weights_path)
                 model.load_state_dict(state_dict, strict=False)
             else:
                 # Download weights and load manually
@@ -148,7 +174,7 @@ class DINOv3GeoProcessor:
                     skip_validation=True,  # optional: speeds things up
                 )
                 # Load state dict manually
-                state_dict = torch.load(weights_path, map_location=self.device)
+                state_dict = self._load_state_dict_safe(weights_path)
                 model.load_state_dict(state_dict, strict=False)
 
             model = model.to(self.device)

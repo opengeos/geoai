@@ -875,6 +875,9 @@ class PrithviProcessor:
         Returns:
             Tuple of (images, metadata, temporal_coords, location_coords)
         """
+        if not file_paths:
+            raise ValueError("file_paths must be a non-empty list of file paths.")
+
         # Check if we need to pad to num_frames
         if len(file_paths) < self.num_frames:
             # Pad file_paths by repeating the last file
@@ -925,7 +928,8 @@ class PrithviProcessor:
         Returns:
             Tuple of (reconstructed_image, mask_image)
         """
-        mask_ratio = mask_ratio or self.mask_ratio
+        if mask_ratio is None:
+            mask_ratio = self.mask_ratio
 
         # Check if input dimensions match model expectations
         B, C, T, H, W = input_data.shape
@@ -1025,7 +1029,7 @@ class PrithviProcessor:
         mask_imgs = torch.cat(mask_imgs, dim=0)
 
         # Rearrange patches back to image
-        num_frames = len(file_paths)
+        num_frames = self.num_frames
         rec_imgs = rearrange(
             rec_imgs,
             "(b h1 w1) c t h w -> b c t (h1 h) (w1 w)",
@@ -1148,11 +1152,14 @@ class PrithviProcessor:
 
         # Handle padding
         original_h, original_w = input_data.shape[-2:]
-        pad_h = self.img_size - (original_h % self.img_size)
-        pad_w = self.img_size - (original_w % self.img_size)
-        input_data = np.pad(
-            input_data, ((0, 0), (0, 0), (0, 0), (0, pad_h), (0, pad_w)), mode="reflect"
-        )
+        pad_h = (self.img_size - (original_h % self.img_size)) % self.img_size
+        pad_w = (self.img_size - (original_w % self.img_size)) % self.img_size
+        if pad_h > 0 or pad_w > 0:
+            input_data = np.pad(
+                input_data,
+                ((0, 0), (0, 0), (0, 0), (0, pad_h), (0, pad_w)),
+                mode="reflect",
+            )
 
         # Convert to tensor
         batch = torch.tensor(input_data, device="cpu")
@@ -1187,7 +1194,7 @@ class PrithviProcessor:
         mask_imgs = torch.cat(mask_imgs, dim=0)
 
         # Rearrange patches back to image
-        num_frames = len(file_paths)
+        num_frames = self.num_frames
         rec_imgs = rearrange(
             rec_imgs,
             "(b h1 w1) c t h w -> b c t (h1 h) (w1 w)",
@@ -1243,7 +1250,12 @@ class PrithviProcessor:
 
             # Update metadata
             meta = metas[t].copy()
-            meta.update(compress="lzw", nodata=0)
+            meta.update(
+                dtype=str(rec_img_t.numpy().dtype),
+                count=rec_img_t.shape[0],
+                compress="lzw",
+                nodata=0,
+            )
 
             # Save files
             self._save_geotiff(

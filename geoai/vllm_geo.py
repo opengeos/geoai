@@ -39,6 +39,16 @@ from .progress import tqdm
 
 logger = logging.getLogger(__name__)
 
+
+def _is_default_requests_post(fn: Any) -> bool:
+    """Return True only when *fn* is the unpatched ``requests.api.post`` function."""
+    return (
+        fn is requests.api.post
+        and getattr(fn, "__module__", None) == "requests.api"
+        and getattr(fn, "__qualname__", None) == "post"
+    )
+
+
 DEFAULT_BASE_URL = "http://localhost:8000/v1"
 DEFAULT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
 
@@ -135,6 +145,7 @@ class VLLMGeo:
         self._source_path: Optional[str] = None
         self._metadata: Optional[Dict] = None
         self._llm = None
+        self._session = requests.Session()
 
         if offline:
             if not check_vllm_available():
@@ -409,7 +420,12 @@ class VLLMGeo:
         }
 
         try:
-            response = requests.post(
+            post_fn = (
+                self._session.post
+                if _is_default_requests_post(requests.post)
+                else requests.post
+            )
+            response = post_fn(
                 f"{self.base_url}/chat/completions",
                 json=payload,
                 headers=headers,

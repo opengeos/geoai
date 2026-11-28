@@ -9,6 +9,7 @@ import json
 import math
 import os
 import sys
+import tempfile
 import traceback
 from typing import Any
 
@@ -166,10 +167,21 @@ def _prepare_image_for_deepforest(image_path: str) -> tuple[str, str | None]:
             if src.count >= 4:
                 profile = src.profile.copy()
                 profile.update(count=3)
-                temp_rgb_path = image_path + ".deepforest_rgb.tif"
-                with rasterio.open(temp_rgb_path, "w", **profile) as dst:
-                    for band in range(1, 4):
-                        dst.write(src.read(band), band)
+                with tempfile.NamedTemporaryFile(
+                    suffix=".tif", prefix="deepforest_rgb_", delete=False
+                ) as tmp:
+                    temp_rgb_path = tmp.name
+                try:
+                    with rasterio.open(temp_rgb_path, "w", **profile) as dst:
+                        for band in range(1, 4):
+                            dst.write(src.read(band), band)
+                except Exception:
+                    if temp_rgb_path and os.path.exists(temp_rgb_path):
+                        try:
+                            os.remove(temp_rgb_path)
+                        except OSError:
+                            pass
+                    raise
                 return temp_rgb_path, temp_rgb_path
     except Exception:
         pass

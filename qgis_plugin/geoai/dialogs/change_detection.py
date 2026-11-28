@@ -6,7 +6,9 @@ co-registered images using the AnyChange model (torchange + SAM) via
 geoai.change_detection.ChangeDetection.
 """
 
+import inspect
 import os
+import threading
 import traceback
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -42,6 +44,42 @@ from qgis.core import (
 ANYCHANGE_TARGET_SIZE = 1024
 
 
+_LIVE_THREADS = set()
+
+
+def _connect_native_finished(thread: QThread, slot) -> bool:
+    """Connect ``slot`` to the native ``QThread.finished`` signal even if shadowed."""
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(slot)
+        return True
+    connected = False
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(slot)
+            connected = True
+    return connected
+
+
+def _keep_thread_alive(thread: QThread) -> None:
+    """Keep a still-running worker thread referenced until it exits."""
+    for sig_name in ("finished", "error", "progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
+    def _drop(*_args):
+        _LIVE_THREADS.discard(thread)
+
+    _LIVE_THREADS.add(thread)
+    _connect_native_finished(thread, _drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
+
+
 class ChangeDetectionWorker(QThread):
     """Worker thread for running AnyChange change detection."""
 
@@ -57,21 +95,29 @@ class ChangeDetectionWorker(QThread):
         """
         super().__init__()
         self.params = params
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of the background task."""
+        self._cancel_event.set()
 
     def run(self):
         """Run change detection in background thread."""
         try:
             from ..core.geoai_task_subprocess import run_geoai_task
 
-            result = run_geoai_task(
-                "detect_changes",
-                self.params,
-                progress_callback=self.progress.emit,
-            )
-            self.finished.emit(result["output_raster"], result.get("output_vector", ""))
+            kwargs = {"progress_callback": self.progress.emit}
+            if "cancel_event" in inspect.signature(run_geoai_task).parameters:
+                kwargs["cancel_event"] = self._cancel_event
+            result = run_geoai_task("detect_changes", self.params, **kwargs)
+            if not self._cancel_event.is_set():
+                self.finished.emit(
+                    result["output_raster"], result.get("output_vector", "")
+                )
 
         except Exception as e:
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class ChangeDetectionDockWidget(QDockWidget):
@@ -476,6 +522,36 @@ class ChangeDetectionDockWidget(QDockWidget):
             "min_area": self.min_area_spin.value(),
         }
 
+        retained = getattr(self, "_retained_workers", None)
+        if retained:
+            requested_outputs = {
+                os.path.normcase(os.path.abspath(p))
+                for p in (output_raster, output_vector)
+                if p
+            }
+            for old_worker in list(retained):
+                if not old_worker.isRunning():
+                    retained.discard(old_worker)
+                    continue
+                old_params = getattr(old_worker, "params", None) or {}
+                old_outputs = {
+                    os.path.normcase(os.path.abspath(p))
+                    for p in (
+                        old_params.get("output_raster"),
+                        old_params.get("output_vector"),
+                    )
+                    if p
+                }
+                if requested_outputs & old_outputs:
+                    QMessageBox.warning(
+                        self,
+                        "Change Detection Busy",
+                        "A cancelled change detection task is still finishing "
+                        "writes to the same output path. Please wait a moment "
+                        "or choose a different output path.",
+                    )
+                    return
+
         self.run_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)  # Indeterminate
@@ -483,11 +559,24 @@ class ChangeDetectionDockWidget(QDockWidget):
         self.status_label.setStyleSheet("color: orange;")
         self.results_text.clear()
 
-        self.worker = ChangeDetectionWorker(params)
-        self.worker.finished.connect(self._on_detection_finished)
-        self.worker.error.connect(self._on_detection_error)
-        self.worker.progress.connect(self._on_detection_progress)
-        self.worker.start()
+        worker = ChangeDetectionWorker(params)
+        self.worker = worker
+        worker.finished.connect(
+            lambda r, v, w=worker: (
+                self._on_detection_finished(r, v) if self.worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda msg, w=worker: (
+                self._on_detection_error(msg) if self.worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: (
+                self._on_detection_progress(msg) if self.worker is w else None
+            )
+        )
+        worker.start()
 
     def _on_detection_finished(self, raster_path, vector_path):
         """Handle successful change detection.
@@ -609,9 +698,41 @@ class ChangeDetectionDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
-        if self.worker is not None and self.worker.isRunning():
-            self.worker.terminate()
-            self.worker.wait()
+        worker = self.worker
+        self.worker = None
+        if worker is not None:
+            for sig_name in ("finished", "error", "progress"):
+                sig = getattr(worker, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
+            if worker.isRunning():
+                worker.cancel()
+                if not worker.wait(5000):
+                    _keep_thread_alive(worker)
+                    retained = getattr(self, "_retained_workers", None)
+                    if retained is None:
+                        retained = set()
+                        self._retained_workers = retained
+                    retained.add(worker)
+
+                    def _drop_retained(*_args, w=worker, s=retained):
+                        s.discard(w)
+
+                    _connect_native_finished(worker, _drop_retained)
+                    if not worker.isRunning():
+                        retained.discard(worker)
+
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.setVisible(False)
+            self.progress_bar.setRange(0, 100)
+        if hasattr(self, "run_btn"):
+            self.run_btn.setEnabled(True)
+        if hasattr(self, "status_label"):
+            self.status_label.setText("Ready")
+            self.status_label.setStyleSheet("color: gray;")
 
     def closeEvent(self, event):
         """Handle dock widget close event.

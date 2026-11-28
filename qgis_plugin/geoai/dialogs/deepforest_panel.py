@@ -8,6 +8,7 @@ using the DeepForest library with pretrained models for various detection tasks.
 import os
 import json
 import tempfile
+import threading
 
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtWidgets import (
@@ -302,6 +303,89 @@ def _large_image_recommendation(dimensions, mode: str):
     )
 
 
+_LIVE_THREADS = set()
+
+
+def _keep_thread_alive(thread: QThread) -> None:
+    """Detach a still-running QThread and hold a reference until it exits."""
+    for sig_name in ("finished", "error", "progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
+    def _drop(*_args):
+        _LIVE_THREADS.discard(thread)
+
+    _LIVE_THREADS.add(thread)
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(_drop)
+    else:
+        for sig_name in ("finished", "error"):
+            sig = getattr(thread, sig_name, None)
+            if sig is not None:
+                sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
+
+
+def _retire_client_in_background(client, wait_worker=None) -> None:
+    """Close a superseded or busy client off the Qt GUI thread."""
+
+    def _close():
+        if wait_worker is not None:
+            try:
+                wait_worker.wait()
+            except Exception:
+                pass
+        try:
+            client.close()
+        except Exception:
+            pass
+
+    threading.Thread(target=_close, daemon=True).start()
+
+
+def _active_project_layer_paths() -> set:
+    """Return normalized real file paths backing layers in the active project."""
+    paths = set()
+    try:
+        layers = QgsProject.instance().mapLayers().values()
+    except Exception:
+        return paths
+    for layer in layers:
+        try:
+            source = layer.source()
+        except Exception:
+            continue
+        if not isinstance(source, str) or not source:
+            continue
+        file_path = source.split("|", 1)[0]
+        if file_path:
+            paths.add(os.path.normcase(os.path.realpath(file_path)))
+    return paths
+
+
+def _get_image_dimensions(image_path: str):
+    """Read (width, height, bands) via rasterio with a PIL fallback."""
+    try:
+        import rasterio
+
+        with rasterio.open(image_path) as src:
+            return int(src.width), int(src.height), int(src.count)
+    except Exception:
+        pass
+
+    from PIL import Image
+
+    with Image.open(image_path) as img:
+        width, height = img.size
+        depth = len(img.getbands())
+        return int(width), int(height), int(depth)
+
+
 class DeepForestModelLoadWorker(QThread):
     """Worker thread for loading DeepForest model."""
 
@@ -333,10 +417,30 @@ class DeepForestModelLoadWorker(QThread):
         if use_subprocess is None:
             use_subprocess = _use_deepforest_subprocess()
         self.use_subprocess = use_subprocess
+        self._client = None
+        self._abort_lock = threading.Lock()
+        self._aborted = False
+
+    def abort(self):
+        """Record cancellation and abort any active subprocess load without locking."""
+        with self._abort_lock:
+            self._aborted = True
+            client = self._client
+        if client is not None and hasattr(client, "abort"):
+            try:
+                client.abort()
+            except Exception:
+                pass
+
+    def _is_aborted(self) -> bool:
+        with self._abort_lock:
+            return self._aborted
 
     def run(self):
         """Load the DeepForest model in background."""
         try:
+            if self._is_aborted():
+                return
             if self.use_subprocess:
                 self.progress.emit("Starting DeepForest subprocess worker...")
                 from ..core.deepforest_subprocess import DeepForestSubprocessClient
@@ -346,7 +450,17 @@ class DeepForestModelLoadWorker(QThread):
                     revision=self.revision,
                     device=self.device,
                 )
+                with self._abort_lock:
+                    if self._aborted:
+                        return
+                    self._client = model
                 model.initialize()
+                if self._is_aborted():
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
+                    return
                 self.finished.emit(model, getattr(model, "model_name", self.model_name))
                 return
 
@@ -394,9 +508,24 @@ class DeepForestModelLoadWorker(QThread):
                     except Exception:
                         pass  # CPU is default
 
+            if self._is_aborted():
+                if hasattr(model, "close") and callable(getattr(model, "close")):
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
+                return
             self.finished.emit(model, self.model_name)
 
         except Exception as e:
+            if self._is_aborted():
+                client = self._client
+                if client is not None and hasattr(client, "close"):
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+                return
             self.error.emit(str(e))
 
 
@@ -518,58 +647,65 @@ class DeepForestPredictWorker(QThread):
             image_path = self.image_path
             temp_rgb_path = None
             try:
-                import rasterio
+                try:
+                    import rasterio
 
-                with rasterio.open(image_path) as src:
-                    if src.count >= 4:
+                    with rasterio.open(image_path) as src:
+                        if src.count >= 4:
+                            self.progress.emit(
+                                "Stripping alpha channel (converting to 3-band RGB)..."
+                            )
+                            profile = src.profile.copy()
+                            profile.update(count=3)
+                            with tempfile.NamedTemporaryFile(
+                                suffix=".tif", prefix="deepforest_rgb_", delete=False
+                            ) as tmp:
+                                temp_rgb_path = tmp.name
+                            with rasterio.open(temp_rgb_path, "w", **profile) as dst:
+                                for band in range(1, 4):
+                                    dst.write(src.read(band), band)
+                            image_path = temp_rgb_path
+                except Exception:
+                    if temp_rgb_path and os.path.exists(temp_rgb_path):
+                        try:
+                            os.remove(temp_rgb_path)
+                        except OSError:
+                            pass
+                        temp_rgb_path = None
+                    # If rasterio check fails, try with original image
+
+                if self.mode == "Single Image":
+                    self.progress.emit("Running prediction on single image...")
+                    result = self._predict_image_on_cpu(image_path)
+                    pred_mode = "single"
+                else:
+                    # Estimate number of patches for progress info
+                    try:
+                        w, h, _ = _get_image_dimensions(image_path)
+                        stride = int(self.patch_size * (1 - self.patch_overlap))
+                        n_cols = max(1, (w - self.patch_size) // stride + 1)
+                        n_rows = max(1, (h - self.patch_size) // stride + 1)
+                        n_patches = n_cols * n_rows
                         self.progress.emit(
-                            "Stripping alpha channel (converting to 3-band RGB)..."
+                            f"Processing ~{n_patches} patches "
+                            f"({w}x{h} image, patch={self.patch_size}, "
+                            f"batch={self.batch_size})..."
                         )
-                        profile = src.profile.copy()
-                        profile.update(count=3)
-                        temp_rgb_path = image_path + ".deepforest_rgb.tif"
-                        with rasterio.open(temp_rgb_path, "w", **profile) as dst:
-                            for band in range(1, 4):
-                                dst.write(src.read(band), band)
-                        image_path = temp_rgb_path
-            except Exception:
-                pass  # If rasterio check fails, try with original image
+                    except Exception:
+                        self.progress.emit(
+                            f"Running prediction on large tile "
+                            f"(patch_size={self.patch_size})..."
+                        )
 
-            if self.mode == "Single Image":
-                self.progress.emit("Running prediction on single image...")
-                result = self._predict_image_on_cpu(image_path)
-                pred_mode = "single"
-            else:
-                # Estimate number of patches for progress info
-                try:
-                    from PIL import Image as PILImage
-
-                    with PILImage.open(image_path) as img:
-                        w, h = img.size
-                    stride = int(self.patch_size * (1 - self.patch_overlap))
-                    n_cols = max(1, (w - self.patch_size) // stride + 1)
-                    n_rows = max(1, (h - self.patch_size) // stride + 1)
-                    n_patches = n_cols * n_rows
-                    self.progress.emit(
-                        f"Processing ~{n_patches} patches "
-                        f"({w}x{h} image, patch={self.patch_size}, "
-                        f"batch={self.batch_size})..."
-                    )
-                except Exception:
-                    self.progress.emit(
-                        f"Running prediction on large tile "
-                        f"(patch_size={self.patch_size})..."
-                    )
-
-                result = self._predict_tile_with_oom_retry(image_path)
-                pred_mode = "tile"
-
-            # Clean up temporary RGB file
-            if temp_rgb_path and os.path.exists(temp_rgb_path):
-                try:
-                    os.remove(temp_rgb_path)
-                except Exception:
-                    pass  # Best-effort cleanup
+                    result = self._predict_tile_with_oom_retry(image_path)
+                    pred_mode = "tile"
+            finally:
+                # Always clean up temporary RGB file even on error
+                if temp_rgb_path and os.path.exists(temp_rgb_path):
+                    try:
+                        os.remove(temp_rgb_path)
+                    except Exception:
+                        pass  # Best-effort cleanup
 
             # Apply score threshold filter
             if (
@@ -1428,14 +1564,50 @@ class DeepForestDockWidget(QDockWidget):
                 # CUDA is now available but there was a warning
                 QMessageBox.information(self, "CUDA Issue Fixed", warning_message)
 
+        # Abort any previous in-flight model load before starting a new one
+        prev_loader = getattr(self, "model_load_worker", None)
+        if prev_loader is not None:
+            self.model_load_worker = None
+            if hasattr(prev_loader, "abort"):
+                try:
+                    prev_loader.abort()
+                except Exception:
+                    pass
+            try:
+                if prev_loader.isRunning():
+                    _keep_thread_alive(prev_loader)
+            except RuntimeError:
+                pass
+
         # Create and start the model loading worker thread
-        self.model_load_worker = DeepForestModelLoadWorker(
+        worker = DeepForestModelLoadWorker(
             model_name, revision, device, use_subprocess=use_subprocess
         )
-        self.model_load_worker.finished.connect(self.on_model_loaded)
-        self.model_load_worker.error.connect(self.on_model_load_error)
-        self.model_load_worker.progress.connect(self.on_model_load_progress)
-        self.model_load_worker.start()
+        self.model_load_worker = worker
+
+        def _on_loaded(model, loaded_name, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                if hasattr(model, "close") and callable(getattr(model, "close")):
+                    _retire_client_in_background(model)
+                return
+            self.model_load_worker = None
+            self.on_model_loaded(model, loaded_name)
+
+        def _on_error(err, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.model_load_worker = None
+            self.on_model_load_error(err)
+
+        def _on_progress(msg, w=worker):
+            if getattr(self, "model_load_worker", None) is not w:
+                return
+            self.on_model_load_progress(msg)
+
+        worker.finished.connect(_on_loaded)
+        worker.error.connect(_on_error)
+        worker.progress.connect(_on_progress)
+        worker.start()
 
     def on_model_load_progress(self, message: str):
         """Handle model loading progress updates."""
@@ -1443,6 +1615,21 @@ class DeepForestDockWidget(QDockWidget):
 
     def on_model_loaded(self, model, model_name: str):
         """Handle successful model loading."""
+        old_model = self.deepforest
+        if (
+            old_model is not None
+            and old_model is not model
+            and hasattr(old_model, "close")
+            and callable(getattr(old_model, "close"))
+        ):
+            predict_worker = getattr(self, "predict_worker", None)
+            if predict_worker is not None and predict_worker.isRunning():
+                _retire_client_in_background(old_model, wait_worker=predict_worker)
+            else:
+                try:
+                    old_model.close()
+                except Exception:
+                    pass
         self.deepforest = model
         self.model_status.setText(f"Model: {model_name} loaded")
         self.model_status.setStyleSheet("color: green;")
@@ -2013,17 +2200,18 @@ class DeepForestDockWidget(QDockWidget):
             # Use sequential value (1-based, 0 is background)
             shapes.append((geom, i + 1))
 
-        # Rasterize
+        # Rasterize using uint32 when detection count exceeds uint16 capacity
+        out_dtype = rasterio.uint32 if len(preds) >= 65535 else rasterio.uint16
         raster = rasterize(
             shapes,
             out_shape=(height, width),
             transform=transform,
             fill=0,
-            dtype=rasterio.uint16,
+            dtype=out_dtype,
         )
 
         # Update profile for single band output
-        profile.update({"count": 1, "dtype": rasterio.uint16, "compress": "lzw"})
+        profile.update({"count": 1, "dtype": out_dtype, "compress": "lzw"})
 
         # Write raster
         with rasterio.open(output_path, "w", **profile) as dst:
@@ -2073,7 +2261,6 @@ class DeepForestDockWidget(QDockWidget):
     def _export_pascal_voc(self, export_dir):
         """Export to PASCAL VOC XML format."""
         import shutil
-        from PIL import Image
         import xml.etree.ElementTree as ET
 
         # Copy image to export directory
@@ -2086,10 +2273,10 @@ class DeepForestDockWidget(QDockWidget):
         dest_image = os.path.join(images_dir, image_name)
         shutil.copy2(self.current_image_path, dest_image)
 
-        # Get image dimensions
-        with Image.open(self.current_image_path) as img:
-            img_width, img_height = img.size
-            img_depth = len(img.getbands())
+        # Get image dimensions via rasterio with PIL fallback
+        img_width, img_height, img_depth = _get_image_dimensions(
+            self.current_image_path
+        )
 
         # Build XML annotation
         annotation = ET.Element("annotation")
@@ -2134,16 +2321,14 @@ class DeepForestDockWidget(QDockWidget):
     def _export_coco(self, export_dir):
         """Export to COCO format."""
         import shutil
-        from PIL import Image
 
         # Copy image to export directory
         image_name = os.path.basename(self.current_image_path)
         image_dest = os.path.join(export_dir, image_name)
         shutil.copy2(self.current_image_path, image_dest)
 
-        # Get image dimensions
-        with Image.open(self.current_image_path) as img:
-            img_width, img_height = img.size
+        # Get image dimensions via rasterio with PIL fallback
+        img_width, img_height, _ = _get_image_dimensions(self.current_image_path)
 
         # Create COCO annotation structure
         coco_data = {
@@ -2209,16 +2394,14 @@ class DeepForestDockWidget(QDockWidget):
     def _export_yolo(self, export_dir):
         """Export to YOLO format."""
         import shutil
-        from PIL import Image
 
         # Copy image to export directory
         image_name = os.path.basename(self.current_image_path)
         image_dest = os.path.join(export_dir, image_name)
         shutil.copy2(self.current_image_path, image_dest)
 
-        # Get image dimensions
-        with Image.open(self.current_image_path) as img:
-            img_width, img_height = img.size
+        # Get image dimensions via rasterio with PIL fallback
+        img_width, img_height, _ = _get_image_dimensions(self.current_image_path)
 
         # Get unique labels
         if "label" in self.predictions.columns:
@@ -2308,18 +2491,62 @@ class DeepForestDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
-        # Stop workers if running
-        if self.model_load_worker is not None and self.model_load_worker.isRunning():
-            self.model_load_worker.terminate()
-            self.model_load_worker.wait()
+        # Detach active worker references before aborting so queued callbacks
+        # from an intentional cancel are ignored and never surface as errors.
+        load_worker = getattr(self, "model_load_worker", None)
+        predict_worker = getattr(self, "predict_worker", None)
+        self.model_load_worker = None
+        self.predict_worker = None
 
-        if self.predict_worker is not None and self.predict_worker.isRunning():
-            self.predict_worker.terminate()
-            self.predict_worker.wait()
+        # Abort subprocesses first (lock-free) so blocked worker threads unblock
+        # and release _lock before wait() / close().
+        if self.deepforest is not None and hasattr(self.deepforest, "abort"):
+            try:
+                self.deepforest.abort()
+            except Exception:
+                pass
+        if load_worker is not None and hasattr(load_worker, "abort"):
+            try:
+                load_worker.abort()
+            except Exception:
+                pass
 
-        # Clean up temporary files
+        retained_predict_worker = None
+        for attr_name, worker in (
+            ("model_load_worker", load_worker),
+            ("predict_worker", predict_worker),
+        ):
+            if worker is None:
+                continue
+            for sig_name in ("finished", "error", "progress"):
+                sig = getattr(worker, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
+            try:
+                if worker.isRunning() and not worker.wait(5000):
+                    _keep_thread_alive(worker)
+                    if attr_name == "predict_worker":
+                        retained_predict_worker = worker
+            except RuntimeError:
+                pass
+
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.setVisible(False)
+        if hasattr(self, "load_model_btn"):
+            self.load_model_btn.setEnabled(True)
+
+        # Clean up temporary files not actively referenced by open project layers
+        active_paths = _active_project_layer_paths()
+        remaining_temp_files = []
         for temp_file in self._temp_files:
             try:
+                norm_temp = os.path.normcase(os.path.realpath(temp_file))
+                if norm_temp in active_paths:
+                    remaining_temp_files.append(temp_file)
+                    continue
                 if os.path.exists(temp_file):
                     os.remove(temp_file)
                     self.log_message(f"Cleaned up temporary file: {temp_file}")
@@ -2327,19 +2554,22 @@ class DeepForestDockWidget(QDockWidget):
                 self.log_message(
                     f"Failed to clean up temp file {temp_file}: {e}", level=Qgis.Warning
                 )
-        self._temp_files.clear()
+        self._temp_files = remaining_temp_files
 
-        # Clean up model
-        if self.deepforest is not None:
-            try:
-                if hasattr(self.deepforest, "close") and callable(
-                    getattr(self.deepforest, "close")
-                ):
-                    self.deepforest.close()
-            except Exception:
-                pass
-            del self.deepforest
-            self.deepforest = None
+        # Clean up model (defer off GUI thread if a retained worker still holds it)
+        model = self.deepforest
+        self.deepforest = None
+        if model is not None:
+            if hasattr(model, "close") and callable(getattr(model, "close")):
+                if retained_predict_worker is not None:
+                    _retire_client_in_background(
+                        model, wait_worker=retained_predict_worker
+                    )
+                else:
+                    try:
+                        model.close()
+                    except Exception:
+                        pass
 
     def closeEvent(self, event):
         """Handle close event."""

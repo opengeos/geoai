@@ -36,19 +36,24 @@ try:
         TQDMProgressBar,
     )
     from lightning.pytorch.loggers import CSVLogger
+    from torchmetrics import Metric
 
     LIGHTNING_AVAILABLE = True
 except ImportError:
     LIGHTNING_AVAILABLE = False
 
+_LightningBase = pl.LightningModule if LIGHTNING_AVAILABLE else nn.Module
+_TQDMBase = TQDMProgressBar if LIGHTNING_AVAILABLE else object
+_MetricBase = Metric if LIGHTNING_AVAILABLE else nn.Module
+
 logger = logging.getLogger(__name__)
 
 
-class _CompactProgressBar(TQDMProgressBar):
+class _CompactProgressBar(_TQDMBase):
     """Progress bar that shows key metrics in the postfix, updated in place."""
 
     def get_metrics(self, trainer, pl_module):
-        # Don't let Lightning set the postfix — we control it
+        # Don't let Lightning set the postfix; we control it
         return {}
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
@@ -122,7 +127,180 @@ def _infer_preprocessing_params(
         return None
 
 
-class PixelRegressionModel(pl.LightningModule):
+def _clean_input_nodata(
+    raw_tile: np.ndarray, nodata: Any = None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Replace NaN and finite raster NoData sentinel values with 0.0.
+
+    Shared by ``PixelRegressionDataset`` and ``predict_raster`` so training and
+    inference select the same normalization scale when input tiles contain
+    finite NoData sentinels.
+
+    Args:
+        raw_tile: Input raster array of shape ``(C, H, W)``.
+        nodata: Raster NoData value (or None / NaN).
+
+    Returns:
+        Tuple of ``(cleaned_float32_tile, nodata_mask_hw)``.
+    """
+    nodata_mask = np.any(np.isnan(raw_tile), axis=0)
+    if nodata is not None and not (isinstance(nodata, float) and np.isnan(nodata)):
+        nodata_mask |= np.any(raw_tile == nodata, axis=0)
+    tile = raw_tile.astype(np.float32, copy=True)
+    if np.any(nodata_mask):
+        tile[:, nodata_mask] = 0.0
+    tile = np.nan_to_num(tile, nan=0.0)
+    return tile, nodata_mask
+
+
+class _PooledRegressionMetric(_MetricBase):
+    """Pooled pixel-level regression metric (RMSE, MAE, or R2) over an epoch.
+
+    Accumulates centered second moments via Chan's parallel Welford algorithm
+    across batches (and across processes when training is distributed) so epoch
+    metrics do not depend on batch splitting, avoid catastrophic cancellation
+    on large-mean targets, remain finite for constant-target batches, and
+    support devices without float64 support (such as MPS).
+    """
+
+    full_state_update = False
+
+    def __init__(self, metric: str = "r2"):
+        super().__init__()
+        if metric not in ("rmse", "mae", "r2"):
+            raise ValueError(f"Unsupported regression metric: {metric!r}")
+        self.metric = metric
+        if hasattr(self, "add_state"):
+            self.add_state(
+                "sum_sq_err",
+                default=torch.tensor(0.0, dtype=torch.float64),
+                dist_reduce_fx="sum",
+            )
+            self.add_state(
+                "sum_abs_err",
+                default=torch.tensor(0.0, dtype=torch.float64),
+                dist_reduce_fx="sum",
+            )
+            self.add_state(
+                "mean_y",
+                default=torch.tensor(0.0, dtype=torch.float64),
+                dist_reduce_fx="cat",
+            )
+            self.add_state(
+                "m2_y",
+                default=torch.tensor(0.0, dtype=torch.float64),
+                dist_reduce_fx="cat",
+            )
+            self.add_state(
+                "count",
+                default=torch.tensor(0, dtype=torch.long),
+                dist_reduce_fx="cat",
+            )
+        else:
+            self.register_buffer("sum_sq_err", torch.tensor(0.0, dtype=torch.float64))
+            self.register_buffer("sum_abs_err", torch.tensor(0.0, dtype=torch.float64))
+            self.register_buffer("mean_y", torch.tensor(0.0, dtype=torch.float64))
+            self.register_buffer("m2_y", torch.tensor(0.0, dtype=torch.float64))
+            self.register_buffer("count", torch.tensor(0, dtype=torch.long))
+
+    def _downcast_float64_states(self) -> None:
+        """Downcast float64 metric states and defaults to float32 (for MPS)."""
+        defaults = getattr(self, "_defaults", None)
+        if isinstance(defaults, dict):
+            for key, val in list(defaults.items()):
+                if isinstance(val, torch.Tensor) and val.dtype == torch.float64:
+                    defaults[key] = val.to(torch.float32)
+                cur = getattr(self, key, None)
+                if isinstance(cur, torch.Tensor) and cur.dtype == torch.float64:
+                    setattr(self, key, cur.to(torch.float32))
+        for key, buf in list(self._buffers.items()):
+            if isinstance(buf, torch.Tensor) and buf.dtype == torch.float64:
+                self._buffers[key] = buf.to(torch.float32)
+
+    def _apply(self, fn: Callable, *args: Any, **kwargs: Any):
+        has_float64 = any(
+            isinstance(getattr(self, name, None), torch.Tensor)
+            and getattr(self, name).dtype == torch.float64
+            for name in ("sum_sq_err", "sum_abs_err", "mean_y", "m2_y")
+        )
+        if has_float64:
+            try:
+                fn(torch.empty(0, dtype=torch.float64, device=self.sum_sq_err.device))
+            except TypeError:
+                self._downcast_float64_states()
+        return super()._apply(fn, *args, **kwargs)
+
+    def update(self, preds: torch.Tensor, targets: torch.Tensor) -> None:
+        """Accumulate error and centered target moments for one batch."""
+        dtype = self.sum_sq_err.dtype
+        preds_flat = preds.detach().reshape(-1).to(dtype)
+        targets_flat = targets.detach().reshape(-1).to(dtype)
+        batch_n = targets_flat.numel()
+        if batch_n == 0:
+            return
+        diff = preds_flat - targets_flat
+        self.sum_sq_err += torch.sum(diff * diff)
+        self.sum_abs_err += torch.sum(torch.abs(diff))
+
+        batch_mean = torch.mean(targets_flat)
+        centered = targets_flat - batch_mean
+        batch_m2 = torch.sum(centered * centered)
+
+        if self.count == 0:
+            self.mean_y.copy_(batch_mean)
+            self.m2_y.copy_(batch_m2)
+        else:
+            prev_n = self.count.to(dtype)
+            new_n = prev_n + batch_n
+            delta = batch_mean - self.mean_y
+            self.mean_y += delta * (batch_n / new_n)
+            self.m2_y += batch_m2 + (delta * delta) * (prev_n * batch_n / new_n)
+        self.count += batch_n
+
+    def compute(self) -> torch.Tensor:
+        """Compute pooled RMSE, MAE, or R2 over all seen pixels."""
+        dtype = self.sum_sq_err.dtype
+        if self.count.ndim == 0:
+            total_n = self.count.to(dtype)
+            mean_y = self.mean_y
+            ss_tot = self.m2_y
+        else:
+            total_n = torch.tensor(0.0, dtype=dtype, device=self.count.device)
+            mean_y = torch.tensor(0.0, dtype=dtype, device=self.count.device)
+            ss_tot = torch.tensor(0.0, dtype=dtype, device=self.count.device)
+            for n_i, m_i, m2_i in zip(self.count, self.mean_y, self.m2_y):
+                n_f = n_i.to(dtype)
+                if n_f == 0:
+                    continue
+                if total_n == 0:
+                    total_n = n_f
+                    mean_y = m_i
+                    ss_tot = m2_i
+                else:
+                    new_n = total_n + n_f
+                    delta = m_i - mean_y
+                    mean_y = mean_y + delta * (n_f / new_n)
+                    ss_tot = ss_tot + m2_i + (delta * delta) * (total_n * n_f / new_n)
+                    total_n = new_n
+
+        if total_n == 0:
+            return torch.tensor(0.0, dtype=torch.float32, device=self.count.device)
+
+        if self.metric == "rmse":
+            return torch.sqrt(self.sum_sq_err / total_n).to(torch.float32)
+        if self.metric == "mae":
+            return (self.sum_abs_err / total_n).to(torch.float32)
+
+        ss_res = self.sum_sq_err
+        eps = torch.finfo(dtype).eps
+        tol = (100.0 * eps * eps) * (total_n * mean_y * mean_y)
+        if ss_tot <= tol:
+            val = 1.0 if ss_res <= tol else 0.0
+            return torch.tensor(val, dtype=torch.float32, device=self.count.device)
+        return (1.0 - ss_res / ss_tot).to(torch.float32)
+
+
+class PixelRegressionModel(_LightningBase):
     """
     PyTorch Lightning module for pixel-level regression using encoder-decoder architectures.
 
@@ -218,6 +396,16 @@ class PixelRegressionModel(pl.LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
 
+        # Pooled epoch-level regression metrics
+        self.train_rmse = _PooledRegressionMetric("rmse")
+        self.train_r2 = _PooledRegressionMetric("r2")
+        self.val_rmse = _PooledRegressionMetric("rmse")
+        self.val_mae = _PooledRegressionMetric("mae")
+        self.val_r2 = _PooledRegressionMetric("r2")
+        self.test_rmse = _PooledRegressionMetric("rmse")
+        self.test_mae = _PooledRegressionMetric("mae")
+        self.test_r2 = _PooledRegressionMetric("r2")
+
     def _freeze_encoder(self):
         """Freeze encoder weights."""
         if hasattr(self.model, "encoder"):
@@ -232,8 +420,8 @@ class PixelRegressionModel(pl.LightningModule):
     ) -> Dict[str, torch.Tensor]:
         """Compute pixel-wise regression metrics."""
         # Flatten for metrics computation
-        preds_flat = preds.view(-1)
-        targets_flat = targets.view(-1)
+        preds_flat = preds.reshape(-1)
+        targets_flat = targets.reshape(-1)
 
         # MSE and RMSE
         mse = torch.mean((preds_flat - targets_flat) ** 2)
@@ -242,10 +430,22 @@ class PixelRegressionModel(pl.LightningModule):
         # MAE
         mae = torch.mean(torch.abs(preds_flat - targets_flat))
 
-        # R² (coefficient of determination)
-        ss_res = torch.sum((targets_flat - preds_flat) ** 2)
-        ss_tot = torch.sum((targets_flat - targets_flat.mean()) ** 2)
-        r2 = 1 - ss_res / (ss_tot + 1e-8)
+        # R2 (coefficient of determination)
+        f_dtype = (
+            targets_flat.dtype if targets_flat.is_floating_point() else torch.float32
+        )
+        targets_f = targets_flat.to(f_dtype)
+        preds_f = preds_flat.to(f_dtype)
+        mean_y = targets_f.mean()
+        ss_res = torch.sum((targets_f - preds_f) ** 2)
+        ss_tot = torch.sum((targets_f - mean_y) ** 2)
+        eps = torch.finfo(f_dtype).eps
+        tol = (100.0 * eps * eps) * (targets_f.numel() * mean_y * mean_y)
+        if ss_tot <= tol:
+            r2_val = 1.0 if ss_res <= tol else 0.0
+            r2 = torch.tensor(r2_val, dtype=preds_flat.dtype, device=preds_flat.device)
+        else:
+            r2 = 1.0 - ss_res / ss_tot
 
         return {"mse": mse, "rmse": rmse, "mae": mae, "r2": r2}
 
@@ -254,12 +454,13 @@ class PixelRegressionModel(pl.LightningModule):
         preds = self(x)
         loss = self.loss_fn(preds, y)
 
-        metrics = self._compute_metrics(preds, y)
+        self.train_rmse.update(preds, y)
+        self.train_r2.update(preds, y)
 
         pb = getattr(self, "_prog_bar_metrics", True)
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=pb)
-        self.log("train_rmse", metrics["rmse"], on_step=False, on_epoch=True)
-        self.log("train_r2", metrics["r2"], on_step=False, on_epoch=True, prog_bar=pb)
+        self.log("train_rmse", self.train_rmse, on_step=False, on_epoch=True)
+        self.log("train_r2", self.train_r2, on_step=False, on_epoch=True, prog_bar=pb)
 
         return loss
 
@@ -268,13 +469,15 @@ class PixelRegressionModel(pl.LightningModule):
         preds = self(x)
         loss = self.loss_fn(preds, y)
 
-        metrics = self._compute_metrics(preds, y)
+        self.val_rmse.update(preds, y)
+        self.val_mae.update(preds, y)
+        self.val_r2.update(preds, y)
 
         pb = getattr(self, "_prog_bar_metrics", True)
         self.log("val_loss", loss, on_epoch=True, prog_bar=pb)
-        self.log("val_rmse", metrics["rmse"], on_epoch=True, prog_bar=pb)
-        self.log("val_mae", metrics["mae"], on_epoch=True)
-        self.log("val_r2", metrics["r2"], on_epoch=True, prog_bar=pb)
+        self.log("val_rmse", self.val_rmse, on_epoch=True, prog_bar=pb)
+        self.log("val_mae", self.val_mae, on_epoch=True)
+        self.log("val_r2", self.val_r2, on_epoch=True, prog_bar=pb)
 
         return loss
 
@@ -283,12 +486,14 @@ class PixelRegressionModel(pl.LightningModule):
         preds = self(x)
         loss = self.loss_fn(preds, y)
 
-        metrics = self._compute_metrics(preds, y)
+        self.test_rmse.update(preds, y)
+        self.test_mae.update(preds, y)
+        self.test_r2.update(preds, y)
 
         self.log("test_loss", loss, on_epoch=True)
-        self.log("test_rmse", metrics["rmse"], on_epoch=True)
-        self.log("test_mae", metrics["mae"], on_epoch=True)
-        self.log("test_r2", metrics["r2"], on_epoch=True)
+        self.log("test_rmse", self.test_rmse, on_epoch=True)
+        self.log("test_mae", self.test_mae, on_epoch=True)
+        self.log("test_r2", self.test_r2, on_epoch=True)
 
         return loss
 
@@ -375,6 +580,7 @@ class PixelRegressionDataset(Dataset):
                 image = src.read(self.input_bands)
             else:
                 image = src.read()
+            src_nodata = src.nodata
 
         # Load target
         with rasterio.open(self.target_paths[idx]) as src:
@@ -393,12 +599,11 @@ class PixelRegressionDataset(Dataset):
         if tgt_nodata is not None:
             target = np.where(target == tgt_nodata, np.nan, target)
 
-        # Handle NaN
-        image = np.nan_to_num(image, nan=0.0)
+        # Clean input NaN/NoData consistently with predict_raster before normalization
+        image, _ = _clean_input_nodata(image, src_nodata)
         target = np.nan_to_num(target, nan=0.0)
 
         # Normalize input
-        image = image.astype(np.float32)
         if self.normalize_input:
             data_max = np.abs(image).max()
             if data_max <= 1.5:
@@ -475,8 +680,8 @@ def create_regression_tiles(
             if input_bands is None:
                 input_bands = list(range(1, src_input.count + 1))
 
-            n_tiles_y = (height - tile_size) // stride + 1
-            n_tiles_x = (width - tile_size) // stride + 1
+            n_tiles_y = max(1, (height - tile_size) // stride + 1)
+            n_tiles_x = max(1, (width - tile_size) // stride + 1)
 
             logger.info("Input raster: %dx%d, %d bands", width, height, src_input.count)
             logger.info("Target raster: %dx%d", src_target.width, src_target.height)
@@ -493,6 +698,15 @@ def create_regression_tiles(
             skipped_nodata = 0
             skipped_range = 0
 
+            input_nodata = src_input.nodata
+            check_input_nodata = input_nodata is not None and not (
+                isinstance(input_nodata, float) and np.isnan(input_nodata)
+            )
+            target_nodata = src_target.nodata
+            check_target_nodata = target_nodata is not None and not (
+                isinstance(target_nodata, float) and np.isnan(target_nodata)
+            )
+
             for row in tqdm(
                 range(0, height - tile_size + 1, stride), desc="Creating tiles"
             ):
@@ -503,10 +717,13 @@ def create_regression_tiles(
                     input_tile = src_input.read(input_bands, window=window)
                     target_tile = src_target.read(target_band, window=window)
 
-                    # Check for valid pixels
-                    valid_mask = ~np.isnan(input_tile).any(axis=0) & ~np.isnan(
-                        target_tile
-                    )
+                    # Check for valid pixels (NaN and raster nodata values)
+                    target_nodata_mask = np.isnan(target_tile)
+                    if check_target_nodata:
+                        target_nodata_mask |= target_tile == target_nodata
+                    valid_mask = ~np.isnan(input_tile).any(axis=0) & ~target_nodata_mask
+                    if check_input_nodata:
+                        valid_mask &= ~(input_tile == input_nodata).any(axis=0)
                     valid_ratio = valid_mask.sum() / (tile_size * tile_size)
 
                     if valid_ratio < min_valid_ratio:
@@ -518,6 +735,10 @@ def create_regression_tiles(
                     valid_target = target_tile[valid_mask]
                     out_of_range_ratio = 0.0
                     if target_min is not None or target_max is not None:
+                        if len(valid_target) == 0:
+                            tile_idx += 1
+                            skipped_nodata += 1
+                            continue
                         out_of_range = np.zeros_like(valid_target, dtype=bool)
                         if target_min is not None:
                             out_of_range |= valid_target < target_min
@@ -531,17 +752,27 @@ def create_regression_tiles(
                             skipped_range += 1
                             continue
 
-                    # Replace NaN with 0
+                    # Replace NaN with 0 in input; preserve finite target NoData
                     input_tile = np.nan_to_num(input_tile, nan=0.0)
-                    target_tile = np.nan_to_num(target_tile, nan=0.0)
-
-                    # Clip target values to valid range (important!)
-                    if target_min is not None or target_max is not None:
-                        target_tile = np.clip(
-                            target_tile,
-                            target_min if target_min is not None else -np.inf,
-                            target_max if target_max is not None else np.inf,
-                        )
+                    if check_target_nodata:
+                        target_clipped = np.nan_to_num(target_tile, nan=0.0)
+                        if target_min is not None or target_max is not None:
+                            target_clipped = np.clip(
+                                target_clipped,
+                                target_min if target_min is not None else -np.inf,
+                                target_max if target_max is not None else np.inf,
+                            )
+                        target_tile = np.where(
+                            target_nodata_mask, target_nodata, target_clipped
+                        ).astype(target_tile.dtype, copy=False)
+                    else:
+                        target_tile = np.nan_to_num(target_tile, nan=0.0)
+                        if target_min is not None or target_max is not None:
+                            target_tile = np.clip(
+                                target_tile,
+                                target_min if target_min is not None else -np.inf,
+                                target_max if target_max is not None else np.inf,
+                            )
 
                     # Save tiles
                     image_path = os.path.join(image_dir, f"tile_{tile_idx:06d}.tif")
@@ -842,6 +1073,12 @@ def predict_raster(
     """
     import rasterio
 
+    if not 0 <= overlap < tile_size:
+        raise ValueError(
+            "overlap must satisfy 0 <= overlap < tile_size, "
+            f"got overlap={overlap} and tile_size={tile_size}"
+        )
+
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -870,9 +1107,10 @@ def predict_raster(
         # which sides of a tile face another tile
         weight_masks = {}
 
-        # Read full input for nodata mask
-        full_input = src.read(input_bands)
-        nodata_mask = np.any(np.isnan(full_input), axis=0)
+        # Populate nodata mask incrementally per tile window to avoid loading
+        # the entire input raster into memory at once.
+        nodata_mask = np.zeros((height, width), dtype=bool)
+        src_nodata = src.nodata
 
         if use_model_preprocessing and image_mean is None and image_std is None:
             encoder_name = getattr(
@@ -901,9 +1139,9 @@ def predict_raster(
                         image_mean = pp_mean
                         image_std = pp_std
 
-        # Collect tiles
+        # Collect deduplicated tile bounds
         tiles = []
-        positions = []
+        seen_tiles = set()
 
         for row in range(0, height, stride):
             for col in range(0, width, stride):
@@ -917,8 +1155,10 @@ def predict_raster(
                 row_start = max(0, row_start)
                 col_start = max(0, col_start)
 
-                tiles.append((row_start, col_start, row_end, col_end))
-                positions.append((row_start, col_start))
+                coord = (row_start, col_start, row_end, col_end)
+                if coord not in seen_tiles:
+                    seen_tiles.add(coord)
+                    tiles.append(coord)
 
         logger.info("Total tiles: %d", len(tiles))
 
@@ -935,7 +1175,9 @@ def predict_raster(
                 window = rasterio.windows.Window(
                     col_start, row_start, col_end - col_start, row_end - row_start
                 )
-                tile = src.read(input_bands, window=window).astype(np.float32)
+                raw_tile = src.read(input_bands, window=window)
+                tile, tile_nodata = _clean_input_nodata(raw_tile, src_nodata)
+                nodata_mask[row_start:row_end, col_start:col_end] |= tile_nodata
 
                 # Handle non-square tiles at edges
                 if tile.shape[1] != tile_size or tile.shape[2] != tile_size:
@@ -1052,15 +1294,19 @@ def _create_weight_mask(
     of the raster keeps full weight up to the edge, since tapering it would
     give the raster's edge pixels a weight of zero.
     """
-    if overlap == 0:
+    if overlap <= 1:
         return np.ones((tile_size, tile_size), dtype=np.float32)
 
     def ramp_1d(taper_start: bool, taper_end: bool) -> np.ndarray:
         ramp = np.ones(tile_size, dtype=np.float32)
         if taper_start:
-            ramp[:overlap] = np.linspace(0, 1, overlap)
+            ramp[:overlap] = np.minimum(
+                ramp[:overlap], np.linspace(0, 1, overlap, dtype=np.float32)
+            )
         if taper_end:
-            ramp[-overlap:] = np.linspace(1, 0, overlap)
+            ramp[-overlap:] = np.minimum(
+                ramp[-overlap:], np.linspace(1, 0, overlap, dtype=np.float32)
+            )
         return ramp
 
     # Create 2D weight mask
@@ -1373,6 +1619,7 @@ def plot_training_history(
         Tuple of (figure, pandas.DataFrame of the loaded metrics).
     """
     import glob
+    import re
 
     import matplotlib.pyplot as plt
 
@@ -1391,9 +1638,14 @@ def plot_training_history(
         os.path.join(log_dir, "version_*", "metrics.csv"),
     ]
 
+    def _version_sort_key(path: str) -> Tuple[int, int, str]:
+        parent = os.path.basename(os.path.dirname(path))
+        match = re.match(r"^version_(\d+)$", parent)
+        return (1, int(match.group(1)), path) if match else (0, 0, path)
+
     csv_path = None
     for pattern in search_paths:
-        matches = sorted(glob.glob(pattern))
+        matches = sorted(glob.glob(pattern), key=_version_sort_key)
         if matches:
             csv_path = matches[-1]  # latest version
             break
@@ -1548,12 +1800,16 @@ def visualize_prediction(
 
     with rasterio.open(input_raster) as src:
         rgb = src.read(rgb_bands).astype(np.float64)
-        # Per-band 2–98 percentile stretch for proper RGB display
+        # Per-band 2-98 percentile stretch for proper RGB display
+        check_nodata = src.nodata is not None and not (
+            isinstance(src.nodata, float) and np.isnan(src.nodata)
+        )
         for i in range(rgb.shape[0]):
             band = rgb[i]
-            valid = band[
-                np.isfinite(band) & (band != src.nodata if src.nodata else True)
-            ]
+            valid_cond = np.isfinite(band)
+            if check_nodata:
+                valid_cond &= band != src.nodata
+            valid = band[valid_cond]
             if valid.size > 0:
                 p2, p98 = np.percentile(valid, [2, 98])
                 if p98 > p2:

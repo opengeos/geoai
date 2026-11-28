@@ -283,12 +283,12 @@ class STACTools:
             JSON string with detailed item information including all assets and metadata.
         """
         try:
-            # Search for the specific item
+            # Search for the specific item by ID
             items = pc_stac_search(
                 collection=collection,
                 bbox=None,
                 time_range=None,
-                query={"id": {"eq": item_id}},
+                ids=[item_id],
                 limit=1,
                 max_items=1,
                 quiet=True,
