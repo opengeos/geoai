@@ -9,7 +9,7 @@ import os
 import platform
 import sys
 
-from qgis.PyQt.QtCore import Qt, pyqtSignal
+from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
     QFrame,
@@ -21,6 +21,45 @@ from qgis.PyQt.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+_LIVE_THREADS = set()
+
+
+def _keep_thread_alive(thread: QThread) -> None:
+    """Detach a running removal worker and keep it referenced until it exits."""
+    done_sig = getattr(thread, "done", None)
+    if done_sig is not None:
+        try:
+            done_sig.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+
+    def _drop(*_args):
+        _LIVE_THREADS.discard(thread)
+
+    _LIVE_THREADS.add(thread)
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(_drop)
+    elif done_sig is not None:
+        done_sig.connect(_drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
+
+
+class _VenvRemoveWorker(QThread):
+    """Background worker that removes an existing virtual environment."""
+
+    done = pyqtSignal(bool, str)
+
+    def run(self):
+        """Remove the plugin virtual environment off the Qt main thread."""
+        try:
+            from ..core.venv_manager import remove_venv
+
+            ok, message = remove_venv()
+            self.done.emit(bool(ok), str(message))
+        except Exception as exc:
+            self.done.emit(False, str(exc))
 
 
 class DepsInstallDockWidget(QDockWidget):
@@ -158,6 +197,7 @@ class DepsInstallDockWidget(QDockWidget):
         self.setWidget(container)
 
         # Detect GPU on creation
+        self._remove_worker = None
         self._detect_gpu()
 
     def _detect_gpu(self):
@@ -213,15 +253,67 @@ class DepsInstallDockWidget(QDockWidget):
                 self.gpu_label.setText("Could not detect GPU.\nCPU mode will be used.")
 
     def _on_reinstall_clicked(self):
-        """Handle reinstall button click by removing existing venv first."""
-        try:
-            from ..core.venv_manager import remove_venv
+        """Handle reinstall button click by removing existing venv off the UI thread."""
+        if self._remove_worker is not None and self._remove_worker.isRunning():
+            return
 
-            remove_venv()
-        except Exception:
-            pass
         self.reinstall_button.hide()
+        self.install_button.hide()
+        self.status_label.hide()
+        self.progress_frame.show()
+        self.progress_bar.setRange(0, 0)
+        self.progress_label.setText("Removing existing virtual environment...")
+
+        worker = _VenvRemoveWorker(self)
+        self._remove_worker = worker
+        worker.done.connect(
+            lambda ok, message, w=worker: (
+                self._on_venv_removed(ok, message) if self._remove_worker is w else None
+            )
+        )
+        worker.start()
+
+    def _on_venv_removed(self, ok: bool, message: str):
+        """Proceed with dependency installation after venv removal completes."""
+        self.progress_bar.setRange(0, 100)
+        self._remove_worker = None
+        if not ok:
+            self.progress_frame.hide()
+            self.status_label.setText(
+                f"Failed to remove existing virtual environment: {message}"
+            )
+            self.status_label.show()
+            self.reinstall_button.show()
+            self.install_button.show()
+            return
         self.install_requested.emit()
+
+    def cleanup(self):
+        """Detach and retain any running venv removal worker before unload/close."""
+        worker = self._remove_worker
+        self._remove_worker = None
+        if worker is None:
+            return
+        done_sig = getattr(worker, "done", None)
+        if done_sig is not None:
+            try:
+                done_sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+        try:
+            worker.setParent(None)
+        except RuntimeError:
+            pass
+        try:
+            if worker.isRunning() and not worker.wait(5000):
+                _keep_thread_alive(worker)
+        except RuntimeError:
+            pass
+
+    def closeEvent(self, event):
+        """Wait for or detach any background venv removal before closing."""
+        self.cleanup()
+        super().closeEvent(event)
 
     def show_install_ui(self):
         """Show the install button, hide progress and status."""

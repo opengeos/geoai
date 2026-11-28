@@ -4,8 +4,16 @@ Map tools for interactive segmentation prompts.
 
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtGui import QColor
-from qgis.core import QgsPointXY, QgsRectangle, QgsWkbTypes
+from qgis.core import Qgis, QgsPointXY, QgsRectangle, QgsWkbTypes
 from qgis.gui import QgsMapTool, QgsRubberBand, QgsVertexMarker
+
+
+def _polygon_geometry_type():
+    """Return the polygon geometry enum compatible with QGIS 3 and QGIS 4."""
+    geometry_type = getattr(Qgis, "GeometryType", None)
+    if geometry_type is not None and hasattr(geometry_type, "Polygon"):
+        return geometry_type.Polygon
+    return QgsWkbTypes.PolygonGeometry
 
 
 class PointPromptTool(QgsMapTool):
@@ -102,7 +110,7 @@ class BoxPromptTool(QgsMapTool):
         self.plugin = plugin
 
         # Rubber band for visual feedback
-        self.rubber_band = QgsRubberBand(canvas, QgsWkbTypes.PolygonGeometry)
+        self.rubber_band = QgsRubberBand(canvas, _polygon_geometry_type())
         self.rubber_band.setColor(QColor(0, 120, 255, 100))
         self.rubber_band.setStrokeColor(QColor(0, 120, 255))
         self.rubber_band.setWidth(2)
@@ -118,7 +126,7 @@ class BoxPromptTool(QgsMapTool):
         if event.button() == Qt.MouseButton.LeftButton:
             self.start_point = self.toMapCoordinates(event.pos())
             self.is_drawing = True
-            self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+            self.rubber_band.reset(_polygon_geometry_type())
 
     def canvasMoveEvent(self, event):
         """Handle mouse move event - update rubber band."""
@@ -148,13 +156,13 @@ class BoxPromptTool(QgsMapTool):
         elif event.button() == Qt.MouseButton.RightButton:
             # Right-click to cancel
             self.is_drawing = False
-            self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+            self.rubber_band.reset(_polygon_geometry_type())
             self.deactivate()
             self.plugin.draw_box_btn.setChecked(False)
 
     def update_rubber_band(self, start_point, end_point):
         """Update the rubber band rectangle."""
-        self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+        self.rubber_band.reset(_polygon_geometry_type())
 
         # Create rectangle points
         self.rubber_band.addPoint(QgsPointXY(start_point.x(), start_point.y()), False)
@@ -164,7 +172,7 @@ class BoxPromptTool(QgsMapTool):
 
     def clear_rubber_band(self):
         """Clear the rubber band."""
-        self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+        self.rubber_band.reset(_polygon_geometry_type())
 
     def deactivate(self):
         """Deactivate the tool."""
@@ -181,7 +189,7 @@ class RectangleRangeTool(QgsMapTool):
     def __init__(self, canvas):
         super().__init__(canvas)
         self.canvas = canvas
-        self.rubber_band = QgsRubberBand(canvas, QgsWkbTypes.PolygonGeometry)
+        self.rubber_band = QgsRubberBand(canvas, _polygon_geometry_type())
         self.rubber_band.setColor(QColor(255, 170, 0, 70))
         self.rubber_band.setStrokeColor(QColor(255, 140, 0))
         self.rubber_band.setWidth(2)
@@ -194,7 +202,7 @@ class RectangleRangeTool(QgsMapTool):
         if event.button() == Qt.MouseButton.LeftButton:
             self.start_point = self.toMapCoordinates(event.pos())
             self.is_drawing = True
-            self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+            self.rubber_band.reset(_polygon_geometry_type())
 
     def canvasMoveEvent(self, event):
         """Update range preview while dragging."""
@@ -219,7 +227,7 @@ class RectangleRangeTool(QgsMapTool):
 
     def update_rubber_band(self, start_point, end_point):
         """Update the rubber band rectangle."""
-        self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+        self.rubber_band.reset(_polygon_geometry_type())
         self.rubber_band.addPoint(QgsPointXY(start_point.x(), start_point.y()), False)
         self.rubber_band.addPoint(QgsPointXY(end_point.x(), start_point.y()), False)
         self.rubber_band.addPoint(QgsPointXY(end_point.x(), end_point.y()), False)
@@ -227,7 +235,7 @@ class RectangleRangeTool(QgsMapTool):
 
     def clear_rubber_band(self):
         """Clear the drawn range preview."""
-        self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+        self.rubber_band.reset(_polygon_geometry_type())
 
     def deactivate(self):
         """Deactivate the tool."""
