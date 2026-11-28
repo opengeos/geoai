@@ -2,7 +2,10 @@
 
 import logging
 import os
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
+
+if TYPE_CHECKING:
+    import torch
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +18,20 @@ __all__ = [
 
 
 def install_package(package: Union[str, List[str]]) -> None:
-    """Install a Python package.
+    """Install a Python package using the active interpreter's pip.
 
     Args:
-        package (str | list): The package name or a GitHub URL or a list of package names or GitHub URLs.
+        package (str | list): The package name or a GitHub URL, or a list of
+            package names or GitHub URLs.
+
+    Raises:
+        ValueError: If *package* is not a non-empty string or list of non-empty
+            strings.
+        subprocess.CalledProcessError: If ``pip install`` exits with a non-zero
+            status code for any requested package.
     """
     import subprocess
+    import sys
 
     if isinstance(package, str):
         packages = [package]
@@ -29,24 +40,31 @@ def install_package(package: Union[str, List[str]]) -> None:
     else:
         raise ValueError("The package argument must be a string or a list of strings.")
 
-    for package in packages:
-        if package.startswith("https"):
-            package = f"git+{package}"
+    for pkg in packages:
+        if not isinstance(pkg, str) or not pkg.strip():
+            raise ValueError("Each package name must be a non-empty string.")
+        pkg = pkg.strip()
+        if pkg.startswith(("http://", "https://")):
+            pkg = f"git+{pkg}"
 
-        # Execute pip install command and show output in real-time
-        command = f"pip install {package}"
-        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+        # Execute pip install using the active interpreter without shell/whitespace splitting
+        cmd = [sys.executable, "-m", "pip", "install", "--", pkg]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        try:
+            if process.stdout is not None:
+                while True:
+                    output = process.stdout.readline()
+                    if output == b"" and process.poll() is not None:
+                        break
+                    if output:
+                        logger.info(output.decode("utf-8", errors="replace").strip())
+            returncode = process.wait()
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
 
-        # Print output in real-time
-        while True:
-            output = process.stdout.readline()
-            if output == b"" and process.poll() is not None:
-                break
-            if output:
-                logger.info(output.decode("utf-8").strip())
-
-        # Wait for process to complete
-        process.wait()
+        if returncode != 0:
+            raise subprocess.CalledProcessError(returncode, cmd)
 
 
 def temp_file_path(ext: str) -> str:
@@ -73,9 +91,73 @@ def temp_file_path(ext: str) -> str:
 def get_device() -> "torch.device":
     """
     Returns the best available device for deep learning in the order:
-    CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU
+    CUDA (NVIDIA GPU) > MPS (Apple Silicon GPU) > CPU.
+
+    Environment Variables:
+        GEOAI_DEVICE: Optional device override string accepted by
+            ``torch.device`` (for example, ``"cpu"``, ``"cuda"``, ``"cuda:0"``,
+            ``"mps"``, or ``"xpu"``). When set, the requested device is
+            validated for syntax and accelerator availability.
+
+    Returns:
+        torch.device: The selected PyTorch device.
+
+    Raises:
+        ValueError: If ``GEOAI_DEVICE`` is not a valid PyTorch device string
+            or requests an accelerator (``cuda``, ``mps``, or ``xpu``) that is
+            not available in the current environment.
     """
     import torch
+
+    env_device = os.environ.get("GEOAI_DEVICE", "").strip()
+    if env_device:
+        try:
+            device = torch.device(env_device)
+        except (RuntimeError, ValueError, TypeError) as e:
+            raise ValueError(f"Invalid GEOAI_DEVICE value {env_device!r}: {e}") from e
+
+        if device.type == "cuda":
+            if not torch.cuda.is_available():
+                raise ValueError(
+                    f"GEOAI_DEVICE={env_device!r} requested CUDA, "
+                    "but CUDA is not available."
+                )
+            if device.index is not None:
+                device_count = torch.cuda.device_count()
+                if device.index < 0 or (
+                    device_count > 0 and device.index >= device_count
+                ):
+                    raise ValueError(
+                        f"GEOAI_DEVICE={env_device!r} requested CUDA device "
+                        f"index {device.index}, but only {device_count} "
+                        "CUDA device(s) are available."
+                    )
+        elif device.type == "mps":
+            mps_backend = getattr(torch.backends, "mps", None)
+            if not (mps_backend and mps_backend.is_available()):
+                raise ValueError(
+                    f"GEOAI_DEVICE={env_device!r} requested MPS, "
+                    "but MPS is not available."
+                )
+        elif device.type == "xpu":
+            xpu_mod = getattr(torch, "xpu", None)
+            if not (xpu_mod and xpu_mod.is_available()):
+                raise ValueError(
+                    f"GEOAI_DEVICE={env_device!r} requested XPU, "
+                    "but XPU is not available."
+                )
+            if device.index is not None and hasattr(xpu_mod, "device_count"):
+                device_count = xpu_mod.device_count()
+                if device.index < 0 or (
+                    device_count > 0 and device.index >= device_count
+                ):
+                    raise ValueError(
+                        f"GEOAI_DEVICE={env_device!r} requested XPU device "
+                        f"index {device.index}, but only {device_count} "
+                        "XPU device(s) are available."
+                    )
+
+        return device
 
     if torch.cuda.is_available():
         return torch.device("cuda")
