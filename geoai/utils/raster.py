@@ -1877,11 +1877,19 @@ def stack_bands(
                     for b in range(1, src.count + 1):
                         src_data = src.read(b)
                         if same_grid:
+                            if src.nodata is not None and src.nodata != out_nodata:
+                                src_data = src_data.copy()
+                                if np.issubdtype(src_data.dtype, np.floating) and (
+                                    math.isnan(float(src.nodata))
+                                ):
+                                    nodata_mask = np.isnan(src_data)
+                                else:
+                                    nodata_mask = src_data == src.nodata
+                                src_data[nodata_mask] = fill_val
                             band_out = _cast_band(src_data)
                         else:
                             # Use native dtype when rasterio supports direct
-                            # reprojection, preserving full integer precision
-                            # (including 64-bit integers when possible) and
+                            # reprojection, preserving source precision and
                             # avoiding bilinear corruption on categorical bands.
                             if np_dtype in (np.int64, np.uint64):
                                 band_buf = np.full(
@@ -1890,8 +1898,13 @@ def stack_bands(
                             elif np.issubdtype(src_data.dtype, np.floating) and (
                                 np.issubdtype(np_dtype, np.integer)
                             ):
+                                buf_dtype = (
+                                    np.float64
+                                    if src_data.dtype == np.float64
+                                    else np.float32
+                                )
                                 band_buf = np.full(
-                                    (height, width), fill_val, dtype=np.float32
+                                    (height, width), fill_val, dtype=buf_dtype
                                 )
                             else:
                                 band_buf = np.full(
@@ -1993,6 +2006,8 @@ def stack_bands(
     except FileNotFoundError:
         if not (shutil.which("gdalbuildvrt") and shutil.which("gdal_translate")):
             _run_stack_rasterio()
+            if temp_vrt is not None and os.path.exists(temp_vrt):
+                os.remove(temp_vrt)
         else:
             raise
 

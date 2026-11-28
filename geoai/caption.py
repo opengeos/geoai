@@ -11,6 +11,7 @@ import logging
 import os
 import shutil
 import sys
+import threading
 from io import BytesIO
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -45,6 +46,27 @@ DEFAULT_BLIP_MODEL = "Salesforce/blip-image-captioning-base"
 # ---------------------------------------------------------------------
 
 
+_SPACY_DOWNLOAD_LOCK = threading.Lock()
+
+
+def _spacy_uses_uv_installer() -> bool:
+    """Return True when spaCy's CLI download helper will invoke uv rather than pip."""
+    fallback = (
+        importlib.util.find_spec("pip") is None
+        and shutil.which("pip") is None
+        and shutil.which("uv") is not None
+    )
+    try:
+        spacy_dl_mod = importlib.import_module("spacy.cli.download")
+        get_cmd = getattr(spacy_dl_mod, "_get_pip_install_cmd", None)
+        if callable(get_cmd):
+            installer_cmd = get_cmd()
+            return bool(installer_cmd) and os.path.basename(installer_cmd[0]) == "uv"
+    except (Exception, SystemExit):
+        return fallback
+    return fallback
+
+
 def ensure_spacy_model(
     model_name: str = DEFAULT_SPACY_MODEL, auto_download: bool = True
 ) -> None:
@@ -70,76 +92,52 @@ def ensure_spacy_model(
                 f"Install it with: python -m spacy download {model_name}"
             )
         logger.info("spaCy model '%s' not found. Installing...", model_name)
-        had_path = "PATH" in os.environ
-        orig_path = os.environ.get("PATH")
-        exe_dir = os.path.dirname(sys.executable)
-        try:
-            if exe_dir:
-                cur_path = orig_path or ""
-                if exe_dir not in cur_path.split(os.pathsep):
-                    os.environ["PATH"] = (
-                        f"{exe_dir}{os.pathsep}{cur_path}" if cur_path else exe_dir
-                    )
-            # Determine whether spaCy will invoke uv rather than pip. Newer
-            # spaCy checks importlib.util.find_spec("pip"), while older
-            # releases check shutil.which("pip"). Query spaCy's helper when
-            # available so --python is only forwarded to uv.
-            use_uv = False
+        with _SPACY_DOWNLOAD_LOCK:
+            had_path = "PATH" in os.environ
+            orig_path = os.environ.get("PATH")
+            exe_dir = os.path.dirname(sys.executable)
             try:
-                spacy_dl_mod = importlib.import_module("spacy.cli.download")
-                get_cmd = getattr(spacy_dl_mod, "_get_pip_install_cmd", None)
-                if callable(get_cmd):
-                    installer_cmd = get_cmd()
-                    use_uv = (
-                        bool(installer_cmd)
-                        and os.path.basename(installer_cmd[0]) == "uv"
-                    )
+                if exe_dir:
+                    cur_path = orig_path or ""
+                    if exe_dir not in cur_path.split(os.pathsep):
+                        os.environ["PATH"] = (
+                            f"{exe_dir}{os.pathsep}{cur_path}" if cur_path else exe_dir
+                        )
+                if _spacy_uses_uv_installer():
+                    # Pass --python so uv targets the active interpreter even
+                    # outside a virtualenv (e.g. conda environments).
+                    sig = inspect.signature(download)
+                    pos_params = [
+                        p
+                        for p in sig.parameters.values()
+                        if p.kind
+                        in (
+                            inspect.Parameter.POSITIONAL_ONLY,
+                            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        )
+                    ]
+                    if len(pos_params) >= 4:
+                        # spaCy signature: download(model, direct, sdist, custom_url, *pip_args)
+                        download(
+                            model_name, False, False, None, "--python", sys.executable
+                        )
+                    else:
+                        # Legacy signature: download(model, direct, sdist, *pip_args)
+                        download(model_name, False, False, "--python", sys.executable)
                 else:
-                    use_uv = (
-                        importlib.util.find_spec("pip") is None
-                        and shutil.which("pip") is None
-                        and shutil.which("uv") is not None
-                    )
-            except (Exception, SystemExit):
-                use_uv = (
-                    importlib.util.find_spec("pip") is None
-                    and shutil.which("pip") is None
-                    and shutil.which("uv") is not None
-                )
-
-            if use_uv:
-                # Pass --python so uv targets the active interpreter even
-                # outside a virtualenv (e.g. conda environments).
-                sig = inspect.signature(download)
-                pos_params = [
-                    p
-                    for p in sig.parameters.values()
-                    if p.kind
-                    in (
-                        inspect.Parameter.POSITIONAL_ONLY,
-                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                    )
-                ]
-                if len(pos_params) >= 4:
-                    # spaCy signature: download(model, direct, sdist, custom_url, *pip_args)
-                    download(model_name, False, False, None, "--python", sys.executable)
+                    download(model_name)
+                logger.info("spaCy model '%s' installed.", model_name)
+            except (Exception, SystemExit) as e:
+                raise RuntimeError(
+                    f"Failed to download spaCy model '{model_name}'. "
+                    f"You may need to install it manually with: python -m spacy download {model_name}. "
+                    f"Error: {e}"
+                ) from e
+            finally:
+                if had_path:
+                    os.environ["PATH"] = orig_path
                 else:
-                    # Legacy signature: download(model, direct, sdist, *pip_args)
-                    download(model_name, False, False, "--python", sys.executable)
-            else:
-                download(model_name)
-            logger.info("spaCy model '%s' installed.", model_name)
-        except (Exception, SystemExit) as e:
-            raise RuntimeError(
-                f"Failed to download spaCy model '{model_name}'. "
-                f"You may need to install it manually with: python -m spacy download {model_name}. "
-                f"Error: {e}"
-            ) from e
-        finally:
-            if had_path:
-                os.environ["PATH"] = orig_path
-            else:
-                os.environ.pop("PATH", None)
+                    os.environ.pop("PATH", None)
 
 
 # ---------------------------------------------------------------------
