@@ -13,8 +13,22 @@ from unittest import mock
 
 import pytest
 import yaml
+from packaging.version import Version
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _assert_min_floor(reqs, pkg_name: str, min_ver: str) -> None:
+    matches = [
+        line
+        for line in reqs
+        if re.match(rf"^{re.escape(pkg_name)}>=(.+)$", line, re.IGNORECASE)
+    ]
+    assert matches, f"Expected lower-bounded requirement for {pkg_name}"
+    ver_str = matches[0].split(">=", 1)[1].split(",")[0].strip()
+    assert Version(ver_str) >= Version(
+        min_ver
+    ), f"{pkg_name} floor {ver_str} is below minimum {min_ver}"
 
 
 def _load_module(name: str, path: Path):
@@ -183,20 +197,6 @@ def test_pyproject_and_requirements_consistency():
         for line in req_lines
         if line.strip() and not line.strip().startswith("#")
     ]
-    from packaging.version import Version
-
-    def _assert_min_floor(reqs, pkg_name, min_ver):
-        matches = [
-            line
-            for line in reqs
-            if re.match(rf"^{re.escape(pkg_name)}>=(.+)$", line, re.IGNORECASE)
-        ]
-        assert matches, f"Expected lower-bounded requirement for {pkg_name}"
-        ver_str = matches[0].split(">=", 1)[1].split(",")[0].strip()
-        assert Version(ver_str) >= Version(
-            min_ver
-        ), f"{pkg_name} floor {ver_str} is below minimum {min_ver}"
-
     _assert_min_floor(active_reqs, "aiohttp", "3.13.4")
     _assert_min_floor(active_reqs, "requests", "2.33.0")
     _assert_min_floor(active_reqs, "cryptography", "46.0.6")
@@ -206,8 +206,6 @@ def test_pyproject_and_requirements_consistency():
 
 
 def test_requirements_docs_and_manifest_and_docker():
-    from packaging.version import Version
-
     docs_reqs = {
         line.strip()
         for line in (REPO_ROOT / "requirements_docs.txt")
@@ -226,11 +224,7 @@ def test_requirements_docs_and_manifest_and_docker():
             re.split(r"[<>=!~;\[]", r)[0].strip().lower() == required for r in docs_reqs
         ), f"Expected {required} in requirements_docs.txt"
 
-    pygments_matches = [r for r in docs_reqs if r.lower().startswith("pygments>=")]
-    assert pygments_matches, "Expected lower-bounded pygments in requirements_docs.txt"
-    assert Version(
-        pygments_matches[0].split(">=", 1)[1].split(",")[0].strip()
-    ) >= Version("2.21.0")
+    _assert_min_floor(docs_reqs, "pygments", "2.21.0")
 
     for legacy in (
         "sphinx",
