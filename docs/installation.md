@@ -25,7 +25,7 @@ To install GeoAI with optional dependencies for additional features:
 pip install "geoai-py[extra]"
 ```
 
-Other task-specific optional extras are also available in `pyproject.toml`: `agents`, `onnx`, `rfdetr`, `terratorch`, `sr`, `vllm`, `networks`, `osd`, and `building` (for example, `pip install "geoai-py[onnx]"`).
+You can also install one or more task-specific extras (for example, `pip install "geoai-py[agents,onnx]"`). See [Optional Dependencies](#optional-dependencies-extras) below for the full list.
 
 ### 🐍 Using uv
 
@@ -33,6 +33,12 @@ To install the latest stable release of GeoAI with [uv](https://docs.astral.sh/u
 
 ```bash
 uv pip install geoai-py
+```
+
+Or with optional extras:
+
+```bash
+uv pip install "geoai-py[extra]"
 ```
 
 ### 🐼 Using conda
@@ -52,6 +58,30 @@ conda create -n geo python=3.12
 conda activate geo
 conda install -c conda-forge mamba
 mamba install -c conda-forge geoai
+```
+
+## 📦 Optional Dependencies (Extras)
+
+GeoAI defines 10 optional dependency groups in `pyproject.toml` so you only install heavy or specialized packages when you need them:
+
+| Extra | Packages | Capabilities |
+| ----- | -------- | ------------ |
+| `extra` | `torchange`, `lightly-train`, `multiclean`, `omnicloudmask`, `omniwatermask`, `quackosm` | Change detection, self-supervised pretraining, mask cleaning, cloud/water masking, and OSM downloads |
+| `agents` | `strands-agents`, `strands-agents-tools`, `strands-agents[ollama]`, `strands-agents[anthropic]`, `strands-agents[openai]` | AI geospatial agents (`GeoAgent`, `STACAgent`, `CatalogAgent`, `DataTools`) |
+| `onnx` | `onnx>=1.21.0`, `onnxruntime` | ONNX model export and inference (`geoai.onnx`, `ONNXInferenceStep`) |
+| `rfdetr` | `rfdetr` | RF-DETR object detection and segmentation (`geoai.rfdetr`) |
+| `terratorch` | `terratorch>=1.0` | Geospatial foundation models via TerraTorch and Prithvi (`geoai.prithvi`, `geoai.foundation_models`) |
+| `sr` | `opensr-model` | Satellite imagery super-resolution (`geoai.tools.sr`) |
+| `vllm` | `vllm` | High-throughput vision-language model inference (`geoai.vllm_geo`) |
+| `networks` | `neatnet`, `osmnx` | Road network simplification and spatial graph analysis (`geoai.networks`) |
+| `osd` | `opticallyshallowdeep` | Optically shallow and deep water classification (`geoai.osd`) |
+| `building` | `buildingregulariser` | Building footprint regularization and orthogonalization (`geoai.orthogonalization`) |
+
+Install one or more extras by combining them in quotes:
+
+```bash
+pip install "geoai-py[extra]"
+pip install "geoai-py[agents,onnx]"
 ```
 
 ## 🔧 Advanced Installation Options
@@ -119,6 +149,23 @@ To verify your installation, run:
 ```python
 import geoai
 print(geoai.__version__)
+```
+
+## ⚙️ Runtime Environment Variables
+
+GeoAI recognizes the following environment variables at runtime:
+
+| Variable | Values | Description |
+| -------- | ------ | ----------- |
+| `GEOAI_DEVICE` | PyTorch device string (e.g. `cpu`, `cuda`, `cuda:0`, `mps`, `xpu`) | Overrides automatic device selection in `geoai.utils.get_device()`. Raises a `ValueError` if the value is invalid or the requested accelerator is unavailable. |
+| `GEOAI_ALLOW_UNSAFE_TORCH_LOAD` | `1`, `true`, `yes` | Allows loading legacy PyTorch checkpoints with `weights_only=False` when safe `weights_only=True` deserialization fails. Only enable this for checkpoints from trusted sources. |
+| `GEOAI_DISABLE_PROGRESS` | `1`, `true`, `yes`, `on` | Globally disables `tqdm` progress bars across GeoAI operations (useful in CI, batch logs, and headless scripts). |
+
+Example:
+
+```bash
+export GEOAI_DEVICE=cuda:0
+export GEOAI_DISABLE_PROGRESS=1
 ```
 
 ## ⚠️ Troubleshooting

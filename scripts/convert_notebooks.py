@@ -38,9 +38,10 @@ def notebook_to_markdown(path: Path) -> str:
 
     Markdown cells are passed through verbatim, code cells are wrapped in
     fenced Python code blocks, and raw cells are skipped. A notebook
-    download badge is inserted after the first Markdown heading. Only
-    markdown cells are searched for the heading, so ``#`` comment lines in
-    code cells can never attract the badge into a code fence.
+    download badge is inserted after the first H1 Markdown heading, or
+    prepended to the document when no H1 heading is present. Only markdown
+    cells are searched for the heading, so ``#`` comment lines in code
+    cells can never attract the badge into a code fence.
 
     Args:
         path: Path to the ``.ipynb`` file to convert.
@@ -62,6 +63,8 @@ def notebook_to_markdown(path: Path) -> str:
             blocks.append(source)
         elif cell.cell_type == "code":
             blocks.append(f"```python\n{source}\n```")
+    if not badge_inserted:
+        blocks.insert(0, badge)
     return "\n\n".join(blocks) + "\n"
 
 

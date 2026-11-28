@@ -1,22 +1,21 @@
 # QGIS Plugin for GeoAI
 
-A QGIS plugin that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Moondream VLM, segmentation training/inference, SamGeo) so you can keep QGIS as your main workspace while experimenting with GeoAI.
+A QGIS plugin that brings [GeoAI](https://github.com/opengeos/geoai) models into dockable panels (Tree Segmentation, Water Segmentation, Change Detection, Moondream VLM, Segment Anything, Semantic Segmentation, Instance Segmentation, and AI Processing Monitor) so you can keep QGIS as your main workspace while running AI-powered geospatial workflows. It supports **QGIS 3.28+ and QGIS 4.0 (PyQt6)** on Linux, Windows, and macOS.
 
 ## Quick Start
 
--   Create a Pixi project and install the dependencies.
--   Install the QGIS plugin from the QGIS Plugin Manager.
--   Enable the GeoAI plugin in QGIS.
--   Restart QGIS.
--   Open a GeoAI toolbar panel and try the sample datasets below.
+- Install the GeoAI plugin from the QGIS Plugin Manager (or download [geoai.zip](https://qgis.gishub.org/plugins/geoai.zip)).
+- Enable the GeoAI plugin in QGIS.
+- Open any GeoAI toolbar panel; the **Built-in Dependency Installer** will guide you through one-click environment setup.
+- Try the sample datasets below.
 
 ## Video Tutorials
 
 ### Installation Tutorial
 
-You can follow this [video tutorial](https://youtu.be/TJmZQXJK-IU) to install the GeoAI QGIS Plugin on Linux/Windows:
+You can follow this [video tutorial](https://youtu.be/L90id_ESQME) to install the GeoAI QGIS Plugin on Linux and Windows:
 
-[![installation](https://github.com/user-attachments/assets/6fa17c97-2ff5-40d6-be16-c6dcfe03f806)](https://youtu.be/TJmZQXJK-IU)
+[![installation](https://github.com/user-attachments/assets/3cda92c0-4de9-4cad-81c8-ddb3c790be91)](https://youtu.be/L90id_ESQME)
 
 ### Usage Tutorial
 
@@ -24,322 +23,115 @@ Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video 
 
 [![demo](https://github.com/user-attachments/assets/5aabc3d3-efd1-4011-ab31-2b3f11aab3ed)](https://youtu.be/8-OhlqeoyiY)
 
-
-
 ## Requirements
 
--   QGIS 3.28 or later
--   Python 3.10+ (Pixi recommended)
--   PyTorch (CUDA if you want GPU acceleration)
--   `geoai` and `samgeo` packages
+- QGIS 3.28 or later, including **QGIS 4.0 (PyQt6)** dual compatibility
+- Python 3.12+ (Built-in Dependency Installer recommended; Pixi optional for custom CUDA setups)
+- PyTorch (CUDA for NVIDIA GPUs, Apple MPS for Apple Silicon, or CPU fallback)
+- `geoai-py`, `segment-geospatial` (`samgeo`), `deepforest`, `omniwatermask`, and `torchange` packages (installed automatically by the Built-in Dependency Installer)
 
 ## Features
 
 Each tool lives inside a dockable panel that can be attached to either side of the QGIS interface, so you can keep layers, maps, and models visible simultaneously.
 
+### Tree Segmentation Panel (DeepForest)
+
+- **Model Tab**: Load pretrained [DeepForest](https://deepforest.readthedocs.io) models from Hugging Face for tree crown, bird, livestock, nest, and dead tree detection
+- **Predict Tab**: Run predictions on single images or large geospatial tiles with configurable patch size, overlap, IoU threshold, and score filtering
+- **Output Tab**: Save detection results as georeferenced vector (GeoPackage, Shapefile, GeoJSON) or raster (GeoTIFF), and export training data in PASCAL_VOC, COCO, or YOLO format
+
+### Water Segmentation Panel (OmniWaterMask)
+
+- **Water Body Detection**: Automated water body segmentation from satellite and aerial imagery using [OmniWaterMask](https://github.com/DPIRD-DMA/OmniWaterMask)
+- **Band Configuration**: Configurable band ordering for multispectral imagery (RGBN, BGRN, etc.)
+- **Patch-based Inference & OSM Integration**: Sliding-window inference with optional OpenStreetMap water, building, and road refinement
+- **Output Options**: Save masks as GeoTIFF or smoothed/filtered vector polygons (GeoPackage, Shapefile)
+
+### Change Detection Panel (AnyChange)
+
+- **Zero-Shot Change Detection**: Detect changes between two co-registered raster layers using [AnyChange](https://github.com/Z-Zheng/pytorch-change-models) built on SAM
+- **Threshold Control**: Set the change angle manually or enable automatic thresholding
+- **Output Options**: Save change masks as GeoTIFF and optional change polygons (GeoPackage, GeoJSON, Shapefile)
+
 ### Moondream Vision-Language Model Panel
 
--   **Caption**: Generate descriptions of geospatial imagery (short, normal, or long)
--   **Query**: Ask questions about images using natural language
--   **Detect**: Detect and locate objects with bounding boxes
--   **Point**: Locate specific objects with point markers
+- **Caption**: Generate descriptions of geospatial imagery (short, normal, or long)
+- **Query**: Ask questions about images using natural language
+- **Detect**: Detect and locate objects with bounding boxes
+- **Point**: Locate specific objects with point markers
 
-### Segmentation Panel (Combined Training & Inference)
+### Segment Anything Panel (SamGeo)
 
--   **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
--   **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, etc.)
--   **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results. Vector outputs can optionally be smoothed or simplified for immediate use in GIS workflows.
+- **Model Tab**: Load SAM models (SAM3, SAM2, or SAM1) with configurable backend and device settings, plus built-in Hugging Face token login for gated SAM 3 access
+- **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road"), with optional tiled processing for large GeoTIFFs
+- **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
+- **Batch Tab**: Process multiple points interactively or from vector files/layers
+- **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional polygon regularization and `score`, `source`, and `prompt` attributes
 
-### SamGeo Panel (Segment Anything Model)
+### Semantic Segmentation Panel (Combined Training & Inference)
 
--   **Model Tab**: Load SAM models (SAM1, SAM2, or SAM3) with configurable backend and device settings
--   **Text Tab**: Segment objects using text prompts (e.g., "tree", "building", "road")
--   **Interactive Tab**: Segment using point prompts (foreground/background) or box prompts drawn on the map
--   **Batch Tab**: Process multiple points interactively or from vector files/layers
--   **Output Tab**: Save results as raster (GeoTIFF) or vector (GeoPackage, Shapefile) with optional regularization (orthogonalize polygons, filter by minimum area)
+- **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data
+- **Tab 2 - Train Models**: Train custom segmentation models (U-Net, DeepLabV3+, FPN, SegFormer, etc.)
+- **Tab 3 - Run Inference**: Apply trained models to new imagery and vectorize results with optional smoothing or simplification
 
-### GPU Memory Management
+### Instance Segmentation Panel (Mask R-CNN)
 
--   **Clear GPU Memory**: Release GPU memory and clear CUDA cache for all loaded models
+- **Tab 1 - Create Training Data**: Export GeoTIFF tiles with instance-level masks in PASCAL_VOC format, with configurable tile size, stride, and buffer radius
+- **Tab 2 - Train Models**: Train Mask R-CNN models with configurable channels, classes, batch size, epochs, learning rate, and validation split
+- **Tab 3 - Run Inference**: Apply trained Mask R-CNN models to new imagery and vectorize results with optional smoothing
 
 ### AI Processing Monitor
 
-Open **GeoAI → AI Processing Monitor** to observe supported Semantic Segmentation
-tasks while they run. The monitor currently covers tile export, training, inference,
-vectorization, and vector smoothing started from the Segmentation panel.
+Open **GeoAI → AI Processing Monitor** to observe supported Semantic Segmentation tasks while they run. The monitor covers tile export, training, inference, vectorization, and vector smoothing started from the Semantic Segmentation panel.
 
-#### What changes for users
+- **Lifecycle States**: Tracks `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, and `CANCELLED` without blocking the QGIS map canvas.
+- **Timing and Progress**: Displays monotonic elapsed time, start and end wall-clock timestamps, epoch-based percentages for training, and indeterminate progress bars for message-only operations (never fabricating percentages).
+- **Error Diagnostics and GPU Metrics**: Retains concise error categories (missing input, missing dependency, GPU/CUDA, output writing, processing) alongside full tracebacks, shows PyTorch CUDA memory metrics when accessible from the QGIS process, and lets you clear finished entries with **Clear finished** while retaining active tasks.
+- **Safety Notes**: The monitor never clears CUDA cache automatically. **Clear GPU Memory** remains a separate manual action and should not be used while a GPU task is actively running.
 
-Before the monitor was introduced, each Semantic Segmentation operation reported
-information only through its source panel and log messages. Users had no single
-place to answer the following questions while a long-running operation was active:
+### Isolated Managed Subprocess Architecture
 
-- Which AI operation is currently running?
-- Has the operation started, or is it still waiting to start?
-- How long has it been running?
-- Is reliable progress available?
-- Did the operation complete, fail, or stop?
-- What error category and technical details should be investigated?
-- Is GPU memory information available?
+Starting with v1.9.2, AI panels run model loading, inference, and training-tile export inside isolated subprocesses launched from the plugin's managed virtual environment (`~/.qgis_geoai/`) rather than importing PyTorch into the QGIS process. This prevents PyTorch and OpenMP runtime conflicts (such as `OMP: Error #15` aborts in conda-forge QGIS on macOS) and keeps the QGIS UI responsive.
 
-With the AI Processing Monitor enabled, open **GeoAI → AI Processing Monitor** to
-see a task entry for supported Semantic Segmentation operations. Each entry
-contains the task name and lifecycle status. While a task is running, the dock
-updates elapsed time without blocking the QGIS map canvas. When reliable progress
-is provided by the worker, the monitor shows a bounded percentage and progress bar.
-For operations that expose only progress messages or start/finish events, it shows
-an indeterminate progress bar instead of inventing a percentage.
+### GPU Memory Management
 
-After a task finishes, the selected entry retains its final status, elapsed
-duration, start timestamp, end timestamp, progress message, and optional GPU
-metrics. Failed tasks show a concise user-facing error category and preserve
-technical traceback details for debugging. Finished entries can be removed with
-**Clear finished**; active tasks are retained.
-
-The monitor is currently connected to Semantic Segmentation tile export, model
-training, inference, vectorization, and vector smoothing. It does not claim
-coverage for the other GeoAI panels.
-
-Supported lifecycle states are `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, and
-`CANCELLED` when the underlying lifecycle event is available. `IDLE` is an
-internal initial state and is not normally shown for submitted work. Elapsed
-time uses a monotonic clock, while start and end timestamps are wall-clock values
-for display.
-
-Training reports epoch-based progress. Operations that expose only messages or
-start/finish events use an indeterminate progress bar. The monitor never
-fabricates a percentage. Error categories are best-effort and include missing
-input, missing dependency, GPU/CUDA, output-writing, and generic processing
-failures. The concise summary is shown in the dock while technical traceback
-details remain available for debugging.
-
-When PyTorch and CUDA metrics are accessible from the QGIS process, the monitor
-shows the device name, allocated memory, reserved memory, and peak allocated
-memory in MB. Allocated memory is active tensor memory; reserved memory is held
-by PyTorch's caching allocator. Neither value represents total GPU utilization.
-CPU-only installations, missing PyTorch, unavailable CUDA drivers, and
-unsupported backends do not prevent processing. For subprocess-backed Semantic
-Segmentation tasks, including training and inference, the displayed values may
-describe the QGIS process rather than the subprocess because subprocess GPU
-telemetry is not yet integrated.
-
-The monitor never invokes CUDA cache clearing automatically. **Clear GPU Memory**
-remains a separate manual action and should not be used while an inference task
-is actively using the GPU. There is no dedicated user-facing cancel control.
-Closing the Semantic Segmentation panel terminates running workers according to
-the panel shutdown lifecycle and can mark their associated monitor tasks as
-`CANCELLED`. Note that forcefully terminating the worker thread does not
-guarantee subprocess cleanup, so an already-started subprocess may continue
-using GPU resources or writing output until it exits. Other task types are not
-claimed to support cancellation.
+- **Clear GPU Memory**: Release GPU memory and clear CUDA cache for loaded models
 
 ## Installation
 
-### 1. Set up the environment
+There are two ways to set up the GeoAI plugin dependencies:
 
-Installing the GeoAI QGIS plugin can be challenging due to the complicated pytorch/cuda dependencies. Conda or mamba might take a while to resolve the dependencies, while pip might fail to install the dependencies properly. It is recommended to use [pixi](https://pixi.prefix.dev/latest) to install the dependencies to avoid these issues.
+- **Option A - Built-in Dependency Installer (recommended)**: One-click setup that creates an isolated Python environment at `~/.qgis_geoai/` (or `GEOAI_CACHE_DIR`), detects NVIDIA CUDA or Apple MPS, and installs all required packages using `uv`.
+- **Option B - Pixi Environment (advanced)**: Manually manage a Pixi environment with explicit PyTorch and CUDA pins.
 
-#### 1) Install Pixi
+### Built-in Dependency Installer
 
-#### Linux/macOS (bash/zsh)
+When you first open any GeoAI panel, the plugin detects whether the required AI packages are installed. If not, it shows a one-click setup dialog that:
 
-```bash
-curl -fsSL https://pixi.sh/install.sh | sh
-```
+- Detects your GPU (NVIDIA CUDA or Apple MPS) and configures PyTorch accordingly
+- Creates an isolated virtual environment at `~/.qgis_geoai/`
+- Installs PyTorch, `geoai-py`, `segment-geospatial`, `deepforest`, `omniwatermask`, `torchange`, and `transformers`
+- Shows real-time installation progress
 
-Close and re-open your terminal (or reload your shell) so `pixi` is on your `PATH`. Then confirm:
-
-```bash
-pixi --version
-```
-
-#### Windows (PowerShell)
-
-Open **PowerShell** (preferably as a normal user, Admin not required), then run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -c "irm -useb https://pixi.sh/install.ps1 | iex"
-```
-
-Close and re-open PowerShell, then confirm:
-
-```powershell
-pixi --version
-```
-
----
-
-#### 2) Create a Pixi project
-
-Navigate to a directory where you want to create the project and run:
-
-```powershell
-pixi init geo
-cd geo
-```
-
----
-
-#### 3) Configure `pixi.toml`
-
-Open `pixi.toml` in the `geo` directory and replace its contents with the following depending on your system.
-
-If you have a NVIDIA GPU with CUDA, run `nvidia-smi` to check the CUDA version.
-
-> **Note:** QGIS is pinned to `3.44.*` on purpose. Do not lower it to `3.42.*`:
-> with the dependencies below, that pin resolves to QGIS 3.42.2 (3.42.3 conflicts
-> with the rest of the stack), and 3.42.2 shipped a Windows regression that makes
-> saving any `.qgz` project fail with "Unable to perform zip"
-> ([QGIS #61560](https://github.com/qgis/QGIS/issues/61560), fixed by
-> [QGIS #61567](https://github.com/qgis/QGIS/pull/61567)). qgis.org reissued its
-> 3.42.2 Windows installer with the fix, but conda-forge builds 3.42.2 from the
-> original release, so the broken code is what you get. The bug is in QGIS itself
-> and is unrelated to this plugin.
->
-> If you already created the environment and hit this, update QGIS in place:
->
-> ```bash
-> cd geo
-> pixi update qgis
-> ```
->
-> Check **Help → About** to confirm you are off 3.42.2. Until you can update,
-> save with *Save As* → **QGIS Project File (\*.qgs)**; `.qgs` is uncompressed
-> XML and never touches the zip path, so it is unaffected.
-
-- For GPU with CUDA 12.x:
-
-```toml
-[workspace]
-channels = ["https://prefix.dev/conda-forge"]
-name = "geo"
-platforms = ["linux-64", "win-64"]
-
-[system-requirements]
-cuda = "12.0"
-
-[dependencies]
-python = "3.12.*"
-pytorch-gpu = ">=2.7.1,<3"
-qgis = "3.44.*"
-pyqt = "5.15.*"
-geoai = ">=0.24.0"
-segment-geospatial = ">=1.2.0"
-sam3 = ">=0.1.0.20251211"
-libopenblas = ">=0.3.30"
-```
-
-- For GPU with CUDA 13.x:
-
-```toml
-[workspace]
-channels = ["https://prefix.dev/conda-forge"]
-name = "geo"
-platforms = ["linux-64", "win-64"]
-
-[system-requirements]
-cuda = "13.0"
-
-[dependencies]
-python = "3.12.*"
-pytorch-gpu = ">=2.7.1,<3"
-qgis = "3.44.*"
-pyqt = "5.15.*"
-geoai = ">=0.24.0"
-segment-geospatial = ">=1.2.0"
-sam3 = ">=0.1.0.20251211"
-```
-
-- For CPU:
-
-```toml
-[workspace]
-channels = ["https://prefix.dev/conda-forge"]
-name = "geo"
-platforms = ["linux-64", "win-64"]
-
-[dependencies]
-python = "3.12.*"
-pytorch-cpu = ">=2.7.1,<3"
-qgis = "3.44.*"
-pyqt = "5.15.*"
-geoai = ">=0.24.0"
-segment-geospatial = ">=1.2.0"
-sam3 = ">=0.1.0.20251211"
-libopenblas = ">=0.3.30"
-```
-
----
-
-#### 4) Install the environment
-
-From the `geo` folder:
-
-```powershell
-pixi install
-```
-
-This step may take several minutes on first install depending on your internet connection and system.
-
----
-
-#### 5) Verify PyTorch + CUDA
-
-If you have a NVIDIA GPU with CUDA, run the following command to verify the PyTorch + CUDA installation:
-
-```powershell
-pixi run python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('GPU:', (torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'))"
-```
-
-Expected output should be like this:
-
--   `PyTorch: 2.9.1`
--   `CUDA available: True`
--   `GPU: NVIDIA RTX 4090`
-
-If CUDA is `False`, check:
-
--   `nvidia-smi` works in PowerShell
--   NVIDIA driver is up to date
-
----
-
-
-#### Request access to SAM 3
-
-SAM 3 is hosted in a gated Hugging Face repository. Request access at <https://huggingface.co/facebook/sam3>, then authenticate from the Pixi project folder:
+To store the managed environment outside your home directory, set `GEOAI_CACHE_DIR` before starting QGIS:
 
 ```bash
-pixi run hf auth login
+export GEOAI_CACHE_DIR=/path/to/writable/directory
 ```
 
-If you installed the dependencies with the plugin's built-in installer instead of Pixi, `hf` is not on your `PATH` — see [Hugging Face Authentication (SAM 3)](https://opengeoai.org/qgis_plugin/#hugging-face-authentication-sam-3) for the full instructions.
+### Pixi Environment (Optional)
 
-After authentication, you can download the SAM 3 model from Hugging Face:
+If you prefer a manually managed Pixi environment, install [Pixi](https://pixi.prefix.dev/latest), run `pixi init geo && cd geo`, and configure `pixi.toml` with Python 3.12, QGIS `3.44.*`, `geoai`, `segment-geospatial`, and `sam3`. See the full [QGIS Plugin Documentation](https://opengeoai.org/qgis_plugin/#1-set-up-the-environment-with-pixi) for CUDA 12.x, CUDA 13.x, and CPU `pixi.toml` templates and DeepForest setup.
 
-```bash
-pixi run hf download facebook/sam3
-```
+### Install the QGIS Plugin
 
-**Important Note**: SAM 3 currently requires an NVIDIA GPU with CUDA support. You won't be able to use SAM 3 if you have a CPU-only system ([source](https://github.com/facebookresearch/sam3/issues/164)). You will get an error message like this: `Failed to load model: Torch not compiled with CUDA enabled`.
+Option A: use QGIS Plugin Manager (recommended):
 
-### 2. Install the QGIS plugin
-
-Option A — use QGIS Plugin Manager (recommended):
-
-GeoAI is available as a QGIS plugin in the official [QGIS plugin repository](https://plugins.qgis.org/plugins/geoai). To install:
-
-1. Launch QGIS: `pixi run qgis`
+1. Launch QGIS (QGIS 3.28+ or QGIS 4.0)
 2. Go to `Plugins` → `Manage and Install Plugins...`
 3. Switch to the `All` tab, search for `GeoAI`, select it, and click `Install Plugin`
 
-![](https://github.com/user-attachments/assets/b31d1d13-27ff-420a-84ab-9cc82ade9a8e)
-
-If you encounter an error message like this after installing the plugin, click **Close** to dismiss the dialog. Next, in the Plugin Manager, toggle the checkbox next to the **GeoAI** plugin in the plugin list to enable it. If the error dialog appears again, close it once more, then restart QGIS to reload the plugin. After restarting, the GeoAI plugin should appear in the QGIS toolbar.
-
-![](https://github.com/user-attachments/assets/cb1be4f9-eaba-4c0c-9c48-f209d39b2d71)
-
-Option B — use the helper script:
+Option B: use the helper script:
 
 ```bash
 git clone https://github.com/opengeos/geoai.git
@@ -347,178 +139,50 @@ cd geoai/qgis_plugin
 python install.py
 ```
 
-This copies the plugin into the `default` profile of every installed QGIS major version (QGIS 3 and QGIS 4; use `--profile NAME` for another profile). Re-run after pulling updates. Remove with:
+This copies the plugin into the `default` profile of every installed QGIS major version (QGIS 3 and QGIS 4; use `--profile NAME` for another profile). Remove with `python install.py --remove`.
 
-```bash
-python install.py --remove
-```
+Option C: manual copy:
 
-Option C — manual copy:
+- Copy the `qgis_plugin/geoai` folder to your QGIS plugins directory:
+    - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
+    - Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins/`
+    - macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
+    - QGIS 4 uses `QGIS4` instead of `QGIS3` in these paths.
 
--   Copy the `qgis_plugin` folder to your QGIS plugins directory:
-    -   Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
-    -   Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
-    -   macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
-    -   QGIS 4 uses `QGIS4` instead of `QGIS3` in these paths.
+## Hugging Face Authentication (SAM 3)
 
-### 3. Enable in QGIS
+SAM 3 is hosted in a gated Hugging Face repository (<https://huggingface.co/facebook/sam3>). After your access request is approved, create a Read (or gated-repo-enabled Fine-grained) token at <https://huggingface.co/settings/tokens> and authenticate using one of these methods:
 
-Launch QGIS: `pixi run qgis`
+- **In-panel login (built-in installer)**: Open **Segment Anything → Model tab → Hugging Face**, paste your token, and click **Log in**.
+- **CLI (Pixi environment)**: Run `pixi run hf auth login` from your Pixi project folder.
+- **Environment variable**: Set `HF_TOKEN` in the environment that launches QGIS.
 
-QGIS → `Plugins` → `Manage and Install Plugins...` → enable `GeoAI`. After updates, toggle the plugin off/on or restart QGIS to reload.
+SAM 3 currently requires an NVIDIA GPU with CUDA support; use SAM 1 or SAM 2 on CPU-only systems. See [Hugging Face Authentication (SAM 3)](https://opengeoai.org/qgis_plugin/#hugging-face-authentication-sam-3) for complete instructions.
 
-![](https://github.com/user-attachments/assets/1b6dab14-311d-4f62-85aa-1faed73ead5b)
-
-## Usage
-
-### Moondream Vision-Language Model
-
-Sample dataset: [parking_lot.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/parking_lot.tif)
-
-Steps:
-
-1. Click the **Moondream** button in the GeoAI toolbar (or `GeoAI` menu → `Moondream VLM`)
-2. Load a Moondream model (default: vikhyatk/moondream2)
-3. Select a raster layer or browse for an image file
-4. Choose a mode:
-    - **Caption**: Generate a description of the image
-    - **Query**: Ask a question about the image
-    - **Detect**: Detect objects by type (e.g., "building", "car")
-    - **Point**: Locate specific objects
-5. Click "Run"
-6. Results are displayed and optionally added to the map. You can drag the panel to any side of QGIS to keep it out of the way while browsing results. Save the output table or vector layer if you want to reuse detections later.
-
-    ![moondream](https://github.com/user-attachments/assets/bb800a04-b7c4-4fdd-a628-a48842d7eac5)
-
-### Segmentation Panel (Create Data, Train, Inference)
-
-Sample datasets:
-
--   [naip_rgb_train.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_rgb_train.tif)
--   [naip_test.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_test.tif)
--   [naip_train_buildings.geojson](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/naip_train_buildings.geojson)
-
-Steps:
-
-1. Download the sample datasets (links above) or prepare your own imagery/vector labels. Store them in a folder that is accessible to pixi project.
-2. Click the **Segmentation** button in the GeoAI toolbar (or `GeoAI` menu → `Segmentation`)
-3. Use the tabs at the top of the panel to switch between:
-
-    - **Create Training Data**: Select input raster and vector labels, configure tile size and stride, and export tiles to a directory.
-    - **Train Model**: Select the images and labels directories, choose model architecture (U-Net, DeepLabV3+, etc.), configure training parameters, and start training.
-    - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results.
-
-    ![data](https://github.com/user-attachments/assets/121fcfa8-6f9b-4413-9419-af666698c053)
-
-    ![train](https://github.com/user-attachments/assets/dfeefb86-ebf7-467c-a5ff-794cde80a7cb)
-
-    ![inference](https://github.com/user-attachments/assets/f0945c01-0fcb-4607-9226-4a3b2bcb05e1)
-
-### SamGeo Panel (Segment Anything Model)
-
-Sample dataset:
-
--   [uc_berkeley.tif](https://huggingface.co/datasets/giswqs/geospatial/resolve/main/uc_berkeley.tif)
--   [wa_building_image.tif](https://github.com/opengeos/datasets/releases/download/places/wa_building_image.tif)
--   [wa_building_centroids.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_centroids.geojson)
--   [wa_building_bboxes.geojson](https://github.com/opengeos/datasets/releases/download/places/wa_building_bboxes.geojson)
-
-Steps:
-
-1. Click the **SamGeo** button in the GeoAI toolbar (or `GeoAI` menu → `SamGeo`)
-2. In the **Model** tab:
-
-    - Select the SAM model version (SamGeo3/SAM3, SamGeo2/SAM2, or SamGeo/SAM1)
-    - Configure backend (meta or transformers) and device (auto, cuda, cpu)
-    - Click "Load Model" to initialize the model
-    - Select a raster layer or browse for an image file and click "Set Image"
-
-    ![](https://github.com/user-attachments/assets/600b0879-f851-4423-b668-cb9e8df28425)
-
-3. Choose a segmentation method:
-
-    - **Text Tab**: Enter text prompts describing objects to segment (e.g., "tree, building")
-
-        ![](https://github.com/user-attachments/assets/da2c17fc-4633-488d-ba44-00f1cd97555c)
-
-    - **Interactive Tab**:
-
-        - Click "Add Foreground Points" or "Add Background Points" and click on the map
-        - Or click "Draw Box" and drag a rectangle on the map
-        - Click "Segment by Points" or "Segment by Box"
-
-        ![](https://github.com/user-attachments/assets/6730737d-62fc-438a-bff5-cffb685d391e)
-
-    - **Batch Tab**: Add multiple points interactively or load from a vector file/layer
-
-        ![](https://github.com/user-attachments/assets/104ec741-44cc-404a-9213-36cf78456171)
-
-4. In the **Output** tab:
-
-    - Select output format (Raster GeoTIFF, Vector GeoPackage, or Vector Shapefile)
-    - For vector output, optionally enable regularization:
-        - Check "Regularize polygons (orthogonalize)"
-        - Set Epsilon (simplification tolerance) and Min Area (filter small polygons)
-    - Click "Save Masks" to export results
-
-    ![](https://github.com/user-attachments/assets/5c80cc57-3870-4a20-bb74-73e394ef22a6)
-
-### Clear GPU Memory
-
-Click the **GPU** button in the GeoAI toolbar to release GPU memory from all loaded models (Moondream, SamGeo, etc.) and clear CUDA cache. Use this frequently when switching between large models to prevent out-of-memory errors.
-
-![](https://github.com/user-attachments/assets/76c9dd8a-581c-4975-9ecb-4bfe301447bd)
+## Utilities and Maintenance
 
 ### Plugin Update Checker
 
-Go to `GeoAI` menu → `Check for Updates...` to see if a newer version of the GeoAI plugin is available. Click on the `Check for Updates` button to fetch the latest version info from GitHub. If an update is found, click the `Download and Install Update` button to download and install the latest version automatically. Restart QGIS to apply the update.
-
-![](https://github.com/user-attachments/assets/cc0dfd38-9b41-4735-9af0-c49b7aa71b72)
+Go to `GeoAI` menu → `Check for Updates...` to check GitHub for newer plugin releases and install updates directly from QGIS.
 
 ### Diagnostics Report
 
-Go to `GeoAI` menu → `Generate Diagnostics Report...` to create a Markdown report that can be copied directly into a GitHub issue. The report includes the plugin version, QGIS/Python runtime, operating system, managed virtual environment path, CUDA availability, GPU details, and versions/import status for key packages such as `geoai-py`, PyTorch, SAM3, Transformers, and `segment-geospatial`.
+Go to `GeoAI` menu → `Generate Diagnostics Report...` to create a Markdown report ready to paste into a GitHub issue. It includes the plugin version, QGIS/Python runtime, operating system, managed virtual environment path (with home paths redacted), CUDA/GPU details, and versions/import status for key packages (`geoai-py`, PyTorch, SAM 3, Transformers, `segment-geospatial`).
 
 ## Supported Model Architectures (Segmentation)
 
-The QGIS plugin supports any models supported by [Pytorch Segmentation Models](https://smp.readthedocs.io/en/latest/models.html), including:
-
--   U-Net
--   U-Net++
--   DeepLabV3
--   DeepLabV3+
--   FPN (Feature Pyramid Network)
--   PSPNet
--   LinkNet
--   MANet
--   PAN
--   UperNet
--   SegFormer
--   DPT
-
-## Supported Encoders (Segmentation)
-
--   ResNet (34, 50, 101, 152)
--   EfficientNet (b0-b4)
--   MobileNetV2
--   VGG (16, 19)
-
-## Supported SAM Models (SamGeo)
-
--   **SamGeo3 (SAM3)**: Latest version with text prompts, point prompts, and box prompts
--   **SamGeo2 (SAM2)**: Improved version with better performance
--   **SamGeo (SAM1)**: Original Segment Anything Model
+Any architecture supported by [PyTorch Segmentation Models](https://smp.readthedocs.io/en/latest/models.html), including U-Net, U-Net++, DeepLabV3, DeepLabV3+, FPN, PSPNet, LinkNet, MANet, PAN, UperNet, SegFormer, and DPT, with ResNet, EfficientNet, MobileNetV2, and VGG encoders.
 
 ## Troubleshooting
 
--   If you report a plugin issue on GitHub, include the Markdown from `GeoAI` menu → `Generate Diagnostics Report...`.
--   Plugin missing after install: confirm the plugin folder exists in your QGIS profile path and that you restarted QGIS.
--   CUDA OOM: use the **GPU** button to clear cache, lower batch sizes, or switch to CPU for smaller runs.
--   Model download failures: check network/firewall, then retry loading models from the panel.
+- Include the Markdown from `GeoAI` menu → `Generate Diagnostics Report...` when reporting an issue on GitHub.
+- Plugin missing after install: confirm `geoai` exists in your QGIS3 or QGIS4 profile plugins folder and restart QGIS.
+- CUDA out-of-memory: use the **GPU** toolbar button to clear cache, lower batch sizes, or switch to CPU.
+- SAM 3 gated-repo error: verify your access approval on <https://huggingface.co/facebook/sam3> and sign in via the Segment Anything panel's **Hugging Face** group.
 
-### Windows installation issues
+### Windows Installation Issues
 
-If the plugin or dependencies fail to install on Windows when using the QGIS Plugin Manager, try a clean reinstall with the quick installer instead:
+If the plugin or dependencies fail to install on Windows when using the QGIS Plugin Manager, try a clean reinstall with the quick installer:
 
 1. Uninstall the GeoAI plugin completely from QGIS.
 2. Close QGIS.
@@ -529,9 +193,7 @@ If the plugin or dependencies fail to install on Windows when using the QGIS Plu
     ```
 
 4. Restart QGIS.
-5. Open `Plugins` → `Manage and Install Plugins...`, enable **GeoAI**, then use the plugin's dependency installer.
-
-This sequence has resolved cases where installing dependencies directly from PowerShell or installing the plugin only through the Plugin Manager failed on Windows.
+5. Open `Plugins` → `Manage and Install Plugins...`, enable **GeoAI**, then use the plugin's built-in dependency installer.
 
 ## License
 
@@ -539,7 +201,8 @@ MIT License - see [LICENSE](../LICENSE) for details.
 
 ## Links
 
--   [GeoAI Documentation](https://opengeoai.org)
--   [SamGeo Documentation](https://samgeo.gishub.org)
--   [GitHub Repository](https://github.com/opengeos/geoai)
--   [Report Issues](https://github.com/opengeos/geoai/issues)
+- [Full QGIS Plugin Guide](https://opengeoai.org/qgis_plugin/)
+- [GeoAI Documentation](https://opengeoai.org)
+- [SamGeo Documentation](https://samgeo.gishub.org)
+- [GitHub Repository](https://github.com/opengeos/geoai)
+- [Report Issues](https://github.com/opengeos/geoai/issues)

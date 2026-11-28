@@ -10,7 +10,7 @@
 [![QGIS](https://img.shields.io/badge/QGIS-plugin-orange.svg)](https://opengeoai.org/qgis_plugin)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.09605/status.svg)](https://doi.org/10.21105/joss.09605)
 
-[![logo](https://raw.githubusercontent.com/opengeos/geoai/master/docs/assets/logo_rect.png)](https://github.com/opengeos/geoai/blob/master/docs/assets/logo.png)
+[![logo](https://raw.githubusercontent.com/opengeos/geoai/main/docs/assets/logo_rect.png)](https://github.com/opengeos/geoai/blob/main/docs/assets/logo.png)
 
 **A powerful Python package for integrating artificial intelligence with geospatial data analysis and visualization**
 
@@ -27,7 +27,7 @@ The package provides six core capabilities:
 5. Interactive visualization through integration with [Leafmap](https://github.com/opengeos/leafmap/) and [MapLibre](https://github.com/eoda-dev/py-maplibregl).
 6. Seamless QGIS integration via a dedicated GeoAI plugin, enabling users to run AI-powered geospatial workflows directly within the QGIS desktop environment, without writing code.
 
-GeoAI addresses the growing demand for accessible AI tools in geospatial research by providing high-level APIs that abstract complex machine learning workflows while maintaining flexibility for advanced users. The package supports multiple data formats (GeoTIFF, JPEG2000, GeoJSON, Shapefile, GeoPackage) and includes automatic device management for GPU acceleration when available. With over 10 modules and extensive notebook examples, GeoAI serves as both a research tool and educational resource for the geospatial AI community.
+GeoAI addresses the growing demand for accessible AI tools in geospatial research by providing high-level APIs that abstract complex machine learning workflows while maintaining flexibility for advanced users. The package supports multiple data formats (GeoTIFF, JPEG2000, GeoJSON, Shapefile, GeoPackage) and includes automatic device management for GPU acceleration when available. With over 50 modules and extensive notebook examples, GeoAI serves as both a research tool and educational resource for the geospatial AI community.
 
 ## 📚 Book
 
@@ -97,6 +97,10 @@ If you find GeoAI useful in your research, please consider citing the following 
 -   Change detection with AI-enhanced feature extraction
 -   Object detection in aerial and satellite imagery
 -   Georeferencing utilities for AI model outputs
+-   [Command-line interface (`geoai`)](https://opengeoai.org/cli/) for file inspection, data downloads, and pipeline execution
+-   [Batch processing pipelines (`geoai.pipeline`)](https://opengeoai.org/pipeline/) with YAML/JSON configs, parallel execution, and checkpoint/resume support
+-   [AI Agents (`geoai.agents`)](https://opengeoai.org/agents/) for natural-language geospatial exploration, STAC queries, and sandboxed data operations
+-   [MCP Server (`geoai-mcp-server`) and Agent CLI harness (`cli-anything-geoai`)](https://opengeoai.org/mcp_server/) for connecting GeoAI to LLM clients and coding agents
 
 ## 📦 Installation
 
@@ -104,6 +108,18 @@ If you find GeoAI useful in your research, please consider citing the following 
 
 ```bash
 pip install geoai-py
+```
+
+For additional features (such as change detection, cloud/water masking, and mask cleaning):
+
+```bash
+pip install "geoai-py[extra]"
+```
+
+### Using uv
+
+```bash
+uv pip install geoai-py
 ```
 
 ### Using conda
@@ -117,6 +133,8 @@ conda install -c conda-forge geoai
 ```bash
 mamba install -c conda-forge geoai
 ```
+
+See the full [Installation Guide](https://opengeoai.org/installation/) for optional dependency extras, GPU/CUDA setup, and runtime environment variables.
 
 ## ⚙️ QGIS Plugin
 
