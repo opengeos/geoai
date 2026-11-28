@@ -112,6 +112,32 @@ class BoundingBox(BaseModel):
         return (self.min_lon, self.min_lat, self.max_lon, self.max_lat)
 
 
+class SearchBoundingBox(BaseModel):
+    """Geographic bounding box for STAC search (permits point and line boxes)."""
+
+    min_lon: float = Field(..., description="Minimum longitude (west)", ge=-180, le=180)
+    min_lat: float = Field(..., description="Minimum latitude (south)", ge=-90, le=90)
+    max_lon: float = Field(..., description="Maximum longitude (east)", ge=-180, le=180)
+    max_lat: float = Field(..., description="Maximum latitude (north)", ge=-90, le=90)
+
+    @model_validator(mode="after")
+    def _validate_search_bounds_order(self) -> "SearchBoundingBox":
+        """Ensure minimum coordinates do not exceed maximum coordinates."""
+        if self.min_lon > self.max_lon:
+            raise ValueError(
+                f"min_lon ({self.min_lon}) must be less than or equal to max_lon ({self.max_lon})"
+            )
+        if self.min_lat > self.max_lat:
+            raise ValueError(
+                f"min_lat ({self.min_lat}) must be less than or equal to max_lat ({self.max_lat})"
+            )
+        return self
+
+    def to_tuple(self) -> tuple[float, float, float, float]:
+        """Convert to tuple format."""
+        return (self.min_lon, self.min_lat, self.max_lon, self.max_lat)
+
+
 class BaseResult(BaseModel):
     """Base schema for all tool results."""
 
@@ -393,6 +419,14 @@ class TrainingDataResult(BaseResult):
     num_train: int = Field(0, description="Number of training tiles")
     num_val: int = Field(0, description="Number of validation tiles")
     tile_size: int = Field(0, description="Tile size in pixels")
+    partial: bool = Field(
+        False, description="Whether the export finished only partially due to errors"
+    )
+    errors: int = Field(0, description="Number of errors recorded during export")
+    failed_files: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Input files that failed during batch export and may need retrying",
+    )
 
 
 # =============================================================================
@@ -528,8 +562,15 @@ class ListFilesResult(BaseResult):
     files: List[Dict[str, Any]] = Field(
         default_factory=list, description="List of files with metadata"
     )
-    total_count: int = Field(0, description="Total number of files")
+    total_count: int = Field(0, description="Total number of files returned")
     total_size_mb: float = Field(0, description="Total size in megabytes")
+    truncated: bool = Field(
+        False,
+        description="Whether additional matching files exist beyond max_files",
+    )
+    max_files: Optional[int] = Field(
+        None, description="Maximum number of files requested"
+    )
 
 
 class InspectRasterResult(BaseResult):

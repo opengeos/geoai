@@ -745,3 +745,592 @@ class TestToolIntegration:
             assert seg_result["success"] is True
             assert str(out_poly) in seg_result["output_files"]
             mock_segmenter.segment_image.assert_called_once()
+
+
+class TestCodeRabbitRegressions:
+    """Regression tests covering all PR #1018 review fixes."""
+
+    def test_stac_search_allows_point_and_line_bbox_and_inclusive_cloud_cover(self):
+        """search_stac_imagery accepts point/line bboxes and uses inclusive lte cloud filter."""
+        from geoai_mcp_server.server import (
+            download_satellite_imagery,
+            search_stac_imagery,
+        )
+
+        mock_download = MagicMock()
+        mock_download.pc_stac_search.return_value = []
+
+        with patch(
+            "geoai_mcp_server.server._get_geoai_module", return_value=mock_download
+        ):
+            res_pt = asyncio.run(
+                search_stac_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.5,
+                    max_lat=37.7,
+                    max_cloud_cover=0,
+                )
+            )
+            res_none = asyncio.run(
+                search_stac_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.4,
+                    max_lat=37.7,
+                    max_cloud_cover=None,
+                )
+            )
+
+        assert res_pt["success"] is True
+        assert res_none["success"] is True
+        assert mock_download.pc_stac_search.call_args_list[0].kwargs["query"] == {
+            "eo:cloud_cover": {"lte": 0}
+        }
+        assert mock_download.pc_stac_search.call_args_list[1].kwargs["query"] is None
+
+        # Download providers still require nonzero-area bounding boxes
+        res_dl = asyncio.run(
+            download_satellite_imagery(
+                min_lon=-122.5,
+                min_lat=37.7,
+                max_lon=-122.5,
+                max_lat=37.7,
+                data_source="naip",
+            )
+        )
+        assert res_dl["success"] is False
+
+    def test_concurrent_run_blocking_does_not_leak_stdout(self, capsys):
+        """Concurrent _run_blocking calls never leak diagnostics to stdout or corrupt sys.stdout."""
+        from geoai_mcp_server.server import _run_blocking
+
+        orig_stdout = sys.stdout
+
+        def worker(tag: str, delay: float):
+            print(f"WORKER_{tag}_START")
+            time.sleep(delay)
+            print(f"WORKER_{tag}_END")
+            return tag
+
+        async def _run_both():
+            return await asyncio.gather(
+                _run_blocking(worker, "A", 0.02),
+                _run_blocking(worker, "B", 0.06),
+            )
+
+        res = asyncio.run(_run_both())
+        captured = capsys.readouterr()
+        assert res == ["A", "B"]
+        assert sys.stdout is orig_stdout
+        assert "WORKER_" not in captured.out
+        assert "WORKER_A_START" in captured.err
+        assert "WORKER_B_END" in captured.err
+
+    def test_auto_segment_counts_remaining_geotiff_instances_and_separates_units(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """GeoTIFF counts remaining raster instances; vectorization does not pass pixel min_object_size as map min_area."""
+        import numpy as np
+        import rasterio
+        from rasterio.transform import from_bounds
+        from geoai_mcp_server.server import auto_segment_image
+
+        class _FakeSam:
+            def __init__(self, **kwargs):
+                self.masks = [{"area": 20}, {"area": 200}]
+
+            def generate(self, source, output, min_size=0, max_size=None):
+                arr = np.zeros((1, 20, 20), dtype=np.uint8)
+                arr[0, 2:16, 2:16] = 1  # only 1 instance remains after filtering
+                with rasterio.open(
+                    output,
+                    "w",
+                    driver="GTiff",
+                    height=20,
+                    width=20,
+                    count=1,
+                    dtype="uint8",
+                    crs="EPSG:32610",
+                    transform=from_bounds(0, 0, 10, 10, 20, 20),
+                ) as dst:
+                    dst.write(arr)
+
+        mock_sam = MagicMock()
+        mock_sam.SamGeo.side_effect = lambda **kw: _FakeSam(**kw)
+        mock_utils = MagicMock()
+        mock_utils.raster_to_vector.return_value = [1]
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch(
+                "geoai_mcp_server.server._get_geoai_module",
+                side_effect=lambda name: mock_sam if name == "sam" else mock_utils,
+            ),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_tif = asyncio.run(
+                auto_segment_image(
+                    image_path=sample_geotiff.name,
+                    output_format="geotiff",
+                    min_object_size=100,
+                    clean_results=False,
+                )
+            )
+            res_vec = asyncio.run(
+                auto_segment_image(
+                    image_path=sample_geotiff.name,
+                    output_format="geojson",
+                    min_object_size=100,
+                    clean_results=False,
+                )
+            )
+
+        assert res_tif["success"] is True
+        assert res_tif["num_objects"] == 1
+        assert res_vec["success"] is True
+        assert mock_utils.raster_to_vector.call_args.kwargs.get("min_area") == 0
+
+    def test_grounded_sam_honors_geopackage_and_reports_mean_score(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """GroundedSAM converts staged GeoJSON to requested GPKG and reports mean detection score."""
+        import geopandas as gpd
+        from shapely.geometry import box
+        from geoai_mcp_server.server import (
+            detect_and_classify_features,
+            segment_objects_with_prompts,
+        )
+
+        class _FakeGSAM:
+            def __init__(self, **kwargs):
+                pass
+
+            def segment_image(
+                self,
+                input_path,
+                output_path,
+                text_prompts,
+                export_boxes=False,
+                export_polygons=True,
+            ):
+                Path(output_path).write_bytes(b"fake_tif")
+                out = {"segmentation": output_path}
+                gdf = gpd.GeoDataFrame(
+                    {
+                        "label": ["building", "building"],
+                        "score": [0.8, 0.9],
+                    },
+                    geometry=[box(0, 0, 1, 1), box(2, 2, 3, 3)],
+                    crs="EPSG:4326",
+                )
+                if export_boxes:
+                    bp = output_path.replace(".tif", "_boxes.geojson")
+                    gdf.to_file(bp, driver="GeoJSON")
+                    out["boxes"] = bp
+                if export_polygons:
+                    pp = output_path.replace(".tif", "_polygons.geojson")
+                    gdf.to_file(pp, driver="GeoJSON")
+                    out["polygons"] = pp
+                return out
+
+        mock_seg = MagicMock()
+        mock_seg.GroundedSAM.side_effect = lambda **kw: _FakeGSAM(**kw)
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_seg),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_det = asyncio.run(
+                detect_and_classify_features(
+                    image_path=sample_geotiff.name,
+                    feature_types=["buildings"],
+                    confidence_threshold=0.5,
+                    output_format="geopackage",
+                    output_filename="det_out.gpkg",
+                )
+            )
+            res_seg = asyncio.run(
+                segment_objects_with_prompts(
+                    image_path=sample_geotiff.name,
+                    prompts=["building"],
+                    model="grounded_sam",
+                    output_format="geopackage",
+                    output_filename="seg_out.gpkg",
+                )
+            )
+
+        assert res_det["success"] is True
+        assert res_det["average_confidence"] == pytest.approx(0.85)
+        assert any(p.endswith(".gpkg") for p in res_det["output_files"])
+        assert not any(p.endswith(".geojson") for p in res_det["output_files"])
+        assert (temp_output_dir / "det_out.gpkg").is_file()
+
+        assert res_seg["success"] is True
+        assert res_seg["num_objects"] == 2
+        assert any(p.endswith(".gpkg") for p in res_seg["output_files"])
+        assert not any(p.endswith(".geojson") for p in res_seg["output_files"])
+        assert (temp_output_dir / "seg_out.gpkg").is_file()
+
+    def test_classify_and_canopy_reject_vector_formats_and_classify_excludes_nodata(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """classify_land_cover and estimate_canopy_height reject vector formats; classify excludes nodata."""
+        import numpy as np
+        import rasterio
+        from rasterio.transform import from_bounds
+        from geoai_mcp_server.server import (
+            classify_land_cover,
+            estimate_canopy_height,
+        )
+
+        model_file = sample_geotiff.parent / "cls_model.ckpt"
+        model_file.write_bytes(b"ckpt")
+
+        def _fake_classify(input_path, model_path, output_path):
+            arr = np.array([[[0, 0], [0, 2]]], dtype=np.uint8)
+            with rasterio.open(
+                output_path,
+                "w",
+                driver="GTiff",
+                height=2,
+                width=2,
+                count=1,
+                dtype="uint8",
+                nodata=0,
+                crs="EPSG:4326",
+                transform=from_bounds(0, 0, 1, 1, 2, 2),
+            ) as dst:
+                dst.write(arr)
+            return output_path
+
+        mock_cls = MagicMock()
+        mock_cls.classify_image.side_effect = _fake_classify
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_cls),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_bad_cls = asyncio.run(
+                classify_land_cover(
+                    image_path=sample_geotiff.name,
+                    model_path="cls_model.ckpt",
+                    output_format="geojson",
+                )
+            )
+            res_bad_can = asyncio.run(
+                estimate_canopy_height(
+                    image_path=sample_geotiff.name,
+                    output_format="geojson",
+                )
+            )
+            res_ok_cls = asyncio.run(
+                classify_land_cover(
+                    image_path=sample_geotiff.name,
+                    model_path="cls_model.ckpt",
+                    output_format="geotiff",
+                )
+            )
+
+        assert res_bad_cls["success"] is False
+        assert res_bad_can["success"] is False
+        assert res_ok_cls["success"] is True
+        assert res_ok_cls["dominant_class"] == "2"
+        assert res_ok_cls["class_distribution"] == {"2": 100.0}
+
+    def test_change_detection_zero_mask_does_not_advertise_stale_vector(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """All-zero change mask returns output_files=[] even if a prior vector exists at output_path."""
+        import numpy as np
+        from geoai_mcp_server.server import detect_temporal_changes
+
+        stale = temp_output_dir / "chg.geojson"
+        stale.write_text('{"type": "FeatureCollection", "features": []}')
+
+        mock_cd = MagicMock()
+        mock_cd.changestar_detect.return_value = {
+            "change_map": np.zeros((4, 4), dtype=np.uint8)
+        }
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_cd),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res = asyncio.run(
+                detect_temporal_changes(
+                    image1_path=sample_geotiff.name,
+                    image2_path=sample_geotiff.name,
+                    output_format="geojson",
+                    output_filename="chg.geojson",
+                )
+            )
+
+        assert res["success"] is True
+        assert res["change_percentage"] == 0.0
+        assert res["output_files"] == []
+
+    def test_prepare_training_data_partial_and_current_export_count(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """Partial batch export reports partial/errors/failed_files; single export uses total_tiles not pre-existing files."""
+        from geoai_mcp_server.server import prepare_training_data
+
+        img_dir = sample_geotiff.parent / "train_imgs"
+        lbl_dir = sample_geotiff.parent / "train_lbls"
+        img_dir.mkdir()
+        lbl_dir.mkdir()
+
+        # Pre-populate stale tiles in output_dir/images
+        pre_dir = temp_output_dir / "images"
+        pre_dir.mkdir(parents=True, exist_ok=True)
+        for i in range(5):
+            (pre_dir / f"old_{i}.tif").write_bytes(b"old")
+
+        mock_utils = MagicMock()
+        mock_utils.export_geotiff_tiles_batch.return_value = {
+            "total_tiles": 4,
+            "errors": 1,
+            "failed_files": [{"image": "bad.tif", "error": "corrupt"}],
+        }
+        mock_utils.export_geotiff_tiles.return_value = {"total_tiles": 2, "errors": 0}
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_utils),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_partial = asyncio.run(
+                prepare_training_data(images_dir="train_imgs", labels_dir="train_lbls")
+            )
+            res_single = asyncio.run(
+                prepare_training_data(
+                    images_dir=sample_geotiff.name, labels_dir=sample_geotiff.name
+                )
+            )
+
+        assert res_partial["success"] is False
+        assert res_partial["partial"] is True
+        assert res_partial["errors"] == 1
+        assert len(res_partial["failed_files"]) == 1
+        assert res_partial["num_tiles"] == 4
+
+        assert res_single["success"] is True
+        assert res_single["partial"] is False
+        assert res_single["num_tiles"] == 2
+
+    def test_prithvi_rejects_similarity_map_and_normalizes_npy_filename(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """Prithvi rejects similarity_map and np.save output_filename is normalized with .npy."""
+        import numpy as np
+        from geoai_mcp_server.server import extract_features_with_foundation_model
+
+        class _FakeDino:
+            def load_image(self, path):
+                return np.zeros((3, 8, 8), dtype=np.uint8), {}
+
+            def preprocess_image_for_dinov3(self, data):
+                return data
+
+            def extract_features(self, img):
+                return np.zeros((4, 8), dtype=np.float32), 2, 2
+
+        mock_dino = MagicMock()
+        mock_dino.DINOv3GeoProcessor.return_value = _FakeDino()
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_dino),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_bad = asyncio.run(
+                extract_features_with_foundation_model(
+                    image_path=sample_geotiff.name,
+                    model="prithvi",
+                    output_type="similarity_map",
+                    reference_x=10,
+                    reference_y=20,
+                )
+            )
+            res_npy = asyncio.run(
+                extract_features_with_foundation_model(
+                    image_path=sample_geotiff.name,
+                    model="dinov3",
+                    output_filename="features",
+                )
+            )
+
+        assert res_bad["success"] is False
+        assert "prithvi" in res_bad["message"].lower()
+        assert res_npy["success"] is True
+        assert res_npy["output_files"] == [str(temp_output_dir / "features.npy")]
+        assert (temp_output_dir / "features.npy").is_file()
+
+    def test_vlm_does_not_return_stale_geojson(self, sample_geotiff, temp_output_dir):
+        """VLM detect/point does not return a pre-existing GeoJSON when no file is written."""
+        from geoai_mcp_server.server import analyze_with_vision_language_model
+
+        stale = temp_output_dir / "vlm_out.geojson"
+        stale.write_text('{"type": "FeatureCollection", "features": []}')
+
+        mock_md = MagicMock()
+        mock_md.moondream_detect.return_value = {"objects": [{"x_min": 0.1}]}
+        mock_md.moondream_point.return_value = {"points": [{"x": 0.5, "y": 0.5}]}
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_md),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_det = asyncio.run(
+                analyze_with_vision_language_model(
+                    image_path=sample_geotiff.name,
+                    task="detect",
+                    detect_target="building",
+                    output_filename="vlm_out.geojson",
+                )
+            )
+            res_pt = asyncio.run(
+                analyze_with_vision_language_model(
+                    image_path=sample_geotiff.name,
+                    task="point",
+                    detect_target="building",
+                    output_filename="vlm_out.geojson",
+                )
+            )
+
+        assert res_det["success"] is True
+        assert res_det["output_files"] == []
+        assert res_pt["success"] is True
+        assert res_pt["output_files"] == []
+
+    def test_clean_skips_regularize_when_empty_and_inspect_uses_band_mask(
+        self, sample_geojson, temp_input_dir, temp_output_dir
+    ):
+        """clean_segmentation_results skips regularize on empty result; inspect_raster honors band mask."""
+        import numpy as np
+        import rasterio
+        from rasterio.transform import from_bounds
+        from geoai_mcp_server.server import (
+            clean_segmentation_results,
+            inspect_raster,
+            list_available_files,
+        )
+
+        # Create raster with no scalar nodata but a validity mask excluding 100
+        masked_tif = temp_input_dir / "masked.tif"
+        with rasterio.open(
+            masked_tif,
+            "w",
+            driver="GTiff",
+            height=1,
+            width=2,
+            count=1,
+            dtype="uint8",
+            crs="EPSG:4326",
+            transform=from_bounds(0, 0, 2, 1, 2, 1),
+        ) as dst:
+            dst.write(np.array([[[1, 100]]], dtype=np.uint8))
+            dst.write_mask(np.array([[255, 0]], dtype=np.uint8))
+
+        # Create extra files to test list_available_files truncation flag
+        for i in range(5):
+            (temp_input_dir / f"extra_{i}.tif").write_bytes(b"x")
+
+        mock_utils = MagicMock()
+        mock_utils.regularize.side_effect = AssertionError(
+            "regularize must not be called on empty GeoDataFrame"
+        )
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_utils),
+        ):
+            mock_config.input_dir = sample_geojson.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_clean = asyncio.run(
+                clean_segmentation_results(
+                    input_path=sample_geojson.name,
+                    operation="all",
+                    min_size=10**12,
+                    regularize_buildings=True,
+                )
+            )
+            res_inspect = asyncio.run(
+                inspect_raster(image_path="masked.tif", include_stats=True)
+            )
+            res_list = asyncio.run(
+                list_available_files(directory="input", pattern="*.tif", max_files=3)
+            )
+
+        assert res_clean["success"] is True
+        assert res_clean["final_count"] == 0
+        mock_utils.regularize.assert_not_called()
+
+        assert res_inspect["success"] is True
+        assert res_inspect["band_stats"][0]["valid_pixels"] == 1
+        assert res_inspect["band_stats"][0]["mean"] == 1.0
+
+        assert res_list["success"] is True
+        assert res_list["total_count"] == 3
+        assert res_list["truncated"] is True
+
+    def test_stac_download_timeout_leaves_no_partial_file(self, temp_output_dir):
+        """Timed-out STAC download stages in temp dir and leaves no partial file in output_dir."""
+        from geoai_mcp_server.server import download_satellite_imagery
+
+        def _slow_download(items, output_dir):
+            part = Path(output_dir) / "scene_B04.tif"
+            part.write_bytes(b"partial")
+            time.sleep(0.3)
+            return {"scene": {"B04": str(part)}}
+
+        mock_dl = MagicMock()
+        mock_dl.pc_stac_search.return_value = [MagicMock(id="scene")]
+        mock_dl.pc_stac_download.side_effect = _slow_download
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_dl),
+        ):
+            mock_config.output_dir = temp_output_dir
+            mock_config.timeout = 0.05
+
+            res = asyncio.run(
+                download_satellite_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.4,
+                    max_lat=37.8,
+                    data_source="sentinel2",
+                    max_cloud_cover=0,
+                )
+            )
+
+        assert res["success"] is False
+        assert "timed out" in res["message"].lower()
+        assert mock_dl.pc_stac_search.call_args.kwargs["query"] == {
+            "eo:cloud_cover": {"lte": 0}
+        }
+        # Wait for the background worker to finish and verify nothing was published
+        time.sleep(0.35)
+        assert not (temp_output_dir / "scene_B04.tif").exists()

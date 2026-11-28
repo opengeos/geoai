@@ -218,3 +218,71 @@ def _get_raster_info_rasterio(path: str) -> Dict[str, Any]:
                 "file_size_bytes": os.path.getsize(path),
             }
         )
+
+
+def extract_band_subset(
+    raster_path: str,
+    band_indexes: List[int],
+    temp_dir: Optional[str] = None,
+) -> str:
+    """Write a temporary GeoTIFF containing only ``band_indexes`` in order.
+
+    Args:
+        raster_path: Path to the source raster.
+        band_indexes: Non-empty list of 0-indexed band indices to extract.
+        temp_dir: Directory in which to create the temporary GeoTIFF.
+
+    Returns:
+        Absolute path to the newly created temporary GeoTIFF.
+
+    Raises:
+        ValueError: If ``band_indexes`` is empty, contains invalid types, or
+            references a band outside the source raster's band count.
+    """
+    if not band_indexes:
+        raise ValueError(
+            "band_indexes must be a non-empty list of 0-based band indices"
+        )
+
+    validated: List[int] = []
+    for idx in band_indexes:
+        if isinstance(idx, bool) or not isinstance(idx, int):
+            raise ValueError(f"Band index must be an integer, got {idx!r}")
+        if idx < 0:
+            raise ValueError(f"Band index must be non-negative, got {idx}")
+        validated.append(idx)
+
+    import tempfile
+    import rasterio
+
+    with rasterio.open(raster_path) as src:
+        for idx in validated:
+            if idx >= src.count:
+                raise ValueError(
+                    f"Band index {idx} out of range for raster with {src.count} band(s) "
+                    f"(valid 0-based indices: 0-{src.count - 1})"
+                )
+
+        one_based = [idx + 1 for idx in validated]
+        data = src.read(one_based)
+        profile = src.profile.copy()
+        profile.update(driver="GTiff", count=len(one_based))
+
+    fd, subset_path = tempfile.mkstemp(
+        suffix=".tif",
+        prefix="geoai_bands_",
+        dir=temp_dir or os.path.dirname(os.path.abspath(raster_path)) or ".",
+    )
+    os.close(fd)
+    try:
+        with rasterio.open(subset_path, "w", **profile) as dst:
+            dst.write(data)
+    except Exception:
+        if os.path.exists(subset_path):
+            try:
+                os.unlink(subset_path)
+            except OSError:
+                pass
+        raise
+
+    return os.path.abspath(subset_path)

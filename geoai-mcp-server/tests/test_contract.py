@@ -337,7 +337,7 @@ class TestMCPGeoAIContracts:
         changestar_fn = make_strict_callable(
             "geoai.change_detection",
             "changestar_detect",
-            return_value={"change": np.array([[0, 1], [1, 0]], dtype=np.uint8)},
+            return_value={"change_map": np.array([[0, 1], [1, 0]], dtype=np.uint8)},
         )
         canopy_fn = make_strict_callable(
             "geoai.canopy",
@@ -373,15 +373,25 @@ class TestMCPGeoAIContracts:
                     change_threshold=0.4,
                 )
             )
+            r_chg_vec = asyncio.run(
+                detect_temporal_changes(
+                    image1_path=sample_geotiff.name,
+                    image2_path=sample_geotiff.name,
+                    change_threshold=0.4,
+                    output_format="geojson",
+                )
+            )
             r_can = asyncio.run(estimate_canopy_height(image_path=sample_geotiff.name))
 
         assert r_cls["success"] is True
         assert r_chg["success"] is True
         assert r_chg["change_percentage"] == 50.0
+        assert r_chg_vec["success"] is True
+        assert r_chg_vec["change_percentage"] == 50.0
         assert r_can["success"] is True
         assert r_can["max_height"] == 12.5
         assert len(classify_fn.calls) == 1
-        assert len(changestar_fn.calls) == 1
+        assert len(changestar_fn.calls) == 2
         assert len(canopy_fn.calls) == 1
 
     def test_download_and_training_and_stac_contract(
@@ -508,14 +518,26 @@ class TestMCPGeoAIContracts:
             return_value=(np.zeros((4, 8), dtype=np.float32), 2, 2),
         )
 
+        import torch
+
         prithvi_init = make_strict_callable("geoai.prithvi", "PrithviProcessor")
-        prithvi_proc = make_strict_callable(
+        prithvi_load = make_strict_callable(
             "geoai.prithvi",
-            "PrithviProcessor.process_images",
+            "PrithviProcessor.load_images",
             return_value=(
-                np.zeros((1, 6, 1, 16, 16)),
                 np.zeros((1, 6, 1, 16, 16), dtype=np.float32),
-                np.zeros((1, 6, 1, 16, 16)),
+                [{}],
+                [],
+                [],
+            ),
+        )
+        prithvi_enc = make_strict_callable(
+            "geoai.prithvi",
+            "PrithviViT.forward",
+            return_value=(
+                torch.zeros((1, 5, 32), dtype=torch.float32),
+                torch.zeros((1, 4), dtype=torch.float32),
+                torch.arange(4, dtype=torch.long).unsqueeze(0),
             ),
         )
 
@@ -550,12 +572,19 @@ class TestMCPGeoAIContracts:
             def extract_features(self, *args, **kwargs):
                 return dino_feat(*args, **kwargs)
 
+        class _FakePrithviEncoder:
+            def __call__(self, *args, **kwargs):
+                return prithvi_enc(*args, **kwargs)
+
         class _FakePrithvi:
             def __init__(self, *args, **kwargs):
                 prithvi_init(*args, **kwargs)
+                self.img_size = 16
+                self.device = torch.device("cpu")
+                self.model = SimpleNamespace(encoder=_FakePrithviEncoder())
 
-            def process_images(self, *args, **kwargs):
-                return prithvi_proc(*args, **kwargs)
+            def load_images(self, *args, **kwargs):
+                return prithvi_load(*args, **kwargs)
 
         modules = {
             "dinov3": SimpleNamespace(

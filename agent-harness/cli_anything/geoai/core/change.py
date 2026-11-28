@@ -5,9 +5,100 @@ for CLI consumption.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 CHANGE_METHODS = ["changestar", "anychange"]
+
+
+def _resolve_change_threshold(confidence_threshold: Union[int, float]) -> float:
+    """Convert a 0-255 integer or 0-1 float confidence threshold to [0, 1].
+
+    Integers are always interpreted on the documented 0-255 scale (so integer 1
+    maps to ``1 / 255``), while floats in ``[0.0, 1.0]`` retain their
+    probability meaning (so float ``1.0`` maps to ``1.0``).
+    """
+    if isinstance(confidence_threshold, bool):
+        raise ValueError(
+            f"confidence_threshold must be an int (0-255) or float (0-1), got bool: {confidence_threshold}"
+        )
+    if isinstance(confidence_threshold, int):
+        if not 0 <= confidence_threshold <= 255:
+            raise ValueError(
+                f"Integer confidence_threshold must be between 0 and 255, got {confidence_threshold}"
+            )
+        return float(confidence_threshold) / 255.0
+
+    val = float(confidence_threshold)
+    if 0.0 <= val <= 1.0:
+        return val
+    if 1.0 < val <= 255.0:
+        return val / 255.0
+    raise ValueError(
+        f"confidence_threshold must be in [0.0, 1.0] or [0, 255], got {confidence_threshold}"
+    )
+
+
+def _filter_min_area_raster(output: str, min_area: int) -> None:
+    """Zero out connected nonzero regions smaller than ``min_area`` pixels."""
+    if min_area <= 0 or not os.path.isfile(output):
+        return
+
+    import numpy as np
+    import rasterio
+
+    with rasterio.open(output) as src:
+        profile = src.profile.copy()
+        data = src.read()
+
+    mask = data[0] != 0
+    if not np.any(mask):
+        return
+
+    try:
+        from scipy.ndimage import label as nd_label
+
+        labeled, num_features = nd_label(mask)
+        if num_features == 0:
+            return
+        counts = np.bincount(labeled.ravel())
+        keep = counts >= min_area
+        keep[0] = False
+        filtered_mask = keep[labeled]
+    except ImportError:
+        # Pure-numpy/Python 4-connected component fallback when scipy is absent.
+        h, w = mask.shape
+        visited = np.zeros((h, w), dtype=bool)
+        filtered_mask = np.zeros((h, w), dtype=bool)
+        for r in range(h):
+            for c in range(w):
+                if mask[r, c] and not visited[r, c]:
+                    stack = [(r, c)]
+                    visited[r, c] = True
+                    component = []
+                    while stack:
+                        cr, cc = stack.pop()
+                        component.append((cr, cc))
+                        for nr, nc in (
+                            (cr - 1, cc),
+                            (cr + 1, cc),
+                            (cr, cc - 1),
+                            (cr, cc + 1),
+                        ):
+                            if (
+                                0 <= nr < h
+                                and 0 <= nc < w
+                                and mask[nr, nc]
+                                and not visited[nr, nc]
+                            ):
+                                visited[nr, nc] = True
+                                stack.append((nr, nc))
+                    if len(component) >= min_area:
+                        for cr, cc in component:
+                            filtered_mask[cr, cc] = True
+
+    data[0] = np.where(filtered_mask, data[0], 0).astype(data.dtype)
+    with rasterio.open(output, "w", **profile) as dst:
+        dst.write(data)
 
 
 def detect_changes(
@@ -15,7 +106,7 @@ def detect_changes(
     image2: str,
     output: str,
     method: str = "changestar",
-    confidence_threshold: int = 155,
+    confidence_threshold: Union[int, float] = 155,
     min_area: int = 0,
 ) -> Dict[str, Any]:
     """Run change detection between two temporal images.
@@ -25,7 +116,7 @@ def detect_changes(
         image2: Path to the later image.
         output: Output change map file path.
         method: Detection method (changestar, anychange).
-        confidence_threshold: Confidence threshold for change pixels (0-255, or 0-1 float).
+        confidence_threshold: Confidence threshold for change pixels (0-255 int, or 0-1 float).
         min_area: Minimum area threshold for change regions in pixels.
 
     Returns:
@@ -33,7 +124,7 @@ def detect_changes(
 
     Raises:
         FileNotFoundError: If input images do not exist.
-        ValueError: If method is not recognized.
+        ValueError: If method, threshold, or min_area is invalid.
     """
     image1 = os.path.abspath(image1)
     image2 = os.path.abspath(image2)
@@ -49,6 +140,9 @@ def detect_changes(
             f"Unknown method: {method}. Choose from: {', '.join(CHANGE_METHODS)}"
         )
 
+    if min_area < 0:
+        raise ValueError(f"min_area must be non-negative, got {min_area}")
+
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
     if method == "changestar":
@@ -60,7 +154,7 @@ def _run_changestar(
     image1: str,
     image2: str,
     output: str,
-    confidence_threshold: int,
+    confidence_threshold: Union[int, float],
     min_area: int,
 ) -> Dict[str, Any]:
     """Run ChangeStar change detection.
@@ -70,18 +164,14 @@ def _run_changestar(
         image2: Path to the later image.
         output: Output change map path.
         confidence_threshold: Confidence threshold (0-255 integer or 0-1 float).
-        min_area: Minimum area threshold.
+        min_area: Minimum area threshold in pixels.
 
     Returns:
         Result dict.
     """
     from geoai.change_detection import changestar_detect
 
-    threshold = (
-        float(confidence_threshold) / 255.0
-        if confidence_threshold > 1
-        else float(confidence_threshold)
-    )
+    threshold = _resolve_change_threshold(confidence_threshold)
 
     changestar_detect(
         image1_path=image1,
@@ -89,6 +179,9 @@ def _run_changestar(
         output_change=output,
         threshold=threshold,
     )
+
+    if min_area > 0 and os.path.isfile(output):
+        _filter_min_area_raster(output, min_area)
 
     result: Dict[str, Any] = {
         "image1": image1,
@@ -119,7 +212,7 @@ def _run_anychange(
         image1: Path to the earlier image.
         image2: Path to the later image.
         output: Output change map path.
-        min_area: Minimum area threshold.
+        min_area: Minimum area threshold in pixels.
 
     Returns:
         Result dict.
@@ -132,6 +225,9 @@ def _run_anychange(
         image2_path=image2,
         output_path=output,
     )
+
+    if min_area > 0 and os.path.isfile(output):
+        _filter_min_area_raster(output, min_area)
 
     result: Dict[str, Any] = {
         "image1": image1,

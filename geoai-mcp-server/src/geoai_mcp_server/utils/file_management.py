@@ -310,7 +310,8 @@ def list_input_files(
     extensions: Optional[List[str]] = None,
     recursive: bool = False,
     max_files: int = 500,
-) -> List[Path]:
+    return_truncated: bool = False,
+) -> List[Path] | tuple[List[Path], bool]:
     """List files in a directory.
 
     Args:
@@ -319,9 +320,13 @@ def list_input_files(
         extensions: Filter by extensions (e.g., ['.tif', '.tiff'])
         recursive: Whether to search subdirectories
         max_files: Maximum number of matching files to return (default: 500)
+        return_truncated: When True, return ``(files, truncated)`` where
+            ``truncated`` is True if at least one additional eligible match
+            exists beyond ``max_files``.
 
     Returns:
-        List of Path objects for matching files
+        Sorted list of Path objects for matching files, or ``(files, truncated)``
+        when ``return_truncated=True``.
 
     Raises:
         InputValidationError: If pattern contains path traversal or '**' wildcards
@@ -348,7 +353,7 @@ def list_input_files(
 
     base_dir = base_dir.resolve()
     if not base_dir.exists():
-        return []
+        return ([], False) if return_truncated else []
 
     normalized_exts = None
     if extensions:
@@ -360,6 +365,7 @@ def list_input_files(
     iterator = base_dir.rglob(pattern) if recursive else base_dir.glob(pattern)
 
     matched: List[Path] = []
+    truncated = False
     for candidate in iterator:
         if not _is_path_within_directory(candidate, base_dir):
             continue
@@ -370,11 +376,15 @@ def list_input_files(
             and candidate.suffix.lower() not in normalized_exts
         ):
             continue
-        matched.append(candidate)
         if max_files > 0 and len(matched) >= max_files:
+            truncated = True
             break
+        matched.append(candidate)
 
-    return sorted(matched)
+    result = sorted(matched)
+    if return_truncated:
+        return result, truncated
+    return result
 
 
 def generate_output_filename(

@@ -218,9 +218,7 @@ def cli(ctx, use_json, project_path, device):
                 )
             else:
                 click.echo(f"Error: {e}", err=True)
-            if not _repl_mode:
-                sys.exit(1)
-            return
+            ctx.exit(1)
 
     if ctx.invoked_subcommand is None:
         ctx.invoke(repl, project_path=project_path)
@@ -595,18 +593,46 @@ def segment_grounded_sam(
     "--output", "-o", "output_path", required=True, help="Output segmentation raster."
 )
 @click.option("--num-classes", "-n", type=int, default=2, help="Number of classes.")
+@click.option("--arch", default="unet", help="Segmentation architecture.")
+@click.option("--backbone", default="resnet50", help="Encoder backbone.")
+@click.option("--in-channels", type=int, default=4, help="Input channels.")
+@click.option(
+    "--bands",
+    default=None,
+    help="Comma-separated 0-based band indices (e.g., 0,1,2,3).",
+)
 @click.option("--chip-size", type=int, default=512, help="Processing chip size.")
 @click.option(
     "--overlap", type=float, default=0.25, help="Overlap fraction between chips."
 )
 @handle_error
-def segment_semantic(raster, model, output_path, num_classes, chip_size, overlap):
+def segment_semantic(
+    raster,
+    model,
+    output_path,
+    num_classes,
+    arch,
+    backbone,
+    in_channels,
+    bands,
+    chip_size,
+    overlap,
+):
     """Run semantic segmentation with a trained model."""
+    band_indexes = (
+        [int(b.strip()) for b in bands.split(",") if b.strip()]
+        if bands is not None
+        else None
+    )
     result = segment_mod.run_semantic_segmentation(
         raster=raster,
         model_path=model,
         output=output_path,
         num_classes=num_classes,
+        architecture=arch,
+        backbone=backbone,
+        in_channels=in_channels,
+        band_indexes=band_indexes,
         chip_size=chip_size,
         overlap=overlap,
     )
@@ -1145,7 +1171,7 @@ def repl(project_path):
             prev_json = _json_output
             try:
                 cli.main(args, standalone_mode=False)
-            except SystemExit:
+            except (SystemExit, click.exceptions.Exit):
                 pass
             except click.exceptions.UsageError as e:
                 skin.warning(f"Usage: {e}")

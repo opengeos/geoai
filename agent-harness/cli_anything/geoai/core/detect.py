@@ -21,6 +21,86 @@ DETECTION_MODELS = [
 INPUT_FORMATS = ["directory", "coco", "yolo"]
 
 
+def _detection_raster_to_vector(raster_path: str, output_vector: str) -> None:
+    """Polygonize multiclass detection output from instance IDs (band 2).
+
+    ``multiclass_detection`` writes class labels to band 1 and per-instance IDs
+    to band 2. Polygonizing band 2 keeps touching same-class detections as
+    separate polygons while attaching each instance's class label from band 1.
+    Falls back to ``geoai.utils.raster_to_vector`` for single-band rasters.
+    """
+    import numpy as np
+    import rasterio
+    from rasterio.features import shapes
+
+    with rasterio.open(raster_path) as src:
+        band_count = src.count
+        if band_count < 2:
+            from geoai.utils import raster_to_vector
+
+            raster_to_vector(raster_path, output_vector)
+            return
+
+        class_band = src.read(1)
+        instance_band = src.read(2)
+        transform = src.transform
+        crs = src.crs
+
+    import geopandas as gpd
+    from shapely.geometry import shape as shapely_shape
+    from shapely.ops import unary_union
+
+    geoms_by_instance: Dict[int, list] = {}
+    for geom_dict, val in shapes(
+        instance_band.astype(np.int32),
+        mask=(instance_band > 0),
+        transform=transform,
+    ):
+        inst_id = int(val)
+        if inst_id <= 0:
+            continue
+        geoms_by_instance.setdefault(inst_id, []).append(shapely_shape(geom_dict))
+
+    records = []
+    for inst_id, parts in sorted(geoms_by_instance.items()):
+        geom = parts[0] if len(parts) == 1 else unary_union(parts)
+        inst_classes = class_band[(instance_band == inst_id) & (class_band > 0)]
+        if inst_classes.size > 0:
+            vals, counts = np.unique(inst_classes, return_counts=True)
+            class_id = int(vals[int(np.argmax(counts))])
+        else:
+            class_id = 0
+        records.append(
+            {
+                "instance_id": inst_id,
+                "class": class_id,
+                "geometry": geom,
+            }
+        )
+
+    if records:
+        gdf = gpd.GeoDataFrame(records, crs=crs)
+    else:
+        gdf = gpd.GeoDataFrame(
+            {"instance_id": [], "class": []},
+            geometry=gpd.GeoSeries([], crs=crs),
+            crs=crs,
+        )
+
+    ext = os.path.splitext(output_vector)[1].lower()
+    driver_map = {
+        ".geojson": "GeoJSON",
+        ".json": "GeoJSON",
+        ".gpkg": "GPKG",
+        ".shp": "ESRI Shapefile",
+    }
+    driver = driver_map.get(ext)
+    if driver:
+        gdf.to_file(output_vector, driver=driver)
+    else:
+        gdf.to_file(output_vector)
+
+
 def run_detection(
     raster: str,
     model_path: str,
@@ -84,20 +164,22 @@ def run_detection(
         )
 
     temp_raster: Optional[str] = None
+    temp_input_raster: Optional[str] = None
+    work_dir = os.path.dirname(output_raster or output_vector or ".") or "."
     if output_raster:
         target_raster = output_raster
     else:
         fd, temp_raster = tempfile.mkstemp(
             suffix=".tif",
             prefix="geoai_det_",
-            dir=os.path.dirname(output_vector) or ".",
+            dir=work_dir,
         )
         os.close(fd)
         target_raster = temp_raster
 
     try:
+        inference_input = raster
         kwargs: Dict[str, Any] = {
-            "input_path": raster,
             "output_path": target_raster,
             "model_path": model_path,
             "num_classes": num_classes,
@@ -106,20 +188,26 @@ def run_detection(
             "overlap": overlap_px,
         }
         if band_indexes is not None:
+            from cli_anything.geoai.core.raster import extract_band_subset
+
+            temp_input_raster = extract_band_subset(
+                raster, band_indexes, temp_dir=work_dir
+            )
+            inference_input = temp_input_raster
             kwargs["num_channels"] = len(band_indexes)
 
+        kwargs["input_path"] = inference_input
         multiclass_detection(**kwargs)
 
         if output_vector and os.path.isfile(target_raster):
-            from geoai.utils import raster_to_vector
-
-            raster_to_vector(target_raster, output_vector)
+            _detection_raster_to_vector(target_raster, output_vector)
     finally:
-        if temp_raster and os.path.exists(temp_raster):
-            try:
-                os.unlink(temp_raster)
-            except OSError:
-                pass
+        for tmp in (temp_raster, temp_input_raster):
+            if tmp and os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
 
     result: Dict[str, Any] = {
         "input": raster,

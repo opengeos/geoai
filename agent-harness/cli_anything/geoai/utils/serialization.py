@@ -25,10 +25,22 @@ def sanitize_json_value(value: Any) -> Any:
         and callable(value.item)
         and getattr(value, "ndim", 1) == 0
     ):
-        return sanitize_json_value(value.item())
+        scalar = value.item()
+        if scalar is value or type(scalar) is type(value):
+            # Extended-precision scalars (e.g. np.longdouble) return another
+            # NumPy scalar from .item(), so convert directly to terminate.
+            try:
+                fval = float(scalar)
+                return fval if math.isfinite(fval) else None
+            except (TypeError, ValueError, OverflowError):
+                return str(scalar)
+        return sanitize_json_value(scalar)
 
     if hasattr(value, "tolist") and callable(value.tolist):
-        return sanitize_json_value(value.tolist())
+        converted = value.tolist()
+        if converted is not value:
+            return sanitize_json_value(converted)
+        return str(value)
 
     if isinstance(value, dict):
         return {str(k): sanitize_json_value(v) for k, v in value.items()}
@@ -47,11 +59,11 @@ def serialize_info(info: Any) -> Dict[str, Any]:
             if hasattr(v, "__geo_interface__"):
                 result[str(k)] = str(v)
             else:
-                cleaned = sanitize_json_value(v)
                 try:
+                    cleaned = sanitize_json_value(v)
                     json.dumps(cleaned, allow_nan=False)
                     result[str(k)] = cleaned
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, RecursionError):
                     result[str(k)] = str(v)
         return result
     return {"info": str(info)}

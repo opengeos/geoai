@@ -3,6 +3,7 @@
 from .tool_schemas import (
     # Common schemas
     BoundingBox,
+    SearchBoundingBox,
     OutputFormat,
     DataSource,
     FoundationModel,
@@ -44,6 +45,7 @@ from .tool_schemas import (
 
 __all__ = [
     "BoundingBox",
+    "SearchBoundingBox",
     "OutputFormat",
     "DataSource",
     "FoundationModel",

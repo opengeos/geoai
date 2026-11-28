@@ -667,3 +667,275 @@ class TestHarnessRegressions:
             ),
         )
         assert parsed["min"] is None
+
+    def test_change_threshold_int_vs_float_and_min_area_filter(self, tmp_path):
+        """Integer thresholds use 0-255 scale (1 -> 1/255), float 1.0 stays 1.0, and min_area filters output."""
+        img1 = tmp_path / "t1.tif"
+        img2 = tmp_path / "t2.tif"
+        img1.write_bytes(b"t1")
+        img2.write_bytes(b"t2")
+
+        transform = from_bounds(0, 0, 10, 10, 10, 10)
+
+        def _write_change_mask(path):
+            arr = np.zeros((1, 10, 10), dtype=np.uint8)
+            arr[0, 0:2, 0:2] = 1  # 4 pixels (below min_area=10)
+            arr[0, 5:9, 5:9] = 1  # 16 pixels (above min_area=10)
+            with rasterio.open(
+                path,
+                "w",
+                driver="GTiff",
+                height=10,
+                width=10,
+                count=1,
+                dtype="uint8",
+                crs="EPSG:4326",
+                transform=transform,
+            ) as dst:
+                dst.write(arr)
+
+        thresholds_seen = []
+
+        def _fake_changestar(image1_path, image2_path, output_change, threshold):
+            thresholds_seen.append(threshold)
+            _write_change_mask(output_change)
+
+        class _FakeAnyChange:
+            def detect_changes(self, image1_path, image2_path, output_path):
+                _write_change_mask(output_path)
+
+        fake_cd = types.ModuleType("geoai.change_detection")
+        fake_cd.changestar_detect = _fake_changestar
+        fake_cd.ChangeDetection = _FakeAnyChange
+
+        with patch.dict(sys.modules, {"geoai.change_detection": fake_cd}):
+            r_int1 = change_mod.detect_changes(
+                str(img1),
+                str(img2),
+                str(tmp_path / "cs_int1.tif"),
+                method="changestar",
+                confidence_threshold=1,
+                min_area=10,
+            )
+            change_mod.detect_changes(
+                str(img1),
+                str(img2),
+                str(tmp_path / "cs_flt1.tif"),
+                method="changestar",
+                confidence_threshold=1.0,
+                min_area=0,
+            )
+            r_any = change_mod.detect_changes(
+                str(img1),
+                str(img2),
+                str(tmp_path / "ac_min.tif"),
+                method="anychange",
+                min_area=10,
+            )
+
+        assert pytest.approx(thresholds_seen[0], rel=1e-6) == 1.0 / 255.0
+        assert thresholds_seen[1] == 1.0
+        assert r_int1["changed_pixels"] == 16
+        assert r_any["changed_pixels"] == 16
+
+    def test_detect_preserves_band_order_and_instance_separation(self, tmp_path):
+        """run_detection subsets requested band_indexes in order and polygonizes band 2 instances."""
+        raster_path = tmp_path / "four_band.tif"
+        transform = from_bounds(0, 0, 8, 8, 8, 8)
+        with rasterio.open(
+            raster_path,
+            "w",
+            driver="GTiff",
+            height=8,
+            width=8,
+            count=4,
+            dtype="uint8",
+            crs="EPSG:4326",
+            transform=transform,
+        ) as dst:
+            for idx in range(4):
+                dst.write(np.full((8, 8), (idx + 1) * 10, dtype=np.uint8), idx + 1)
+
+        model = tmp_path / "det.pth"
+        model.write_bytes(b"pth")
+
+        observed_band_means = []
+
+        def _fake_multiclass_detection(
+            input_path,
+            output_path,
+            model_path,
+            num_classes,
+            confidence_threshold,
+            window_size,
+            overlap,
+            num_channels=3,
+        ):
+            with rasterio.open(input_path) as src:
+                assert src.count == num_channels
+                observed_band_means.append(
+                    [int(src.read(i).mean()) for i in range(1, src.count + 1)]
+                )
+            # Write 2-band output: band 1 = class (both class 2), band 2 = instance IDs (1 and 2, touching!)
+            class_band = np.zeros((8, 8), dtype=np.uint8)
+            inst_band = np.zeros((8, 8), dtype=np.uint8)
+            class_band[1:4, 1:3] = 2
+            inst_band[1:4, 1:3] = 1
+            class_band[1:4, 3:5] = 2
+            inst_band[1:4, 3:5] = 2
+            with rasterio.open(
+                output_path,
+                "w",
+                driver="GTiff",
+                height=8,
+                width=8,
+                count=2,
+                dtype="uint8",
+                crs="EPSG:4326",
+                transform=transform,
+            ) as dst:
+                dst.write(class_band, 1)
+                dst.write(inst_band, 2)
+
+        fake_od = types.ModuleType("geoai.object_detect")
+        fake_od.multiclass_detection = _fake_multiclass_detection
+
+        out_vec = tmp_path / "dets.geojson"
+        with patch.dict(sys.modules, {"geoai.object_detect": fake_od}):
+            res = detect_mod.run_detection(
+                str(raster_path),
+                str(model),
+                num_classes=3,
+                output_vector=str(out_vec),
+                band_indexes=[3, 1, 0],
+            )
+
+        assert observed_band_means == [[40, 20, 10]]
+        assert res["detection_count"] == 2
+        import geopandas as gpd
+
+        gdf = gpd.read_file(out_vec)
+        assert len(gdf) == 2
+        assert sorted(gdf["instance_id"].tolist()) == [1, 2]
+        assert gdf["class"].tolist() == [2, 2]
+
+    def test_segment_rejects_non_automatic_sam_and_preserves_semantic_config(
+        self, tmp_path
+    ):
+        """run_sam rejects automatic=False; run_semantic_segmentation forwards backbone/in_channels and band order."""
+        raster_path = tmp_path / "four_band.tif"
+        transform = from_bounds(0, 0, 8, 8, 8, 8)
+        with rasterio.open(
+            raster_path,
+            "w",
+            driver="GTiff",
+            height=8,
+            width=8,
+            count=4,
+            dtype="uint8",
+            crs="EPSG:4326",
+            transform=transform,
+        ) as dst:
+            for idx in range(4):
+                dst.write(np.full((8, 8), (idx + 1) * 10, dtype=np.uint8), idx + 1)
+
+        model = tmp_path / "seg.pth"
+        model.write_bytes(b"pth")
+
+        with pytest.raises(ValueError, match="automatic=False"):
+            segment_mod.run_sam(
+                str(raster_path), str(tmp_path / "sam.tif"), automatic=False
+            )
+
+        with pytest.raises(ValueError, match="band_indexes"):
+            segment_mod.run_semantic_segmentation(
+                str(raster_path),
+                str(model),
+                str(tmp_path / "sem.tif"),
+                in_channels=4,
+                band_indexes=[0, 1, 2],
+            )
+
+        recorded = {}
+
+        def _fake_sem(
+            input_path,
+            output_path,
+            model_path,
+            architecture,
+            encoder_name,
+            num_channels,
+            num_classes,
+            window_size,
+            overlap,
+        ):
+            with rasterio.open(input_path) as src:
+                recorded["band_means"] = [
+                    int(src.read(i).mean()) for i in range(1, src.count + 1)
+                ]
+            recorded["architecture"] = architecture
+            recorded["encoder_name"] = encoder_name
+            recorded["num_channels"] = num_channels
+
+        fake_train = types.ModuleType("geoai.train")
+        fake_train.semantic_segmentation = _fake_sem
+
+        with patch.dict(sys.modules, {"geoai.train": fake_train}):
+            segment_mod.run_semantic_segmentation(
+                str(raster_path),
+                str(model),
+                str(tmp_path / "sem.tif"),
+                in_channels=3,
+                band_indexes=[3, 2, 1],
+            )
+
+        assert recorded["band_means"] == [40, 30, 20]
+        assert recorded["architecture"] == "unet"
+        assert recorded["encoder_name"] == "resnet50"
+        assert recorded["num_channels"] == 3
+
+    def test_repl_project_load_error_stops_subcommand_dispatch(self, tmp_path):
+        """In REPL mode, --project missing.json must NOT run the subcommand on the prior project."""
+        proj_a = project_mod.create_project(name="project_a")
+        proj_a_path = tmp_path / "proj_a.json"
+        project_mod.save_project(proj_a, str(proj_a_path))
+
+        scene = tmp_path / "scene.tif"
+        scene.write_bytes(b"tif")
+
+        sess = geoai_cli.get_session()
+        sess.set_project(proj_a, str(proj_a_path))
+        prev_repl = geoai_cli._repl_mode
+        try:
+            geoai_cli._repl_mode = True
+            exit_code = geoai_cli.cli.main(
+                [
+                    "--project",
+                    str(tmp_path / "missing.json"),
+                    "project",
+                    "add-file",
+                    str(scene),
+                ],
+                standalone_mode=False,
+            )
+            assert exit_code == 1
+            assert len(sess.project["files"]) == 0
+        finally:
+            geoai_cli._repl_mode = prev_repl
+
+    def test_sanitize_json_value_terminates_on_longdouble(self):
+        """sanitize_json_value and serialize_info terminate on np.longdouble scalars."""
+        from cli_anything.geoai.utils.serialization import (
+            sanitize_json_value,
+            serialize_info,
+        )
+
+        ld = np.longdouble("1.25")
+        val = sanitize_json_value(ld)
+        assert isinstance(val, float)
+        assert val == pytest.approx(1.25)
+
+        info = serialize_info({"ld": ld, "nan_ld": np.longdouble("nan")})
+        assert info["ld"] == pytest.approx(1.25)
+        assert info["nan_ld"] is None
+        json.dumps(info, allow_nan=False)
