@@ -5,6 +5,8 @@ model and extract relevant features from the captions using spaCy NLP.
 """
 
 import importlib
+import importlib.util
+import inspect
 import logging
 import os
 import shutil
@@ -68,18 +70,62 @@ def ensure_spacy_model(
                 f"Install it with: python -m spacy download {model_name}"
             )
         logger.info("spaCy model '%s' not found. Installing...", model_name)
-        orig_path = os.environ.get("PATH", "")
+        had_path = "PATH" in os.environ
+        orig_path = os.environ.get("PATH")
         exe_dir = os.path.dirname(sys.executable)
         try:
-            if exe_dir and exe_dir not in orig_path.split(os.pathsep):
-                os.environ["PATH"] = (
-                    f"{exe_dir}{os.pathsep}{orig_path}" if orig_path else exe_dir
+            if exe_dir:
+                cur_path = orig_path or ""
+                if exe_dir not in cur_path.split(os.pathsep):
+                    os.environ["PATH"] = (
+                        f"{exe_dir}{os.pathsep}{cur_path}" if cur_path else exe_dir
+                    )
+            # Determine whether spaCy will invoke uv rather than pip. Newer
+            # spaCy checks importlib.util.find_spec("pip"), while older
+            # releases check shutil.which("pip"). Query spaCy's helper when
+            # available so --python is only forwarded to uv.
+            use_uv = False
+            try:
+                spacy_dl_mod = importlib.import_module("spacy.cli.download")
+                get_cmd = getattr(spacy_dl_mod, "_get_pip_install_cmd", None)
+                if callable(get_cmd):
+                    installer_cmd = get_cmd()
+                    use_uv = (
+                        bool(installer_cmd)
+                        and os.path.basename(installer_cmd[0]) == "uv"
+                    )
+                else:
+                    use_uv = (
+                        importlib.util.find_spec("pip") is None
+                        and shutil.which("pip") is None
+                        and shutil.which("uv") is not None
+                    )
+            except (Exception, SystemExit):
+                use_uv = (
+                    importlib.util.find_spec("pip") is None
+                    and shutil.which("pip") is None
+                    and shutil.which("uv") is not None
                 )
-            # spaCy's CLI falls back to `uv pip install` when `pip` is not on
-            # PATH; pass `--python` so uv targets the active interpreter even
-            # outside a virtualenv (e.g. conda environments).
-            if not shutil.which("pip") and shutil.which("uv"):
-                download(model_name, False, False, None, "--python", sys.executable)
+
+            if use_uv:
+                # Pass --python so uv targets the active interpreter even
+                # outside a virtualenv (e.g. conda environments).
+                sig = inspect.signature(download)
+                pos_params = [
+                    p
+                    for p in sig.parameters.values()
+                    if p.kind
+                    in (
+                        inspect.Parameter.POSITIONAL_ONLY,
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    )
+                ]
+                if len(pos_params) >= 4:
+                    # spaCy signature: download(model, direct, sdist, custom_url, *pip_args)
+                    download(model_name, False, False, None, "--python", sys.executable)
+                else:
+                    # Legacy signature: download(model, direct, sdist, *pip_args)
+                    download(model_name, False, False, "--python", sys.executable)
             else:
                 download(model_name)
             logger.info("spaCy model '%s' installed.", model_name)
@@ -90,7 +136,10 @@ def ensure_spacy_model(
                 f"Error: {e}"
             ) from e
         finally:
-            os.environ["PATH"] = orig_path
+            if had_path:
+                os.environ["PATH"] = orig_path
+            else:
+                os.environ.pop("PATH", None)
 
 
 # ---------------------------------------------------------------------
