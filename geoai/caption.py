@@ -6,6 +6,9 @@ model and extract relevant features from the captions using spaCy NLP.
 
 import importlib
 import logging
+import os
+import shutil
+import sys
 from io import BytesIO
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -65,15 +68,29 @@ def ensure_spacy_model(
                 f"Install it with: python -m spacy download {model_name}"
             )
         logger.info("spaCy model '%s' not found. Installing...", model_name)
+        orig_path = os.environ.get("PATH", "")
+        exe_dir = os.path.dirname(sys.executable)
         try:
-            download(model_name)
+            if exe_dir and exe_dir not in orig_path.split(os.pathsep):
+                os.environ["PATH"] = (
+                    f"{exe_dir}{os.pathsep}{orig_path}" if orig_path else exe_dir
+                )
+            # spaCy's CLI falls back to `uv pip install` when `pip` is not on
+            # PATH; pass `--python` so uv targets the active interpreter even
+            # outside a virtualenv (e.g. conda environments).
+            if not shutil.which("pip") and shutil.which("uv"):
+                download(model_name, False, False, None, "--python", sys.executable)
+            else:
+                download(model_name)
             logger.info("spaCy model '%s' installed.", model_name)
-        except Exception as e:
+        except (Exception, SystemExit) as e:
             raise RuntimeError(
                 f"Failed to download spaCy model '{model_name}'. "
                 f"You may need to install it manually with: python -m spacy download {model_name}. "
                 f"Error: {e}"
             ) from e
+        finally:
+            os.environ["PATH"] = orig_path
 
 
 # ---------------------------------------------------------------------

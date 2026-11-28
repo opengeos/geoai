@@ -4,6 +4,7 @@
 import logging
 import math
 import os
+import shutil
 import subprocess
 import tempfile
 import warnings
@@ -1774,6 +1775,119 @@ def stack_bands(
     else:
         resolution_x = resolution_y = resolution
 
+    _GDAL_DTYPE_MAP = {
+        "byte": "uint8",
+        "uint8": "uint8",
+        "int8": "int8",
+        "uint16": "uint16",
+        "int16": "int16",
+        "uint32": "uint32",
+        "int32": "int32",
+        "float32": "float32",
+        "float64": "float64",
+    }
+
+    def _run_stack_rasterio() -> None:
+        from rasterio.transform import from_bounds
+        from rasterio.warp import Resampling, reproject, transform_bounds
+
+        if extra_gdal_translate_args:
+            logger.warning(
+                "GDAL CLI tools not found; falling back to rasterio and "
+                "ignoring extra_gdal_translate_args=%s",
+                extra_gdal_translate_args,
+            )
+
+        with rasterio.open(input_files[0]) as ref:
+            dst_crs = ref.crs
+            default_dtype = ref.dtypes[0]
+            min_x, min_y, max_x, max_y = ref.bounds
+
+        total_bands = 0
+        for path in input_files:
+            with rasterio.open(path) as src:
+                total_bands += src.count
+                if src.crs and dst_crs and src.crs != dst_crs:
+                    bx0, by0, bx1, by1 = transform_bounds(src.crs, dst_crs, *src.bounds)
+                else:
+                    bx0, by0, bx1, by1 = src.bounds
+                min_x = min(min_x, bx0)
+                min_y = min(min_y, by0)
+                max_x = max(max_x, bx1)
+                max_y = max(max_y, by1)
+
+        res_x = abs(float(resolution_x))
+        res_y = abs(float(resolution_y))
+        width = max(1, int(round((max_x - min_x) / res_x)))
+        height = max(1, int(round((max_y - min_y) / res_y)))
+        dst_transform = from_bounds(min_x, min_y, max_x, max_y, width, height)
+
+        if dtype:
+            out_dtype = _GDAL_DTYPE_MAP.get(dtype.lower(), dtype.lower())
+        else:
+            out_dtype = default_dtype
+        np_dtype = np.dtype(out_dtype)
+
+        stacked = np.zeros((total_bands, height, width), dtype=np_dtype)
+        work_dtype = (
+            np.float64 if np_dtype in (np.float64, np.uint32, np.int32) else np.float32
+        )
+        band_idx = 0
+        for path in input_files:
+            with rasterio.open(path) as src:
+                for b in range(1, src.count + 1):
+                    src_data = src.read(b)
+                    tmp = np.zeros((height, width), dtype=work_dtype)
+                    reproject(
+                        source=src_data,
+                        destination=tmp,
+                        src_transform=src.transform,
+                        src_crs=src.crs or dst_crs,
+                        src_nodata=src.nodata,
+                        dst_transform=dst_transform,
+                        dst_crs=dst_crs,
+                        dst_nodata=None,
+                        resampling=Resampling.bilinear,
+                    )
+                    if np.issubdtype(np_dtype, np.integer):
+                        info = np.iinfo(np_dtype)
+                        tmp = np.nan_to_num(
+                            tmp, nan=0.0, posinf=info.max, neginf=info.min
+                        )
+                        stacked[band_idx] = np.clip(tmp, info.min, info.max).astype(
+                            np_dtype
+                        )
+                    else:
+                        stacked[band_idx] = tmp.astype(np_dtype)
+                    band_idx += 1
+
+        parent_dir = os.path.dirname(os.path.abspath(output_file))
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        driver = "COG" if output_format.upper() == "COG" else output_format
+        profile = {
+            "driver": driver,
+            "height": height,
+            "width": width,
+            "count": total_bands,
+            "dtype": str(np_dtype),
+            "crs": dst_crs,
+            "transform": dst_transform,
+            "compress": compress,
+        }
+        try:
+            with rasterio.open(output_file, "w", **profile) as dst:
+                dst.write(stacked)
+        except rasterio.errors.RasterioIOError:
+            if driver == "COG":
+                profile["driver"] = "GTiff"
+                profile["tiled"] = True
+                with rasterio.open(output_file, "w", **profile) as dst:
+                    dst.write(stacked)
+            else:
+                raise
+
     def _run_stack(vrt_path: str) -> None:
         # Step 1: Build VRT
         vrt_cmd = ["gdalbuildvrt", "-separate", vrt_path] + input_files
@@ -1802,13 +1916,19 @@ def stack_bands(
 
         subprocess.run(translate_cmd, check=True)
 
-    if temp_vrt is None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            _run_stack(os.path.join(tmpdir, "stack.vrt"))
-    else:
-        _run_stack(temp_vrt)
-        if os.path.exists(temp_vrt):
-            os.remove(temp_vrt)
+    try:
+        if temp_vrt is None:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                _run_stack(os.path.join(tmpdir, "stack.vrt"))
+        else:
+            _run_stack(temp_vrt)
+            if os.path.exists(temp_vrt):
+                os.remove(temp_vrt)
+    except FileNotFoundError:
+        if not (shutil.which("gdalbuildvrt") and shutil.which("gdal_translate")):
+            _run_stack_rasterio()
+        else:
+            raise
 
     return output_file
 

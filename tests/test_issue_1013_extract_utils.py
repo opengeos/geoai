@@ -864,9 +864,9 @@ class TestRasterUtilsFixes(unittest.TestCase):
 
             with patch(
                 "geoai.utils.raster.subprocess.run",
-                side_effect=FileNotFoundError("gdalbuildvrt missing"),
+                side_effect=subprocess.CalledProcessError(1, "gdalbuildvrt"),
             ):
-                with self.assertRaises(FileNotFoundError):
+                with self.assertRaises(subprocess.CalledProcessError):
                     stack_bands([f1, f2], out_tif, temp_vrt=existing_vrt)
             self.assertTrue(os.path.exists(existing_vrt))
 
