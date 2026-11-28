@@ -59,14 +59,11 @@ def _resolve_loss_fn(loss: str):
 
         return FocalLoss()
     if loss == "jaccard":
-        try:
-            import segmentation_models_pytorch as smp
+        from geoai.landcover_train import TverskyLoss
 
-            return smp.losses.JaccardLoss(mode="multiclass")
-        except ImportError:
-            from geoai.landcover_train import TverskyLoss
-
-            return TverskyLoss(alpha=0.5, beta=0.5)
+        # TverskyLoss with alpha=beta=1.0 is multiclass Jaccard (IoU) loss and
+        # excludes ignore_index (-100) pixels from both targets and predictions.
+        return TverskyLoss(alpha=1.0, beta=1.0, ignore_index=-100)
     return None
 
 

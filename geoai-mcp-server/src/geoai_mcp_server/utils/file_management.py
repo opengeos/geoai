@@ -16,6 +16,23 @@ from .error_handling import FileAccessError, InputValidationError
 logger = logging.getLogger("geoai_mcp.file_management")
 
 
+_INTERNAL_STAGING_PREFIXES = (
+    ".geoai_pub_",
+    ".geoai_bak_",
+    ".geoai_tmp_",
+    ".geoai_training_dataset",
+)
+
+
+def _is_internal_staging_path(path: Path, base_dir: Path) -> bool:
+    """Return True if any path component inside ``base_dir`` is an internal staging entry."""
+    try:
+        rel_parts = path.resolve().relative_to(base_dir.resolve()).parts
+    except ValueError:
+        return False
+    return any(part.startswith(_INTERNAL_STAGING_PREFIXES) for part in rel_parts)
+
+
 def _is_path_within_directory(path: Path, directory: Path) -> bool:
     """Check if a path is within a directory (prevents traversal attacks).
 
@@ -221,7 +238,9 @@ def get_safe_file_path(
     base_dir = (config.input_dir if source == "input" else config.output_dir).resolve()
     full_path = (base_dir / filename).resolve()
 
-    if not _is_path_within_directory(full_path, base_dir):
+    if not _is_path_within_directory(full_path, base_dir) or _is_internal_staging_path(
+        full_path, base_dir
+    ):
         logger.warning(f"Path traversal attempt blocked ({source}): {filename}")
         raise FileAccessError(
             message=f"Path is outside allowed {source} directory",
@@ -368,6 +387,8 @@ def list_input_files(
     truncated = False
     for candidate in iterator:
         if not _is_path_within_directory(candidate, base_dir):
+            continue
+        if _is_internal_staging_path(candidate, base_dir):
             continue
         if not candidate.is_file():
             continue

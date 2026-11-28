@@ -416,8 +416,14 @@ class TestMCPGeoAIContracts:
         stac_search_fn = make_strict_callable(
             "geoai.download", "pc_stac_search", return_value=[fake_item]
         )
+
+        def _fake_stac_download(items, output_dir, **kwargs):
+            p = Path(output_dir) / "s2_1_B04.tif"
+            p.write_bytes(b"tif")
+            return {"s2_1": {"B04": str(p)}}
+
         stac_dl_fn = make_strict_callable(
-            "geoai.download", "pc_stac_download", return_value={}
+            "geoai.download", "pc_stac_download", return_value=_fake_stac_download
         )
         tiles_batch_fn = make_strict_callable(
             "geoai.utils",

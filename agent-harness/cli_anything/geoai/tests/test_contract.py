@@ -983,3 +983,20 @@ class TestHarnessRegressions:
             finally:
                 if os.path.exists(subset_path):
                     os.unlink(subset_path)
+
+    def test_jaccard_loss_handles_ignore_index(self):
+        """_resolve_loss_fn('jaccard') returns an ignore-aware loss supporting target -100."""
+        import torch
+
+        loss_fn = segment_mod._resolve_loss_fn("jaccard")
+        logits = torch.randn(2, 3, 4, 4, requires_grad=True)
+        targets = torch.tensor(
+            [
+                [[0, 1, -100, 2]] * 4,
+                [[2, -100, 1, 0]] * 4,
+            ],
+            dtype=torch.long,
+        )
+        loss = loss_fn(logits, targets)
+        assert torch.isfinite(loss)
+        loss.backward()

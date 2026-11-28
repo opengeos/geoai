@@ -24,6 +24,8 @@ For Claude Desktop integration, add to claude_desktop_config.json:
 import asyncio
 import builtins
 import contextlib
+from datetime import date
+import errno
 import importlib
 import logging
 import math
@@ -33,6 +35,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -198,6 +201,28 @@ def _stdout_router_installed():
                 _stdout_router_proxy = None
 
 
+class _WorkerTimeoutError(Exception):
+    """Sentinel wrapper distinguishing a worker-raised TimeoutError from wait_for expiration."""
+
+    def __init__(self, exc: BaseException):
+        self.exc = exc
+
+
+_path_locks_guard = threading.Lock()
+_path_locks: dict[str, threading.Lock] = {}
+
+
+def _get_path_lock(path: Path) -> threading.Lock:
+    """Return a per-destination lock keyed by resolved path."""
+    key = str(path.resolve())
+    with _path_locks_guard:
+        lock = _path_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _path_locks[key] = lock
+        return lock
+
+
 async def _run_blocking(fn, *args, **kwargs):
     """Execute a synchronous GeoAI call in a worker thread.
 
@@ -215,12 +240,16 @@ async def _run_blocking(fn, *args, **kwargs):
             _thread_stdout_state.redirect_to_stderr = True
             try:
                 return fn(*args, **kwargs)
+            except TimeoutError as worker_exc:
+                raise _WorkerTimeoutError(worker_exc) from worker_exc
             finally:
                 _thread_stdout_state.redirect_to_stderr = prev
 
     try:
         return await asyncio.wait_for(asyncio.to_thread(_wrapped), timeout=timeout)
-    except (asyncio.TimeoutError, builtins.TimeoutError) as exc:
+    except _WorkerTimeoutError as wrapped:
+        raise wrapped.exc from None
+    except asyncio.TimeoutError as exc:
         raise OperationTimeoutError(
             message=f"Operation timed out after {int(timeout)} seconds",
             timeout_seconds=int(timeout),
@@ -253,12 +282,40 @@ _SHAPEFILE_SIDECAR_EXTS = (
 
 
 def _atomic_publish_file(src: Path, dest: Path) -> None:
-    """Move ``src`` to ``dest``, using ``os.replace`` when on the same device."""
+    """Atomically publish ``src`` to ``dest``, staging cross-device copies first."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.replace(str(src), str(dest))
-    except OSError:
-        shutil.move(str(src), str(dest))
+        return
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+
+    # Cross-device move: copy into an internal hidden sibling file on the
+    # destination filesystem first so workspace tools never see a partial file,
+    # then atomically rename into place.
+    tmp_path: Optional[Path] = None
+    try:
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(dest.parent),
+            prefix=".geoai_pub_",
+            suffix=".tmp",
+        )
+        os.close(fd)
+        tmp_path = Path(tmp_name)
+        shutil.copy2(str(src), str(tmp_path))
+        os.replace(str(tmp_path), str(dest))
+        tmp_path = None
+        try:
+            src.unlink()
+        except OSError:
+            pass
+    finally:
+        if tmp_path is not None and tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def _move_vector_file(src: Path, dest: Path, cfg: Optional[GeoAIConfig] = None) -> None:
@@ -1142,7 +1199,7 @@ async def classify_land_cover(
 
         return ClassificationResult(
             success=True,
-            message=f"Land cover classification complete with {num_classes} classes",
+            message="Land cover classification complete",
             output_files=[str(output_path)],
             processing_time_seconds=processing_time,
             class_distribution=class_distribution,
@@ -1229,7 +1286,7 @@ async def detect_temporal_changes(
                     detect_kwargs["output_vector"] = str(staged_vec)
                     result = change_module.changestar_detect(**detect_kwargs)
                     if staged_vec.is_file():
-                        _move_vector_file(staged_vec, output_path)
+                        _move_vector_file(staged_vec, output_path, cfg)
                         published_files = [str(output_path)]
 
             chg_pct = 0.0
@@ -1378,14 +1435,66 @@ async def download_satellite_imagery(
 
         downloaded_files: list[str] = []
         total_size_mb = 0.0
+        download_success = True
+        download_message: Optional[str] = None
 
         if source_enum == DataSource.NAIP:
-            files = await _run_blocking(
-                download_module.download_naip,
-                bbox=bbox.to_tuple(),
-                output_dir=str(output_dir),
-                max_items=max_items,
-            )
+            naip_year: Optional[int] = None
+            if date_range is not None:
+                cleaned_range = date_range.strip()
+                if len(cleaned_range) == 4 and cleaned_range.isdigit():
+                    naip_year = int(cleaned_range)
+                elif "/" in cleaned_range:
+                    parts = cleaned_range.split("/", 1)
+                    try:
+                        start_dt = date.fromisoformat(parts[0].strip())
+                        end_dt = date.fromisoformat(parts[1].strip())
+                    except ValueError as exc:
+                        raise InputValidationError(
+                            message=(
+                                f"Invalid date_range '{date_range}' for NAIP. "
+                                "Expected 'YYYY' or full-year 'YYYY-01-01/YYYY-12-31'."
+                            ),
+                            parameter_name="date_range",
+                            received_value=date_range,
+                            expected="'YYYY' or 'YYYY-01-01/YYYY-12-31'",
+                        ) from exc
+                    if (
+                        start_dt.year == end_dt.year
+                        and start_dt == date(start_dt.year, 1, 1)
+                        and end_dt == date(end_dt.year, 12, 31)
+                    ):
+                        naip_year = start_dt.year
+                    else:
+                        raise InputValidationError(
+                            message=(
+                                f"NAIP only supports whole-year date filtering "
+                                f"('YYYY' or 'YYYY-01-01/YYYY-12-31'), got '{date_range}'."
+                            ),
+                            parameter_name="date_range",
+                            received_value=date_range,
+                            expected="'YYYY' or 'YYYY-01-01/YYYY-12-31'",
+                        )
+                else:
+                    raise InputValidationError(
+                        message=(
+                            f"Invalid date_range '{date_range}' for NAIP. "
+                            "Expected 'YYYY' or 'YYYY-01-01/YYYY-12-31'."
+                        ),
+                        parameter_name="date_range",
+                        received_value=date_range,
+                        expected="'YYYY' or 'YYYY-01-01/YYYY-12-31'",
+                    )
+
+            naip_kwargs: dict[str, Any] = {
+                "bbox": bbox.to_tuple(),
+                "output_dir": str(output_dir),
+                "max_items": max_items,
+            }
+            if naip_year is not None:
+                naip_kwargs["year"] = naip_year
+
+            files = await _run_blocking(download_module.download_naip, **naip_kwargs)
             if isinstance(files, list):
                 downloaded_files = [str(f) for f in files if f]
             elif files:
@@ -1409,22 +1518,29 @@ async def download_satellite_imagery(
                 quiet=True,
             )
             if items:
-                # Stage outside output_dir so workspace listings/reads cannot
-                # observe incomplete downloads, and separate staging (worker)
-                # from publication (request) so timed-out workers cannot
-                # overwrite files published by a later retry.
-                stage_dir = Path(tempfile.mkdtemp(prefix="geoai_stac_stage_"))
-                stage_root = stage_dir.resolve()
+                requested_assets = sum(
+                    len(item.assets)
+                    for item in items
+                    if isinstance(getattr(item, "assets", None), dict)
+                )
+
+                # Allocate the staging directory inside the worker so queued work
+                # that never starts leaves nothing behind, and hand off ownership
+                # explicitly under stage_lock before committing without a second
+                # deadline.
                 stage_lock = threading.Lock()
                 abandoned = False
-                worker_finished = False
+                staged_dir_holder: list[Optional[Path]] = [None]
 
                 def _stage_stac_download():
-                    nonlocal worker_finished
+                    with stage_lock:
+                        if abandoned:
+                            return None, []
+                    local_stage = Path(tempfile.mkdtemp(prefix="geoai_stac_stage_"))
                     try:
                         dl_map = download_module.pc_stac_download(
                             items=items,
-                            output_dir=str(stage_dir),
+                            output_dir=str(local_stage),
                         )
                         raw_paths: list[str] = []
                         if isinstance(dl_map, dict):
@@ -1435,47 +1551,93 @@ async def download_satellite_imagery(
                                     )
                                 elif asset_dict:
                                     raw_paths.append(str(asset_dict))
-                        return raw_paths
-                    finally:
                         with stage_lock:
-                            worker_finished = True
-                            should_cleanup = abandoned
+                            if abandoned:
+                                should_cleanup = True
+                            else:
+                                staged_dir_holder[0] = local_stage
+                                should_cleanup = False
                         if should_cleanup:
-                            shutil.rmtree(stage_dir, ignore_errors=True)
+                            shutil.rmtree(local_stage, ignore_errors=True)
+                            return None, []
+                        return local_stage, raw_paths
+                    except BaseException:
+                        shutil.rmtree(local_stage, ignore_errors=True)
+                        raise
 
                 try:
-                    raw_paths = await _run_blocking(_stage_stac_download)
+                    stage_dir, raw_paths = await _run_blocking(_stage_stac_download)
                 except BaseException:
                     with stage_lock:
                         abandoned = True
-                        done = worker_finished
-                    if done:
-                        shutil.rmtree(stage_dir, ignore_errors=True)
+                        orphan = staged_dir_holder[0]
+                        staged_dir_holder[0] = None
+                    if orphan is not None:
+                        shutil.rmtree(orphan, ignore_errors=True)
                     raise
 
-                def _publish_stac_downloads():
-                    try:
-                        published: list[str] = []
-                        for p_str in raw_paths:
-                            src_p = Path(p_str)
-                            try:
-                                resolved_src = src_p.resolve()
-                            except OSError:
-                                resolved_src = src_p
-                            if resolved_src.is_relative_to(stage_root):
-                                if resolved_src.is_file():
-                                    dest_p = validate_output_path(
-                                        output_dir / resolved_src.name, cfg
-                                    )
-                                    _atomic_publish_file(resolved_src, dest_p)
-                                    published.append(str(dest_p))
-                            else:
-                                published.append(p_str)
-                        return published
-                    finally:
-                        shutil.rmtree(stage_dir, ignore_errors=True)
+                if stage_dir is not None:
+                    stage_root = stage_dir.resolve()
+                    pub_lock = threading.Lock()
+                    pub_started = False
 
-                downloaded_files = await _run_blocking(_publish_stac_downloads)
+                    def _publish_stac_downloads():
+                        nonlocal pub_started
+                        with pub_lock:
+                            pub_started = True
+                        try:
+                            published: list[str] = []
+                            for p_str in raw_paths:
+                                src_p = Path(p_str)
+                                try:
+                                    resolved_src = src_p.resolve()
+                                except OSError:
+                                    resolved_src = src_p
+                                if resolved_src.is_relative_to(stage_root):
+                                    if resolved_src.is_file():
+                                        dest_p = validate_output_path(
+                                            output_dir / resolved_src.name, cfg
+                                        )
+                                        with _get_path_lock(dest_p):
+                                            _atomic_publish_file(resolved_src, dest_p)
+                                        published.append(str(dest_p))
+                                else:
+                                    published.append(p_str)
+                            return published
+                        finally:
+                            shutil.rmtree(stage_dir, ignore_errors=True)
+
+                    try:
+                        # Do not apply a second timeout to the irreversible commit.
+                        downloaded_files = await asyncio.to_thread(
+                            _publish_stac_downloads
+                        )
+                    except BaseException:
+                        with pub_lock:
+                            started = pub_started
+                        if not started:
+                            shutil.rmtree(stage_dir, ignore_errors=True)
+                        raise
+
+                if requested_assets > 0:
+                    if len(downloaded_files) == 0:
+                        download_success = False
+                        download_message = (
+                            f"Failed to download any of {requested_assets} asset(s) "
+                            f"from {len(items)} {source_enum.value} scene(s)"
+                        )
+                    elif len(downloaded_files) < requested_assets:
+                        download_success = False
+                        download_message = (
+                            f"Partial download from {source_enum.value}: downloaded "
+                            f"{len(downloaded_files)} of {requested_assets} requested asset(s)"
+                        )
+                elif len(downloaded_files) == 0:
+                    download_success = False
+                    download_message = (
+                        f"Found {len(items)} scene(s) in {source_enum.value}, "
+                        "but failed to download any assets"
+                    )
 
         for f in downloaded_files:
             fp = Path(f)
@@ -1485,8 +1647,12 @@ async def download_satellite_imagery(
         processing_time = time.time() - start_time
 
         return DownloadResult(
-            success=True,
-            message=f"Downloaded {len(downloaded_files)} files from {source_enum.value}",
+            success=download_success,
+            message=(
+                download_message
+                if download_message is not None
+                else f"Downloaded {len(downloaded_files)} files from {source_enum.value}"
+            ),
             output_files=downloaded_files,
             processing_time_seconds=processing_time,
             num_files=len(downloaded_files),
@@ -1581,7 +1747,8 @@ async def prepare_training_data(
         output_dir = cfg.output_dir
         if output_subdir:
             output_dir = validate_output_subdir(output_subdir, cfg)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            output_dir.mkdir(parents=True, exist_ok=True)
 
         logger.info(f"Preparing training data: {images_path} + {labels_path}")
 
@@ -1590,69 +1757,78 @@ async def prepare_training_data(
 
         error_count = 0
         failed_files: list[dict[str, Any]] = []
+        reported_output_files: list[str] = [str(output_dir)]
+        preserved_existing = False
 
-        # When output_subdir is specified, stage into a fresh temp directory and
-        # replace output_dir as a unit on clean completion so a full retry after
-        # a partial export never merges or duplicates tiles by filename.
+        # When output_subdir is specified, allocate a worker-owned staging dir
+        # and commit via a locked, recoverable swap on the destination filesystem.
         use_staged_unit = bool(output_subdir)
-        stage_export_dir: Optional[Path] = (
-            Path(tempfile.mkdtemp(prefix="geoai_train_stage_"))
-            if use_staged_unit
-            else None
-        )
-        target_export_dir = (
-            stage_export_dir if stage_export_dir is not None else output_dir
-        )
+        stage_lock = threading.Lock()
+        stage_abandoned = False
+        stage_holder: list[Optional[Path]] = [None]
+        marker_name = ".geoai_training_dataset"
 
-        try:
-            if images_path.is_dir():
-                batch_kwargs: dict[str, Any] = {
-                    "images_folder": str(images_path),
-                    "output_folder": str(target_export_dir),
-                    "tile_size": tile_size,
-                    "stride": stride,
-                    "quiet": True,
-                }
-                if labels_path.is_dir():
-                    batch_kwargs["masks_folder"] = str(labels_path)
-                else:
-                    batch_kwargs["masks_file"] = str(labels_path)
+        def _run_export_worker():
+            with stage_lock:
+                if stage_abandoned:
+                    return None, 0, 0, []
 
-                result = await _run_blocking(
-                    utils_module.export_geotiff_tiles_batch, **batch_kwargs
-                )
-                num_tiles = (
-                    int(result.get("total_tiles", 0)) if isinstance(result, dict) else 0
-                )
-                if isinstance(result, dict):
-                    raw_errors = result.get("errors", 0)
-                    error_count = (
-                        len(raw_errors)
-                        if isinstance(raw_errors, (list, tuple))
-                        else int(raw_errors or 0)
+            local_stage: Optional[Path] = (
+                Path(tempfile.mkdtemp(prefix="geoai_train_stage_"))
+                if use_staged_unit
+                else None
+            )
+            target_dir = local_stage if local_stage is not None else output_dir
+
+            try:
+                if images_path.is_dir():
+                    batch_kwargs: dict[str, Any] = {
+                        "images_folder": str(images_path),
+                        "output_folder": str(target_dir),
+                        "tile_size": tile_size,
+                        "stride": stride,
+                        "quiet": True,
+                    }
+                    if labels_path.is_dir():
+                        batch_kwargs["masks_folder"] = str(labels_path)
+                    else:
+                        batch_kwargs["masks_file"] = str(labels_path)
+
+                    result = utils_module.export_geotiff_tiles_batch(**batch_kwargs)
+                    tiles = (
+                        int(result.get("total_tiles", 0))
+                        if isinstance(result, dict)
+                        else 0
                     )
-                    raw_failed = result.get("failed_files") or []
-                    if isinstance(raw_failed, list):
-                        failed_files = [
-                            item if isinstance(item, dict) else {"file": str(item)}
-                            for item in raw_failed
-                        ]
-            else:
-
-                def _run_single_export():
-                    images_out = target_export_dir / "images"
+                    errs = 0
+                    fails: list[dict[str, Any]] = []
+                    if isinstance(result, dict):
+                        raw_errors = result.get("errors", 0)
+                        errs = (
+                            len(raw_errors)
+                            if isinstance(raw_errors, (list, tuple))
+                            else int(raw_errors or 0)
+                        )
+                        raw_failed = result.get("failed_files") or []
+                        if isinstance(raw_failed, list):
+                            fails = [
+                                item if isinstance(item, dict) else {"file": str(item)}
+                                for item in raw_failed
+                            ]
+                else:
+                    images_out = target_dir / "images"
                     pre_existing = (
                         {p.resolve() for p in images_out.iterdir() if p.is_file()}
                         if images_out.is_dir()
                         else {
                             p.resolve()
-                            for p in target_export_dir.rglob("*.tif")
+                            for p in target_dir.rglob("*.tif")
                             if p.is_file()
                         }
                     )
                     export_res = utils_module.export_geotiff_tiles(
                         in_raster=str(images_path),
-                        out_folder=str(target_export_dir),
+                        out_folder=str(target_dir),
                         in_class_data=str(labels_path),
                         tile_size=tile_size,
                         stride=stride,
@@ -1676,41 +1852,136 @@ async def prepare_training_data(
                             if isinstance(raw_fail, list)
                             else []
                         )
-                        return tiles, errs, fails
-
-                    # Fallback when a custom/mock exporter returns None: count only
-                    # files created by this call rather than pre-existing tiles.
-                    if images_out.is_dir():
-                        post_files = {
-                            p.resolve() for p in images_out.iterdir() if p.is_file()
-                        }
                     else:
-                        post_files = {
-                            p.resolve()
-                            for p in target_export_dir.rglob("*.tif")
-                            if p.is_file()
-                        }
-                    return len(post_files - pre_existing), 0, []
+                        if images_out.is_dir():
+                            post_files = {
+                                p.resolve() for p in images_out.iterdir() if p.is_file()
+                            }
+                        else:
+                            post_files = {
+                                p.resolve()
+                                for p in target_dir.rglob("*.tif")
+                                if p.is_file()
+                            }
+                        tiles = len(post_files - pre_existing)
+                        errs = 0
+                        fails = []
 
-                num_tiles, error_count, failed_files = await _run_blocking(
-                    _run_single_export
-                )
+                if local_stage is not None:
+                    with stage_lock:
+                        if stage_abandoned:
+                            should_cleanup = True
+                        else:
+                            stage_holder[0] = local_stage
+                            should_cleanup = False
+                    if should_cleanup:
+                        shutil.rmtree(local_stage, ignore_errors=True)
+                        return None, tiles, errs, fails
 
-            is_partial = error_count > 0 or len(failed_files) > 0
+                return local_stage, tiles, errs, fails
+            except BaseException:
+                if local_stage is not None:
+                    shutil.rmtree(local_stage, ignore_errors=True)
+                raise
 
-            if stage_export_dir is not None:
+        try:
+            stage_export_dir, num_tiles, error_count, failed_files = (
+                await _run_blocking(_run_export_worker)
+            )
+        except BaseException:
+            with stage_lock:
+                stage_abandoned = True
+                orphan = stage_holder[0]
+                stage_holder[0] = None
+            if orphan is not None:
+                shutil.rmtree(orphan, ignore_errors=True)
+            raise
 
-                def _replace_output_unit():
-                    if output_dir.exists():
-                        shutil.rmtree(output_dir)
+        is_partial = error_count > 0 or len(failed_files) > 0
+
+        if stage_export_dir is not None:
+            pub_lock = threading.Lock()
+            pub_started = False
+
+            def _commit_training_stage():
+                nonlocal pub_started
+                with pub_lock:
+                    pub_started = True
+                prepared_dir: Optional[Path] = None
+                backup_dir: Optional[Path] = None
+                try:
+                    (stage_export_dir / marker_name).write_text(
+                        "partial\n" if is_partial else "complete\n",
+                        encoding="utf-8",
+                    )
                     output_dir.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(stage_export_dir), str(output_dir))
+                    with _get_path_lock(output_dir):
+                        has_existing = output_dir.exists() and any(output_dir.iterdir())
+                        if has_existing:
+                            if not (output_dir / marker_name).is_file():
+                                raise ProcessingError(
+                                    message=(
+                                        f"Refusing to replace existing non-empty directory "
+                                        f"'{output_subdir}' not created by prepare_training_data. "
+                                        "Choose a fresh output_subdir."
+                                    ),
+                                    stage="publish",
+                                )
+                            if is_partial:
+                                # Preserve the existing dataset rather than replacing it
+                                # with an incomplete export.
+                                return False
 
-                await _run_blocking(_replace_output_unit)
-                stage_export_dir = None
-        finally:
-            if stage_export_dir is not None and stage_export_dir.exists():
-                shutil.rmtree(stage_export_dir, ignore_errors=True)
+                        # Prepare the full replacement on the destination filesystem
+                        # before touching output_dir so cross-device moves cannot lose
+                        # the previous dataset.
+                        prepared_name = f".geoai_pub_train_{uuid.uuid4().hex[:8]}"
+                        prepared_dir = output_dir.parent / prepared_name
+                        try:
+                            os.rename(str(stage_export_dir), str(prepared_dir))
+                        except OSError as exc:
+                            if exc.errno != errno.EXDEV:
+                                raise
+                            shutil.copytree(str(stage_export_dir), str(prepared_dir))
+
+                        if output_dir.exists():
+                            backup_dir = (
+                                output_dir.parent
+                                / f".geoai_bak_{output_dir.name}_{uuid.uuid4().hex[:8]}"
+                            )
+                            os.rename(str(output_dir), str(backup_dir))
+
+                        try:
+                            os.rename(str(prepared_dir), str(output_dir))
+                            prepared_dir = None
+                        except BaseException:
+                            if backup_dir is not None and backup_dir.exists():
+                                os.rename(str(backup_dir), str(output_dir))
+                                backup_dir = None
+                            raise
+
+                        if backup_dir is not None and backup_dir.exists():
+                            shutil.rmtree(backup_dir, ignore_errors=True)
+                            backup_dir = None
+                        return True
+                finally:
+                    if prepared_dir is not None and prepared_dir.exists():
+                        shutil.rmtree(prepared_dir, ignore_errors=True)
+                    if stage_export_dir.exists():
+                        shutil.rmtree(stage_export_dir, ignore_errors=True)
+
+            try:
+                published_stage = await asyncio.to_thread(_commit_training_stage)
+            except BaseException:
+                with pub_lock:
+                    started = pub_started
+                if not started and stage_export_dir.exists():
+                    shutil.rmtree(stage_export_dir, ignore_errors=True)
+                raise
+
+            if not published_stage:
+                preserved_existing = True
+                reported_output_files = []
 
         num_train = int(num_tiles * train_ratio)
         num_val = num_tiles - num_train
@@ -1723,14 +1994,22 @@ async def prepare_training_data(
             retry_list = (
                 f" Failed inputs: {', '.join(failed_names)}." if failed_names else ""
             )
-            retry_guidance = (
-                " After fixing the failed inputs, re-run with this output_subdir (which "
-                "replaces the dataset as a unit) or choose a fresh output_subdir."
-                if use_staged_unit
-                else " Do not merge a full retry into this directory; after fixing the "
-                "failed inputs, run a full retry into a fresh output_subdir to avoid "
-                "duplicate tiles."
-            )
+            if preserved_existing:
+                retry_guidance = (
+                    " Preserved the existing dataset at this output_subdir without "
+                    "overwriting it; fix the failed inputs and re-run."
+                )
+            elif use_staged_unit:
+                retry_guidance = (
+                    " After fixing the failed inputs, re-run with this output_subdir (which "
+                    "replaces the dataset as a unit) or choose a fresh output_subdir."
+                )
+            else:
+                retry_guidance = (
+                    " Do not merge a full retry into this directory; after fixing the "
+                    "failed inputs, run a full retry into a fresh output_subdir to avoid "
+                    "duplicate tiles."
+                )
             message = (
                 f"Partial training export: created {num_tiles} tiles with "
                 f"{error_count} error(s) and {len(failed_files)} failed file(s)."
@@ -1742,7 +2021,7 @@ async def prepare_training_data(
         return TrainingDataResult(
             success=not is_partial,
             message=message,
-            output_files=[str(output_dir)],
+            output_files=reported_output_files,
             processing_time_seconds=processing_time,
             num_tiles=num_tiles,
             num_train=num_train,
@@ -1844,7 +2123,8 @@ async def extract_features_with_foundation_model(
         out_name = output_filename or generate_output_filename(
             image_path, f"features_{fm.value}", "npy"
         )
-        if output_type == "embeddings" and not out_name.lower().endswith(".npy"):
+        # NumPy checks the '.npy' suffix case-sensitively when given a filename.
+        if output_type == "embeddings" and not out_name.endswith(".npy"):
             out_name = f"{out_name}.npy"
         output_path = validate_output_path(out_name, cfg)
 
@@ -1858,23 +2138,43 @@ async def extract_features_with_foundation_model(
 
             if output_type == "similarity_map":
                 sim_dir = validate_output_path(output_path.with_suffix(""), cfg)
-                sim_dir.mkdir(parents=True, exist_ok=True)
-                result = await _run_blocking(
-                    dino_module.create_similarity_map,
-                    input_image=str(full_input_path),
-                    query_coords=(float(reference_x), float(reference_y)),
-                    output_dir=str(sim_dir),
-                )
-                if isinstance(result, dict):
-                    sim_data = result.get("similarity_map")
-                    if sim_data is None and "image_dict" in result:
-                        img_dict = result["image_dict"]
-                        if isinstance(img_dict, dict):
-                            sim_data = img_dict.get("image")
-                    if sim_data is not None and hasattr(sim_data, "shape"):
-                        feature_dims = tuple(int(d) for d in sim_data.shape)
-                generated = sorted(str(p) for p in sim_dir.iterdir() if p.is_file())
-                output_files = generated or [str(sim_dir)]
+
+                def _run_similarity():
+                    # Run similarity map in a fresh staging directory so reused
+                    # output names only publish and report artifacts from this run.
+                    with tempfile.TemporaryDirectory(
+                        prefix="geoai_sim_stage_"
+                    ) as stage_dir:
+                        stage_root = Path(stage_dir)
+                        res = dino_module.create_similarity_map(
+                            input_image=str(full_input_path),
+                            query_coords=(float(reference_x), float(reference_y)),
+                            output_dir=str(stage_root),
+                        )
+                        dims: tuple[int, ...] = ()
+                        if isinstance(res, dict):
+                            sim_data = res.get("similarity_map")
+                            if sim_data is None and "image_dict" in res:
+                                img_dict = res["image_dict"]
+                                if isinstance(img_dict, dict):
+                                    sim_data = img_dict.get("image")
+                            if sim_data is not None and hasattr(sim_data, "shape"):
+                                dims = tuple(int(d) for d in sim_data.shape)
+
+                        staged_files = sorted(
+                            p for p in stage_root.rglob("*") if p.is_file()
+                        )
+                        published: list[str] = []
+                        if staged_files:
+                            sim_dir.mkdir(parents=True, exist_ok=True)
+                            for src_f in staged_files:
+                                rel = src_f.relative_to(stage_root)
+                                dest_f = validate_output_path(sim_dir / rel, cfg)
+                                _atomic_publish_file(src_f, dest_f)
+                                published.append(str(dest_f))
+                        return dims, published
+
+                feature_dims, output_files = await _run_blocking(_run_similarity)
             else:
                 import numpy as np
 
@@ -1888,7 +2188,8 @@ async def extract_features_with_foundation_model(
                         if hasattr(features, "detach")
                         else np.asarray(features)
                     )
-                    np.save(str(output_path), arr)
+                    with open(output_path, "wb") as fh:
+                        np.save(fh, arr)
                     return arr
 
                 arr = await _run_blocking(_extract_dinov3)
@@ -1904,7 +2205,7 @@ async def extract_features_with_foundation_model(
                 import torch
 
                 processor = prithvi_module.PrithviProcessor()
-                input_data, _metas, _temporal_coords, _location_coords = (
+                input_data, _metas, temporal_coords, location_coords = (
                     processor.load_images(file_paths=[str(full_input_path)])
                 )
                 img_size = int(getattr(processor, "img_size", 224))
@@ -1928,6 +2229,34 @@ async def extract_features_with_foundation_model(
                 )
 
                 device = getattr(processor, "device", torch.device("cpu"))
+                coords_enc = getattr(processor, "coords_encoding", None) or []
+
+                t_coords_tensor = None
+                if (
+                    "time" in coords_enc
+                    and temporal_coords is not None
+                    and len(temporal_coords) > 0
+                ):
+                    t_arr = torch.as_tensor(
+                        temporal_coords, dtype=torch.float32, device=device
+                    )
+                    if t_arr.ndim == 2:
+                        t_arr = t_arr.unsqueeze(0)
+                    t_coords_tensor = t_arr
+
+                l_coords_tensor = None
+                if (
+                    "location" in coords_enc
+                    and location_coords is not None
+                    and len(location_coords) > 0
+                ):
+                    l_arr = torch.as_tensor(
+                        location_coords, dtype=torch.float32, device=device
+                    )
+                    if l_arr.ndim == 1:
+                        l_arr = l_arr.unsqueeze(0)
+                    l_coords_tensor = l_arr
+
                 encoder = processor.model.encoder
                 latents = []
                 with torch.no_grad():
@@ -1935,8 +2264,8 @@ async def extract_features_with_foundation_model(
                         x_win = windows[idx : idx + 1].to(device)
                         latent, _mask, ids_restore = encoder(
                             x_win,
-                            temporal_coords=None,
-                            location_coords=None,
+                            temporal_coords=t_coords_tensor,
+                            location_coords=l_coords_tensor,
                             mask_ratio=0.0,
                         )
                         if (
@@ -1961,7 +2290,8 @@ async def extract_features_with_foundation_model(
                         )
 
                 arr = np.concatenate(latents, axis=0)
-                np.save(str(output_path), arr)
+                with open(output_path, "wb") as fh:
+                    np.save(fh, arr)
                 return arr
 
             arr = await _run_blocking(_extract_prithvi)
@@ -2427,27 +2757,29 @@ async def list_available_files(
             )
 
         capped_max = max(1, min(int(max_files), 500))
-        files, truncated = list_input_files(
-            base_dir, pattern, max_files=capped_max, return_truncated=True
-        )
 
-        file_list = []
-        total_size_mb = 0.0
+        def _scan_workspace():
+            files, is_truncated = list_input_files(
+                base_dir, pattern, max_files=capped_max, return_truncated=True
+            )
+            base_resolved = base_dir.resolve()
+            entries: list[dict[str, Any]] = []
+            size_total_mb = 0.0
+            for f in files:
+                file_info: dict[str, Any] = {
+                    "name": f.name,
+                    "path": str(f.resolve().relative_to(base_resolved)),
+                }
+                if include_metadata:
+                    stat = f.stat()
+                    size_mb = stat.st_size / (1024 * 1024)
+                    size_total_mb += size_mb
+                    file_info["size_mb"] = round(size_mb, 2)
+                    file_info["modified"] = stat.st_mtime
+                entries.append(file_info)
+            return entries, is_truncated, size_total_mb
 
-        for f in files:
-            file_info: dict[str, Any] = {
-                "name": f.name,
-                "path": str(f.resolve().relative_to(base_dir.resolve())),
-            }
-
-            if include_metadata:
-                stat = f.stat()
-                size_mb = stat.st_size / (1024 * 1024)
-                total_size_mb += size_mb
-                file_info["size_mb"] = round(size_mb, 2)
-                file_info["modified"] = stat.st_mtime
-
-            file_list.append(file_info)
+        file_list, truncated, total_size_mb = await _run_blocking(_scan_workspace)
 
         message = (
             f"Found {len(file_list)} files in {directory} directory "

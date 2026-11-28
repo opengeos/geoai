@@ -138,16 +138,44 @@ class TestSegmentationTools:
         assert result["output_files"] == [str(raster_path)]
 
     def test_auto_segment_cleans_up_temp_files(self, sample_geotiff, temp_output_dir):
-        """auto_segment_image cleans up intermediate temp GeoTIFFs after vectorization."""
+        """auto_segment_image cleans up intermediate temp GeoTIFFs and staging dir after vectorization."""
         from geoai_mcp_server.server import auto_segment_image
 
-        mock_segmenter = MagicMock()
-        mock_segmenter.masks = [{"area": 200}, {"area": 300}]
-        mock_sam = MagicMock()
-        mock_sam.SamGeo.return_value = mock_segmenter
+        seen_raw_paths: list[Path] = []
+        seen_clean_paths: list[Path] = []
+        existed_during_vectorize: list[bool] = []
 
+        class _FakeSam:
+            def __init__(self, **kwargs):
+                self.masks = [{"area": 200}, {"area": 300}]
+
+            def generate(self, source, output, min_size=0, max_size=None):
+                p = Path(output)
+                p.write_bytes(b"raw_mask")
+                seen_raw_paths.append(p)
+
+        def _fake_clean(input_path, output_path, min_area=0):
+            assert Path(input_path).is_file()
+            p = Path(output_path)
+            p.write_bytes(b"clean_mask")
+            seen_clean_paths.append(p)
+
+        def _fake_r2v(raster_path, output_path, min_area=0):
+            existed_during_vectorize.append(
+                Path(raster_path).is_file()
+                and seen_raw_paths[0].is_file()
+                and seen_clean_paths[0].is_file()
+            )
+            Path(output_path).write_text(
+                '{"type": "FeatureCollection", "features": []}'
+            )
+            return [1, 2]
+
+        mock_sam = MagicMock()
+        mock_sam.SamGeo.side_effect = lambda **kw: _FakeSam(**kw)
         mock_utils = MagicMock()
-        mock_utils.raster_to_vector.return_value = [1, 2]
+        mock_utils.clean_instance_mask.side_effect = _fake_clean
+        mock_utils.raster_to_vector.side_effect = _fake_r2v
 
         def get_module(name):
             return mock_sam if name == "sam" else mock_utils
@@ -175,8 +203,11 @@ class TestSegmentationTools:
         )
         mock_utils.clean_instance_mask.assert_called_once()
         mock_utils.raster_to_vector.assert_called_once()
-        # No leftover temporary .tif files in output_dir
-        assert list(temp_output_dir.glob("auto_seg_*.tif")) == []
+        assert existed_during_vectorize == [True]
+        assert not seen_raw_paths[0].exists()
+        assert not seen_clean_paths[0].exists()
+        assert not seen_raw_paths[0].parent.exists()
+        assert list(temp_output_dir.glob(".auto_seg_tmp_*")) == []
 
 
 class TestDetectionTools:
@@ -320,16 +351,25 @@ class TestDownloadTools:
         assert "data_source" in result["message"].lower()
 
     def test_download_imagery_sentinel2_uses_stac(self, temp_output_dir):
-        """Sentinel-2 routes through pc_stac_search and pc_stac_download."""
+        """Sentinel-2 routes through pc_stac_search and staged pc_stac_download publication."""
         from geoai_mcp_server.server import download_satellite_imagery
 
-        fake_file = temp_output_dir / "item1_B04.tif"
-        fake_file.write_bytes(b"0" * 1024)
+        payload = b"0" * 1024
+        seen_stage_dirs: list[Path] = []
+
+        def _fake_stac_dl(items, output_dir):
+            stage_p = Path(output_dir)
+            seen_stage_dirs.append(stage_p)
+            staged_file = stage_p / "item1_B04.tif"
+            staged_file.write_bytes(payload)
+            return {"item1": {"B04": str(staged_file)}}
+
         fake_item = MagicMock(id="item1")
+        fake_item.assets = {"B04": "href"}
 
         mock_download = MagicMock()
         mock_download.pc_stac_search.return_value = [fake_item]
-        mock_download.pc_stac_download.return_value = {"item1": {"B04": str(fake_file)}}
+        mock_download.pc_stac_download.side_effect = _fake_stac_dl
 
         with (
             patch("geoai_mcp_server.server.config") as mock_config,
@@ -352,9 +392,13 @@ class TestDownloadTools:
                 )
             )
 
+        expected_final = temp_output_dir / "item1_B04.tif"
         assert result["success"] is True
         assert result["num_files"] == 1
-        assert result["output_files"] == [str(fake_file)]
+        assert result["output_files"] == [str(expected_final)]
+        assert expected_final.is_file()
+        assert expected_final.read_bytes() == payload
+        assert seen_stage_dirs and not seen_stage_dirs[0].exists()
         mock_download.pc_stac_search.assert_called_once()
         mock_download.pc_stac_download.assert_called_once()
 
@@ -700,19 +744,33 @@ class TestToolIntegration:
     """Integration tests for tool workflows."""
 
     def test_segmentation_workflow(self, sample_geotiff, temp_output_dir):
-        """Test listing input files and running GroundedSAM segmentation."""
+        """Test listing input files and running GroundedSAM segmentation with published polygon."""
+        import geopandas as gpd
+        from shapely.geometry import box
         from geoai_mcp_server.server import (
             segment_objects_with_prompts,
             list_available_files,
         )
 
-        out_tif = temp_output_dir / "out.tif"
-        out_poly = temp_output_dir / "out_polygons.geojson"
+        def _fake_segment_image(
+            input_path,
+            output_path,
+            text_prompts,
+            export_polygons=True,
+            export_boxes=False,
+        ):
+            Path(output_path).write_bytes(b"fake_tif")
+            poly_path = output_path.replace(".tif", "_polygons.geojson")
+            gdf = gpd.GeoDataFrame(
+                {"label": ["building"]},
+                geometry=[box(0, 0, 1, 1)],
+                crs="EPSG:4326",
+            )
+            gdf.to_file(poly_path, driver="GeoJSON")
+            return {"segmentation": output_path, "polygons": poly_path}
+
         mock_segmenter = MagicMock()
-        mock_segmenter.segment_image.return_value = {
-            "segmentation": str(out_tif),
-            "polygons": str(out_poly),
-        }
+        mock_segmenter.segment_image.side_effect = _fake_segment_image
         mock_segment = MagicMock()
         mock_segment.GroundedSAM.return_value = mock_segmenter
 
@@ -743,7 +801,14 @@ class TestToolIntegration:
                 )
             )
             assert seg_result["success"] is True
-            assert str(out_poly) in seg_result["output_files"]
+            geojson_outputs = [
+                p for p in seg_result["output_files"] if p.endswith(".geojson")
+            ]
+            assert len(geojson_outputs) == 1
+            published_poly = Path(geojson_outputs[0])
+            assert published_poly.is_file()
+            assert published_poly.resolve().is_relative_to(temp_output_dir.resolve())
+            assert len(gpd.read_file(published_poly)) == 1
             mock_segmenter.segment_image.assert_called_once()
 
 
@@ -1338,27 +1403,37 @@ class TestCodeRabbitRegressions:
                 worker_exited.set()
 
         mock_dl = MagicMock()
-        mock_dl.pc_stac_search.return_value = [MagicMock(id="scene")]
+        fake_item = MagicMock(id="scene")
+        fake_item.assets = {"B04": "href"}
+        mock_dl.pc_stac_search.return_value = [fake_item]
         mock_dl.pc_stac_download.side_effect = _slow_download
 
-        async def _drive_timeout():
-            task = asyncio.create_task(
-                download_satellite_imagery(
-                    min_lon=-122.5,
-                    min_lat=37.7,
-                    max_lon=-122.4,
-                    max_lat=37.8,
-                    data_source="sentinel2",
-                    max_cloud_cover=0,
+        real_wait_for = asyncio.wait_for
+        wait_calls = {"n": 0}
+
+        async def _gated_wait_for(aw, timeout):
+            wait_calls["n"] += 1
+            # Call 1 is pc_stac_search; call 2 is _stage_stac_download.
+            # Start the short deadline only after the fake downloader confirms
+            # its staged write so slow CI startup cannot expire beforehand.
+            if wait_calls["n"] == 2:
+                task = asyncio.ensure_future(aw)
+                assert await asyncio.to_thread(staged_written.wait, 5.0)
+                listing_while_streaming.append(
+                    await list_available_files(directory="output", pattern="*/*.tif")
                 )
+                return await real_wait_for(task, timeout=0.01)
+            return await real_wait_for(aw, timeout=timeout)
+
+        async def _drive_timeout():
+            res = await download_satellite_imagery(
+                min_lon=-122.5,
+                min_lat=37.7,
+                max_lon=-122.4,
+                max_lat=37.8,
+                data_source="sentinel2",
+                max_cloud_cover=0,
             )
-            # Wait until the worker definitely wrote its staged file
-            assert await asyncio.to_thread(staged_written.wait, 5.0)
-            # Output listing while streaming must not see any staged file
-            listing_while_streaming.append(
-                await list_available_files(directory="output", pattern="*/*.tif")
-            )
-            res = await task
             release_worker.set()
             assert await asyncio.to_thread(worker_exited.wait, 5.0)
             return res
@@ -1366,9 +1441,12 @@ class TestCodeRabbitRegressions:
         with (
             patch("geoai_mcp_server.server.config") as mock_config,
             patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_dl),
+            patch(
+                "geoai_mcp_server.server.asyncio.wait_for", side_effect=_gated_wait_for
+            ),
         ):
             mock_config.output_dir = temp_output_dir
-            mock_config.timeout = 0.15
+            mock_config.timeout = 30.0
 
             res = asyncio.run(_drive_timeout())
 
@@ -1382,7 +1460,6 @@ class TestCodeRabbitRegressions:
         )
         assert listing_while_streaming[0]["total_count"] == 0
         assert not (temp_output_dir / "scene_B04.tif").exists()
-        # Wait briefly for worker's finally cleanup of stage_dir
         deadline = time.time() + 2.0
         while staged_paths[0].exists() and time.time() < deadline:
             time.sleep(0.01)
@@ -1542,3 +1619,220 @@ class TestCodeRabbitRegressions:
         assert res_inspect["success"] is True
         assert res_inspect["band_stats"][0]["valid_pixels"] == 2
         assert res_inspect["band_stats"][0]["mean"] == 5.0
+
+    def test_round3_fixes_worker_timeout_naip_stac_partial_npy_sim_prithvi(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """Verify round-3 fixes: worker TimeoutError, NAIP year filter, failed STAC download,
+        partial training preserving usable dataset, .NPY suffix, similarity map isolation,
+        and Prithvi coordinate forwarding.
+        """
+        import numpy as np
+        import torch
+        from types import SimpleNamespace
+        from geoai_mcp_server.server import (
+            _run_blocking,
+            download_satellite_imagery,
+            extract_features_with_foundation_model,
+            prepare_training_data,
+        )
+
+        # 1. Worker-raised built-in TimeoutError propagates unchanged (not OperationTimeoutError)
+        def _upstream_timeout():
+            raise TimeoutError("upstream socket timed out")
+
+        with patch("geoai_mcp_server.server.config") as mock_config:
+            mock_config.timeout = 30.0
+            with pytest.raises(TimeoutError, match="upstream socket timed out"):
+                asyncio.run(_run_blocking(_upstream_timeout))
+
+        # 2. NAIP date_range maps whole year to year=2018 and rejects partial-year range
+        mock_dl = MagicMock()
+        mock_dl.download_naip.return_value = []
+        mock_dl.pc_stac_search.side_effect = [
+            [],  # empty search -> success=True
+            [
+                SimpleNamespace(id="s1", assets={"B04": "href"})
+            ],  # failed download -> success=False
+        ]
+        mock_dl.pc_stac_download.return_value = {}
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_dl),
+        ):
+            mock_config.output_dir = temp_output_dir
+
+            res_naip_ok = asyncio.run(
+                download_satellite_imagery(
+                    -122.5,
+                    37.7,
+                    -122.4,
+                    37.8,
+                    data_source="naip",
+                    date_range="2018-01-01/2018-12-31",
+                )
+            )
+            res_naip_bad = asyncio.run(
+                download_satellite_imagery(
+                    -122.5,
+                    37.7,
+                    -122.4,
+                    37.8,
+                    data_source="naip",
+                    date_range="2018-03-01/2018-06-01",
+                )
+            )
+            res_stac_empty = asyncio.run(
+                download_satellite_imagery(
+                    -122.5, 37.7, -122.4, 37.8, data_source="sentinel2"
+                )
+            )
+            res_stac_fail = asyncio.run(
+                download_satellite_imagery(
+                    -122.5, 37.7, -122.4, 37.8, data_source="sentinel2"
+                )
+            )
+
+        assert res_naip_ok["success"] is True
+        assert mock_dl.download_naip.call_args.kwargs["year"] == 2018
+        assert res_naip_bad["success"] is False
+        assert res_stac_empty["success"] is True and res_stac_empty["num_files"] == 0
+        assert res_stac_fail["success"] is False and res_stac_fail["num_files"] == 0
+
+        # 3. Partial training export does not overwrite an existing usable dataset
+        img_dir = sample_geotiff.parent / "r3_imgs"
+        lbl_dir = sample_geotiff.parent / "r3_lbls"
+        img_dir.mkdir()
+        lbl_dir.mkdir()
+
+        export_round = {"n": 0}
+
+        def _batch_usable_then_partial(
+            images_folder,
+            output_folder,
+            tile_size,
+            stride,
+            quiet=True,
+            masks_folder=None,
+        ):
+            export_round["n"] += 1
+            out_imgs = Path(output_folder) / "images"
+            out_imgs.mkdir(parents=True, exist_ok=True)
+            if export_round["n"] == 1:
+                (out_imgs / "good_0.tif").write_bytes(b"good")
+                return {"total_tiles": 1, "errors": 0, "failed_files": []}
+            (out_imgs / "partial_0.tif").write_bytes(b"partial")
+            return {
+                "total_tiles": 1,
+                "errors": 1,
+                "failed_files": [{"image": "bad.tif", "error": "err"}],
+            }
+
+        mock_utils = MagicMock()
+        mock_utils.export_geotiff_tiles_batch.side_effect = _batch_usable_then_partial
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_utils),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            r_good = asyncio.run(
+                prepare_training_data(
+                    images_dir="r3_imgs", labels_dir="r3_lbls", output_subdir="ds_keep"
+                )
+            )
+            r_part = asyncio.run(
+                prepare_training_data(
+                    images_dir="r3_imgs", labels_dir="r3_lbls", output_subdir="ds_keep"
+                )
+            )
+
+        assert r_good["success"] is True
+        assert r_part["success"] is False
+        assert r_part["partial"] is True
+        assert (temp_output_dir / "ds_keep" / "images" / "good_0.tif").is_file()
+        assert not (temp_output_dir / "ds_keep" / "images" / "partial_0.tif").exists()
+
+        # 4. Uppercase .NPY suffix, DINOv3 similarity map isolation, and Prithvi coords
+        stale_sim_dir = temp_output_dir / "sim_reuse"
+        stale_sim_dir.mkdir(parents=True, exist_ok=True)
+        (stale_sim_dir / "stale_old.png").write_bytes(b"old")
+
+        def _fake_sim_map(input_image, query_coords, output_dir):
+            (Path(output_dir) / "fresh_sim.png").write_bytes(b"new")
+            return {"similarity_map": np.zeros((4, 4))}
+
+        seen_encoder_coords = {}
+
+        class _FakePrithviEnc:
+            def __call__(
+                self, x, temporal_coords=None, location_coords=None, mask_ratio=0.0
+            ):
+                seen_encoder_coords["temporal"] = temporal_coords
+                seen_encoder_coords["location"] = location_coords
+                return (
+                    torch.zeros((1, 5, 8)),
+                    torch.zeros((1, 4)),
+                    torch.arange(4, dtype=torch.long).unsqueeze(0),
+                )
+
+        class _FakePrithvi:
+            def __init__(self):
+                self.img_size = 16
+                self.device = torch.device("cpu")
+                self.coords_encoding = ["time", "location"]
+                self.model = SimpleNamespace(encoder=_FakePrithviEnc())
+
+            def load_images(self, file_paths):
+                return (
+                    np.zeros((1, 6, 1, 16, 16), dtype=np.float32),
+                    [{}],
+                    [[2024.0, 120.0]],
+                    [37.7, -122.5],
+                )
+
+        modules = {
+            "dinov3": SimpleNamespace(create_similarity_map=_fake_sim_map),
+            "prithvi": SimpleNamespace(PrithviProcessor=_FakePrithvi),
+        }
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch(
+                "geoai_mcp_server.server._get_geoai_module",
+                side_effect=lambda name: modules[name],
+            ),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            r_sim = asyncio.run(
+                extract_features_with_foundation_model(
+                    image_path=sample_geotiff.name,
+                    model="dinov3",
+                    output_type="similarity_map",
+                    reference_x=1,
+                    reference_y=2,
+                    output_filename="sim_reuse.npy",
+                )
+            )
+            r_pr = asyncio.run(
+                extract_features_with_foundation_model(
+                    image_path=sample_geotiff.name,
+                    model="prithvi",
+                    output_filename="features.NPY",
+                )
+            )
+
+        assert r_sim["success"] is True
+        assert r_sim["output_files"] == [str(stale_sim_dir / "fresh_sim.png")]
+        assert r_pr["success"] is True
+        assert r_pr["output_files"] == [str(temp_output_dir / "features.NPY.npy")]
+        assert (temp_output_dir / "features.NPY.npy").is_file()
+        assert seen_encoder_coords["temporal"] is not None
+        assert tuple(seen_encoder_coords["temporal"].shape) == (1, 1, 2)
+        assert seen_encoder_coords["location"] is not None
+        assert tuple(seen_encoder_coords["location"].shape) == (1, 2)
