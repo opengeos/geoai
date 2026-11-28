@@ -2,8 +2,10 @@
 
 # Standard Library
 import logging
+import math
 import os
 import subprocess
+import tempfile
 import warnings
 from typing import (
     Any,
@@ -129,17 +131,45 @@ def calc_stats(dataset, divide_by: float = 1.0) -> Tuple[np.ndarray, np.ndarray]
 
     # To avoid loading the entire dataset in memory, we will loop through each img
     # The filenames will be retrieved from the dataset's rtree index
-    files = [
-        item.object
-        for item in dataset.index.intersection(dataset.index.bounds, objects=True)
-    ]
+    index = dataset.index
+    get_size = getattr(index, "get_size", None)
+    if callable(get_size):
+        size = get_size()
+        if isinstance(size, int) and size == 0:
+            raise ValueError("Dataset contains no raster files to compute statistics.")
+
+    try:
+        bounds = index.bounds
+        if (
+            bounds is None
+            or len(bounds) == 0
+            or (
+                len(bounds) % 2 == 0
+                and any(
+                    bounds[i] > bounds[i + len(bounds) // 2]
+                    for i in range(len(bounds) // 2)
+                )
+            )
+        ):
+            raise ValueError("Dataset contains no raster files to compute statistics.")
+        files = [item.object for item in index.intersection(bounds, objects=True)]
+    except Exception as e:
+        if type(e).__name__ == "RTreeError":
+            raise ValueError(
+                "Dataset contains no raster files to compute statistics."
+            ) from e
+        raise
+
+    if not files:
+        raise ValueError("Dataset contains no raster files to compute statistics.")
 
     # Resetting statistics
     accum_mean = 0
     accum_std = 0
 
     for file in files:
-        img = rasterio.open(file).read() / divide_by  # type: ignore
+        with rasterio.open(file) as src:
+            img = src.read() / divide_by  # type: ignore
         accum_mean += img.reshape((img.shape[0], -1)).mean(axis=1)
         accum_std += img.reshape((img.shape[0], -1)).std(axis=1)
 
@@ -443,11 +473,32 @@ def clip_raster_by_bbox(
                         f"Failed to transform bbox from {bbox_crs} to {src_crs}: {str(e)}"
                     )
 
-            # Calculate the pixel window from geographic coordinates
+            # Calculate the pixel window from geographic coordinates, clamp to
+            # the raster extent first, then snap the clamped edges outward
+            # (floor start, ceil stop) so partial edge overlaps are preserved
+            # and read shapes always match the output metadata and transform.
             window = src.window(minx, miny, maxx, maxy)
+            full_window = Window(0, 0, src.width, src.height)
+            try:
+                clamped = window.intersection(full_window)
+            except rasterio.errors.WindowError as e:
+                raise ValueError(
+                    "Bounding box does not intersect the raster extent"
+                ) from e
 
-            # Use the same bounds for the output transform
-            output_bounds = (minx, miny, maxx, maxy)
+            if clamped.width <= 0 or clamped.height <= 0:
+                raise ValueError("Bounding box does not intersect the raster extent")
+
+            col_start = max(0, int(math.floor(clamped.col_off)))
+            row_start = max(0, int(math.floor(clamped.row_off)))
+            col_stop = min(src.width, int(math.ceil(clamped.col_off + clamped.width)))
+            row_stop = min(src.height, int(math.ceil(clamped.row_off + clamped.height)))
+            window = Window(
+                col_start,
+                row_start,
+                col_stop - col_start,
+                row_stop - row_start,
+            )
 
         else:  # bbox_type == "pixel"
             min_row, min_col, max_row, max_col = bbox
@@ -471,19 +522,6 @@ def clip_raster_by_bbox(
             # Create a window from pixel coordinates
             window = Window(min_col, min_row, max_col - min_col, max_row - min_row)
 
-            # Calculate the geographic bounds for this window
-            window_transform = src.window_transform(window)
-            output_bounds = rasterio.transform.array_bounds(
-                window.height, window.width, window_transform
-            )
-            # Reorder to (minx, miny, maxx, maxy)
-            output_bounds = (
-                output_bounds[0],
-                output_bounds[1],
-                output_bounds[2],
-                output_bounds[3],
-            )
-
         # Get window dimensions
         window_width = int(window.width)
         window_height = int(window.height)
@@ -502,15 +540,9 @@ def clip_raster_by_bbox(
                 raise ValueError(f"Band indices must be between 1 and {src.count}")
             bands_to_read = bands
 
-        # Calculate new transform for the clipped raster
-        new_transform = from_bounds(
-            output_bounds[0],
-            output_bounds[1],
-            output_bounds[2],
-            output_bounds[3],
-            window_width,
-            window_height,
-        )
+        # Calculate new transform directly from the snapped window so pixel
+        # scale and alignment match the source raster exactly.
+        new_transform = src.window_transform(window)
 
         # Create a metadata dictionary for the output
         out_meta = src.meta.copy()
@@ -591,9 +623,9 @@ def raster_to_vector(
         if class_values is not None:
             # Create a mask for each specified class value and vectorize per class
             masks = {val: (data == val) for val in class_values}
+            shape_count = 1
             for class_val in class_values:
                 mask = masks[class_val]
-                shape_count = 1
                 for geom, value in features.shapes(
                     mask.astype(np.uint8), mask=mask, transform=transform
                 ):
@@ -606,7 +638,7 @@ def raster_to_vector(
                         all_features.append(
                             {
                                 "geometry": geom,
-                                attribute_name: class_val * shape_count,
+                                attribute_name: shape_count,
                             }
                         )
                     else:
@@ -633,9 +665,7 @@ def raster_to_vector(
                 if simplify_tolerance is not None:
                     geom = geom.simplify(simplify_tolerance)
                 if unique_attribute_value:
-                    all_features.append(
-                        {"geometry": geom, attribute_name: class_val * shape_count}
-                    )
+                    all_features.append({"geometry": geom, attribute_name: shape_count})
                 else:
                     all_features.append({"geometry": geom, attribute_name: class_val})
                 shape_count += 1
@@ -887,8 +917,24 @@ def vector_to_raster(
             transform = src.transform
             output_shape = src.shape
             crs = src.crs
-            if nodata is None:
-                nodata = src.nodata
+            if nodata is None and src.nodata is not None:
+                out_dtype = np.dtype(dtype)
+                if np.issubdtype(out_dtype, np.integer):
+                    info = np.iinfo(out_dtype)
+                    if (
+                        np.isfinite(src.nodata)
+                        and float(src.nodata).is_integer()
+                        and info.min <= src.nodata <= info.max
+                    ):
+                        nodata = int(src.nodata)
+                elif np.issubdtype(out_dtype, np.floating):
+                    finfo = np.finfo(out_dtype)
+                    if (
+                        np.isnan(src.nodata)
+                        or np.isinf(src.nodata)
+                        or (float(finfo.min) <= float(src.nodata) <= float(finfo.max))
+                    ):
+                        nodata = float(src.nodata)
     else:
         # Check if we have all required parameters
         if transform is None:
@@ -1212,12 +1258,19 @@ def masks_to_vector(
             if max_object_area is not None and area > max_object_area:
                 continue
 
-            # Create a mask for this building
-            building_mask = (labels == i).astype(np.uint8)
+            # Extract tight bounding-box slice for this component
+            x0 = int(stats[i, cv2.CC_STAT_LEFT])
+            y0 = int(stats[i, cv2.CC_STAT_TOP])
+            w = int(stats[i, cv2.CC_STAT_WIDTH])
+            h = int(stats[i, cv2.CC_STAT_HEIGHT])
+            building_mask = (labels[y0 : y0 + h, x0 : x0 + w] == i).astype(np.uint8)
 
-            # Find contours
+            # Find contours in full-image pixel coordinates using offset
             contours, _ = cv2.findContours(
-                building_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                building_mask,
+                cv2.RETR_EXTERNAL,
+                cv2.CHAIN_APPROX_SIMPLE,
+                offset=(x0, y0),
             )
 
             # Process each contour
@@ -1226,10 +1279,9 @@ def masks_to_vector(
                 if contour.shape[0] < 3:
                     continue
 
-                # Simplify contour if it has many points
+                # Simplify contour if it has many points (simplify_tolerance is in pixels)
                 if contour.shape[0] > 50 and simplify_tolerance > 0:
-                    epsilon = simplify_tolerance * cv2.arcLength(contour, True)
-                    contour = cv2.approxPolyDP(contour, epsilon, True)
+                    contour = cv2.approxPolyDP(contour, simplify_tolerance, True)
 
                 # Convert to list of (x, y) coordinates
                 polygon_points = contour.reshape(-1, 2)
@@ -1291,41 +1343,48 @@ def masks_to_vector(
             iou_threshold = kwargs.get("nms_iou_threshold", nms_iou_threshold)
 
             # Sort by confidence
-            gdf = gdf.sort_values("confidence", ascending=False)
+            gdf = gdf.sort_values("confidence", ascending=False).copy()
 
             # Fix any invalid geometries
             gdf["geometry"] = gdf["geometry"].apply(
                 lambda geom: geom.buffer(0) if not geom.is_valid else geom
             )
 
+            sindex = gdf.sindex
             keep_indices = []
             polygons = gdf.geometry.values
+            n_polys = len(polygons)
+            suppressed = np.zeros(n_polys, dtype=bool)
 
-            for i in range(len(polygons)):
-                if i in keep_indices:
+            for i in range(n_polys):
+                if suppressed[i]:
                     continue
 
-                keep = True
-                for j in keep_indices:
-                    # Skip invalid geometries
-                    if not polygons[i].is_valid or not polygons[j].is_valid:
+                keep_indices.append(i)
+                poly_i = polygons[i]
+                if poly_i is None or poly_i.is_empty or not poly_i.is_valid:
+                    continue
+
+                poly_i_area = poly_i.area
+                candidates = sindex.query(poly_i, predicate="intersects")
+                for j in candidates:
+                    if j <= i or suppressed[j]:
+                        continue
+                    poly_j = polygons[j]
+                    if poly_j is None or poly_j.is_empty or not poly_j.is_valid:
                         continue
 
                     # Calculate IoU
                     try:
-                        intersection = polygons[i].intersection(polygons[j]).area
-                        union = polygons[i].area + polygons[j].area - intersection
+                        intersection = poly_i.intersection(poly_j).area
+                        union = poly_i_area + poly_j.area - intersection
                         iou = intersection / union if union > 0 else 0
 
                         if iou > iou_threshold:
-                            keep = False
-                            break
+                            suppressed[j] = True
                     except (ValueError, TypeError):
                         # Skip on topology exceptions
                         continue
-
-                if keep:
-                    keep_indices.append(i)
 
             return gdf.iloc[keep_indices]
 
@@ -1399,25 +1458,7 @@ def read_vector(
             return gpd.read_file(source, layer=layer, **kwargs)
         return gpd.read_file(source, **kwargs)
 
-    # Try to identify valid layers for formats that might have them
-    # Only attempt this for local files
-    if layer is None and ext in [".gpkg", ".gml"] and not is_url:
-        try:
-            try:
-                import pyogrio
-
-                layers = pyogrio.list_layers(source)[:, 0].tolist()
-            except ImportError:
-                import fiona
-
-                layers = fiona.listlayers(source)
-            if layers:
-                return gpd.read_file(source, layer=layers[0], **kwargs)
-        except (OSError, ValueError):
-            # If listing layers fails, we'll fall through to the generic read attempt
-            pass
-
-    # For other formats or when layer listing fails, attempt to read using GeoPandas
+    # For other formats, attempt to read using GeoPandas
     try:
         return gpd.read_file(source, **kwargs)
     except (OSError, ValueError) as e:
@@ -1562,98 +1603,96 @@ def mosaic_geotiffs(
     # Close the dataset
     ds = None
 
-    # Create a temporary VRT (Virtual Dataset)
-    vrt_path = os.path.join(input_dir, "temp_mosaic.vrt")
+    output_dir = os.path.dirname(os.path.abspath(output_file))
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Build VRT from input files with proper nodata handling
-    vrt_options = gdal.BuildVRTOptions(
-        resampleAlg="nearest",
-        srcNodata=nodata_value if has_nodata else None,
-        VRTNodata=nodata_value if has_nodata else None,
-    )
-    vrt_dataset = gdal.BuildVRT(vrt_path, tif_files, options=vrt_options)
+    # Create temporary intermediates inside an isolated directory on the output volume
+    with tempfile.TemporaryDirectory(dir=output_dir) as tmpdir:
+        vrt_path = os.path.join(tmpdir, "temp_mosaic.vrt")
 
-    # Close the VRT dataset to flush it to disk
-    vrt_dataset = None
+        # Build VRT from input files with proper nodata handling
+        vrt_options = gdal.BuildVRTOptions(
+            resampleAlg="nearest",
+            srcNodata=nodata_value if has_nodata else None,
+            VRTNodata=nodata_value if has_nodata else None,
+        )
+        vrt_dataset = gdal.BuildVRT(vrt_path, tif_files, options=vrt_options)
 
-    # Create temp mosaic
-    temp_mosaic = output_file + ".temp.tif"
+        # Close the VRT dataset to flush it to disk
+        vrt_dataset = None
 
-    # Convert VRT to GeoTIFF with the same compression as input
-    translate_options = gdal.TranslateOptions(
-        format="GTiff",
-        creationOptions=creation_options,
-        noData=nodata_value if has_nodata else None,
-    )
-    gdal.Translate(temp_mosaic, vrt_path, options=translate_options)
+        # Create temp mosaic
+        temp_mosaic = os.path.join(tmpdir, "temp_mosaic.tif")
 
-    # Apply mask if provided
-    if mask_file and os.path.exists(mask_file):
-        logger.info("Clipping mosaic to mask: %s", mask_file)
+        # Convert VRT to GeoTIFF with the same compression as input
+        translate_options = gdal.TranslateOptions(
+            format="GTiff",
+            creationOptions=creation_options,
+            noData=nodata_value if has_nodata else None,
+        )
+        gdal.Translate(temp_mosaic, vrt_path, options=translate_options)
 
-        # Create a temporary clipped file
-        clipped_mosaic = output_file + ".clipped.tif"
+        # Apply mask if provided
+        if mask_file and os.path.exists(mask_file):
+            logger.info("Clipping mosaic to mask: %s", mask_file)
 
-        # Open mask file
-        mask_ds = gdal.Open(mask_file)
-        if mask_ds is None:
-            logger.error("Unable to open mask file: %s", mask_file)
-            # Continue without clipping
-        else:
-            # Get mask extent
-            mask_geotransform = mask_ds.GetGeoTransform()
-            mask_projection = mask_ds.GetProjection()
-            mask_ulx = mask_geotransform[0]
-            mask_uly = mask_geotransform[3]
-            mask_lrx = mask_ulx + (mask_geotransform[1] * mask_ds.RasterXSize)
-            mask_lry = mask_uly + (mask_geotransform[5] * mask_ds.RasterYSize)
+            # Create a temporary clipped file
+            clipped_mosaic = os.path.join(tmpdir, "clipped_mosaic.tif")
 
-            # Close mask dataset
-            mask_ds = None
+            # Open mask file
+            mask_ds = gdal.Open(mask_file)
+            if mask_ds is None:
+                logger.error("Unable to open mask file: %s", mask_file)
+                # Continue without clipping
+            else:
+                # Get mask extent
+                mask_geotransform = mask_ds.GetGeoTransform()
+                mask_projection = mask_ds.GetProjection()
+                mask_ulx = mask_geotransform[0]
+                mask_uly = mask_geotransform[3]
+                mask_lrx = mask_ulx + (mask_geotransform[1] * mask_ds.RasterXSize)
+                mask_lry = mask_uly + (mask_geotransform[5] * mask_ds.RasterYSize)
 
-            # Use warp options to clip
-            warp_options = gdal.WarpOptions(
-                format="GTiff",
-                outputBounds=[mask_ulx, mask_lry, mask_lrx, mask_uly],
-                dstSRS=mask_projection,
-                creationOptions=creation_options,
-                srcNodata=nodata_value if has_nodata else None,
-                dstNodata=nodata_value if has_nodata else None,
-            )
+                # Close mask dataset
+                mask_ds = None
 
-            # Apply clipping
-            gdal.Warp(clipped_mosaic, temp_mosaic, options=warp_options)
+                # Use warp options to clip
+                warp_options = gdal.WarpOptions(
+                    format="GTiff",
+                    outputBounds=[mask_ulx, mask_lry, mask_lrx, mask_uly],
+                    dstSRS=mask_projection,
+                    creationOptions=creation_options,
+                    srcNodata=nodata_value if has_nodata else None,
+                    dstNodata=nodata_value if has_nodata else None,
+                )
 
-            # Remove the unclipped temp mosaic and use the clipped one
-            os.remove(temp_mosaic)
-            temp_mosaic = clipped_mosaic
+                # Apply clipping
+                gdal.Warp(clipped_mosaic, temp_mosaic, options=warp_options)
 
-    # Create internal overviews for the temp mosaic
-    ds = gdal.Open(temp_mosaic, gdal.GA_Update)
-    overview_list = [2, 4, 8, 16, 32]
-    ds.BuildOverviews("NEAREST", overview_list)
-    ds = None  # Close the dataset to ensure overviews are written
+                # Remove the unclipped temp mosaic and use the clipped one
+                os.remove(temp_mosaic)
+                temp_mosaic = clipped_mosaic
 
-    # Convert the temp mosaic to a proper COG
-    cog_options = gdal.TranslateOptions(
-        format="GTiff",
-        creationOptions=[
-            "TILED=YES",
-            "COPY_SRC_OVERVIEWS=YES",
-            "COMPRESS=DEFLATE",
-            "PREDICTOR=2",
-            "BLOCKXSIZE=512",
-            "BLOCKYSIZE=512",
-        ],
-        noData=nodata_value if has_nodata else None,
-    )
-    gdal.Translate(output_file, temp_mosaic, options=cog_options)
+        # Create internal overviews for the temp mosaic
+        ds = gdal.Open(temp_mosaic, gdal.GA_Update)
+        overview_list = [2, 4, 8, 16, 32]
+        ds.BuildOverviews("NEAREST", overview_list)
+        ds = None  # Close the dataset to ensure overviews are written
 
-    # Clean up temporary files
-    if os.path.exists(vrt_path):
-        os.remove(vrt_path)
-    if os.path.exists(temp_mosaic):
-        os.remove(temp_mosaic)
+        # Convert the temp mosaic to a proper COG
+        cog_options = gdal.TranslateOptions(
+            format="GTiff",
+            creationOptions=[
+                "TILED=YES",
+                "COPY_SRC_OVERVIEWS=YES",
+                "COMPRESS=DEFLATE",
+                "PREDICTOR=2",
+                "BLOCKXSIZE=512",
+                "BLOCKYSIZE=512",
+            ],
+            noData=nodata_value if has_nodata else None,
+        )
+        gdal.Translate(output_file, temp_mosaic, options=cog_options)
 
     logger.info("Cloud Optimized GeoTIFF mosaic created successfully: %s", output_file)
     return True
@@ -1695,7 +1734,7 @@ def stack_bands(
     output_file: str,
     resolution: Optional[float] = None,
     dtype: Optional[str] = None,  # e.g., "UInt16", "Float32"
-    temp_vrt: str = "stack.vrt",
+    temp_vrt: Optional[str] = None,
     overwrite: bool = False,
     compress: str = "DEFLATE",
     output_format: str = "COG",
@@ -1709,7 +1748,7 @@ def stack_bands(
         output_file (str): Path to the output stacked image.
         resolution (float, optional): Output resolution. If None, inferred from first image.
         dtype (str, optional): Output data type (e.g., "UInt16", "Float32").
-        temp_vrt (str): Temporary VRT filename.
+        temp_vrt (str, optional): Temporary VRT filename. If None, uses a temporary directory.
         overwrite (bool): Whether to overwrite the output file.
         compress (str): Compression method.
         output_format (str): GDAL output format (default is "COG").
@@ -1735,36 +1774,41 @@ def stack_bands(
     else:
         resolution_x = resolution_y = resolution
 
-    # Step 1: Build VRT
-    vrt_cmd = ["gdalbuildvrt", "-separate", temp_vrt] + input_files
-    subprocess.run(vrt_cmd, check=True)
+    def _run_stack(vrt_path: str) -> None:
+        # Step 1: Build VRT
+        vrt_cmd = ["gdalbuildvrt", "-separate", vrt_path] + input_files
+        subprocess.run(vrt_cmd, check=True)
 
-    # Step 2: Translate VRT to output GeoTIFF
-    translate_cmd = [
-        "gdal_translate",
-        "-tr",
-        str(resolution_x),
-        str(resolution_y),
-        temp_vrt,
-        output_file,
-        "-of",
-        output_format,
-        "-co",
-        f"COMPRESS={compress}",
-    ]
+        # Step 2: Translate VRT to output GeoTIFF
+        translate_cmd = [
+            "gdal_translate",
+            "-tr",
+            str(resolution_x),
+            str(resolution_y),
+            vrt_path,
+            output_file,
+            "-of",
+            output_format,
+            "-co",
+            f"COMPRESS={compress}",
+        ]
 
-    if dtype:
-        translate_cmd.insert(1, "-ot")
-        translate_cmd.insert(2, dtype)
+        if dtype:
+            translate_cmd.insert(1, "-ot")
+            translate_cmd.insert(2, dtype)
 
-    if extra_gdal_translate_args:
-        translate_cmd += extra_gdal_translate_args
+        if extra_gdal_translate_args:
+            translate_cmd += extra_gdal_translate_args
 
-    subprocess.run(translate_cmd, check=True)
+        subprocess.run(translate_cmd, check=True)
 
-    # Step 3: Clean up VRT
-    if os.path.exists(temp_vrt):
-        os.remove(temp_vrt)
+    if temp_vrt is None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _run_stack(os.path.join(tmpdir, "stack.vrt"))
+    else:
+        _run_stack(temp_vrt)
+        if os.path.exists(temp_vrt):
+            os.remove(temp_vrt)
 
     return output_file
 
@@ -1841,91 +1885,160 @@ def clean_instance_mask(
     if nodata_val is not None:
         cleaned[cleaned == nodata_val] = 0
 
-    unique_ids = np.unique(cleaned)
-    unique_ids = unique_ids[unique_ids != 0]
+    h, w = cleaned.shape
 
-    # Remove small instances
-    for uid in unique_ids:
-        instance = cleaned == uid
-        if instance.sum() < min_area:
-            cleaned[instance] = 0
+    def _find_id_slices(label_arr: np.ndarray, ids: np.ndarray) -> Dict[Any, Any]:
+        """Return mapping from non-zero instance ID to tight bounding-box slice."""
+        if ids.size == 0:
+            return {}
+        if (
+            np.issubdtype(label_arr.dtype, np.integer)
+            and int(ids.min()) > 0
+            and int(ids.max()) <= 1_000_000
+        ):
+            raw_slices = ndimage.find_objects(label_arr)
+            return {
+                uid: raw_slices[int(uid) - 1]
+                for uid in ids
+                if int(uid) - 1 < len(raw_slices)
+                and raw_slices[int(uid) - 1] is not None
+            }
+        # Compact remap for non-integer, sparse, or very large IDs
+        sorted_ids = np.sort(ids)
+        compact = np.zeros(label_arr.shape, dtype=np.int32)
+        nz = label_arr != 0
+        nz_vals = label_arr[nz]
+        pos = np.searchsorted(sorted_ids, nz_vals)
+        in_bounds = pos < sorted_ids.size
+        matched = np.zeros(nz_vals.shape, dtype=bool)
+        matched[in_bounds] = sorted_ids[pos[in_bounds]] == nz_vals[in_bounds]
+        nz_indices = np.flatnonzero(nz)
+        compact.ravel()[nz_indices[matched]] = pos[matched] + 1
+        raw_slices = ndimage.find_objects(compact)
+        return {
+            uid: raw_slices[idx]
+            for idx, uid in enumerate(sorted_ids)
+            if idx < len(raw_slices) and raw_slices[idx] is not None
+        }
 
-    # Re-scan after removal
-    unique_ids = np.unique(cleaned)
-    unique_ids = unique_ids[unique_ids != 0]
+    # Remove small instances in a single vectorized pass
+    unique_ids, counts = np.unique(cleaned, return_counts=True)
+    nonzero_mask = unique_ids != 0
+    unique_ids = unique_ids[nonzero_mask]
+    counts = counts[nonzero_mask]
 
-    # Smooth boundaries using Gaussian blur + re-threshold per instance.
-    # This rounds jagged staircase edges into smooth curves.
-    if smooth and smooth_sigma > 0:
+    small_ids = unique_ids[counts < min_area]
+    if small_ids.size > 0:
+        if (
+            np.issubdtype(cleaned.dtype, np.integer)
+            and int(unique_ids.min()) > 0
+            and int(unique_ids.max()) <= 1_000_000
+        ):
+            keep_lut = np.ones(int(unique_ids.max()) + 1, dtype=bool)
+            keep_lut[small_ids.astype(np.int64)] = False
+            cleaned = np.where(keep_lut[cleaned], cleaned, 0)
+        else:
+            cleaned[np.isin(cleaned, small_ids)] = 0
+
+    kept_mask = counts >= min_area
+    unique_ids = unique_ids[kept_mask]
+    counts = counts[kept_mask]
+
+    # Smooth boundaries using Gaussian blur + re-threshold per instance on
+    # tight padded bounding-box slices rather than full-image scans.
+    if smooth and smooth_sigma > 0 and unique_ids.size > 0:
         # Process instances from largest to smallest so that larger
         # instances get priority when smoothed boundaries overlap.
-        areas = {uid: (cleaned == uid).sum() for uid in unique_ids}
-        sorted_ids = sorted(unique_ids, key=lambda u: areas[u], reverse=True)
+        order = np.argsort(-counts)
+        sorted_ids = unique_ids[order]
+        id_slices = _find_id_slices(cleaned, sorted_ids)
+        pad = int(math.ceil(4.0 * smooth_sigma)) + 1
 
         result = np.zeros_like(cleaned)
         for uid in sorted_ids:
-            binary = (cleaned == uid).astype(np.float64)
+            slc = id_slices.get(uid)
+            if slc is None:
+                continue
+            r0 = max(0, slc[0].start - pad)
+            r1 = min(h, slc[0].stop + pad)
+            c0 = max(0, slc[1].start - pad)
+            c1 = min(w, slc[1].stop + pad)
+            binary = (cleaned[r0:r1, c0:c1] == uid).astype(np.float64)
             blurred = ndimage.gaussian_filter(binary, sigma=smooth_sigma)
             smoothed = blurred >= 0.5
             # Only write to pixels not already claimed by a larger instance
-            result[smoothed & (result == 0)] = uid
+            sub_result = result[r0:r1, c0:c1]
+            sub_result[smoothed & (sub_result == 0)] = uid
 
         cleaned = result
 
     # Fill holes: find small background regions that don't touch the
     # image border and assign them to the most common neighboring instance.
-    # This handles both holes inside a single instance and gaps between
-    # adjacent instances.  Runs after smoothing so that any gaps introduced
-    # by the smooth step are also filled.
+    # Runs after smoothing so that any gaps introduced by smoothing are filled.
     if fill_holes:
         background = cleaned == 0
         labeled_bg, n_bg = ndimage.label(background)
-        for i in range(1, n_bg + 1):
-            region = labeled_bg == i
-            area = region.sum()
-            if area > max_hole_area:
-                continue
-            # Skip regions that touch the image border (real background)
-            if (
-                region[0, :].any()
-                or region[-1, :].any()
-                or region[:, 0].any()
-                or region[:, -1].any()
-            ):
-                continue
-            # Find the most common neighboring instance ID
-            dilated = ndimage.binary_dilation(region, iterations=1)
-            border_pixels = dilated & ~region
-            neighbor_ids = cleaned[border_pixels]
-            neighbor_ids = neighbor_ids[neighbor_ids > 0]
-            if len(neighbor_ids) > 0:
-                # Assign to the most frequent neighbor
-                fill_id = np.bincount(neighbor_ids).argmax()
-                cleaned[region] = fill_id
+        if n_bg > 0:
+            bg_slices = ndimage.find_objects(labeled_bg)
+            for i in range(1, n_bg + 1):
+                slc = bg_slices[i - 1]
+                if slc is None:
+                    continue
+                # Skip regions that touch the image border (real background)
+                if (
+                    slc[0].start == 0
+                    or slc[0].stop == h
+                    or slc[1].start == 0
+                    or slc[1].stop == w
+                ):
+                    continue
+                r0 = slc[0].start - 1
+                r1 = slc[0].stop + 1
+                c0 = slc[1].start - 1
+                c1 = slc[1].stop + 1
+                region = labeled_bg[r0:r1, c0:c1] == i
+                if int(region.sum()) > max_hole_area:
+                    continue
+                # Find the most common neighboring instance ID
+                dilated = ndimage.binary_dilation(region, iterations=1)
+                border_pixels = dilated & ~region
+                neighbor_ids = cleaned[r0:r1, c0:c1][border_pixels]
+                neighbor_ids = neighbor_ids[neighbor_ids > 0]
+                if len(neighbor_ids) > 0:
+                    # Assign to the most frequent neighbor
+                    if np.issubdtype(neighbor_ids.dtype, np.integer):
+                        fill_id = np.bincount(neighbor_ids).argmax()
+                    else:
+                        vals, cnts = np.unique(neighbor_ids, return_counts=True)
+                        fill_id = vals[cnts.argmax()]
+                    sub_cleaned = cleaned[r0:r1, c0:c1]
+                    sub_cleaned[region] = fill_id
 
-    # Remove disconnected fragments: any spatially disconnected component
-    # of an instance that is smaller than min_area is erased.  This catches
-    # fragments produced by smoothing as well as fragments that existed in
-    # the original input.
-    for uid in np.unique(cleaned):
-        if uid == 0:
-            continue
-        instance = cleaned == uid
-        labeled_parts, n_parts = ndimage.label(instance)
-        if n_parts <= 1:
-            continue
-        # Vectorised size check via bincount (avoids per-component masks)
-        sizes = np.bincount(labeled_parts.ravel())
-        small_labels = np.where(sizes < min_area)[0]
-        # Label 0 is background in labeled_parts — skip it
-        small_labels = small_labels[small_labels > 0]
-        if len(small_labels) > 0:
-            remove_mask = np.isin(labeled_parts, small_labels)
-            cleaned[remove_mask] = 0
+    # Remove disconnected fragments on tight bounding-box slices: any spatially
+    # disconnected component of an instance smaller than min_area is erased.
+    remaining_ids = np.unique(cleaned)
+    remaining_ids = remaining_ids[remaining_ids != 0]
+    if remaining_ids.size > 0:
+        frag_slices = _find_id_slices(cleaned, remaining_ids)
+        for uid in remaining_ids:
+            slc = frag_slices.get(uid)
+            if slc is None:
+                continue
+            sub_cleaned = cleaned[slc]
+            instance = sub_cleaned == uid
+            labeled_parts, n_parts = ndimage.label(instance)
+            if n_parts <= 1:
+                continue
+            # Vectorised size check via bincount (avoids per-component masks)
+            sizes = np.bincount(labeled_parts.ravel())
+            small_labels = np.where(sizes < min_area)[0]
+            # Label 0 is background in labeled_parts, skip it
+            small_labels = small_labels[small_labels > 0]
+            if len(small_labels) > 0:
+                remove_mask = np.isin(labeled_parts, small_labels)
+                sub_cleaned[remove_mask] = 0
 
-    # Restore nodata — but only for values that are distinct from
-    # background (0).  When nodata==0, background pixels and nodata
-    # pixels are the same, so there is nothing extra to restore.
+    # Restore nodata only for values distinct from background (0).
     if nodata_val is not None and nodata_val != 0:
         cleaned[mask == nodata_val] = nodata_val
 

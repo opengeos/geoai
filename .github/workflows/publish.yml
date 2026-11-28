@@ -9,14 +9,22 @@ on:
                 description: "Release tag to publish (must already exist on GitHub)"
                 required: true
                 type: string
+            upload_qgis_repo:
+                description: "Upload plugin zip to plugins.qgis.org"
+                required: false
+                default: true
+                type: boolean
 
 permissions:
-    contents: write
+    contents: read
 
 jobs:
     publish:
         name: Publish plugin to plugins.qgis.org
         runs-on: ubuntu-latest
+        # Write access is needed only for attaching the plugin zip asset to the GitHub release.
+        permissions:
+            contents: write
         env:
             TAG: ${{ github.event.release.tag_name || inputs.tag }}
             PLUGIN_DIR: qgis_plugin/geoai
@@ -24,6 +32,9 @@ jobs:
             ZIP_PATH: dist/geoai.zip
         steps:
             - uses: actions/checkout@v7
+              with:
+                  ref: ${{ inputs.tag || github.sha }}
+                  fetch-depth: 0
 
             - uses: actions/setup-python@v7
               with:
@@ -45,6 +56,38 @@ jobs:
                   echo "Release tag (package): $TAG"
                   echo "Plugin version (metadata.txt): $plugin_version"
 
+            - name: Check whether QGIS plugin metadata changed
+              id: plugin_change
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  UPLOAD_QGIS_REPO: ${{ inputs.upload_qgis_repo }}
+              run: |
+                  if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+                      if [ "$UPLOAD_QGIS_REPO" = "false" ]; then
+                          echo "should_upload=false" >> "$GITHUB_OUTPUT"
+                          echo "Skipping plugins.qgis.org upload (upload_qgis_repo=false)."
+                      else
+                          echo "should_upload=true" >> "$GITHUB_OUTPUT"
+                          echo "Manual dispatch requested plugins.qgis.org upload."
+                      fi
+                      exit 0
+                  fi
+
+                  prev_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+                  if [ -z "$prev_tag" ]; then
+                      echo "should_upload=true" >> "$GITHUB_OUTPUT"
+                      echo "No previous tag found; proceeding with plugins.qgis.org upload."
+                      exit 0
+                  fi
+
+                  if git diff --quiet "$prev_tag" HEAD -- "$PLUGIN_DIR/metadata.txt"; then
+                      echo "should_upload=false" >> "$GITHUB_OUTPUT"
+                      echo "$PLUGIN_DIR/metadata.txt unchanged since $prev_tag; skipping plugins.qgis.org upload."
+                  else
+                      echo "should_upload=true" >> "$GITHUB_OUTPUT"
+                      echo "$PLUGIN_DIR/metadata.txt changed since $prev_tag; proceeding with plugins.qgis.org upload."
+                  fi
+
             - name: Build plugin zip
               run: python "qgis_plugin/package_plugin.py" --source "$PLUGIN_DIR" --output "$ZIP_PATH"
 
@@ -55,6 +98,7 @@ jobs:
                   gh release upload "$TAG" "$ZIP_PATH" --clobber
 
             - name: Upload to plugins.qgis.org
+              if: steps.plugin_change.outputs.should_upload == 'true'
               env:
                   QGIS_PLUGIN_REPO_USERNAME: ${{ secrets.QGIS_PLUGIN_REPO_USERNAME }}
                   QGIS_PLUGIN_REPO_PASSWORD: ${{ secrets.QGIS_PLUGIN_REPO_PASSWORD }}

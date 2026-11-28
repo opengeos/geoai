@@ -3,6 +3,8 @@
 All notable changes to this project are documented in this file. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+> **Note:** For release notes after `v0.35.0`, see [GitHub Releases](https://github.com/opengeos/geoai/releases).
+
 ## v0.35.0 - Mar 17, 2026
 
 - Preserve class labels and instance attributes in instance segmentation inference

@@ -6,9 +6,10 @@ satellite and aerial imagery using the OmniWaterMask model via the
 geoai.segment_water() function.
 """
 
+import inspect
 import os
-import sys
 import tempfile
+import threading
 import traceback
 
 from qgis.PyQt.QtCore import Qt, QThread, pyqtSignal
@@ -42,43 +43,40 @@ from qgis.core import (
     Qgis,
 )
 
+_LIVE_THREADS = set()
 
-class OutputCapture:
-    """Capture stdout and emit lines to a callback in real-time."""
 
-    def __init__(self, callback, original_stdout):
-        """Initialize the output capture.
+def _connect_native_finished(thread: QThread, slot) -> bool:
+    """Connect ``slot`` to the native ``QThread.finished`` signal even if shadowed."""
+    if isinstance(thread, QThread):
+        QThread.finished.__get__(thread, QThread).connect(slot)
+        return True
+    connected = False
+    for sig_name in ("finished", "error"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            sig.connect(slot)
+            connected = True
+    return connected
 
-        Args:
-            callback: Function to call for each line of output.
-            original_stdout: The original stdout stream to also write to.
-        """
-        self.callback = callback
-        self.original_stdout = original_stdout
-        self.buffer = ""
 
-    def write(self, text):
-        """Write text to buffer, emitting complete lines via callback.
+def _keep_thread_alive(thread: QThread) -> None:
+    """Keep a still-running worker thread referenced until it exits."""
+    for sig_name in ("finished", "error", "progress"):
+        sig = getattr(thread, sig_name, None)
+        if sig is not None:
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
 
-        Args:
-            text: Text to write.
-        """
-        if self.original_stdout:
-            self.original_stdout.write(text)
+    def _drop(*_args):
+        _LIVE_THREADS.discard(thread)
 
-        self.buffer += text
-        while "\n" in self.buffer:
-            line, self.buffer = self.buffer.split("\n", 1)
-            if line.strip():
-                self.callback(line)
-
-    def flush(self):
-        """Flush the buffer, emitting any remaining content."""
-        if self.original_stdout:
-            self.original_stdout.flush()
-        if self.buffer.strip():
-            self.callback(self.buffer)
-            self.buffer = ""
+    _LIVE_THREADS.add(thread)
+    _connect_native_finished(thread, _drop)
+    if not thread.isRunning():
+        _LIVE_THREADS.discard(thread)
 
 
 class WaterSegmentationWorker(QThread):
@@ -144,6 +142,11 @@ class WaterSegmentationWorker(QThread):
         self.min_size = min_size
         self.smooth = smooth
         self.smooth_iterations = smooth_iterations
+        self._cancel_event = threading.Event()
+
+    def cancel(self):
+        """Request cooperative cancellation of the water segmentation task."""
+        self._cancel_event.set()
 
     def run(self):
         """Run water segmentation in background thread."""
@@ -177,15 +180,19 @@ class WaterSegmentationWorker(QThread):
             if self.device:
                 kwargs["device"] = self.device
 
-            result = run_geoai_task(
-                "segment_water",
-                kwargs,
-                progress_callback=self.progress.emit,
-            )
-            self.finished.emit(result["output_raster"], result.get("output_vector", ""))
+            call_kwargs = {"progress_callback": self.progress.emit}
+            if "cancel_event" in inspect.signature(run_geoai_task).parameters:
+                call_kwargs["cancel_event"] = self._cancel_event
+
+            result = run_geoai_task("segment_water", kwargs, **call_kwargs)
+            if not self._cancel_event.is_set():
+                self.finished.emit(
+                    result["output_raster"], result.get("output_vector", "")
+                )
 
         except Exception as e:
-            self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
+            if not self._cancel_event.is_set():
+                self.error.emit(f"{str(e)}\n\n{traceback.format_exc()}")
 
 
 class WaterSegmentationDockWidget(QDockWidget):
@@ -799,6 +806,38 @@ class WaterSegmentationDockWidget(QDockWidget):
         if device == "auto":
             device = None
 
+        retained = getattr(self, "_retained_workers", None)
+        if retained:
+            requested_outputs = {
+                os.path.normcase(os.path.abspath(p))
+                for p in (output_raster, output_vector)
+                if p
+            }
+            for old_worker in list(retained):
+                if not old_worker.isRunning():
+                    retained.discard(old_worker)
+                    continue
+                old_outputs = {
+                    os.path.normcase(os.path.abspath(p))
+                    for p in (
+                        getattr(old_worker, "output_raster", None),
+                        getattr(old_worker, "output_vector", None),
+                    )
+                    if p
+                }
+                if (requested_outputs & old_outputs) or (
+                    not requested_outputs
+                    and getattr(old_worker, "input_path", None) == input_path
+                ):
+                    QMessageBox.warning(
+                        self,
+                        "Water Segmentation Busy",
+                        "A cancelled water segmentation task is still finishing "
+                        "writes to the same output. Please wait a moment or "
+                        "choose a different output path.",
+                    )
+                    return
+
         # Disable UI and show progress
         self.run_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
@@ -807,7 +846,7 @@ class WaterSegmentationDockWidget(QDockWidget):
         self.status_label.setStyleSheet("color: orange;")
         self.results_text.clear()
 
-        self.worker = WaterSegmentationWorker(
+        worker = WaterSegmentationWorker(
             input_path=input_path,
             band_order=band_order,
             output_raster=output_raster,
@@ -825,10 +864,23 @@ class WaterSegmentationDockWidget(QDockWidget):
             smooth=self.smooth_check.isChecked(),
             smooth_iterations=self.smooth_iterations_spin.value(),
         )
-        self.worker.finished.connect(self._on_segmentation_finished)
-        self.worker.error.connect(self._on_segmentation_error)
-        self.worker.progress.connect(self._on_segmentation_progress)
-        self.worker.start()
+        self.worker = worker
+        worker.finished.connect(
+            lambda r, v, w=worker: (
+                self._on_segmentation_finished(r, v) if self.worker is w else None
+            )
+        )
+        worker.error.connect(
+            lambda msg, w=worker: (
+                self._on_segmentation_error(msg) if self.worker is w else None
+            )
+        )
+        worker.progress.connect(
+            lambda msg, w=worker: (
+                self._on_segmentation_progress(msg) if self.worker is w else None
+            )
+        )
+        worker.start()
 
     def _on_segmentation_finished(self, raster_path, vector_path):
         """Handle successful segmentation completion.
@@ -966,9 +1018,41 @@ class WaterSegmentationDockWidget(QDockWidget):
 
     def cleanup(self):
         """Clean up resources when the dock is closed."""
-        if self.worker is not None and self.worker.isRunning():
-            self.worker.terminate()
-            self.worker.wait()
+        worker = self.worker
+        self.worker = None
+        if worker is not None:
+            for sig_name in ("finished", "error", "progress"):
+                sig = getattr(worker, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect()
+                    except (TypeError, RuntimeError):
+                        pass
+            if worker.isRunning():
+                worker.cancel()
+                if not worker.wait(5000):
+                    _keep_thread_alive(worker)
+                    retained = getattr(self, "_retained_workers", None)
+                    if retained is None:
+                        retained = set()
+                        self._retained_workers = retained
+                    retained.add(worker)
+
+                    def _drop_retained(*_args, w=worker, s=retained):
+                        s.discard(w)
+
+                    _connect_native_finished(worker, _drop_retained)
+                    if not worker.isRunning():
+                        retained.discard(worker)
+
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.setVisible(False)
+            self.progress_bar.setRange(0, 100)
+        if hasattr(self, "run_btn"):
+            self.run_btn.setEnabled(True)
+        if hasattr(self, "status_label"):
+            self.status_label.setText("Ready")
+            self.status_label.setStyleSheet("color: gray;")
 
         for temp_file in self._temp_files:
             try:

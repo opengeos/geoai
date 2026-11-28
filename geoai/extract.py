@@ -3,6 +3,7 @@
 # Standard Library
 import logging
 import os
+import pickle
 import time
 import warnings
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
@@ -18,6 +19,7 @@ from huggingface_hub import hf_hub_download
 from rasterio.windows import Window
 from shapely.geometry import Polygon, box
 from torchvision.models.detection import (
+    MaskRCNN,
     fasterrcnn_resnet50_fpn_v2,
     maskrcnn_resnet50_fpn,
 )
@@ -46,6 +48,17 @@ __all__ = [
     "ParkingSplotDetector",
     "AgricultureFieldDelineator",
 ]
+
+
+def _compute_window_starts(length: int, chip: int, stride: int) -> List[int]:
+    """Compute ordered, deduplicated sliding-window start positions covering [0, length)."""
+    if length <= chip:
+        return [0]
+    last_start = length - chip
+    starts = list(range(0, last_start, stride))
+    if not starts or starts[-1] != last_start:
+        starts.append(last_start)
+    return starts
 
 
 class CustomDataset(NonGeoDataset):
@@ -112,7 +125,10 @@ class CustomDataset(NonGeoDataset):
         self.verbose = verbose
         self.warned_about_bands = False
 
-        # Calculate stride based on overlap
+        # Validate overlap and calculate stride
+        if not (0 <= overlap < 1):
+            raise ValueError(f"Overlap must be in [0, 1), got {overlap}")
+
         self.stride_x = int(chip_size[1] * (1 - overlap))
         self.stride_y = int(chip_size[0] * (1 - overlap))
 
@@ -133,33 +149,13 @@ class CustomDataset(NonGeoDataset):
             self.bounds = (west, south, east, north)
             self.roi = box(*self.bounds)
 
-            # Calculate starting positions for each tile
-            self.row_starts = []
-            self.col_starts = []
-
-            # Normal row starts using stride
-            for r in range((self.height - 1) // self.stride_y):
-                self.row_starts.append(r * self.stride_y)
-
-            # Add a special last row that ensures we reach the bottom edge
-            if self.height > self.chip_size[0]:
-                self.row_starts.append(max(0, self.height - self.chip_size[0]))
-            else:
-                # If the image is smaller than chip size, just start at 0
-                if not self.row_starts:
-                    self.row_starts.append(0)
-
-            # Normal column starts using stride
-            for c in range((self.width - 1) // self.stride_x):
-                self.col_starts.append(c * self.stride_x)
-
-            # Add a special last column that ensures we reach the right edge
-            if self.width > self.chip_size[1]:
-                self.col_starts.append(max(0, self.width - self.chip_size[1]))
-            else:
-                # If the image is smaller than chip size, just start at 0
-                if not self.col_starts:
-                    self.col_starts.append(0)
+            # Calculate ordered, deduplicated starting positions for each tile
+            self.row_starts = _compute_window_starts(
+                self.height, self.chip_size[0], self.stride_y
+            )
+            self.col_starts = _compute_window_starts(
+                self.width, self.chip_size[1], self.stride_x
+            )
 
             # Update rows and cols based on actual starting positions
             self.rows = len(self.row_starts)
@@ -179,8 +175,19 @@ class CustomDataset(NonGeoDataset):
                 if src.crs:
                     logger.info(f"CRS: {src.crs}")
 
-        # Get raster stats
-        self.raster_stats = get_raster_stats(raster_path, divide_by=255)
+        # Lazily computed on first access via raster_stats property
+        self._raster_stats: Optional[Dict[str, Any]] = None
+
+    @property
+    def raster_stats(self) -> Dict[str, Any]:
+        """Lazily compute and cache raster statistics on first access."""
+        if self._raster_stats is None:
+            self._raster_stats = get_raster_stats(self.raster_path, divide_by=255)
+        return self._raster_stats
+
+    @raster_stats.setter
+    def raster_stats(self, value: Optional[Dict[str, Any]]) -> None:
+        self._raster_stats = value
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         """
@@ -431,21 +438,66 @@ class ObjectDetector:
                 logger.info(f"Checkpoint metadata: {metadata}")
             return {key: f.get_tensor(key) for key in f.keys()}
 
-    def load_weights(self, model_path: str) -> None:
+    def load_weights(self, model_path: str, allow_unsafe: bool = False) -> None:
         """
         Load weights from file with error handling for different formats.
 
         Args:
-            model_path: Path to model weights
+            model_path: Path to model weights.
+            allow_unsafe: If True (or if the ``GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1``
+                environment variable is set), fall back to ``weights_only=False``
+                when restricted loading rejects a trusted legacy checkpoint.
+                Defaults to False.
         """
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
+
+        unsafe_allowed = allow_unsafe or (
+            os.environ.get("GEOAI_ALLOW_UNSAFE_TORCH_LOAD", "").strip().lower()
+            in {"1", "true", "yes"}
+        )
 
         try:
             if model_path.endswith(".safetensors"):
                 state_dict = self._load_safetensors(model_path)
             else:
-                state_dict = torch.load(model_path, map_location=self.device)
+                try:
+                    state_dict = torch.load(
+                        model_path, map_location=self.device, weights_only=True
+                    )
+                except TypeError as e:
+                    if "weights_only" not in str(e):
+                        raise
+                    if not unsafe_allowed:
+                        raise RuntimeError(
+                            f"Installed PyTorch does not support weights_only=True "
+                            f"when loading '{model_path}'. If this is a trusted "
+                            "checkpoint, pass allow_unsafe=True or set "
+                            "GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1."
+                        ) from e
+                    state_dict = torch.load(model_path, map_location=self.device)
+                except (pickle.UnpicklingError, RuntimeError) as e:
+                    if isinstance(
+                        e, pickle.UnpicklingError
+                    ) or "Weights only load failed" in str(e):
+                        if not unsafe_allowed:
+                            raise RuntimeError(
+                                f"Restricted checkpoint loading (weights_only=True) "
+                                f"rejected '{model_path}': {e}. If this is a trusted "
+                                "legacy checkpoint, pass allow_unsafe=True or set "
+                                "GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1."
+                            ) from e
+                        logger.warning(
+                            "weights_only=True failed for %s (%s); loading with "
+                            "weights_only=False because unsafe loading was explicitly enabled.",
+                            model_path,
+                            e,
+                        )
+                        state_dict = torch.load(
+                            model_path, map_location=self.device, weights_only=False
+                        )
+                    else:
+                        raise
 
             # Handle different state dict formats
             if isinstance(state_dict, dict):
@@ -473,8 +525,12 @@ class ObjectDetector:
                 self.model.load_state_dict(new_state_dict)
                 logger.info("Model loaded successfully after key fixing")
 
+        except RuntimeError as e:
+            if "Restricted checkpoint loading (weights_only=True)" in str(e):
+                raise
+            raise RuntimeError(f"Failed to load model: {e}") from e
         except Exception as e:
-            raise RuntimeError(f"Failed to load model: {e}")
+            raise RuntimeError(f"Failed to load model: {e}") from e
 
     def mask_to_polygons(self, mask: np.ndarray, **kwargs: Any) -> List[Polygon]:
         """
@@ -523,10 +579,9 @@ class ObjectDetector:
             ):
                 continue
 
-            # Simplify contour if it has many points
-            if contour.shape[0] > 50:
-                epsilon = simplify_tolerance * cv2.arcLength(contour, True)
-                contour = cv2.approxPolyDP(contour, epsilon, True)
+            # Simplify contour if it has many points (simplify_tolerance is in pixels)
+            if contour.shape[0] > 50 and simplify_tolerance > 0:
+                contour = cv2.approxPolyDP(contour, simplify_tolerance, True)
 
             # Convert to list of [x, y] coordinates
             polygon = contour.reshape(-1, 2).tolist()
@@ -555,41 +610,48 @@ class ObjectDetector:
         iou_threshold = kwargs.get("nms_iou_threshold", self.nms_iou_threshold)
 
         # Sort by confidence
-        gdf = gdf.sort_values("confidence", ascending=False)
+        gdf = gdf.sort_values("confidence", ascending=False).copy()
 
         # Fix any invalid geometries
         gdf["geometry"] = gdf["geometry"].apply(
             lambda geom: geom.buffer(0) if not geom.is_valid else geom
         )
 
+        sindex = gdf.sindex
         keep_indices = []
         polygons = gdf.geometry.values
+        n_polys = len(polygons)
+        suppressed = np.zeros(n_polys, dtype=bool)
 
-        for i in range(len(polygons)):
-            if i in keep_indices:
+        for i in range(n_polys):
+            if suppressed[i]:
                 continue
 
-            keep = True
-            for j in keep_indices:
-                # Skip invalid geometries
-                if not polygons[i].is_valid or not polygons[j].is_valid:
+            keep_indices.append(i)
+            poly_i = polygons[i]
+            if poly_i is None or poly_i.is_empty or not poly_i.is_valid:
+                continue
+
+            poly_i_area = poly_i.area
+            candidates = sindex.query(poly_i, predicate="intersects")
+            for j in candidates:
+                if j <= i or suppressed[j]:
+                    continue
+                poly_j = polygons[j]
+                if poly_j is None or poly_j.is_empty or not poly_j.is_valid:
                     continue
 
                 # Calculate IoU
                 try:
-                    intersection = polygons[i].intersection(polygons[j]).area
-                    union = polygons[i].area + polygons[j].area - intersection
+                    intersection = poly_i.intersection(poly_j).area
+                    union = poly_i_area + poly_j.area - intersection
                     iou = intersection / union if union > 0 else 0
 
                     if iou > iou_threshold:
-                        keep = False
-                        break
+                        suppressed[j] = True
                 except Exception:
                     # Skip on topology exceptions
                     continue
-
-            if keep:
-                keep_indices.append(i)
 
         return gdf.iloc[keep_indices]
 
@@ -772,12 +834,19 @@ class ObjectDetector:
                 if max_object_area is not None and area > max_object_area:
                     continue
 
-                # Create a mask for this object
-                object_mask = (labels == i).astype(np.uint8)
+                # Extract tight bounding-box slice for this object
+                x0 = int(stats[i, cv2.CC_STAT_LEFT])
+                y0 = int(stats[i, cv2.CC_STAT_TOP])
+                w = int(stats[i, cv2.CC_STAT_WIDTH])
+                h = int(stats[i, cv2.CC_STAT_HEIGHT])
+                object_mask = (labels[y0 : y0 + h, x0 : x0 + w] == i).astype(np.uint8)
 
-                # Find contours
+                # Find contours in full-image pixel coordinates using offset
                 contours, _ = cv2.findContours(
-                    object_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                    object_mask,
+                    cv2.RETR_EXTERNAL,
+                    cv2.CHAIN_APPROX_SIMPLE,
+                    offset=(x0, y0),
                 )
 
                 # Process each contour
@@ -786,10 +855,9 @@ class ObjectDetector:
                     if contour.shape[0] < 3:
                         continue
 
-                    # Simplify contour if it has many points
+                    # Simplify contour if it has many points (simplify_tolerance is in pixels)
                     if contour.shape[0] > 50 and simplify_tolerance > 0:
-                        epsilon = simplify_tolerance * cv2.arcLength(contour, True)
-                        contour = cv2.approxPolyDP(contour, epsilon, True)
+                        contour = cv2.approxPolyDP(contour, simplify_tolerance, True)
 
                     # Convert to list of (x, y) coordinates
                     polygon_points = contour.reshape(-1, 2)
@@ -930,14 +998,15 @@ class ObjectDetector:
         if filter_edges:
             logger.info(f"- Edge buffer size: {edge_buffer} pixels")
 
-        # Create dataset
-        dataset = CustomDataset(
-            raster_path=raster_path,
-            chip_size=chip_size,
-            overlap=overlap,
-            band_indexes=band_indexes,
-        )
-        self.raster_stats = dataset.raster_stats
+        # Create dataset (or reuse a custom dataset supplied by subclasses)
+        dataset = kwargs.get("dataset")
+        if dataset is None:
+            dataset = CustomDataset(
+                raster_path=raster_path,
+                chip_size=chip_size,
+                overlap=overlap,
+                band_indexes=band_indexes,
+            )
 
         # Custom collate function to handle Shapely objects
         def custom_collate(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -980,6 +1049,8 @@ class ObjectDetector:
         # Process batches
         all_polygons = []
         all_scores = []
+        all_labels = []
+        transform = dataset.transform
 
         logger.info(f"Processing raster with {len(dataloader)} batches")
         for batch in tqdm(dataloader):
@@ -1072,27 +1143,25 @@ class ObjectDetector:
                     if not contours:
                         continue
 
-                    # Transform polygons to geographic coordinates
-                    with rasterio.open(raster_path) as src:
-                        transform = src.transform
+                    # Transform polygons to geographic coordinates using dataset.transform
+                    for contour in contours:
+                        # Convert polygon to global coordinates
+                        global_polygon = []
+                        for x, y in contour:
+                            # Adjust coordinates based on window position
+                            gx, gy = transform * (i + x, j + y)
+                            global_polygon.append((gx, gy))
 
-                        for contour in contours:
-                            # Convert polygon to global coordinates
-                            global_polygon = []
-                            for x, y in contour:
-                                # Adjust coordinates based on window position
-                                gx, gy = transform * (i + x, j + y)
-                                global_polygon.append((gx, gy))
-
-                            # Create Shapely polygon
-                            if len(global_polygon) >= 3:
-                                try:
-                                    shapely_poly = Polygon(global_polygon)
-                                    if shapely_poly.is_valid and shapely_poly.area > 0:
-                                        all_polygons.append(shapely_poly)
-                                        all_scores.append(float(scores[mask_idx]))
-                                except Exception as e:
-                                    logger.error(f"Error creating polygon: {e}")
+                        # Create Shapely polygon
+                        if len(global_polygon) >= 3:
+                            try:
+                                shapely_poly = Polygon(global_polygon)
+                                if shapely_poly.is_valid and shapely_poly.area > 0:
+                                    all_polygons.append(shapely_poly)
+                                    all_scores.append(float(scores[mask_idx]))
+                                    all_labels.append(int(labels[mask_idx]))
+                            except Exception as e:
+                                logger.error(f"Error creating polygon: {e}")
 
         # Create GeoDataFrame
         if not all_polygons:
@@ -1103,7 +1172,7 @@ class ObjectDetector:
             {
                 "geometry": all_polygons,
                 "confidence": all_scores,
-                "class": 1,  # Object class
+                "class": all_labels,
             },
             crs=dataset.crs,
         )
@@ -1178,7 +1247,6 @@ class ObjectDetector:
         )
 
         # Store a flag to avoid repetitive messages
-        self.raster_stats = dataset.raster_stats
         seen_warnings = {
             "bands": False,
             "resize": {},  # Dictionary to track resize warnings by shape
@@ -1455,14 +1523,16 @@ class ObjectDetector:
 
         def create_oriented_envelope(polygon: Polygon, angle_deg: float) -> Polygon:
             """Create an oriented minimum area rectangle for the polygon"""
-            # Create a rotated rectangle using OpenCV method (more robust than Shapely methods)
-            coords = np.array(polygon.exterior.coords)[:-1].astype(
-                np.float32
-            )  # Skip the last point (same as first)
+            # Center coordinates around their float64 centroid before casting to
+            # float32 for OpenCV so large projected coordinates (e.g. UTM) keep
+            # sub-meter precision, then translate back in float64.
+            coords_f64 = np.asarray(polygon.exterior.coords, dtype=np.float64)[:-1]
+            centroid = coords_f64.mean(axis=0)
+            centered_f32 = (coords_f64 - centroid).astype(np.float32)
 
             # Use OpenCV's minAreaRect
-            rect = cv2.minAreaRect(coords)
-            box_points = cv2.boxPoints(rect)
+            rect = cv2.minAreaRect(centered_f32)
+            box_points = cv2.boxPoints(rect).astype(np.float64) + centroid
 
             # Convert to shapely polygon
             oriented_box = Polygon(box_points)
@@ -2246,6 +2316,7 @@ class ObjectDetector:
             confidence_threshold: float,
             min_object_area: int,
             max_object_area: Optional[int],
+            offset: Tuple[int, int] = (0, 0),
         ) -> Optional[Dict[str, Any]]:
             # Get confidence value
             conf_region = conf_data[component_mask > 0]
@@ -2258,9 +2329,12 @@ class ObjectDetector:
             if confidence < confidence_threshold:
                 return None
 
-            # Find contours
+            # Find contours in full-image pixel coordinates using offset
             contours, _ = cv2.findContours(
-                component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                component_mask,
+                cv2.RETR_EXTERNAL,
+                cv2.CHAIN_APPROX_SIMPLE,
+                offset=offset,
             )
 
             results = []
@@ -2291,16 +2365,25 @@ class ObjectDetector:
             return results
 
         import concurrent.futures
-        from functools import partial
 
         def process_component(
-            args: Tuple[int, np.ndarray, np.ndarray, Any, float, int, Optional[int]],
+            args: Tuple[
+                int,
+                Any,
+                np.ndarray,
+                np.ndarray,
+                Any,
+                float,
+                int,
+                Optional[int],
+            ],
         ) -> Optional[Dict[str, Any]]:
             """
-            Helper function to process a single component
+            Helper function to process a single component on its tight bounding box
             """
             (
                 label,
+                slc,
                 labeled_mask,
                 conf_data,
                 transform,
@@ -2309,16 +2392,21 @@ class ObjectDetector:
                 max_object_area,
             ) = args
 
-            # Create mask for this component
-            component_mask = (labeled_mask == label).astype(np.uint8)
+            if slc is None:
+                return None
+
+            row_slice, col_slice = slc
+            component_mask = (labeled_mask[slc] == label).astype(np.uint8)
+            conf_slice = conf_data[slc]
 
             return _process_single_component(
                 component_mask,
-                conf_data,
+                conf_slice,
                 transform,
                 confidence_threshold,
                 min_object_area,
                 max_object_area,
+                offset=(int(col_slice.start), int(row_slice.start)),
             )
 
         start_time = time.time()
@@ -2337,8 +2425,9 @@ class ObjectDetector:
             # Convert to binary mask
             binary_mask = mask_data > 0
 
-            # Find connected components
+            # Find connected components and their tight bounding-box slices
             labeled_mask, num_features = ndimage.label(binary_mask)
+            component_slices = ndimage.find_objects(labeled_mask)
             logger.info(f"Found {num_features} connected components")
 
             # Process each component
@@ -2354,16 +2443,21 @@ class ObjectDetector:
                 for label in tqdm(
                     range(1, num_features + 1), desc="Processing components"
                 ):
-                    # Create mask for this component
-                    component_mask = (labeled_mask == label).astype(np.uint8)
+                    slc = component_slices[label - 1]
+                    if slc is None:
+                        continue
+                    row_slice, col_slice = slc
+                    component_mask = (labeled_mask[slc] == label).astype(np.uint8)
+                    conf_slice = conf_data[slc]
 
                     result = _process_single_component(
                         component_mask,
-                        conf_data,
+                        conf_slice,
                         transform,
                         confidence_threshold,
                         min_object_area,
                         max_object_area,
+                        offset=(int(col_slice.start), int(row_slice.start)),
                     )
 
                     if result:
@@ -2380,6 +2474,7 @@ class ObjectDetector:
                 process_args = [
                     (
                         label,
+                        component_slices[label - 1],
                         labeled_mask,
                         conf_data,
                         transform,
@@ -2712,8 +2807,9 @@ class AgricultureFieldDelineator(ObjectDetector):
         )
 
         # Default Sentinel-2 band statistics (can be overridden with actual stats)
-        # Band order: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B10, B11, B12]
+        # Band order: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B11, B12]
         self.sentinel_band_stats = {
+            "bands": list(range(12)),
             "means": [
                 0.0975,
                 0.0476,
@@ -2767,8 +2863,6 @@ class AgricultureFieldDelineator(ObjectDetector):
         Returns:
             Modified model with appropriate input channels
         """
-        import torchvision
-        from torchvision.models.detection import maskrcnn_resnet50_fpn
         from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
         if model is not None:
@@ -2788,7 +2882,7 @@ class AgricultureFieldDelineator(ObjectDetector):
         )
 
         # Create a ResNet50 backbone with modified input channels
-        backbone = resnet_fpn_backbone("resnet50", weights=None)
+        backbone = resnet_fpn_backbone(backbone_name="resnet50", weights=None)
 
         # Replace the first conv layer to accept multi-spectral input
         original_conv = backbone.body.conv1
@@ -2802,7 +2896,7 @@ class AgricultureFieldDelineator(ObjectDetector):
         )
 
         # Create Mask R-CNN with our modified backbone
-        model = maskrcnn_resnet50_fpn(
+        model = MaskRCNN(
             backbone=backbone,
             num_classes=2,  # Background + field
             image_mean=[0.485] * num_input_channels,  # Extend mean to all channels
@@ -2823,7 +2917,7 @@ class AgricultureFieldDelineator(ObjectDetector):
 
         Args:
             image_data: Raw Sentinel-2 image data as numpy array [bands, height, width]
-            band_selection: List of band indices to use (overrides instance default if provided)
+            band_selection: List of 0-based band indices to use (overrides instance default if provided)
             use_ndvi: Whether to include NDVI (overrides instance default if provided)
 
         Returns:
@@ -2838,7 +2932,8 @@ class AgricultureFieldDelineator(ObjectDetector):
         # Select bands
         selected_bands = image_data[band_selection]
 
-        # Calculate NDVI if requested (using B8 and B4 which are indices 7 and 3)
+        # Calculate NDVI if requested (using B8 and B4 which are 0-based indices 7 and 3)
+        ndvi_added = False
         if (
             use_ndvi
             and 7 in range(image_data.shape[0])
@@ -2860,20 +2955,43 @@ class AgricultureFieldDelineator(ObjectDetector):
 
             # Add NDVI as an additional channel
             selected_bands = np.vstack([selected_bands, ndvi[np.newaxis, :, :]])
+            ndvi_added = True
 
         # Convert to tensor
         image_tensor = torch.from_numpy(selected_bands).float()
 
-        # Normalize using band statistics
+        # Normalize using band statistics: use explicit band identities when
+        # provided, positional indexing only when explicitly contracted, or
+        # band-index lookup otherwise.
+        means = self.sentinel_band_stats["means"]
+        stds = self.sentinel_band_stats["stds"]
+        stats_bands = self.sentinel_band_stats.get("bands")
+        positional_stats = bool(self.sentinel_band_stats.get("positional", False))
+        band_to_pos = (
+            {b: idx for idx, b in enumerate(stats_bands)}
+            if stats_bands is not None
+            else None
+        )
         for i, band_idx in enumerate(band_selection):
-            # Make sure band_idx is within range of our statistics
-            if band_idx < len(self.sentinel_band_stats["means"]):
-                mean = self.sentinel_band_stats["means"][band_idx]
-                std = self.sentinel_band_stats["stds"][band_idx]
+            if band_to_pos is not None:
+                if band_idx not in band_to_pos:
+                    continue
+                stat_pos = band_to_pos[band_idx]
+            elif positional_stats:
+                stat_pos = i
+            elif 0 <= band_idx < len(means):
+                stat_pos = band_idx
+            else:
+                continue
+            if stat_pos >= len(means) or stat_pos >= len(stds):
+                continue
+            mean = means[stat_pos]
+            std = stds[stat_pos]
+            if std > 0:
                 image_tensor[i] = (image_tensor[i] - mean) / std
 
         # If NDVI was added, normalize it too (last channel)
-        if use_ndvi:
+        if ndvi_added:
             # NDVI is already roughly in [0,1] range, just standardize it slightly
             image_tensor[-1] = (image_tensor[-1] - 0.5) / 0.5
 
@@ -2890,7 +3008,7 @@ class AgricultureFieldDelineator(ObjectDetector):
 
         Args:
             raster_path: Path to the Sentinel-2 raster file
-            band_selection: Specific bands to update (None = update all available)
+            band_selection: Specific 0-based band indices to update (None = update all available)
             sample_size: Number of random pixels to sample for statistics calculation
 
         Returns:
@@ -2907,23 +3025,28 @@ class AgricultureFieldDelineator(ObjectDetector):
             # Get dimensions
             height, width = src.height, src.width
 
-            # Determine which bands to analyze
+            # Determine which 0-based bands to analyze
             if band_selection is None:
-                band_selection = list(range(1, band_count + 1))  # 1-indexed
+                band_selection = list(range(band_count))
+
+            for band in band_selection:
+                if band < 0 or band >= band_count:
+                    raise ValueError(
+                        f"Band index {band} out of range for raster with {band_count} bands (0-based indexing)."
+                    )
 
             # Initialize arrays for band statistics
             means = []
             stds = []
 
             # Sample random pixels
-            np.random.seed(42)  # For reproducibility
-            sample_rows = np.random.randint(0, height, sample_size)
-            sample_cols = np.random.randint(0, width, sample_size)
+            rng = np.random.default_rng(42)
+            sample_rows = rng.integers(0, height, size=sample_size)
+            sample_cols = rng.integers(0, width, size=sample_size)
 
-            # Calculate statistics for each band
+            # Calculate statistics for each 0-based band (rasterio uses 1-based band indices)
             for band in band_selection:
-                # Read band data
-                band_data = src.read(band)
+                band_data = src.read(band + 1)
 
                 # Sample values
                 sample_values = band_data[sample_rows, sample_cols]
@@ -2932,8 +3055,8 @@ class AgricultureFieldDelineator(ObjectDetector):
                 valid_samples = sample_values[np.isfinite(sample_values)]
 
                 # Calculate statistics
-                mean = float(np.mean(valid_samples))
-                std = float(np.std(valid_samples))
+                mean = float(np.mean(valid_samples)) if valid_samples.size > 0 else 0.0
+                std = float(np.std(valid_samples)) if valid_samples.size > 0 else 1.0
 
                 # Store results
                 means.append(mean)
@@ -2942,7 +3065,11 @@ class AgricultureFieldDelineator(ObjectDetector):
                 logger.info(f"Band {band}: mean={mean:.4f}, std={std:.4f}")
 
             # Update instance variables
-            self.sentinel_band_stats = {"means": means, "stds": stds}
+            self.sentinel_band_stats = {
+                "means": means,
+                "stds": stds,
+                "bands": list(band_selection),
+            }
 
             return self.sentinel_band_stats
 
@@ -2964,7 +3091,7 @@ class AgricultureFieldDelineator(ObjectDetector):
             raster_path: Path to Sentinel-2 raster file
             output_path: Path to output GeoJSON or Parquet file (optional)
             batch_size: Batch size for processing
-            band_selection: List of bands to use (None = use instance default)
+            band_selection: List of 0-based bands to use (None = use instance default)
             use_ndvi: Whether to include NDVI (None = use instance default)
             filter_edges: Whether to filter out objects at the edges of the image
             edge_buffer: Size of edge buffer in pixels to filter out objects
@@ -2990,11 +3117,14 @@ class AgricultureFieldDelineator(ObjectDetector):
         min_object_area = kwargs.get("min_object_area", self.min_object_area)
         simplify_tolerance = kwargs.get("simplify_tolerance", self.simplify_tolerance)
 
+        if not (0 <= overlap < 1):
+            raise ValueError(f"Overlap must be in [0, 1), got {overlap}")
+
         # Update band statistics if not already done
         if kwargs.get("update_stats", True):
             self.update_band_stats(raster_path, band_selection)
 
-        logger.info(f"Processing with parameters:")
+        logger.info("Processing with parameters:")
         logger.info(f"- Using bands: {band_selection}")
         logger.info(f"- Include NDVI: {use_ndvi}")
         logger.info(f"- Confidence threshold: {confidence_threshold}")
@@ -3029,35 +3159,13 @@ class AgricultureFieldDelineator(ObjectDetector):
                     self.crs = src.crs
                     self.transform = src.transform
 
-                    # Calculate row_starts and col_starts
-                    self.row_starts = []
-                    self.col_starts = []
+                    self.row_starts = _compute_window_starts(
+                        self.height, self.chip_size[0], self.stride_y
+                    )
+                    self.col_starts = _compute_window_starts(
+                        self.width, self.chip_size[1], self.stride_x
+                    )
 
-                    # Normal row starts using stride
-                    for r in range((self.height - 1) // self.stride_y):
-                        self.row_starts.append(r * self.stride_y)
-
-                    # Add a special last row that ensures we reach the bottom edge
-                    if self.height > self.chip_size[0]:
-                        self.row_starts.append(max(0, self.height - self.chip_size[0]))
-                    else:
-                        # If the image is smaller than chip size, just start at 0
-                        if not self.row_starts:
-                            self.row_starts.append(0)
-
-                    # Normal column starts using stride
-                    for c in range((self.width - 1) // self.stride_x):
-                        self.col_starts.append(c * self.stride_x)
-
-                    # Add a special last column that ensures we reach the right edge
-                    if self.width > self.chip_size[1]:
-                        self.col_starts.append(max(0, self.width - self.chip_size[1]))
-                    else:
-                        # If the image is smaller than chip size, just start at 0
-                        if not self.col_starts:
-                            self.col_starts.append(0)
-
-                # Calculate number of tiles
                 self.rows = len(self.row_starts)
                 self.cols = len(self.col_starts)
 
@@ -3073,48 +3181,38 @@ class AgricultureFieldDelineator(ObjectDetector):
                 return self.rows * self.cols
 
             def __getitem__(self, idx: int) -> Dict[str, Any]:
-                # Convert flat index to grid position
                 row = idx // self.cols
                 col = idx % self.cols
 
-                # Get pre-calculated starting positions
                 j = self.row_starts[row]
                 i = self.col_starts[col]
 
-                # Read window from raster
                 with rasterio.open(self.raster_path) as src:
-                    # Make sure we don't read outside the image
                     width = min(self.chip_size[1], self.width - i)
                     height = min(self.chip_size[0], self.height - j)
 
                     window = Window(i, j, width, height)
-
-                    # Read all bands
                     image = src.read(window=window)
+                    window_transform = src.window_transform(window)
 
-                    # Handle partial windows at edges by padding
-                    if (
-                        image.shape[1] != self.chip_size[0]
-                        or image.shape[2] != self.chip_size[1]
-                    ):
-                        temp = np.zeros(
-                            (image.shape[0], self.chip_size[0], self.chip_size[1]),
-                            dtype=image.dtype,
-                        )
-                        temp[:, : image.shape[1], : image.shape[2]] = image
-                        image = temp
+                if (
+                    image.shape[1] != self.chip_size[0]
+                    or image.shape[2] != self.chip_size[1]
+                ):
+                    temp = np.zeros(
+                        (image.shape[0], self.chip_size[0], self.chip_size[1]),
+                        dtype=image.dtype,
+                    )
+                    temp[:, : image.shape[1], : image.shape[2]] = image
+                    image = temp
 
-                # Preprocess bands for the model
                 image_tensor = self.field_delineator.preprocess_sentinel_bands(
                     image, self.band_selection, self.use_ndvi
                 )
 
-                # Get geographic bounds for the window
-                with rasterio.open(self.raster_path) as src:
-                    window_transform = src.window_transform(window)
-                    minx, miny = window_transform * (0, height)
-                    maxx, maxy = window_transform * (width, 0)
-                    bbox = [minx, miny, maxx, maxy]
+                minx, miny = window_transform * (0, height)
+                maxx, maxy = window_transform * (width, 0)
+                bbox = [minx, miny, maxx, maxy]
 
                 return {
                     "image": image_tensor,
@@ -3126,8 +3224,12 @@ class AgricultureFieldDelineator(ObjectDetector):
         # Calculate stride based on overlap
         stride_x = int(chip_size[1] * (1 - overlap))
         stride_y = int(chip_size[0] * (1 - overlap))
+        if stride_x <= 0 or stride_y <= 0:
+            raise ValueError(
+                f"Overlap {overlap} is too high, resulting in non-positive stride"
+            )
 
-        # Create dataset
+        # Create dataset and wire it into the parent process_raster pipeline
         dataset = Sentinel2Dataset(
             raster_path=raster_path,
             chip_size=chip_size,
@@ -3138,42 +3240,6 @@ class AgricultureFieldDelineator(ObjectDetector):
             field_delineator=self,
         )
 
-        # Define custom collate function
-        def custom_collate(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
-            elem = batch[0]
-            if isinstance(elem, dict):
-                result = {}
-                for key in elem:
-                    if key == "bbox":
-                        # Don't collate bbox objects, keep as list
-                        result[key] = [d[key] for d in batch]
-                    else:
-                        # For tensors and other collatable types
-                        try:
-                            result[key] = (
-                                torch.utils.data._utils.collate.default_collate(
-                                    [d[key] for d in batch]
-                                )
-                            )
-                        except TypeError:
-                            # Fall back to list for non-collatable types
-                            result[key] = [d[key] for d in batch]
-                return result
-            else:
-                # Default collate for non-dict types
-                return torch.utils.data._utils.collate.default_collate(batch)
-
-        # Create dataloader
-        dataloader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=0,
-            collate_fn=custom_collate,
-        )
-
-        # Process batches (call the parent class's process_raster method)
-        # We'll adapt the process_raster method to work with our Sentinel2Dataset
         results = super().process_raster(
             raster_path=raster_path,
             output_path=output_path,
@@ -3187,6 +3253,7 @@ class AgricultureFieldDelineator(ObjectDetector):
             mask_threshold=mask_threshold,
             min_object_area=min_object_area,
             simplify_tolerance=simplify_tolerance,
+            dataset=dataset,
         )
 
         return results

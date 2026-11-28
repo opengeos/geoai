@@ -8,6 +8,9 @@ on:
         branches:
             - main
 
+permissions:
+    contents: read
+
 jobs:
     minimal-import:
         runs-on: ubuntu-latest

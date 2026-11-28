@@ -7,8 +7,10 @@ GeoTIFF images using the latent diffusion models from the ESA OpenSR project:
     GitHub: https://github.com/ESAOpenSR/opensr-model.git
 """
 
+import contextlib
 import logging
 import os
+import tempfile
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -31,6 +33,50 @@ except ImportError:
 
 
 _CKPT_MIN_SIZE = 1_000_000  # 1 MB; real checkpoint is ~1.1 GB
+
+
+def _get_cached_config(config_url: str, filename: str = "config_10m.yaml"):
+    """Load the OpenSR YAML configuration from local cache, downloading if needed.
+
+    Args:
+        config_url (str): Remote URL for the YAML configuration file.
+        filename (str): Filename to store in the local cache directory.
+
+    Returns:
+        DictConfig: Loaded OmegaConf configuration object.
+    """
+    cache_dir = os.path.join(torch.hub.get_dir(), "opensr")
+    os.makedirs(cache_dir, exist_ok=True)
+    config_path = os.path.join(cache_dir, filename)
+
+    if not os.path.isfile(config_path) or os.path.getsize(config_path) == 0:
+        logger.info("Downloading model configuration from: %s", config_url)
+        temp_path = None
+        try:
+            with requests.get(config_url, timeout=60) as response:
+                response.raise_for_status()
+                config_text = response.text
+            fd, temp_path = tempfile.mkstemp(
+                dir=cache_dir, prefix=".opensr_cfg_", suffix=".tmp"
+            )
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(config_text)
+            cfg = OmegaConf.load(temp_path)
+            os.replace(temp_path, config_path)
+            return cfg
+        except requests.RequestException as e:
+            if temp_path is not None:
+                with contextlib.suppress(OSError):
+                    os.remove(temp_path)
+            logger.error("Error downloading model configuration: %s", e)
+            raise
+        except BaseException:
+            if temp_path is not None:
+                with contextlib.suppress(OSError):
+                    os.remove(temp_path)
+            raise
+
+    return OmegaConf.load(config_path)
 
 
 def _get_cached_checkpoint(ckpt_name: str) -> str:
@@ -172,16 +218,9 @@ def super_resolution(
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Download configuration YAML from GitHub
+    # Load configuration YAML from local cache or download from GitHub
     config_url = "https://raw.githubusercontent.com/ESAOpenSR/opensr-model/refs/heads/main/opensr_model/configs/config_10m.yaml"
-    logger.info("Downloading model configuration from: %s", config_url)
-    try:
-        response = requests.get(config_url)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.error("Error downloading model configuration: %s", e)
-        raise
-    config = OmegaConf.load(StringIO(response.text))
+    config = _get_cached_config(config_url, filename="config_10m.yaml")
 
     # Initialize latent diffusion model and load pretrained weights.
     # Download checkpoint to the torch hub cache directory instead of cwd.
@@ -195,10 +234,10 @@ def super_resolution(
     ckpt_path = _get_cached_checkpoint(ckpt_name)
     model.load_pretrained(ckpt_path)
 
-    # Load only the specified RGB+NIR bands
+    # Keep the full LR raster on CPU and move only individual patches to device.
     lr_tensor, profile = load_image_tensor(
         image_path=input_lr_path,
-        device=device,
+        device="cpu",
         bands=rgb_nir_bands,
         window=window,
         scale_factor=scale_factor,
@@ -214,10 +253,14 @@ def super_resolution(
             overlap=overlap,
             scale=scale,
             sampling_steps=sampling_steps,
+            device=device,
         )
     else:
-        sr_tensor = model.forward(lr_tensor, sampling_steps=sampling_steps)
-        sr_image = sr_tensor.squeeze(0).cpu().numpy().astype(np.float32)
+        with torch.no_grad():
+            sr_tensor = model.forward(
+                lr_tensor.to(device), sampling_steps=sampling_steps
+            )
+        sr_image = sr_tensor.squeeze(0).detach().cpu().numpy().astype(np.float32)
 
     save_geotiff(sr_image, profile, output_sr_path, scale)
     logger.info("Saved super-resolution image to: %s", output_sr_path)
@@ -234,14 +277,16 @@ def super_resolution(
                 scale=scale,
                 n_variations=n_variations,
                 sampling_steps=sampling_steps,
+                device=device,
             )
         else:
-            unc_tensor = model.uncertainty_map(
-                lr_tensor,
-                n_variations=n_variations,
-                sampling_steps=sampling_steps,
-            )
-            uncertainty = unc_tensor.squeeze().cpu().numpy().astype(np.float32)
+            with torch.no_grad():
+                unc_tensor = model.uncertainty_map(
+                    lr_tensor.to(device),
+                    n_variations=n_variations,
+                    sampling_steps=sampling_steps,
+                )
+            uncertainty = unc_tensor.squeeze().detach().cpu().numpy().astype(np.float32)
         save_geotiff(uncertainty, profile, output_uncertainty_path, scale)
         logger.info("Saved uncertainty map to: %s", output_uncertainty_path)
 
@@ -273,14 +318,7 @@ def save_geotiff(
     # Update profile and transform
     profile = reference_profile.copy()
     old_transform = profile["transform"]
-    new_transform = Affine(
-        old_transform.a / scale,
-        old_transform.b,
-        old_transform.c,
-        old_transform.d,
-        old_transform.e / scale,
-        old_transform.f,
-    )
+    new_transform = old_transform * Affine.scale(1 / scale, 1 / scale)
     profile.update(
         dtype=rasterio.float32,
         count=data.shape[0],
@@ -370,6 +408,24 @@ def load_image_tensor(
     return tensor, profile
 
 
+def _patch_grid(h: int, w: int, patch_size: int, overlap: int) -> List[Tuple[int, int]]:
+    """Compute deduplicated (row_start, col_start) patch coordinates."""
+    stride = patch_size - overlap
+
+    row_starts = list(range(0, h - patch_size + 1, stride))
+    if not row_starts or row_starts[-1] + patch_size < h:
+        row_starts.append(max(0, h - patch_size))
+
+    col_starts = list(range(0, w - patch_size + 1, stride))
+    if not col_starts or col_starts[-1] + patch_size < w:
+        col_starts.append(max(0, w - patch_size))
+
+    row_starts = list(dict.fromkeys(row_starts))
+    col_starts = list(dict.fromkeys(col_starts))
+
+    return [(r, c) for r in row_starts for c in col_starts]
+
+
 def _create_patches(
     tensor: torch.Tensor, patch_size: int, overlap: int
 ) -> List[Tuple[torch.Tensor, int, int]]:
@@ -385,26 +441,10 @@ def _create_patches(
         col_start) tuples.
     """
     _, _, h, w = tensor.shape
-    stride = patch_size - overlap
     patches = []
-
-    row_starts = list(range(0, h - patch_size + 1, stride))
-    if not row_starts or row_starts[-1] + patch_size < h:
-        row_starts.append(max(0, h - patch_size))
-
-    col_starts = list(range(0, w - patch_size + 1, stride))
-    if not col_starts or col_starts[-1] + patch_size < w:
-        col_starts.append(max(0, w - patch_size))
-
-    # Deduplicate while preserving order
-    row_starts = list(dict.fromkeys(row_starts))
-    col_starts = list(dict.fromkeys(col_starts))
-
-    for r in row_starts:
-        for c in col_starts:
-            patch = tensor[:, :, r : r + patch_size, c : c + patch_size]
-            patches.append((patch, r, c))
-
+    for r, c in _patch_grid(h, w, patch_size, overlap):
+        patch = tensor[:, :, r : r + patch_size, c : c + patch_size]
+        patches.append((patch, r, c))
     return patches
 
 
@@ -521,6 +561,45 @@ def _stitch_patches(
     return output
 
 
+def _accumulate_patch(
+    output: np.ndarray,
+    weight_map: np.ndarray,
+    sr_patch: np.ndarray,
+    lr_r: int,
+    lr_c: int,
+    h: int,
+    w: int,
+    scale: int,
+    overlap: int,
+    patch_size: int,
+) -> None:
+    """Blend and accumulate a single SR patch directly into output arrays."""
+    sr_patch_size = patch_size * scale
+    sr_r = lr_r * scale
+    sr_c = lr_c * scale
+    ph = sr_patch.shape[-2]
+    pw = sr_patch.shape[-1]
+
+    w_rows = _create_blend_weights(
+        sr_patch_size,
+        overlap,
+        scale,
+        taper_start=lr_r > 0,
+        taper_end=lr_r + patch_size < h,
+    )[:ph]
+    w_cols = _create_blend_weights(
+        sr_patch_size,
+        overlap,
+        scale,
+        taper_start=lr_c > 0,
+        taper_end=lr_c + patch_size < w,
+    )[:pw]
+    w2d = w_rows[:, np.newaxis] * w_cols[np.newaxis, :]
+
+    output[:, sr_r : sr_r + ph, sr_c : sr_c + pw] += sr_patch * w2d[np.newaxis]
+    weight_map[:, sr_r : sr_r + ph, sr_c : sr_c + pw] += w2d[np.newaxis]
+
+
 def _process_patched(
     model,
     lr_tensor: torch.Tensor,
@@ -528,8 +607,13 @@ def _process_patched(
     overlap: int,
     scale: int,
     sampling_steps: int,
+    device: Optional[str] = None,
 ) -> np.ndarray:
     """Run super-resolution on a large image using patched inference.
+
+    Moves one patch at a time to ``device`` and accumulates each SR patch
+    directly into the output buffer to avoid holding the full raster on GPU
+    or buffering all SR patches in memory.
 
     Args:
         model: The OpenSR SRLatentDiffusion model.
@@ -538,14 +622,16 @@ def _process_patched(
         overlap (int): Overlap between adjacent tiles in pixels.
         scale (int): Super-resolution scale factor.
         sampling_steps (int): Number of diffusion sampling steps.
+        device (str, optional): Device to run patch inference on. If None,
+            keeps patches on ``lr_tensor.device``.
 
     Returns:
         np.ndarray: Stitched super-resolution image of shape (C, H*scale,
         W*scale).
     """
     _, channels, h, w = lr_tensor.shape
-    patches = _create_patches(lr_tensor, patch_size, overlap)
-    total = len(patches)
+    coords = _patch_grid(h, w, patch_size, overlap)
+    total = len(coords)
     logger.info(
         "Processing %d patches (%dx%d, overlap=%d)",
         total,
@@ -554,14 +640,28 @@ def _process_patched(
         overlap,
     )
 
-    sr_patches = []
-    for i, (patch, r, c) in enumerate(patches):
-        logger.debug("  Patch %d/%d at (%d, %d)", i + 1, total, r, c)
-        sr_tensor = model.forward(patch, sampling_steps=sampling_steps)
-        sr_patch = sr_tensor.squeeze(0).cpu().numpy().astype(np.float32)
-        sr_patches.append((sr_patch, r, c))
+    sr_h = h * scale
+    sr_w = w * scale
+    output = np.zeros((channels, sr_h, sr_w), dtype=np.float32)
+    weight_map = np.zeros((1, sr_h, sr_w), dtype=np.float32)
 
-    return _stitch_patches(sr_patches, h, w, channels, scale, overlap, patch_size)
+    for i, (r, c) in enumerate(coords):
+        logger.debug("  Patch %d/%d at (%d, %d)", i + 1, total, r, c)
+        patch = lr_tensor[:, :, r : r + patch_size, c : c + patch_size]
+        if device is not None:
+            patch = patch.to(device)
+        with torch.no_grad():
+            sr_tensor = model.forward(patch, sampling_steps=sampling_steps)
+        sr_patch = sr_tensor.squeeze(0).detach().cpu().numpy().astype(np.float32)
+        _accumulate_patch(
+            output, weight_map, sr_patch, r, c, h, w, scale, overlap, patch_size
+        )
+
+    weight_map = np.maximum(weight_map, 1e-8)
+    output /= weight_map
+    if channels == 1:
+        return output[0]
+    return output
 
 
 def _process_patched_uncertainty(
@@ -572,8 +672,12 @@ def _process_patched_uncertainty(
     scale: int,
     n_variations: int,
     sampling_steps: int,
+    device: Optional[str] = None,
 ) -> np.ndarray:
     """Compute uncertainty maps using patched inference.
+
+    Moves one patch at a time to ``device`` and accumulates each uncertainty
+    patch directly into the output buffer.
 
     Args:
         model: The OpenSR SRLatentDiffusion model.
@@ -583,25 +687,41 @@ def _process_patched_uncertainty(
         scale (int): Super-resolution scale factor.
         n_variations (int): Number of stochastic forward passes.
         sampling_steps (int): Number of diffusion sampling steps.
+        device (str, optional): Device to run patch inference on. If None,
+            keeps patches on ``lr_tensor.device``.
 
     Returns:
         np.ndarray: Stitched uncertainty map of shape (H*scale, W*scale).
     """
     _, _, h, w = lr_tensor.shape
-    patches = _create_patches(lr_tensor, patch_size, overlap)
-    total = len(patches)
+    coords = _patch_grid(h, w, patch_size, overlap)
+    total = len(coords)
     logger.info("Computing uncertainty for %d patches", total)
 
-    unc_patches = []
-    for i, (patch, r, c) in enumerate(patches):
-        logger.debug("  Uncertainty patch %d/%d at (%d, %d)", i + 1, total, r, c)
-        unc_tensor = model.uncertainty_map(
-            patch, n_variations=n_variations, sampling_steps=sampling_steps
-        )
-        unc_patch = unc_tensor.squeeze(0).cpu().numpy().astype(np.float32)
-        unc_patches.append((unc_patch, r, c))
+    sr_h = h * scale
+    sr_w = w * scale
+    output = np.zeros((1, sr_h, sr_w), dtype=np.float32)
+    weight_map = np.zeros((1, sr_h, sr_w), dtype=np.float32)
 
-    return _stitch_patches(unc_patches, h, w, 1, scale, overlap, patch_size)
+    for i, (r, c) in enumerate(coords):
+        logger.debug("  Uncertainty patch %d/%d at (%d, %d)", i + 1, total, r, c)
+        patch = lr_tensor[:, :, r : r + patch_size, c : c + patch_size]
+        if device is not None:
+            patch = patch.to(device)
+        with torch.no_grad():
+            unc_tensor = model.uncertainty_map(
+                patch, n_variations=n_variations, sampling_steps=sampling_steps
+            )
+        unc_patch = unc_tensor.squeeze(0).detach().cpu().numpy().astype(np.float32)
+        if unc_patch.ndim == 2:
+            unc_patch = unc_patch[np.newaxis, ...]
+        _accumulate_patch(
+            output, weight_map, unc_patch, r, c, h, w, scale, overlap, patch_size
+        )
+
+    weight_map = np.maximum(weight_map, 1e-8)
+    output /= weight_map
+    return output[0]
 
 
 def plot_sr_comparison(

@@ -7,6 +7,10 @@ on:
             - main
 
 name: Linux build
+
+permissions:
+    contents: read
+
 jobs:
     test-ubuntu:
         runs-on: ubuntu-latest

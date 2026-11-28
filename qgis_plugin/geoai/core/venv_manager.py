@@ -783,19 +783,16 @@ def _append_space_separated_env(env: dict, key: str, values: Tuple[str, ...]) ->
 
 
 def _apply_package_host_env(env: dict) -> None:
-    """Apply package-host trust settings to subprocess environment.
+    """Apply default TLS settings to the subprocess environment.
 
-    Command-line flags are still used for top-level pip/uv commands. These
-    environment variables provide the same host allow-list to nested package
-    operations and to uv code paths where the first failure must be classified
-    before an explicit retry can be attempted.
+    Enables native OS certificate store validation for uv without bypassing
+    TLS verification. Explicit host allow-lists are only applied inside the
+    SSL-error retry helpers after an initial verified attempt fails.
 
     Args:
         env: Environment dictionary to update in-place.
     """
-    _append_space_separated_env(env, "PIP_TRUSTED_HOST", _INSECURE_PACKAGE_HOSTS)
     env.setdefault("UV_NATIVE_TLS", "true")
-    _append_space_separated_env(env, "UV_INSECURE_HOST", _INSECURE_PACKAGE_HOSTS)
 
 
 def _is_network_error(output: str) -> bool:
@@ -1172,16 +1169,15 @@ def _get_qgis_proxy_settings() -> Optional[str]:
 
 
 def _get_pip_proxy_args() -> List[str]:
-    """Get pip --proxy argument if QGIS proxy is configured.
+    """Return an empty list; proxy settings are passed via environment variables.
+
+    Proxy URLs (which may contain credentials) are injected exclusively via
+    ``HTTP_PROXY`` and ``HTTPS_PROXY`` in ``_get_clean_env_for_venv()`` so
+    credentials never appear in process command-line arguments.
 
     Returns:
-        List with --proxy args, or empty list.
+        An empty list.
     """
-    proxy_url = _get_qgis_proxy_settings()
-    if proxy_url:
-        safe_url = proxy_url.split("@")[-1] if "@" in proxy_url else proxy_url
-        _log(f"Using QGIS proxy for pip: {safe_url}", Qgis.Info)
-        return ["--proxy", proxy_url]
     return []
 
 
@@ -2791,7 +2787,8 @@ def _retry_uv_install_with_insecure_hosts(
         return result
 
     _log(
-        "uv SSL certificate error, retrying with explicit trusted package hosts...",
+        "WARNING: uv TLS verification failed; retrying with insecure host "
+        "exceptions for known package indexes.",
         Qgis.Warning,
     )
     if progress_callback:
@@ -2802,10 +2799,76 @@ def _retry_uv_install_with_insecure_hosts(
     if cancel_check and cancel_check():
         return _PipResult(-1, "", "Installation cancelled")
 
+    retry_env = dict(env)
+    _append_space_separated_env(retry_env, "UV_INSECURE_HOST", _INSECURE_PACKAGE_HOSTS)
     return _run_pip_install(
         cmd=cmd + _get_uv_insecure_host_flags(),
         timeout=timeout,
-        env=env,
+        env=retry_env,
+        subprocess_kwargs=subprocess_kwargs,
+        label="{} (SSL retry)".format(label),
+        progress_start=progress_start,
+        progress_end=progress_end,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+    )
+
+
+def _retry_pip_install_with_insecure_hosts(
+    result: _PipResult,
+    cmd: List[str],
+    timeout: int,
+    env: dict,
+    subprocess_kwargs: dict,
+    label: str,
+    progress_start: int,
+    progress_end: int,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> _PipResult:
+    """Retry a failed pip install with explicit trusted package hosts.
+
+    Args:
+        result: The failed install result to inspect.
+        cmd: The original pip install command.
+        timeout: Maximum time in seconds.
+        env: Environment variables dict.
+        subprocess_kwargs: Platform-specific kwargs for subprocess.
+        label: Human-readable label for progress messages.
+        progress_start: Start percentage for this install's progress range.
+        progress_end: End percentage for this install's progress range.
+        progress_callback: Optional progress callback.
+        cancel_check: Optional cancellation check callback.
+
+    Returns:
+        Original result if no SSL retry is needed, otherwise the retry result.
+    """
+    if result.returncode == 0:
+        return result
+
+    error_output = result.stderr or result.stdout or ""
+    if not _is_ssl_error(error_output):
+        return result
+
+    _log(
+        "WARNING: pip TLS verification failed; retrying with --trusted-host "
+        "exceptions for known package indexes.",
+        Qgis.Warning,
+    )
+    if progress_callback:
+        progress_callback(
+            progress_start,
+            "SSL certificate error, retrying with trusted package hosts...",
+        )
+    if cancel_check and cancel_check():
+        return _PipResult(-1, "", "Installation cancelled")
+
+    retry_env = dict(env)
+    _append_space_separated_env(retry_env, "PIP_TRUSTED_HOST", _INSECURE_PACKAGE_HOSTS)
+    return _run_pip_install(
+        cmd=cmd + _get_pip_ssl_flags(),
+        timeout=timeout,
+        env=retry_env,
         subprocess_kwargs=subprocess_kwargs,
         label="{} (SSL retry)".format(label),
         progress_start=progress_start,
@@ -2919,19 +2982,16 @@ def _reinstall_cpu_torch(
                     + [pkg]
                 )
             else:
-                cmd = (
-                    [
-                        python_path,
-                        "-m",
-                        "pip",
-                        "install",
-                        "--no-warn-script-location",
-                        "--disable-pip-version-check",
-                        "--prefer-binary",
-                    ]
-                    + _get_pip_ssl_flags()
-                    + [pkg]
-                )
+                cmd = [
+                    python_path,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-warn-script-location",
+                    "--disable-pip-version-check",
+                    "--prefer-binary",
+                    pkg,
+                ]
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -2944,18 +3004,34 @@ def _reinstall_cpu_torch(
                 _log(f"Installed {pkg} (CPU)", Qgis.Success)
             else:
                 err = result.stderr or result.stdout or ""
-                if _use_uv and _is_ssl_error(err):
-                    _log(
-                        "CPU torch reinstall hit a uv SSL certificate error, "
-                        "retrying with explicit trusted package hosts...",
-                        Qgis.Warning,
-                    )
+                if _is_ssl_error(err):
+                    retry_env = dict(env)
+                    if _use_uv:
+                        _log(
+                            "WARNING: CPU torch reinstall hit a uv TLS error; "
+                            "retrying with insecure host exceptions.",
+                            Qgis.Warning,
+                        )
+                        _append_space_separated_env(
+                            retry_env, "UV_INSECURE_HOST", _INSECURE_PACKAGE_HOSTS
+                        )
+                        retry_cmd = cmd + _get_uv_insecure_host_flags()
+                    else:
+                        _log(
+                            "WARNING: CPU torch reinstall hit a pip TLS error; "
+                            "retrying with --trusted-host exceptions.",
+                            Qgis.Warning,
+                        )
+                        _append_space_separated_env(
+                            retry_env, "PIP_TRUSTED_HOST", _INSECURE_PACKAGE_HOSTS
+                        )
+                        retry_cmd = cmd + _get_pip_ssl_flags()
                     retry_result = subprocess.run(
-                        cmd + _get_uv_insecure_host_flags(),
+                        retry_cmd,
                         capture_output=True,
                         text=True,
                         timeout=600,
-                        env=env,
+                        env=retry_env,
                         **subprocess_kwargs,
                     )
                     if retry_result.returncode == 0:
@@ -3395,8 +3471,6 @@ def install_dependencies(
                     "--disable-pip-version-check",
                     "--prefer-binary",
                 ]
-                pip_args.extend(_get_pip_ssl_flags())
-                pip_args.extend(_get_pip_proxy_args())
                 pip_args.append(package_spec)
 
             is_cuda_package = True
@@ -3513,20 +3587,44 @@ def install_dependencies(
                             progress_callback=progress_callback,
                             cancel_check=cancel_check,
                         )
+                        if (
+                            result.returncode == -1
+                            and "cancelled" in (result.stderr or "").lower()
+                        ) or (cancel_check and cancel_check()):
+                            return False, "Installation cancelled"
 
-                if result.returncode != 0 and use_uv:
-                    result = _retry_uv_install_with_insecure_hosts(
-                        result=result,
-                        cmd=base_cmd,
-                        timeout=pkg_timeout,
-                        env=env,
-                        subprocess_kwargs=subprocess_kwargs,
-                        label=label,
-                        progress_start=pkg_start,
-                        progress_end=pkg_end,
-                        progress_callback=progress_callback,
-                        cancel_check=cancel_check,
-                    )
+                if result.returncode != 0:
+                    if use_uv:
+                        result = _retry_uv_install_with_insecure_hosts(
+                            result=result,
+                            cmd=base_cmd,
+                            timeout=pkg_timeout,
+                            env=env,
+                            subprocess_kwargs=subprocess_kwargs,
+                            label=label,
+                            progress_start=pkg_start,
+                            progress_end=pkg_end,
+                            progress_callback=progress_callback,
+                            cancel_check=cancel_check,
+                        )
+                    else:
+                        result = _retry_pip_install_with_insecure_hosts(
+                            result=result,
+                            cmd=base_cmd,
+                            timeout=pkg_timeout,
+                            env=env,
+                            subprocess_kwargs=subprocess_kwargs,
+                            label=label,
+                            progress_start=pkg_start,
+                            progress_end=pkg_end,
+                            progress_callback=progress_callback,
+                            cancel_check=cancel_check,
+                        )
+                    if (
+                        result.returncode == -1
+                        and "cancelled" in (result.stderr or "").lower()
+                    ) or (cancel_check and cancel_check()):
+                        return False, "Installation cancelled"
 
                 # Retry on network errors
                 if result.returncode != 0:
@@ -3559,6 +3657,44 @@ def install_dependencies(
                                 progress_callback=progress_callback,
                                 cancel_check=cancel_check,
                             )
+                            if (
+                                result.returncode == -1
+                                and "cancelled" in (result.stderr or "").lower()
+                            ) or (cancel_check and cancel_check()):
+                                return False, "Installation cancelled"
+                            if result.returncode == 0:
+                                break
+                            if use_uv:
+                                result = _retry_uv_install_with_insecure_hosts(
+                                    result=result,
+                                    cmd=base_cmd,
+                                    timeout=pkg_timeout,
+                                    env=env,
+                                    subprocess_kwargs=subprocess_kwargs,
+                                    label=label,
+                                    progress_start=pkg_start,
+                                    progress_end=pkg_end,
+                                    progress_callback=progress_callback,
+                                    cancel_check=cancel_check,
+                                )
+                            else:
+                                result = _retry_pip_install_with_insecure_hosts(
+                                    result=result,
+                                    cmd=base_cmd,
+                                    timeout=pkg_timeout,
+                                    env=env,
+                                    subprocess_kwargs=subprocess_kwargs,
+                                    label=label,
+                                    progress_start=pkg_start,
+                                    progress_end=pkg_end,
+                                    progress_callback=progress_callback,
+                                    cancel_check=cancel_check,
+                                )
+                            if (
+                                result.returncode == -1
+                                and "cancelled" in (result.stderr or "").lower()
+                            ) or (cancel_check and cancel_check()):
+                                return False, "Installation cancelled"
                             if result.returncode == 0:
                                 break
 
@@ -3606,6 +3742,9 @@ def install_dependencies(
 
             # CUDA -> CPU fallback
             if install_failed and is_cuda_package:
+                if cancel_check and cancel_check():
+                    _log("Installation cancelled by user", Qgis.Warning)
+                    return False, "Installation cancelled"
                 _log(
                     "CUDA install of {} failed, falling back to CPU...".format(
                         package_name
@@ -3636,7 +3775,6 @@ def install_dependencies(
                         "--disable-pip-version-check",
                         "--prefer-binary",
                     ]
-                    cpu_pip_args.extend(_get_pip_ssl_flags())
                     cpu_pip_args.append(package_spec)
                     cpu_cmd = [python_path, "-m", "pip"] + cpu_pip_args
                 try:
@@ -3651,19 +3789,43 @@ def install_dependencies(
                         progress_callback=progress_callback,
                         cancel_check=cancel_check,
                     )
-                    if cpu_result.returncode != 0 and use_uv:
-                        cpu_result = _retry_uv_install_with_insecure_hosts(
-                            result=cpu_result,
-                            cmd=cpu_cmd,
-                            timeout=600,
-                            env=env,
-                            subprocess_kwargs=subprocess_kwargs,
-                            label="{} (CPU fallback)".format(package_name),
-                            progress_start=pkg_start,
-                            progress_end=pkg_end,
-                            progress_callback=progress_callback,
-                            cancel_check=cancel_check,
-                        )
+                    if (
+                        cpu_result.returncode == -1
+                        and "cancelled" in (cpu_result.stderr or "").lower()
+                    ) or (cancel_check and cancel_check()):
+                        return False, "Installation cancelled"
+                    if cpu_result.returncode != 0:
+                        if use_uv:
+                            cpu_result = _retry_uv_install_with_insecure_hosts(
+                                result=cpu_result,
+                                cmd=cpu_cmd,
+                                timeout=600,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label="{} (CPU fallback)".format(package_name),
+                                progress_start=pkg_start,
+                                progress_end=pkg_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
+                        else:
+                            cpu_result = _retry_pip_install_with_insecure_hosts(
+                                result=cpu_result,
+                                cmd=cpu_cmd,
+                                timeout=600,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label="{} (CPU fallback)".format(package_name),
+                                progress_start=pkg_start,
+                                progress_end=pkg_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
+                        if (
+                            cpu_result.returncode == -1
+                            and "cancelled" in (cpu_result.stderr or "").lower()
+                        ) or (cancel_check and cancel_check()):
+                            return False, "Installation cancelled"
                     if cpu_result.returncode == 0:
                         _log(
                             "Successfully installed {} (CPU)".format(package_spec),
@@ -3808,8 +3970,6 @@ def install_dependencies(
                 "--disable-pip-version-check",
                 "--prefer-binary",
             ]
-            pip_args.extend(_get_pip_ssl_flags())
-            pip_args.extend(_get_pip_proxy_args())
             pip_args.extend(torch_index_args)
             pip_args.extend(constraint_args)
             pip_args.extend(batch_specs)
@@ -3854,19 +4014,38 @@ def install_dependencies(
                         cancel_check=cancel_check,
                     )
 
-            if result.returncode != 0 and use_uv:
-                result = _retry_uv_install_with_insecure_hosts(
-                    result=result,
-                    cmd=base_cmd,
-                    timeout=batch_timeout,
-                    env=env,
-                    subprocess_kwargs=subprocess_kwargs,
-                    label="dependencies",
-                    progress_start=batch_start,
-                    progress_end=batch_end,
-                    progress_callback=progress_callback,
-                    cancel_check=cancel_check,
-                )
+            if result.returncode != 0:
+                if use_uv:
+                    result = _retry_uv_install_with_insecure_hosts(
+                        result=result,
+                        cmd=base_cmd,
+                        timeout=batch_timeout,
+                        env=env,
+                        subprocess_kwargs=subprocess_kwargs,
+                        label="dependencies",
+                        progress_start=batch_start,
+                        progress_end=batch_end,
+                        progress_callback=progress_callback,
+                        cancel_check=cancel_check,
+                    )
+                else:
+                    result = _retry_pip_install_with_insecure_hosts(
+                        result=result,
+                        cmd=base_cmd,
+                        timeout=batch_timeout,
+                        env=env,
+                        subprocess_kwargs=subprocess_kwargs,
+                        label="dependencies",
+                        progress_start=batch_start,
+                        progress_end=batch_end,
+                        progress_callback=progress_callback,
+                        cancel_check=cancel_check,
+                    )
+                if (
+                    result.returncode == -1
+                    and "cancelled" in (result.stderr or "").lower()
+                ) or (cancel_check and cancel_check()):
+                    return False, "Installation cancelled"
 
             # Retry on network errors
             if result.returncode != 0:
@@ -3897,6 +4076,44 @@ def install_dependencies(
                             progress_callback=progress_callback,
                             cancel_check=cancel_check,
                         )
+                        if (
+                            result.returncode == -1
+                            and "cancelled" in (result.stderr or "").lower()
+                        ) or (cancel_check and cancel_check()):
+                            return False, "Installation cancelled"
+                        if result.returncode == 0:
+                            break
+                        if use_uv:
+                            result = _retry_uv_install_with_insecure_hosts(
+                                result=result,
+                                cmd=base_cmd,
+                                timeout=batch_timeout,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label="dependencies (retry {})".format(attempt),
+                                progress_start=batch_start,
+                                progress_end=batch_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
+                        else:
+                            result = _retry_pip_install_with_insecure_hosts(
+                                result=result,
+                                cmd=base_cmd,
+                                timeout=batch_timeout,
+                                env=env,
+                                subprocess_kwargs=subprocess_kwargs,
+                                label="dependencies (retry {})".format(attempt),
+                                progress_start=batch_start,
+                                progress_end=batch_end,
+                                progress_callback=progress_callback,
+                                cancel_check=cancel_check,
+                            )
+                        if (
+                            result.returncode == -1
+                            and "cancelled" in (result.stderr or "").lower()
+                        ) or (cancel_check and cancel_check()):
+                            return False, "Installation cancelled"
                         if result.returncode == 0:
                             break
 
@@ -3944,8 +4161,6 @@ def install_dependencies(
                                 "--disable-pip-version-check",
                                 "--prefer-binary",
                             ]
-                            retry_args.extend(_get_pip_ssl_flags())
-                            retry_args.extend(_get_pip_proxy_args())
                             retry_args.extend(torch_index_args)
                             retry_args.extend(constraint_args)
                             retry_args.extend(retry_specs)
@@ -3966,19 +4181,42 @@ def install_dependencies(
                             progress_callback=progress_callback,
                             cancel_check=cancel_check,
                         )
-                        if result.returncode != 0 and use_uv:
-                            result = _retry_uv_install_with_insecure_hosts(
-                                result=result,
-                                cmd=retry_cmd,
-                                timeout=batch_timeout,
-                                env=env,
-                                subprocess_kwargs=subprocess_kwargs,
-                                label="dependencies (without {})".format(failed_pkg),
-                                progress_start=batch_start,
-                                progress_end=batch_end,
-                                progress_callback=progress_callback,
-                                cancel_check=cancel_check,
-                            )
+                        if (
+                            result.returncode == -1
+                            and "cancelled" in (result.stderr or "").lower()
+                        ) or (cancel_check and cancel_check()):
+                            return False, "Installation cancelled"
+                        if result.returncode != 0:
+                            if use_uv:
+                                result = _retry_uv_install_with_insecure_hosts(
+                                    result=result,
+                                    cmd=retry_cmd,
+                                    timeout=batch_timeout,
+                                    env=env,
+                                    subprocess_kwargs=subprocess_kwargs,
+                                    label="dependencies (without {})".format(
+                                        failed_pkg
+                                    ),
+                                    progress_start=batch_start,
+                                    progress_end=batch_end,
+                                    progress_callback=progress_callback,
+                                    cancel_check=cancel_check,
+                                )
+                            else:
+                                result = _retry_pip_install_with_insecure_hosts(
+                                    result=result,
+                                    cmd=retry_cmd,
+                                    timeout=batch_timeout,
+                                    env=env,
+                                    subprocess_kwargs=subprocess_kwargs,
+                                    label="dependencies (without {})".format(
+                                        failed_pkg
+                                    ),
+                                    progress_start=batch_start,
+                                    progress_end=batch_end,
+                                    progress_callback=progress_callback,
+                                    cancel_check=cancel_check,
+                                )
                         if result.returncode == 0:
                             _log(
                                 "Batch succeeded without optional "

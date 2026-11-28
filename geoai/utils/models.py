@@ -2,6 +2,7 @@
 
 import logging
 import os
+import pickle
 from collections import OrderedDict
 from typing import Any, Dict, Optional
 
@@ -13,7 +14,18 @@ logger = logging.getLogger(__name__)
 __all__ = ["inspect_pth_file", "try_common_architectures"]
 
 
-def inspect_pth_file(pth_path: str) -> None:
+def _allow_unsafe_torch_load(allow_unsafe: bool) -> bool:
+    """Return True when unrestricted torch.load fallback is explicitly enabled."""
+    if allow_unsafe:
+        return True
+    return os.environ.get("GEOAI_ALLOW_UNSAFE_TORCH_LOAD", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def inspect_pth_file(pth_path: str, allow_unsafe: bool = False) -> None:
     """
     Inspect a PyTorch .pth model file to determine its architecture.
 
@@ -21,18 +33,64 @@ def inspect_pth_file(pth_path: str) -> None:
     architecture indicators, and output classes.
 
     Args:
-        pth_path: Path to the .pth file to inspect
+        pth_path: Path to the .pth file to inspect.
+        allow_unsafe: If True (or if the ``GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1``
+            environment variable is set), fall back to ``weights_only=False``
+            when restricted loading rejects a trusted legacy checkpoint.
+            Defaults to False.
 
     Raises:
         FileNotFoundError: If *pth_path* does not exist.
+        RuntimeError: If restricted loading (``weights_only=True``) rejects
+            the checkpoint and unsafe loading has not been explicitly enabled.
     """
     # Check if file exists
     if not os.path.exists(pth_path):
         raise FileNotFoundError(f"Model file not found: {pth_path}")
 
-    # Load the checkpoint
+    # Load the checkpoint safely with weights_only=True by default
+    unsafe_allowed = _allow_unsafe_torch_load(allow_unsafe)
     try:
+        checkpoint = torch.load(
+            pth_path, map_location=torch.device("cpu"), weights_only=True
+        )
+    except TypeError as e:
+        if "weights_only" not in str(e):
+            raise
+        if not unsafe_allowed:
+            raise RuntimeError(
+                f"Installed PyTorch does not support weights_only=True when loading "
+                f"'{pth_path}'. If this is a trusted checkpoint, pass allow_unsafe=True "
+                "or set GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1."
+            ) from e
         checkpoint = torch.load(pth_path, map_location=torch.device("cpu"))
+    except (pickle.UnpicklingError, RuntimeError) as e:
+        if isinstance(e, pickle.UnpicklingError) or "Weights only load failed" in str(
+            e
+        ):
+            if not unsafe_allowed:
+                raise RuntimeError(
+                    f"Restricted checkpoint loading (weights_only=True) rejected "
+                    f"'{pth_path}': {e}. If this is a trusted legacy checkpoint, "
+                    "pass allow_unsafe=True or set GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1."
+                ) from e
+            logger.warning(
+                "weights_only=True failed for %s (%s); loading with "
+                "weights_only=False because unsafe loading was explicitly enabled.",
+                pth_path,
+                e,
+            )
+            checkpoint = torch.load(
+                pth_path, map_location=torch.device("cpu"), weights_only=False
+            )
+        else:
+            logger.error("Error loading the model file: %s", str(e))
+            return
+    except OSError as e:
+        logger.error("Error loading the model file: %s", str(e))
+        return
+
+    try:
         logger.info("=" * 50)
         logger.info("Inspecting model file: %s", pth_path)
         logger.info("=" * 50)

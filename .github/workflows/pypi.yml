@@ -1,11 +1,19 @@
-# This workflows will upload a Python Package using Twine when a release is created
+# This workflow uploads the Python package to PyPI using Twine when a release is published.
 # For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
+#
+# To migrate from PYPI_USERNAME/PYPI_PASSWORD secrets to PyPI OIDC Trusted Publishing:
+# 1. Configure a Trusted Publisher for this repository and workflow on PyPI.
+# 2. Add `id-token: write` under `permissions:` below.
+# 3. Keep `python -m build` in its own preceding step and replace `twine upload` with `uses: pypa/gh-action-pypi-publish@release/v1`.
 
 name: pypi
 
 on:
     release:
-        types: [created]
+        types: [published]
+
+permissions:
+    contents: read
 
 jobs:
     deploy:
@@ -16,7 +24,7 @@ jobs:
             - name: Set up Python
               uses: actions/setup-python@v7
               with:
-                  python-version: "3.x"
+                  python-version: "3.12"
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
