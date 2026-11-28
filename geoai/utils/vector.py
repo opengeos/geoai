@@ -665,6 +665,10 @@ def add_geometric_properties(
                 # Get the minimum rotated rectangle
                 rect = geom.minimum_rotated_rectangle
 
+                # Degenerate/collinear polygons can yield a LineString or Point
+                if not isinstance(rect, Polygon):
+                    return None, None, None, None, None
+
                 # Extract coordinates
                 coords = list(rect.exterior.coords)[
                     :-1

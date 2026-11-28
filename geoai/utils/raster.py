@@ -4,6 +4,7 @@
 import logging
 import math
 import os
+import shutil
 import subprocess
 import tempfile
 import warnings
@@ -1753,6 +1754,8 @@ def stack_bands(
         compress (str): Compression method.
         output_format (str): GDAL output format (default is "COG").
         extra_gdal_translate_args (List[str], optional): Extra arguments for gdal_translate.
+            Ignored with a warning when GDAL CLI binaries are unavailable and the
+            rasterio fallback is used.
 
     Returns:
         str: Path to the output file.
@@ -1773,6 +1776,197 @@ def stack_bands(
         resolution_x, resolution_y = get_raster_resolution(input_files[0])
     else:
         resolution_x = resolution_y = resolution
+
+    _GDAL_DTYPE_MAP = {
+        "byte": "uint8",
+        "uint8": "uint8",
+        "int8": "int8",
+        "uint16": "uint16",
+        "int16": "int16",
+        "uint32": "uint32",
+        "int32": "int32",
+        "uint64": "uint64",
+        "int64": "int64",
+        "float32": "float32",
+        "float64": "float64",
+    }
+
+    def _run_stack_rasterio() -> None:
+        from rasterio.crs import CRS
+        from rasterio.shutil import copy as rio_copy
+        from rasterio.transform import from_origin
+        from rasterio.warp import Resampling, reproject, transform_bounds
+
+        if extra_gdal_translate_args:
+            logger.warning(
+                "GDAL CLI tools not found; falling back to rasterio and "
+                "ignoring extra_gdal_translate_args=%s",
+                extra_gdal_translate_args,
+            )
+
+        with rasterio.open(input_files[0]) as ref:
+            dst_crs = ref.crs
+            default_dtype = ref.dtypes[0]
+            ref_nodata = ref.nodata
+            min_x, min_y, max_x, max_y = ref.bounds
+
+        total_bands = 0
+        for path in input_files:
+            with rasterio.open(path) as src:
+                total_bands += src.count
+                if src.crs and dst_crs and src.crs != dst_crs:
+                    bx0, by0, bx1, by1 = transform_bounds(src.crs, dst_crs, *src.bounds)
+                else:
+                    bx0, by0, bx1, by1 = src.bounds
+                min_x = min(min_x, bx0)
+                min_y = min(min_y, by0)
+                max_x = max(max_x, bx1)
+                max_y = max(max_y, by1)
+
+        res_x = abs(float(resolution_x))
+        res_y = abs(float(resolution_y))
+        width = max(1, int(math.ceil((max_x - min_x) / res_x)))
+        height = max(1, int(math.ceil((max_y - min_y) / res_y)))
+        dst_transform = from_origin(min_x, max_y, res_x, res_y)
+
+        if dtype:
+            out_dtype = _GDAL_DTYPE_MAP.get(dtype.lower(), dtype.lower())
+        else:
+            out_dtype = default_dtype
+        np_dtype = np.dtype(out_dtype)
+
+        # Preserve nodata when representable in the output dtype.
+        out_nodata = None
+        if ref_nodata is not None:
+            if np.issubdtype(np_dtype, np.integer):
+                info = np.iinfo(np_dtype)
+                if (
+                    math.isfinite(float(ref_nodata))
+                    and info.min <= float(ref_nodata) <= info.max
+                    and float(ref_nodata).is_integer()
+                ):
+                    out_nodata = int(ref_nodata)
+            else:
+                out_nodata = float(ref_nodata)
+
+        fill_val = out_nodata if out_nodata is not None else 0
+        # Rasterio's array reproject requires a CRS; use a shared local dummy
+        # CRS only when both source and destination have crs=None.
+        local_crs = CRS.from_epsg(3857) if dst_crs is None else dst_crs
+
+        def _cast_band(arr: np.ndarray) -> np.ndarray:
+            if arr.dtype == np_dtype:
+                return arr
+            if np.issubdtype(np_dtype, np.integer):
+                info = np.iinfo(np_dtype)
+                if np.issubdtype(arr.dtype, np.floating):
+                    arr = np.nan_to_num(
+                        arr, nan=float(fill_val), posinf=info.max, neginf=info.min
+                    )
+                return np.clip(arr, info.min, info.max).astype(np_dtype)
+            return arr.astype(np_dtype)
+
+        def _write_bands(dst: rasterio.io.DatasetWriter) -> None:
+            out_band_idx = 1
+            for path in input_files:
+                with rasterio.open(path) as src:
+                    same_grid = (
+                        src.crs == dst_crs
+                        and src.transform == dst_transform
+                        and src.width == width
+                        and src.height == height
+                    )
+                    for b in range(1, src.count + 1):
+                        src_data = src.read(b)
+                        if same_grid:
+                            nodata_mask = None
+                            if src.nodata is not None and src.nodata != out_nodata:
+                                if np.issubdtype(src_data.dtype, np.floating) and (
+                                    math.isnan(float(src.nodata))
+                                ):
+                                    nodata_mask = np.isnan(src_data)
+                                else:
+                                    nodata_mask = src_data == src.nodata
+                            band_out = _cast_band(src_data)
+                            if nodata_mask is not None:
+                                if band_out is src_data:
+                                    band_out = band_out.copy()
+                                band_out[nodata_mask] = fill_val
+                        else:
+                            # Use native dtype when rasterio supports direct
+                            # reprojection, preserving source precision and
+                            # avoiding bilinear corruption on categorical bands.
+                            if np_dtype in (np.int64, np.uint64):
+                                band_buf = np.full(
+                                    (height, width), fill_val, dtype=np.float64
+                                )
+                            elif np.issubdtype(src_data.dtype, np.floating) and (
+                                np.issubdtype(np_dtype, np.integer)
+                            ):
+                                buf_dtype = (
+                                    np.float64
+                                    if src_data.dtype == np.float64
+                                    else np.float32
+                                )
+                                band_buf = np.full(
+                                    (height, width), fill_val, dtype=buf_dtype
+                                )
+                            else:
+                                band_buf = np.full(
+                                    (height, width), fill_val, dtype=np_dtype
+                                )
+                            reproject(
+                                source=src_data,
+                                destination=band_buf,
+                                src_transform=src.transform,
+                                src_crs=src.crs or local_crs,
+                                src_nodata=src.nodata,
+                                dst_transform=dst_transform,
+                                dst_crs=local_crs,
+                                dst_nodata=out_nodata,
+                                resampling=Resampling.nearest,
+                            )
+                            band_out = _cast_band(band_buf)
+                        dst.write(band_out, out_band_idx)
+                        out_band_idx += 1
+
+        parent_dir = os.path.dirname(os.path.abspath(output_file))
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        base_profile = {
+            "driver": "GTiff",
+            "height": height,
+            "width": width,
+            "count": total_bands,
+            "dtype": str(np_dtype),
+            "crs": dst_crs,
+            "transform": dst_transform,
+            "compress": compress,
+            "tiled": True,
+        }
+        if out_nodata is not None:
+            base_profile["nodata"] = out_nodata
+
+        want_cog = output_format.upper() == "COG"
+        if want_cog:
+            # Write band-by-band to a temporary tiled GeoTIFF to avoid holding
+            # the entire multi-band stack in memory, then convert to COG.
+            with tempfile.TemporaryDirectory(dir=parent_dir) as tmpdir:
+                tmp_tif = os.path.join(tmpdir, "stack_tmp.tif")
+                with rasterio.open(tmp_tif, "w", **base_profile) as dst:
+                    _write_bands(dst)
+                try:
+                    rio_copy(tmp_tif, output_file, driver="COG", compress=compress)
+                except rasterio.errors.RasterioIOError:
+                    shutil.move(tmp_tif, output_file)
+        else:
+            profile = dict(base_profile)
+            profile["driver"] = output_format
+            if output_format.upper() != "GTIFF":
+                profile.pop("tiled", None)
+            with rasterio.open(output_file, "w", **profile) as dst:
+                _write_bands(dst)
 
     def _run_stack(vrt_path: str) -> None:
         # Step 1: Build VRT
@@ -1802,13 +1996,21 @@ def stack_bands(
 
         subprocess.run(translate_cmd, check=True)
 
-    if temp_vrt is None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            _run_stack(os.path.join(tmpdir, "stack.vrt"))
-    else:
-        _run_stack(temp_vrt)
-        if os.path.exists(temp_vrt):
-            os.remove(temp_vrt)
+    try:
+        if temp_vrt is None:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                _run_stack(os.path.join(tmpdir, "stack.vrt"))
+        else:
+            _run_stack(temp_vrt)
+            if os.path.exists(temp_vrt):
+                os.remove(temp_vrt)
+    except FileNotFoundError:
+        if not (shutil.which("gdalbuildvrt") and shutil.which("gdal_translate")):
+            _run_stack_rasterio()
+            if temp_vrt is not None and os.path.exists(temp_vrt):
+                os.remove(temp_vrt)
+        else:
+            raise
 
     return output_file
 
