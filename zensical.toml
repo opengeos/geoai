@@ -54,6 +54,7 @@ nav = [
     { "field_boundary_detection" = "examples/field_boundary_detection.md" },
     { "flipnslide_augmentation" = "examples/flipnslide_augmentation.md" },
     { "foundation_models" = "examples/foundation_models.md" },
+    { "geolibre" = "examples/geolibre.md" },
     { "geometric_properties" = "examples/geometric_properties.md" },
     { "globe_projection" = "examples/globe_projection.md" },
     { "google_satellite_embedding" = "examples/google_satellite_embedding.md" },
