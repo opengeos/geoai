@@ -2110,8 +2110,8 @@ class TestGroup10ReviewRoundFixes(unittest.TestCase):
                 vlm = vllm_mod.VLLMGeo(
                     model_id="m", base_url="http://localhost:8000/v1"
                 )
-                ans = vlm.query("hello")
-            self.assertEqual(ans["answer"], "patched")
+                result = vlm.query("hello")
+            self.assertEqual(result["answer"], "patched")
             mock_post.assert_called_once()
         finally:
             if saved_mod is not None:
