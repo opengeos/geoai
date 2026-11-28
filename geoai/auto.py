@@ -36,7 +36,7 @@ import torch
 from PIL import Image
 from rasterio.features import shapes
 from rasterio.windows import Window
-from shapely.geometry import box, shape
+from shapely.geometry import Polygon, box, shape
 from transformers import (
     AutoConfig,
     AutoImageProcessor,
@@ -942,18 +942,25 @@ class AutoGeoModel:
         mask_output = np.zeros((height, width), dtype=np.float32)
         prob_output: Optional[np.ndarray] = None
         discrete_votes: Optional[np.ndarray] = None
+        final_mask: Optional[np.ndarray] = None
+        band_buf: Optional[np.ndarray] = None
+        band_is_discrete = False
+        band_y0 = 0
+        max_band_h = min(height, self.tile_size)
         count_output = np.zeros((height, width), dtype=np.float32)
 
         logger.info("Processing %d tiles (%dx%d)", total_tiles, n_tiles_x, n_tiles_y)
 
         with tqdm(total=total_tiles, desc="Processing tiles") as pbar:
             for y in range(n_tiles_y):
+                row_y_start = max(0, y * effective_tile_size - self.overlap)
+                row_y_end = min(height, (y + 1) * effective_tile_size + self.overlap)
                 for x in range(n_tiles_x):
                     # Calculate tile coordinates
                     x_start = max(0, x * effective_tile_size - self.overlap)
-                    y_start = max(0, y * effective_tile_size - self.overlap)
+                    y_start = row_y_start
                     x_end = min(width, (x + 1) * effective_tile_size + self.overlap)
-                    y_end = min(height, (y + 1) * effective_tile_size + self.overlap)
+                    y_end = row_y_end
 
                     # Extract tile
                     if data.ndim == 3:
@@ -977,9 +984,7 @@ class AutoGeoModel:
                                 "depth", tile_result.get("output")
                             )
                             if tile_depth is not None:
-                                if tile_depth.ndim > 2:
-                                    tile_depth = tile_depth.squeeze()
-                                if tile_depth.ndim > 2:
+                                while tile_depth.ndim > 2:
                                     tile_depth = tile_depth[0]
                                 if tile_depth.shape != (tile_h, tile_w):
                                     tile_depth = cv2.resize(
@@ -1002,10 +1007,6 @@ class AutoGeoModel:
                             and tile_probs.shape[0] > 1
                         ):
                             num_classes = tile_probs.shape[0]
-                            if prob_output is None:
-                                prob_output = np.zeros(
-                                    (num_classes, height, width), dtype=np.float32
-                                )
                             if tile_probs.shape[1:] != (tile_h, tile_w):
                                 resized = np.empty(
                                     (num_classes, tile_h, tile_w), dtype=np.float32
@@ -1017,9 +1018,34 @@ class AutoGeoModel:
                                         interpolation=cv2.INTER_LINEAR,
                                     )
                                 tile_probs = resized
-                            prob_output[
-                                :, y_start:y_end, x_start:x_end
-                            ] += tile_probs.astype(np.float32)
+                            if return_probabilities:
+                                if prob_output is None:
+                                    prob_output = np.zeros(
+                                        (num_classes, height, width), dtype=np.float32
+                                    )
+                                prob_output[
+                                    :, y_start:y_end, x_start:x_end
+                                ] += tile_probs.astype(np.float32)
+                            else:
+                                if final_mask is None:
+                                    final_mask = np.zeros(
+                                        (height, width), dtype=np.uint8
+                                    )
+                                if self.overlap == 0:
+                                    final_mask[y_start:y_end, x_start:x_end] = (
+                                        np.argmax(tile_probs, axis=0).astype(np.uint8)
+                                    )
+                                else:
+                                    if band_buf is None:
+                                        band_buf = np.zeros(
+                                            (num_classes, max_band_h, width),
+                                            dtype=np.float32,
+                                        )
+                                    ly0 = y_start - band_y0
+                                    ly1 = y_end - band_y0
+                                    band_buf[
+                                        :, ly0:ly1, x_start:x_end
+                                    ] += tile_probs.astype(np.float32)
                             count_output[y_start:y_end, x_start:x_end] += 1
                         else:
                             tile_mask = tile_result.get(
@@ -1036,7 +1062,11 @@ class AutoGeoModel:
                                     )
                                 )
                             ):
-                                tile_arr = tile_probs.squeeze().astype(np.float32)
+                                tile_arr = (
+                                    tile_probs[0]
+                                    if tile_probs.ndim == 3
+                                    else tile_probs
+                                ).astype(np.float32)
                                 if tile_arr.shape != (tile_h, tile_w):
                                     tile_arr = cv2.resize(
                                         tile_arr,
@@ -1046,14 +1076,16 @@ class AutoGeoModel:
                                 mask_output[y_start:y_end, x_start:x_end] += tile_arr
                                 count_output[y_start:y_end, x_start:x_end] += 1
                             elif tile_mask is not None:
-                                if tile_mask.ndim > 2:
-                                    tile_mask = tile_mask.squeeze()
-                                if tile_mask.ndim > 2:
+                                while tile_mask.ndim > 2:
                                     tile_mask = tile_mask[0]
-                                is_discrete_multi = discrete_votes is not None or (
-                                    tile_mask.dtype.kind in ("i", "u")
-                                    and tile_mask.size > 0
-                                    and int(tile_mask.max()) > 1
+                                is_discrete_multi = (
+                                    discrete_votes is not None
+                                    or band_is_discrete
+                                    or (
+                                        tile_mask.dtype.kind in ("i", "u")
+                                        and tile_mask.size > 0
+                                        and int(tile_mask.max()) > 1
+                                    )
                                 )
                                 if is_discrete_multi:
                                     if tile_mask.shape != (tile_h, tile_w):
@@ -1065,28 +1097,100 @@ class AutoGeoModel:
                                     max_cls = (
                                         int(tile_mask.max()) if tile_mask.size else 0
                                     )
-                                    if discrete_votes is None:
-                                        num_cls = max(max_cls + 1, 2)
-                                        discrete_votes = np.zeros(
-                                            (num_cls, height, width), dtype=np.float32
-                                        )
-                                        discrete_votes[0] = count_output - mask_output
-                                        discrete_votes[1] = mask_output
-                                    elif max_cls >= discrete_votes.shape[0]:
-                                        grown = np.zeros(
-                                            (max_cls + 1, height, width),
-                                            dtype=np.float32,
-                                        )
-                                        grown[: discrete_votes.shape[0]] = (
-                                            discrete_votes
-                                        )
-                                        discrete_votes = grown
-                                    for cls_id in np.unique(tile_mask):
-                                        cls_idx = int(cls_id)
-                                        if cls_idx >= 0:
-                                            discrete_votes[
-                                                cls_idx, y_start:y_end, x_start:x_end
-                                            ] += (tile_mask == cls_id)
+                                    if return_probabilities:
+                                        if discrete_votes is None:
+                                            num_cls = max(max_cls + 1, 2)
+                                            discrete_votes = np.zeros(
+                                                (num_cls, height, width),
+                                                dtype=np.float32,
+                                            )
+                                            discrete_votes[0] = (
+                                                count_output - mask_output
+                                            )
+                                            discrete_votes[1] = mask_output
+                                        elif max_cls >= discrete_votes.shape[0]:
+                                            grown = np.zeros(
+                                                (max_cls + 1, height, width),
+                                                dtype=np.float32,
+                                            )
+                                            grown[: discrete_votes.shape[0]] = (
+                                                discrete_votes
+                                            )
+                                            discrete_votes = grown
+                                        for cls_id in np.unique(tile_mask):
+                                            cls_idx = int(cls_id)
+                                            if cls_idx >= 0:
+                                                discrete_votes[
+                                                    cls_idx,
+                                                    y_start:y_end,
+                                                    x_start:x_end,
+                                                ] += (
+                                                    tile_mask == cls_id
+                                                )
+                                    else:
+                                        if final_mask is None:
+                                            final_mask = np.zeros(
+                                                (height, width), dtype=np.uint8
+                                            )
+                                        if self.overlap == 0:
+                                            if not band_is_discrete:
+                                                prior = count_output > 0
+                                                final_mask[prior] = (
+                                                    mask_output[prior]
+                                                    > (
+                                                        count_output[prior]
+                                                        - mask_output[prior]
+                                                    )
+                                                ).astype(np.uint8)
+                                                band_is_discrete = True
+                                            final_mask[y_start:y_end, x_start:x_end] = (
+                                                np.clip(tile_mask, 0, 255).astype(
+                                                    np.uint8
+                                                )
+                                            )
+                                        else:
+                                            if band_buf is None:
+                                                num_cls = max(max_cls + 1, 2)
+                                                band_buf = np.zeros(
+                                                    (num_cls, max_band_h, width),
+                                                    dtype=np.float32,
+                                                )
+                                                band_is_discrete = True
+                                                if band_y0 > 0:
+                                                    final_mask[:band_y0] = (
+                                                        mask_output[:band_y0]
+                                                        > (
+                                                            count_output[:band_y0]
+                                                            - mask_output[:band_y0]
+                                                        )
+                                                    ).astype(np.uint8)
+                                                live_h = row_y_end - band_y0
+                                                band_buf[0, :live_h, :] = (
+                                                    count_output[band_y0:row_y_end]
+                                                    - mask_output[band_y0:row_y_end]
+                                                )
+                                                band_buf[1, :live_h, :] = mask_output[
+                                                    band_y0:row_y_end
+                                                ]
+                                            elif max_cls >= band_buf.shape[0]:
+                                                grown = np.zeros(
+                                                    (max_cls + 1, max_band_h, width),
+                                                    dtype=np.float32,
+                                                )
+                                                grown[: band_buf.shape[0]] = band_buf
+                                                band_buf = grown
+                                            ly0 = y_start - band_y0
+                                            ly1 = y_end - band_y0
+                                            for cls_id in np.unique(tile_mask):
+                                                cls_idx = int(cls_id)
+                                                if cls_idx >= 0:
+                                                    band_buf[
+                                                        cls_idx,
+                                                        ly0:ly1,
+                                                        x_start:x_end,
+                                                    ] += (
+                                                        tile_mask == cls_id
+                                                    )
                                     count_output[y_start:y_end, x_start:x_end] += 1
                                 else:
                                     if tile_mask.shape != (tile_h, tile_w):
@@ -1105,6 +1209,25 @@ class AutoGeoModel:
 
                     pbar.update(1)
 
+                next_y_start = (
+                    max(0, (y + 1) * effective_tile_size - self.overlap)
+                    if y + 1 < n_tiles_y
+                    else height
+                )
+                flush_h = next_y_start - band_y0
+                if flush_h > 0:
+                    if band_buf is not None and final_mask is not None:
+                        final_mask[band_y0:next_y_start, :] = np.argmax(
+                            band_buf[:, :flush_h, :], axis=0
+                        ).astype(np.uint8)
+                        keep_h = max(0, row_y_end - next_y_start)
+                        if keep_h > 0:
+                            band_buf[:, :keep_h, :] = band_buf[
+                                :, flush_h : flush_h + keep_h, :
+                            ].copy()
+                        band_buf[:, keep_h:, :] = 0.0
+                    band_y0 = next_y_start
+
         # Average overlapping regions
         count_output = np.maximum(count_output, 1)
 
@@ -1117,7 +1240,7 @@ class AutoGeoModel:
             }
 
         if prob_output is not None:
-            prob_output = prob_output / count_output[np.newaxis, :, :]
+            prob_output /= count_output[np.newaxis, :, :]
             return {
                 "mask": np.argmax(prob_output, axis=0).astype(np.uint8),
                 "probabilities": prob_output if return_probabilities else None,
@@ -1125,17 +1248,23 @@ class AutoGeoModel:
             }
 
         if discrete_votes is not None:
+            mask = np.argmax(discrete_votes, axis=0).astype(np.uint8)
+            if return_probabilities:
+                discrete_votes /= count_output[np.newaxis, :, :]
             return {
-                "mask": np.argmax(discrete_votes, axis=0).astype(np.uint8),
-                "probabilities": (
-                    (discrete_votes / count_output[np.newaxis, :, :])
-                    if return_probabilities
-                    else None
-                ),
+                "mask": mask,
+                "probabilities": discrete_votes if return_probabilities else None,
                 "metadata": metadata,
             }
 
-        mask_output = mask_output / count_output
+        if final_mask is not None:
+            return {
+                "mask": final_mask,
+                "probabilities": None,
+                "metadata": metadata,
+            }
+
+        mask_output /= count_output
 
         result = {
             "mask": (mask_output > threshold).astype(np.uint8),
@@ -1321,7 +1450,26 @@ class AutoGeoModel:
                     logits = outputs.logits[0].cpu()
                     scores = logits.sigmoid().max(dim=-1).values.numpy()
                     mask = scores > box_threshold
-                    result["boxes"] = boxes[mask]
+                    filtered_boxes = boxes[mask]
+                    img_h, img_w = image_size
+                    if (
+                        filtered_boxes.ndim == 2
+                        and filtered_boxes.shape[1] == 4
+                        and len(filtered_boxes) > 0
+                    ):
+                        if np.all((filtered_boxes >= 0.0) & (filtered_boxes <= 1.0)):
+                            cx = filtered_boxes[:, 0] * img_w
+                            cy = filtered_boxes[:, 1] * img_h
+                            bw = filtered_boxes[:, 2] * img_w
+                            bh = filtered_boxes[:, 3] * img_h
+                            x1 = np.clip(cx - bw / 2.0, 0.0, float(img_w))
+                            y1 = np.clip(cy - bh / 2.0, 0.0, float(img_h))
+                            x2 = np.clip(cx + bw / 2.0, 0.0, float(img_w))
+                            y2 = np.clip(cy + bh / 2.0, 0.0, float(img_h))
+                            filtered_boxes = np.stack([x1, y1, x2, y2], axis=-1)
+                        else:
+                            result["_box_format_unknown"] = True
+                    result["boxes"] = filtered_boxes
                     result["scores"] = scores[mask]
                     result["labels"] = [
                         f"object_{i}" for i in range(len(result["boxes"]))
@@ -1364,16 +1512,25 @@ class AutoGeoModel:
         transform = metadata.get("transform") if metadata else None
         crs = metadata.get("crs") if metadata else None
 
+        if detections.get("_box_format_unknown") and transform is not None:
+            logger.warning(
+                "Declining georeferenced detection export because fallback box "
+                "coordinate format is unknown."
+            )
+            return None
+
         geometries = []
         for bbox in boxes:
             # Convert [x1, y1, x2, y2] to polygon
             x1, y1, x2, y2 = bbox
             if transform is not None:
-                gx1, gy1 = transform * (x1, y1)
-                gx2, gy2 = transform * (x2, y2)
-                geometries.append(
-                    box(min(gx1, gx2), min(gy1, gy2), max(gx1, gx2), max(gy1, gy2))
-                )
+                corners = [
+                    transform * (x1, y1),
+                    transform * (x2, y1),
+                    transform * (x2, y2),
+                    transform * (x1, y2),
+                ]
+                geometries.append(Polygon(corners))
             else:
                 geometries.append(box(x1, y1, x2, y2))
 
@@ -1412,11 +1569,11 @@ class AutoGeoModel:
                     )
 
                 probs = torch.softmax(logits, dim=1)
-                mask = probs.argmax(dim=1).squeeze().cpu().numpy()
+                mask = probs.argmax(dim=1).squeeze(0).cpu().numpy()
                 result["mask"] = mask.astype(np.uint8)
 
                 if return_probabilities:
-                    result["probabilities"] = probs.squeeze().cpu().numpy()
+                    result["probabilities"] = probs.squeeze(0).cpu().numpy()
 
             elif logits.dim() == 2:  # Classification output
                 probs = torch.softmax(logits, dim=-1)

@@ -568,13 +568,28 @@ class ONNXInferenceStep(PipelineStep):
         base_name = os.path.splitext(os.path.basename(input_path))[0]
         output_path = os.path.join(output_dir, f"{base_name}{self.suffix}.tif")
 
-        self._model.predict(
+        result = self._model.predict(
             input_path,
             output_path=output_path,
             threshold=self.threshold,
             box_threshold=self.box_threshold,
         )
-        item[self.output_key] = output_path
+        if isinstance(result, dict):
+            if "output_path" in result:
+                item[self.output_key] = result["output_path"]
+            elif os.path.exists(output_path):
+                item[self.output_key] = output_path
+            task_results = {
+                k: v
+                for k, v in result.items()
+                if k in ("boxes", "scores", "labels", "class", "label", "probabilities")
+            }
+            if task_results:
+                item["onnx_result"] = task_results
+                for k, v in task_results.items():
+                    item[k] = v
+        elif os.path.exists(output_path):
+            item[self.output_key] = output_path
         return item
 
     def teardown(self) -> None:

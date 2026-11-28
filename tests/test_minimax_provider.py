@@ -122,27 +122,106 @@ class TestMinimaxExportedFromInit(unittest.TestCase):
         self.assertIn("create_minimax_model", init_source)
 
 
+def _find_agent_resolve_model_call(tree: ast.AST, class_name: str):
+    """Find the ``self._model_factory = _resolve_model(...)`` call in *class_name*.__init__."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+                    for stmt in ast.walk(item):
+                        if (
+                            isinstance(stmt, ast.Assign)
+                            and any(
+                                isinstance(t, ast.Attribute)
+                                and isinstance(t.value, ast.Name)
+                                and t.value.id == "self"
+                                and t.attr == "_model_factory"
+                                for t in stmt.targets
+                            )
+                            and isinstance(stmt.value, ast.Call)
+                            and isinstance(stmt.value.func, ast.Name)
+                            and stmt.value.func.id == "_resolve_model"
+                        ):
+                            return stmt.value
+    return None
+
+
+def _resolve_model_forwards_minimax_id(tree: ast.AST) -> bool:
+    """Verify ``_resolve_model`` routes ``minimax*`` model strings to ``create_minimax_model``."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_resolve_model":
+            for stmt in node.body:
+                if isinstance(stmt, ast.If):
+                    cond_src = ast.unparse(stmt.test).replace("'", '"')
+                    if 'model.lower().startswith("minimax")' not in cond_src:
+                        continue
+                    for sub in ast.walk(stmt):
+                        if (
+                            isinstance(sub, ast.Lambda)
+                            and isinstance(sub.body, ast.Call)
+                            and isinstance(sub.body.func, ast.Name)
+                            and sub.body.func.id == "create_minimax_model"
+                        ):
+                            defaults = list(sub.args.defaults)
+                            default_binds_model = any(
+                                isinstance(d, ast.Name) and d.id == "model"
+                                for d in defaults
+                            )
+                            bound_names = {a.arg for a in sub.args.args}
+                            for kw in sub.body.keywords:
+                                if kw.arg == "model_id" and isinstance(
+                                    kw.value, ast.Name
+                                ):
+                                    if kw.value.id == "model" or (
+                                        default_binds_model
+                                        and kw.value.id in bound_names
+                                    ):
+                                        return True
+    return False
+
+
 class TestMinimaxStringRouting(unittest.TestCase):
     """Tests for MiniMax model string routing in agent classes."""
 
     def setUp(self):
         self.source = _read_source(_geo_agents_path)
+        self.tree = ast.parse(self.source)
 
     def test_geo_agent_has_minimax_routing(self):
         """Test that GeoAgent routes 'minimax' strings to create_minimax_model."""
-        # Find the GeoAgent class section with minimax routing
-        self.assertIn('model.lower().startswith("minimax")', self.source)
+        self.assertTrue(_resolve_model_forwards_minimax_id(self.tree))
+        call = _find_agent_resolve_model_call(self.tree, "GeoAgent")
+        self.assertIsNotNone(
+            call, "GeoAgent.__init__ must assign self._model_factory via _resolve_model"
+        )
 
     def test_minimax_routing_calls_create_minimax_model(self):
-        """Test that minimax string routing calls create_minimax_model."""
-        pattern = r'model\.lower\(\)\.startswith\("minimax"\).*?create_minimax_model'
-        matches = re.findall(pattern, self.source, re.DOTALL)
-        # Routing is handled centrally in _resolve_model (or once per agent class)
-        self.assertGreaterEqual(
-            len(matches),
-            1,
-            "Expected minimax routing to call create_minimax_model",
+        """Test that minimax string routing forwards the requested model ID to create_minimax_model."""
+        self.assertTrue(
+            _resolve_model_forwards_minimax_id(self.tree),
+            "_resolve_model must forward minimax model IDs to create_minimax_model",
         )
+        for cls_name in ("GeoAgent", "STACAgent", "CatalogAgent"):
+            call = _find_agent_resolve_model_call(self.tree, cls_name)
+            self.assertIsNotNone(
+                call,
+                f"{cls_name}.__init__ must assign self._model_factory via _resolve_model",
+            )
+            forwarded_arg = (
+                call.args[0]
+                if call.args
+                else next((kw.value for kw in call.keywords if kw.arg == "model"), None)
+            )
+            self.assertIsInstance(
+                forwarded_arg,
+                ast.Name,
+                f"{cls_name} must pass its model parameter to _resolve_model",
+            )
+            self.assertEqual(
+                forwarded_arg.id,
+                "model",
+                f"{cls_name} must forward the user's 'model' argument to _resolve_model",
+            )
 
     def test_minimax_string_detection_logic(self):
         """Test that MiniMax string detection correctly identifies MiniMax models."""
@@ -272,34 +351,34 @@ class TestMinimaxInAllAgents(unittest.TestCase):
 
     def setUp(self):
         self.source = _read_source(_geo_agents_path)
+        self.tree = ast.parse(self.source)
+
+    def _assert_agent_forwards_model_to_resolver(self, class_name: str):
+        self.assertTrue(_resolve_model_forwards_minimax_id(self.tree))
+        call = _find_agent_resolve_model_call(self.tree, class_name)
+        self.assertIsNotNone(
+            call,
+            f"{class_name}.__init__ must assign self._model_factory = _resolve_model(model, ...)",
+        )
+        forwarded_arg = (
+            call.args[0]
+            if call.args
+            else next((kw.value for kw in call.keywords if kw.arg == "model"), None)
+        )
+        self.assertIsInstance(forwarded_arg, ast.Name)
+        self.assertEqual(forwarded_arg.id, "model")
 
     def test_geo_agent_minimax_routing(self):
-        """Test that GeoAgent has MiniMax string routing."""
-        # Extract GeoAgent class source
-        geo_start = self.source.find("class GeoAgent")
-        stac_start = self.source.find("class STACAgent")
-        geo_source = self.source[geo_start:stac_start]
-        self.assertTrue(
-            "create_minimax_model" in geo_source or "_resolve_model(" in geo_source
-        )
+        """Test that GeoAgent forwards its model argument to _resolve_model."""
+        self._assert_agent_forwards_model_to_resolver("GeoAgent")
 
     def test_stac_agent_minimax_routing(self):
-        """Test that STACAgent has MiniMax string routing."""
-        stac_start = self.source.find("class STACAgent")
-        catalog_start = self.source.find("class CatalogAgent")
-        stac_source = self.source[stac_start:catalog_start]
-        self.assertTrue(
-            "create_minimax_model" in stac_source or "_resolve_model(" in stac_source
-        )
+        """Test that STACAgent forwards its model argument to _resolve_model."""
+        self._assert_agent_forwards_model_to_resolver("STACAgent")
 
     def test_catalog_agent_minimax_routing(self):
-        """Test that CatalogAgent has MiniMax string routing."""
-        catalog_start = self.source.find("class CatalogAgent")
-        catalog_source = self.source[catalog_start:]
-        self.assertTrue(
-            "create_minimax_model" in catalog_source
-            or "_resolve_model(" in catalog_source
-        )
+        """Test that CatalogAgent forwards its model argument to _resolve_model."""
+        self._assert_agent_forwards_model_to_resolver("CatalogAgent")
 
 
 class TestMinimaxModelIntegration(unittest.TestCase):

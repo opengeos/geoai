@@ -33,15 +33,22 @@ def download_file(
     """
 
     import contextlib
+    import hashlib
     import uuid
     import zipfile
     from urllib.parse import urlparse
 
     from ..progress import tqdm
 
+    parsed_url = urlparse(url)
+    display_name = os.path.basename(parsed_url.path) or "downloaded_file"
     if output_path is None:
-        url_path = urlparse(url).path
-        output_path = os.path.basename(url_path) or "downloaded_file"
+        if parsed_url.query:
+            stem, ext = os.path.splitext(display_name)
+            url_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()[:8]
+            output_path = f"{stem}_{url_hash}{ext}"
+        else:
+            output_path = display_name
 
     if os.path.exists(output_path) and not overwrite:
         logger.info("File already exists: %s", output_path)
@@ -62,7 +69,7 @@ def download_file(
                 with (
                     open(temp_path, "wb") as file,
                     tqdm(
-                        desc=f"Downloading {os.path.basename(output_path)}",
+                        desc=f"Downloading {display_name}",
                         total=total_size,
                         unit="B",
                         unit_scale=True,

@@ -61,7 +61,9 @@ def _get_cached_config(config_url: str, filename: str = "config_10m.yaml"):
             )
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(config_text)
+            cfg = OmegaConf.load(temp_path)
             os.replace(temp_path, config_path)
+            return cfg
         except requests.RequestException as e:
             if temp_path is not None:
                 with contextlib.suppress(OSError):

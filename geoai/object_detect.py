@@ -14,6 +14,29 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+
+def _load_detector_state_dict(model_path: str, map_location: Any = "cpu") -> dict:
+    """Load a detector checkpoint with ``weights_only=True`` and a clear error on failure."""
+    import pickle
+
+    try:
+        state = torch.load(model_path, map_location=map_location, weights_only=True)
+    except (pickle.UnpicklingError, RuntimeError) as exc:
+        raise RuntimeError(
+            f"Failed to load checkpoint '{model_path}' with weights_only=True. "
+            "GeoAI enforces weights_only=True by default for security. If this is a "
+            "trusted legacy checkpoint containing pickled Python objects, re-save it "
+            "as a plain state_dict (torch.save(model.state_dict(), path)) or register "
+            "trusted globals with torch.serialization.add_safe_globals()."
+        ) from exc
+    if isinstance(state, dict):
+        if "state_dict" in state and isinstance(state["state_dict"], dict):
+            return state["state_dict"]
+        if "model_state_dict" in state and isinstance(state["model_state_dict"], dict):
+            return state["model_state_dict"]
+    return state
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -616,7 +639,7 @@ def multiclass_detection(
             model_name = class_info.get("model_name", None)
 
     # Load checkpoint
-    state_dict = torch.load(model_path, map_location=device, weights_only=True)
+    state_dict = _load_detector_state_dict(model_path, map_location=device)
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()
@@ -1023,7 +1046,7 @@ def evaluate_multiclass_detector(
 
         model_path = hf_hub_download(repo_id=hf_repo, filename=model_path)
 
-    state_dict = torch.load(model_path, map_location=device, weights_only=True)
+    state_dict = _load_detector_state_dict(model_path, map_location=device)
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()
@@ -1454,7 +1477,7 @@ def push_detector_to_hub(
         return None
 
     # Load state dict
-    state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+    state_dict = _load_detector_state_dict(model_path, map_location="cpu")
     if any(key.startswith("module.") for key in state_dict.keys()):
         state_dict = {
             key.replace("module.", ""): value for key, value in state_dict.items()

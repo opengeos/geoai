@@ -1898,6 +1898,12 @@ class ChangeStarDetection:
             ValueError: If the images do not overlap.
         """
         with rasterio.open(image1_path) as src1, rasterio.open(image2_path) as src2:
+            if (src1.crs is None) != (src2.crs is None):
+                raise ValueError(
+                    f"CRS mismatch between images: image1 has {src1.crs} and "
+                    f"image2 has {src2.crs}. Both images must share a CRS or "
+                    "both must be unreferenced before running change detection."
+                )
             if src1.crs is not None and src2.crs is not None and src1.crs != src2.crs:
                 raise ValueError(
                     f"CRS mismatch between images: image1 has {src1.crs} and "

@@ -1034,6 +1034,10 @@ def pc_stac_search(
         "limit": limit,
     }
     if ids is not None:
+        if len(ids) == 0:
+            if not quiet:
+                logger.info("Found 0 items matching search criteria")
+            return []
         search_kwargs["ids"] = ids
     search = catalog.search(**search_kwargs)
 
@@ -1103,10 +1107,11 @@ def pc_stac_download(
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    # Function to download a single asset (expects an already-signed item)
+    # Function to download a single asset (signs inside worker for fresh SAS tokens)
     def download_asset(
         item: "pystac.Item", asset_key: str, asset: "pystac.Asset"
     ) -> str:
+        item = pc.sign(item)
         item_id = item.id
 
         # Get the signed asset URL
@@ -1181,7 +1186,6 @@ def pc_stac_download(
         item_assets = {}
         if isinstance(item, str):
             item = pystac.Item.from_file(item)
-        item = pc.sign(item)
         item_id = item.id
         logger.info("Processing STAC item: %s", item_id)
 

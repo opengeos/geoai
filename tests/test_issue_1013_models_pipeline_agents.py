@@ -71,12 +71,7 @@ def _png_bytes(width: int = 16, height: int = 16) -> bytes:
 
 
 def _import_agent_module_with_stubs(module_name: str):
-    """Import a geoai.agents.* module even when optional strands/boto3 are absent."""
-    if "strands" in sys.modules and not getattr(
-        sys.modules["strands"], "_is_stub", False
-    ):
-        return importlib.import_module(module_name)
-
+    """Build deterministic offline stubs for strands/boto3 regardless of import order."""
     fake_modules = {}
 
     def _passthrough_tool(*args, **kwargs):
@@ -122,16 +117,54 @@ def _import_agent_module_with_stubs(module_name: str):
     class _FakeOpenAIModel(_BaseFakeModel):
         pass
 
-    class _FakeAnthropicModel(_BaseFakeModel):
-        pass
+    class _FakeAnthropicModel:
+        """Mirrors Strands v1.41.0 AnthropicModel storing client without client_args."""
 
-    class _FakeGeminiModel(_BaseFakeModel):
-        pass
+        def __init__(self, model_id="claude", client_args=None, **kwargs):
+            self.config = {"model_id": model_id}
+            self.client = types.SimpleNamespace(
+                api_key=(client_args or {}).get("api_key")
+            )
+            self.extra_kwargs = kwargs
 
-    class _FakeBedrockModel(_BaseFakeModel):
-        def __init__(self, model_id="bedrock", region_name=None, **kwargs):
-            super().__init__(model_id=model_id, **kwargs)
-            self.region_name = region_name
+    class _FakeGeminiModel:
+        """Mirrors Strands v1.41.0 GeminiModel supporting client_args or injected client."""
+
+        def __init__(self, model_id="gemini", client_args=None, client=None, **kwargs):
+            self.config = {"model_id": model_id}
+            self.client_args = client_args if client_args is not None else {}
+            self.client = client
+            self.extra_kwargs = kwargs
+
+    class _FakeBedrockModel:
+        """Mirrors Strands v1.41.0 BedrockModel storing region on client.meta.region_name."""
+
+        def __init__(
+            self,
+            model_id="bedrock",
+            region_name=None,
+            boto_session=None,
+            boto_client_config=None,
+            **kwargs,
+        ):
+            if boto_session is not None and region_name is not None:
+                raise ValueError("Cannot specify both boto_session and region_name")
+            effective_region = (
+                region_name
+                if region_name is not None
+                else (
+                    getattr(boto_session, "region_name", None)
+                    or os.environ.get("AWS_REGION")
+                    or os.environ.get("AWS_DEFAULT_REGION")
+                    or "us-east-1"
+                )
+            )
+            self.config = {"model_id": model_id, **kwargs}
+            self.boto_session = boto_session
+            self.boto_client_config = boto_client_config
+            self.client = types.SimpleNamespace(
+                meta=types.SimpleNamespace(region_name=effective_region)
+            )
 
     models_mod = types.ModuleType("strands.models")
     models_mod.BedrockModel = _FakeBedrockModel
@@ -144,6 +177,12 @@ def _import_agent_module_with_stubs(module_name: str):
     gemini_mod = types.ModuleType("strands.models.gemini")
     gemini_mod.GeminiModel = _FakeGeminiModel
 
+    boto3_mod = types.ModuleType("boto3")
+    boto3_mod.Session = MagicMock
+    botocore_mod = types.ModuleType("botocore")
+    botocore_cfg = types.ModuleType("botocore.config")
+    botocore_cfg.Config = MagicMock
+
     fake_modules.update(
         {
             "strands": strands_mod,
@@ -152,19 +191,12 @@ def _import_agent_module_with_stubs(module_name: str):
             "strands.models.ollama": ollama_mod,
             "strands.models.openai": openai_mod,
             "strands.models.gemini": gemini_mod,
+            "boto3": boto3_mod,
+            "botocore": botocore_mod,
+            "botocore.config": botocore_cfg,
         }
     )
 
-    if importlib.util.find_spec("boto3") is None:
-        boto3_mod = types.ModuleType("boto3")
-        boto3_mod.Session = MagicMock
-        fake_modules["boto3"] = boto3_mod
-    if importlib.util.find_spec("botocore") is None:
-        botocore_mod = types.ModuleType("botocore")
-        botocore_cfg = types.ModuleType("botocore.config")
-        botocore_cfg.Config = MagicMock
-        fake_modules["botocore"] = botocore_mod
-        fake_modules["botocore.config"] = botocore_cfg
     if importlib.util.find_spec("ipyevents") is None:
         ipyevents_mod = types.ModuleType("ipyevents")
         ipyevents_mod.Event = MagicMock
@@ -796,7 +828,7 @@ class TestGroup6RfdetrAndDinov3Finetune(unittest.TestCase):
                 photometric="minisblack",
             )
             ckpt_path = os.path.join(td, "dummy.pth")
-            torch.save({}, ckpt_path)
+            torch.save({"state_dict": {}, "input_scaling": "dtype"}, ckpt_path)
             out_tif = os.path.join(td, "nested", "subdir", "mask.tif")
 
             with patch.object(
@@ -816,11 +848,71 @@ class TestGroup6RfdetrAndDinov3Finetune(unittest.TestCase):
             self.assertTrue(os.path.exists(out_tif))
             # 1-band input repeated to 3 channels
             self.assertEqual(captured["shape"][1], 3)
-            # uint16 32768 / 65535 ~= 0.5 (not 32768 / 255 ~= 128!)
+            # New checkpoint with input_scaling="dtype": uint16 32768 / 65535 ~= 0.5
             self.assertAlmostEqual(captured["max"], 32768.0 / 65535.0, places=3)
             with rasterio.open(out_tif) as src:
                 self.assertEqual(src.count, 1)
                 self.assertEqual(src.dtypes[0], "uint8")
+
+            # Legacy checkpoint without policy preserves legacy scaling (32768 / 255)
+            legacy_ckpt = os.path.join(td, "legacy.pth")
+            torch.save({}, legacy_ckpt)
+            legacy_out = os.path.join(td, "legacy_mask.tif")
+            with patch.object(
+                dinov3_finetune, "DINOv3Segmenter", return_value=DummySegmenter()
+            ):
+                dinov3_finetune.dinov3_segment_geotiff(
+                    input_path=in_tif,
+                    output_path=legacy_out,
+                    checkpoint_path=legacy_ckpt,
+                    window_size=32,
+                    overlap=0,
+                    batch_size=1,
+                    device="cpu",
+                    quiet=True,
+                )
+            self.assertAlmostEqual(captured["max"], 32768.0 / 255.0, places=2)
+
+            # Floating-point raster uses one raster-wide scale across windows
+            float_tif = os.path.join(td, "float_seam.tif")
+            fdata = np.full((3, 32, 64), 500.0, dtype=np.float32)
+            fdata[:, :, 32:] = 1000.0
+            _make_geotiff(
+                float_tif,
+                width=64,
+                height=32,
+                bands=3,
+                dtype="float32",
+                data=fdata,
+            )
+            window_values = []
+
+            class RecordSegmenter(torch.nn.Module):
+                patch_size = 16
+
+                def forward(self, x):
+                    for k in range(x.shape[0]):
+                        window_values.append(float(x[k, 0, 0, 0]))
+                    b, _, h, w = x.shape
+                    return torch.zeros((b, 2, h, w), dtype=torch.float32)
+
+            float_out = os.path.join(td, "float_mask.tif")
+            with patch.object(
+                dinov3_finetune, "DINOv3Segmenter", return_value=RecordSegmenter()
+            ):
+                dinov3_finetune.dinov3_segment_geotiff(
+                    input_path=float_tif,
+                    output_path=float_out,
+                    checkpoint_path=ckpt_path,
+                    window_size=32,
+                    overlap=0,
+                    batch_size=1,
+                    device="cpu",
+                    quiet=True,
+                )
+            # Left window (max 500) must divide by global raster max 1000 -> 0.5, not 1.0
+            self.assertAlmostEqual(window_values[0], 0.5, places=5)
+            self.assertAlmostEqual(window_values[1], 1.0, places=5)
 
 
 # ---------------------------------------------------------------------------
@@ -858,8 +950,9 @@ class TestGroup7SecurityAndHttpHygiene(unittest.TestCase):
                         f"{path.name}:{node.lineno} missing weights_only=True",
                     )
                     self.assertIsInstance(kw["weights_only"], ast.Constant)
-                    self.assertTrue(
+                    self.assertIs(
                         kw["weights_only"].value,
+                        True,
                         f"{path.name}:{node.lineno} weights_only is not True",
                     )
             self.assertGreater(found, 0, f"Expected torch.load calls in {path.name}")
@@ -954,12 +1047,17 @@ class TestGroup7SecurityAndHttpHygiene(unittest.TestCase):
             items = pc_stac_search(
                 collection="sentinel-2-l2a", ids=["item-1"], quiet=True
             )
+            empty_items = pc_stac_search(
+                collection="sentinel-2-l2a", ids=[], quiet=True
+            )
 
         self.assertEqual(len(items), 1)
+        self.assertEqual(empty_items, [])
+        self.assertEqual(fake_catalog.search.call_count, 1)
         self.assertEqual(fake_catalog.search.call_args.kwargs["ids"], ["item-1"])
         fake_search.items.assert_called_once()
 
-    def test_pc_stac_download_signs_item_once_not_per_asset(self):
+    def test_pc_stac_download_signs_per_asset_in_worker(self):
         import pystac
         from geoai.download import pc_stac_download
 
@@ -992,7 +1090,8 @@ class TestGroup7SecurityAndHttpHygiene(unittest.TestCase):
             ):
                 results = pc_stac_download(item, output_dir=td, max_workers=2)
 
-        self.assertEqual(mock_sign.call_count, 1)
+        # Each queued asset download signs inside the worker so SAS tokens stay fresh
+        self.assertEqual(mock_sign.call_count, 3)
         self.assertEqual(set(results["scene1"].keys()), {"B02", "B03", "B04"})
 
     def test_download_pc_stac_item_closes_rioxarray_handles(self):
@@ -1063,22 +1162,46 @@ class TestGroup7SecurityAndHttpHygiene(unittest.TestCase):
     def test_utils_download_strips_query_string_and_closes_response(self):
         from geoai.utils.download import download_file
 
-        resp = MagicMock()
-        resp.headers = {"content-length": "5"}
-        resp.iter_content.return_value = [b"hello"]
+        def _make_resp(payload: bytes):
+            r = MagicMock()
+            r.headers = {"content-length": str(len(payload))}
+            r.iter_content.return_value = [payload]
+            return r
+
+        resp_a = _make_resp(b"helloA")
+        resp_b = _make_resp(b"helloB")
 
         old_cwd = os.getcwd()
         with tempfile.TemporaryDirectory() as td:
             try:
                 os.chdir(td)
-                with patch("geoai.utils.download.requests.get", return_value=resp):
-                    out = download_file(
-                        "https://example.com/files/sample.tif?sig=abc&exp=999",
+                with patch(
+                    "geoai.utils.download.requests.get",
+                    side_effect=[resp_a, resp_b],
+                ) as mock_get:
+                    out_a = download_file(
+                        "https://example.com/files/sample.tif?sig=abc&id=A",
                         unzip=False,
                     )
-                self.assertEqual(out, "sample.tif")
-                self.assertTrue(os.path.isfile(os.path.join(td, "sample.tif")))
-                resp.close.assert_called_once()
+                    out_b = download_file(
+                        "https://example.com/files/sample.tif?sig=xyz&id=B",
+                        unzip=False,
+                    )
+                    # Calling URL A again reuses cached file without another HTTP request
+                    out_a_cached = download_file(
+                        "https://example.com/files/sample.tif?sig=abc&id=A",
+                        unzip=False,
+                    )
+                self.assertNotIn("?", out_a)
+                self.assertNotIn("sig=", out_a)
+                self.assertTrue(out_a.startswith("sample_") and out_a.endswith(".tif"))
+                self.assertNotEqual(out_a, out_b)
+                self.assertEqual(out_a_cached, out_a)
+                self.assertEqual(mock_get.call_count, 2)
+                self.assertEqual(Path(td, out_a).read_bytes(), b"helloA")
+                self.assertEqual(Path(td, out_b).read_bytes(), b"helloB")
+                resp_a.close.assert_called_once()
+                resp_b.close.assert_called_once()
             finally:
                 os.chdir(old_cwd)
 
@@ -1161,10 +1284,38 @@ class TestGroup8Agents(unittest.TestCase):
             with self.assertRaises(ValueError):
                 tools.list_files(outer)
 
-            # Default DataTools() stays backward-compatible (no restriction)
-            unrestricted = DataTools()
+            # Default DataTools() stays backward-compatible (no restriction) and logs warning
+            with self.assertLogs("geoai.agents.data_tools", level="WARNING") as cm:
+                unrestricted = DataTools()
+            self.assertTrue(any("unrestricted" in m for m in cm.output))
             info_out = json.loads(unrestricted.inspect_raster(outside))
             self.assertEqual(info_out["width"], 32)
+
+            # clip_raster and raster_to_vector create nested parent dirs inside workspace
+            nested_clip = os.path.join(workspace, "sub1", "sub2", "clipped.tif")
+            nested_vec = os.path.join(workspace, "vec_sub", "out.geojson")
+            with (
+                patch(
+                    "geoai.utils.raster.clip_raster_by_bbox",
+                    side_effect=lambda src, dst, bbox: _make_geotiff(dst),
+                ),
+                patch(
+                    "geoai.utils.raster.raster_to_vector",
+                    side_effect=lambda src, dst: Path(dst).write_text("{}"),
+                ),
+                patch(
+                    "geoai.utils.raster.read_vector",
+                    return_value=[],
+                ),
+            ):
+                clip_res = json.loads(
+                    tools.clip_raster(inside, nested_clip, -122.5, 37.7, -122.3, 37.9)
+                )
+                vec_res = json.loads(tools.raster_to_vector(inside, nested_vec))
+            self.assertTrue(os.path.isdir(os.path.dirname(nested_clip)))
+            self.assertTrue(os.path.isdir(os.path.dirname(nested_vec)))
+            self.assertEqual(clip_res["width"], 32)
+            self.assertEqual(vec_res["feature_count"], 0)
 
     def test_stac_tools_get_item_info_uses_ids_parameter(self):
         stubs = _import_agent_module_with_stubs("geoai.agents.stac_tools")
@@ -1233,7 +1384,62 @@ class TestGroup8Agents(unittest.TestCase):
             ga.create_vllm_model(api_key="EMPTY", client_args=caller_args5)
             self.assertEqual(caller_args5, {"timeout": 30})
 
-            # 2. _resolve_model handles all 5 model classes + strings
+            # 1b. create_gemini_model preserves explicit api_key=None without GOOGLE_API_KEY lookup
+            with patch.dict(os.environ, {"GOOGLE_API_KEY": "env-should-not-override"}):
+                vertex_model = ga.create_gemini_model(
+                    client_args={"vertexai": True, "api_key": None}
+                )
+                self.assertIsNone(vertex_model.client_args["api_key"])
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("GOOGLE_API_KEY", None)
+                vertex_model2 = ga.create_gemini_model(
+                    client_args={"vertexai": True, "api_key": None}
+                )
+                self.assertIsNone(vertex_model2.client_args["api_key"])
+
+            # 2. _resolve_model handles all 5 model classes + strings and preserves config/client/region
+            custom_client = object()
+            gem_with_client = ga.GeminiModel(model_id="gemini", client=custom_client)
+            self.assertIs(ga._resolve_model(gem_with_client)(), gem_with_client)
+            self.assertIs(ga._resolve_model(gem_with_client)().client, custom_client)
+
+            # Gemini client_args override must not raise TypeError for duplicate client_args
+            gem_base = ga.create_gemini_model(
+                model_id="gemini", api_key="k1", client_args={"timeout": 10}
+            )
+            gem_rebuilt = ga._resolve_model(
+                gem_base, model_args={"client_args": {"api_key": "k2"}}
+            )()
+            self.assertEqual(gem_rebuilt.client_args["api_key"], "k2")
+            self.assertEqual(gem_rebuilt.client_args["timeout"], 10)
+
+            # Bedrock preserves guardrails and client.meta.region_name even when ambient AWS_REGION differs
+            with patch.dict(os.environ, {"AWS_REGION": "eu-central-1"}):
+                bed_configured = ga.create_bedrock_model(
+                    model_id="bedrock-id",
+                    region_name="us-west-2",
+                    guardrail_id="gr-123",
+                    guardrail_version="1",
+                )
+                # No overrides -> exact instance reused
+                self.assertIs(ga._resolve_model(bed_configured)(), bed_configured)
+                # With override -> rebuilt model preserves region & guardrails
+                bed_rebuilt = ga._resolve_model(
+                    bed_configured, model_args={"temperature": 0.2}
+                )()
+                self.assertIsInstance(bed_rebuilt, ga.BedrockModel)
+                self.assertEqual(bed_rebuilt.client.meta.region_name, "us-west-2")
+                self.assertEqual(bed_rebuilt.config["guardrail_id"], "gr-123")
+                self.assertEqual(bed_rebuilt.config["guardrail_version"], "1")
+                self.assertEqual(bed_rebuilt.config["temperature"], 0.2)
+                # With boto_session override -> must NOT pass inherited region_name too
+                fake_session = types.SimpleNamespace(region_name="ap-southeast-1")
+                bed_session = ga._resolve_model(
+                    bed_configured, model_args={"boto_session": fake_session}
+                )()
+                self.assertIs(bed_session.boto_session, fake_session)
+                self.assertEqual(bed_session.client.meta.region_name, "ap-southeast-1")
+
             for inst, expected_cls in (
                 (ga.create_ollama_model(model_id="llama3.1"), ga.OllamaModel),
                 (
@@ -1267,36 +1473,42 @@ class TestGroup8Agents(unittest.TestCase):
             cat_agent = ga.CatalogAgent(model=bed, catalog_df=MagicMock())
             self.assertIsInstance(cat_agent.model, ga.BedrockModel)
 
-        # 3. Verify old_callback is assigned before try: in both show_ui() methods
-        src_path = Path(__file__).resolve().parents[1] / "geoai/agents/geo_agents.py"
-        tree = ast.parse(src_path.read_text(encoding="utf-8"))
-        on_send_fns = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.FunctionDef) and node.name == "_on_send"
-        ]
-        self.assertEqual(len(on_send_fns), 2)
-        for fn in on_send_fns:
-            try_idx = next(i for i, st in enumerate(fn.body) if isinstance(st, ast.Try))
-            assign_idx = next(
-                (
-                    i
-                    for i, st in enumerate(fn.body)
-                    if isinstance(st, ast.Assign)
-                    and any(
-                        isinstance(t, ast.Name) and t.id == "old_callback"
-                        for t in st.targets
-                    )
-                ),
-                None,
-            )
-            self.assertIsNotNone(
-                assign_idx, "old_callback must be assigned at _on_send scope"
-            )
-            self.assertLess(
-                assign_idx,
-                try_idx,
-                "old_callback must be assigned BEFORE try: so finally never hits UnboundLocalError",
+            # 3. Behavioral test: both GeoAgent and STACAgent show_ui send handlers
+            # report errors, restore original callback_handler, and re-enable Send
+            import ipywidgets as widgets
+
+            fake_map = MagicMock()
+            fake_map.floating_sidebar_widget = widgets.HTML()
+            geo_agent = ga.GeoAgent(model=gem, map_instance=fake_map)
+            stac_ui_agent = ga.STACAgent(model=gem, map_instance=fake_map)
+            with (
+                patch.object(ga, "display"),
+                patch.object(ga, "Event"),
+            ):
+                geo_agent.show_ui()
+                stac_ui_agent.show_ui()
+
+            sentinel_cb = object()
+            geo_agent.callback_handler = sentinel_cb
+            geo_agent._ui.inp.value = "zoom to seattle"
+            with patch.object(geo_agent, "ask", side_effect=RuntimeError("geo boom")):
+                geo_agent._handlers.on_send()
+            self.assertIs(geo_agent.callback_handler, sentinel_cb)
+            self.assertFalse(geo_agent._ui.btn_send.disabled)
+            self.assertTrue(any("geo boom" in msg for _, msg in geo_agent._ui.messages))
+
+            stac_ui_agent.callback_handler = sentinel_cb
+            stac_ui_agent._ui.inp.value = "find sentinel"
+            with patch.object(
+                stac_ui_agent,
+                "search_and_get_first_item",
+                side_effect=RuntimeError("stac boom"),
+            ):
+                stac_ui_agent._handlers.on_send()
+            self.assertIs(stac_ui_agent.callback_handler, sentinel_cb)
+            self.assertFalse(stac_ui_agent._ui.btn_send.disabled)
+            self.assertTrue(
+                any("stac boom" in msg for _, msg in stac_ui_agent._ui.messages)
             )
 
 
@@ -1381,11 +1593,20 @@ class TestGroup9PipelineAndCLI(unittest.TestCase):
                     return orig_save(self_ckpt)
 
                 with patch.object(CheckpointManager, "save", tracked_save):
-                    pipe.run(items=items)
+                    res = pipe.run(items=items)
 
-            # Should have saved at 10 items (periodic) AND at end (12 items)
+            # Should have saved at 10 items (periodic) AND at end (all 12 items)
             self.assertIn(10, save_calls)
+            self.assertEqual(save_calls[-1], 12)
             self.assertGreaterEqual(len(save_calls), 2)
+            with open(res.checkpoint_path, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            self.assertEqual(
+                set(saved["entries"].keys()), {f"img_{i}.tif" for i in range(12)}
+            )
+            self.assertTrue(
+                all(e["status"] == "completed" for e in saved["entries"].values())
+            )
 
     def test_pipeline_builtin_onnx_canopy_clean_steps(self):
         from geoai.pipeline import (
@@ -1550,6 +1771,390 @@ class TestGroup9PipelineAndCLI(unittest.TestCase):
                 output_dir=out_stac,
                 assets=["B04", "B03"],
             )
+
+
+class TestGroup10ReviewRoundFixes(unittest.TestCase):
+    """Targeted regression tests for PR #1019 review findings."""
+
+    def test_auto_one_pixel_edge_tile_preserves_class_axis(self):
+        import torch
+        from geoai.auto import AutoGeoModel
+
+        model = AutoGeoModel.__new__(AutoGeoModel)
+        model.task = "semantic-segmentation"
+        model.tile_size = 16
+        model.overlap = 0
+
+        # 16x17 input -> last tile is 16x1 (1 pixel wide)
+        def fake_single(tile, metadata, threshold=0.5, return_probabilities=False):
+            _, h, w = tile.shape
+            logits = torch.zeros((1, 2, h, w), dtype=torch.float32)
+            logits[0, 1] = 5.0  # class 1 everywhere
+            outputs = types.SimpleNamespace(logits=logits)
+            return model._process_outputs(
+                outputs,
+                tile.shape,
+                threshold=threshold,
+                return_probabilities=return_probabilities,
+            )
+
+        model._predict_single = fake_single
+        data = np.zeros((3, 16, 17), dtype=np.uint8)
+        res = model._predict_tiled("dummy", data, None, return_probabilities=False)
+        self.assertEqual(res["mask"].shape, (16, 17))
+        self.assertTrue(np.all(res["mask"] == 1))
+
+    def test_auto_and_onnx_mask_only_tiling_matches_prob_blending(self):
+        from geoai.auto import AutoGeoModel
+        from geoai.onnx import ONNXGeoModel
+
+        rng = np.random.default_rng(42)
+        full_probs = rng.random((5, 40, 40)).astype(np.float32)
+        full_probs /= full_probs.sum(axis=0, keepdims=True)
+        data = np.zeros((3, 40, 40), dtype=np.uint8)
+
+        # ONNXGeoModel: mask-only must equal return_probabilities=True mask
+        onnx_m = ONNXGeoModel.__new__(ONNXGeoModel)
+        onnx_m.task = "semantic-segmentation"
+        onnx_m.tile_size = 16
+        onnx_m.overlap = 4
+
+        def fake_onnx_single(
+            tile, metadata, threshold=0.5, return_probabilities=False, box_threshold=0.3
+        ):
+            _, h, w = tile.shape
+            # Deterministic tile-dependent probabilities
+            p = full_probs[:, :h, :w].copy()
+            return {"mask": np.argmax(p, axis=0).astype(np.uint8), "probabilities": p}
+
+        onnx_m._predict_single = fake_onnx_single
+        res_full = onnx_m._predict_tiled(data, None, return_probabilities=True)
+        res_mask_only = onnx_m._predict_tiled(data, None, return_probabilities=False)
+        self.assertIsNone(res_mask_only["probabilities"])
+        np.testing.assert_array_equal(res_mask_only["mask"], res_full["mask"])
+
+        # AutoGeoModel: mask-only must equal return_probabilities=True mask
+        auto_m = AutoGeoModel.__new__(AutoGeoModel)
+        auto_m.task = "semantic-segmentation"
+        auto_m.tile_size = 16
+        auto_m.overlap = 4
+
+        def fake_auto_single(tile, metadata, threshold=0.5, return_probabilities=False):
+            _, h, w = tile.shape
+            p = full_probs[:, :h, :w].copy()
+            return {"mask": np.argmax(p, axis=0).astype(np.uint8), "probabilities": p}
+
+        auto_m._predict_single = fake_auto_single
+        ares_full = auto_m._predict_tiled(
+            "dummy", data, None, return_probabilities=True
+        )
+        ares_mask = auto_m._predict_tiled(
+            "dummy", data, None, return_probabilities=False
+        )
+        self.assertIsNone(ares_mask["probabilities"])
+        np.testing.assert_array_equal(ares_mask["mask"], ares_full["mask"])
+
+    def test_auto_fallback_detections_and_rotated_transform_four_corners(self):
+        import torch
+        from geoai.auto import AutoGeoModel
+
+        model = AutoGeoModel.__new__(AutoGeoModel)
+        model.task = "zero-shot-object-detection"
+        model.processor = None
+
+        # Normalized cxcywh (0.5, 0.5, 0.2, 0.4) on 100x100 -> pixel corners (40, 30, 60, 70)
+        outputs = types.SimpleNamespace(
+            pred_boxes=torch.tensor([[[0.5, 0.5, 0.2, 0.4]]], dtype=torch.float32),
+            logits=torch.tensor([[[5.0]]], dtype=torch.float32),
+        )
+        broken_proc = MagicMock()
+        broken_proc.post_process_grounded_object_detection.side_effect = AttributeError(
+            "no grounded"
+        )
+        res = model._process_detection_outputs(
+            outputs,
+            inputs={"input_ids": None},
+            text="building.",
+            image_size=(100, 100),
+            box_threshold=0.3,
+            text_threshold=0.25,
+            processor=broken_proc,
+        )
+        np.testing.assert_allclose(res["boxes"][0], [40.0, 30.0, 60.0, 70.0], atol=1e-4)
+
+        # Rotated/sheared affine transform: x' = x - y + 100, y' = x + y + 200
+        rot = Affine(1.0, -1.0, 100.0, 1.0, 1.0, 200.0)
+        gdf = model._detections_to_geodataframe(
+            {
+                "boxes": np.array([[0.0, 0.0, 10.0, 10.0]]),
+                "scores": [0.9],
+                "labels": ["a"],
+            },
+            image_size=(100, 100),
+            metadata={"transform": rot, "crs": "EPSG:3857"},
+        )
+        geom = gdf.geometry.iloc[0]
+        self.assertAlmostEqual(geom.area, 200.0, places=5)
+        self.assertEqual(geom.bounds, (90.0, 200.0, 110.0, 220.0))
+
+        # Unknown fallback box format declines georeferenced export
+        unknown_outputs = types.SimpleNamespace(
+            pred_boxes=torch.tensor(
+                [[[200.0, 300.0, 50.0, 50.0]]], dtype=torch.float32
+            ),
+            logits=torch.tensor([[[5.0]]], dtype=torch.float32),
+        )
+        res_unknown = model._process_detection_outputs(
+            unknown_outputs,
+            inputs={"input_ids": None},
+            text="building.",
+            image_size=(100, 100),
+            box_threshold=0.3,
+            text_threshold=0.25,
+            processor=broken_proc,
+        )
+        self.assertIsNone(
+            model._detections_to_geodataframe(
+                res_unknown,
+                image_size=(100, 100),
+                metadata={"transform": rot, "crs": "EPSG:3857"},
+            )
+        )
+
+    def test_change_detection_rejects_mixed_known_and_none_crs(self):
+        from geoai.change_detection import ChangeStarDetection
+
+        det = ChangeStarDetection.__new__(ChangeStarDetection)
+        with tempfile.TemporaryDirectory() as td:
+            p_crs = os.path.join(td, "with_crs.tif")
+            p_none1 = os.path.join(td, "no_crs_1.tif")
+            p_none2 = os.path.join(td, "no_crs_2.tif")
+            _make_geotiff(p_crs, crs="EPSG:32618", bounds=(0, 0, 10, 10))
+            _make_geotiff(p_none1, crs=None, bounds=(0, 0, 10, 10))
+            _make_geotiff(p_none2, crs=None, bounds=(0, 0, 10, 10))
+
+            with self.assertRaises(ValueError):
+                det._read_and_align_images(p_crs, p_none1)
+            with self.assertRaises(ValueError):
+                det._read_and_align_images(p_none1, p_crs)
+
+            # Two unreferenced images still work
+            img1, img2, _, crs, _ = det._read_and_align_images(p_none1, p_none2)
+            self.assertIsNone(crs)
+            self.assertEqual(img1.shape, img2.shape)
+
+    def test_cli_strict_json_max_items_and_empty_stac_download(self):
+        from geoai.cli import _emit_info, main
+
+        # 1. Strict JSON: NaN/Inf -> null, NumPy int -> int, unsupported -> TypeError
+        runner = CliRunner()
+        info_payload = {
+            "nodata": float("nan"),
+            "nested": {
+                "inf_val": float("inf"),
+                "null_count": np.int64(0),
+                "mean": np.float64(1.5),
+            },
+        }
+        buf = io.StringIO()
+        with patch("geoai.cli.click.echo", side_effect=lambda s, **kw: buf.write(s)):
+            _emit_info(info_payload, as_json=True)
+        parsed = json.loads(buf.getvalue())
+        self.assertIsNone(parsed["nodata"])
+        self.assertIsNone(parsed["nested"]["inf_val"])
+        self.assertIs(type(parsed["nested"]["null_count"]), int)
+        self.assertEqual(parsed["nested"]["null_count"], 0)
+        self.assertEqual(parsed["nested"]["mean"], 1.5)
+
+        with self.assertRaises(TypeError):
+            _emit_info({"bad": object()}, as_json=True)
+
+        # 2. --max-items 0 and -1 rejected before pc_stac_search
+        with patch("geoai.download.pc_stac_search") as mock_search:
+            res_zero = runner.invoke(
+                main,
+                [
+                    "download",
+                    "stac",
+                    "--bbox",
+                    "0,0,1,1",
+                    "-o",
+                    "/tmp/out",
+                    "--max-items",
+                    "0",
+                ],
+            )
+            res_neg = runner.invoke(
+                main,
+                [
+                    "download",
+                    "stac",
+                    "--bbox",
+                    "0,0,1,1",
+                    "-o",
+                    "/tmp/out",
+                    "--max-items",
+                    "-1",
+                ],
+            )
+        self.assertNotEqual(res_zero.exit_code, 0)
+        self.assertNotEqual(res_neg.exit_code, 0)
+        mock_search.assert_not_called()
+
+        # 3. Empty STAC download result returns nonzero exit code
+        with (
+            patch("geoai.download.pc_stac_search", return_value=[MagicMock(id="i1")]),
+            patch("geoai.download.pc_stac_download", return_value={"i1": {}}),
+        ):
+            res_empty = runner.invoke(
+                main,
+                ["download", "stac", "--bbox", "0,0,1,1", "-o", "/tmp/out"],
+            )
+        self.assertNotEqual(res_empty.exit_code, 0)
+
+    def test_onnx_binary_singleton_axis_and_multiclass_prob_resampling(self):
+        from geoai.onnx import ONNXGeoModel
+
+        model = ONNXGeoModel.__new__(ONNXGeoModel)
+        model.task = "semantic-segmentation"
+
+        # Binary (1, 1, 1, 4): pattern varies across row (W=4), must not transpose to column
+        logits_bin = np.array([[[[-5.0, -5.0, 5.0, 5.0]]]], dtype=np.float32)
+        res_bin = model._process_outputs(
+            [logits_bin], original_size=(2, 4), return_probabilities=True
+        )
+        self.assertEqual(res_bin["mask"].shape, (2, 4))
+        # Left columns 0, right columns 1 (same across both rows)
+        self.assertTrue(np.all(res_bin["mask"][:, :2] == 0))
+        self.assertTrue(np.all(res_bin["mask"][:, 2:] == 1))
+
+        # Multiclass resampling: 2 model columns -> 3 output columns resizes probabilities then argmax
+        # Col 0: p(class 1) ~= 0.51, Col 1: p(class 1) ~= 0.01 -> center bilinear avg ~= 0.26 -> class 0
+        p1_left, p1_right = 0.51, 0.01
+        l0 = np.log([1 - p1_left, p1_left])
+        l1 = np.log([1 - p1_right, p1_right])
+        logits_mc = np.zeros((1, 2, 1, 2), dtype=np.float32)
+        logits_mc[0, :, 0, 0] = l0
+        logits_mc[0, :, 0, 1] = l1
+        res_mc = model._process_outputs(
+            [logits_mc], original_size=(1, 3), return_probabilities=True
+        )
+        self.assertEqual(res_mc["probabilities"].shape, (2, 1, 3))
+        # Center pixel must agree with argmax of resized probabilities (class 0)
+        np.testing.assert_array_equal(
+            res_mc["mask"], np.argmax(res_mc["probabilities"], axis=0)
+        )
+        self.assertEqual(int(res_mc["mask"][0, 1]), 0)
+
+    def test_pipeline_onnx_step_retains_non_raster_results(self):
+        from geoai.pipeline import ONNXInferenceStep
+
+        det_result = {
+            "boxes": np.array([[10.0, 20.0, 30.0, 40.0]]),
+            "scores": np.array([0.92]),
+            "labels": np.array([1]),
+            "metadata": {},
+        }
+        fake_onnx = MagicMock()
+        fake_onnx.predict.return_value = det_result
+
+        with tempfile.TemporaryDirectory() as td:
+            in_path = os.path.join(td, "scene.tif")
+            _make_geotiff(in_path)
+            with patch("geoai.onnx.ONNXGeoModel", return_value=fake_onnx):
+                step = ONNXInferenceStep(model_path="det.onnx", task="object-detection")
+                out_item = step.process({"input_path": in_path, "output_dir": td})
+
+        self.assertNotIn("output_path", out_item)
+        self.assertIn("onnx_result", out_item)
+        np.testing.assert_array_equal(out_item["boxes"], det_result["boxes"])
+        np.testing.assert_array_equal(out_item["scores"], det_result["scores"])
+
+    def test_sr_cached_config_validates_yaml_before_publishing_cache(self):
+        from geoai.tools.sr import _get_cached_config
+
+        bad_resp = MagicMock()
+        bad_resp.text = "model: [unclosed"
+        bad_resp.__enter__.return_value = bad_resp
+        bad_resp.__exit__.return_value = False
+
+        good_resp = MagicMock()
+        good_resp.text = "model:\n  scale: 4\n"
+        good_resp.__enter__.return_value = good_resp
+        good_resp.__exit__.return_value = False
+
+        with tempfile.TemporaryDirectory() as td:
+            with patch("geoai.tools.sr.torch.hub.get_dir", return_value=td):
+                with patch("geoai.tools.sr.requests.get", return_value=bad_resp):
+                    with self.assertRaises(Exception):
+                        _get_cached_config("https://example.com/cfg.yaml", "cfg.yaml")
+                # Cache file must NOT exist after invalid YAML
+                cache_file = os.path.join(td, "opensr", "cfg.yaml")
+                self.assertFalse(os.path.exists(cache_file))
+
+                # Subsequent call retries and succeeds
+                with patch("geoai.tools.sr.requests.get", return_value=good_resp):
+                    cfg = _get_cached_config("https://example.com/cfg.yaml", "cfg.yaml")
+                self.assertEqual(cfg.model.scale, 4)
+                self.assertTrue(os.path.isfile(cache_file))
+
+    def test_vllm_geo_preserves_pre_import_requests_post_patch(self):
+        fake_resp = MagicMock()
+        fake_resp.json.return_value = {"choices": [{"message": {"content": "patched"}}]}
+        mock_post = MagicMock(return_value=fake_resp)
+
+        saved_mod = sys.modules.pop("geoai.vllm_geo", None)
+        try:
+            with patch("requests.post", mock_post):
+                vllm_mod = importlib.import_module("geoai.vllm_geo")
+                vlm = vllm_mod.VLLMGeo(
+                    model_id="m", base_url="http://localhost:8000/v1"
+                )
+                ans = vlm.query("hello")
+            self.assertEqual(ans["answer"], "patched")
+            mock_post.assert_called_once()
+        finally:
+            if saved_mod is not None:
+                sys.modules["geoai.vllm_geo"] = saved_mod
+
+    def test_dinov3_dataset_dtype_scaling_and_weights_only_error_message(self):
+        import torch
+        from geoai import dinov3_finetune
+
+        with tempfile.TemporaryDirectory() as td:
+            img_path = os.path.join(td, "u16.tif")
+            mask_path = os.path.join(td, "m.tif")
+            _make_geotiff(
+                img_path,
+                width=32,
+                height=32,
+                bands=3,
+                dtype="uint16",
+                data=np.full((3, 32, 32), 32768, dtype=np.uint16),
+            )
+            _make_geotiff(
+                mask_path,
+                width=32,
+                height=32,
+                bands=1,
+                dtype="uint8",
+                data=np.ones((1, 32, 32), dtype=np.uint8),
+            )
+            ds = dinov3_finetune.DINOv3SegmentationDataset(
+                [img_path], [mask_path], input_scaling="dtype"
+            )
+            img_t, _ = ds[0]
+            self.assertAlmostEqual(float(img_t.max()), 32768.0 / 65535.0, places=3)
+
+            # weights_only=True failure raises clear actionable RuntimeError
+            bad_ckpt = os.path.join(td, "custom_obj.pth")
+            import argparse
+
+            torch.save(argparse.Namespace(x=1), bad_ckpt)
+            with self.assertRaisesRegex(RuntimeError, "weights_only=True"):
+                dinov3_finetune._load_torch_checkpoint_safe(
+                    bad_ckpt, map_location="cpu"
+                )
 
 
 if __name__ == "__main__":

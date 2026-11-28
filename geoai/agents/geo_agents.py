@@ -232,7 +232,7 @@ def create_gemini_model(
         if client_args is not None
         else (kwargs.pop("client_args", None) or {})
     )
-    if api_key is None and not client_args.get("api_key"):
+    if api_key is None and "api_key" not in client_args:
         try:
             api_key = os.getenv("GOOGLE_API_KEY", None)
             if api_key is None:
@@ -240,7 +240,7 @@ def create_gemini_model(
         except Exception:
             raise ValueError("GOOGLE_API_KEY is not set")
 
-    if not client_args.get("api_key") and api_key is not None:
+    if "api_key" not in client_args and api_key is not None:
         client_args["api_key"] = api_key
 
     return GeminiModel(client_args=client_args, model_id=model_id, **kwargs)
@@ -358,41 +358,83 @@ def _resolve_model(
     if isinstance(model, str) and model.lower().startswith("minimax"):
         return lambda m=model: create_minimax_model(model_id=m, **args)
     if isinstance(model, OllamaModel):
+        if not args:
+            return lambda m=model: m
         model_id = model.config["model_id"]
         host = model.host
-        client_args = dict(model.client_args or {})
-        return lambda mid=model_id, h=host, ca=client_args: create_ollama_model(
-            host=h, model_id=mid, client_args=dict(ca), **args
+        call_args = dict(args)
+        override_ca = call_args.pop("client_args", None)
+        merged_ca = dict(getattr(model, "client_args", None) or {})
+        if override_ca is not None:
+            merged_ca.update(override_ca)
+        return lambda mid=model_id, h=host, ca=merged_ca, ka=call_args: create_ollama_model(
+            host=h, model_id=mid, client_args=dict(ca), **ka
         )
     if isinstance(model, OpenAIModel):
+        if not args:
+            return lambda m=model: m
         model_id = model.config["model_id"]
-        client_args = dict(model.client_args or {})
-        return lambda mid=model_id, ca=client_args: create_openai_model(
-            model_id=mid, client_args=dict(ca), **args
+        call_args = dict(args)
+        override_ca = call_args.pop("client_args", None)
+        merged_ca = dict(getattr(model, "client_args", None) or {})
+        if override_ca is not None:
+            merged_ca.update(override_ca)
+        return lambda mid=model_id, ca=merged_ca, ka=call_args: create_openai_model(
+            model_id=mid, client_args=dict(ca), **ka
         )
     if isinstance(model, AnthropicModel):
+        if not args:
+            return lambda m=model: m
         model_id = model.config["model_id"]
-        client_args = dict(model.client_args or {})
-        return lambda mid=model_id, ca=client_args: create_anthropic_model(
-            model_id=mid, client_args=dict(ca), **args
+        call_args = dict(args)
+        override_ca = call_args.pop("client_args", None)
+        merged_ca = dict(getattr(model, "client_args", None) or {})
+        if override_ca is not None:
+            merged_ca.update(override_ca)
+        return lambda mid=model_id, ca=merged_ca, ka=call_args: create_anthropic_model(
+            model_id=mid, client_args=dict(ca), **ka
         )
     if isinstance(model, GeminiModel):
+        if not args:
+            return lambda m=model: m
         model_id = model.config["model_id"]
-        client_args = dict(model.client_args or {})
-        return lambda mid=model_id, ca=client_args: create_gemini_model(
-            model_id=mid, client_args=dict(ca), **args
+        call_args = dict(args)
+        override_ca = call_args.pop("client_args", None)
+        merged_ca = dict(getattr(model, "client_args", None) or {})
+        if override_ca is not None:
+            merged_ca.update(override_ca)
+        return lambda mid=model_id, ca=merged_ca, ka=call_args: create_gemini_model(
+            model_id=mid, client_args=dict(ca), **ka
         )
     if isinstance(model, BedrockModel):
-        model_id = model.config["model_id"]
-        bedrock_kwargs = dict(args)
-        if "region_name" not in bedrock_kwargs:
-            region = getattr(model, "region_name", None)
+        if not args:
+            return lambda m=model: m
+        model_config = (
+            dict(model.config)
+            if isinstance(getattr(model, "config", None), dict)
+            else {}
+        )
+        model_id = model_config.pop("model_id", None)
+        bedrock_kwargs = dict(model_config)
+        bedrock_kwargs.update(args)
+        if "model_id" in bedrock_kwargs:
+            model_id = bedrock_kwargs.pop("model_id")
+        if "boto_session" in args and "region_name" not in args:
+            bedrock_kwargs.pop("region_name", None)
+        if "region_name" not in bedrock_kwargs and "boto_session" not in bedrock_kwargs:
+            region = None
+            client = getattr(model, "client", None)
+            meta = getattr(client, "meta", None) if client is not None else None
+            if meta is not None:
+                region = getattr(meta, "region_name", None)
+            if region is None:
+                region = getattr(model, "region_name", None)
             if region is None and isinstance(getattr(model, "config", None), dict):
                 region = model.config.get("region_name")
             if region is not None:
                 bedrock_kwargs["region_name"] = region
         return lambda mid=model_id, bk=bedrock_kwargs: create_bedrock_model(
-            model_id=mid, **bk
+            model_id=mid, **dict(bk)
         )
     if isinstance(model, str):
         return lambda m=model: create_bedrock_model(model_id=m, **args)

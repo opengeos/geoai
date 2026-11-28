@@ -6,10 +6,13 @@ and basic data operations.  These complement the existing CatalogTools
 """
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional
 
 from strands import tool
+
+logger = logging.getLogger(__name__)
 
 
 class DataTools:
@@ -33,6 +36,11 @@ class DataTools:
             os.path.realpath(workspace_dir) if workspace_dir is not None else None
         )
         if workspace_dir is None and allowed_roots is None:
+            logger.warning(
+                "DataTools initialized without workspace_dir or allowed_roots; "
+                "file access is unrestricted. Pass workspace_dir or allowed_roots "
+                "to restrict reads and writes to specific directories."
+            )
             self.allowed_roots: Optional[List[str]] = None
         else:
             roots: List[str] = []
@@ -152,6 +160,9 @@ class DataTools:
 
         resolved_in = self._resolve_and_validate_path(input_raster)
         resolved_out = self._resolve_and_validate_path(output_raster)
+        out_parent = os.path.dirname(resolved_out)
+        if out_parent:
+            os.makedirs(out_parent, exist_ok=True)
         bbox = [min_lon, min_lat, max_lon, max_lat]
         clip_raster_by_bbox(resolved_in, resolved_out, bbox)
 
@@ -184,6 +195,9 @@ class DataTools:
 
         resolved_in = self._resolve_and_validate_path(raster_path)
         resolved_out = self._resolve_and_validate_path(output_path)
+        out_parent = os.path.dirname(resolved_out)
+        if out_parent:
+            os.makedirs(out_parent, exist_ok=True)
         _r2v(resolved_in, resolved_out)
         gdf = read_vector(resolved_out)
         return json.dumps({"output_path": resolved_out, "feature_count": len(gdf)})

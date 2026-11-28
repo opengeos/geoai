@@ -1,27 +1,64 @@
 """Command-line interface for geoai."""
 
 import json
+import math
 import os
 import sys
+from pathlib import Path
 
 import click
+
+
+def _to_json_value(value):
+    """Recursively normalize values for strict JSON output."""
+    if value is None or isinstance(value, (bool, str)):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Path):
+        return str(value)
+    if (
+        hasattr(value, "left")
+        and hasattr(value, "bottom")
+        and hasattr(value, "right")
+        and hasattr(value, "top")
+    ):
+        return {
+            "left": _to_json_value(value.left),
+            "bottom": _to_json_value(value.bottom),
+            "right": _to_json_value(value.right),
+            "top": _to_json_value(value.top),
+        }
+    if type(value).__module__.startswith("numpy"):
+        import numpy as np
+
+        if isinstance(value, np.ma.core.MaskedConstant):
+            return None
+        if isinstance(value, np.bool_):
+            return bool(value)
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            fval = float(value)
+            return fval if math.isfinite(fval) else None
+        if isinstance(value, np.ndarray):
+            return [_to_json_value(v) for v in value.tolist()]
+    if type(value).__name__ == "NAType":
+        return None
+    if isinstance(value, dict):
+        return {str(k): _to_json_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_json_value(v) for v in value]
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def _emit_info(info_dict, as_json):
     """Print raster or vector info in plain text or JSON format."""
     if as_json:
-        serializable = {}
-        for key, value in info_dict.items():
-            if hasattr(value, "left") and hasattr(value, "bottom"):
-                serializable[key] = {
-                    "left": value.left,
-                    "bottom": value.bottom,
-                    "right": value.right,
-                    "top": value.top,
-                }
-            else:
-                serializable[key] = value
-        click.echo(json.dumps(serializable, indent=2, default=str))
+        serializable = _to_json_value(info_dict)
+        click.echo(json.dumps(serializable, indent=2, allow_nan=False))
     else:
         for key, value in info_dict.items():
             click.echo(f"{key}: {value}")
@@ -132,7 +169,7 @@ def info(filepath, as_json):
 @click.option(
     "--max-items",
     default=1,
-    type=int,
+    type=click.IntRange(min=1),
     help="Maximum number of STAC items to download (stac).",
 )
 def download(
@@ -212,6 +249,9 @@ def download(
                 output_dir=output,
                 assets=asset_list,
             )
+            if not result or not any(result.values()):
+                click.echo("Error: No STAC assets were downloaded.", err=True)
+                sys.exit(1)
             click.echo(f"Downloaded: {result}")
         except Exception as e:
             click.echo(f"Error downloading STAC data: {e}", err=True)
@@ -298,7 +338,7 @@ def run(
                 for item, error in result.failed
             ],
         }
-        click.echo(json.dumps(payload, indent=2, default=str))
+        click.echo(json.dumps(_to_json_value(payload), indent=2, allow_nan=False))
         return
 
     click.echo("\nPipeline complete:")
