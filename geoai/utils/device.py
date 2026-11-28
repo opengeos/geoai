@@ -18,10 +18,17 @@ __all__ = [
 
 
 def install_package(package: Union[str, List[str]]) -> None:
-    """Install a Python package.
+    """Install a Python package using the active interpreter's pip.
 
     Args:
-        package (str | list): The package name or a GitHub URL or a list of package names or GitHub URLs.
+        package (str | list): The package name or a GitHub URL, or a list of
+            package names or GitHub URLs.
+
+    Raises:
+        ValueError: If *package* is not a non-empty string or list of non-empty
+            strings.
+        subprocess.CalledProcessError: If ``pip install`` exits with a non-zero
+            status code for any requested package.
     """
     import subprocess
     import sys

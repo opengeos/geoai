@@ -465,7 +465,16 @@ class ObjectDetector:
                     state_dict = torch.load(
                         model_path, map_location=self.device, weights_only=True
                     )
-                except TypeError:
+                except TypeError as e:
+                    if "weights_only" not in str(e):
+                        raise
+                    if not unsafe_allowed:
+                        raise RuntimeError(
+                            f"Installed PyTorch does not support weights_only=True "
+                            f"when loading '{model_path}'. If this is a trusted "
+                            "checkpoint, pass allow_unsafe=True or set "
+                            "GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1."
+                        ) from e
                     state_dict = torch.load(model_path, map_location=self.device)
                 except (pickle.UnpicklingError, RuntimeError) as e:
                     if isinstance(

@@ -54,7 +54,15 @@ def inspect_pth_file(pth_path: str, allow_unsafe: bool = False) -> None:
         checkpoint = torch.load(
             pth_path, map_location=torch.device("cpu"), weights_only=True
         )
-    except TypeError:
+    except TypeError as e:
+        if "weights_only" not in str(e):
+            raise
+        if not unsafe_allowed:
+            raise RuntimeError(
+                f"Installed PyTorch does not support weights_only=True when loading "
+                f"'{pth_path}'. If this is a trusted checkpoint, pass allow_unsafe=True "
+                "or set GEOAI_ALLOW_UNSAFE_TORCH_LOAD=1."
+            ) from e
         checkpoint = torch.load(pth_path, map_location=torch.device("cpu"))
     except (pickle.UnpicklingError, RuntimeError) as e:
         if isinstance(e, pickle.UnpicklingError) or "Weights only load failed" in str(
