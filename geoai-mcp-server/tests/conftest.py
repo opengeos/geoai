@@ -15,14 +15,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def temp_input_dir() -> Generator[Path, None, None]:
     """Create a temporary input directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
+        yield Path(tmpdir).resolve()
 
 
 @pytest.fixture
 def temp_output_dir() -> Generator[Path, None, None]:
     """Create a temporary output directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
+        yield Path(tmpdir).resolve()
 
 
 @pytest.fixture
