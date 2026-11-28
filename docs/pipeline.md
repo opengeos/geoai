@@ -157,7 +157,7 @@ Pass `checkpoint_dir` to `Pipeline` (or `-c` / `--checkpoint-dir` on the CLI) to
 - Progress is persisted atomically to `<checkpoint_dir>/<name>_checkpoint.json` every 10 processed items and when the run finishes or aborts.
 - Each item is keyed by `item["input_path"]` by default (customizable via `item_key_fn`).
 - On subsequent runs, items marked `completed` are skipped automatically and recorded in `result.skipped`.
-- A hash of the pipeline name, step types, and public step attributes is stored in the checkpoint. If a registered step's public configuration changes, existing checkpoint progress is reset automatically so stale outputs are not reused. Note that private attributes (such as a `FunctionStep`'s underlying `_fn` callable) are not included in `_config_hash()`, so clear the checkpoint file or choose a new checkpoint directory/pipeline name whenever you modify callable behavior.
+- A hash of the pipeline name, step types, and public step attributes is stored in the checkpoint. If a registered step's public configuration changes, existing checkpoint progress is reset automatically so stale outputs are not reused. Note that private attributes (such as a `FunctionStep`'s underlying `_fn` callable) and the runtime `output_dir` are not included in `_config_hash()` or the default item key, so clear the checkpoint file or choose a new checkpoint directory/pipeline name whenever you modify callable behavior or change `output_dir`.
 
 ## Error Handling and Execution
 

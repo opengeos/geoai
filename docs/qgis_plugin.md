@@ -361,7 +361,7 @@ cd geoai/qgis_plugin
 python install.py
 ```
 
-This copies the plugin into the `default` profile of every QGIS major version whose settings directory exists (`QGIS4` and `QGIS3`; use `--profile NAME` for another profile). If QGIS 4 has not been launched yet so its settings directory does not exist, launch QGIS 4 once first or pass `--plugin-dir /path/to/plugins` explicitly (if neither settings directory exists, the script falls back to the QGIS 3 path). Re-run after pulling updates. Remove with:
+This copies the plugin into the `default` profile of every QGIS major version whose settings directory exists (`QGIS4` and `QGIS3`; use `--profile NAME` for another profile). If QGIS 4 has not been launched yet so its settings directory does not exist, launch QGIS 4 once first or pass `--plugin-dir /path/to/plugins` explicitly (if neither settings directory exists, the script falls back to the QGIS 3 path). Re-run after pulling updates. Remove with (passing the same `--profile NAME` or `--plugin-dir DIR` flag if you used one during installation):
 
 ```bash
 python install.py --remove
