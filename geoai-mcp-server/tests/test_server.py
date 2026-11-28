@@ -2,6 +2,7 @@
 
 import asyncio
 import importlib
+import os
 import subprocess
 import sys
 import time
@@ -720,6 +721,14 @@ class TestRuntimeSafety:
     def test_import_server_has_no_filesystem_side_effects(self, tmp_path):
         """Importing geoai_mcp_server.server must not create ./input or ./output dirs."""
         src_dir = str(Path(__file__).parent.parent / "src")
+        clean_env = {
+            "PATH": "",
+            "PYTHONPATH": src_dir,
+        }
+        # Windows requires SYSTEMROOT/WINDIR so asyncio's _overlapped/Winsock can initialize
+        for key in ("SYSTEMROOT", "WINDIR", "COMSPEC"):
+            if key in os.environ:
+                clean_env[key] = os.environ[key]
         proc = subprocess.run(
             [
                 sys.executable,
@@ -728,10 +737,7 @@ class TestRuntimeSafety:
                 "assert geoai_mcp_server.mcp is geoai_mcp_server.server.mcp",
             ],
             cwd=str(tmp_path),
-            env={
-                "PATH": "",
-                "PYTHONPATH": src_dir,
-            },
+            env=clean_env,
             capture_output=True,
             text=True,
             check=False,
