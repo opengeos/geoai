@@ -113,7 +113,12 @@ class BoundingBox(BaseModel):
 
 
 class SearchBoundingBox(BaseModel):
-    """Geographic bounding box for STAC search (permits point and line boxes)."""
+    """Geographic bounding box for STAC search.
+
+    Permits point/line boxes (equal bounds) and antimeridian-crossing boxes
+    (``min_lon > max_lon``) per the STAC Item Search specification while still
+    requiring ``min_lat <= max_lat``.
+    """
 
     min_lon: float = Field(..., description="Minimum longitude (west)", ge=-180, le=180)
     min_lat: float = Field(..., description="Minimum latitude (south)", ge=-90, le=90)
@@ -122,11 +127,7 @@ class SearchBoundingBox(BaseModel):
 
     @model_validator(mode="after")
     def _validate_search_bounds_order(self) -> "SearchBoundingBox":
-        """Ensure minimum coordinates do not exceed maximum coordinates."""
-        if self.min_lon > self.max_lon:
-            raise ValueError(
-                f"min_lon ({self.min_lon}) must be less than or equal to max_lon ({self.max_lon})"
-            )
+        """Ensure south latitude does not exceed north latitude."""
         if self.min_lat > self.max_lat:
             raise ValueError(
                 f"min_lat ({self.min_lat}) must be less than or equal to max_lat ({self.max_lat})"

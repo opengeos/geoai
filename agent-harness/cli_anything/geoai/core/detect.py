@@ -61,15 +61,27 @@ def _detection_raster_to_vector(raster_path: str, output_vector: str) -> None:
             continue
         geoms_by_instance.setdefault(inst_id, []).append(shapely_shape(geom_dict))
 
+    # Aggregate dominant positive class label per instance ID in a single pass
+    # over the raster rather than rescanning both full bands per instance.
+    valid_mask = (instance_band > 0) & (class_band > 0)
+    inst_vals = instance_band[valid_mask].astype(np.int64, copy=False)
+    cls_vals = class_band[valid_mask].astype(np.int64, copy=False)
+    dominant_class_by_instance: Dict[int, int] = {}
+    if inst_vals.size > 0:
+        pairs = np.empty(inst_vals.size, dtype=[("inst", np.int64), ("cls", np.int64)])
+        pairs["inst"] = inst_vals
+        pairs["cls"] = cls_vals
+        unique_pairs, pair_counts = np.unique(pairs, return_counts=True)
+        best_count: Dict[int, int] = {}
+        for (i_id, c_id), cnt in zip(unique_pairs.tolist(), pair_counts.tolist()):
+            if cnt > best_count.get(i_id, -1):
+                best_count[i_id] = cnt
+                dominant_class_by_instance[i_id] = c_id
+
     records = []
     for inst_id, parts in sorted(geoms_by_instance.items()):
         geom = parts[0] if len(parts) == 1 else unary_union(parts)
-        inst_classes = class_band[(instance_band == inst_id) & (class_band > 0)]
-        if inst_classes.size > 0:
-            vals, counts = np.unique(inst_classes, return_counts=True)
-            class_id = int(vals[int(np.argmax(counts))])
-        else:
-            class_id = 0
+        class_id = dominant_class_by_instance.get(inst_id, 0)
         records.append(
             {
                 "instance_id": inst_id,

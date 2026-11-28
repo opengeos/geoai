@@ -264,25 +264,37 @@ def extract_band_subset(
                 )
 
         one_based = [idx + 1 for idx in validated]
-        data = src.read(one_based)
         profile = src.profile.copy()
-        profile.update(driver="GTiff", count=len(one_based))
+        # Strip lossy compression and source-specific photometric options so
+        # decoded pixels are stored losslessly regardless of selected band count.
+        for key in (
+            "compress",
+            "photometric",
+            "jpeg_quality",
+            "jpegtablesmode",
+            "ycbcr_subsampling",
+            "quality",
+            "predictor",
+        ):
+            profile.pop(key, None)
+        profile.update(driver="GTiff", count=len(one_based), compress="lzw")
 
-    fd, subset_path = tempfile.mkstemp(
-        suffix=".tif",
-        prefix="geoai_bands_",
-        dir=temp_dir or os.path.dirname(os.path.abspath(raster_path)) or ".",
-    )
-    os.close(fd)
-    try:
-        with rasterio.open(subset_path, "w", **profile) as dst:
-            dst.write(data)
-    except Exception:
-        if os.path.exists(subset_path):
-            try:
-                os.unlink(subset_path)
-            except OSError:
-                pass
-        raise
+        fd, subset_path = tempfile.mkstemp(
+            suffix=".tif",
+            prefix="geoai_bands_",
+            dir=temp_dir or os.path.dirname(os.path.abspath(raster_path)) or ".",
+        )
+        os.close(fd)
+        try:
+            with rasterio.open(subset_path, "w", **profile) as dst:
+                for _ji, window in src.block_windows(1):
+                    dst.write(src.read(one_based, window=window), window=window)
+        except Exception:
+            if os.path.exists(subset_path):
+                try:
+                    os.unlink(subset_path)
+                except OSError:
+                    pass
+            raise
 
     return os.path.abspath(subset_path)

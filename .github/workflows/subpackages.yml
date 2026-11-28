@@ -11,6 +11,8 @@ on:
             - "geoai-mcp-server/**"
             - "agent-harness/**"
             - "geoai/**"
+            - "pyproject.toml"
+            - "requirements.txt"
             - ".github/workflows/subpackages.yml"
     pull_request:
         branches:
@@ -19,6 +21,8 @@ on:
             - "geoai-mcp-server/**"
             - "agent-harness/**"
             - "geoai/**"
+            - "pyproject.toml"
+            - "requirements.txt"
             - ".github/workflows/subpackages.yml"
 
 jobs:

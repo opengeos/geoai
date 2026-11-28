@@ -238,16 +238,43 @@ def _vector_driver_for_format(out_format: OutputFormat) -> Optional[str]:
     return drivers.get(out_format)
 
 
-def _move_vector_file(src: Path, dest: Path) -> None:
-    """Move a vector file (and shapefile sidecars if applicable) to ``dest``."""
+_SHAPEFILE_SIDECAR_EXTS = (
+    ".shp",
+    ".shx",
+    ".dbf",
+    ".prj",
+    ".cpg",
+    ".sbn",
+    ".sbx",
+    ".qix",
+    ".fix",
+    ".shp.xml",
+)
+
+
+def _atomic_publish_file(src: Path, dest: Path) -> None:
+    """Move ``src`` to ``dest``, using ``os.replace`` when on the same device."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.replace(str(src), str(dest))
+    except OSError:
+        shutil.move(str(src), str(dest))
+
+
+def _move_vector_file(src: Path, dest: Path, cfg: Optional[GeoAIConfig] = None) -> None:
+    """Publish a vector file (including shapefile sidecars) to ``dest``."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     if src.suffix.lower() == ".shp" and dest.suffix.lower() == ".shp":
-        for ext in (".shp", ".shx", ".dbf", ".prj", ".cpg"):
-            sidecar = src.with_suffix(ext)
+        for ext in _SHAPEFILE_SIDECAR_EXTS:
+            sidecar = src.with_name(f"{src.stem}{ext}")
             if sidecar.is_file():
-                shutil.move(str(sidecar), str(dest.with_suffix(ext)))
+                target = dest.with_name(f"{dest.stem}{ext}")
+                if cfg is not None:
+                    target = validate_output_path(target, cfg)
+                _atomic_publish_file(sidecar, target)
     else:
-        shutil.move(str(src), str(dest))
+        target = validate_output_path(dest, cfg) if cfg is not None else dest
+        _atomic_publish_file(src, target)
 
 
 def _count_raster_instances(raster_path: Path) -> Optional[int]:
@@ -1382,23 +1409,23 @@ async def download_satellite_imagery(
                 quiet=True,
             )
             if items:
-                cancelled = threading.Event()
+                # Stage outside output_dir so workspace listings/reads cannot
+                # observe incomplete downloads, and separate staging (worker)
+                # from publication (request) so timed-out workers cannot
+                # overwrite files published by a later retry.
+                stage_dir = Path(tempfile.mkdtemp(prefix="geoai_stac_stage_"))
+                stage_root = stage_dir.resolve()
+                stage_lock = threading.Lock()
+                abandoned = False
+                worker_finished = False
 
-                def _run_stac_download():
-                    # Stage downloads into a private directory and atomically
-                    # publish only after pc_stac_download completes without
-                    # timeout so partial files never pollute output_dir.
-                    with tempfile.TemporaryDirectory(
-                        dir=str(output_dir), prefix=".stac_dl_"
-                    ) as stage_dir:
-                        stage_root = Path(stage_dir).resolve()
+                def _stage_stac_download():
+                    nonlocal worker_finished
+                    try:
                         dl_map = download_module.pc_stac_download(
                             items=items,
-                            output_dir=stage_dir,
+                            output_dir=str(stage_dir),
                         )
-                        if cancelled.is_set():
-                            return []
-
                         raw_paths: list[str] = []
                         if isinstance(dl_map, dict):
                             for asset_dict in dl_map.values():
@@ -1408,7 +1435,26 @@ async def download_satellite_imagery(
                                     )
                                 elif asset_dict:
                                     raw_paths.append(str(asset_dict))
+                        return raw_paths
+                    finally:
+                        with stage_lock:
+                            worker_finished = True
+                            should_cleanup = abandoned
+                        if should_cleanup:
+                            shutil.rmtree(stage_dir, ignore_errors=True)
 
+                try:
+                    raw_paths = await _run_blocking(_stage_stac_download)
+                except BaseException:
+                    with stage_lock:
+                        abandoned = True
+                        done = worker_finished
+                    if done:
+                        shutil.rmtree(stage_dir, ignore_errors=True)
+                    raise
+
+                def _publish_stac_downloads():
+                    try:
                         published: list[str] = []
                         for p_str in raw_paths:
                             src_p = Path(p_str)
@@ -1421,17 +1467,15 @@ async def download_satellite_imagery(
                                     dest_p = validate_output_path(
                                         output_dir / resolved_src.name, cfg
                                     )
-                                    os.replace(str(resolved_src), str(dest_p))
+                                    _atomic_publish_file(resolved_src, dest_p)
                                     published.append(str(dest_p))
                             else:
                                 published.append(p_str)
                         return published
+                    finally:
+                        shutil.rmtree(stage_dir, ignore_errors=True)
 
-                try:
-                    downloaded_files = await _run_blocking(_run_stac_download)
-                except OperationTimeoutError:
-                    cancelled.set()
-                    raise
+                downloaded_files = await _run_blocking(_publish_stac_downloads)
 
         for f in downloaded_files:
             fp = Path(f)
@@ -1473,7 +1517,9 @@ async def prepare_training_data(
 
     Args:
         images_dir: Directory or image file containing source imagery.
-        labels_dir: Directory or label file containing label masks/vectors.
+        labels_dir: Directory of per-image masks/vectors, a single vector file
+            (when images_dir is a directory), or a single raster/vector mask
+            (when images_dir is a single raster file).
         tile_size: Output tile size in pixels (64-2048).
         overlap: Tile overlap in pixels (must be less than tile_size).
         train_ratio: Training data proportion (0.1-0.95).
@@ -1507,6 +1553,31 @@ async def prepare_training_data(
         images_path = get_safe_input_path(images_dir, cfg)
         labels_path = get_safe_input_path(labels_dir, cfg)
 
+        vector_label_exts = {
+            ".geojson",
+            ".json",
+            ".shp",
+            ".gpkg",
+            ".geoparquet",
+            ".parquet",
+            ".fgb",
+            ".gml",
+            ".kml",
+        }
+        if images_path.is_dir() and not labels_path.is_dir():
+            if labels_path.suffix.lower() not in vector_label_exts:
+                raise InputValidationError(
+                    message=(
+                        f"Batch mode (images_dir is a directory) requires labels_dir to be "
+                        f"either a directory of per-image masks or a single vector file "
+                        f"(got '{labels_path.name}'). For a single raster label mask, pass "
+                        f"a single raster image or organize per-image masks into a directory."
+                    ),
+                    parameter_name="labels_dir",
+                    received_value=labels_dir,
+                    expected="A directory of masks or a single vector file (.geojson, .gpkg, .shp, etc.)",
+                )
+
         output_dir = cfg.output_dir
         if output_subdir:
             output_dir = validate_output_subdir(output_subdir, cfg)
@@ -1520,109 +1591,150 @@ async def prepare_training_data(
         error_count = 0
         failed_files: list[dict[str, Any]] = []
 
-        if images_path.is_dir():
-            batch_kwargs: dict[str, Any] = {
-                "images_folder": str(images_path),
-                "output_folder": str(output_dir),
-                "tile_size": tile_size,
-                "stride": stride,
-                "quiet": True,
-            }
-            if labels_path.is_dir():
-                batch_kwargs["masks_folder"] = str(labels_path)
-            else:
-                batch_kwargs["masks_file"] = str(labels_path)
+        # When output_subdir is specified, stage into a fresh temp directory and
+        # replace output_dir as a unit on clean completion so a full retry after
+        # a partial export never merges or duplicates tiles by filename.
+        use_staged_unit = bool(output_subdir)
+        stage_export_dir: Optional[Path] = (
+            Path(tempfile.mkdtemp(prefix="geoai_train_stage_"))
+            if use_staged_unit
+            else None
+        )
+        target_export_dir = (
+            stage_export_dir if stage_export_dir is not None else output_dir
+        )
 
-            result = await _run_blocking(
-                utils_module.export_geotiff_tiles_batch, **batch_kwargs
-            )
-            num_tiles = (
-                int(result.get("total_tiles", 0)) if isinstance(result, dict) else 0
-            )
-            if isinstance(result, dict):
-                raw_errors = result.get("errors", 0)
-                error_count = (
-                    len(raw_errors)
-                    if isinstance(raw_errors, (list, tuple))
-                    else int(raw_errors or 0)
-                )
-                raw_failed = result.get("failed_files") or []
-                if isinstance(raw_failed, list):
-                    failed_files = [
-                        item if isinstance(item, dict) else {"file": str(item)}
-                        for item in raw_failed
-                    ]
-        else:
-
-            def _run_single_export():
-                images_out = output_dir / "images"
-                pre_existing = (
-                    {p.resolve() for p in images_out.iterdir() if p.is_file()}
-                    if images_out.is_dir()
-                    else {p.resolve() for p in output_dir.rglob("*.tif") if p.is_file()}
-                )
-                export_res = utils_module.export_geotiff_tiles(
-                    in_raster=str(images_path),
-                    out_folder=str(output_dir),
-                    in_class_data=str(labels_path),
-                    tile_size=tile_size,
-                    stride=stride,
-                    quiet=True,
-                    apply_augmentation=augment,
-                )
-                if isinstance(export_res, dict):
-                    tiles = int(export_res.get("total_tiles", 0))
-                    raw_err = export_res.get("errors", 0)
-                    errs = (
-                        len(raw_err)
-                        if isinstance(raw_err, (list, tuple))
-                        else int(raw_err or 0)
-                    )
-                    raw_fail = export_res.get("failed_files") or []
-                    fails = (
-                        [
-                            item if isinstance(item, dict) else {"file": str(item)}
-                            for item in raw_fail
-                        ]
-                        if isinstance(raw_fail, list)
-                        else []
-                    )
-                    return tiles, errs, fails
-
-                # Fallback when a custom/mock exporter returns None: count only
-                # files created by this call rather than pre-existing tiles.
-                if images_out.is_dir():
-                    post_files = {
-                        p.resolve() for p in images_out.iterdir() if p.is_file()
-                    }
+        try:
+            if images_path.is_dir():
+                batch_kwargs: dict[str, Any] = {
+                    "images_folder": str(images_path),
+                    "output_folder": str(target_export_dir),
+                    "tile_size": tile_size,
+                    "stride": stride,
+                    "quiet": True,
+                }
+                if labels_path.is_dir():
+                    batch_kwargs["masks_folder"] = str(labels_path)
                 else:
-                    post_files = {
-                        p.resolve() for p in output_dir.rglob("*.tif") if p.is_file()
-                    }
-                return len(post_files - pre_existing), 0, []
+                    batch_kwargs["masks_file"] = str(labels_path)
 
-            num_tiles, error_count, failed_files = await _run_blocking(
-                _run_single_export
-            )
+                result = await _run_blocking(
+                    utils_module.export_geotiff_tiles_batch, **batch_kwargs
+                )
+                num_tiles = (
+                    int(result.get("total_tiles", 0)) if isinstance(result, dict) else 0
+                )
+                if isinstance(result, dict):
+                    raw_errors = result.get("errors", 0)
+                    error_count = (
+                        len(raw_errors)
+                        if isinstance(raw_errors, (list, tuple))
+                        else int(raw_errors or 0)
+                    )
+                    raw_failed = result.get("failed_files") or []
+                    if isinstance(raw_failed, list):
+                        failed_files = [
+                            item if isinstance(item, dict) else {"file": str(item)}
+                            for item in raw_failed
+                        ]
+            else:
+
+                def _run_single_export():
+                    images_out = target_export_dir / "images"
+                    pre_existing = (
+                        {p.resolve() for p in images_out.iterdir() if p.is_file()}
+                        if images_out.is_dir()
+                        else {
+                            p.resolve()
+                            for p in target_export_dir.rglob("*.tif")
+                            if p.is_file()
+                        }
+                    )
+                    export_res = utils_module.export_geotiff_tiles(
+                        in_raster=str(images_path),
+                        out_folder=str(target_export_dir),
+                        in_class_data=str(labels_path),
+                        tile_size=tile_size,
+                        stride=stride,
+                        quiet=True,
+                        apply_augmentation=augment,
+                    )
+                    if isinstance(export_res, dict):
+                        tiles = int(export_res.get("total_tiles", 0))
+                        raw_err = export_res.get("errors", 0)
+                        errs = (
+                            len(raw_err)
+                            if isinstance(raw_err, (list, tuple))
+                            else int(raw_err or 0)
+                        )
+                        raw_fail = export_res.get("failed_files") or []
+                        fails = (
+                            [
+                                item if isinstance(item, dict) else {"file": str(item)}
+                                for item in raw_fail
+                            ]
+                            if isinstance(raw_fail, list)
+                            else []
+                        )
+                        return tiles, errs, fails
+
+                    # Fallback when a custom/mock exporter returns None: count only
+                    # files created by this call rather than pre-existing tiles.
+                    if images_out.is_dir():
+                        post_files = {
+                            p.resolve() for p in images_out.iterdir() if p.is_file()
+                        }
+                    else:
+                        post_files = {
+                            p.resolve()
+                            for p in target_export_dir.rglob("*.tif")
+                            if p.is_file()
+                        }
+                    return len(post_files - pre_existing), 0, []
+
+                num_tiles, error_count, failed_files = await _run_blocking(
+                    _run_single_export
+                )
+
+            is_partial = error_count > 0 or len(failed_files) > 0
+
+            if stage_export_dir is not None:
+
+                def _replace_output_unit():
+                    if output_dir.exists():
+                        shutil.rmtree(output_dir)
+                    output_dir.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(stage_export_dir), str(output_dir))
+
+                await _run_blocking(_replace_output_unit)
+                stage_export_dir = None
+        finally:
+            if stage_export_dir is not None and stage_export_dir.exists():
+                shutil.rmtree(stage_export_dir, ignore_errors=True)
 
         num_train = int(num_tiles * train_ratio)
         num_val = num_tiles - num_train
         processing_time = time.time() - start_time
-        is_partial = error_count > 0 or len(failed_files) > 0
 
         if is_partial:
             failed_names = [
                 str(f.get("image") or f.get("file") or f) for f in failed_files
             ]
-            retry_note = (
-                f" Failed inputs requiring retry: {', '.join(failed_names)}."
-                if failed_names
-                else ""
+            retry_list = (
+                f" Failed inputs: {', '.join(failed_names)}." if failed_names else ""
+            )
+            retry_guidance = (
+                " After fixing the failed inputs, re-run with this output_subdir (which "
+                "replaces the dataset as a unit) or choose a fresh output_subdir."
+                if use_staged_unit
+                else " Do not merge a full retry into this directory; after fixing the "
+                "failed inputs, run a full retry into a fresh output_subdir to avoid "
+                "duplicate tiles."
             )
             message = (
                 f"Partial training export: created {num_tiles} tiles with "
                 f"{error_count} error(s) and {len(failed_files)} failed file(s)."
-                f"{retry_note}"
+                f"{retry_list}{retry_guidance}"
             )
         else:
             message = f"Created {num_tiles} training tiles"
@@ -1921,34 +2033,37 @@ async def estimate_canopy_height(
 
         canopy_module = _get_geoai_module("canopy")
 
-        heights = await _run_blocking(
-            canopy_module.canopy_height_estimation,
-            str(full_input_path),
-            output_path=str(output_path),
-        )
+        def _run_canopy():
+            heights = canopy_module.canopy_height_estimation(
+                str(full_input_path),
+                output_path=str(output_path),
+            )
+            min_h = 0.0
+            max_h = 0.0
+            mean_h = 0.0
+            cov = 0.0
+            if include_statistics:
+                if hasattr(heights, "statistics") and isinstance(
+                    heights.statistics, dict
+                ):
+                    stats = heights.statistics
+                    min_h = float(stats.get("min_height", 0.0))
+                    max_h = float(stats.get("max_height", 0.0))
+                    mean_h = float(stats.get("mean_height", 0.0))
+                    cov = float(stats.get("forest_coverage", 0.0))
+                elif heights is not None:
+                    import numpy as np
 
-        min_height = 0.0
-        max_height = 0.0
-        mean_height = 0.0
-        coverage = 0.0
+                    arr = np.asarray(heights, dtype=float)
+                    valid = arr[np.isfinite(arr)]
+                    if valid.size > 0:
+                        min_h = round(float(np.min(valid)), 3)
+                        max_h = round(float(np.max(valid)), 3)
+                        mean_h = round(float(np.mean(valid)), 3)
+                        cov = round(float(np.mean(valid > 0)) * 100.0, 2)
+            return min_h, max_h, mean_h, cov
 
-        if include_statistics:
-            if hasattr(heights, "statistics") and isinstance(heights.statistics, dict):
-                stats = heights.statistics
-                min_height = float(stats.get("min_height", 0.0))
-                max_height = float(stats.get("max_height", 0.0))
-                mean_height = float(stats.get("mean_height", 0.0))
-                coverage = float(stats.get("forest_coverage", 0.0))
-            elif heights is not None:
-                import numpy as np
-
-                arr = np.asarray(heights, dtype=float)
-                valid = arr[np.isfinite(arr)]
-                if valid.size > 0:
-                    min_height = round(float(np.min(valid)), 3)
-                    max_height = round(float(np.max(valid)), 3)
-                    mean_height = round(float(np.mean(valid)), 3)
-                    coverage = round(float(np.mean(valid > 0)) * 100.0, 2)
+        min_height, max_height, mean_height, coverage = await _run_blocking(_run_canopy)
 
         processing_time = time.time() - start_time
 
@@ -2063,7 +2178,7 @@ async def analyze_with_vision_language_model(
                     )
                     wrote_file = False
                     if staged_out.is_file():
-                        os.replace(str(staged_out), str(output_path))
+                        _move_vector_file(staged_out, output_path, cfg)
                         wrote_file = True
                     return raw_res, wrote_file
 
@@ -2094,7 +2209,7 @@ async def analyze_with_vision_language_model(
                     )
                     wrote_file = False
                     if staged_out.is_file():
-                        os.replace(str(staged_out), str(output_path))
+                        _move_vector_file(staged_out, output_path, cfg)
                         wrote_file = True
                     return raw_res, wrote_file
 
@@ -2410,15 +2525,10 @@ async def inspect_raster(
 
                 band_stats: list[dict[str, Any]] = []
                 if include_stats:
-                    nodata = src.nodata
                     for b in range(1, src.count + 1):
                         masked_arr = src.read(b, masked=True)
                         raw_data = np.asarray(masked_arr.data)
                         mask = (~np.ma.getmaskarray(masked_arr)) & np.isfinite(raw_data)
-                        if nodata is not None and not (
-                            isinstance(nodata, float) and math.isnan(nodata)
-                        ):
-                            mask &= raw_data != nodata
                         valid = raw_data[mask]
                         band_stats.append(
                             {

@@ -750,8 +750,8 @@ class TestToolIntegration:
 class TestCodeRabbitRegressions:
     """Regression tests covering all PR #1018 review fixes."""
 
-    def test_stac_search_allows_point_and_line_bbox_and_inclusive_cloud_cover(self):
-        """search_stac_imagery accepts point/line bboxes and uses inclusive lte cloud filter."""
+    def test_stac_search_allows_point_line_antimeridian_and_inclusive_cloud_cover(self):
+        """search_stac_imagery accepts point/line/antimeridian bboxes and uses inclusive lte cloud filter."""
         from geoai_mcp_server.server import (
             download_satellite_imagery,
             search_stac_imagery,
@@ -781,25 +781,42 @@ class TestCodeRabbitRegressions:
                     max_cloud_cover=None,
                 )
             )
+            res_antimeridian = asyncio.run(
+                search_stac_imagery(
+                    min_lon=160.6,
+                    min_lat=-55.95,
+                    max_lon=-170.0,
+                    max_lat=-25.89,
+                )
+            )
+            # Download providers still require nonzero-area bounding boxes and
+            # must reject before touching the provider.
+            res_dl = asyncio.run(
+                download_satellite_imagery(
+                    min_lon=-122.5,
+                    min_lat=37.7,
+                    max_lon=-122.5,
+                    max_lat=37.7,
+                    data_source="naip",
+                )
+            )
 
         assert res_pt["success"] is True
         assert res_none["success"] is True
+        assert res_antimeridian["success"] is True
         assert mock_download.pc_stac_search.call_args_list[0].kwargs["query"] == {
             "eo:cloud_cover": {"lte": 0}
         }
         assert mock_download.pc_stac_search.call_args_list[1].kwargs["query"] is None
-
-        # Download providers still require nonzero-area bounding boxes
-        res_dl = asyncio.run(
-            download_satellite_imagery(
-                min_lon=-122.5,
-                min_lat=37.7,
-                max_lon=-122.5,
-                max_lat=37.7,
-                data_source="naip",
-            )
-        )
+        assert mock_download.pc_stac_search.call_args_list[2].kwargs["bbox"] == [
+            160.6,
+            -55.95,
+            -170.0,
+            -25.89,
+        ]
         assert res_dl["success"] is False
+        assert "min_lon" in res_dl["message"]
+        mock_download.download_naip.assert_not_called()
 
     def test_concurrent_run_blocking_does_not_leak_stdout(self, capsys):
         """Concurrent _run_blocking calls never leak diagnostics to stdout or corrupt sys.stdout."""
@@ -1295,27 +1312,37 @@ class TestCodeRabbitRegressions:
         assert res_list["truncated"] is True
 
     def test_stac_download_timeout_leaves_no_partial_file(self, temp_output_dir):
-        """Timed-out STAC download stages in temp dir and leaves no partial file in output_dir."""
-        from geoai_mcp_server.server import download_satellite_imagery
+        """Timed-out STAC download stages outside output_dir and never publishes after timeout."""
+        import threading
+        from geoai_mcp_server.server import (
+            download_satellite_imagery,
+            list_available_files,
+        )
+
+        staged_written = threading.Event()
+        release_worker = threading.Event()
+        worker_exited = threading.Event()
+        staged_paths: list[Path] = []
+        listing_while_streaming: list[dict] = []
 
         def _slow_download(items, output_dir):
-            part = Path(output_dir) / "scene_B04.tif"
-            part.write_bytes(b"partial")
-            time.sleep(0.3)
-            return {"scene": {"B04": str(part)}}
+            try:
+                stage_path = Path(output_dir)
+                part = stage_path / "scene_B04.tif"
+                part.write_bytes(b"partial")
+                staged_paths.append(stage_path)
+                staged_written.set()
+                release_worker.wait(timeout=5.0)
+                return {"scene": {"B04": str(part)}}
+            finally:
+                worker_exited.set()
 
         mock_dl = MagicMock()
         mock_dl.pc_stac_search.return_value = [MagicMock(id="scene")]
         mock_dl.pc_stac_download.side_effect = _slow_download
 
-        with (
-            patch("geoai_mcp_server.server.config") as mock_config,
-            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_dl),
-        ):
-            mock_config.output_dir = temp_output_dir
-            mock_config.timeout = 0.05
-
-            res = asyncio.run(
+        async def _drive_timeout():
+            task = asyncio.create_task(
                 download_satellite_imagery(
                     min_lon=-122.5,
                     min_lat=37.7,
@@ -1325,12 +1352,193 @@ class TestCodeRabbitRegressions:
                     max_cloud_cover=0,
                 )
             )
+            # Wait until the worker definitely wrote its staged file
+            assert await asyncio.to_thread(staged_written.wait, 5.0)
+            # Output listing while streaming must not see any staged file
+            listing_while_streaming.append(
+                await list_available_files(directory="output", pattern="*/*.tif")
+            )
+            res = await task
+            release_worker.set()
+            assert await asyncio.to_thread(worker_exited.wait, 5.0)
+            return res
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_dl),
+        ):
+            mock_config.output_dir = temp_output_dir
+            mock_config.timeout = 0.15
+
+            res = asyncio.run(_drive_timeout())
 
         assert res["success"] is False
         assert "timed out" in res["message"].lower()
         assert mock_dl.pc_stac_search.call_args.kwargs["query"] == {
             "eo:cloud_cover": {"lte": 0}
         }
-        # Wait for the background worker to finish and verify nothing was published
-        time.sleep(0.35)
+        assert staged_paths and not staged_paths[0].resolve().is_relative_to(
+            temp_output_dir.resolve()
+        )
+        assert listing_while_streaming[0]["total_count"] == 0
         assert not (temp_output_dir / "scene_B04.tif").exists()
+        # Wait briefly for worker's finally cleanup of stage_dir
+        deadline = time.time() + 2.0
+        while staged_paths[0].exists() and time.time() < deadline:
+            time.sleep(0.01)
+        assert not staged_paths[0].exists()
+
+    def test_prepare_training_data_rejects_batch_raster_label_and_replaces_retry_unit(
+        self, sample_geotiff, temp_output_dir
+    ):
+        """Batch mode rejects single raster label; retrying output_subdir replaces failed dataset as a unit."""
+        from geoai_mcp_server.server import prepare_training_data
+
+        img_dir = sample_geotiff.parent / "batch_imgs"
+        lbl_dir = sample_geotiff.parent / "batch_lbls"
+        img_dir.mkdir()
+        lbl_dir.mkdir()
+
+        call_num = {"n": 0}
+
+        def _fake_batch(
+            images_folder,
+            output_folder,
+            tile_size,
+            stride,
+            quiet=True,
+            masks_folder=None,
+            masks_file=None,
+        ):
+            call_num["n"] += 1
+            imgs_out = Path(output_folder) / "images"
+            imgs_out.mkdir(parents=True, exist_ok=True)
+            if call_num["n"] == 1:
+                # Simulate A failing and B writing B_000000.tif
+                (imgs_out / "B_000000.tif").write_bytes(b"tileB_old")
+                return {
+                    "total_tiles": 1,
+                    "errors": 1,
+                    "failed_files": [{"image": "A.tif", "error": "bad"}],
+                }
+            # Simulate clean retry writing A_000000.tif and B_000001.tif
+            (imgs_out / "A_000000.tif").write_bytes(b"tileA")
+            (imgs_out / "B_000001.tif").write_bytes(b"tileB_new")
+            return {"total_tiles": 2, "errors": 0, "failed_files": []}
+
+        mock_utils = MagicMock()
+        mock_utils.export_geotiff_tiles_batch.side_effect = _fake_batch
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_utils),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            # Single GeoTIFF mask with an image directory must be rejected
+            res_bad_mask = asyncio.run(
+                prepare_training_data(
+                    images_dir="batch_imgs",
+                    labels_dir=sample_geotiff.name,
+                )
+            )
+            res_first = asyncio.run(
+                prepare_training_data(
+                    images_dir="batch_imgs",
+                    labels_dir="batch_lbls",
+                    output_subdir="ds_unit",
+                )
+            )
+            res_retry = asyncio.run(
+                prepare_training_data(
+                    images_dir="batch_imgs",
+                    labels_dir="batch_lbls",
+                    output_subdir="ds_unit",
+                )
+            )
+
+        assert res_bad_mask["success"] is False
+        assert "vector" in res_bad_mask["message"].lower()
+        assert res_first["success"] is False
+        assert res_first["partial"] is True
+        assert res_retry["success"] is True
+        assert res_retry["partial"] is False
+        final_tiles = sorted(
+            p.name for p in (temp_output_dir / "ds_unit" / "images").iterdir()
+        )
+        assert final_tiles == ["A_000000.tif", "B_000001.tif"]
+
+    def test_vlm_publishes_all_shapefile_sidecars_and_inspect_honors_explicit_mask(
+        self, sample_geotiff, temp_input_dir, temp_output_dir
+    ):
+        """VLM shapefile output publishes all sidecars; inspect_raster lets explicit mask override scalar nodata."""
+        import geopandas as gpd
+        import numpy as np
+        import rasterio
+        from rasterio.transform import from_bounds
+        from shapely.geometry import box
+        from geoai_mcp_server.server import (
+            analyze_with_vision_language_model,
+            inspect_raster,
+        )
+
+        # Explicit mask marks both pixels valid even though scalar nodata=0
+        override_tif = temp_input_dir / "mask_override.tif"
+        with rasterio.open(
+            override_tif,
+            "w",
+            driver="GTiff",
+            height=1,
+            width=2,
+            count=1,
+            dtype="uint8",
+            nodata=0,
+            crs="EPSG:4326",
+            transform=from_bounds(0, 0, 2, 1, 2, 1),
+        ) as dst:
+            dst.write(np.array([[[0, 10]]], dtype=np.uint8))
+            dst.write_mask(np.array([[255, 255]], dtype=np.uint8))
+
+        def _write_shp(source, object_type, output_path):
+            gdf = gpd.GeoDataFrame(
+                {"label": [object_type]},
+                geometry=[box(0, 0, 1, 1)],
+                crs="EPSG:4326",
+            )
+            gdf.to_file(output_path, driver="ESRI Shapefile")
+            return {"objects": [{"x_min": 0.1}]}
+
+        mock_md = MagicMock()
+        mock_md.moondream_detect.side_effect = _write_shp
+
+        with (
+            patch("geoai_mcp_server.server.config") as mock_config,
+            patch("geoai_mcp_server.server._get_geoai_module", return_value=mock_md),
+        ):
+            mock_config.input_dir = sample_geotiff.parent
+            mock_config.output_dir = temp_output_dir
+
+            res_shp = asyncio.run(
+                analyze_with_vision_language_model(
+                    image_path=sample_geotiff.name,
+                    task="detect",
+                    detect_target="building",
+                    output_filename="objects.shp",
+                )
+            )
+            res_inspect = asyncio.run(
+                inspect_raster(image_path="mask_override.tif", include_stats=True)
+            )
+
+        assert res_shp["success"] is True
+        assert res_shp["output_files"] == [str(temp_output_dir / "objects.shp")]
+        assert (temp_output_dir / "objects.shp").is_file()
+        assert (temp_output_dir / "objects.shx").is_file()
+        assert (temp_output_dir / "objects.dbf").is_file()
+        reloaded = gpd.read_file(temp_output_dir / "objects.shp")
+        assert len(reloaded) == 1
+
+        assert res_inspect["success"] is True
+        assert res_inspect["band_stats"][0]["valid_pixels"] == 2
+        assert res_inspect["band_stats"][0]["mean"] == 5.0

@@ -939,3 +939,47 @@ class TestHarnessRegressions:
         assert info["ld"] == pytest.approx(1.25)
         assert info["nan_ld"] is None
         json.dumps(info, allow_nan=False)
+
+    def test_extract_band_subset_lossless_on_jpeg_compressed_source(self, tmp_path):
+        """extract_band_subset copies JPEG-compressed source bands losslessly and in order."""
+        rng = np.random.default_rng(42)
+        textured = rng.integers(0, 256, size=(3, 64, 64), dtype=np.uint8)
+        src_path = tmp_path / "jpeg_textured.tif"
+        transform = from_bounds(0, 0, 64, 64, 64, 64)
+        with rasterio.open(
+            src_path,
+            "w",
+            driver="GTiff",
+            height=64,
+            width=64,
+            count=3,
+            dtype="uint8",
+            crs="EPSG:4326",
+            transform=transform,
+            compress="jpeg",
+            photometric="ycbcr",
+            tiled=True,
+            blockxsize=32,
+            blockysize=32,
+        ) as dst:
+            dst.write(textured)
+
+        with rasterio.open(src_path) as decoded_src:
+            decoded_bands = [decoded_src.read(i) for i in (1, 2, 3)]
+
+        # Test both a 2-band subset (incompatible with YCbCr) and a reversed 3-band subset
+        for selection in ([2, 0], [2, 1, 0]):
+            subset_path = raster_mod.extract_band_subset(
+                str(src_path), selection, temp_dir=str(tmp_path)
+            )
+            try:
+                with rasterio.open(subset_path) as sub_src:
+                    assert sub_src.count == len(selection)
+                    assert (sub_src.profile.get("compress") or "").lower() != "jpeg"
+                    for out_idx, orig_idx in enumerate(selection, start=1):
+                        assert np.array_equal(
+                            sub_src.read(out_idx), decoded_bands[orig_idx]
+                        )
+            finally:
+                if os.path.exists(subset_path):
+                    os.unlink(subset_path)
