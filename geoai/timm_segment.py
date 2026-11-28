@@ -114,6 +114,15 @@ class _PooledIoU(_MetricBase):
         return (self.intersection[present].float() / self.union[present].float()).mean()
 
 
+class _SafeCrossEntropyLoss(nn.CrossEntropyLoss):
+    """CrossEntropyLoss that returns 0 instead of NaN when all targets are ignored."""
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        if not target.is_floating_point() and not (target != self.ignore_index).any():
+            return (input * 0.0).sum()
+        return super().forward(input, target)
+
+
 class TimmSegmentationModel(_LightningBase):
     """
     PyTorch Lightning module for semantic segmentation using timm encoders with SMP decoders,
@@ -240,9 +249,9 @@ class TimmSegmentationModel(_LightningBase):
         if loss_fn is not None:
             self.loss_fn = loss_fn
         elif class_weights is not None:
-            self.loss_fn = nn.CrossEntropyLoss(weight=class_weights, **ce_kwargs)
+            self.loss_fn = _SafeCrossEntropyLoss(weight=class_weights, **ce_kwargs)
         else:
-            self.loss_fn = nn.CrossEntropyLoss(**ce_kwargs)
+            self.loss_fn = _SafeCrossEntropyLoss(**ce_kwargs)
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay

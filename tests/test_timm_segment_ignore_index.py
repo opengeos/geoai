@@ -148,6 +148,48 @@ def test_val_iou_ignores_nodata_end_to_end():
     assert results[0]["val_iou"] == pytest.approx(1.0)
 
 
+@pytest.mark.parametrize("class_weights", [None, torch.tensor([1.0, 2.0, 3.0])])
+def test_all_ignored_batch_produces_finite_loss(class_weights):
+    model = _model(class_weights=class_weights, ignore_index=NODATA)
+    x = torch.rand(2, 3, 32, 32)
+    y = torch.full((2, 32, 32), NODATA, dtype=torch.long)
+
+    loss = model.training_step((x, y), 0)
+    assert torch.isfinite(loss)
+    assert loss.item() == pytest.approx(0.0)
+    loss.backward()
+    grads = [p.grad for p in model.parameters() if p.grad is not None]
+    assert grads and all(torch.isfinite(g).all() for g in grads)
+
+
+@pytest.mark.parametrize("class_weights", [None, torch.tensor([1.0, 2.0, 3.0])])
+def test_val_loss_finite_with_all_ignored_validation_batch(class_weights):
+    x_labelled, y_labelled = _nodata_batch()
+    x_ignored = torch.zeros_like(x_labelled)
+    y_ignored = torch.full_like(y_labelled, NODATA)
+    loader = DataLoader(
+        TensorDataset(
+            torch.cat([x_labelled, x_ignored], dim=0),
+            torch.cat([y_labelled, y_ignored], dim=0),
+        ),
+        batch_size=1,
+    )
+    trainer = pl.Trainer(
+        accelerator="cpu",
+        logger=False,
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        enable_checkpointing=False,
+    )
+    results = trainer.validate(
+        _model(FixedPredictions, class_weights=class_weights, ignore_index=NODATA),
+        loader,
+        verbose=False,
+    )
+    assert torch.isfinite(torch.tensor(results[0]["val_loss"]))
+    assert results[0]["val_iou"] == pytest.approx(1.0)
+
+
 def test_train_timm_segmentation_passes_ignore_index(tmp_path):
     data = TensorDataset(torch.rand(2, 3, 32, 32), torch.full((2, 32, 32), NODATA))
     data.tensors[1][:, :16] = 1
