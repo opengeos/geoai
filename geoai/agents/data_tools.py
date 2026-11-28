@@ -24,7 +24,8 @@ class DataTools:
             are restricted to this directory (and any ``allowed_roots``).
         allowed_roots: Optional list of allowed root directories. When set,
             all file and directory paths must resolve inside one of these
-            roots (after symlink resolution via ``os.path.realpath``).
+            roots (after symlink resolution via ``os.path.realpath``). Passing
+            an empty list ``[]`` denies all file paths.
     """
 
     def __init__(

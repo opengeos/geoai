@@ -2156,6 +2156,26 @@ class TestGroup10ReviewRoundFixes(unittest.TestCase):
                     bad_ckpt, map_location="cpu"
                 )
 
+    def test_cli_to_json_value_handles_non_tuple_affine(self):
+        from geoai.cli import _to_json_value
+
+        class _Affine3Like:
+            a, b, c, d, e, f = 1.0, 0.0, 10.0, 0.0, -1.0, 20.0
+
+            def to_gdal(self):
+                return (self.c, self.a, self.b, self.f, self.d, self.e)
+
+            def __iter__(self):
+                return iter(
+                    (self.a, self.b, self.c, self.d, self.e, self.f, 0.0, 0.0, 1.0)
+                )
+
+        serialized = _to_json_value({"transform": _Affine3Like()})
+        self.assertEqual(
+            serialized["transform"],
+            [1.0, 0.0, 10.0, 0.0, -1.0, 20.0, 0.0, 0.0, 1.0],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1141,9 +1141,7 @@ def dinov3_segment_geotiff(
 
         def _prepare_window(img: np.ndarray) -> Tuple[np.ndarray, int, int]:
             """Normalise, channel-select, and pad a raw window."""
-            if img.shape[0] == 1:
-                img = np.repeat(img, num_channels, axis=0)
-            elif img.shape[0] > num_channels:
+            if img.shape[0] > num_channels:
                 img = img[:num_channels]
             elif img.shape[0] < num_channels:
                 pad_arr = np.zeros(

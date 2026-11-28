@@ -31,6 +31,18 @@ def _to_json_value(value):
             "right": _to_json_value(value.right),
             "top": _to_json_value(value.top),
         }
+    if (
+        hasattr(value, "a")
+        and hasattr(value, "b")
+        and hasattr(value, "c")
+        and hasattr(value, "d")
+        and hasattr(value, "e")
+        and hasattr(value, "f")
+        and hasattr(value, "to_gdal")
+    ):
+        return [_to_json_value(v) for v in value]
+    if hasattr(value, "to_string") and type(value).__name__ == "CRS":
+        return value.to_string()
     if type(value).__module__.startswith("numpy"):
         import numpy as np
 
