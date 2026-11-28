@@ -112,6 +112,7 @@ nav = [
     { "train_water_detection" = "examples/train_water_detection.md" },
     { "universat" = "examples/universat.md" },
     { "view_metadata" = "examples/view_metadata.md" },
+    { "visualization" = "examples/visualization.md" },
     { "water_detection" = "examples/water_detection.md" },
     { "water_detection_s2" = "examples/water_detection_s2.md" },
     { "water_detection_s2_hf" = "examples/water_detection_s2_hf.md" },
