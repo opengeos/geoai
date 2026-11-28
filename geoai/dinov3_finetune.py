@@ -17,6 +17,7 @@ Key components:
 import logging
 import math
 import os
+import pickle
 import sys
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -237,6 +238,118 @@ class DPTSegmentationHead(nn.Module):
 # ---------------------------------------------------------------------------
 
 
+_VALID_INPUT_SCALING = ("dtype", "legacy")
+
+
+def _load_torch_checkpoint_safe(checkpoint_path: str, map_location: Any = "cpu") -> Any:
+    """Load a PyTorch checkpoint with ``weights_only=True`` and a clear error on failure."""
+    try:
+        return torch.load(checkpoint_path, map_location=map_location, weights_only=True)
+    except (pickle.UnpicklingError, RuntimeError) as exc:
+        raise RuntimeError(
+            f"Failed to load checkpoint '{checkpoint_path}' with weights_only=True. "
+            "GeoAI enforces weights_only=True by default for security. If this is a "
+            "trusted legacy checkpoint containing pickled Python objects, re-save it "
+            "as a plain state_dict (torch.save(model.state_dict(), path)) or register "
+            "trusted globals with torch.serialization.add_safe_globals()."
+        ) from exc
+
+
+def _unwrap_state_dict(state: Any) -> Tuple[Any, Optional[str]]:
+    """Extract state_dict and optional input_scaling policy from a loaded checkpoint."""
+    if isinstance(state, dict):
+        policy = state.get("input_scaling", state.get("preprocessing_policy"))
+        if "state_dict" in state and isinstance(state["state_dict"], dict):
+            return state["state_dict"], policy
+        if "model_state_dict" in state and isinstance(state["model_state_dict"], dict):
+            return state["model_state_dict"], policy
+        return state, policy
+    return state, None
+
+
+def _normalize_dinov3_array(
+    img: np.ndarray,
+    src_dtype: np.dtype,
+    input_scaling: str = "dtype",
+    float_scale: Optional[float] = None,
+) -> np.ndarray:
+    """Normalize a ``(C, H, W)`` float32 raster array according to *input_scaling*.
+
+    Args:
+        img: Float32 image array of shape ``(C, H, W)``.
+        src_dtype: Original raster dtype before casting to float32.
+        input_scaling: ``"dtype"`` for dtype-aware scaling (consistent across
+            training and inference) or ``"legacy"`` for the historical ``/ 255.0``
+            behavior used by checkpoints trained before dtype-aware scaling.
+        float_scale: Optional raster-wide divisor for floating-point rasters
+            under ``"dtype"`` scaling. When ``None``, uses the array maximum
+            (single-image training path).
+    """
+    if input_scaling not in _VALID_INPUT_SCALING:
+        raise ValueError(
+            f"Invalid input_scaling '{input_scaling}'. "
+            f"Expected one of {_VALID_INPUT_SCALING}."
+        )
+
+    if input_scaling == "legacy":
+        img_max = float(img.max()) if img.size > 0 else 0.0
+        if img_max > 1.0:
+            img = img / 255.0
+        return img
+
+    if src_dtype == np.uint8:
+        return img / 255.0
+    if src_dtype == np.uint16:
+        return img / 65535.0
+    if np.issubdtype(src_dtype, np.integer):
+        dtype_max = float(np.iinfo(src_dtype).max)
+        return np.clip(img, 0.0, dtype_max) / dtype_max
+
+    img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
+    scale = float_scale
+    if scale is None:
+        img_max = float(img.max()) if img.size > 0 else 0.0
+        if img_max > 1.0:
+            scale = 255.0 if img_max <= 255.0 else img_max
+        else:
+            scale = 1.0
+    if scale > 1.0:
+        img = img / scale
+    return np.clip(img, 0.0, 1.0)
+
+
+def _compute_raster_float_scale(src: Any, num_channels: int) -> float:
+    """Compute a single raster-wide finite scale factor for floating-point imagery."""
+    bands = list(range(1, min(src.count, num_channels) + 1))
+    raster_max = 0.0
+    block_windows = None
+    if hasattr(src, "block_windows"):
+        try:
+            block_windows = list(src.block_windows(1))
+        except Exception:
+            block_windows = None
+
+    if block_windows:
+        for _, win in block_windows:
+            arr = src.read(bands, window=win).astype(np.float32)
+            finite = arr[np.isfinite(arr)]
+            if finite.size > 0:
+                val = float(finite.max())
+                if val > raster_max:
+                    raster_max = val
+    else:
+        arr = src.read(bands).astype(np.float32)
+        finite = arr[np.isfinite(arr)]
+        if finite.size > 0:
+            raster_max = float(finite.max())
+
+    if raster_max <= 1.0:
+        return 1.0
+    if raster_max <= 255.0:
+        return 255.0
+    return raster_max
+
+
 class DINOv3Segmenter(_LightningBase):
     """PyTorch Lightning module for DINOv3-based semantic segmentation.
 
@@ -284,10 +397,16 @@ class DINOv3Segmenter(_LightningBase):
         ignore_index: int = 255,
         num_channels: int = 3,
         normalize_input: bool = True,
+        input_scaling: str = "dtype",
     ) -> None:
         if not LIGHTNING_AVAILABLE:
             raise ImportError(
                 "PyTorch Lightning is required. Install it with: pip install lightning"
+            )
+        if input_scaling not in _VALID_INPUT_SCALING:
+            raise ValueError(
+                f"Invalid input_scaling '{input_scaling}'. "
+                f"Expected one of {_VALID_INPUT_SCALING}."
             )
         super().__init__()
         self.save_hyperparameters(ignore=["loss_fn"])
@@ -330,6 +449,13 @@ class DINOv3Segmenter(_LightningBase):
         self.weight_decay = weight_decay
         self.num_channels = num_channels
         self.normalize_input = normalize_input
+        self.input_scaling = input_scaling
+
+    def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        """Preserve legacy input scaling when loading checkpoints saved without a policy."""
+        hparams = checkpoint.get("hyper_parameters", {})
+        if isinstance(hparams, dict) and "input_scaling" not in hparams:
+            self.input_scaling = "legacy"
 
     # -- backbone loading (mirrors DINOv3GeoProcessor) --
 
@@ -365,7 +491,8 @@ class DINOv3Segmenter(_LightningBase):
         )
 
         if weights_path and os.path.exists(weights_path):
-            state_dict = torch.load(weights_path, map_location="cpu")
+            raw_state = _load_torch_checkpoint_safe(weights_path, map_location="cpu")
+            state_dict, _ = _unwrap_state_dict(raw_state)
         else:
             if weights_path:
                 logger.warning(
@@ -375,7 +502,8 @@ class DINOv3Segmenter(_LightningBase):
             weights_file = hf_hub_download(
                 repo_id="giswqs/geoai", filename="dinov3_vitl16_sat493m.pth"
             )
-            state_dict = torch.load(weights_file, map_location="cpu")
+            raw_state = _load_torch_checkpoint_safe(weights_file, map_location="cpu")
+            state_dict, _ = _unwrap_state_dict(raw_state)
 
         model.load_state_dict(state_dict, strict=False)
         return model
@@ -546,6 +674,7 @@ class DINOv3SegmentationDataset(Dataset):
         target_size: Optional[int] = None,
         num_channels: int = 3,
         transform: Optional[Any] = None,
+        input_scaling: str = "dtype",
     ) -> None:
         if len(image_paths) != len(mask_paths):
             raise ValueError(
@@ -554,6 +683,11 @@ class DINOv3SegmentationDataset(Dataset):
             )
         if len(image_paths) == 0:
             raise ValueError("image_paths must not be empty")
+        if input_scaling not in _VALID_INPUT_SCALING:
+            raise ValueError(
+                f"Invalid input_scaling '{input_scaling}'. "
+                f"Expected one of {_VALID_INPUT_SCALING}."
+            )
 
         self.image_paths = image_paths
         self.mask_paths = mask_paths
@@ -561,6 +695,7 @@ class DINOv3SegmentationDataset(Dataset):
         self.target_size = target_size
         self.num_channels = num_channels
         self.transform = transform
+        self.input_scaling = input_scaling
 
     def __len__(self) -> int:
         return len(self.image_paths)
@@ -570,10 +705,14 @@ class DINOv3SegmentationDataset(Dataset):
 
         # --- image ---
         with rasterio.open(self.image_paths[idx]) as src:
+            raw_dtypes = getattr(src, "dtypes", None)
+            src_dtype = np.dtype(raw_dtypes[0]) if raw_dtypes else np.dtype("float32")
             image = src.read().astype(np.float32)  # (C, H, W)
 
         # Channel selection / padding.
-        if image.shape[0] > self.num_channels:
+        if image.shape[0] == 1 and self.num_channels > 1:
+            image = np.repeat(image, self.num_channels, axis=0)
+        elif image.shape[0] > self.num_channels:
             image = image[: self.num_channels]
         elif image.shape[0] < self.num_channels:
             pad = np.zeros(
@@ -582,10 +721,10 @@ class DINOv3SegmentationDataset(Dataset):
             pad[: image.shape[0]] = image
             image = pad
 
-        # Normalise to [0, 1].
-        img_max = image.max()
-        if img_max > 1.0:
-            image = image / 255.0
+        # Normalise according to the configured scaling policy.
+        image = _normalize_dinov3_array(
+            image, src_dtype, input_scaling=self.input_scaling
+        )
 
         # --- mask ---
         with rasterio.open(self.mask_paths[idx]) as src:
@@ -597,7 +736,9 @@ class DINOv3SegmentationDataset(Dataset):
 
             # Resize image (C, H, W) -> (C, target_size, target_size).
             img_pil = PILImage.fromarray(
-                (np.transpose(image, (1, 2, 0)) * 255).astype(np.uint8)
+                (np.clip(np.transpose(image, (1, 2, 0)), 0.0, 1.0) * 255).astype(
+                    np.uint8
+                )
             )
             img_pil = img_pil.resize(
                 (self.target_size, self.target_size), PILImage.BILINEAR
@@ -669,6 +810,7 @@ def train_dinov3_segmentation(
     checkpoint_path: Optional[str] = None,
     num_channels: int = 3,
     normalize_input: bool = True,
+    input_scaling: str = "dtype",
     **kwargs: Any,
 ) -> "DINOv3Segmenter":
     """Train a DINOv3-based semantic segmentation model.
@@ -762,6 +904,7 @@ def train_dinov3_segmentation(
         ignore_index=ignore_index,
         num_channels=num_channels,
         normalize_input=normalize_input,
+        input_scaling=input_scaling,
     )
 
     if train_dataloader is None:
@@ -861,6 +1004,8 @@ def dinov3_segment_geotiff(
     batch_size: int = 4,
     device: Optional[str] = None,
     quiet: bool = False,
+    input_scaling: Optional[str] = None,
+    input_scale: Optional[float] = None,
 ) -> None:
     """Run sliding-window segmentation inference on a GeoTIFF.
 
@@ -878,6 +1023,14 @@ def dinov3_segment_geotiff(
         batch_size: Number of windows to process at once.
         device: Device string (auto-detected if ``None``).
         quiet: Suppress progress output.
+        input_scaling: Optional preprocessing policy override (``"dtype"`` or
+            ``"legacy"``). When ``None``, uses the policy stored in the
+            checkpoint and defaults to ``"legacy"`` for older checkpoints that
+            predate policy metadata.
+        input_scale: Optional fixed divisor for floating-point rasters under
+            ``"dtype"`` scaling. When ``None``, a single raster-wide scale is
+            computed once before the sliding-window loop so overlapping windows
+            share an identical scale.
     """
     import rasterio
     from rasterio.windows import Window
@@ -887,6 +1040,13 @@ def dinov3_segment_geotiff(
         raise ValueError(
             f"overlap ({overlap}) must be less than window_size ({window_size})"
         )
+    if input_scaling is not None and input_scaling not in _VALID_INPUT_SCALING:
+        raise ValueError(
+            f"Invalid input_scaling '{input_scaling}'. "
+            f"Expected one of {_VALID_INPUT_SCALING}."
+        )
+    if input_scale is not None and input_scale <= 0:
+        raise ValueError(f"input_scale must be positive, got {input_scale}")
 
     if device is None:
         from .utils.device import get_device
@@ -895,11 +1055,13 @@ def dinov3_segment_geotiff(
     else:
         dev = torch.device(device)
 
-    # Load model.
+    # Load model and resolve checkpoint preprocessing policy.
+    ckpt_scaling: Optional[str] = None
     if checkpoint_path.endswith(".ckpt"):
         model_module = DINOv3Segmenter.load_from_checkpoint(
             checkpoint_path, map_location=dev
         )
+        ckpt_scaling = getattr(model_module, "input_scaling", None)
     else:
         model_module = DINOv3Segmenter(
             model_name=model_name,
@@ -907,8 +1069,13 @@ def dinov3_segment_geotiff(
             num_classes=num_classes,
             decoder_features=decoder_features,
         )
-        state = torch.load(checkpoint_path, map_location=dev)
+        raw_state = _load_torch_checkpoint_safe(checkpoint_path, map_location=dev)
+        state, ckpt_scaling = _unwrap_state_dict(raw_state)
         model_module.load_state_dict(state, strict=False)
+
+    effective_scaling = (
+        input_scaling if input_scaling is not None else (ckpt_scaling or "legacy")
+    )
 
     model_module.eval()
     model_module = model_module.to(dev)
@@ -917,7 +1084,21 @@ def dinov3_segment_geotiff(
     with rasterio.open(input_path) as src:
         meta = src.meta.copy()
         height, width = src.shape
-        num_channels = min(src.count, 3)
+        raw_dtypes = getattr(src, "dtypes", None)
+        if raw_dtypes:
+            src_dtype = np.dtype(raw_dtypes[0])
+        elif meta.get("dtype") is not None:
+            src_dtype = np.dtype(meta["dtype"])
+        else:
+            src_dtype = np.dtype("float32")
+        num_channels = 3
+
+        float_scale: Optional[float] = None
+        if effective_scaling == "dtype" and not np.issubdtype(src_dtype, np.integer):
+            if input_scale is not None:
+                float_scale = float(input_scale)
+            else:
+                float_scale = _compute_raster_float_scale(src, num_channels)
 
         stride = window_size - overlap
         n_rows = max(1, int(np.ceil((height - overlap) / stride)))
@@ -969,8 +1150,12 @@ def dinov3_segment_geotiff(
                 pad_arr[: img.shape[0]] = img
                 img = pad_arr
 
-            if img.max() > 1.0:
-                img = img / 255.0
+            img = _normalize_dinov3_array(
+                img,
+                src_dtype,
+                input_scaling=effective_scaling,
+                float_scale=float_scale,
+            )
 
             h, w = img.shape[1], img.shape[2]
             if h < padded_h or w < padded_w:
@@ -1001,7 +1186,11 @@ def dinov3_segment_geotiff(
                 out_window = Window(wcs, wrs, wce - wcs, wre - wrs)
                 dst.write(pred, 1, window=out_window)
 
+        meta.pop("photometric", None)
         meta.update({"count": 1, "dtype": "uint8", "compress": "lzw"})
+        out_dir = os.path.dirname(os.path.abspath(output_path))
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         with torch.no_grad():
             batch_imgs: List[np.ndarray] = []
             batch_meta: List[

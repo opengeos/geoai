@@ -843,21 +843,38 @@ def _download_checkpoint(model_name: str, cache_dir: str = DEFAULT_CACHE_DIR) ->
     logger.info("URL: %s", info["url"])
     logger.info("Saving to: %s", checkpoint_path)
 
-    import urllib.error
-    import urllib.request
+    import contextlib
+    import tempfile
 
+    import requests
+
+    temp_path = None
     try:
-        urllib.request.urlretrieve(info["url"], checkpoint_path)
-    except (OSError, urllib.error.URLError) as e:
-        # Clean up partial download
-        if os.path.exists(checkpoint_path):
-            os.remove(checkpoint_path)
+        with requests.get(info["url"], stream=True, timeout=(30, 300)) as resp:
+            resp.raise_for_status()
+            fd, temp_path = tempfile.mkstemp(
+                dir=cache_dir, prefix=".canopy_", suffix=".part"
+            )
+            with os.fdopen(fd, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+        os.replace(temp_path, checkpoint_path)
+    except (OSError, requests.RequestException) as e:
+        if temp_path is not None:
+            with contextlib.suppress(OSError):
+                os.remove(temp_path)
         raise RuntimeError(
             f"Failed to download checkpoint from {info['url']}. "
             f"Error: {e}\n"
             f"You can manually download from: "
             f"s3://dataforgood-fb-data/forests/v1/models/saved_checkpoints/{info['filename']}"
         ) from e
+    except BaseException:
+        if temp_path is not None:
+            with contextlib.suppress(OSError):
+                os.remove(temp_path)
+        raise
 
     logger.info("Download complete.")
     return checkpoint_path
@@ -1144,18 +1161,15 @@ class CanopyHeightEstimation:
             )
 
         with rasterio.open(input_path) as src:
-            # Read the image
-            img = src.read()  # (bands, height, width)
+            if src.count < 3:
+                raise ValueError(
+                    f"Input image has {src.count} bands, but at least 3 (RGB) are required."
+                )
+
+            # Read only the first 3 bands (RGB) to avoid loading unused bands
+            img = src.read([1, 2, 3])  # (3, height, width)
             profile = src.profile.copy()
             height, width = src.height, src.width
-
-            # Handle different band counts
-            if img.shape[0] >= 3:
-                img = img[:3]  # Use first 3 bands (RGB)
-            else:
-                raise ValueError(
-                    f"Input image has {img.shape[0]} bands, but at least 3 (RGB) are required."
-                )
 
             # Convert to float32 in [0, 1]
             if img.dtype == np.uint8:
