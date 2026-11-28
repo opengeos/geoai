@@ -8,6 +8,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 DATA_SOURCES = ["naip", "overture", "stac"]
+OVERTURE_FORMATS = ("geojson", "parquet")
 
 
 def search_stac(
@@ -29,23 +30,30 @@ def search_stac(
     Returns:
         Dict with search results.
     """
-    from geoai import pc_stac_search
+    from geoai.download import pc_stac_search
 
-    kwargs = {
+    time_range: Optional[str] = None
+    if start_date and end_date:
+        time_range = f"{start_date}/{end_date}"
+    elif start_date:
+        time_range = f"{start_date}/.."
+    elif end_date:
+        time_range = f"../{end_date}"
+
+    kwargs: Dict[str, Any] = {
+        "collection": collection,
         "bbox": list(bbox),
-        "collections": [collection],
         "max_items": max_items,
+        "quiet": True,
     }
-    if start_date:
-        kwargs["start_date"] = start_date
-    if end_date:
-        kwargs["end_date"] = end_date
+    if time_range is not None:
+        kwargs["time_range"] = time_range
 
     items = pc_stac_search(**kwargs)
 
     results = []
     for item in items:
-        entry = {
+        entry: Dict[str, Any] = {
             "id": item.id if hasattr(item, "id") else str(item),
             "datetime": str(item.datetime) if hasattr(item, "datetime") else "",
         }
@@ -77,7 +85,7 @@ def download_naip(
 
     Args:
         bbox: Bounding box as (minx, miny, maxx, maxy) in EPSG:4326.
-        output: Output file path.
+        output: Output directory path for downloaded GeoTIFF files.
         year: Optional specific year.
         max_items: Maximum number of items to download.
 
@@ -85,17 +93,21 @@ def download_naip(
         Dict with download result and file paths.
     """
     output = os.path.abspath(output)
-    os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
+    os.makedirs(output, exist_ok=True)
 
     from geoai.download import download_naip as _download_naip
 
-    kwargs = {"bbox": list(bbox), "output": output, "max_items": max_items}
+    kwargs: Dict[str, Any] = {
+        "bbox": tuple(bbox),
+        "output_dir": output,
+        "max_items": max_items,
+    }
     if year is not None:
         kwargs["year"] = year
 
     result = _download_naip(**kwargs)
 
-    files = result if isinstance(result, list) else [result]
+    files = result if isinstance(result, list) else ([result] if result else [])
     return {
         "source": "naip",
         "bbox": list(bbox),
@@ -117,30 +129,44 @@ def download_overture(
     Args:
         bbox: Bounding box as (minx, miny, maxx, maxy) in EPSG:4326.
         output: Output file path.
-        data_type: Data type (building, transportation, place).
+        data_type: Overture feature type (e.g., building, segment, place).
         output_format: Output format (geojson, parquet).
 
     Returns:
         Dict with download result.
     """
-    output = os.path.abspath(output)
-    os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
+    if output_format not in OVERTURE_FORMATS:
+        raise ValueError(
+            f"Unsupported output format: {output_format}. "
+            f"Choose from: {', '.join(OVERTURE_FORMATS)}"
+        )
 
-    from geoai import download_overture_buildings
+    target = os.path.abspath(output)
+    if output_format == "parquet" and not target.lower().endswith(".parquet"):
+        target = os.path.splitext(target)[0] + ".parquet"
+    elif output_format == "geojson" and not target.lower().endswith(
+        (".geojson", ".json")
+    ):
+        target = os.path.splitext(target)[0] + ".geojson"
 
-    result = download_overture_buildings(
-        bbox=list(bbox),
-        output=output,
+    os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+
+    from geoai.download import get_overture_data
+
+    get_overture_data(
+        overture_type=data_type,
+        bbox=tuple(bbox),
+        output=target,
     )
 
-    out = {
+    out: Dict[str, Any] = {
         "source": "overture",
         "data_type": data_type,
+        "output_format": output_format,
         "bbox": list(bbox),
-        "output": str(result) if result else output,
+        "output": target,
     }
 
-    target = str(result) if result else output
     if os.path.isfile(target):
         out["file_size_bytes"] = os.path.getsize(target)
 

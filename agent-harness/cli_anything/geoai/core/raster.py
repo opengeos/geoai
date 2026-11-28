@@ -4,8 +4,11 @@ Wraps geoai raster utility functions for CLI consumption.
 All functions return JSON-serializable dicts.
 """
 
+import math
 import os
 from typing import Any, Dict, List, Optional
+
+from cli_anything.geoai.utils.serialization import sanitize_json_value, serialize_info
 
 
 def get_raster_info(path: str) -> Dict[str, Any]:
@@ -29,7 +32,7 @@ def get_raster_info(path: str) -> Dict[str, Any]:
         from geoai.utils import get_raster_info as _get_info
 
         info = _get_info(path)
-        return _serialize_info(info)
+        return serialize_info(info)
     except ImportError:
         return _get_raster_info_rasterio(path)
 
@@ -60,24 +63,27 @@ def get_raster_stats(path: str, band: int = 1) -> Dict[str, Any]:
         data = src.read(band)
         nodata = src.nodata
 
-        mask = np.ones(data.shape, dtype=bool)
-        if nodata is not None:
+        mask = np.isfinite(data)
+        if nodata is not None and not (
+            isinstance(nodata, float) and math.isnan(nodata)
+        ):
             mask &= data != nodata
-        mask &= ~np.isnan(data)
 
         valid = data[mask]
 
-        return {
-            "band": band,
-            "min": float(np.min(valid)) if valid.size > 0 else None,
-            "max": float(np.max(valid)) if valid.size > 0 else None,
-            "mean": float(np.mean(valid)) if valid.size > 0 else None,
-            "std": float(np.std(valid)) if valid.size > 0 else None,
-            "valid_pixels": int(valid.size),
-            "nodata_pixels": int(data.size - valid.size),
-            "total_pixels": int(data.size),
-            "nodata_value": float(nodata) if nodata is not None else None,
-        }
+        return sanitize_json_value(
+            {
+                "band": band,
+                "min": float(np.min(valid)) if valid.size > 0 else None,
+                "max": float(np.max(valid)) if valid.size > 0 else None,
+                "mean": float(np.mean(valid)) if valid.size > 0 else None,
+                "std": float(np.std(valid)) if valid.size > 0 else None,
+                "valid_pixels": int(valid.size),
+                "nodata_pixels": int(data.size - valid.size),
+                "total_pixels": int(data.size),
+                "nodata_value": float(nodata) if nodata is not None else None,
+            }
+        )
 
 
 def tile_raster(
@@ -192,49 +198,103 @@ def _get_raster_info_rasterio(path: str) -> Dict[str, Any]:
     import rasterio
 
     with rasterio.open(path) as src:
-        return {
-            "path": path,
-            "driver": src.driver,
-            "dtype": str(src.dtypes[0]),
-            "width": src.width,
-            "height": src.height,
-            "bands": src.count,
-            "crs": str(src.crs) if src.crs else None,
-            "bounds": {
-                "left": src.bounds.left,
-                "bottom": src.bounds.bottom,
-                "right": src.bounds.right,
-                "top": src.bounds.top,
-            },
-            "resolution": {"x": src.res[0], "y": src.res[1]},
-            "nodata": src.nodata,
-            "file_size_bytes": os.path.getsize(path),
-        }
+        return sanitize_json_value(
+            {
+                "path": path,
+                "driver": src.driver,
+                "dtype": str(src.dtypes[0]),
+                "width": src.width,
+                "height": src.height,
+                "bands": src.count,
+                "crs": str(src.crs) if src.crs else None,
+                "bounds": {
+                    "left": src.bounds.left,
+                    "bottom": src.bounds.bottom,
+                    "right": src.bounds.right,
+                    "top": src.bounds.top,
+                },
+                "resolution": {"x": src.res[0], "y": src.res[1]},
+                "nodata": src.nodata,
+                "file_size_bytes": os.path.getsize(path),
+            }
+        )
 
 
-def _serialize_info(info: Any) -> Dict[str, Any]:
-    """Convert geoai info output to a clean JSON-serializable dict.
+def extract_band_subset(
+    raster_path: str,
+    band_indexes: List[int],
+    temp_dir: Optional[str] = None,
+) -> str:
+    """Write a temporary GeoTIFF containing only ``band_indexes`` in order.
 
     Args:
-        info: Info dict or object from geoai.
+        raster_path: Path to the source raster.
+        band_indexes: Non-empty list of 0-indexed band indices to extract.
+        temp_dir: Directory in which to create the temporary GeoTIFF.
 
     Returns:
-        Cleaned dict.
-    """
-    if isinstance(info, dict):
-        result = {}
-        for k, v in info.items():
-            if hasattr(v, "__geo_interface__"):
-                result[k] = str(v)
-            elif hasattr(v, "tolist"):
-                result[k] = v.tolist()
-            else:
-                try:
-                    import json
+        Absolute path to the newly created temporary GeoTIFF.
 
-                    json.dumps(v)
-                    result[k] = v
-                except (TypeError, ValueError):
-                    result[k] = str(v)
-        return result
-    return {"info": str(info)}
+    Raises:
+        ValueError: If ``band_indexes`` is empty, contains invalid types, or
+            references a band outside the source raster's band count.
+    """
+    if not band_indexes:
+        raise ValueError(
+            "band_indexes must be a non-empty list of 0-based band indices"
+        )
+
+    validated: List[int] = []
+    for idx in band_indexes:
+        if isinstance(idx, bool) or not isinstance(idx, int):
+            raise ValueError(f"Band index must be an integer, got {idx!r}")
+        if idx < 0:
+            raise ValueError(f"Band index must be non-negative, got {idx}")
+        validated.append(idx)
+
+    import tempfile
+    import rasterio
+
+    with rasterio.open(raster_path) as src:
+        for idx in validated:
+            if idx >= src.count:
+                raise ValueError(
+                    f"Band index {idx} out of range for raster with {src.count} band(s) "
+                    f"(valid 0-based indices: 0-{src.count - 1})"
+                )
+
+        one_based = [idx + 1 for idx in validated]
+        profile = src.profile.copy()
+        # Strip lossy compression and source-specific photometric options so
+        # decoded pixels are stored losslessly regardless of selected band count.
+        for key in (
+            "compress",
+            "photometric",
+            "jpeg_quality",
+            "jpegtablesmode",
+            "ycbcr_subsampling",
+            "quality",
+            "predictor",
+        ):
+            profile.pop(key, None)
+        profile.update(driver="GTiff", count=len(one_based), compress="lzw")
+
+        fd, subset_path = tempfile.mkstemp(
+            suffix=".tif",
+            prefix="geoai_bands_",
+            dir=temp_dir or os.path.dirname(os.path.abspath(raster_path)) or ".",
+        )
+        os.close(fd)
+        try:
+            with rasterio.open(subset_path, "w", **profile) as dst:
+                for _ji, window in src.block_windows(1):
+                    dst.write(src.read(one_based, window=window), window=window)
+        except Exception:
+            if os.path.exists(subset_path):
+                try:
+                    os.unlink(subset_path)
+                except OSError:
+                    pass
+            raise
+
+    return os.path.abspath(subset_path)

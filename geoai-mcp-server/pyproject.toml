@@ -3,10 +3,10 @@ name = "geoai-mcp-server"
 version = "0.1.0"
 description = "Model Context Protocol (MCP) server for GeoAI - exposing geospatial AI capabilities to LLM applications"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
-    { name = "GeoAI Community", email = "geoai@example.com" }
+    { name = "Qiusheng Wu", email = "giswqs@gmail.com" }
 ]
 keywords = [
     "mcp",
@@ -23,19 +23,17 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: GIS",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 dependencies = [
     "mcp>=1.0.0,<3.0.0",
-    "geoai-py>=0.29.0",
+    "geoai-py>=0.44.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
-    "aiofiles>=23.0.0",
 ]
 
 [project.optional-dependencies]
@@ -64,14 +62,14 @@ packages = ["src/geoai_mcp_server"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_ignores = true
 disallow_untyped_defs = true

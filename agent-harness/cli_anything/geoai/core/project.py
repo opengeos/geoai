@@ -4,11 +4,12 @@ A project is a JSON-serializable dict that tracks input files, models,
 processing results, and metadata for a geospatial AI workflow.
 """
 
-import copy
 import json
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+from cli_anything.geoai.utils.serialization import atomic_write_json
 
 
 def create_project(
@@ -56,11 +57,16 @@ def open_project(path: str) -> Dict[str, Any]:
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Project file not found: {path}")
 
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         try:
             project = json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in project file: {e}")
+
+    if not isinstance(project, dict):
+        raise ValueError(
+            f"Project file must contain a JSON object, got {type(project).__name__}"
+        )
 
     required = {"name", "files"}
     missing = required - set(project.keys())
@@ -71,7 +77,7 @@ def open_project(path: str) -> Dict[str, Any]:
 
 
 def save_project(project: Dict[str, Any], path: str) -> str:
-    """Save a project to a JSON file.
+    """Save a project to a JSON file atomically.
 
     Args:
         project: Project dict.
@@ -80,14 +86,13 @@ def save_project(project: Dict[str, Any], path: str) -> str:
     Returns:
         Absolute path to the saved file.
     """
-    path = os.path.abspath(path)
-    project["modified"] = datetime.now().isoformat()
+    new_modified = datetime.now().isoformat()
+    payload = dict(project)
+    payload["modified"] = new_modified
 
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(project, f, indent=2, default=str)
-
-    return path
+    saved_path = atomic_write_json(payload, path)
+    project["modified"] = new_modified
+    return saved_path
 
 
 def get_project_info(project: Dict[str, Any]) -> Dict[str, Any]:

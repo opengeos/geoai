@@ -23,7 +23,10 @@ def train_classifier(
 
     Args:
         train_dir: Training data directory (subdirectories are class names).
-        val_dir: Optional validation data directory.
+        val_dir: Unsupported legacy parameter; passing a non-empty value
+            raises ``ValueError`` because
+            ``geoai.recognize.train_image_classifier`` splits ``train_dir``
+            internally.
         output_dir: Output directory for model and metrics.
         model_name: TIMM model architecture name.
         num_epochs: Number of training epochs.
@@ -37,6 +40,7 @@ def train_classifier(
 
     Raises:
         FileNotFoundError: If training directory does not exist.
+        ValueError: If ``val_dir`` is provided.
     """
     train_dir = os.path.abspath(train_dir)
     output_dir = os.path.abspath(output_dir)
@@ -44,30 +48,27 @@ def train_classifier(
     if not os.path.isdir(train_dir):
         raise FileNotFoundError(f"Training directory not found: {train_dir}")
     if val_dir:
-        val_dir = os.path.abspath(val_dir)
-        if not os.path.isdir(val_dir):
-            raise FileNotFoundError(f"Validation directory not found: {val_dir}")
+        raise ValueError(
+            "Separate val_dir is not supported by geoai.recognize.train_image_classifier; "
+            "place all class subdirectories under train_dir instead."
+        )
 
     os.makedirs(output_dir, exist_ok=True)
 
-    from geoai import train_image_classifier
+    from geoai.recognize import train_image_classifier
 
-    kwargs = {
-        "train_dir": train_dir,
-        "output_dir": output_dir,
-        "model_name": model_name,
-        "num_epochs": num_epochs,
-        "batch_size": batch_size,
-        "learning_rate": learning_rate,
-        "image_size": image_size,
-        "in_channels": in_channels,
-    }
-    if val_dir:
-        kwargs["val_dir"] = val_dir
+    result = train_image_classifier(
+        data_dir=train_dir,
+        output_dir=output_dir,
+        model_name=model_name,
+        num_epochs=num_epochs,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        image_size=image_size,
+        in_channels=in_channels,
+    )
 
-    result = train_image_classifier(**kwargs)
-
-    output = {
+    output: Dict[str, Any] = {
         "train_dir": train_dir,
         "output_dir": output_dir,
         "model_name": model_name,
@@ -76,7 +77,10 @@ def train_classifier(
     }
 
     if isinstance(result, dict):
-        output.update(result)
+        if "checkpoint_path" in result:
+            output["checkpoint_path"] = result["checkpoint_path"]
+        if "class_names" in result:
+            output["class_names"] = result["class_names"]
     elif result is not None:
         output["result"] = str(result)
 
@@ -115,32 +119,37 @@ def predict_classification(
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    from geoai.recognize import predict_with_timm
+    from geoai.timm_train import TimmClassifier, predict_with_timm
 
-    kwargs = {
-        "image_size": image_size,
-        "in_channels": in_channels,
-    }
+    load_kwargs: Dict[str, Any] = {"in_channels": in_channels}
     if num_classes is not None:
-        kwargs["num_classes"] = num_classes
-    if class_names is not None:
-        kwargs["class_names"] = class_names
+        load_kwargs["num_classes"] = num_classes
 
+    model = TimmClassifier.load_from_checkpoint(model_path, **load_kwargs)
     result = predict_with_timm(
-        image_path=image_path,
-        model_path=model_path,
-        **kwargs,
+        model=model,
+        image_paths=[image_path],
+        return_probabilities=True,
     )
 
-    output = {
+    output: Dict[str, Any] = {
         "image": image_path,
         "model": model_path,
+        "image_size": image_size,
     }
 
-    if isinstance(result, dict):
-        output.update(result)
-    elif isinstance(result, (list, tuple)):
-        output["predictions"] = list(result)
+    if isinstance(result, tuple) and len(result) == 2:
+        preds, probs = result
+        pred_list = preds.tolist() if hasattr(preds, "tolist") else list(preds)
+        prob_list = probs.tolist() if hasattr(probs, "tolist") else list(probs)
+        output["predictions"] = pred_list
+        output["probabilities"] = prob_list
+        if class_names and pred_list:
+            idx = int(pred_list[0])
+            if 0 <= idx < len(class_names):
+                output["predicted_class"] = class_names[idx]
+    elif hasattr(result, "tolist"):
+        output["predictions"] = result.tolist()
     else:
         output["result"] = str(result)
 

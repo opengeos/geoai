@@ -5,7 +5,7 @@ and model training for CLI consumption.
 """
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 SAM_MODELS = [
     "facebook/sam-vit-huge",
@@ -38,6 +38,34 @@ SEGMENTATION_BACKBONES = [
     "resnext50_32x4d",
 ]
 
+SUPPORTED_LOSSES = ("ce", "dice", "focal", "jaccard")
+
+
+def _resolve_loss_fn(loss: str):
+    """Map a CLI loss name to an optional torch.nn.Module for train_segmentation_model."""
+    if loss not in SUPPORTED_LOSSES:
+        raise ValueError(
+            f"Unknown loss function: {loss}. "
+            f"Choose from: {', '.join(SUPPORTED_LOSSES)}"
+        )
+    if loss == "ce":
+        return None
+    if loss == "dice":
+        from geoai.landcover_train import DiceLoss
+
+        return DiceLoss()
+    if loss == "focal":
+        from geoai.landcover_train import FocalLoss
+
+        return FocalLoss()
+    if loss == "jaccard":
+        from geoai.landcover_train import TverskyLoss
+
+        # TverskyLoss with alpha=beta=1.0 is multiclass Jaccard (IoU) loss and
+        # excludes ignore_index (-100) pixels from both targets and predictions.
+        return TverskyLoss(alpha=1.0, beta=1.0, ignore_index=-100)
+    return None
+
 
 def run_sam(
     raster: str,
@@ -67,13 +95,19 @@ def run_sam(
     output = os.path.abspath(output)
     if not os.path.isfile(raster):
         raise FileNotFoundError(f"Raster file not found: {raster}")
+    if not automatic:
+        raise ValueError(
+            "Prompt-based SAM mode (automatic=False) is not supported by run_sam "
+            "because no point/box prompts are provided. Use automatic=True or "
+            "run_grounded_sam for text-prompted segmentation."
+        )
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
-    from geoai import SamGeo
+    from geoai.sam import SamGeo
 
-    sam = SamGeo(model_id=model, automatic=automatic)
-    sam.generate(raster, output, foreground=foreground, unique=unique)
+    sam = SamGeo(model=model, automatic=automatic)
+    sam.generate(source=raster, output=output, foreground=foreground, unique=unique)
 
     result = {
         "input": raster,
@@ -121,14 +155,14 @@ def run_grounded_sam(
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
-    from geoai import GroundedSAM
+    from geoai.segment import GroundedSAM
 
     gsam = GroundedSAM(
         detector_id=detector_model,
         segmenter_id=segmenter_model,
         tile_size=tile_size,
     )
-    gsam.segment_image(raster, output, text_prompts=prompt)
+    gsam.segment_image(input_path=raster, output_path=output, text_prompts=prompt)
 
     result = {
         "input": raster,
@@ -150,6 +184,9 @@ def run_semantic_segmentation(
     model_path: str,
     output: str,
     num_classes: int = 2,
+    architecture: str = "unet",
+    backbone: str = "resnet50",
+    in_channels: int = 4,
     band_indexes: Optional[List[int]] = None,
     chip_size: int = 512,
     overlap: float = 0.25,
@@ -161,15 +198,19 @@ def run_semantic_segmentation(
         model_path: Path to the trained model checkpoint.
         output: Output segmentation raster path.
         num_classes: Number of classes in the model.
-        band_indexes: Band indices to use (0-indexed). None for all bands.
+        architecture: Segmentation model architecture used for training.
+        backbone: Encoder backbone name used for training.
+        in_channels: Number of input channels the model was trained with.
+        band_indexes: Band indices to use (0-indexed). None for first ``in_channels`` bands.
         chip_size: Size of processing chips.
-        overlap: Overlap fraction between chips.
+        overlap: Overlap fraction (0-1) or overlap in pixels between chips.
 
     Returns:
         Result dict with output path.
 
     Raises:
         FileNotFoundError: If the input files do not exist.
+        ValueError: If model/band parameters are invalid.
     """
     raster = os.path.abspath(raster)
     model_path = os.path.abspath(model_path)
@@ -179,34 +220,71 @@ def run_semantic_segmentation(
         raise FileNotFoundError(f"Raster file not found: {raster}")
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
+    if in_channels <= 0:
+        raise ValueError(f"in_channels must be positive, got {in_channels}")
+    if band_indexes is not None and len(band_indexes) != in_channels:
+        raise ValueError(
+            f"Length of band_indexes ({len(band_indexes)}) must match "
+            f"in_channels ({in_channels})"
+        )
 
-    os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
+    out_dir = os.path.dirname(output) or "."
+    os.makedirs(out_dir, exist_ok=True)
 
-    from geoai import semantic_segmentation
+    from geoai.train import semantic_segmentation
 
-    kwargs = {
-        "num_classes": num_classes,
-        "chip_size": chip_size,
-        "overlap": overlap,
-    }
-    if band_indexes is not None:
-        kwargs["band_indexes"] = band_indexes
-
-    semantic_segmentation(
-        raster=raster,
-        model_path=model_path,
-        output=output,
-        **kwargs,
+    overlap_px = (
+        int(chip_size * overlap)
+        if isinstance(overlap, float) and 0.0 <= overlap < 1.0
+        else int(overlap)
     )
+
+    temp_input_raster: Optional[str] = None
+    try:
+        inference_input = raster
+        if band_indexes is not None:
+            from cli_anything.geoai.core.raster import extract_band_subset
+
+            temp_input_raster = extract_band_subset(
+                raster, band_indexes, temp_dir=out_dir
+            )
+            inference_input = temp_input_raster
+
+        kwargs: Dict[str, Any] = {
+            "architecture": architecture,
+            "encoder_name": backbone,
+            "num_channels": in_channels,
+            "num_classes": num_classes,
+            "window_size": chip_size,
+            "overlap": overlap_px,
+        }
+
+        semantic_segmentation(
+            input_path=inference_input,
+            output_path=output,
+            model_path=model_path,
+            **kwargs,
+        )
+    finally:
+        if temp_input_raster and os.path.exists(temp_input_raster):
+            try:
+                os.unlink(temp_input_raster)
+            except OSError:
+                pass
 
     result = {
         "input": raster,
         "model": model_path,
         "output": output,
+        "architecture": architecture,
+        "backbone": backbone,
+        "in_channels": in_channels,
         "num_classes": num_classes,
         "chip_size": chip_size,
-        "overlap": overlap,
+        "overlap": overlap_px,
     }
+    if band_indexes is not None:
+        result["band_indexes"] = list(band_indexes)
 
     if os.path.isfile(output):
         result["output_size_bytes"] = os.path.getsize(output)
@@ -247,7 +325,7 @@ def train_segmentation(
 
     Raises:
         FileNotFoundError: If input directories do not exist.
-        ValueError: If architecture or backbone is invalid.
+        ValueError: If architecture or loss is invalid.
     """
     image_root = os.path.abspath(image_root)
     label_root = os.path.abspath(label_root)
@@ -264,22 +342,23 @@ def train_segmentation(
             f"Choose from: {', '.join(SEGMENTATION_ARCHITECTURES)}"
         )
 
+    loss_fn = _resolve_loss_fn(loss)
     os.makedirs(output_dir, exist_ok=True)
 
-    from geoai import train_segmentation_model
+    from geoai.train import train_segmentation_model
 
     result = train_segmentation_model(
-        image_root=image_root,
-        label_root=label_root,
+        images_dir=image_root,
+        labels_dir=label_root,
         output_dir=output_dir,
-        model=architecture,
-        backbone=backbone,
+        architecture=architecture,
+        encoder_name=backbone,
+        num_channels=in_channels,
         num_classes=num_classes,
-        in_channels=in_channels,
-        epochs=epochs,
+        num_epochs=epochs,
         batch_size=batch_size,
         learning_rate=learning_rate,
-        loss=loss,
+        loss_fn=loss_fn,
     )
 
     return {

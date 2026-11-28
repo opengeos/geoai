@@ -5,6 +5,7 @@ Wraps geoai object detection functions (Mask R-CNN and friends via
 """
 
 import os
+import tempfile
 from typing import Any, Dict, List, Optional
 
 DETECTION_MODELS = [
@@ -18,6 +19,98 @@ DETECTION_MODELS = [
 ]
 
 INPUT_FORMATS = ["directory", "coco", "yolo"]
+
+
+def _detection_raster_to_vector(raster_path: str, output_vector: str) -> None:
+    """Polygonize multiclass detection output from instance IDs (band 2).
+
+    ``multiclass_detection`` writes class labels to band 1 and per-instance IDs
+    to band 2. Polygonizing band 2 keeps touching same-class detections as
+    separate polygons while attaching each instance's class label from band 1.
+    Falls back to ``geoai.utils.raster_to_vector`` for single-band rasters.
+    """
+    import numpy as np
+    import rasterio
+    from rasterio.features import shapes
+
+    with rasterio.open(raster_path) as src:
+        band_count = src.count
+        if band_count < 2:
+            from geoai.utils import raster_to_vector
+
+            raster_to_vector(raster_path, output_vector)
+            return
+
+        class_band = src.read(1)
+        instance_band = src.read(2)
+        transform = src.transform
+        crs = src.crs
+
+    import geopandas as gpd
+    from shapely.geometry import shape as shapely_shape
+    from shapely.ops import unary_union
+
+    geoms_by_instance: Dict[int, list] = {}
+    for geom_dict, val in shapes(
+        instance_band.astype(np.int32),
+        mask=(instance_band > 0),
+        transform=transform,
+    ):
+        inst_id = int(val)
+        if inst_id <= 0:
+            continue
+        geoms_by_instance.setdefault(inst_id, []).append(shapely_shape(geom_dict))
+
+    # Aggregate dominant positive class label per instance ID in a single pass
+    # over the raster rather than rescanning both full bands per instance.
+    valid_mask = (instance_band > 0) & (class_band > 0)
+    inst_vals = instance_band[valid_mask].astype(np.int64, copy=False)
+    cls_vals = class_band[valid_mask].astype(np.int64, copy=False)
+    dominant_class_by_instance: Dict[int, int] = {}
+    if inst_vals.size > 0:
+        pairs = np.empty(inst_vals.size, dtype=[("inst", np.int64), ("cls", np.int64)])
+        pairs["inst"] = inst_vals
+        pairs["cls"] = cls_vals
+        unique_pairs, pair_counts = np.unique(pairs, return_counts=True)
+        best_count: Dict[int, int] = {}
+        for (i_id, c_id), cnt in zip(unique_pairs.tolist(), pair_counts.tolist()):
+            if cnt > best_count.get(i_id, -1):
+                best_count[i_id] = cnt
+                dominant_class_by_instance[i_id] = c_id
+
+    records = []
+    for inst_id, parts in sorted(geoms_by_instance.items()):
+        geom = parts[0] if len(parts) == 1 else unary_union(parts)
+        class_id = dominant_class_by_instance.get(inst_id, 0)
+        records.append(
+            {
+                "instance_id": inst_id,
+                "class": class_id,
+                "geometry": geom,
+            }
+        )
+
+    if records:
+        gdf = gpd.GeoDataFrame(records, crs=crs)
+    else:
+        gdf = gpd.GeoDataFrame(
+            {"instance_id": [], "class": []},
+            geometry=gpd.GeoSeries([], crs=crs),
+            crs=crs,
+        )
+
+    ext = os.path.splitext(output_vector)[1].lower()
+    driver_map = {
+        ".geojson": "GeoJSON",
+        ".json": "GeoJSON",
+        ".gpkg": "GPKG",
+        ".shp": "ESRI Shapefile",
+    }
+    driver = driver_map.get(ext)
+    if driver:
+        gdf.to_file(output_vector, driver=driver)
+    else:
+        gdf.to_file(output_vector)
 
 
 def run_detection(
@@ -42,13 +135,14 @@ def run_detection(
         band_indexes: Band indices to use (0-indexed).
         confidence_threshold: Minimum confidence for detections.
         chip_size: Processing chip size in pixels.
-        overlap: Overlap fraction between chips.
+        overlap: Overlap fraction (0-1) or overlap in pixels between chips.
 
     Returns:
         Result dict with output paths and detection count.
 
     Raises:
         FileNotFoundError: If input files do not exist.
+        ValueError: If neither output_vector nor output_raster is provided.
     """
     raster = os.path.abspath(raster)
     model_path = os.path.abspath(model_path)
@@ -57,6 +151,8 @@ def run_detection(
         raise FileNotFoundError(f"Raster file not found: {raster}")
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
+    if not output_vector and not output_raster:
+        raise ValueError("Specify at least one of output_vector or output_raster")
 
     if output_vector:
         output_vector = os.path.abspath(output_vector)
@@ -65,26 +161,67 @@ def run_detection(
         output_raster = os.path.abspath(output_raster)
         os.makedirs(os.path.dirname(output_raster) or ".", exist_ok=True)
 
-    from geoai import multiclass_detection
+    from geoai.object_detect import multiclass_detection
 
-    kwargs = {
-        "raster": raster,
-        "model_path": model_path,
-        "num_classes": num_classes,
-        "confidence_threshold": confidence_threshold,
-        "chip_size": chip_size,
-        "overlap": overlap,
-    }
-    if output_vector:
-        kwargs["output_vector"] = output_vector
+    if overlap < 0:
+        raise ValueError(f"overlap must be non-negative, got {overlap}")
+    overlap_px = (
+        int(chip_size * overlap)
+        if isinstance(overlap, float) and 0.0 < overlap < 1.0
+        else int(overlap)
+    )
+    if overlap_px >= chip_size:
+        raise ValueError(
+            f"Resolved overlap ({overlap_px}px) must be smaller than chip_size ({chip_size}px)"
+        )
+
+    temp_raster: Optional[str] = None
+    temp_input_raster: Optional[str] = None
+    work_dir = os.path.dirname(output_raster or output_vector or ".") or "."
     if output_raster:
-        kwargs["output_raster"] = output_raster
-    if band_indexes is not None:
-        kwargs["band_indexes"] = band_indexes
+        target_raster = output_raster
+    else:
+        fd, temp_raster = tempfile.mkstemp(
+            suffix=".tif",
+            prefix="geoai_det_",
+            dir=work_dir,
+        )
+        os.close(fd)
+        target_raster = temp_raster
 
-    multiclass_detection(**kwargs)
+    try:
+        inference_input = raster
+        kwargs: Dict[str, Any] = {
+            "output_path": target_raster,
+            "model_path": model_path,
+            "num_classes": num_classes,
+            "confidence_threshold": confidence_threshold,
+            "window_size": chip_size,
+            "overlap": overlap_px,
+        }
+        if band_indexes is not None:
+            from cli_anything.geoai.core.raster import extract_band_subset
 
-    result = {
+            temp_input_raster = extract_band_subset(
+                raster, band_indexes, temp_dir=work_dir
+            )
+            inference_input = temp_input_raster
+            kwargs["num_channels"] = len(band_indexes)
+
+        kwargs["input_path"] = inference_input
+        multiclass_detection(**kwargs)
+
+        if output_vector and os.path.isfile(target_raster):
+            _detection_raster_to_vector(target_raster, output_vector)
+    finally:
+        for tmp in (temp_raster, temp_input_raster):
+            if tmp and os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+
+    result: Dict[str, Any] = {
         "input": raster,
         "model": model_path,
         "num_classes": num_classes,
@@ -158,7 +295,7 @@ def train_detector(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    from geoai import train_MaskRCNN_model
+    from geoai.train import train_MaskRCNN_model
 
     result = train_MaskRCNN_model(
         images_dir=images_dir,
@@ -167,7 +304,7 @@ def train_detector(
         model_name=model_name,
         num_classes=num_classes,
         input_format=input_format,
-        epochs=epochs,
+        num_epochs=epochs,
         batch_size=batch_size,
         learning_rate=learning_rate,
     )

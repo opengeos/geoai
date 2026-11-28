@@ -22,28 +22,38 @@ For Claude Desktop integration, add to claude_desktop_config.json:
 """
 
 import asyncio
+import builtins
+import contextlib
+from datetime import date
+import errno
+import importlib
 import logging
+import math
 import os
+import shutil
 import sys
+import tempfile
+import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from mcp.server.fastmcp import FastMCP as MCPServer
+try:
+    from mcp.server.fastmcp import FastMCP as MCPServer
+except ImportError:
+    from mcp.server import MCPServer
 
-from .config import load_config, GeoAIConfig
+from .config import GeoAIConfig, get_config, load_config, setup_logging
 from .schemas import (
     # Segmentation
     SegmentObjectsInput,
     AutoSegmentInput,
     SegmentationResult,
     # Detection
-    DetectFeaturesInput,
-    ClassifyLandCoverInput,
     DetectionResult,
     ClassificationResult,
     # Change Detection
-    ChangeDetectionInput,
     ChangeDetectionResult,
     # Data Download
     DownloadImageryInput,
@@ -51,49 +61,48 @@ from .schemas import (
     DownloadResult,
     TrainingDataResult,
     # Foundation Models
-    ExtractFeaturesInput,
-    CanopyHeightInput,
-    VLMAnalysisInput,
     FeatureExtractionResult,
     CanopyHeightResult,
     VLMResult,
     # Utilities
-    CleanResultsInput,
     CleanResultsResult,
     ListFilesResult,
+    InspectRasterResult,
+    InspectVectorResult,
+    StacSearchResult,
     # Common
     OutputFormat,
+    DataSource,
+    FoundationModel,
+    SegmentationModel,
     BoundingBox,
+    SearchBoundingBox,
 )
 from .utils.error_handling import (
     GeoAIError,
     InputValidationError,
     FileAccessError,
     ModelLoadError,
+    ProcessingError,
+    OperationTimeoutError,
 )
 from .utils.file_management import (
-    validate_input_path,
     validate_output_path,
     validate_output_subdir,
+    get_safe_file_path,
     get_safe_input_path,
     list_input_files,
     generate_output_filename,
 )
 from .utils.validation import (
-    validate_bbox,
-    validate_image_path,
-    validate_text_prompts,
+    validate_confidence_threshold,
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger("geoai-mcp-server")
 
-# Load configuration
-config = load_config()
+# Defer directory creation out of module import time.
+# Tests may still patch ``geoai_mcp_server.server.config`` directly.
+config: Optional[GeoAIConfig] = None
 
 # Initialize MCP Server
 mcp = MCPServer(
@@ -107,7 +116,14 @@ mcp = MCPServer(
 # =============================================================================
 
 
-def _format_error_result(error: Exception, operation: str) -> dict:
+def _get_config() -> GeoAIConfig:
+    """Return active configuration without creating directories at import time."""
+    if config is not None:
+        return config
+    return get_config()
+
+
+def _format_error_result(error: Exception, operation: str) -> dict[str, Any]:
     """Format an error into a consistent result structure."""
     return {
         "success": False,
@@ -120,11 +136,257 @@ def _format_error_result(error: Exception, operation: str) -> dict:
 def _get_geoai_module(module_name: str):
     """Lazily import GeoAI modules to avoid startup overhead."""
     try:
-        import importlib
-
         return importlib.import_module(f"geoai.{module_name}")
     except ImportError as e:
         raise ModelLoadError(f"Failed to import geoai.{module_name}: {e}")
+
+
+_thread_stdout_state = threading.local()
+_stdout_router_lock = threading.Lock()
+_stdout_router_refcount = 0
+_stdout_router_orig: Any = None
+_stdout_router_proxy: Any = None
+
+
+class _ThreadRoutingStdout:
+    """Thread-aware stdout proxy that routes worker prints to stderr.
+
+    The main thread (MCP JSON-RPC protocol writer) always writes to the
+    original stdout stream, while worker threads with ``redirect_to_stderr``
+    enabled write to ``sys.stderr`` without swapping process-wide ``sys.stdout``
+    per call.
+    """
+
+    def __init__(self, orig_stdout: Any):
+        self._orig = orig_stdout
+
+    def _target(self) -> Any:
+        if getattr(_thread_stdout_state, "redirect_to_stderr", False):
+            return sys.stderr
+        return self._orig
+
+    def write(self, data: str) -> int:
+        return self._target().write(data)
+
+    def writelines(self, lines: Any) -> None:
+        return self._target().writelines(lines)
+
+    def flush(self) -> None:
+        return self._target().flush()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._target(), name)
+
+
+@contextlib.contextmanager
+def _stdout_router_installed():
+    """Ref-counted installation of the thread-aware stdout router."""
+    global _stdout_router_refcount, _stdout_router_orig, _stdout_router_proxy
+
+    with _stdout_router_lock:
+        if _stdout_router_refcount == 0:
+            _stdout_router_orig = sys.stdout
+            _stdout_router_proxy = _ThreadRoutingStdout(_stdout_router_orig)
+            sys.stdout = _stdout_router_proxy
+        _stdout_router_refcount += 1
+    try:
+        yield
+    finally:
+        with _stdout_router_lock:
+            _stdout_router_refcount -= 1
+            if _stdout_router_refcount == 0:
+                if sys.stdout is _stdout_router_proxy:
+                    sys.stdout = _stdout_router_orig
+                _stdout_router_orig = None
+                _stdout_router_proxy = None
+
+
+class _WorkerTimeoutError(Exception):
+    """Sentinel wrapper distinguishing a worker-raised TimeoutError from wait_for expiration."""
+
+    def __init__(self, exc: BaseException):
+        self.exc = exc
+
+
+_path_locks_guard = threading.Lock()
+_path_locks: dict[str, threading.Lock] = {}
+
+
+def _get_path_lock(path: Path) -> threading.Lock:
+    """Return a per-destination lock keyed by resolved path."""
+    key = str(path.resolve())
+    with _path_locks_guard:
+        lock = _path_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _path_locks[key] = lock
+        return lock
+
+
+async def _run_blocking(fn, *args, **kwargs):
+    """Execute a synchronous GeoAI call in a worker thread.
+
+    Routes worker-thread stdout writes to stderr via thread-local dispatch so
+    concurrent requests cannot race on global ``sys.stdout`` or corrupt MCP
+    STDIO JSON-RPC framing, and enforces ``config.timeout``.
+    """
+    cfg = _get_config()
+    raw_timeout = getattr(cfg, "timeout", 300)
+    timeout = float(raw_timeout) if isinstance(raw_timeout, (int, float)) else 300.0
+
+    def _wrapped():
+        with _stdout_router_installed():
+            prev = getattr(_thread_stdout_state, "redirect_to_stderr", False)
+            _thread_stdout_state.redirect_to_stderr = True
+            try:
+                return fn(*args, **kwargs)
+            except TimeoutError as worker_exc:
+                raise _WorkerTimeoutError(worker_exc) from worker_exc
+            finally:
+                _thread_stdout_state.redirect_to_stderr = prev
+
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(_wrapped), timeout=timeout)
+    except _WorkerTimeoutError as wrapped:
+        raise wrapped.exc from None
+    except asyncio.TimeoutError as exc:
+        raise OperationTimeoutError(
+            message=f"Operation timed out after {int(timeout)} seconds",
+            timeout_seconds=int(timeout),
+            operation=getattr(fn, "__name__", str(fn)),
+        ) from exc
+
+
+def _vector_driver_for_format(out_format: OutputFormat) -> Optional[str]:
+    """Return the GeoPandas/GDAL driver name for a vector OutputFormat."""
+    drivers = {
+        OutputFormat.GEOJSON: "GeoJSON",
+        OutputFormat.GEOPACKAGE: "GPKG",
+        OutputFormat.SHAPEFILE: "ESRI Shapefile",
+    }
+    return drivers.get(out_format)
+
+
+_SHAPEFILE_SIDECAR_EXTS = (
+    ".shp",
+    ".shx",
+    ".dbf",
+    ".prj",
+    ".cpg",
+    ".sbn",
+    ".sbx",
+    ".qix",
+    ".fix",
+    ".shp.xml",
+)
+
+
+def _atomic_publish_file(src: Path, dest: Path) -> None:
+    """Atomically publish ``src`` to ``dest``, staging cross-device copies first."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.replace(str(src), str(dest))
+        return
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+
+    # Cross-device move: copy into an internal hidden sibling file on the
+    # destination filesystem first so workspace tools never see a partial file,
+    # then atomically rename into place.
+    tmp_path: Optional[Path] = None
+    try:
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(dest.parent),
+            prefix=".geoai_pub_",
+            suffix=".tmp",
+        )
+        os.close(fd)
+        tmp_path = Path(tmp_name)
+        shutil.copy2(str(src), str(tmp_path))
+        os.replace(str(tmp_path), str(dest))
+        tmp_path = None
+        try:
+            src.unlink()
+        except OSError:
+            pass
+    finally:
+        if tmp_path is not None and tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+
+
+def _move_vector_file(src: Path, dest: Path, cfg: Optional[GeoAIConfig] = None) -> None:
+    """Publish a vector file (including shapefile sidecars) to ``dest``."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if src.suffix.lower() == ".shp" and dest.suffix.lower() == ".shp":
+        for ext in _SHAPEFILE_SIDECAR_EXTS:
+            sidecar = src.with_name(f"{src.stem}{ext}")
+            if sidecar.is_file():
+                target = dest.with_name(f"{dest.stem}{ext}")
+                if cfg is not None:
+                    target = validate_output_path(target, cfg)
+                _atomic_publish_file(sidecar, target)
+    else:
+        target = validate_output_path(dest, cfg) if cfg is not None else dest
+        _atomic_publish_file(src, target)
+
+
+def _count_raster_instances(raster_path: Path) -> Optional[int]:
+    """Count distinct positive instance IDs in band 1 of a segmentation raster."""
+    if not raster_path.is_file():
+        return None
+    try:
+        import numpy as np
+        import rasterio
+
+        with rasterio.open(raster_path) as src:
+            masked = src.read(1, masked=True)
+            valid = masked.compressed()
+            if valid.size == 0:
+                return 0
+            vals = np.unique(valid)
+            return int(np.count_nonzero(vals > 0))
+    except Exception:
+        return None
+
+
+def _sanitize_float(value: Any) -> Optional[float]:
+    """Return a finite Python float or None if NaN/Inf/None."""
+    if value is None:
+        return None
+    try:
+        fval = float(value)
+    except (TypeError, ValueError):
+        return None
+    return fval if math.isfinite(fval) else None
+
+
+def _parse_output_format(output_format: str) -> OutputFormat:
+    """Parse and validate an output format string."""
+    try:
+        return OutputFormat(output_format)
+    except ValueError as exc:
+        valid = ", ".join(fmt.value for fmt in OutputFormat)
+        raise InputValidationError(
+            message=f"Invalid output format '{output_format}'. Expected one of: {valid}",
+            parameter_name="output_format",
+            received_value=output_format,
+            expected=valid,
+        ) from exc
+
+
+def _unlink_quietly(path: Optional[Path]) -> None:
+    """Delete a temporary file if it exists, ignoring cleanup errors."""
+    if path is None:
+        return
+    try:
+        if path.exists():
+            path.unlink()
+    except OSError:
+        pass
 
 
 # =============================================================================
@@ -152,127 +414,272 @@ async def segment_objects_with_prompts(
         image_path: Path to input image (relative to input directory).
                    Supports GeoTIFF, PNG, JPEG.
         prompts: Text descriptions of objects to find (e.g., ["building", "road"]).
-        output_format: Output format - "geojson", "geotiff", "shapefile", "geopackage".
-        model: Model to use - "sam", "sam2", "grounded_sam", "clipseg", "auto".
+        output_format: Output format: "geojson", "geotiff", "shapefile", "geopackage".
+        model: Model to use: "sam", "sam2", "grounded_sam", "clipseg", "auto".
         confidence_threshold: Minimum confidence (0-1). Lower = more detections.
         tile_size: Tile size for large images (512-4096 pixels).
         output_filename: Custom output filename (optional).
 
     Returns:
         Dictionary with segmentation results, output file paths, and statistics.
-
-    Example:
-        >>> segment_objects_with_prompts(
-        ...     image_path="area_of_interest.tif",
-        ...     prompts=["building", "parking lot", "swimming pool"],
-        ...     confidence_threshold=0.4
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        # Validate inputs
+        out_format = _parse_output_format(output_format)
+        try:
+            seg_model = SegmentationModel(model)
+        except ValueError as exc:
+            valid_models = ", ".join(m.value for m in SegmentationModel)
+            raise InputValidationError(
+                message=f"Invalid model '{model}'. Expected one of: {valid_models}",
+                parameter_name="model",
+                received_value=model,
+                expected=valid_models,
+            ) from exc
+
         input_data = SegmentObjectsInput(
             image_path=image_path,
             prompts=prompts,
-            output_format=OutputFormat(output_format),
+            output_format=out_format,
+            model=seg_model,
             confidence_threshold=confidence_threshold,
             tile_size=tile_size,
             output_filename=output_filename,
         )
 
-        # Get full paths
-        full_input_path = get_safe_input_path(input_data.image_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {input_data.image_path}")
+        full_input_path = get_safe_input_path(input_data.image_path, cfg)
 
-        # Generate output filename
         out_name = output_filename or generate_output_filename(
-            input_data.image_path, "segmented", input_data.output_format.value
+            input_data.image_path, "segmented", input_data.output_format.extension
         )
-        output_path = validate_output_path(out_name, config)
+        output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Segmenting objects in {full_input_path} with prompts: {prompts}")
 
-        # Initialize model based on selection
-        if model in ("grounded_sam", "auto"):
-            # GroundedSAM: detector + SAM segmenter driven by text prompts
-            # segment_image() always writes a GeoTIFF and derives vector sidecars
-            # by replacing ".tif" in the path, so the raster path must end in .tif.
+        num_objects = 0
+        output_files: list[str] = []
+
+        if input_data.model in (SegmentationModel.GROUNDED_SAM, SegmentationModel.AUTO):
+            # Validate every derived destination path before running GroundedSAM in a
+            # private staging directory so sidecars cannot escape the workspace.
             segment_module = _get_geoai_module("segment")
-            raster_path = output_path.with_suffix(".tif")
-            segmenter = segment_module.GroundedSAM(
-                threshold=confidence_threshold,
-                tile_size=input_data.tile_size,
-            )
-            result = segmenter.segment_image(
-                input_path=str(full_input_path),
-                output_path=str(raster_path),
-                text_prompts=prompts,
-                export_polygons=(input_data.output_format == OutputFormat.GEOJSON),
-                export_boxes=(input_data.output_format != OutputFormat.GEOJSON),
-            )
-            masks = result
-        elif model == "clipseg":
-            # CLIPSegmentation accepts a single text prompt; join multiple prompts
+            dest_raster = validate_output_path(output_path.with_suffix(".tif"), cfg)
+            dest_vector: Optional[Path] = None
+            dest_boxes: Optional[Path] = None
+            if input_data.output_format == OutputFormat.GEOTIFF:
+                dest_boxes = validate_output_path(
+                    dest_raster.with_name(f"{dest_raster.stem}_boxes.geojson"), cfg
+                )
+            else:
+                dest_vector = validate_output_path(
+                    output_path.with_suffix(f".{input_data.output_format.extension}"),
+                    cfg,
+                )
+
+            def _run_grounded():
+                with tempfile.TemporaryDirectory(
+                    dir=str(output_path.parent), prefix=".gsam_stage_"
+                ) as stage_dir:
+                    staged_raster = Path(stage_dir) / "grounded_sam.tif"
+                    segmenter = segment_module.GroundedSAM(
+                        threshold=confidence_threshold,
+                        tile_size=input_data.tile_size,
+                    )
+                    masks = segmenter.segment_image(
+                        input_path=str(full_input_path),
+                        output_path=str(staged_raster),
+                        text_prompts=prompts,
+                        export_polygons=(
+                            input_data.output_format != OutputFormat.GEOTIFF
+                        ),
+                        export_boxes=(input_data.output_format == OutputFormat.GEOTIFF),
+                    )
+
+                    published_files: list[str] = []
+                    obj_count = 0
+
+                    if isinstance(masks, dict):
+                        seg_raw = masks.get("segmentation")
+                        if seg_raw:
+                            seg_p = Path(seg_raw)
+                            if seg_p.is_file():
+                                shutil.move(str(seg_p), str(dest_raster))
+                                published_files.append(str(dest_raster))
+                            else:
+                                validated_seg = validate_output_path(seg_p, cfg)
+                                published_files.append(str(validated_seg))
+
+                        if input_data.output_format == OutputFormat.GEOTIFF:
+                            boxes_raw = masks.get("boxes")
+                            if boxes_raw:
+                                boxes_p = Path(boxes_raw)
+                                try:
+                                    import geopandas as gpd
+
+                                    gdf = gpd.read_file(str(boxes_p))
+                                    obj_count = len(gdf)
+                                except Exception:
+                                    pass
+                                if boxes_p.is_file() and dest_boxes is not None:
+                                    shutil.move(str(boxes_p), str(dest_boxes))
+                                    published_files.append(str(dest_boxes))
+                                else:
+                                    validated_b = validate_output_path(boxes_p, cfg)
+                                    published_files.append(str(validated_b))
+                        else:
+                            vec_raw = masks.get("polygons") or masks.get("boxes")
+                            if vec_raw:
+                                vec_p = Path(vec_raw)
+                                gdf = None
+                                try:
+                                    import geopandas as gpd
+
+                                    gdf = gpd.read_file(str(vec_p))
+                                    obj_count = len(gdf)
+                                except Exception:
+                                    pass
+
+                                if vec_p.is_file() and dest_vector is not None:
+                                    if input_data.output_format == OutputFormat.GEOJSON:
+                                        shutil.move(str(vec_p), str(dest_vector))
+                                    else:
+                                        if gdf is None:
+                                            import geopandas as gpd
+
+                                            gdf = gpd.read_file(str(vec_p))
+                                            obj_count = len(gdf)
+                                        driver = _vector_driver_for_format(
+                                            input_data.output_format
+                                        )
+                                        gdf.to_file(str(dest_vector), driver=driver)
+                                    published_files.append(str(dest_vector))
+                                elif input_data.output_format == OutputFormat.GEOJSON:
+                                    validated_v = validate_output_path(vec_p, cfg)
+                                    published_files.append(str(validated_v))
+                                elif dest_vector is not None and gdf is not None:
+                                    driver = _vector_driver_for_format(
+                                        input_data.output_format
+                                    )
+                                    gdf.to_file(str(dest_vector), driver=driver)
+                                    published_files.append(str(dest_vector))
+                    elif isinstance(masks, str):
+                        mask_p = Path(masks)
+                        if mask_p.is_file():
+                            shutil.move(str(mask_p), str(dest_raster))
+                            published_files.append(str(dest_raster))
+                        else:
+                            validated_m = validate_output_path(mask_p, cfg)
+                            published_files.append(str(validated_m))
+                    else:
+                        if staged_raster.is_file():
+                            shutil.move(str(staged_raster), str(dest_raster))
+                        published_files.append(str(dest_raster))
+
+                    return published_files, obj_count
+
+            output_files, num_objects = await _run_blocking(_run_grounded)
+
+        elif input_data.model == SegmentationModel.CLIPSEG:
             segment_module = _get_geoai_module("segment")
-            segmenter = segment_module.CLIPSegmentation(
-                tile_size=input_data.tile_size,
+            utils_module = (
+                _get_geoai_module("utils")
+                if input_data.output_format != OutputFormat.GEOTIFF
+                else None
             )
             text_prompt = ", ".join(prompts)
-            raster_path = output_path.with_suffix(".tif")
-            masks = segmenter.segment_image(
-                input_path=str(full_input_path),
-                output_path=str(raster_path),
-                text_prompt=text_prompt,
-                threshold=confidence_threshold,
+            dest_raster = (
+                validate_output_path(output_path.with_suffix(".tif"), cfg)
+                if input_data.output_format == OutputFormat.GEOTIFF
+                else None
             )
-            if input_data.output_format == OutputFormat.GEOJSON:
-                utils_module = _get_geoai_module("utils")
-                utils_module.raster_to_vector(str(raster_path), str(output_path))
-                masks = str(output_path)
+
+            def _run_clipseg():
+                # Keep temporary raster creation, inference, vectorization, and
+                # cleanup inside the worker lifetime so timeouts cannot race.
+                with tempfile.TemporaryDirectory(
+                    dir=str(output_path.parent), prefix=".clipseg_tmp_"
+                ) as tmp_dir:
+                    if input_data.output_format == OutputFormat.GEOTIFF:
+                        target_raster = dest_raster
+                    else:
+                        target_raster = Path(tmp_dir) / "clipseg_mask.tif"
+
+                    segmenter = segment_module.CLIPSegmentation(
+                        tile_size=input_data.tile_size,
+                    )
+                    written_raster = segmenter.segment_image(
+                        input_path=str(full_input_path),
+                        output_path=str(target_raster),
+                        text_prompt=text_prompt,
+                        threshold=confidence_threshold,
+                    )
+                    if input_data.output_format != OutputFormat.GEOTIFF:
+                        gdf = utils_module.raster_to_vector(
+                            str(target_raster),
+                            str(output_path),
+                        )
+                        count = len(gdf) if hasattr(gdf, "__len__") else 0
+                        return [str(output_path)], count
+                    final_path = (
+                        str(validate_output_path(written_raster, cfg))
+                        if isinstance(written_raster, str)
+                        else str(target_raster)
+                    )
+                    return [final_path], 0
+
+            output_files, num_objects = await _run_blocking(_run_clipseg)
+
         else:
-            # SAM without text prompts — automatic segmentation
+            # SAM / SAM2 automatic segmentation
             sam_module = _get_geoai_module("sam")
-            segmenter = sam_module.SamGeo(model_type="vit_h")
-            segmenter.set_image(str(full_input_path))
+            utils_module = (
+                _get_geoai_module("utils")
+                if input_data.output_format != OutputFormat.GEOTIFF
+                else None
+            )
+            sam_model_id = (
+                "facebook/sam2.1-hiera-large"
+                if input_data.model == SegmentationModel.SAM2
+                else "facebook/sam-vit-huge"
+            )
 
-            if input_data.output_format == OutputFormat.GEOJSON:
-                raster_output_path = output_path.with_suffix(".tif")
-            else:
-                raster_output_path = output_path
+            def _run_sam():
+                with tempfile.TemporaryDirectory(
+                    dir=str(output_path.parent), prefix=".sam_tmp_"
+                ) as tmp_dir:
+                    raster_target = (
+                        output_path
+                        if input_data.output_format == OutputFormat.GEOTIFF
+                        else Path(tmp_dir) / "sam_mask.tif"
+                    )
+                    segmenter = sam_module.SamGeo(model=sam_model_id, automatic=True)
+                    segmenter.generate(
+                        source=str(full_input_path),
+                        output=str(raster_target),
+                    )
+                    seg_masks = getattr(segmenter, "masks", None)
+                    mask_count = (
+                        len(seg_masks)
+                        if seg_masks is not None and hasattr(seg_masks, "__len__")
+                        else 0
+                    )
 
-            masks = segmenter.generate(output=str(raster_output_path))
+                    if input_data.output_format != OutputFormat.GEOTIFF:
+                        gdf = utils_module.raster_to_vector(
+                            str(raster_target),
+                            str(output_path),
+                        )
+                        count = len(gdf) if hasattr(gdf, "__len__") else mask_count
+                    else:
+                        raster_count = _count_raster_instances(raster_target)
+                        count = raster_count if raster_count is not None else mask_count
+                    return [str(output_path)], count
 
-            if input_data.output_format == OutputFormat.GEOJSON:
-                utils_module = _get_geoai_module("utils")
-                utils_module.raster_to_vector(str(raster_output_path), str(output_path))
-
-        # Calculate statistics
-        num_objects = 0
-        if isinstance(masks, dict):
-            # GroundedSAM returns a dict of output file paths, not mask arrays.
-            # Count actual detected objects from the vector sidecar if present.
-            import geopandas as gpd
-
-            count_file = masks.get("polygons") or masks.get("boxes")
-            if count_file:
-                try:
-                    num_objects = len(gpd.read_file(count_file))
-                except Exception:
-                    pass
-        elif hasattr(masks, "__len__") and not isinstance(masks, str):
-            num_objects = len(masks)
+            output_files, num_objects = await _run_blocking(_run_sam)
 
         processing_time = time.time() - start_time
-
-        if isinstance(masks, dict):
-            output_files = list(masks.values())
-        elif isinstance(masks, str):
-            # CLIPSeg returns the path it actually wrote; use it directly.
-            output_files = [masks]
-        else:
-            output_files = [str(output_path)]
 
         return SegmentationResult(
             success=True,
@@ -282,7 +689,7 @@ async def segment_objects_with_prompts(
             num_objects=num_objects,
             classes_found=prompts,
             statistics={
-                "model_used": model,
+                "model_used": input_data.model.value,
                 "confidence_threshold": confidence_threshold,
             },
         ).model_dump()
@@ -311,7 +718,7 @@ async def auto_segment_image(
 
     Args:
         image_path: Path to input image (relative to input directory).
-        output_format: Output format - "geotiff", "geojson", "shapefile".
+        output_format: Output format: "geotiff", "geojson", "shapefile", "geopackage".
         min_object_size: Minimum object size in pixels to keep.
         max_object_size: Maximum object size in pixels (optional).
         clean_results: Whether to clean up small artifacts.
@@ -319,75 +726,98 @@ async def auto_segment_image(
 
     Returns:
         Dictionary with segmentation masks and statistics.
-
-    Example:
-        >>> auto_segment_image(
-        ...     image_path="satellite_tile.tif",
-        ...     min_object_size=200,
-        ...     output_format="geojson"
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
+        out_format = _parse_output_format(output_format)
         input_data = AutoSegmentInput(
             image_path=image_path,
-            output_format=OutputFormat(output_format),
+            output_format=out_format,
             min_object_size=min_object_size,
             max_object_size=max_object_size,
             clean_results=clean_results,
             output_filename=output_filename,
         )
 
-        full_input_path = get_safe_input_path(input_data.image_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {input_data.image_path}")
+        full_input_path = get_safe_input_path(input_data.image_path, cfg)
 
         out_name = output_filename or generate_output_filename(
-            input_data.image_path, "auto_segmented", input_data.output_format.value
+            input_data.image_path, "auto_segmented", input_data.output_format.extension
         )
-        output_path = validate_output_path(out_name, config)
+        output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Auto-segmenting {full_input_path}")
 
         sam_module = _get_geoai_module("sam")
+        utils_module = (
+            _get_geoai_module("utils")
+            if (clean_results or input_data.output_format != OutputFormat.GEOTIFF)
+            else None
+        )
 
-        # Initialize SAM
-        segmenter = sam_module.SamGeo(model_type="vit_h")
-        segmenter.set_image(str(full_input_path))
+        def _run_auto_seg_pipeline():
+            # Keep intermediate rasters owned by the worker until it finishes so
+            # timeouts cannot race with cleanup.
+            with tempfile.TemporaryDirectory(
+                dir=str(output_path.parent), prefix=".auto_seg_tmp_"
+            ) as tmp_dir:
+                tmp_root = Path(tmp_dir)
+                if (
+                    input_data.output_format == OutputFormat.GEOTIFF
+                    and not clean_results
+                ):
+                    raster_output_path = output_path
+                else:
+                    raster_output_path = tmp_root / "auto_seg_raw.tif"
 
-        # Generate raster mask first
-        if input_data.output_format == OutputFormat.GEOTIFF:
-            raster_output_path = output_path
-        else:
-            temp_dir = config.output_dir / "temp"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_filename = generate_output_filename(
-                input_data.image_path, "auto_segmented_mask", "tif"
-            )
-            raster_output_path = temp_dir / temp_filename
+                segmenter = sam_module.SamGeo(
+                    model="facebook/sam-vit-huge", automatic=True
+                )
+                segmenter.generate(
+                    source=str(full_input_path),
+                    output=str(raster_output_path),
+                    min_size=min_object_size,
+                    max_size=max_object_size,
+                )
+                seg_masks = getattr(segmenter, "masks", None)
+                mask_count = (
+                    len(seg_masks)
+                    if seg_masks is not None and hasattr(seg_masks, "__len__")
+                    else 0
+                )
 
-        masks = segmenter.generate(output=str(raster_output_path))
+                active_raster = raster_output_path
+                if clean_results:
+                    cleaned_raster = (
+                        output_path
+                        if input_data.output_format == OutputFormat.GEOTIFF
+                        else tmp_root / "auto_seg_clean.tif"
+                    )
+                    utils_module.clean_instance_mask(
+                        input_path=str(raster_output_path),
+                        output_path=str(cleaned_raster),
+                        min_area=min_object_size,
+                    )
+                    active_raster = cleaned_raster
 
-        # Convert to vector output if requested
-        if input_data.output_format != OutputFormat.GEOTIFF:
-            utils_module = _get_geoai_module("utils")
-            utils_module.raster_to_vector(
-                str(raster_output_path),
-                str(output_path),
-            )
+                if input_data.output_format != OutputFormat.GEOTIFF:
+                    # Pixel-area filtering already ran on the raster mask; do not
+                    # reuse min_object_size (pixels) as vector map-unit min_area.
+                    gdf = utils_module.raster_to_vector(
+                        str(active_raster),
+                        str(output_path),
+                        min_area=0,
+                    )
+                    return len(gdf) if hasattr(gdf, "__len__") else mask_count
 
-        # Filter by size if specified
-        num_objects = len(masks) if hasattr(masks, "__len__") else 0
+                # Count distinct remaining instance IDs in the final GeoTIFF
+                # rather than the pre-filter segmenter.masks list.
+                raster_count = _count_raster_instances(active_raster)
+                return raster_count if raster_count is not None else mask_count
 
-        # Clean results if requested (vector outputs only)
-        if clean_results and input_data.output_format != OutputFormat.GEOTIFF:
-            utils_module = _get_geoai_module("utils")
-            utils_module.clean_segmentation(
-                str(output_path),
-                min_size=min_object_size,
-                max_size=max_object_size,
-            )
+        num_objects = await _run_blocking(_run_auto_seg_pipeline)
 
         processing_time = time.time() - start_time
 
@@ -429,7 +859,7 @@ async def detect_and_classify_features(
 
     Args:
         image_path: Path to input image.
-        feature_types: Types to detect - "buildings", "vehicles", "ships",
+        feature_types: Types to detect: "buildings", "vehicles", "ships",
                       "solar_panels", "trees", "water", "roads", "custom".
         confidence_threshold: Minimum detection confidence (0-1).
         output_format: Output format for results.
@@ -438,91 +868,217 @@ async def detect_and_classify_features(
 
     Returns:
         Dictionary with detection results and bounding boxes.
-
-    Example:
-        >>> detect_and_classify_features(
-        ...     image_path="urban_area.tif",
-        ...     feature_types=["buildings", "vehicles"],
-        ...     confidence_threshold=0.6
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        full_input_path = get_safe_input_path(image_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {image_path}")
+        if not feature_types:
+            raise InputValidationError(
+                message="At least one feature type is required",
+                parameter_name="feature_types",
+                received_value=feature_types,
+                expected="Non-empty list of feature types",
+            )
+        validate_confidence_threshold(confidence_threshold)
+        out_format = _parse_output_format(output_format)
+
+        full_input_path = get_safe_input_path(image_path, cfg)
 
         out_name = output_filename or generate_output_filename(
-            image_path, "detections", output_format
+            image_path, "detections", out_format.extension
         )
-        output_path = validate_output_path(out_name, config)
+        output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Detecting {feature_types} in {full_input_path}")
 
-        # Build prompts from feature types
-        prompts = []
+        prompt_map = {
+            "buildings": ["building"],
+            "vehicles": ["car", "truck", "vehicle"],
+            "ships": ["ship", "boat", "vessel"],
+            "solar_panels": ["solar panel"],
+            "trees": ["tree"],
+            "water": ["water", "pond", "lake", "river"],
+            "roads": ["road"],
+        }
+
+        prompts: list[str] = []
         for ft in feature_types:
-            if ft == "custom" and custom_prompts:
+            if ft == "custom":
+                if not custom_prompts:
+                    raise InputValidationError(
+                        message="custom_prompts is required when feature_types includes 'custom'",
+                        parameter_name="custom_prompts",
+                        expected="Non-empty list of text prompts",
+                    )
                 prompts.extend(custom_prompts)
-            elif ft == "buildings":
-                prompts.append("building")
-            elif ft == "vehicles":
-                prompts.extend(["car", "truck", "vehicle"])
-            elif ft == "ships":
-                prompts.extend(["ship", "boat", "vessel"])
-            elif ft == "solar_panels":
-                prompts.append("solar panel")
-            elif ft == "trees":
-                prompts.append("tree")
-            elif ft == "water":
-                prompts.extend(["water", "pond", "lake", "river"])
-            elif ft == "roads":
-                prompts.append("road")
+            elif ft in prompt_map:
+                prompts.extend(prompt_map[ft])
+            else:
+                prompts.append(ft)
 
-        if not prompts:
-            prompts = feature_types
-
-        # Use GroundedSAM for detection
-        sam_module = _get_geoai_module("sam")
-
-        try:
-            segmenter = sam_module.SamGeo(model_type="vit_h")
-            segmenter.set_image(str(full_input_path))
-            results = segmenter.predict_with_text(
-                text_prompts=prompts,
-                box_threshold=confidence_threshold,
-                text_threshold=confidence_threshold,
-                output=str(output_path),
+        segment_module = _get_geoai_module("segment")
+        dest_raster = validate_output_path(output_path.with_suffix(".tif"), cfg)
+        dest_boxes_geojson = validate_output_path(
+            dest_raster.with_name(f"{dest_raster.stem}_boxes.geojson"), cfg
+        )
+        dest_vector: Optional[Path] = None
+        dest_polygons: Optional[Path] = None
+        if out_format != OutputFormat.GEOTIFF:
+            dest_vector = validate_output_path(
+                output_path.with_suffix(f".{out_format.extension}"), cfg
+            )
+            dest_polygons = validate_output_path(
+                output_path.with_name(
+                    f"{output_path.stem}_polygons.{out_format.extension}"
+                ),
+                cfg,
             )
 
-            # Count detections by class
-            detections_by_class = {}
-            if hasattr(results, "__iter__"):
-                for r in results:
-                    cls = (
-                        r.get("class", "unknown") if isinstance(r, dict) else "detected"
-                    )
-                    detections_by_class[cls] = detections_by_class.get(cls, 0) + 1
+        def _run_detect():
+            import numpy as np
 
-            num_detections = sum(detections_by_class.values())
+            with tempfile.TemporaryDirectory(
+                dir=str(output_path.parent), prefix=".detect_stage_"
+            ) as stage_dir:
+                staged_raster = Path(stage_dir) / "grounded_sam.tif"
+                detector = segment_module.GroundedSAM(threshold=confidence_threshold)
+                results = detector.segment_image(
+                    input_path=str(full_input_path),
+                    output_path=str(staged_raster),
+                    text_prompts=prompts,
+                    export_boxes=True,
+                    export_polygons=(out_format != OutputFormat.GEOTIFF),
+                )
 
-        except Exception as e:
-            logger.warning(f"GroundedSAM detection failed: {e}")
-            # Fallback message
-            num_detections = 0
-            detections_by_class = {}
+                det_by_class: dict[str, int] = {}
+                det_count = 0
+                avg_conf: Optional[float] = None
+                published_files: list[str] = []
+
+                if isinstance(results, dict):
+                    seg_raw = results.get("segmentation")
+                    if seg_raw:
+                        seg_p = Path(seg_raw)
+                        if seg_p.is_file():
+                            shutil.move(str(seg_p), str(dest_raster))
+                            published_files.append(str(dest_raster))
+                        else:
+                            published_files.append(
+                                str(validate_output_path(seg_p, cfg))
+                            )
+
+                    boxes_raw = results.get("boxes")
+                    polys_raw = results.get("polygons")
+
+                    primary_vec = boxes_raw or polys_raw
+                    primary_gdf = None
+                    if primary_vec and Path(primary_vec).is_file():
+                        import geopandas as gpd
+
+                        primary_gdf = gpd.read_file(str(primary_vec))
+                        det_count = len(primary_gdf)
+                        label_col = next(
+                            (
+                                c
+                                for c in ("label", "class", "category")
+                                if c in primary_gdf.columns
+                            ),
+                            None,
+                        )
+                        if label_col:
+                            for cls_name, cnt in (
+                                primary_gdf[label_col].value_counts().items()
+                            ):
+                                det_by_class[str(cls_name)] = int(cnt)
+                        elif det_count > 0:
+                            det_by_class["detected"] = det_count
+
+                        if "score" in primary_gdf.columns:
+                            raw_scores = (
+                                primary_gdf["score"].dropna().to_numpy(dtype=float)
+                            )
+                            finite_scores = raw_scores[np.isfinite(raw_scores)]
+                            if finite_scores.size > 0:
+                                avg_conf = round(float(np.mean(finite_scores)), 4)
+
+                    if out_format == OutputFormat.GEOTIFF:
+                        if boxes_raw:
+                            boxes_p = Path(boxes_raw)
+                            if boxes_p.is_file():
+                                shutil.move(str(boxes_p), str(dest_boxes_geojson))
+                                published_files.append(str(dest_boxes_geojson))
+                            else:
+                                published_files.append(
+                                    str(validate_output_path(boxes_p, cfg))
+                                )
+                    else:
+                        driver = _vector_driver_for_format(out_format)
+                        if boxes_raw and dest_vector is not None:
+                            boxes_p = Path(boxes_raw)
+                            if boxes_p.is_file():
+                                if out_format == OutputFormat.GEOJSON:
+                                    shutil.move(str(boxes_p), str(dest_vector))
+                                else:
+                                    import geopandas as gpd
+
+                                    bgdf = (
+                                        primary_gdf
+                                        if primary_vec == boxes_raw
+                                        and primary_gdf is not None
+                                        else gpd.read_file(str(boxes_p))
+                                    )
+                                    bgdf.to_file(str(dest_vector), driver=driver)
+                                published_files.append(str(dest_vector))
+                            elif out_format == OutputFormat.GEOJSON:
+                                published_files.append(
+                                    str(validate_output_path(boxes_p, cfg))
+                                )
+
+                        if polys_raw:
+                            polys_p = Path(polys_raw)
+                            target_poly = (
+                                dest_polygons
+                                if boxes_raw and dest_polygons is not None
+                                else dest_vector
+                            )
+                            if polys_p.is_file() and target_poly is not None:
+                                if out_format == OutputFormat.GEOJSON:
+                                    shutil.move(str(polys_p), str(target_poly))
+                                else:
+                                    import geopandas as gpd
+
+                                    pgdf = (
+                                        primary_gdf
+                                        if primary_vec == polys_raw
+                                        and primary_gdf is not None
+                                        else gpd.read_file(str(polys_p))
+                                    )
+                                    pgdf.to_file(str(target_poly), driver=driver)
+                                published_files.append(str(target_poly))
+                            elif out_format == OutputFormat.GEOJSON:
+                                published_files.append(
+                                    str(validate_output_path(polys_p, cfg))
+                                )
+                else:
+                    published_files = [str(output_path)]
+
+                return published_files, det_count, det_by_class, avg_conf
+
+        output_files, num_detections, detections_by_class, average_confidence = (
+            await _run_blocking(_run_detect)
+        )
 
         processing_time = time.time() - start_time
 
         return DetectionResult(
             success=True,
             message=f"Detection complete: found {num_detections} objects",
-            output_files=[str(output_path)],
+            output_files=output_files,
             processing_time_seconds=processing_time,
             num_detections=num_detections,
             detections_by_class=detections_by_class,
-            average_confidence=confidence_threshold,
+            average_confidence=average_confidence,
         ).model_dump()
 
     except GeoAIError as e:
@@ -547,69 +1103,103 @@ async def classify_land_cover(
 
     Args:
         image_path: Path to input multispectral image.
-        model_path: Path to trained model (uses default if not specified).
+        model_path: Path to a trained classification model (required, within input directory).
         num_classes: Number of land cover classes (2-100).
         output_format: Output format for classified map.
         output_filename: Custom output filename (optional).
 
     Returns:
         Dictionary with classification results and class distribution.
-
-    Example:
-        >>> classify_land_cover(
-        ...     image_path="sentinel2_tile.tif",
-        ...     num_classes=8
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        full_input_path = get_safe_input_path(image_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {image_path}")
+        out_format = _parse_output_format(output_format)
+        if out_format != OutputFormat.GEOTIFF:
+            raise InputValidationError(
+                message=(
+                    f"Unsupported output_format '{out_format.value}' for "
+                    "classify_land_cover. Only 'geotiff' is supported."
+                ),
+                parameter_name="output_format",
+                received_value=output_format,
+                expected=OutputFormat.GEOTIFF.value,
+            )
+
+        if not model_path:
+            raise InputValidationError(
+                message="model_path is required for land cover classification",
+                parameter_name="model_path",
+                received_value=model_path,
+                expected="A local model file path within the input directory",
+            )
+
+        if "://" in model_path or model_path.lower().startswith(
+            ("http:", "https:", "ftp:", "file:", "s3:", "gs:")
+        ):
+            raise InputValidationError(
+                message="Model path must be a local file within the input directory, not a URL",
+                parameter_name="model_path",
+                received_value=model_path,
+                expected="A local model file path within the input directory",
+            )
+
+        full_input_path = get_safe_input_path(image_path, cfg)
+        validated_model_path = str(get_safe_input_path(model_path, cfg))
 
         out_name = output_filename or generate_output_filename(
-            image_path, "classified", output_format
+            image_path, "classified", out_format.extension
         )
-        output_path = validate_output_path(out_name, config)
-
-        validated_model_path: Optional[str] = None
-        if model_path is not None:
-            if "://" in model_path or model_path.lower().startswith(
-                ("http:", "https:", "ftp:", "file:", "s3:", "gs:")
-            ):
-                raise InputValidationError(
-                    message="Model path must be a local file within the input directory, not a URL",
-                    parameter_name="model_path",
-                    received_value=model_path,
-                    expected="A local model file path within the input directory",
-                )
-            validated_model_path = str(get_safe_input_path(model_path, config))
+        output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Classifying land cover in {full_input_path}")
 
         classify_module = _get_geoai_module("classify")
 
-        # Perform classification
-        result = classify_module.classify_image(
-            str(full_input_path),
-            output_path=str(output_path),
-            model_path=validated_model_path,
-            num_classes=num_classes,
-        )
+        def _run_classify():
+            result = classify_module.classify_image(
+                str(full_input_path),
+                model_path=validated_model_path,
+                output_path=str(output_path),
+            )
 
-        # Get class distribution
-        class_distribution = {}
-        dominant_class = None
-        if hasattr(result, "class_distribution"):
-            class_distribution = result.class_distribution
-            dominant_class = max(class_distribution, key=class_distribution.get)
+            class_dist: dict[str, float] = {}
+            dominant: Optional[str] = None
+            if hasattr(result, "class_distribution") and isinstance(
+                result.class_distribution, dict
+            ):
+                class_dist = result.class_distribution
+                if class_dist:
+                    dominant = max(class_dist, key=class_dist.get)
+            elif output_path.is_file():
+                try:
+                    import numpy as np
+                    import rasterio
+
+                    with rasterio.open(output_path) as src:
+                        masked = src.read(1, masked=True)
+                        valid = masked.compressed()
+                        if valid.size > 0:
+                            vals, counts = np.unique(valid, return_counts=True)
+                            total = int(valid.size)
+                            class_dist = {
+                                str(int(v)): round(float(c) / total * 100.0, 2)
+                                for v, c in zip(vals, counts)
+                            }
+                            dominant = max(class_dist, key=class_dist.get)
+                except Exception:
+                    pass
+
+            return class_dist, dominant
+
+        class_distribution, dominant_class = await _run_blocking(_run_classify)
 
         processing_time = time.time() - start_time
 
         return ClassificationResult(
             success=True,
-            message=f"Land cover classification complete with {num_classes} classes",
+            message="Land cover classification complete",
             output_files=[str(output_path)],
             processing_time_seconds=processing_time,
             class_distribution=class_distribution,
@@ -652,59 +1242,112 @@ async def detect_temporal_changes(
 
     Returns:
         Dictionary with change map, statistics, and change percentages.
-
-    Example:
-        >>> detect_temporal_changes(
-        ...     image1_path="area_2020.tif",
-        ...     image2_path="area_2023.tif",
-        ...     change_threshold=0.4
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        full_path1 = get_safe_input_path(image1_path, config)
-        full_path2 = get_safe_input_path(image2_path, config)
+        validate_confidence_threshold(change_threshold)
+        out_format = _parse_output_format(output_format)
 
-        if not full_path1.exists():
-            raise FileAccessError(f"First image not found: {image1_path}")
-        if not full_path2.exists():
-            raise FileAccessError(f"Second image not found: {image2_path}")
+        full_path1 = get_safe_input_path(image1_path, cfg)
+        full_path2 = get_safe_input_path(image2_path, cfg)
 
         out_name = output_filename or generate_output_filename(
-            image1_path, "change_map", output_format
+            image1_path, "change_map", out_format.extension
         )
-        output_path = validate_output_path(out_name, config)
+        if (
+            out_format == OutputFormat.SHAPEFILE
+            and Path(out_name).suffix.lower() != ".shp"
+        ):
+            out_name = f"{out_name}.shp"
+        output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Detecting changes between {full_path1} and {full_path2}")
 
         change_module = _get_geoai_module("change_detection")
 
-        # Perform change detection
-        result = change_module.detect_changes(
-            str(full_path1),
-            str(full_path2),
-            output=str(output_path),
-            threshold=change_threshold,
+        def _run_change():
+            import numpy as np
+
+            detect_kwargs: dict[str, Any] = {
+                "image1_path": str(full_path1),
+                "image2_path": str(full_path2),
+                "threshold": change_threshold,
+            }
+            published_files: list[str] = []
+
+            if out_format == OutputFormat.GEOTIFF:
+                detect_kwargs["output_change"] = str(output_path)
+                result = change_module.changestar_detect(**detect_kwargs)
+                published_files = [str(output_path)]
+            else:
+                # Stage vector output so an all-zero change mask (which does not
+                # write a file) never advertises a missing or stale pre-existing path.
+                with tempfile.TemporaryDirectory(
+                    dir=str(output_path.parent), prefix=".change_stage_"
+                ) as stage_dir:
+                    staged_vec = Path(stage_dir) / f"change.{out_format.extension}"
+                    detect_kwargs["output_vector"] = str(staged_vec)
+                    result = change_module.changestar_detect(**detect_kwargs)
+                    if staged_vec.is_file():
+                        _move_vector_file(staged_vec, output_path, cfg)
+                        published_files = [str(output_path)]
+
+            chg_pct = 0.0
+            chg_area = None
+            chg_types: dict[str, float] = {}
+
+            if include_statistics:
+                if isinstance(result, dict) and (
+                    "change_map" in result or "change" in result
+                ):
+                    raw_map = (
+                        result["change_map"]
+                        if "change_map" in result
+                        else result["change"]
+                    )
+                    change_arr = np.asarray(raw_map)
+                    if change_arr.size > 0:
+                        chg_pct = round(
+                            float(np.count_nonzero(change_arr))
+                            / change_arr.size
+                            * 100.0,
+                            2,
+                        )
+                elif hasattr(result, "statistics") and isinstance(
+                    result.statistics, dict
+                ):
+                    stats = result.statistics
+                    chg_pct = float(stats.get("change_percentage", 0.0))
+                    chg_area = stats.get("change_area_sq_meters")
+                    chg_types = stats.get("change_types", {})
+                elif out_format == OutputFormat.GEOTIFF and output_path.is_file():
+                    try:
+                        import rasterio
+
+                        with rasterio.open(output_path) as src:
+                            data = src.read(1)
+                            if data.size > 0:
+                                chg_pct = round(
+                                    float(np.count_nonzero(data)) / data.size * 100.0,
+                                    2,
+                                )
+                    except Exception:
+                        pass
+
+            return published_files, chg_pct, chg_area, chg_types
+
+        output_files, change_percentage, change_area_sq_meters, change_types = (
+            await _run_blocking(_run_change)
         )
-
-        # Calculate statistics
-        change_percentage = 0.0
-        change_area_sq_meters = None
-        change_types = {}
-
-        if include_statistics and hasattr(result, "statistics"):
-            stats = result.statistics
-            change_percentage = stats.get("change_percentage", 0.0)
-            change_area_sq_meters = stats.get("change_area_sq_meters")
-            change_types = stats.get("change_types", {})
 
         processing_time = time.time() - start_time
 
         return ChangeDetectionResult(
             success=True,
             message=f"Change detection complete: {change_percentage:.1f}% change detected",
-            output_files=[str(output_path)],
+            output_files=output_files,
             processing_time_seconds=processing_time,
             change_percentage=change_percentage,
             change_area_sq_meters=change_area_sq_meters,
@@ -737,7 +1380,7 @@ async def download_satellite_imagery(
 ) -> dict[str, Any]:
     """Download satellite or aerial imagery for an area of interest.
 
-    Fetches imagery from various sources including NAIP, Sentinel-2, Landsat,
+    Fetches imagery from supported sources including NAIP, Sentinel-2, Landsat,
     and Microsoft Planetary Computer.
 
     Args:
@@ -745,7 +1388,7 @@ async def download_satellite_imagery(
         min_lat: Minimum latitude (south boundary).
         max_lon: Maximum longitude (east boundary).
         max_lat: Maximum latitude (north boundary).
-        data_source: Source - "naip", "sentinel2", "landsat", "planetary_computer".
+        data_source: Source: "naip", "sentinel2", "landsat", "planetary_computer".
         date_range: Date range as "YYYY-MM-DD/YYYY-MM-DD" (optional).
         max_cloud_cover: Maximum cloud cover percentage (0-100).
         max_items: Maximum number of images to download (1-100).
@@ -753,89 +1396,298 @@ async def download_satellite_imagery(
 
     Returns:
         Dictionary with download results and file paths.
-
-    Example:
-        >>> download_satellite_imagery(
-        ...     min_lon=-122.5, min_lat=37.7,
-        ...     max_lon=-122.4, max_lat=37.8,
-        ...     data_source="naip",
-        ...     max_cloud_cover=10
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
+        try:
+            source_enum = DataSource(data_source)
+        except ValueError as exc:
+            valid_sources = ", ".join(s.value for s in DataSource)
+            raise InputValidationError(
+                message=f"Unsupported data_source '{data_source}'. Expected one of: {valid_sources}",
+                parameter_name="data_source",
+                received_value=data_source,
+                expected=valid_sources,
+            ) from exc
+
         bbox = BoundingBox(
             min_lon=min_lon,
             min_lat=min_lat,
             max_lon=max_lon,
             max_lat=max_lat,
         )
+        DownloadImageryInput(
+            bbox=bbox,
+            data_source=source_enum,
+            date_range=date_range,
+            max_cloud_cover=max_cloud_cover,
+            max_items=max_items,
+            output_subdir=output_subdir,
+        )
 
-        # Determine output directory
-        output_dir = config.output_dir
+        output_dir = cfg.output_dir
         if output_subdir:
-            output_dir = validate_output_subdir(output_subdir, config)
-            output_dir.mkdir(parents=True, exist_ok=True)
+            output_dir = validate_output_subdir(output_subdir, cfg)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Downloading {data_source} imagery for bbox: {bbox.to_tuple()}")
+        logger.info(
+            f"Downloading {source_enum.value} imagery for bbox: {bbox.to_tuple()}"
+        )
 
         download_module = _get_geoai_module("download")
 
-        downloaded_files = []
+        downloaded_files: list[str] = []
         total_size_mb = 0.0
+        download_success = True
+        download_message: Optional[str] = None
 
-        if data_source == "naip":
-            files = download_module.download_naip(
-                bbox=bbox.to_tuple(),
-                output_dir=str(output_dir),
+        if source_enum == DataSource.NAIP:
+            naip_year: Optional[int] = None
+            if date_range is not None:
+                cleaned_range = date_range.strip()
+                if len(cleaned_range) == 4 and cleaned_range.isdigit():
+                    parsed_year = int(cleaned_range)
+                    if not (1900 <= parsed_year <= 2100):
+                        raise InputValidationError(
+                            message=(
+                                f"Invalid NAIP year '{date_range}'. "
+                                "Expected a four-digit year between 1900 and 2100."
+                            ),
+                            parameter_name="date_range",
+                            received_value=date_range,
+                            expected="Four-digit year between 1900 and 2100",
+                        )
+                    naip_year = parsed_year
+                elif "/" in cleaned_range:
+                    parts = cleaned_range.split("/", 1)
+                    try:
+                        start_dt = date.fromisoformat(parts[0].strip())
+                        end_dt = date.fromisoformat(parts[1].strip())
+                    except ValueError as exc:
+                        raise InputValidationError(
+                            message=(
+                                f"Invalid date_range '{date_range}' for NAIP. "
+                                "Expected 'YYYY' or full-year 'YYYY-01-01/YYYY-12-31'."
+                            ),
+                            parameter_name="date_range",
+                            received_value=date_range,
+                            expected="'YYYY' or 'YYYY-01-01/YYYY-12-31'",
+                        ) from exc
+                    if (
+                        start_dt.year == end_dt.year
+                        and 1900 <= start_dt.year <= 2100
+                        and start_dt == date(start_dt.year, 1, 1)
+                        and end_dt == date(end_dt.year, 12, 31)
+                    ):
+                        naip_year = start_dt.year
+                    else:
+                        raise InputValidationError(
+                            message=(
+                                f"NAIP only supports whole-year date filtering "
+                                f"('YYYY' or 'YYYY-01-01/YYYY-12-31'), got '{date_range}'."
+                            ),
+                            parameter_name="date_range",
+                            received_value=date_range,
+                            expected="'YYYY' or 'YYYY-01-01/YYYY-12-31'",
+                        )
+                else:
+                    raise InputValidationError(
+                        message=(
+                            f"Invalid date_range '{date_range}' for NAIP. "
+                            "Expected 'YYYY' or 'YYYY-01-01/YYYY-12-31'."
+                        ),
+                        parameter_name="date_range",
+                        received_value=date_range,
+                        expected="'YYYY' or 'YYYY-01-01/YYYY-12-31'",
+                    )
+
+            naip_kwargs: dict[str, Any] = {
+                "bbox": bbox.to_tuple(),
+                "output_dir": str(output_dir),
+                "max_items": max_items,
+            }
+            if naip_year is not None:
+                naip_kwargs["year"] = naip_year
+
+            files = await _run_blocking(download_module.download_naip, **naip_kwargs)
+            if isinstance(files, list):
+                downloaded_files = [str(f) for f in files if f]
+            elif files:
+                downloaded_files = [str(files)]
+        else:
+            collection_map = {
+                DataSource.SENTINEL2: "sentinel-2-l2a",
+                DataSource.LANDSAT: "landsat-c2-l2",
+                DataSource.PLANETARY_COMPUTER: "sentinel-2-l2a",
+            }
+            collection = collection_map[source_enum]
+            query = {"eo:cloud_cover": {"lte": max_cloud_cover}}
+
+            items = await _run_blocking(
+                download_module.pc_stac_search,
+                collection=collection,
+                bbox=list(bbox.to_tuple()),
+                time_range=date_range,
+                query=query,
                 max_items=max_items,
+                quiet=True,
             )
-            downloaded_files = files if isinstance(files, list) else [files]
+            if items:
+                requested_assets = sum(
+                    len(item.assets)
+                    for item in items
+                    if isinstance(getattr(item, "assets", None), dict)
+                )
 
-        elif data_source == "sentinel2":
-            files = download_module.download_sentinel2(
-                bbox=bbox.to_tuple(),
-                output_dir=str(output_dir),
-                date_range=date_range,
-                max_cloud_cover=max_cloud_cover,
-                max_items=max_items,
-            )
-            downloaded_files = files if isinstance(files, list) else [files]
+                # Allocate the staging directory inside the worker so queued work
+                # that never starts leaves nothing behind, and hand off ownership
+                # explicitly under stage_lock before committing without a second
+                # deadline.
+                stage_lock = threading.Lock()
+                abandoned = False
+                staged_dir_holder: list[Optional[Path]] = [None]
 
-        elif data_source == "landsat":
-            files = download_module.download_landsat(
-                bbox=bbox.to_tuple(),
-                output_dir=str(output_dir),
-                date_range=date_range,
-                max_cloud_cover=max_cloud_cover,
-                max_items=max_items,
-            )
-            downloaded_files = files if isinstance(files, list) else [files]
+                def _stage_stac_download():
+                    with stage_lock:
+                        if abandoned:
+                            return None, []
+                    local_stage = Path(tempfile.mkdtemp(prefix="geoai_stac_stage_"))
+                    try:
+                        dl_map = download_module.pc_stac_download(
+                            items=items,
+                            output_dir=str(local_stage),
+                        )
+                        raw_paths: list[str] = []
+                        if isinstance(dl_map, dict):
+                            for asset_dict in dl_map.values():
+                                if isinstance(asset_dict, dict):
+                                    raw_paths.extend(
+                                        str(p) for p in asset_dict.values() if p
+                                    )
+                                elif asset_dict:
+                                    raw_paths.append(str(asset_dict))
+                        with stage_lock:
+                            if abandoned:
+                                should_cleanup = True
+                            else:
+                                staged_dir_holder[0] = local_stage
+                                should_cleanup = False
+                        if should_cleanup:
+                            shutil.rmtree(local_stage, ignore_errors=True)
+                            return None, []
+                        return local_stage, raw_paths
+                    except BaseException:
+                        shutil.rmtree(local_stage, ignore_errors=True)
+                        raise
 
-        elif data_source == "planetary_computer":
-            files = download_module.download_planetary_computer(
-                bbox=bbox.to_tuple(),
-                output_dir=str(output_dir),
-                collection="sentinel-2-l2a",
-                max_items=max_items,
-            )
-            downloaded_files = files if isinstance(files, list) else [files]
+                try:
+                    stage_dir, raw_paths = await _run_blocking(_stage_stac_download)
+                except BaseException:
+                    with stage_lock:
+                        abandoned = True
+                        orphan = staged_dir_holder[0]
+                        staged_dir_holder[0] = None
+                    if orphan is not None:
+                        shutil.rmtree(orphan, ignore_errors=True)
+                    raise
 
-        # Calculate total size
+                publish_error: Optional[str] = None
+                if stage_dir is not None:
+                    stage_root = stage_dir.resolve()
+                    pub_lock = threading.Lock()
+                    pub_started = False
+                    publish_abandoned = False
+
+                    def _publish_stac_downloads():
+                        nonlocal pub_started
+                        with pub_lock:
+                            if publish_abandoned:
+                                return [], None
+                            pub_started = True
+                        published: list[str] = []
+                        err_msg: Optional[str] = None
+                        try:
+                            for p_str in raw_paths:
+                                src_p = Path(p_str)
+                                try:
+                                    resolved_src = src_p.resolve()
+                                except OSError:
+                                    resolved_src = src_p
+                                if resolved_src.is_relative_to(stage_root):
+                                    if resolved_src.is_file():
+                                        dest_p = validate_output_path(
+                                            output_dir / resolved_src.name, cfg
+                                        )
+                                        with _get_path_lock(dest_p):
+                                            _atomic_publish_file(resolved_src, dest_p)
+                                        published.append(str(dest_p))
+                                else:
+                                    published.append(p_str)
+                        except Exception as exc:
+                            err_msg = str(exc)
+                        finally:
+                            shutil.rmtree(stage_dir, ignore_errors=True)
+                        return published, err_msg
+
+                    try:
+                        # Do not apply a second timeout to the irreversible commit.
+                        downloaded_files, publish_error = await asyncio.to_thread(
+                            _publish_stac_downloads
+                        )
+                    except BaseException:
+                        with pub_lock:
+                            publish_abandoned = True
+                            started = pub_started
+                        if not started:
+                            shutil.rmtree(stage_dir, ignore_errors=True)
+                        raise
+
+                if publish_error is not None:
+                    download_success = False
+                    download_message = (
+                        f"Failed while publishing {source_enum.value} assets after "
+                        f"publishing {len(downloaded_files)} file(s): {publish_error}"
+                    )
+                elif requested_assets > 0:
+                    if len(downloaded_files) == 0:
+                        download_success = False
+                        download_message = (
+                            f"Failed to download any of {requested_assets} asset(s) "
+                            f"from {len(items)} {source_enum.value} scene(s)"
+                        )
+                    elif len(downloaded_files) < requested_assets:
+                        download_success = False
+                        download_message = (
+                            f"Partial download from {source_enum.value}: downloaded "
+                            f"{len(downloaded_files)} of {requested_assets} requested asset(s)"
+                        )
+                elif len(downloaded_files) == 0:
+                    download_success = False
+                    download_message = (
+                        f"Found {len(items)} scene(s) in {source_enum.value}, "
+                        "but failed to download any assets"
+                    )
+
         for f in downloaded_files:
-            if Path(f).exists():
-                total_size_mb += Path(f).stat().st_size / (1024 * 1024)
+            fp = Path(f)
+            if fp.exists():
+                total_size_mb += fp.stat().st_size / (1024 * 1024)
 
         processing_time = time.time() - start_time
 
         return DownloadResult(
-            success=True,
-            message=f"Downloaded {len(downloaded_files)} files from {data_source}",
-            output_files=[str(f) for f in downloaded_files],
+            success=download_success,
+            message=(
+                download_message
+                if download_message is not None
+                else f"Downloaded {len(downloaded_files)} files from {source_enum.value}"
+            ),
+            output_files=downloaded_files,
             processing_time_seconds=processing_time,
             num_files=len(downloaded_files),
-            total_size_mb=total_size_mb,
+            total_size_mb=round(total_size_mb, 4),
         ).model_dump()
 
     except GeoAIError as e:
@@ -857,75 +1709,358 @@ async def prepare_training_data(
 ) -> dict[str, Any]:
     """Prepare training datasets from images and labels.
 
-    Creates tiled training data suitable for deep learning, with
-    automatic train/validation splits and optional augmentation.
+    Creates tiled training data suitable for deep learning using GeoAI's
+    GeoTIFF tile export utilities.
 
     Args:
-        images_dir: Directory containing source images.
-        labels_dir: Directory containing label masks.
+        images_dir: Directory or image file containing source imagery.
+        labels_dir: Directory of per-image masks/vectors, a single vector file
+            (when images_dir is a directory), or a single raster/vector mask
+            (when images_dir is a single raster file).
         tile_size: Output tile size in pixels (64-2048).
-        overlap: Tile overlap in pixels.
+        overlap: Tile overlap in pixels (must be less than tile_size).
         train_ratio: Training data proportion (0.1-0.95).
-        augment: Whether to apply data augmentation.
+        augment: Whether to apply data augmentation (single-raster mode).
         output_subdir: Subdirectory for training data (optional).
 
     Returns:
         Dictionary with training data statistics and paths.
-
-    Example:
-        >>> prepare_training_data(
-        ...     images_dir="raw_images",
-        ...     labels_dir="labels",
-        ...     tile_size=512,
-        ...     train_ratio=0.8
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        images_path = get_safe_input_path(images_dir, config)
-        labels_path = get_safe_input_path(labels_dir, config)
-
-        if not images_path.exists():
-            raise FileAccessError(f"Images directory not found: {images_dir}")
-        if not labels_path.exists():
-            raise FileAccessError(f"Labels directory not found: {labels_dir}")
-
-        output_dir = config.output_dir
-        if output_subdir:
-            output_dir = validate_output_subdir(output_subdir, config)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        logger.info(f"Preparing training data: {images_path} + {labels_path}")
-
-        train_module = _get_geoai_module("train")
-
-        # Create training dataset
-        result = train_module.prepare_training_data(
-            images_dir=str(images_path),
-            labels_dir=str(labels_path),
-            output_dir=str(output_dir),
+        PrepareTrainingDataInput(
+            images_dir=images_dir,
+            labels_dir=labels_dir,
             tile_size=tile_size,
             overlap=overlap,
             train_ratio=train_ratio,
             augment=augment,
+            output_subdir=output_subdir,
         )
+        if overlap >= tile_size:
+            raise InputValidationError(
+                message=f"overlap ({overlap}) must be less than tile_size ({tile_size})",
+                parameter_name="overlap",
+                received_value=overlap,
+                expected=f"An integer less than {tile_size}",
+            )
 
-        num_tiles = getattr(result, "total_tiles", 0)
+        images_path = get_safe_input_path(images_dir, cfg)
+        labels_path = get_safe_input_path(labels_dir, cfg)
+
+        vector_label_exts = {
+            ".geojson",
+            ".json",
+            ".shp",
+            ".gpkg",
+            ".geoparquet",
+            ".parquet",
+            ".fgb",
+            ".gml",
+            ".kml",
+        }
+        if images_path.is_dir() and not labels_path.is_dir():
+            if labels_path.suffix.lower() not in vector_label_exts:
+                raise InputValidationError(
+                    message=(
+                        f"Batch mode (images_dir is a directory) requires labels_dir to be "
+                        f"either a directory of per-image masks or a single vector file "
+                        f"(got '{labels_path.name}'). For a single raster label mask, pass "
+                        f"a single raster image or organize per-image masks into a directory."
+                    ),
+                    parameter_name="labels_dir",
+                    received_value=labels_dir,
+                    expected="A directory of masks or a single vector file (.geojson, .gpkg, .shp, etc.)",
+                )
+
+        output_dir = cfg.output_dir
+        if output_subdir:
+            output_dir = validate_output_subdir(output_subdir, cfg)
+        else:
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Preparing training data: {images_path} + {labels_path}")
+
+        utils_module = _get_geoai_module("utils")
+        stride = tile_size - overlap
+
+        error_count = 0
+        failed_files: list[dict[str, Any]] = []
+        reported_output_files: list[str] = [str(output_dir)]
+        preserved_existing = False
+
+        # When output_subdir is specified, allocate a worker-owned staging dir
+        # and commit via a locked, recoverable swap on the destination filesystem.
+        use_staged_unit = bool(output_subdir)
+        stage_lock = threading.Lock()
+        stage_abandoned = False
+        stage_holder: list[Optional[Path]] = [None]
+        marker_name = ".geoai_training_dataset"
+
+        def _run_export_worker():
+            with stage_lock:
+                if stage_abandoned:
+                    return None, 0, 0, []
+
+            local_stage: Optional[Path] = (
+                Path(tempfile.mkdtemp(prefix="geoai_train_stage_"))
+                if use_staged_unit
+                else None
+            )
+            target_dir = local_stage if local_stage is not None else output_dir
+
+            try:
+                if images_path.is_dir():
+                    batch_kwargs: dict[str, Any] = {
+                        "images_folder": str(images_path),
+                        "output_folder": str(target_dir),
+                        "tile_size": tile_size,
+                        "stride": stride,
+                        "quiet": True,
+                    }
+                    if labels_path.is_dir():
+                        batch_kwargs["masks_folder"] = str(labels_path)
+                    else:
+                        batch_kwargs["masks_file"] = str(labels_path)
+
+                    result = utils_module.export_geotiff_tiles_batch(**batch_kwargs)
+                    tiles = (
+                        int(result.get("total_tiles", 0))
+                        if isinstance(result, dict)
+                        else 0
+                    )
+                    errs = 0
+                    fails: list[dict[str, Any]] = []
+                    if isinstance(result, dict):
+                        raw_errors = result.get("errors", 0)
+                        errs = (
+                            len(raw_errors)
+                            if isinstance(raw_errors, (list, tuple))
+                            else int(raw_errors or 0)
+                        )
+                        raw_failed = result.get("failed_files") or []
+                        if isinstance(raw_failed, list):
+                            fails = [
+                                item if isinstance(item, dict) else {"file": str(item)}
+                                for item in raw_failed
+                            ]
+                else:
+                    images_out = target_dir / "images"
+                    pre_existing = (
+                        {p.resolve() for p in images_out.iterdir() if p.is_file()}
+                        if images_out.is_dir()
+                        else {
+                            p.resolve()
+                            for p in target_dir.rglob("*.tif")
+                            if p.is_file()
+                        }
+                    )
+                    export_res = utils_module.export_geotiff_tiles(
+                        in_raster=str(images_path),
+                        out_folder=str(target_dir),
+                        in_class_data=str(labels_path),
+                        tile_size=tile_size,
+                        stride=stride,
+                        quiet=True,
+                        apply_augmentation=augment,
+                    )
+                    if isinstance(export_res, dict):
+                        tiles = int(export_res.get("total_tiles", 0))
+                        raw_err = export_res.get("errors", 0)
+                        errs = (
+                            len(raw_err)
+                            if isinstance(raw_err, (list, tuple))
+                            else int(raw_err or 0)
+                        )
+                        raw_fail = export_res.get("failed_files") or []
+                        fails = (
+                            [
+                                item if isinstance(item, dict) else {"file": str(item)}
+                                for item in raw_fail
+                            ]
+                            if isinstance(raw_fail, list)
+                            else []
+                        )
+                    else:
+                        if images_out.is_dir():
+                            post_files = {
+                                p.resolve() for p in images_out.iterdir() if p.is_file()
+                            }
+                        else:
+                            post_files = {
+                                p.resolve()
+                                for p in target_dir.rglob("*.tif")
+                                if p.is_file()
+                            }
+                        tiles = len(post_files - pre_existing)
+                        errs = 0
+                        fails = []
+
+                if local_stage is not None:
+                    with stage_lock:
+                        if stage_abandoned:
+                            should_cleanup = True
+                        else:
+                            stage_holder[0] = local_stage
+                            should_cleanup = False
+                    if should_cleanup:
+                        shutil.rmtree(local_stage, ignore_errors=True)
+                        return None, tiles, errs, fails
+
+                return local_stage, tiles, errs, fails
+            except BaseException:
+                if local_stage is not None:
+                    shutil.rmtree(local_stage, ignore_errors=True)
+                raise
+
+        try:
+            stage_export_dir, num_tiles, error_count, failed_files = (
+                await _run_blocking(_run_export_worker)
+            )
+        except BaseException:
+            with stage_lock:
+                stage_abandoned = True
+                orphan = stage_holder[0]
+                stage_holder[0] = None
+            if orphan is not None:
+                shutil.rmtree(orphan, ignore_errors=True)
+            raise
+
+        is_partial = error_count > 0 or len(failed_files) > 0
+
+        if stage_export_dir is not None:
+            pub_lock = threading.Lock()
+            pub_started = False
+
+            def _commit_training_stage():
+                nonlocal pub_started
+                with pub_lock:
+                    pub_started = True
+                prepared_dir: Optional[Path] = None
+                backup_dir: Optional[Path] = None
+                try:
+                    (stage_export_dir / marker_name).write_text(
+                        "partial\n" if is_partial else "complete\n",
+                        encoding="utf-8",
+                    )
+                    output_dir.parent.mkdir(parents=True, exist_ok=True)
+                    with _get_path_lock(output_dir):
+                        has_existing = output_dir.exists() and any(output_dir.iterdir())
+                        if has_existing:
+                            if not (output_dir / marker_name).is_file():
+                                raise ProcessingError(
+                                    message=(
+                                        f"Refusing to replace existing non-empty directory "
+                                        f"'{output_subdir}' not created by prepare_training_data. "
+                                        "Choose a fresh output_subdir."
+                                    ),
+                                    stage="publish",
+                                )
+                            if is_partial:
+                                # Preserve the existing dataset rather than replacing it
+                                # with an incomplete export.
+                                return False
+
+                        # Prepare the full replacement on the destination filesystem
+                        # before touching output_dir so cross-device moves cannot lose
+                        # the previous dataset.
+                        prepared_name = f".geoai_pub_train_{uuid.uuid4().hex[:8]}"
+                        prepared_dir = output_dir.parent / prepared_name
+                        try:
+                            os.rename(str(stage_export_dir), str(prepared_dir))
+                        except OSError as exc:
+                            if exc.errno != errno.EXDEV:
+                                raise
+                            shutil.copytree(str(stage_export_dir), str(prepared_dir))
+
+                        if output_dir.exists():
+                            backup_dir = (
+                                output_dir.parent
+                                / f".geoai_bak_{output_dir.name}_{uuid.uuid4().hex[:8]}"
+                            )
+                            os.rename(str(output_dir), str(backup_dir))
+
+                        try:
+                            os.rename(str(prepared_dir), str(output_dir))
+                            prepared_dir = None
+                        except BaseException:
+                            if backup_dir is not None and backup_dir.exists():
+                                os.rename(str(backup_dir), str(output_dir))
+                                backup_dir = None
+                            raise
+
+                        if backup_dir is not None and backup_dir.exists():
+                            shutil.rmtree(backup_dir, ignore_errors=True)
+                            backup_dir = None
+                        return True
+                finally:
+                    if prepared_dir is not None and prepared_dir.exists():
+                        shutil.rmtree(prepared_dir, ignore_errors=True)
+                    if stage_export_dir.exists():
+                        shutil.rmtree(stage_export_dir, ignore_errors=True)
+
+            try:
+                published_stage = await asyncio.to_thread(_commit_training_stage)
+            except BaseException:
+                with pub_lock:
+                    started = pub_started
+                if not started and stage_export_dir.exists():
+                    shutil.rmtree(stage_export_dir, ignore_errors=True)
+                raise
+
+            if not published_stage:
+                preserved_existing = True
+                reported_output_files = []
+
         num_train = int(num_tiles * train_ratio)
         num_val = num_tiles - num_train
-
         processing_time = time.time() - start_time
 
+        if is_partial:
+            failed_names = [
+                str(f.get("image") or f.get("file") or f) for f in failed_files
+            ]
+            retry_list = (
+                f" Failed inputs: {', '.join(failed_names)}." if failed_names else ""
+            )
+            if preserved_existing:
+                retry_guidance = (
+                    " Preserved the existing dataset at this output_subdir without "
+                    "overwriting it; fix the failed inputs and re-run."
+                )
+            elif use_staged_unit:
+                retry_guidance = (
+                    " After fixing the failed inputs, re-run with this output_subdir (which "
+                    "replaces the dataset as a unit) or choose a fresh output_subdir."
+                )
+            else:
+                retry_guidance = (
+                    " Do not merge a full retry into this directory; after fixing the "
+                    "failed inputs, run a full retry into a fresh output_subdir to avoid "
+                    "duplicate tiles."
+                )
+            message = (
+                f"Partial training export: created {num_tiles} tiles with "
+                f"{error_count} error(s) and {len(failed_files)} failed file(s)."
+                f"{retry_list}{retry_guidance}"
+            )
+        else:
+            message = f"Created {num_tiles} training tiles"
+
         return TrainingDataResult(
-            success=True,
-            message=f"Created {num_tiles} training tiles",
-            output_files=[str(output_dir)],
+            success=not is_partial,
+            message=message,
+            output_files=reported_output_files,
             processing_time_seconds=processing_time,
             num_tiles=num_tiles,
             num_train=num_train,
             num_val=num_val,
             tile_size=tile_size,
+            partial=is_partial,
+            errors=error_count,
+            failed_files=failed_files,
         ).model_dump()
 
     except GeoAIError as e:
@@ -956,74 +2091,288 @@ async def extract_features_with_foundation_model(
 
     Args:
         image_path: Path to input image.
-        model: Foundation model - "dinov3" or "prithvi".
+        model: Foundation model: "dinov3" or "prithvi".
         output_type: "embeddings" for raw features, "similarity_map" for similarity analysis.
-        reference_x: X coordinate for similarity reference point (if output_type="similarity_map").
-        reference_y: Y coordinate for similarity reference point.
+        reference_x: X coordinate for similarity reference point (pair with reference_y).
+        reference_y: Y coordinate for similarity reference point (pair with reference_x).
         output_filename: Custom output filename (optional).
 
     Returns:
         Dictionary with extracted features or similarity map.
-
-    Example:
-        >>> extract_features_with_foundation_model(
-        ...     image_path="scene.tif",
-        ...     model="dinov3",
-        ...     output_type="similarity_map",
-        ...     reference_x=100, reference_y=100
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        full_input_path = get_safe_input_path(image_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {image_path}")
+        try:
+            fm = FoundationModel(model)
+        except ValueError as exc:
+            valid = ", ".join(m.value for m in FoundationModel)
+            raise InputValidationError(
+                message=f"Unknown model '{model}'. Expected one of: {valid}",
+                parameter_name="model",
+                received_value=model,
+                expected=valid,
+            ) from exc
+
+        if output_type not in ("embeddings", "similarity_map"):
+            raise InputValidationError(
+                message=f"Invalid output_type '{output_type}'. Use 'embeddings' or 'similarity_map'.",
+                parameter_name="output_type",
+                received_value=output_type,
+                expected="'embeddings' or 'similarity_map'",
+            )
+
+        if (reference_x is None) != (reference_y is None):
+            raise InputValidationError(
+                message="reference_x and reference_y must both be provided or both be omitted",
+                parameter_name="reference_x/reference_y",
+                received_value=f"reference_x={reference_x}, reference_y={reference_y}",
+                expected="Both integer coordinates or both None",
+            )
+
+        if output_type == "similarity_map" and reference_x is None:
+            raise InputValidationError(
+                message="Both reference_x and reference_y are required for output_type='similarity_map'",
+                parameter_name="reference_x/reference_y",
+                expected="Both reference_x and reference_y coordinates",
+            )
+
+        if fm == FoundationModel.PRITHVI and output_type == "similarity_map":
+            raise InputValidationError(
+                message=(
+                    "output_type='similarity_map' is not supported for model='prithvi'. "
+                    "Use model='dinov3' for similarity maps or output_type='embeddings' for Prithvi."
+                ),
+                parameter_name="output_type",
+                received_value=output_type,
+                expected="'embeddings' for prithvi, or use model='dinov3'",
+            )
+
+        full_input_path = get_safe_input_path(image_path, cfg)
 
         out_name = output_filename or generate_output_filename(
-            image_path, f"features_{model}", "npy"
+            image_path, f"features_{fm.value}", "npy"
         )
-        output_path = validate_output_path(out_name, config)
+        # NumPy checks the '.npy' suffix case-sensitively when given a filename.
+        if output_type == "embeddings" and not out_name.endswith(".npy"):
+            out_name = f"{out_name}.npy"
+        output_path = validate_output_path(out_name, cfg)
 
-        logger.info(f"Extracting features from {full_input_path} using {model}")
+        logger.info(f"Extracting features from {full_input_path} using {fm.value}")
 
-        if model == "dinov3":
+        feature_dims: tuple[int, ...] = ()
+        output_files: list[str] = [str(output_path)]
+
+        if fm == FoundationModel.DINOV3:
             dino_module = _get_geoai_module("dinov3")
 
-            if output_type == "similarity_map" and reference_x is not None:
-                result = dino_module.compute_similarity_map(
-                    str(full_input_path),
-                    reference_point=(reference_x, reference_y),
-                    output=str(output_path),
-                )
+            if output_type == "similarity_map":
+                sim_dir = validate_output_path(output_path.with_suffix(""), cfg)
+                sim_lock = threading.Lock()
+                sim_abandoned = False
+                sim_stage_holder: list[Optional[Path]] = [None]
+
+                def _run_similarity():
+                    # Stage similarity map inside the worker and publish only
+                    # after the request accepts the result so timed-out workers
+                    # cannot overwrite outputs of a later run.
+                    with sim_lock:
+                        if sim_abandoned:
+                            return (), None, []
+                    stage_root = Path(tempfile.mkdtemp(prefix="geoai_sim_stage_"))
+                    try:
+                        res = dino_module.create_similarity_map(
+                            input_image=str(full_input_path),
+                            query_coords=(float(reference_x), float(reference_y)),
+                            output_dir=str(stage_root),
+                        )
+                        dims: tuple[int, ...] = ()
+                        if isinstance(res, dict):
+                            sim_data = res.get("similarity_map")
+                            if sim_data is None and "image_dict" in res:
+                                img_dict = res["image_dict"]
+                                if isinstance(img_dict, dict):
+                                    sim_data = img_dict.get("image")
+                            if sim_data is not None and hasattr(sim_data, "shape"):
+                                dims = tuple(int(d) for d in sim_data.shape)
+
+                        rel_files = sorted(
+                            p.relative_to(stage_root)
+                            for p in stage_root.rglob("*")
+                            if p.is_file()
+                        )
+                        with sim_lock:
+                            if sim_abandoned:
+                                should_cleanup = True
+                            else:
+                                sim_stage_holder[0] = stage_root
+                                should_cleanup = False
+                        if should_cleanup:
+                            shutil.rmtree(stage_root, ignore_errors=True)
+                            return (), None, []
+                        return dims, stage_root, rel_files
+                    except BaseException:
+                        shutil.rmtree(stage_root, ignore_errors=True)
+                        raise
+
+                try:
+                    feature_dims, sim_stage_dir, staged_rel_files = await _run_blocking(
+                        _run_similarity
+                    )
+                except BaseException:
+                    with sim_lock:
+                        sim_abandoned = True
+                        orphan_sim = sim_stage_holder[0]
+                        sim_stage_holder[0] = None
+                    if orphan_sim is not None:
+                        shutil.rmtree(orphan_sim, ignore_errors=True)
+                    raise
+
+                output_files = []
+                if sim_stage_dir is not None:
+                    try:
+                        if staged_rel_files:
+                            sim_dir.mkdir(parents=True, exist_ok=True)
+                            for rel in staged_rel_files:
+                                src_f = sim_stage_dir / rel
+                                dest_f = validate_output_path(sim_dir / rel, cfg)
+                                _atomic_publish_file(src_f, dest_f)
+                                output_files.append(str(dest_f))
+                    finally:
+                        shutil.rmtree(sim_stage_dir, ignore_errors=True)
             else:
-                result = dino_module.extract_features(
-                    str(full_input_path),
-                    output=str(output_path),
+                import numpy as np
+
+                def _extract_dinov3():
+                    processor = dino_module.DINOv3GeoProcessor()
+                    data, _meta = processor.load_image(str(full_input_path))
+                    pil_img = processor.preprocess_image_for_dinov3(data)
+                    features, _h, _w = processor.extract_features(pil_img)
+                    arr = (
+                        features.detach().cpu().numpy()
+                        if hasattr(features, "detach")
+                        else np.asarray(features)
+                    )
+                    with open(output_path, "wb") as fh:
+                        np.save(fh, arr)
+                    return arr
+
+                arr = await _run_blocking(_extract_dinov3)
+                if hasattr(arr, "shape"):
+                    feature_dims = tuple(int(d) for d in arr.shape)
+
+        elif fm == FoundationModel.PRITHVI:
+            import numpy as np
+
+            prithvi_module = _get_geoai_module("prithvi")
+
+            def _extract_prithvi():
+                import torch
+
+                processor = prithvi_module.PrithviProcessor()
+                input_data, _metas, temporal_coords, location_coords = (
+                    processor.load_images(file_paths=[str(full_input_path)])
+                )
+                img_size = int(getattr(processor, "img_size", 224))
+                original_h, original_w = input_data.shape[-2:]
+                pad_h = (img_size - (original_h % img_size)) % img_size
+                pad_w = (img_size - (original_w % img_size)) % img_size
+                if pad_h > 0 or pad_w > 0:
+                    input_data = np.pad(
+                        input_data,
+                        ((0, 0), (0, 0), (0, 0), (0, pad_h), (0, pad_w)),
+                        mode="reflect",
+                    )
+
+                batch = torch.as_tensor(input_data, dtype=torch.float32)
+                b, c, t = batch.shape[:3]
+                windows = batch.unfold(3, img_size, img_size).unfold(
+                    4, img_size, img_size
+                )
+                windows = windows.permute(0, 3, 4, 1, 2, 5, 6).reshape(
+                    -1, c, t, img_size, img_size
                 )
 
-        elif model == "prithvi":
-            prithvi_module = _get_geoai_module("prithvi")
-            result = prithvi_module.extract_features(
-                str(full_input_path),
-                output=str(output_path),
-            )
-        else:
-            raise InputValidationError(f"Unknown model: {model}")
+                device = getattr(processor, "device", torch.device("cpu"))
+                coords_enc = getattr(processor, "coords_encoding", None) or []
 
-        feature_dims = ()
-        if hasattr(result, "shape"):
-            feature_dims = result.shape
+                t_coords_tensor = None
+                if (
+                    "time" in coords_enc
+                    and temporal_coords is not None
+                    and len(temporal_coords) > 0
+                ):
+                    t_arr = torch.as_tensor(
+                        temporal_coords, dtype=torch.float32, device=device
+                    )
+                    if t_arr.ndim == 2:
+                        t_arr = t_arr.unsqueeze(0)
+                    t_coords_tensor = t_arr
+
+                l_coords_tensor = None
+                if (
+                    "location" in coords_enc
+                    and location_coords is not None
+                    and len(location_coords) > 0
+                ):
+                    l_arr = torch.as_tensor(
+                        location_coords, dtype=torch.float32, device=device
+                    )
+                    if l_arr.ndim == 1:
+                        l_arr = l_arr.unsqueeze(0)
+                    l_coords_tensor = l_arr
+
+                encoder = processor.model.encoder
+                latents = []
+                with torch.no_grad():
+                    for idx in range(windows.shape[0]):
+                        x_win = windows[idx : idx + 1].to(device)
+                        latent, _mask, ids_restore = encoder(
+                            x_win,
+                            temporal_coords=t_coords_tensor,
+                            location_coords=l_coords_tensor,
+                            mask_ratio=0.0,
+                        )
+                        if (
+                            hasattr(latent, "shape")
+                            and latent.ndim == 3
+                            and ids_restore is not None
+                            and latent.shape[1] == ids_restore.shape[1] + 1
+                        ):
+                            cls_tok = latent[:, :1, :]
+                            patch_toks = torch.gather(
+                                latent[:, 1:, :],
+                                dim=1,
+                                index=ids_restore.unsqueeze(-1).expand(
+                                    -1, -1, latent.shape[-1]
+                                ),
+                            )
+                            latent = torch.cat([cls_tok, patch_toks], dim=1)
+                        latents.append(
+                            latent.detach().cpu().numpy()
+                            if hasattr(latent, "detach")
+                            else np.asarray(latent)
+                        )
+
+                arr = np.concatenate(latents, axis=0)
+                with open(output_path, "wb") as fh:
+                    np.save(fh, arr)
+                return arr
+
+            arr = await _run_blocking(_extract_prithvi)
+            if hasattr(arr, "shape"):
+                feature_dims = tuple(int(d) for d in arr.shape)
 
         processing_time = time.time() - start_time
 
         return FeatureExtractionResult(
             success=True,
-            message=f"Feature extraction complete using {model}",
-            output_files=[str(output_path)],
+            message=f"Feature extraction complete using {fm.value}",
+            output_files=output_files,
             processing_time_seconds=processing_time,
             feature_dimensions=feature_dims,
-            model_used=model,
+            model_used=fm.value,
         ).model_dump()
 
     except GeoAIError as e:
@@ -1053,46 +2402,64 @@ async def estimate_canopy_height(
 
     Returns:
         Dictionary with height map and statistics.
-
-    Example:
-        >>> estimate_canopy_height(
-        ...     image_path="forest_area.tif",
-        ...     include_statistics=True
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        full_input_path = get_safe_input_path(image_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {image_path}")
+        out_format = _parse_output_format(output_format)
+        if out_format != OutputFormat.GEOTIFF:
+            raise InputValidationError(
+                message=(
+                    f"Unsupported output_format '{out_format.value}' for "
+                    "estimate_canopy_height. Only 'geotiff' is supported."
+                ),
+                parameter_name="output_format",
+                received_value=output_format,
+                expected=OutputFormat.GEOTIFF.value,
+            )
+        full_input_path = get_safe_input_path(image_path, cfg)
 
         out_name = output_filename or generate_output_filename(
-            image_path, "canopy_height", output_format
+            image_path, "canopy_height", out_format.extension
         )
-        output_path = validate_output_path(out_name, config)
+        output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Estimating canopy height for {full_input_path}")
 
         canopy_module = _get_geoai_module("canopy")
 
-        result = canopy_module.estimate_canopy_height(
-            str(full_input_path),
-            output=str(output_path),
-        )
+        def _run_canopy():
+            heights = canopy_module.canopy_height_estimation(
+                str(full_input_path),
+                output_path=str(output_path),
+            )
+            min_h = 0.0
+            max_h = 0.0
+            mean_h = 0.0
+            cov = 0.0
+            if include_statistics:
+                if hasattr(heights, "statistics") and isinstance(
+                    heights.statistics, dict
+                ):
+                    stats = heights.statistics
+                    min_h = float(stats.get("min_height", 0.0))
+                    max_h = float(stats.get("max_height", 0.0))
+                    mean_h = float(stats.get("mean_height", 0.0))
+                    cov = float(stats.get("forest_coverage", 0.0))
+                elif heights is not None:
+                    import numpy as np
 
-        # Extract statistics
-        min_height = 0.0
-        max_height = 0.0
-        mean_height = 0.0
-        coverage = 0.0
+                    arr = np.asarray(heights, dtype=float)
+                    valid = arr[np.isfinite(arr)]
+                    if valid.size > 0:
+                        min_h = round(float(np.min(valid)), 3)
+                        max_h = round(float(np.max(valid)), 3)
+                        mean_h = round(float(np.mean(valid)), 3)
+                        cov = round(float(np.mean(valid > 0)) * 100.0, 2)
+            return min_h, max_h, mean_h, cov
 
-        if include_statistics and hasattr(result, "statistics"):
-            stats = result.statistics
-            min_height = stats.get("min_height", 0.0)
-            max_height = stats.get("max_height", 0.0)
-            mean_height = stats.get("mean_height", 0.0)
-            coverage = stats.get("forest_coverage", 0.0)
+        min_height, max_height, mean_height, coverage = await _run_blocking(_run_canopy)
 
         processing_time = time.time() - start_time
 
@@ -1124,76 +2491,141 @@ async def analyze_with_vision_language_model(
 ) -> dict[str, Any]:
     """Analyze imagery using vision-language models (Moondream).
 
-    Use natural language to caption, query, or detect objects in imagery.
+    Use natural language to caption, query, detect, or point at objects in imagery.
     Ideal for understanding image content without predefined categories.
 
     Args:
         image_path: Path to input image.
-        task: Analysis task - "caption" for description, "query" for Q&A,
-              "detect" for object detection.
+        task: Analysis task: "caption", "query", "detect", or "point".
         query: Question about the image (required for "query" task).
-        detect_target: Object to detect (required for "detect" task).
-        output_filename: Output filename for detection results (optional).
+        detect_target: Object description (required for "detect" and "point" tasks).
+        output_filename: Output filename for detection/point results (optional).
 
     Returns:
         Dictionary with analysis results (caption, answer, or detections).
-
-    Example:
-        >>> analyze_with_vision_language_model(
-        ...     image_path="aerial_view.jpg",
-        ...     task="query",
-        ...     query="How many buildings are visible?"
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        full_input_path = get_safe_input_path(image_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {image_path}")
+        valid_tasks = ("caption", "query", "detect", "point")
+        if task not in valid_tasks:
+            raise InputValidationError(
+                message=f"Invalid VLM task '{task}'. Must be one of: {', '.join(valid_tasks)}",
+                parameter_name="task",
+                received_value=task,
+                expected=", ".join(valid_tasks),
+            )
 
         if task == "query" and not query:
-            raise InputValidationError("Query is required for 'query' task")
-        if task == "detect" and not detect_target:
-            raise InputValidationError("detect_target is required for 'detect' task")
+            raise InputValidationError(
+                message="query is required for 'query' task",
+                parameter_name="query",
+                expected="A non-empty question string",
+            )
+        if task in ("detect", "point") and not detect_target:
+            raise InputValidationError(
+                message=f"detect_target is required for '{task}' task",
+                parameter_name="detect_target",
+                expected="A non-empty object description string",
+            )
+
+        full_input_path = get_safe_input_path(image_path, cfg)
 
         logger.info(f"Analyzing {full_input_path} with VLM, task: {task}")
 
         moondream_module = _get_geoai_module("moondream")
 
-        caption = None
-        answer = None
-        detections = []
-        output_files = []
+        caption: Optional[str] = None
+        answer: Optional[str] = None
+        detections: list[dict[str, Any]] = []
+        output_files: list[str] = []
 
         if task == "caption":
-            caption = moondream_module.caption_image(str(full_input_path))
+            caption = await _run_blocking(
+                moondream_module.moondream_caption,
+                source=str(full_input_path),
+            )
 
         elif task == "query":
-            answer = moondream_module.query_image(str(full_input_path), query)
+            answer = await _run_blocking(
+                moondream_module.moondream_query,
+                question=query,
+                source=str(full_input_path),
+            )
 
         elif task == "detect":
             out_name = output_filename or generate_output_filename(
                 image_path, "vlm_detections", "geojson"
             )
-            output_path = validate_output_path(out_name, config)
+            output_path = validate_output_path(out_name, cfg)
 
-            detections = moondream_module.detect_objects(
-                str(full_input_path),
-                detect_target,
-                output=str(output_path),
+            def _run_vlm_detect():
+                # Stage output in a private temp dir so an un-georeferenced
+                # input (which writes no GeoJSON) cannot return a stale file.
+                with tempfile.TemporaryDirectory(
+                    dir=str(output_path.parent), prefix=".vlm_stage_"
+                ) as stage_dir:
+                    staged_out = Path(stage_dir) / output_path.name
+                    raw_res = moondream_module.moondream_detect(
+                        source=str(full_input_path),
+                        object_type=detect_target,
+                        output_path=str(staged_out),
+                    )
+                    wrote_file = False
+                    if staged_out.is_file():
+                        _move_vector_file(staged_out, output_path, cfg)
+                        wrote_file = True
+                    return raw_res, wrote_file
+
+            raw_result, wrote_file = await _run_blocking(_run_vlm_detect)
+            if isinstance(raw_result, dict):
+                objects = raw_result.get("objects", [])
+                detections = objects if isinstance(objects, list) else []
+            elif isinstance(raw_result, list):
+                detections = raw_result
+            if wrote_file:
+                output_files = [str(output_path)]
+
+        elif task == "point":
+            out_name = output_filename or generate_output_filename(
+                image_path, "vlm_points", "geojson"
             )
-            output_files = [str(output_path)]
+            output_path = validate_output_path(out_name, cfg)
+
+            def _run_vlm_point():
+                with tempfile.TemporaryDirectory(
+                    dir=str(output_path.parent), prefix=".vlm_stage_"
+                ) as stage_dir:
+                    staged_out = Path(stage_dir) / output_path.name
+                    raw_res = moondream_module.moondream_point(
+                        source=str(full_input_path),
+                        object_description=detect_target,
+                        output_path=str(staged_out),
+                    )
+                    wrote_file = False
+                    if staged_out.is_file():
+                        _move_vector_file(staged_out, output_path, cfg)
+                        wrote_file = True
+                    return raw_res, wrote_file
+
+            raw_result, wrote_file = await _run_blocking(_run_vlm_point)
+            if isinstance(raw_result, dict):
+                points = raw_result.get("points", [])
+                detections = points if isinstance(points, list) else []
+            elif isinstance(raw_result, list):
+                detections = raw_result
+            if wrote_file:
+                output_files = [str(output_path)]
 
         processing_time = time.time() - start_time
 
-        # Build message
-        if caption:
+        if caption is not None:
             message = f"Caption: {caption}"
-        elif answer:
+        elif answer is not None:
             message = f"Answer: {answer}"
         else:
-            message = f"Detected {len(detections)} instances of '{detect_target}'"
+            message = f"Found {len(detections)} instances of '{detect_target}'"
 
         return VLMResult(
             success=True,
@@ -1203,7 +2635,7 @@ async def analyze_with_vision_language_model(
             task=task,
             caption=caption,
             answer=answer,
-            detections=detections if isinstance(detections, list) else [],
+            detections=detections,
         ).model_dump()
 
     except GeoAIError as e:
@@ -1214,7 +2646,7 @@ async def analyze_with_vision_language_model(
 
 
 # =============================================================================
-# UTILITY TOOLS
+# UTILITY & INSPECTION TOOLS
 # =============================================================================
 
 
@@ -1225,93 +2657,117 @@ async def clean_segmentation_results(
     min_size: int = 100,
     regularize_buildings: bool = False,
     output_filename: Optional[str] = None,
+    source: str = "input",
 ) -> dict[str, Any]:
-    """Clean and post-process segmentation/detection results.
+    """Clean and post-process segmentation/detection vector results.
 
-    Removes noise, fills holes, smooths boundaries, and optionally
-    regularizes building footprints into clean rectangular shapes.
+    Removes small noise polygons, fixes invalid geometries, smooths boundaries,
+    and optionally regularizes building footprints into clean shapes.
 
     Args:
-        input_path: Path to segmentation result file.
-        operation: Operation - "remove_noise", "fill_holes", "regularize",
+        input_path: Path to segmentation result vector file.
+        operation: Operation: "remove_noise", "fill_holes", "regularize",
                   "smooth", "all".
-        min_size: Minimum object size to keep (pixels).
-        regularize_buildings: Whether to regularize building shapes.
+        min_size: Minimum polygon area (in square meters when CRS is geographic
+                 or CRS units when projected).
+        regularize_buildings: Whether to apply building footprint regularization.
         output_filename: Custom output filename (optional).
+        source: Directory to read input_path from: "input" or "output" (default "input").
 
     Returns:
         Dictionary with cleaning statistics and output path.
-
-    Example:
-        >>> clean_segmentation_results(
-        ...     input_path="buildings_raw.geojson",
-        ...     operation="all",
-        ...     regularize_buildings=True
-        ... )
     """
     start_time = time.time()
+    cfg = _get_config()
 
     try:
-        full_input_path = get_safe_input_path(input_path, config)
-        if not full_input_path.exists():
-            raise FileAccessError(f"Input file not found: {input_path}")
+        valid_ops = ("remove_noise", "fill_holes", "regularize", "smooth", "all")
+        if operation not in valid_ops:
+            raise InputValidationError(
+                message=f"Invalid operation '{operation}'. Expected one of: {', '.join(valid_ops)}",
+                parameter_name="operation",
+                received_value=operation,
+                expected=", ".join(valid_ops),
+            )
 
-        out_ext = full_input_path.suffix
+        full_input_path = get_safe_file_path(input_path, source=source, config=cfg)
+
+        out_ext = full_input_path.suffix.lstrip(".") or "geojson"
         out_name = output_filename or generate_output_filename(
-            input_path, "cleaned", out_ext.lstrip(".")
+            input_path, "cleaned", out_ext
         )
-        output_path = validate_output_path(out_name, config)
+        output_path = validate_output_path(out_name, cfg)
 
         logger.info(f"Cleaning segmentation results: {full_input_path}")
 
-        utils_module = _get_geoai_module("utils")
-
-        # Get initial count
-        original_count = 0
-        try:
+        def _run_clean():
             import geopandas as gpd
 
-            gdf = gpd.read_file(str(full_input_path))
-            original_count = len(gdf)
-        except Exception as e:
-            logger.debug("Unable to load GeoJSON for cleaning stats: %s", e)
-        # Apply cleaning operations
-        result_gdf = gdf.copy() if "gdf" in dir() else None
-        objects_removed = 0
-        objects_modified = 0
+            try:
+                gdf = gpd.read_file(str(full_input_path))
+            except Exception as exc:
+                raise ProcessingError(
+                    message=f"Failed to read vector file '{input_path}': {exc}",
+                    stage="read",
+                ) from exc
 
-        if operation in ("all", "remove_noise"):
-            if result_gdf is not None:
-                result_gdf = result_gdf[result_gdf.geometry.area >= min_size]
+            original_count = len(gdf)
+            result_gdf = gdf.copy()
+            objects_removed = 0
+            objects_modified = 0
+
+            # Project geographic CRS to a metric UTM CRS before area/distance operations
+            original_crs = result_gdf.crs
+            reprojected = False
+            if (
+                original_crs is not None
+                and original_crs.is_geographic
+                and len(result_gdf) > 0
+            ):
+                metric_crs = result_gdf.estimate_utm_crs()
+                if metric_crs is not None:
+                    result_gdf = result_gdf.to_crs(metric_crs)
+                    reprojected = True
+
+            if operation in ("all", "remove_noise") and len(result_gdf) > 0:
+                result_gdf = result_gdf[result_gdf.geometry.area >= min_size].copy()
                 objects_removed = original_count - len(result_gdf)
 
-        if operation in ("all", "fill_holes"):
-            # Fill small holes in polygons
-            if result_gdf is not None:
-                result_gdf.geometry = result_gdf.geometry.buffer(0)
+            if operation in ("all", "fill_holes") and len(result_gdf) > 0:
+                result_gdf["geometry"] = result_gdf.geometry.buffer(0)
 
-        if operation in ("all", "smooth"):
-            if result_gdf is not None:
-                result_gdf.geometry = result_gdf.geometry.simplify(1)
+            if operation in ("all", "smooth") and len(result_gdf) > 0:
+                result_gdf["geometry"] = result_gdf.geometry.simplify(1.0)
                 objects_modified += len(result_gdf)
 
-        if regularize_buildings:
-            # Apply building regularization
-            try:
-                result_gdf = utils_module.regularize_buildings(
-                    result_gdf if result_gdf is not None else str(full_input_path),
-                    output=str(output_path),
+            saved_by_regularize = False
+            if (regularize_buildings or operation == "regularize") and len(
+                result_gdf
+            ) > 0:
+                utils_module = _get_geoai_module("utils")
+                if reprojected and original_crs is not None:
+                    result_gdf = result_gdf.to_crs(original_crs)
+                    reprojected = False
+                reg_gdf = utils_module.regularize(
+                    result_gdf,
+                    output_path=str(output_path),
                 )
-                objects_modified += len(result_gdf) if result_gdf is not None else 0
-            except Exception as e:
-                logger.warning(f"Building regularization failed: {e}")
+                if reg_gdf is not None:
+                    result_gdf = reg_gdf
+                    objects_modified += len(result_gdf)
+                saved_by_regularize = output_path.exists()
 
-        # Save result
-        if result_gdf is not None:
-            result_gdf.to_file(str(output_path))
-            final_count = len(result_gdf)
-        else:
-            final_count = original_count
+            if reprojected and original_crs is not None:
+                result_gdf = result_gdf.to_crs(original_crs)
+
+            if not saved_by_regularize:
+                result_gdf.to_file(str(output_path))
+
+            return original_count, len(result_gdf), objects_removed, objects_modified
+
+        original_count, final_count, objects_removed, objects_modified = (
+            await _run_blocking(_run_clean)
+        )
 
         processing_time = time.time() - start_time
 
@@ -1338,6 +2794,7 @@ async def list_available_files(
     directory: str = "input",
     pattern: str = "*",
     include_metadata: bool = True,
+    max_files: int = 500,
 ) -> dict[str, Any]:
     """List available files in input or output directories.
 
@@ -1345,56 +2802,67 @@ async def list_available_files(
     Useful for discovering available data before running analysis.
 
     Args:
-        directory: Which directory - "input" or "output".
+        directory: Which directory: "input" or "output".
         pattern: Glob pattern to filter files (e.g., "*.tif", "*.geojson").
         include_metadata: Whether to include file size and modification time.
+        max_files: Maximum number of files to return (1-500).
 
     Returns:
         Dictionary with list of files and their metadata.
-
-    Example:
-        >>> list_available_files(
-        ...     directory="input",
-        ...     pattern="*.tif"
-        ... )
     """
+    cfg = _get_config()
+
     try:
         if directory == "input":
-            base_dir = config.input_dir
+            base_dir = cfg.input_dir
         elif directory == "output":
-            base_dir = config.output_dir
+            base_dir = cfg.output_dir
         else:
             raise InputValidationError(
                 f"Invalid directory: {directory}. Use 'input' or 'output'."
             )
 
-        files = list_input_files(base_dir, pattern)
+        capped_max = max(1, min(int(max_files), 500))
 
-        file_list = []
-        total_size_mb = 0.0
+        def _scan_workspace():
+            files, is_truncated = list_input_files(
+                base_dir, pattern, max_files=capped_max, return_truncated=True
+            )
+            base_resolved = base_dir.resolve()
+            entries: list[dict[str, Any]] = []
+            size_total_mb = 0.0
+            for f in files:
+                file_info: dict[str, Any] = {
+                    "name": f.name,
+                    "path": str(f.resolve().relative_to(base_resolved)),
+                }
+                if include_metadata:
+                    stat = f.stat()
+                    size_mb = stat.st_size / (1024 * 1024)
+                    size_total_mb += size_mb
+                    file_info["size_mb"] = round(size_mb, 2)
+                    file_info["modified"] = stat.st_mtime
+                entries.append(file_info)
+            return entries, is_truncated, size_total_mb
 
-        for f in files:
-            file_info = {
-                "name": f.name,
-                "path": str(f.resolve().relative_to(base_dir.resolve())),
-            }
+        file_list, truncated, total_size_mb = await _run_blocking(_scan_workspace)
 
-            if include_metadata:
-                stat = f.stat()
-                size_mb = stat.st_size / (1024 * 1024)
-                total_size_mb += size_mb
-                file_info["size_mb"] = round(size_mb, 2)
-                file_info["modified"] = stat.st_mtime
-
-            file_list.append(file_info)
+        message = (
+            f"Found {len(file_list)} files in {directory} directory "
+            f"(truncated at max_files={capped_max}; narrow pattern to see all matches)"
+            if truncated
+            else f"Found {len(file_list)} files in {directory} directory"
+        )
 
         return ListFilesResult(
             success=True,
-            message=f"Found {len(file_list)} files in {directory} directory",
+            message=message,
             output_files=[],
             files=file_list,
             total_count=len(file_list),
             total_size_mb=round(total_size_mb, 2),
+            truncated=truncated,
+            max_files=capped_max,
         ).model_dump()
 
     except GeoAIError as e:
@@ -1404,6 +2872,283 @@ async def list_available_files(
         return _format_error_result(e, "file listing")
 
 
+@mcp.tool()
+async def inspect_raster(
+    image_path: str,
+    source: str = "input",
+    include_stats: bool = False,
+) -> dict[str, Any]:
+    """Inspect metadata and optional band statistics for a raster file (read-only).
+
+    Args:
+        image_path: Path to the raster file relative to the selected workspace directory.
+        source: Directory to read from: "input" or "output" (default "input").
+        include_stats: Whether to compute per-band min/max/mean/std statistics.
+
+    Returns:
+        Dictionary with raster metadata and optional band statistics.
+    """
+    start_time = time.time()
+    cfg = _get_config()
+
+    try:
+        full_path = get_safe_file_path(image_path, source=source, config=cfg)
+
+        def _read_raster_meta():
+            import numpy as np
+            import rasterio
+
+            with rasterio.open(full_path) as src:
+                metadata = {
+                    "path": str(full_path),
+                    "driver": src.driver,
+                    "width": src.width,
+                    "height": src.height,
+                    "bands": src.count,
+                    "dtypes": [str(d) for d in src.dtypes],
+                    "crs": str(src.crs) if src.crs else None,
+                    "bounds": {
+                        "left": _sanitize_float(src.bounds.left),
+                        "bottom": _sanitize_float(src.bounds.bottom),
+                        "right": _sanitize_float(src.bounds.right),
+                        "top": _sanitize_float(src.bounds.top),
+                    },
+                    "resolution": {
+                        "x": _sanitize_float(src.res[0]),
+                        "y": _sanitize_float(src.res[1]),
+                    },
+                    "nodata": _sanitize_float(src.nodata),
+                    "file_size_mb": round(full_path.stat().st_size / (1024 * 1024), 4),
+                }
+
+                band_stats: list[dict[str, Any]] = []
+                if include_stats:
+                    for b in range(1, src.count + 1):
+                        masked_arr = src.read(b, masked=True)
+                        raw_data = np.asarray(masked_arr.data)
+                        mask = (~np.ma.getmaskarray(masked_arr)) & np.isfinite(raw_data)
+                        valid = raw_data[mask]
+                        band_stats.append(
+                            {
+                                "band": b,
+                                "min": (
+                                    _sanitize_float(np.min(valid))
+                                    if valid.size > 0
+                                    else None
+                                ),
+                                "max": (
+                                    _sanitize_float(np.max(valid))
+                                    if valid.size > 0
+                                    else None
+                                ),
+                                "mean": (
+                                    _sanitize_float(np.mean(valid))
+                                    if valid.size > 0
+                                    else None
+                                ),
+                                "std": (
+                                    _sanitize_float(np.std(valid))
+                                    if valid.size > 0
+                                    else None
+                                ),
+                                "valid_pixels": int(valid.size),
+                                "total_pixels": int(raw_data.size),
+                            }
+                        )
+                return metadata, band_stats
+
+        metadata, band_stats = await _run_blocking(_read_raster_meta)
+        processing_time = time.time() - start_time
+
+        return InspectRasterResult(
+            success=True,
+            message=(
+                f"Inspected raster {full_path.name}: "
+                f"{metadata['width']}x{metadata['height']}, {metadata['bands']} band(s)"
+            ),
+            output_files=[],
+            processing_time_seconds=processing_time,
+            metadata=metadata,
+            band_stats=band_stats,
+        ).model_dump()
+
+    except GeoAIError as e:
+        return _format_error_result(e, "raster inspection")
+    except Exception as e:
+        logger.exception("Unexpected error in inspect_raster")
+        return _format_error_result(e, "raster inspection")
+
+
+@mcp.tool()
+async def inspect_vector(
+    vector_path: str,
+    source: str = "input",
+) -> dict[str, Any]:
+    """Inspect metadata for a vector file (read-only).
+
+    Args:
+        vector_path: Path to the vector file relative to the selected workspace directory.
+        source: Directory to read from: "input" or "output" (default "input").
+
+    Returns:
+        Dictionary with vector metadata (feature count, CRS, geometry types, bounds, columns).
+    """
+    start_time = time.time()
+    cfg = _get_config()
+
+    try:
+        full_path = get_safe_file_path(vector_path, source=source, config=cfg)
+
+        def _read_vector_meta():
+            import geopandas as gpd
+
+            gdf = gpd.read_file(str(full_path))
+            bounds = gdf.total_bounds if len(gdf) > 0 else [None, None, None, None]
+            return {
+                "path": str(full_path),
+                "feature_count": int(len(gdf)),
+                "crs": str(gdf.crs) if gdf.crs else None,
+                "geometry_types": (
+                    [str(t) for t in gdf.geometry.geom_type.dropna().unique()]
+                    if len(gdf) > 0
+                    else []
+                ),
+                "bounds": {
+                    "minx": _sanitize_float(bounds[0]),
+                    "miny": _sanitize_float(bounds[1]),
+                    "maxx": _sanitize_float(bounds[2]),
+                    "maxy": _sanitize_float(bounds[3]),
+                },
+                "columns": [str(c) for c in gdf.columns if c != "geometry"],
+                "file_size_mb": round(full_path.stat().st_size / (1024 * 1024), 4),
+            }
+
+        metadata = await _run_blocking(_read_vector_meta)
+        processing_time = time.time() - start_time
+
+        return InspectVectorResult(
+            success=True,
+            message=(
+                f"Inspected vector {full_path.name}: "
+                f"{metadata['feature_count']} feature(s)"
+            ),
+            output_files=[],
+            processing_time_seconds=processing_time,
+            metadata=metadata,
+        ).model_dump()
+
+    except GeoAIError as e:
+        return _format_error_result(e, "vector inspection")
+    except Exception as e:
+        logger.exception("Unexpected error in inspect_vector")
+        return _format_error_result(e, "vector inspection")
+
+
+@mcp.tool()
+async def search_stac_imagery(
+    min_lon: float,
+    min_lat: float,
+    max_lon: float,
+    max_lat: float,
+    collection: str = "sentinel-2-l2a",
+    date_range: Optional[str] = None,
+    max_cloud_cover: Optional[float] = 20.0,
+    max_items: int = 10,
+) -> dict[str, Any]:
+    """Search for satellite imagery via the Planetary Computer STAC API (read-only).
+
+    Discovers available scenes and asset metadata without downloading files.
+
+    Args:
+        min_lon: Minimum longitude (west boundary).
+        min_lat: Minimum latitude (south boundary).
+        max_lon: Maximum longitude (east boundary).
+        max_lat: Maximum latitude (north boundary).
+        collection: STAC collection ID (e.g., "sentinel-2-l2a", "landsat-c2-l2", "naip").
+        date_range: Date range as "YYYY-MM-DD/YYYY-MM-DD" (optional).
+        max_cloud_cover: Maximum cloud cover percentage (0-100, optional).
+        max_items: Maximum number of STAC items to return (1-100).
+
+    Returns:
+        Dictionary with matching STAC item metadata.
+    """
+    start_time = time.time()
+
+    try:
+        bbox = SearchBoundingBox(
+            min_lon=min_lon,
+            min_lat=min_lat,
+            max_lon=max_lon,
+            max_lat=max_lat,
+        )
+        if not 1 <= max_items <= 100:
+            raise InputValidationError(
+                message=f"max_items must be between 1 and 100, got {max_items}",
+                parameter_name="max_items",
+                received_value=max_items,
+                expected="An integer between 1 and 100",
+            )
+        if max_cloud_cover is not None and not 0 <= max_cloud_cover <= 100:
+            raise InputValidationError(
+                message=f"max_cloud_cover must be between 0 and 100, got {max_cloud_cover}",
+                parameter_name="max_cloud_cover",
+                received_value=max_cloud_cover,
+                expected="A number between 0 and 100",
+            )
+
+        query = (
+            {"eo:cloud_cover": {"lte": max_cloud_cover}}
+            if max_cloud_cover is not None
+            else None
+        )
+
+        download_module = _get_geoai_module("download")
+        raw_items = await _run_blocking(
+            download_module.pc_stac_search,
+            collection=collection,
+            bbox=list(bbox.to_tuple()),
+            time_range=date_range,
+            query=query,
+            max_items=max_items,
+            quiet=True,
+        )
+
+        items_summary: list[dict[str, Any]] = []
+        for item in raw_items or []:
+            entry: dict[str, Any] = {
+                "id": getattr(item, "id", str(item)),
+                "datetime": str(getattr(item, "datetime", "") or ""),
+            }
+            item_bbox = getattr(item, "bbox", None)
+            if item_bbox is not None:
+                entry["bbox"] = [_sanitize_float(v) for v in item_bbox]
+            props = getattr(item, "properties", None)
+            if isinstance(props, dict):
+                entry["cloud_cover"] = _sanitize_float(props.get("eo:cloud_cover"))
+            assets = getattr(item, "assets", None)
+            if isinstance(assets, dict):
+                entry["assets"] = list(assets.keys())[:20]
+            items_summary.append(entry)
+
+        processing_time = time.time() - start_time
+
+        return StacSearchResult(
+            success=True,
+            message=f"Found {len(items_summary)} STAC items in {collection}",
+            output_files=[],
+            processing_time_seconds=processing_time,
+            collection=collection,
+            total_items=len(items_summary),
+            items=items_summary,
+        ).model_dump()
+
+    except GeoAIError as e:
+        return _format_error_result(e, "STAC search")
+    except Exception as e:
+        logger.exception("Unexpected error in search_stac_imagery")
+        return _format_error_result(e, "STAC search")
+
+
 # =============================================================================
 # SERVER ENTRY POINT
 # =============================================================================
@@ -1411,13 +3156,20 @@ async def list_available_files(
 
 def main():
     """Run the GeoAI MCP Server."""
+    global config
+    config = load_config()
+    setup_logging(config)
+
     logger.info("Starting GeoAI MCP Server...")
     logger.info(f"Input directory: {config.input_dir}")
     logger.info(f"Output directory: {config.output_dir}")
     logger.info(f"Log level: {config.log_level}")
 
-    # Run with stdio transport (default for Claude Desktop)
-    mcp.run()
+    # Run with stdio transport (default for Claude Desktop), installing the
+    # thread-aware stdout router once for the server lifetime so worker threads
+    # never swap process-wide sys.stdout.
+    with _stdout_router_installed():
+        mcp.run()
 
 
 if __name__ == "__main__":

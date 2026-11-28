@@ -218,6 +218,19 @@ class TestFileManagement:
         valid = validate_output_subdir("downloads/naip", cfg)
         assert valid == (cfg.output_dir / "downloads" / "naip").resolve()
 
+    def test_list_input_files_rejects_recursive_glob_and_caps_results(self, tmp_path):
+        """list_input_files blocks '**' patterns and caps count at max_files."""
+        from geoai_mcp_server.utils.file_management import list_input_files
+
+        for i in range(10):
+            (tmp_path / f"f{i}.tif").touch()
+
+        with pytest.raises(InputValidationError):
+            list_input_files(tmp_path, pattern="**/*.tif")
+
+        capped = list_input_files(tmp_path, pattern="*.tif", max_files=3)
+        assert len(capped) == 3
+
 
 def _load_server_module():
     """Import geoai_mcp_server.server, stubbing FastMCP when mcp is not installed."""

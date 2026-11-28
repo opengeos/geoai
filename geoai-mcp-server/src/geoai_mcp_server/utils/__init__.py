@@ -4,6 +4,7 @@ from .file_management import (
     validate_input_path,
     validate_output_path,
     validate_output_subdir,
+    get_safe_file_path,
     get_safe_input_path,
     get_safe_output_path,
     list_input_files,
@@ -21,6 +22,7 @@ from .error_handling import (
     FileAccessError,
     ModelLoadError,
     ProcessingError,
+    OperationTimeoutError,
     TimeoutError,
     format_error_response,
 )
@@ -30,6 +32,7 @@ __all__ = [
     "validate_input_path",
     "validate_output_path",
     "validate_output_subdir",
+    "get_safe_file_path",
     "get_safe_input_path",
     "get_safe_output_path",
     "list_input_files",
@@ -45,6 +48,7 @@ __all__ = [
     "FileAccessError",
     "ModelLoadError",
     "ProcessingError",
+    "OperationTimeoutError",
     "TimeoutError",
     "format_error_response",
 ]

@@ -30,6 +30,7 @@ from cli_anything.geoai.core import (
     session as session_mod,
     vector as vector_mod,
 )
+from cli_anything.geoai.utils.serialization import sanitize_json_value
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -65,7 +66,11 @@ def output(data: Any, message: str = "") -> None:
         message: Optional human-readable message for non-JSON mode.
     """
     if _json_output:
-        click.echo(json.dumps(data, indent=2, default=str))
+        click.echo(
+            json.dumps(
+                sanitize_json_value(data), indent=2, default=str, allow_nan=False
+            )
+        )
     else:
         if message:
             click.echo(message)
@@ -73,6 +78,12 @@ def output(data: Any, message: str = "") -> None:
             _print_dict(data)
         elif isinstance(data, list):
             _print_list(data)
+
+
+def _auto_save_if_oneshot(sess: session_mod.Session) -> None:
+    """Persist project mutations automatically in one-shot --project invocations."""
+    if not _repl_mode and sess.project_path and sess.has_project():
+        sess.save_session()
 
 
 def _print_dict(d: Dict[str, Any], indent: int = 0) -> None:
@@ -186,15 +197,28 @@ def cli(ctx, use_json, project_path, device):
     Use --json for machine-readable output.
     """
     global _json_output
-    _json_output = use_json
+    if not _repl_mode or use_json:
+        _json_output = use_json
 
     if device and device != "auto":
         os.environ["GEOAI_DEVICE"] = device
 
     if project_path:
-        sess = get_session()
-        proj = project_mod.open_project(project_path)
-        sess.set_project(proj, os.path.abspath(project_path))
+        try:
+            sess = get_session()
+            proj = project_mod.open_project(project_path)
+            sess.set_project(proj, os.path.abspath(project_path))
+        except (FileNotFoundError, ValueError, OSError) as e:
+            if _json_output:
+                click.echo(
+                    json.dumps(
+                        {"error": str(e), "type": type(e).__name__},
+                        indent=2,
+                    )
+                )
+            else:
+                click.echo(f"Error: {e}", err=True)
+            ctx.exit(1)
 
     if ctx.invoked_subcommand is None:
         ctx.invoke(repl, project_path=project_path)
@@ -287,6 +311,7 @@ def project_add_file(path, file_type):
     sess.snapshot("Add file")
     proj = sess.get_project()
     entry = project_mod.add_file(proj, path, file_type=file_type)
+    _auto_save_if_oneshot(sess)
     output(entry, f"Added {entry['type']}: {os.path.basename(path)}")
 
 
@@ -451,15 +476,33 @@ def data_search(bbox, collection, start_date, end_date, max_items):
     "--output", "-o", "output_path", required=True, help="Output file/directory."
 )
 @click.option("--year", type=int, default=None, help="Year (for NAIP).")
+@click.option(
+    "--type",
+    "data_type",
+    default="building",
+    help="Overture feature type (e.g., building, segment, place).",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["geojson", "parquet"]),
+    default="geojson",
+    help="Output format for Overture downloads.",
+)
 @handle_error
-def data_download(source, bbox, output_path, year):
+def data_download(source, bbox, output_path, year, data_type, output_format):
     """Download geospatial data from supported sources."""
     bbox_tuple = data_mod.parse_bbox(bbox)
 
     if source == "naip":
         result = data_mod.download_naip(bbox=bbox_tuple, output=output_path, year=year)
     elif source == "overture":
-        result = data_mod.download_overture(bbox=bbox_tuple, output=output_path)
+        result = data_mod.download_overture(
+            bbox=bbox_tuple,
+            output=output_path,
+            data_type=data_type,
+            output_format=output_format,
+        )
     else:
         raise ValueError(f"Unsupported source: {source}")
 
@@ -550,18 +593,46 @@ def segment_grounded_sam(
     "--output", "-o", "output_path", required=True, help="Output segmentation raster."
 )
 @click.option("--num-classes", "-n", type=int, default=2, help="Number of classes.")
+@click.option("--arch", default="unet", help="Segmentation architecture.")
+@click.option("--backbone", default="resnet50", help="Encoder backbone.")
+@click.option("--in-channels", type=int, default=4, help="Input channels.")
+@click.option(
+    "--bands",
+    default=None,
+    help="Comma-separated 0-based band indices (e.g., 0,1,2,3).",
+)
 @click.option("--chip-size", type=int, default=512, help="Processing chip size.")
 @click.option(
     "--overlap", type=float, default=0.25, help="Overlap fraction between chips."
 )
 @handle_error
-def segment_semantic(raster, model, output_path, num_classes, chip_size, overlap):
+def segment_semantic(
+    raster,
+    model,
+    output_path,
+    num_classes,
+    arch,
+    backbone,
+    in_channels,
+    bands,
+    chip_size,
+    overlap,
+):
     """Run semantic segmentation with a trained model."""
+    band_indexes = (
+        [int(b.strip()) for b in bands.split(",") if b.strip()]
+        if bands is not None
+        else None
+    )
     result = segment_mod.run_semantic_segmentation(
         raster=raster,
         model_path=model,
         output=output_path,
         num_classes=num_classes,
+        architecture=arch,
+        backbone=backbone,
+        in_channels=in_channels,
+        band_indexes=band_indexes,
         chip_size=chip_size,
         overlap=overlap,
     )
@@ -783,14 +854,7 @@ def classify():
     "-t",
     required=True,
     type=click.Path(exists=True),
-    help="Training data directory.",
-)
-@click.option(
-    "--val-dir",
-    "-v",
-    default=None,
-    type=click.Path(exists=True),
-    help="Validation data directory.",
+    help="Training data directory (split internally for validation).",
 )
 @click.option("--output-dir", "-o", required=True, help="Output directory.")
 @click.option("--model", "-m", default="resnet50", help="TIMM model name.")
@@ -802,7 +866,6 @@ def classify():
 @handle_error
 def classify_train(
     train_dir,
-    val_dir,
     output_dir,
     model,
     epochs,
@@ -814,7 +877,6 @@ def classify_train(
     """Train an image classification model."""
     result = classify_mod.train_classifier(
         train_dir=train_dir,
-        val_dir=val_dir,
         output_dir=output_dir,
         model_name=model,
         num_epochs=epochs,
@@ -994,6 +1056,7 @@ def session_undo():
     """Undo the last operation."""
     sess = get_session()
     desc = sess.undo()
+    _auto_save_if_oneshot(sess)
     output(
         {"undone": desc, **sess.get_status()},
         f"Undone: {desc}" if desc else "Undone.",
@@ -1006,6 +1069,7 @@ def session_redo():
     """Redo a previously undone operation."""
     sess = get_session()
     desc = sess.redo()
+    _auto_save_if_oneshot(sess)
     output(
         {"redone": desc, **sess.get_status()},
         f"Redone: {desc}" if desc else "Redone.",
@@ -1103,14 +1167,18 @@ def repl(project_path):
             except ValueError:
                 args = line.split()
 
+            global _json_output
+            prev_json = _json_output
             try:
                 cli.main(args, standalone_mode=False)
-            except SystemExit:
+            except (SystemExit, click.exceptions.Exit):
                 pass
             except click.exceptions.UsageError as e:
                 skin.warning(f"Usage: {e}")
             except Exception as e:
                 skin.error(str(e))
+            finally:
+                _json_output = prev_json
 
         except (EOFError, KeyboardInterrupt):
             break
