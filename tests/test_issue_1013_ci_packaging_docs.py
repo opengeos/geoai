@@ -465,3 +465,18 @@ def test_train_s2_water_uses_data_dir_and_tempdir(tmp_path):
     assert url == "https://huggingface.co/datasets/org/test-ds"
     assert len(uploaded_paths) == 1
     assert not uploaded_paths[0].exists(), "Temporary directory should be cleaned up"
+
+
+def test_zensical_examples_nav_sorted_alphabetically():
+    """Examples navigation entries in zensical.toml use filename stems sorted alphabetically."""
+    config = tomllib.loads((REPO_ROOT / "zensical.toml").read_text(encoding="utf-8"))
+    examples_nav = next(
+        item["Examples"]
+        for item in config["project"]["nav"]
+        if isinstance(item, dict) and "Examples" in item
+    )
+    labels = [next(iter(entry.keys())) for entry in examples_nav]
+    paths = [next(iter(entry.values())) for entry in examples_nav]
+
+    assert labels == [Path(p).stem for p in paths]
+    assert labels == sorted(labels, key=lambda s: (s.lower(), s))
