@@ -1,4 +1,4 @@
-FROM quay.io/jupyter/base-notebook:python-3.12
+FROM quay.io/jupyter/base-notebook:python-3.13
 
 # -------------------------------------------------------
 # 1. Install system-level packages (minimal, just git)
