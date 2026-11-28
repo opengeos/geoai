@@ -41,12 +41,16 @@ print(result.summary)
 pipe.to_yaml("building_segmentation.yaml")
 ```
 
-Reload an exported configuration with `load_pipeline()`:
+Reload an exported configuration with `load_pipeline()` (note that `to_yaml()` and `to_json()` omit `checkpoint_dir`, so pass `checkpoint_dir` explicitly when reloading if you want resume support):
 
 ```python
 from geoai.pipeline import load_pipeline
 
-pipe = load_pipeline("building_segmentation.yaml", max_workers=4)
+pipe = load_pipeline(
+    "building_segmentation.yaml",
+    max_workers=4,
+    checkpoint_dir="./checkpoints",
+)
 result = pipe.run(input_dir="./data/images", output_dir="./data/results")
 ```
 
