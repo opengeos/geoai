@@ -1,0 +1,12 @@
+{
+  "name": "glob_only",
+  "max_workers": 1,
+  "on_error": "skip",
+  "steps": [
+    {
+      "type": "GlobStep",
+      "name": "find_images",
+      "extensions": [".tif", ".tiff", ".jp2", ".img"]
+    }
+  ]
+}
