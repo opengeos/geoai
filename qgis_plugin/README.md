@@ -91,7 +91,7 @@ Open **GeoAI → AI Processing Monitor** to observe supported Semantic Segmentat
 
 ### Isolated Managed Subprocess Architecture
 
-Starting with v1.9.2, AI panels run model loading, inference, and training-tile export inside isolated subprocesses launched from the plugin's managed virtual environment (`~/.qgis_geoai/`) rather than importing PyTorch into the QGIS process. This prevents PyTorch and OpenMP runtime conflicts (such as `OMP: Error #15` aborts in conda-forge QGIS on macOS) and keeps the QGIS UI responsive.
+AI panels run model loading, inference, and training-tile export inside isolated subprocesses launched from the plugin's managed virtual environment (`~/.qgis_geoai/`) rather than importing PyTorch into the QGIS process. This prevents PyTorch and OpenMP runtime conflicts (such as `OMP: Error #15` aborts in conda-forge QGIS on macOS) and keeps the QGIS UI responsive.
 
 ### GPU Memory Management
 
@@ -145,7 +145,7 @@ Option C: manual copy:
 
 - Copy the `qgis_plugin/geoai` folder to your QGIS plugins directory:
     - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
-    - Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins/`
+    - Windows: `C:\Users\<username>\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\`
     - macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
     - QGIS 4 uses `QGIS4` instead of `QGIS3` in these paths.
 
