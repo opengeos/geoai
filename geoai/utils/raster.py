@@ -1754,6 +1754,8 @@ def stack_bands(
         compress (str): Compression method.
         output_format (str): GDAL output format (default is "COG").
         extra_gdal_translate_args (List[str], optional): Extra arguments for gdal_translate.
+            Ignored with a warning when GDAL CLI binaries are unavailable and the
+            rasterio fallback is used.
 
     Returns:
         str: Path to the output file.
@@ -1877,16 +1879,19 @@ def stack_bands(
                     for b in range(1, src.count + 1):
                         src_data = src.read(b)
                         if same_grid:
+                            nodata_mask = None
                             if src.nodata is not None and src.nodata != out_nodata:
-                                src_data = src_data.copy()
                                 if np.issubdtype(src_data.dtype, np.floating) and (
                                     math.isnan(float(src.nodata))
                                 ):
                                     nodata_mask = np.isnan(src_data)
                                 else:
                                     nodata_mask = src_data == src.nodata
-                                src_data[nodata_mask] = fill_val
                             band_out = _cast_band(src_data)
+                            if nodata_mask is not None:
+                                if band_out is src_data:
+                                    band_out = band_out.copy()
+                                band_out[nodata_mask] = fill_val
                         else:
                             # Use native dtype when rasterio supports direct
                             # reprojection, preserving source precision and
@@ -1990,10 +1995,6 @@ def stack_bands(
             translate_cmd += extra_gdal_translate_args
 
         subprocess.run(translate_cmd, check=True)
-
-    for path in input_files:
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Input file not found: {path}")
 
     try:
         if temp_vrt is None:

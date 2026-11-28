@@ -92,6 +92,8 @@ def ensure_spacy_model(
                 f"Install it with: python -m spacy download {model_name}"
             )
         logger.info("spaCy model '%s' not found. Installing...", model_name)
+        # Serialize concurrent model downloads; note os.environ["PATH"] is
+        # process-global while the installer subprocess runs.
         with _SPACY_DOWNLOAD_LOCK:
             had_path = "PATH" in os.environ
             orig_path = os.environ.get("PATH")
