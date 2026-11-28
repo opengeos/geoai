@@ -1,3 +1,184 @@
 # pipeline module
 
+The `geoai.pipeline` module provides a batch processing framework for chaining geospatial AI steps (file discovery, inference, post-processing, and vectorization) with thread-based parallelism, YAML/JSON configuration files, and resume-from-checkpoint support.
+
+## Quickstart
+
+### Python API
+
+```python
+from geoai.pipeline import (
+    GlobStep,
+    Pipeline,
+    RasterToVectorStep,
+    SemanticSegmentationStep,
+)
+
+pipe = Pipeline(
+    name="building_segmentation",
+    steps=[
+        GlobStep(extensions=[".tif", ".tiff"]),
+        SemanticSegmentationStep(
+            model_path="path/to/model.pth",
+            architecture="unet",
+            encoder_name="resnet34",
+            num_channels=3,
+            num_classes=2,
+            window_size=512,
+            overlap=256,
+        ),
+        RasterToVectorStep(output_format=".geojson", simplify_tolerance=1.0),
+    ],
+    max_workers=2,
+    on_error="skip",
+    checkpoint_dir="./checkpoints",
+)
+
+result = pipe.run(input_dir="./data/images", output_dir="./data/results")
+print(result.summary)
+
+# Pipelines made of registered steps can be exported to YAML/JSON and reloaded later
+pipe.to_yaml("building_segmentation.yaml")
+```
+
+Reload an exported configuration with `load_pipeline()` (note that `to_yaml()` and `to_json()` omit `checkpoint_dir` and any custom `item_key_fn`, so pass them explicitly as keyword arguments to `load_pipeline()` if you want resume support with those settings):
+
+```python
+from geoai.pipeline import load_pipeline
+
+pipe = load_pipeline(
+    "building_segmentation.yaml",
+    max_workers=4,
+    checkpoint_dir="./checkpoints",
+)
+result = pipe.run(input_dir="./data/images", output_dir="./data/results")
+```
+
+For quick ad-hoc Python transformations, wrap any callable taking and returning an item `dict` with `FunctionStep` (note that `FunctionStep` callables cannot round-trip through YAML or JSON configs because `FunctionStep` is not registered for config deserialization):
+
+```python
+from geoai.pipeline import FunctionStep, Pipeline
+
+
+def tag_item(item):
+    item["processed"] = True
+    return item
+
+
+custom_pipe = Pipeline(steps=[FunctionStep("tag", tag_item)])
+result = custom_pipe.run(items=[{"input_path": "scene_01.tif"}])
+```
+
+### YAML and JSON Configuration Files
+
+Pipelines composed of registered step types can be declared in YAML (requires PyYAML, `pip install pyyaml`) or JSON and executed from Python or the [CLI](cli.md).
+
+#### YAML Example
+
+```yaml
+name: semantic_segmentation
+max_workers: 2
+executor_type: thread
+on_error: skip
+
+steps:
+  - type: GlobStep
+    name: find_images
+    extensions:
+      - ".tif"
+      - ".tiff"
+
+  - type: SemanticSegmentationStep
+    name: segment
+    model_path: "path/to/model.pth"
+    architecture: unet
+    encoder_name: resnet34
+    num_channels: 3
+    num_classes: 2
+    window_size: 512
+    overlap: 256
+    batch_size: 4
+    suffix: "_mask"
+
+  - type: RasterToVectorStep
+    name: vectorize
+    output_format: ".geojson"
+    input_key: output_path
+    output_key: vector_path
+```
+
+#### JSON Example
+
+```json
+{
+  "name": "batch_vectorize",
+  "max_workers": 4,
+  "executor_type": "thread",
+  "on_error": "skip",
+  "steps": [
+    {
+      "type": "GlobStep",
+      "name": "find_masks",
+      "extensions": [".tif"]
+    },
+    {
+      "type": "RasterToVectorStep",
+      "name": "vectorize",
+      "output_format": ".gpkg",
+      "input_key": "input_path",
+      "output_key": "vector_path"
+    }
+  ]
+}
+```
+
+Run or inspect config files from the command line:
+
+```bash
+geoai pipeline show semantic_segmentation.yaml
+geoai pipeline run semantic_segmentation.yaml -i ./data/images -o ./data/results -c ./checkpoints -w 4
+```
+
+## Built-in Step Types
+
+All six domain steps below are pre-registered in the config step registry and can be used directly in YAML/JSON configs by their class name:
+
+| Step Class | Config `type` | Purpose |
+| ---------- | ------------- | ------- |
+| `GlobStep` | `GlobStep` | Expand `input_dir` or `input_pattern` into per-file work items (default extensions: `.tif`, `.tiff`, `.jp2`, `.img`). |
+| `SemanticSegmentationStep` | `SemanticSegmentationStep` | Run sliding-window semantic segmentation using `geoai.train.semantic_segmentation`. |
+| `RasterToVectorStep` | `RasterToVectorStep` | Convert raster masks to vector polygons (`.geojson`, `.gpkg`, etc.) with optional geometry simplification. |
+| `ONNXInferenceStep` | `ONNXInferenceStep` | Load an ONNX model once in `setup()` and run tiled inference via `geoai.onnx.ONNXGeoModel`. |
+| `CanopyHeightStep` | `CanopyHeightStep` | Load a canopy height model once in `setup()` and predict vegetation height via `geoai.canopy.CanopyHeightEstimation`. |
+| `CleanMaskStep` | `CleanMaskStep` | Post-process segmentation masks with morphological cleaning via `geoai.tools.multiclean.clean_raster`. |
+
+In Python code, you can also use `FunctionStep` for plain callables or subclass `PipelineStep` and decorate it with `@register_step` to make custom steps loadable from YAML/JSON configs.
+
+## Checkpointing and Resume
+
+Pass `checkpoint_dir` to `Pipeline` (or `-c` / `--checkpoint-dir` on the CLI) to enable resume support for long-running batch jobs:
+
+- Progress is persisted atomically to `<checkpoint_dir>/<name>_checkpoint.json` every 10 processed items and when the run finishes or aborts.
+- Each item is keyed by `item["input_path"]` by default (customizable via `item_key_fn`).
+- On subsequent runs, items marked `completed` are skipped automatically and recorded in `result.skipped`.
+- A hash of the pipeline name, step types, and public step attributes is stored in the checkpoint. If a registered step's public configuration changes, existing checkpoint progress is reset automatically so stale outputs are not reused. Note that private attributes (such as a `FunctionStep`'s underlying `_fn` callable) and the runtime `output_dir` are not included in `_config_hash()` or the default item key, so clear the checkpoint file or choose a new checkpoint directory/pipeline name whenever you modify callable behavior or change `output_dir`.
+
+## Error Handling and Execution
+
+`Pipeline` executes items using a thread pool (`executor_type="thread"`, controlled by `max_workers`) so GPU models loaded in `setup()` can be shared safely without cross-process pickling. Two error policies are supported via `on_error` (or `--on-error`):
+
+- **`"skip"` (`ErrorPolicy.SKIP`, default)**: Logs the error, records `(item, error_message)` in `result.failed`, marks the item as failed in the checkpoint, and continues processing the remaining items.
+- **`"fail"` (`ErrorPolicy.FAIL`)**: Saves the checkpoint and raises a `RuntimeError` on the first failed item. When running with multiple workers (`max_workers > 1`), pending tasks are cancelled while already-running worker threads finish (and may still write outputs) before the exception propagates.
+
+## Example Pipeline Configurations
+
+Ready-to-use sample configurations are available in the repository under [`docs/examples/pipelines/`](https://github.com/opengeos/geoai/tree/main/docs/examples/pipelines):
+
+- [`semantic_segmentation.yaml`](https://github.com/opengeos/geoai/blob/main/docs/examples/pipelines/semantic_segmentation.yaml): Glob GeoTIFFs, run U-Net semantic segmentation, and export GeoJSON polygons.
+- [`building_extraction.yaml`](https://github.com/opengeos/geoai/blob/main/docs/examples/pipelines/building_extraction.yaml): Multi-worker building footprint extraction with GeoPackage output and geometry simplification.
+- [`batch_vectorize.json`](https://github.com/opengeos/geoai/blob/main/docs/examples/pipelines/batch_vectorize.json): Parallel raster-to-GeoPackage vectorization for pre-computed masks.
+- [`glob_only.json`](https://github.com/opengeos/geoai/blob/main/docs/examples/pipelines/glob_only.json): Minimal file-discovery pipeline template.
+
+## API Reference
+
 ::: geoai.pipeline

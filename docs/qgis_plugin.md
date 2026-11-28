@@ -4,13 +4,13 @@
 [![image](https://img.shields.io/badge/YouTube-Tutorials-red)](https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.09605/status.svg)](https://doi.org/10.21105/joss.09605)
 
-A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Tree Segmentation, Water Segmentation, Change Detection, Moondream VLM, Segment Anything, Semantic Segmentation, Instance Segmentation) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
+A [QGIS plugin](https://plugins.qgis.org/plugins/geoai) that brings the [geoai](https://github.com/opengeos/geoai) models into dockable panels (Tree Segmentation, Water Segmentation, Change Detection, Moondream VLM, Segment Anything, Semantic Segmentation, Instance Segmentation, and AI Processing Monitor) so you can keep QGIS as your main workspace while experimenting with GeoAI. It supports QGIS 3.28+ and QGIS 4.0 (PyQt6) on Linux, Windows, and macOS. For better performance, it is recommended to use a GPU with CUDA support. Apple Silicon users can use the Apple MPS backend for GPU acceleration. If no GPU is available, the plugin will run on CPU.
 
 ## Quick Start
 
 - Install the QGIS plugin from the QGIS Plugin Manager. Alternatively, you can download the plugin from [here](https://qgis.gishub.org/plugins/geoai.zip) and install it manually.
 - Enable the GeoAI plugin in QGIS.
-- Open any GeoAI toolbar panel — the built-in installer will guide you through dependency setup (one-click).
+- Open an AI tool panel (such as **Semantic Segmentation**, **Segment Anything**, or **Moondream**); the built-in installer will guide you through one-click dependency setup.
 - Try the sample datasets below.
 
 ## Video Tutorials
@@ -29,10 +29,10 @@ Check out this [short video demo](https://youtu.be/Esr_e6_P1is) and [full video 
 
 ## Requirements
 
-- QGIS 3.28 or later
-- Python 3.10+ (Pixi recommended)
-- PyTorch (CUDA if you want GPU acceleration)
-- `geoai`, `samgeo`, `deepforest`, `omniwatermask`, and `torchange` packages
+- QGIS 3.28 or later, including **QGIS 4.0 (PyQt6)** dual compatibility
+- Python 3.12+ (Built-in Dependency Installer recommended; Pixi optional for custom CUDA setups)
+- PyTorch (CUDA for NVIDIA GPUs, Apple MPS for Apple Silicon, or CPU fallback)
+- `geoai-py`, `segment-geospatial` (`samgeo`), `deepforest`, `omniwatermask`, and `torchange` packages (installed automatically by the Built-in Dependency Installer)
 
 ## Features
 
@@ -84,6 +84,17 @@ Each tool lives inside a dockable panel that can be attached to either side of t
 - **Tab 1 - Create Training Data**: Export GeoTIFF tiles from raster and vector data with instance-level masks in PASCAL_VOC format, with configurable tile size, stride, and buffer radius
 - **Tab 2 - Train Models**: Train Mask R-CNN instance segmentation models with configurable number of channels, classes, batch size, epochs, learning rate, and validation split
 - **Tab 3 - Run Inference**: Apply trained Mask R-CNN models to new imagery and vectorize results with optional smoothing
+
+### AI Processing Monitor Panel
+
+- **Live Task Tracking**: Open **GeoAI → AI Processing Monitor** to observe Semantic Segmentation operations (tile export, model training, inference, vectorization, and vector smoothing) while they run without blocking the QGIS map canvas
+- **Lifecycle and Progress**: Displays task states (`QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`), monotonic elapsed time, start and end timestamps, epoch-based progress bars for training, and indeterminate progress indicators for message-only operations
+- **Error Diagnostics and GPU Metrics**: Categorizes failures (missing input, missing dependency, GPU/CUDA, output writing, processing) with preserved technical tracebacks, shows optional PyTorch CUDA memory statistics when accessible, and lets you remove completed entries with **Clear finished**
+
+### Isolated Managed Subprocess Architecture
+
+- **Clean Process Isolation**: AI panels run model loading, inference, and training-tile export inside isolated worker subprocesses launched from the managed virtual environment (`~/.qgis_geoai/`) instead of importing PyTorch directly into the QGIS host process
+- **Conflict Prevention**: Prevents PyTorch and OpenMP runtime collisions (such as `OMP: Error #15` aborts in conda-forge QGIS on macOS) and native library incompatibilities between QGIS and deep learning packages while keeping the desktop interface responsive
 
 ### GPU Memory Management
 
@@ -328,7 +339,7 @@ See [Hugging Face Authentication (SAM 3)](#hugging-face-authentication-sam-3) fo
 
 ### 2. Install the QGIS plugin
 
-Option A — use QGIS Plugin Manager (recommended):
+Option A: use QGIS Plugin Manager (recommended):
 
 GeoAI is available as a QGIS plugin in the official [QGIS plugin repository](https://plugins.qgis.org/plugins/geoai). To install:
 
@@ -342,7 +353,7 @@ If you encounter an error message like this after installing the plugin, click *
 
 ![](https://github.com/user-attachments/assets/cb1be4f9-eaba-4c0c-9c48-f209d39b2d71)
 
-Option B — use the helper script:
+Option B: use the helper script:
 
 ```bash
 git clone https://github.com/opengeos/geoai.git
@@ -350,13 +361,13 @@ cd geoai/qgis_plugin
 python install.py
 ```
 
-This copies the plugin into the `default` profile of every installed QGIS major version (QGIS 3 and QGIS 4; use `--profile NAME` for another profile). Re-run after pulling updates. Remove with:
+This copies the plugin into the `default` profile of every QGIS major version whose settings directory exists (`QGIS4` and `QGIS3`; use `--profile NAME` for another profile). If QGIS 4 has not been launched yet so its settings directory does not exist, launch QGIS 4 once first or pass `--plugin-dir /path/to/plugins` explicitly (if neither settings directory exists, the script falls back to the QGIS 3 path). Re-run after pulling updates. Remove with (passing the same `--profile NAME` or `--plugin-dir DIR` flag if you used one during installation):
 
 ```bash
 python install.py --remove
 ```
 
-Option C — manual copy:
+Option C: manual copy:
 
 - Copy the `qgis_plugin/geoai` folder to your QGIS plugins directory:
     - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
@@ -378,7 +389,7 @@ SAM 3 lives in a [gated Hugging Face repository](https://huggingface.co/facebook
 
 ### Request access
 
-Fill out the access form at <https://huggingface.co/facebook/sam3> while logged in to your Hugging Face account. Approval is not instant. Before continuing, revisit that page and confirm you see a banner stating that you have been granted access rather than the request form — having a token is not the same as having access.
+Fill out the access form at <https://huggingface.co/facebook/sam3> while logged in to your Hugging Face account. Approval is not instant. Before continuing, revisit that page and confirm you see a banner stating that you have been granted access rather than the request form (having a token is not the same as having access).
 
 ### Create an access token
 
@@ -407,7 +418,7 @@ The `hf` command is installed inside the plugin's Python environment, not on you
 
 Call `hf` by its full path inside the managed environment at `~/.qgis_geoai/`. The environment folder is named after your QGIS Python version (for example, `venv_py3.12`); to see the exact path, use `GeoAI` menu → `Generate Diagnostics Report...` and look for **Virtual environment path**.
 
-Windows (PowerShell — any directory):
+Windows (PowerShell, any directory):
 
 ```powershell
 # List the environment folder name (e.g. venv_py3.12)
@@ -672,6 +683,15 @@ Steps:
     - **Create Training Data**: Select input raster and vector labels, configure tile size, stride, and buffer radius, choose metadata format (PASCAL_VOC), and export instance segmentation tiles to a directory.
     - **Train Model**: Select the images and labels directories, configure model parameters (number of channels, number of classes, batch size, epochs, learning rate, validation split), and start Mask R-CNN training.
     - **Run Inference**: Select input raster layer or file, specify the trained model path, configure inference parameters, run inference, and optionally vectorize the results with smoothing.
+
+### AI Processing Monitor
+
+Open `GeoAI` menu → `AI Processing Monitor` to monitor Semantic Segmentation operations (tile export, model training, inference, vectorization, and vector smoothing) in real time without blocking the QGIS map canvas.
+
+- Each running or completed operation appears in the task list with its lifecycle state (`QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, or `CANCELLED`).
+- Selecting a task shows its monotonic elapsed duration, start and end wall-clock timestamps, progress status (epoch-based percentage for training, indeterminate progress bar for message-only operations), progress messages, and optional PyTorch CUDA memory statistics when accessible.
+- Failed tasks display a concise error category alongside the full technical traceback for debugging.
+- Click **Clear finished** to remove completed or failed entries while retaining active tasks.
 
 ### Clear GPU Memory
 

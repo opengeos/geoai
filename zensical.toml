@@ -4,6 +4,8 @@ site_description = "A Python package for using Artificial Intelligence (AI) with
 site_author = "opengeos"
 site_url = "https://opengeoai.org"
 repo_url = "https://github.com/opengeos/geoai"
+repo_name = "opengeos/geoai"
+edit_uri = "edit/main/docs/"
 copyright = "Copyright &copy; 2023 - 2026 Qiusheng Wu"
 
 nav = [
@@ -11,6 +13,7 @@ nav = [
   { "Book" = "https://book.opengeoai.org" },
   { "Installation" = "installation.md" },
   { "QGIS Plugin" = "qgis_plugin.md" },
+  { "MCP & Agent CLI" = "mcp_server.md" },
   { "Citations" = "citations.md" },
   { "Contributing" = "contributing.md" },
   { "Changelog" = "https://github.com/opengeos/geoai/releases" },
@@ -120,11 +123,12 @@ nav = [
     { "train_point_cloud_ptv3" = "examples/train_point_cloud_ptv3.md" },
   ] },
   { "Workshops" = [
-    "workshops/GeoAI_Workshop_2025.md",
-    "workshops/AWS_2025.md",
-    "workshops/TNView_2025.md",
-    "workshops/CANVAS_2025.md",
-    "workshops/AGU_2025.md",
+    { "GeoAI_Workshop_2025" = "workshops/GeoAI_Workshop_2025.md" },
+    { "AWS_2025" = "workshops/AWS_2025.md" },
+    { "TNView_2025" = "workshops/TNView_2025.md" },
+    { "CANVAS_2025" = "workshops/CANVAS_2025.md" },
+    { "AGU_2025" = "workshops/AGU_2025.md" },
+    { "semantic_segmentation" = "workshops/semantic/semantic_segmentation.md" },
   ] },
   { "API Reference" = [
     { "agents module" = "agents.md" },
@@ -133,31 +137,32 @@ nav = [
     { "caption module" = "caption.md" },
     { "change_detection module" = "change_detection.md" },
     { "classify module" = "classify.md" },
+    { "cli module" = "cli.md" },
     { "clip_classify module" = "clip_classify.md" },
     { "cross_validation module" = "cross_validation.md" },
-    { "cli module" = "cli.md" },
     { "detectron2 module" = "detectron2.md" },
     { "DINOv3 module" = "dinov3.md" },
     { "dinov3_finetune module" = "dinov3_finetune.md" },
+    { "download module" = "download.md" },
+    { "embeddings module" = "embeddings.md" },
     { "ESRGAN module" = "esrgan.md" },
+    { "extract module" = "extract.md" },
+    { "foundation_models module" = "foundation_models.md" },
     { "ftw module" = "ftw.md" },
     { "geo_agents module" = "geo_agents.md" },
     { "geoai module" = "geoai.md" },
-    { "download module" = "download.md" },
-    { "embeddings module" = "embeddings.md" },
-    { "extract module" = "extract.md" },
-    { "foundation_models module" = "foundation_models.md" },
     { "hf module" = "hf.md" },
     { "inference module" = "inference.md" },
     { "landcover_train module" = "landcover_train.md" },
     { "landcover_utils module" = "landcover_utils.md" },
-    { "object_detect module" = "object_detect.md" },
     { "map_tools module" = "map_tools.md" },
     { "map_widgets module" = "map_widgets.md" },
     { "moondream module" = "moondream.md" },
     { "networks module" = "networks.md" },
+    { "object_detect module" = "object_detect.md" },
     { "onnx module" = "onnx.md" },
     { "orthogonalization" = "orthogonalization.md" },
+    { "osd module" = "osd.md" },
     { "pipeline module" = "pipeline.md" },
     { "prithvi module" = "prithvi.md" },
     { "progress module" = "progress.md" },
@@ -175,27 +180,31 @@ nav = [
     { "utils module" = "utils.md" },
     { "vllm_geo module" = "vllm_geo.md" },
     { "water module" = "water.md" },
-    { "osd module" = "osd.md" },
     { "tools" = [
-      { "sr module" = "sr.md" },
       { "cloudmask module" = "cloudmask.md" },
       { "multiclean module" = "multiclean.md" },
+      { "sr module" = "sr.md" },
       { "timeseries module" = "timeseries.md" },
     ] },
   ] },
 ]
 
 [project.theme]
+custom_dir = "docs/overrides"
 logo = "assets/logo.png"
 favicon = "assets/logo.ico"
 features = [
+  "content.action.edit",
   "content.code.copy",
+  "content.tabs.link",
   "navigation.footer",
   "navigation.instant",
+  "navigation.path",
   "navigation.top",
   "navigation.tracking",
   "search.highlight",
   "search.share",
+  "search.suggest",
 ]
 
 [project.theme.icon]
@@ -213,6 +222,26 @@ accent = "indigo"
 toggle.icon = "material/toggle-switch"
 toggle.name = "Switch to light mode"
 
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/opengeos/geoai"
+name = "GitHub"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/youtube"
+link = "https://www.youtube.com/playlist?list=PLAxJ4-o7ZoPcvENqwaPa_QwbbkZ5sctZE"
+name = "YouTube Tutorials"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/python"
+link = "https://pypi.org/project/geoai-py/"
+name = "PyPI"
+
+[[project.extra.social]]
+icon = "fontawesome/solid/box-open"
+link = "https://anaconda.org/conda-forge/geoai"
+name = "conda-forge"
+
 [project.plugins.mkdocstrings.handlers.python]
 paths = ["."]
 
@@ -226,6 +255,8 @@ docstring_style = "google"
 [project.markdown_extensions.footnotes]
 [project.markdown_extensions.md_in_html]
 [project.markdown_extensions.pymdownx.superfences]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
 [project.markdown_extensions.pymdownx.highlight]
 linenums = true
 [project.markdown_extensions.toc]
