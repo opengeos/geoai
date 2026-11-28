@@ -41,11 +41,9 @@ def _normalize_mask(mask: np.ndarray, num_classes: int) -> np.ndarray:
     if num_classes < 2:
         raise ValueError(f"num_classes must be >= 2, got {num_classes}")
     mask = mask.astype(np.int64)
-    mask_max = mask.max()
     if num_classes == 2:
-        # Binary: normalize any non-zero value to foreground (1).
-        if mask_max > 1:
-            mask = (mask > 0).astype(np.int64)
+        # Binary: clamp negative values to 0 and map positive values to foreground (1).
+        mask = (mask > 0).astype(np.int64)
     else:
         # Multi-class: preserve class IDs, clamp to valid range.
         mask = np.clip(mask, 0, num_classes - 1)
@@ -96,8 +94,9 @@ class CustomDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         mask = Image.open(mask_path).convert("L")
 
-        image = image.resize(self.target_size)
-        mask = mask.resize(self.target_size, resample=Image.NEAREST)
+        pil_size = (self.target_size[1], self.target_size[0])
+        image = image.resize(pil_size)
+        mask = mask.resize(pil_size, resample=Image.NEAREST)
 
         image = np.array(image)
         mask = np.array(mask)
@@ -125,49 +124,107 @@ class CustomDataset(Dataset):
         return {"pixel_values": image, "labels": mask}
 
 
-def get_transform() -> A.Compose:
-    """
+def get_transform(
+    target_size: Tuple[int, int] = (256, 256),
+    train: bool = True,
+) -> A.Compose:
+    """Create image/mask transform pipeline.
+
+    Args:
+        target_size (tuple, optional): Target ``(height, width)`` size.
+            Defaults to ``(256, 256)``.
+        train (bool, optional): If True, include random geometric
+            augmentations. If False, perform only resize, normalization, and
+            tensor conversion. Defaults to True.
+
     Returns:
         A.Compose: A composition of image transformations.
     """
-    return A.Compose(
+    height, width = target_size
+    transforms: List[Any] = [A.Resize(height, width)]
+    if train:
+        transforms.extend(
+            [
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.5),
+            ]
+        )
+        if height == width:
+            transforms.append(A.RandomRotate90(p=0.5))
+    transforms.extend(
         [
-            A.Resize(256, 256),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
     )
+    return A.Compose(transforms)
 
 
 def prepare_datasets(
     images_dir: str,
     masks_dir: str,
-    transform: A.Compose,
+    transform: Optional[A.Compose] = None,
     test_size: float = 0.2,
     random_state: int = 42,
     num_classes: int = 2,
+    val_transform: Optional[A.Compose] = None,
+    target_size: Tuple[int, int] = (256, 256),
 ) -> Tuple[Subset, Subset]:
-    """
+    """Prepare separate training and validation datasets.
+
     Args:
         images_dir (str): Directory containing images.
         masks_dir (str): Directory containing masks.
-        transform (A.Compose): Transformations to be applied.
-        test_size (float, optional): Proportion of the dataset to include in the validation split.
+        transform (A.Compose, optional): Transformations applied to the
+            training split. If None, uses ``get_transform(target_size, train=True)``.
+        test_size (float, optional): Proportion of the dataset to include in
+            the validation split.
         random_state (int, optional): Random seed for shuffling the dataset.
-        num_classes (int, optional): Number of classes in the segmentation masks. Defaults to 2.
+        num_classes (int, optional): Number of classes in the segmentation
+            masks. Defaults to 2.
+        val_transform (A.Compose, optional): Transformations applied to the
+            validation split. If None, uses a deterministic validation
+            transform without random flip/rotate augmentations.
+        target_size (tuple, optional): Target ``(height, width)`` size for
+            resizing. Defaults to ``(256, 256)``.
 
     Returns:
         tuple: Training and validation datasets.
     """
-    dataset = CustomDataset(images_dir, masks_dir, transform, num_classes=num_classes)
-    train_indices, val_indices = train_test_split(
-        list(range(len(dataset))), test_size=test_size, random_state=random_state
+    effective_target_size = target_size
+    if transform is not None and target_size == (256, 256):
+        for t in getattr(transform, "transforms", []):
+            if isinstance(t, A.Resize):
+                effective_target_size = (t.height, t.width)
+                break
+
+    train_transform = (
+        transform
+        if transform is not None
+        else get_transform(target_size=effective_target_size, train=True)
     )
-    train_dataset = Subset(dataset, train_indices)
-    val_dataset = Subset(dataset, val_indices)
+    if val_transform is None:
+        val_transform = get_transform(target_size=effective_target_size, train=False)
+
+    train_base = CustomDataset(
+        images_dir,
+        masks_dir,
+        transform=train_transform,
+        target_size=effective_target_size,
+        num_classes=num_classes,
+    )
+    val_base = CustomDataset(
+        images_dir,
+        masks_dir,
+        transform=val_transform,
+        target_size=effective_target_size,
+        num_classes=num_classes,
+    )
+    train_indices, val_indices = train_test_split(
+        list(range(len(train_base))), test_size=test_size, random_state=random_state
+    )
+    train_dataset = Subset(train_base, train_indices)
+    val_dataset = Subset(val_base, val_indices)
     return train_dataset, val_dataset
 
 
@@ -348,8 +405,9 @@ def visualize_predictions(
         num_classes (int, optional): Number of classes in the segmentation mask.
             Controls colormap selection. Defaults to 2.
     """
+    pil_size = (target_size[1], target_size[0])
     original_image = Image.open(image_path).convert("RGB")
-    original_image = original_image.resize(target_size)
+    original_image = original_image.resize(pil_size)
 
     if num_classes <= 2:
         # Binary: scale [0, 1] to [0, 255] grayscale.
@@ -364,7 +422,7 @@ def visualize_predictions(
 
     if reference_image_path:
         reference_image = Image.open(reference_image_path).convert("RGB")
-        reference_image = reference_image.resize(target_size)
+        reference_image = reference_image.resize(pil_size)
         fig, axes = plt.subplots(1, 3, figsize=(18, 6))
         axes[1].imshow(reference_image)
         axes[1].set_title("Reference Image")

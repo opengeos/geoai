@@ -26,6 +26,8 @@ try:
 except ImportError:
     LIGHTNING_AVAILABLE = False
 
+_LightningBase = pl.LightningModule if LIGHTNING_AVAILABLE else nn.Module
+
 logger = logging.getLogger(__name__)
 
 
@@ -176,7 +178,7 @@ def modify_first_conv_for_channels(
     return model
 
 
-class TimmClassifier(pl.LightningModule):
+class TimmClassifier(_LightningBase):
     """
     PyTorch Lightning module for image classification using timm models.
     """
@@ -240,9 +242,38 @@ class TimmClassifier(pl.LightningModule):
 
     def _freeze_backbone(self):
         """Freeze all layers except the classifier head."""
-        for name, param in self.model.named_parameters():
-            if "fc" not in name and "head" not in name and "classifier" not in name:
-                param.requires_grad = False
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        unfrozen = False
+        if hasattr(self.model, "get_classifier"):
+            try:
+                classifier = self.model.get_classifier()
+                if isinstance(classifier, str) and hasattr(self.model, classifier):
+                    classifier = getattr(self.model, classifier)
+                modules = []
+                if isinstance(classifier, nn.Module):
+                    modules = [classifier]
+                elif isinstance(classifier, (tuple, list)):
+                    for item in classifier:
+                        if isinstance(item, str) and hasattr(self.model, item):
+                            item = getattr(self.model, item)
+                        if isinstance(item, nn.Module):
+                            modules.append(item)
+                for module in modules:
+                    params = list(module.parameters())
+                    if params:
+                        for param in params:
+                            param.requires_grad = True
+                        unfrozen = True
+            except Exception:
+                unfrozen = False
+
+        if not unfrozen:
+            for name, param in self.model.named_parameters():
+                top_level = name.split(".")[0]
+                if top_level in ("fc", "head", "classifier"):
+                    param.requires_grad = True
 
     def forward(self, x):
         return self.model(x)
