@@ -51,13 +51,19 @@ class _PooledIoU(_MetricBase):
     result does not depend on how the data is split into batches. As in
     ``TimmSegmentationModel._compute_iou``, a class that appears in neither
     the predictions nor the targets is left out of the mean.
+
+    Pixels whose target equals ``ignore_index`` are dropped from both the
+    predictions and the targets, so whatever the model predicts there is not
+    counted. An ``ignore_index`` inside ``[0, num_classes)`` is also left out
+    of the mean.
     """
 
     full_state_update = False
 
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, ignore_index: Optional[int] = None):
         super().__init__()
         self.num_classes = num_classes
+        self.ignore_index = ignore_index
         if hasattr(self, "add_state"):
             self.add_state(
                 "intersection",
@@ -80,13 +86,17 @@ class _PooledIoU(_MetricBase):
 
         Args:
             pred: Predicted class indices, any shape.
-            target: Target class indices, same shape as ``pred``. Values
-                outside ``[0, num_classes)`` (such as an ignore index) count
-                towards no class.
+            target: Target class indices, same shape as ``pred``. Pixels
+                equal to ``ignore_index`` are skipped. Other values outside
+                ``[0, num_classes)`` count towards no class.
         """
         n = self.num_classes
         pred = pred.flatten().long()
         target = target.flatten().long()
+        if self.ignore_index is not None:
+            keep = target != self.ignore_index
+            pred = pred[keep]
+            target = target[keep]
         pred_ok = (pred >= 0) & (pred < n)
         target_ok = (target >= 0) & (target < n)
         inter = torch.bincount(target[(pred == target) & target_ok], minlength=n)
@@ -97,9 +107,20 @@ class _PooledIoU(_MetricBase):
 
     def compute(self) -> torch.Tensor:
         present = self.union > 0
+        if self.ignore_index is not None and 0 <= self.ignore_index < self.num_classes:
+            present[self.ignore_index] = False
         if not present.any():
             return torch.tensor(0.0, device=self.union.device)
         return (self.intersection[present].float() / self.union[present].float()).mean()
+
+
+class _SafeCrossEntropyLoss(nn.CrossEntropyLoss):
+    """CrossEntropyLoss that returns 0 instead of NaN when all targets are ignored."""
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        if not target.is_floating_point() and not (target != self.ignore_index).any():
+            return (input * 0.0).sum()
+        return super().forward(input, target)
 
 
 class TimmSegmentationModel(_LightningBase):
@@ -122,6 +143,7 @@ class TimmSegmentationModel(_LightningBase):
         class_weights: Optional[torch.Tensor] = None,
         use_timm_model: bool = False,
         timm_model_name: Optional[str] = None,
+        ignore_index: Optional[int] = -100,
         **decoder_kwargs: Any,
     ):
         """
@@ -145,6 +167,12 @@ class TimmSegmentationModel(_LightningBase):
             timm_model_name (str, optional): Name or path of timm model from HF Hub
                 (e.g., 'hf-hub:timm/segformer_b0.ade_512x512' or 'nvidia/mit-b0').
                 Only used if use_timm_model=True.
+            ignore_index (int, optional): Mask value to ignore, such as 255 for
+                nodata. Ignored pixels are left out of the default
+                CrossEntropyLoss and of the IoU metrics; an ignore_index inside
+                [0, num_classes) is also left out of the mean IoU. A custom
+                loss_fn must handle it itself. None disables it. Defaults to
+                -100, PyTorch's default.
             **decoder_kwargs: Additional arguments for decoder (only used with SMP).
         """
         super().__init__()
@@ -217,20 +245,21 @@ class TimmSegmentationModel(_LightningBase):
             self._freeze_encoder()
 
         # Set up loss function
+        ce_kwargs = {} if ignore_index is None else {"ignore_index": ignore_index}
         if loss_fn is not None:
             self.loss_fn = loss_fn
         elif class_weights is not None:
-            self.loss_fn = nn.CrossEntropyLoss(weight=class_weights)
+            self.loss_fn = _SafeCrossEntropyLoss(weight=class_weights, **ce_kwargs)
         else:
-            self.loss_fn = nn.CrossEntropyLoss()
+            self.loss_fn = _SafeCrossEntropyLoss(**ce_kwargs)
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
 
         # IoU metrics pool intersections and unions over the whole epoch.
-        self.train_iou = _PooledIoU(num_classes)
-        self.val_iou = _PooledIoU(num_classes)
-        self.test_iou = _PooledIoU(num_classes)
+        self.train_iou = _PooledIoU(num_classes, ignore_index)
+        self.val_iou = _PooledIoU(num_classes, ignore_index)
+        self.test_iou = _PooledIoU(num_classes, ignore_index)
 
     def _freeze_encoder(self):
         """Freeze encoder weights."""
@@ -439,6 +468,7 @@ def train_timm_segmentation(
     checkpoint_path: Optional[str] = None,
     use_timm_model: bool = False,
     timm_model_name: Optional[str] = None,
+    ignore_index: Optional[int] = -100,
     **kwargs: Any,
 ) -> TimmSegmentationModel:
     """
@@ -475,6 +505,9 @@ def train_timm_segmentation(
         checkpoint_path (str, optional): Path to checkpoint to resume from.
         use_timm_model (bool): Load complete segmentation model from timm/HF Hub.
         timm_model_name (str, optional): Model name from HF Hub (e.g., 'hf-hub:nvidia/mit-b0').
+        ignore_index (int, optional): Mask value to ignore in the default loss
+            and the IoU metrics (e.g. 255 for nodata). None disables it.
+            Defaults to -100.
         **kwargs: Additional arguments for PyTorch Lightning Trainer.
 
     Returns:
@@ -509,6 +542,7 @@ def train_timm_segmentation(
         loss_fn=loss_fn,
         use_timm_model=use_timm_model,
         timm_model_name=timm_model_name,
+        ignore_index=ignore_index,
     )
 
     # Create data loaders
@@ -729,6 +763,7 @@ def train_timm_segmentation_model(
     timm_model_name: Optional[str] = None,
     train_transforms: Optional[Callable] = None,
     val_transforms: Optional[Callable] = None,
+    ignore_index: Optional[int] = -100,
     **kwargs: Any,
 ) -> torch.nn.Module:
     """
@@ -787,6 +822,9 @@ def train_timm_segmentation_model(
         val_transforms (callable, optional): Custom transforms for validation data.
             Same signature as train_transforms. If None, no augmentation is
             applied. Defaults to None.
+        ignore_index (int, optional): Mask value to ignore in the default loss
+            and the IoU metrics, e.g. 255 for nodata pixels. None disables it.
+            Defaults to -100.
         **kwargs: Additional arguments for training.
 
     Returns:
@@ -896,6 +934,7 @@ def train_timm_segmentation_model(
         save_top_k=save_top_k,
         use_timm_model=use_timm_model,
         timm_model_name=timm_model_name,
+        ignore_index=ignore_index,
         **kwargs,
     )
 
